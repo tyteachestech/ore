@@ -7515,6 +7515,30 @@ journey("review: editing an Explain card corrects a key point too; it's there wh
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: saving an edit to the question keeps an answer changed outside meanwhile (F-new-card-save-clobbers)", async (page) => {
+  await startReview(page, /Teaching/);
+  const entry = ((await ore("due")) as { id: string; question: string }[]).find((e) => e.question.startsWith("Explain why rereading"))!;
+  const show = async () => (await ore("card", "show", entry.id)) as { question: string; answer: string };
+  const original = await show();
+  await reveal(page);
+  await page.getByRole("button", { name: "Edit exercise" }).click();
+  const field = page.locator(".review textarea").first();
+  await until("the editor has the question", async () => (await field.inputValue()) === original.question);
+  await field.fill(`${original.question} (edited)`);
+  // The /ore skill (or the phone) rewrites the answer while the editor is open.
+  await ore("card", "set", entry.id, "--answer", "An answer written outside");
+  try {
+    await page.getByRole("button", { name: "Save" }).click();
+    await until("the question saved", async () => (await show()).question === `${original.question} (edited)`);
+    const now = await show();
+    if (now.answer !== "An answer written outside") throw new Error(`the outside answer was written over: ${now.answer}`);
+  } finally {
+    await ore("card", "set", entry.id, "--question", original.question, "--answer", original.answer);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  }
+});
+
 journey("review: retiring a card keeps ⌘Z for the ratings before it, and so does a retire that fails", async (page) => {
   await startReview(page, null);
   const q = page.locator(".review-q");
@@ -12284,6 +12308,31 @@ journey("source rename: pending Undo takes back the rename, not the source added
     await until("Redo renames it again", async () => (await ore("show", source.id) as { title: string }).title === `${title} renamed`);
   } finally {
     await release(page, "edit");
+    await ore("archive", source.id);
+  }
+});
+
+journey("source rename: ⌘Z leaves a title set outside since, and says so (F-new-rename-undo-clobbers)", async (page) => {
+  const title = `Source renamed twice ${Date.now()}`;
+  await page.reload();
+  await page.keyboard.press("Meta+n");
+  await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nRenamed in the app, then outside it.`);
+  await page.keyboard.press("Enter");
+  await page.getByRole("heading", { name: title, exact: true }).waitFor();
+  await until("the import has settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+  const source = (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === title)!;
+  const now = async () => (await ore("show", source.id) as { title: string }).title;
+  try {
+    await page.locator(".doc-head h1.renamable").click();
+    await page.locator(".doc-head .title-edit").fill(`${title} in the app`);
+    await page.keyboard.press("Enter");
+    await until("the rename saved", async () => (await now()) === `${title} in the app`);
+    await ore("edit", source.id, "--title", `${title} outside`);
+    await page.locator(".doc-body, .doc").first().click();
+    await page.keyboard.press("Meta+z");
+    await page.locator(".toast").filter({ hasText: "renamed since" }).waitFor();
+    if ((await now()) !== `${title} outside`) throw new Error(`Undo wrote over the outside title: ${await now()}`);
+  } finally {
     await ore("archive", source.id);
   }
 });

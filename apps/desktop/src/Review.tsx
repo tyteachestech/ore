@@ -879,10 +879,17 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
 
   /** A card's new wording, and an Explain card's key points when given, on the history: undo puts the old
    *  ones back (and on screen, if it still is). */
-  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true) => {
+  /** Only what changed from `from` is written, so a field edited outside meanwhile keeps its edit (F-new-card-save-clobbers). */
+  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true, from: { question: string; answer: string; rubric?: string[] } = c) => {
     const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric };
+    const changed = [
+      ...(question !== from.question ? [opt("question", question)] : []),
+      ...(answer !== from.answer ? [opt("answer", answer)] : []),
+      ...(rubric && rubric.join("\n") !== (from.rubric ?? c.rubric).join("\n") ? rubric.map((p) => opt("point", p)) : []),
+    ];
+    if (!changed.length) return;
     dropAhead();
-    const saved = await ore<CardFull>("card", "set", c.id, opt("question", question), opt("answer", answer), ...(rubric ?? []).map((p) => opt("point", p)), ...variantOpt(c));
+    const saved = await ore<CardFull>("card", "set", c.id, ...changed, ...variantOpt(c));
     const s = now.current;
     setCard((cur) => (cur?.id === c.id ? saved : cur));
     // New key points: the AI's grade was for the old ones, so it goes (and one still on its way). A point
@@ -904,8 +911,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       setDraft(loaded.current);
     }
     if (undoable) {
-      const put = (w: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false);
-      notify("Exercise edit", "quiet", put(was), put({ question, answer, rubric }));
+      const put = (w: typeof was, f: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false, f);
+      notify("Exercise edit", "quiet", put(was, { question, answer, rubric }), put({ question, answer, rubric }, was));
     }
   };
 

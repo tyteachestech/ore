@@ -2898,13 +2898,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     setDoc((cur) => cur && cur.id === id ? { ...cur, title: t } : cur);
     // On the history at once, so a quick ⌘Z takes it back (F156); taken off again if the write fails.
     const forget = undoable ? p.notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false)) : () => {};
+    let now = before;
     try {
-      await inOrder(id, () => ore("edit", id, "--title", t));
+      await inOrder(id, async () => {
+        // Undo or redo: a title set outside since (`ore edit`, the phone) is newer, and stays (F-new-rename-undo-clobbers).
+        if (!undoable && (now = (await ore<{ title: string }>("show", id)).title) !== before) throw new Error(`Left as “${now}”: it was renamed since`);
+        return ore("edit", id, "--title", t);
+      });
       p.onChanged();
       return true;
     } catch (e) {
       forget();
-      setDoc((cur) => cur && cur.id === id ? { ...cur, title: before } : cur);
+      setDoc((cur) => cur && cur.id === id ? { ...cur, title: now } : cur);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       p.notify(errorText(e), "error");
