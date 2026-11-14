@@ -126,6 +126,10 @@ export function Cutting({ go, still, size = 36, seam, polished }: { go: boolean;
 }
 
 /** The hover line for a skill's gems: what a cut gem is, the level, and the near goal. */
+/** The gem breakdown's word after each count (D276): what the stone is, short enough to sit
+ *  beside its number and never a noun, so "1 missed" and "214 missed" both read right. */
+export const GEM_WORD = { polished: "polished", mended: "won back", cut: "cut", ready: "nearly cut", dull: "missed", rough: "rough", empty: "new" } as const;
+
 export function gemHint(k: Pick<Strength, "solid" | "ready" | "ready_today" | "win_back">, levelLine: string): string {
   const parts = [`${k.solid} cut ${k.solid === 1 ? "gem" : "gems"}: things you'd still recall three weeks from now`, levelLine];
   if (k.ready) parts.push(`${k.ready} nearly cut: cut if you recall ${k.ready === 1 ? "it" : "them"} at the next review${k.ready_today ? ` (${k.ready_today} due today)` : ""}`);
