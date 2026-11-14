@@ -4,7 +4,7 @@ The promise (D122): everything people learn from comes in whole, as one `doc.md`
 
 **Where it holds.** Web articles, blogs, docs sites, Wikipedia, newsletters, tutorials, YouTube (transcript, chapters, description), playlists and course pages, Apple Podcasts and other episode pages, audio files, EPUB (chapters, images), Word, PowerPoint text, notebooks, subtitles, Markdown, screenshots and scanned PDFs (Vision), arXiv, GitHub, Google Docs and Slides, and signed-in pages through the browser tab. Junk (bot checks, sign-in walls, feeds, empty pages) is refused with the next step.
 
-**PDF tables, formulas, bold and footnotes:** built (D125). Bold, italic and footnotes come from pdf.js; tables and display formulas come from Docling, an optional download. Inline math is still plain text.
+**PDF tables, formulas, bold and footnotes:** built (D125). Bold, italic and footnotes come from pdf.js; tables and display formulas come from Docling, an optional download. Inline math is still plain text; Granite-Docling was tried and doesn't read it either (`docs/research/brief-pdf-inline-math.md`).
 
 ## Gaps, ranked
 

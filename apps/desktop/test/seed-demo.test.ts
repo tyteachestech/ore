@@ -14,7 +14,8 @@ for (const [name, now] of [["midday", clock(12, 30)], ["just after midnight", cl
 test(`the demo library is set up to film, seeded ${name}: the day nearly done, gems to cut, a level within reach`, async () => {
   const root = join(mkdtempSync(join(tmpdir(), "ore-demo-")), "lib");
   try {
-    await $`bun ${join(import.meta.dir, "../scripts/mock/seed-demo.ts")} ${root}`.env({ ...process.env, ORE_SEED_NOW: now.toISOString() }).quiet();
+    // In the test's own time zone: bun test runs in UTC, the seed it starts in the Mac's, and their days differ (F-new-seed-demo-tz).
+    await $`bun ${join(import.meta.dir, "../scripts/mock/seed-demo.ts")} ${root}`.env({ ...process.env, TZ: Intl.DateTimeFormat().resolvedOptions().timeZone, ORE_SEED_NOW: now.toISOString() }).quiet();
     const lib = { root };
     // It never writes over a library.
     expect((await $`bun ${join(import.meta.dir, "../scripts/mock/seed-demo.ts")} ${root}`.quiet().nothrow()).exitCode).not.toBe(0);
