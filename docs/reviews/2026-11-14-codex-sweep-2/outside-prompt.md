@@ -1,0 +1,12 @@
+Your name is `outside`. First read `codex-out/preamble.md` and follow it.
+
+PORTS
+
+## Your focus: the library changes under the app
+Ore's files are canonical (D5) and live in iCloud Drive (D222); the phone, Finder, a text editor, Claude Code (`skills/ore`) and the `ore` CLI all write the same folder. Read D5, D78 and D222 in `docs/DECISIONS.md` and `packages/core/src/templates/library-agents.md` first. With the Mac app open on your library, change the library from your shell (as another device or tool would) and see what the app does, when it notices, and whether anything is lost:
+1. **Edits while open.** Edit a source's `doc.md`, its note, an exercise's file and `skills.yaml` in a shell while that source, note, exercise or skill is on screen (and while you are typing in the note). Does the app pick it up, keep your typing, or overwrite the outside edit?
+2. **Moves and deletes.** Delete, rename or move a source's folder (and a skill) while it is open, while it is in the review queue, and while it is mid-review.
+3. **iCloud's own files.** Conflicted copies (`note 2.md`, `doc 2.md`, `skills 2.yaml`, `cards/<id> 2.md`), `.icloud` placeholders for a file not downloaded yet (`.doc.md.icloud`), Finder junk (`.DS_Store`, `Icon\r`), a half-written file (truncated mid-frontmatter), a zero-byte file. Is each one ignored, shown, or does it break a list or Review?
+4. **Broken files.** Malformed YAML frontmatter, a missing `id`, two sources with the same id, an exercise pointing at a source that is gone, a review log line that is not JSON, a log from another device (`reviews/<yyyy>-<mm>.<other>.jsonl`) rating the same exercise at the same time.
+5. **The CLI beside the app.** Run `ore` commands (add, rate, archive, rename: `ore --help`) on the same library while the app shows the thing they change, then use the app's Undo.
+A finding here is data lost, a crash or blank screen, a stale screen that misleads (rates an exercise that is gone, shows a deleted source), or a file the app writes that clobbers an outside change.

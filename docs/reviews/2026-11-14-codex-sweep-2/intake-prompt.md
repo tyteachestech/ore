@@ -1,0 +1,10 @@
+Your name is `intake`. First read `codex-out/preamble.md` and follow it.
+
+PORTS
+
+## Your focus: unusual things a learner adds
+Ore's core promise is that whatever someone learns from imports whole, as one `doc.md` (`CLAUDE.md` "Core promise", D96, D122). Known gaps are the `"gap:"` cells in `packages/core/test/intake-grid.test.ts` and `docs/reviews/2026-11-06-import-promise.md`: do not report those again. Add each item through the Mac app's Add (paste a link, drop or pick a file), then open the source and check its title, author, date, headings, images, tables, math, code and end against the original. Make the files yourself in your folder (scripts with Python, LibreOffice or pandoc if present, or download openly licensed ones).
+1. **Files.** An EPUB with no table of contents and one with footnotes; a scanned PDF with no text layer; a password-protected PDF; a PDF of slides; a 600-page PDF; a DOCX with footnotes, comments and tracked changes; a PPTX with speaker notes; a Jupyter notebook with images in its outputs; an RTF; a CSV; a `.webarchive`; an `.m4a` and an `.mp3` with chapters; a HEIC screenshot and a 10,000-px-tall PNG; a text file in Latin-1 and one in UTF-16; a zero-byte file; a file whose name has emoji, accents (NFD) and a slash-like character; a folder dropped instead of a file; two files dropped at once.
+2. **Links.** A paywalled news article; a Substack post; a Wikipedia page with math and tables; an arXiv abstract page (not the PDF); a GitHub README and a GitHub file; a direct PDF link; a link through redirects and tracking parameters; a YouTube Shorts link, a playlist link, a timestamped link; a podcast's Apple and Spotify page; a Google Docs share link; a link that is an image; a link pasted with spaces or inside text.
+3. **After.** Add the same thing twice (as a link and as a file); reimport; cancel mid-add; add while offline.
+A finding is a source that comes in broken, partial or with the wrong title or author, a page that is not the content saved anyway, a refusal that gives no next step (D96), or an add that hangs. Note the exact input so it can become a fixture.
