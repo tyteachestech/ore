@@ -225,7 +225,7 @@ test("traced: no dot of the helmet is alone a shade whiter than the dots round i
   for (const [x, y] of top) expect(top.some(([a, b]) => (a !== x || b !== y) && Math.hypot(a - x, b - y) < 1)).toBe(true);
 });
 
-test("waking from his sleep on the cart he is the front view from the first frame, never the sleeper stood on end (F104)", () => {
+test("waking from his sleep on the cart he is the front view from the first frame, never the sleeper stood on end (F-new-sleeper-on-end)", () => {
   const s = puppet();
   start(s, "doze", 0);
   for (let t = 16; t < 2000; t += 16) advance(s, t, 0.016);
