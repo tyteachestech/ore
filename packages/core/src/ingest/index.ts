@@ -279,6 +279,21 @@ export function decodeText(bytes: Uint8Array): string {
   }
 }
 
+/** A code file's extension and the language its fence names (GitHub links to code). */
+const CODE_EXT: Record<string, string> = { py: "python", js: "javascript", mjs: "javascript", ts: "typescript", tsx: "tsx", jsx: "jsx", rs: "rust", go: "go", c: "c", h: "c", cc: "cpp", cpp: "cpp", hpp: "cpp", java: "java", kt: "kotlin", swift: "swift", rb: "ruby", php: "php", cs: "csharp", sh: "bash", zsh: "bash", sql: "sql", r: "r", jl: "julia", lua: "lua", hs: "haskell", ml: "ocaml", ex: "elixir", scala: "scala", dart: "dart", m: "objectivec", toml: "toml", yaml: "yaml", yml: "yaml", json: "json", css: "css", scss: "scss", vue: "vue", svelte: "svelte", zig: "zig", nix: "nix", tex: "latex" };
+
+/** The file name a download gives itself (`content-disposition`), the UTF-8 form first. */
+export function downloadName(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const star = header.match(/filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/)?.[1];
+  if (star) {
+    try {
+      return decodeURIComponent(star.trim().replace(/^"|"$/g, ""));
+    } catch {}
+  }
+  return header.match(/filename\s*=\s*"([^"]+)"/)?.[1] ?? (header.match(/filename\s*=\s*([^;]+)/)?.[1]?.trim() || undefined);
+}
+
 /** What a file is from its name and, for a link, the server's content type; null when Ore can't read it. */
 function kindOf(name: string, ctype = ""): string | null {
   const ext = extname(name).slice(1).toLowerCase();
@@ -343,7 +358,8 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
     await res.body?.cancel();
     throw new Error(google);
   }
-  const urlName = decodeURIComponent(new URL(res.url || url).pathname.split("/").pop() || url);
+  // A download names itself (a Google Doc's export: "Study Guide.docx", F-new-google-doc-title); else the link's last part.
+  const urlName = downloadName(res.headers.get("content-disposition")) ?? decodeURIComponent(new URL(res.url || url).pathname.split("/").pop() || url);
   // Video is never read as a page: the whole file would download and parse as HTML. Audio is transcribed.
   if ((/^(audio|video)\//.test(ctype) || /\.(ogg|opus|mp4|mov|m4v|webm)$/i.test(urlName)) && !kindOf(urlName, ctype)) {
     await res.body?.cancel();
@@ -359,6 +375,14 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   const name = AUDIO_TYPES.includes(kind) ? decodeURIComponent(new URL(url).pathname.split("/").pop() || urlName) : urlName;
   const draft = await fromBytes(bytes, kind, name, url, res.url || rw?.url || url, opts);
   if (rw?.kind !== "fetch") return draft;
+  // A GitHub link to a code file is code: one fenced block, titled by its file name (F-new-github-code-file).
+  const lang = rw.base && draft.type === "markdown" ? CODE_EXT[extname(urlName).slice(1).toLowerCase()] : undefined;
+  if (lang !== undefined) {
+    const text = decodeText(bytes).replace(/\s+$/, "");
+    const fence = "`".repeat(Math.max(3, ...[...text.matchAll(/`{3,}/g)].map((m) => m[0].length + 1)));
+    const body = `${fence}${lang}\n${text}\n${fence}\n`;
+    return { ...draft, title: urlName, body, author: draft.author ?? rw.author, source: draft.source && { ...draft.source, data: body } };
+  }
   const body = rw.base && draft.type === "markdown" ? (await import("./links.ts")).absolutize(draft.body, rw.base) : draft.body;
   return { ...draft, body, author: draft.author ?? rw.author, source: draft.source && rw.base && draft.type === "markdown" ? { ...draft.source, data: body } : draft.source };
 }
