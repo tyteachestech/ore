@@ -60,12 +60,12 @@ a typed answer whose check fails: three unticked points and four ratings with no
   One user who reports bugs by pasting them: the raw line is the useful one.
 
 ## Tyler's picks (2026-11-14), built in the same PR
-1. Review names Retire in its key bar, and the memory line ends with "next in 1 month" (F130).
-2. What to review with its gem numbers in words: mocked for him on the Mac and the iPhone, and declined: words there are prone to overflowing. D249 stands, words on hover (F131).
-3. ⌘K lists an ambience channel only once he types (F132).
-4. iPhone Review: how sure he is and the ratings sit at the foot of the screen; what the last answer won stands above them (F133).
-5. End screen: the mole never says a number the row under the ring already shows (F134, Mac and iPhone).
-6. iPhone skill page: a question takes two lines (F135).
+1. Review names Retire in its key bar, and the memory line ends with "next in 1 month" (F-new-r7z130).
+2. What to review with its gem numbers in words: mocked for him on the Mac and the iPhone, and declined: words there are prone to overflowing. D249 stands, words on hover (F-new-r7z131).
+3. ⌘K lists an ambience channel only once he types (F-new-r7z132).
+4. iPhone Review: how sure he is and the ratings sit at the foot of the screen; what the last answer won stands above them (F-new-r7z133).
+5. End screen: the mole never says a number the row under the ring already shows (F-new-r7z134, Mac and iPhone).
+6. iPhone skill page: a question takes two lines (F-new-r7z135).
 
 The iPhone scored about 27/40 on thinner evidence, apart from the score above; its ⋯ sheet did not open under automation.
 
