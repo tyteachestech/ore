@@ -348,13 +348,14 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
 test("a rare line leads the mole's lines and wears its own mark (D247)", async () => {
   jest.useFakeTimers();
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
-  Object.assign(e.session, { depth_days: 41, rescued: 2 });
+  // The row under the ring shows the two pulled back, so the rare thing left for him to say is the long gap (F-new-r7-115).
+  Object.assign(e.session, { depth_days: 41, rescued: 2, longest_days: 18 });
   const s = await mount(e as never);
   await act(async () => void jest.advanceTimersByTime(560));
   const line = s.body.querySelector(".end-says .says-line")!;
-  expect(line.textContent).toBe("2 pulled back just before you’d have lost them.");
-  // The gold-rimmed gem, the drawing a won-back memory already has.
-  expect(line.querySelectorAll(".says-mark .gem").length).toBe(1);
+  expect(line.textContent).toBe("18 days gone and you still had it.");
+  // The clock, the drawing a long gap already has.
+  expect(line.querySelectorAll(".says-mark svg").length).toBe(1);
   jest.useRealTimers();
   await s.done();
 });
@@ -531,4 +532,39 @@ test("D258: then-and-now gets the curious pose on the mounted end screen, withou
   await act(async () => void jest.advanceTimersByTime(560));
   expect(s.body.querySelector(".review-mole .mole")?.getAttribute("data-mood")).toBe("curious");
   await s.done();
+
+// F-new-r7-115
+test("on the full end screen the mole never says a number the row under the ring already shows", async () => {
+  const { endSays, endTiles } = await import("../src/end-says");
+  const base = { today: today(true, 600_000) as never, closed: false, short: false, ups: [], minutesLeft: null, row: true };
+  const session = (o: Record<string, unknown>) => ({ id: "s", reviews: 8, kept: 5, rescued: 0, ...o }) as never;
+  // A long gap is the row's third number, so he gives his verdict instead of saying it again.
+  const gap = { ...base, session: session({ depth_days: 30, longest_days: 18 }) };
+  expect(endTiles(gap).map((t) => t.key)).toEqual(["kept", "depth", "long"]);
+  expect(endSays(gap)[0]!.text).toBe("Gneiss work.");
+  // The same for a new level and for memories pulled back, and never the days of memory.
+  expect(endSays({ ...base, closed: true, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ depth_days: 30 }) })[0]!.text).toBe("Goal met. You rock.");
+  expect(endSays({ ...base, session: session({ rescued: 2 }) }).map((l) => l.text)).toEqual(["Gneiss work."]);
+  // A rare thing the row has no room for is still his to say: the row shows the level, he says the gap.
+  expect(endSays({ ...base, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ longest_days: 18 }) })[0]!.text).toBe("18 days gone and you still had it.");
+  // Then and now is never in the row.
+  expect(endSays({ ...base, session: session({ longest_days: 18, then_now: { then_ts: new Date(Date.now() - 28 * 864e5).toISOString() } }) })[0]!.rare?.kind).toBe("then");
+});
+
+// F-new-r7-111
+test("the memory line ends by saying in words when the next review falls for the rating in hand", async () => {
+  const { Timeline } = await import("../src/Timeline");
+  const at = (days: number) => new Date(Date.now() + days * 864e5 + 6e4).toISOString();
+  const history = { reviews: [{ ts: at(-9), rating: 3 }], next: { 1: at(0), 2: at(4), 3: at(21), 4: at(40) } } as never;
+  const body = document.createElement("div");
+  document.body.appendChild(body);
+  const root = createRoot(body);
+  const said = async (rating: 1 | 2 | 3 | 4) => {
+    await act(async () => root.render(<TooltipProvider><Timeline history={history} rating={rating} /></TooltipProvider>));
+    const el = body.querySelector(".timeline-next")!;
+    return [el.textContent, el.getAttribute("aria-hidden")];
+  };
+  expect(await said(3)).toEqual(["next in 21 days", "true"]);
+  expect(await said(4)).toEqual(["next in 1 month", "true"]);
+  await act(async () => (root.unmount(), body.remove()));
 });

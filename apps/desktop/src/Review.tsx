@@ -1406,7 +1406,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
           </div>
         )}
       </div>
-      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} />}
+      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} draft={entry.state === "draft"} />}
     </div>
     </Trap>
   );
@@ -1425,7 +1425,7 @@ function nothingDue(t: Today | null, pick: string[] | null, source?: string): st
 
 /** The review footer: the keys for this step, Raycast's action bar (DESIGN.md). `suggested`: the rating ↵ gives,
  *  named in the bar as its button is (Again, Hard, Good or Easy); none, no ↵. */
-function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; kind: CardFull["kind"]; suggested?: number; variant: boolean; inHead: boolean }) {
+function KeyFoot({ phase, kind, suggested, variant, inHead, draft }: { phase: Phase; kind: CardFull["kind"]; suggested?: number; variant: boolean; inHead: boolean; draft: boolean }) {
   const map = useKeymap();
   const k = (id: KeyId) => label(map[id]);
   const rows: [string, string][] =
@@ -1436,7 +1436,7 @@ function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; ki
           ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
             [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
           : [["1 2 3", "How sure, then show"], [k("later"), "Later"], ["Esc", "Leave"]]
-        : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], ["Esc", "Leave"]];
+        : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], [k("retire-card"), draft ? "Delete" : "Retire"], ["Esc", "Leave"]];
   return (
     <div className="review-keys" aria-hidden="true">
       {rows.map(([key, what]) => (
@@ -1667,7 +1667,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const mark = (l: Said) => (!l.rare ? undefined : l.rare.kind === "level" ? <SkillIcon icon={skill(l.rare.skill)?.icon} color={skill(l.rare.skill)?.color} dot /> : l.rare.kind === "long" || l.rare.kind === "then" ? <Clock size={16} /> : <Gem kind="cut" size={16} seam />);
   const named = ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level }));
   const said = endSays({
-    session: s, today: t, closed, short, roll, ups: named, plain: quick, napped: nap,
+    session: s, today: t, closed, short, roll, ups: named, plain: quick, napped: nap, row: !quick,
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   }).map((l) => ({ ...l, mark: mark(l) }));
   const tiles = endTiles({ session: s, ups: named });

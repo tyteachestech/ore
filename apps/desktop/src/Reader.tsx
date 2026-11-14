@@ -3542,8 +3542,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                   </button>
                 </Hint>
                 {video && words && (
-                  <Hint text="Play the video from here" side="right">
-                    <button tabIndex={-1} className="intent icon extra" aria-label="Play the video from here" onClick={startHere}>
+                  <Hint text="Play from here" side="right">
+                    <button tabIndex={-1} className="intent icon extra" aria-label="Play from here" onClick={startHere}>
                       <Play size={14} aria-hidden="true" />
                     </button>
                   </Hint>

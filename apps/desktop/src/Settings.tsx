@@ -33,6 +33,8 @@ type Section = (typeof SECTIONS)[number]["id"];
 
 export const GOALS = [5, 10, 15, 20, 30];
 export const NEW = [0, 5, 10, 20];
+/** The choices for New exercises a day: the list, plus the library's own value when `ore goal` or a hand edit set one off it, so one is always shown picked. */
+export const newOptions = (now: number) => [...new Set([...NEW, now])].sort((a, b) => a - b);
 const VENDORS: { id: Vendor; label: string }[] = [
   { id: "claude", label: "Claude" },
   { id: "codex", label: "ChatGPT" },
@@ -329,7 +331,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                     <Seg
                       label="New exercises a day"
                       value={String(data.review.new_per_day)}
-                      options={NEW.map((m) => ({ id: String(m), label: String(m) }))}
+                      options={newOptions(data.review.new_per_day).map((m) => ({ id: String(m), label: String(m) }))}
                       onChange={(v) => void setGoal("new_per_day", "new-per-day", Number(v))}
                     />
                   </Row>

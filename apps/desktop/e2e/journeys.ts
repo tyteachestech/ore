@@ -400,6 +400,29 @@ journey("reader width: a recording's transcript keeps about the column an articl
   if (transcript < article - 20) throw new Error(`transcript column ${transcript}px, article ${article}px at the same window`);
 });
 
+// F-new-r7-106
+journey("highlight popup: on a recording, where Play takes a second column of tools, each type's name stays on one line", async (page) => {
+  await openSource(page, "Lecture 4");
+  await page.locator(".page.video").waitFor();
+  await select(page, "testing yourself");
+  // F-new-r7-107: a recording has no video, so its Play says only "Play from here".
+  await page.locator(".popup .popup-tools").getByRole("button", { name: "Play from here", exact: true }).waitFor();
+  const tall = await page.locator(".popup .intents .intent").evaluateAll((els) =>
+    els
+      .filter((el) => {
+        // The button keeps its height, so a wrapped name shows only as a second line of text.
+        const r = document.createRange();
+        r.selectNodeContents(el.lastChild!);
+        return new Set([...r.getClientRects()].map((c) => Math.round(c.top))).size > 1 || el.scrollWidth > el.clientWidth;
+      })
+      .map((el) => el.textContent),
+  );
+  // Leaves the recording with the highlights it came with: a later journey counts its ticks.
+  await page.locator(".popup").getByRole("button", { name: "Remove highlight" }).click();
+  await page.locator(".popup").waitFor({ state: "detached" });
+  if (tall.length) throw new Error(`wrapped or cut: ${tall.join(", ")}`);
+});
+
 journey("reader width: a line holds about 66 characters at any text size, in Charter or Geist (D207)", async (page) => {
   const para = "Spacing your practice over days instead of cramming it into one evening tends to produce memories that last longer, because each return to the material comes after some forgetting has begun, and the effort of pulling it back strengthens the trace more than an easy repeat would. ";
   await page.getByRole("button", { name: "+ Add" }).click();
@@ -8741,6 +8764,20 @@ journey("review: a card that fails to load offers Try again, focused, which load
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+// F-new-r7-113
+journey("⌘K opens without the ambience channels; typing one's name finds it (D254)", async (page) => {
+  await page.keyboard.press("Meta+KeyK");
+  const rows = page.locator("[cmdk-item]");
+  await rows.filter({ hasText: "Ambience…" }).waitFor();
+  const plays = await rows.filter({ hasText: /^Play / }).allInnerTexts();
+  if (plays.length) throw new Error(`⌘K opened on ${plays.join(", ")}`);
+  await page.keyboard.type("rain");
+  await rows.filter({ hasText: "Play Rain" }).waitFor();
+  await page.keyboard.press("Escape"); // clears what he typed
+  await page.keyboard.press("Escape");
+  await rows.first().waitFor({ state: "detached" });
+});
+
 journey("review: once an Explain exercise is checked, the key bar names the suggested rating (↵ Hard), as its button does", async (page) => {
   await page.route(/\/ore$/, async (route) => {
     if (!(route.request().postData() ?? "").includes('"grade",')) return route.fallback();
@@ -8759,6 +8796,8 @@ journey("review: once an Explain exercise is checked, the key bar names the sugg
     await until("the key bar says ↵ Hard", async () => /↵\s*Hard/.test(await keys.innerText())).catch(async () => {
       throw new Error(`the key bar reads: ${await keys.innerText()}`);
     });
+    // F-new-r7-111: Retire is a tool under the ratings like Ask, Edit and Later, so the bar names its key too.
+    if (!/⇧⌘⌫\s*Retire/.test(await keys.innerText())) throw new Error(`the key bar doesn't name Retire: ${await keys.innerText()}`);
   } finally {
     await page.unroute(/\/ore$/);
     await page.keyboard.press("Escape");
@@ -10107,6 +10146,53 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
     return w < 44 || h < 44 ? [`${e.getAttribute("aria-label") ?? e.textContent?.trim().slice(0, 20)} ${Math.round(w)}×${Math.round(h)}`] : [];
   }));
   if (small.length) throw new Error(`taps under 44 pt on the skill page: ${small.join(", ")}`);
+}, "phone");
+
+journey("phone: in Review the buttons he taps on every exercise sit at the foot of the screen, and what the last answer won stands above them (F-new-r7-114)", async (page) => {
+  // How sure he is, then the ratings, sat mid-screen with the bottom 40% empty: a reach for one thumb.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const foot = (sel: string) => page.locator(sel).evaluate((el) => Math.round(innerHeight - el.getBoundingClientRect().bottom));
+  let seen = 0;
+  for (let i = 0; i < 12 && seen < 2; i++) {
+    const sure = page.getByRole("radio", { name: "Think so" });
+    await sure.or(page.locator(".phone-full .review-end")).first().waitFor();
+    if (!(await sure.count())) break;
+    const typed = (await page.locator(".phone-full textarea:visible").count()) > 0;
+    if (!typed) {
+      // An exercise answered in his head: nothing under the question but the three buttons, at the foot.
+      const gap = await foot(".quiz-sure");
+      if (gap > 60) throw new Error(`How sure are you? ends ${gap}px above the foot of the screen`);
+      const moment = page.locator(".review-moment");
+      if (await moment.count()) {
+        const over = await moment.evaluate((m) => Math.round(m.getBoundingClientRect().bottom - document.querySelector("#review-sure")!.getBoundingClientRect().top));
+        if (over > 0) throw new Error(`what the last answer won covers the confidence buttons by ${over}px`);
+      }
+    }
+    if (typed) await tap(page, page.getByRole("button", { name: "No idea" }));
+    else await tap(page, sure);
+    const good = page.getByRole("button", { name: "Good", exact: true });
+    await good.waitFor();
+    const gap = await foot(".review-rate");
+    const tall = await page.locator(".review-body").evaluate((b) => b.scrollHeight > b.clientHeight + 1);
+    // A long answer scrolls and the ratings follow it; a short one leaves them at the foot.
+    if (!tall && gap > 60) throw new Error(`the ratings end ${gap}px above the foot of the screen`);
+    if (!typed) seen++;
+    await tap(page, good);
+  }
+  if (!seen) throw new Error("no exercise answered in his head came up");
+}, "phone");
+
+journey("phone: a long question on a skill page takes two lines before it cuts (F-new-r7-116)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
+  const note = page.locator(".phone-skill .question-quote .note").first();
+  await note.waitFor();
+  const lines = (text: string) => note.evaluate((el, text) => ((el.textContent = text), Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight))), text);
+  const two = await lines("Is a nap enough, or does it have to be a full night before it sticks?");
+  if (two !== 2) throw new Error(`a question a line and a half long shows on ${two} line(s)`);
+  const most = await lines("Is a nap enough, or does it have to be a full night before it sticks? ".repeat(4));
+  if (most !== 2) throw new Error(`a very long question shows on ${most} lines`);
 }, "phone");
 
 journey("phone: Review's confidence labels stay in their buttons at the largest text, and Open in source is a 44 pt tap (F100, F101)", async (page) => {

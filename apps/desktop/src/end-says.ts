@@ -11,13 +11,13 @@ export type Said = { text: string; hint?: string; verdict?: true; rare?: { kind:
 export const SAID_MAX = 3;
 
 /** What the mole says at a session's end (D243), three lines at most (D247). The full end screen has him say
- *  only the first, since its numbers stand in the row under the ring (`endTiles`); the quick quiz lists them all. The rare things
+ *  only the first, and never a number that stands in the row under the ring (`endTiles`, `row`); the quick quiz lists them all. The rare things
  *  lead, rarest first: a skill's new level, a long gap he recalled across, memories pulled back in time. Days
  *  of memory always has its place. What room is left goes to the everyday lines, in an order `roll` (0 to 1,
  *  one per end screen) shuffles: which true line shows varies, never whether something was won (D62). With
  *  nothing rare the verdict opens, and a session of misses always opens with why it was worth it (D62).
  *  His voice is an old miner's: short, dry, fond of a pun, and only ever what the numbers say, never about the person. */
-export function endSays(o: { session: SessionEnd; today: Today; closed: boolean; short: boolean; ups: { skill?: string; name: string; level: number }[]; minutesLeft: string | null; roll?: number; plain?: boolean; napped?: boolean }): Said[] {
+export function endSays(o: { session: SessionEnd; today: Today; closed: boolean; short: boolean; ups: { skill?: string; name: string; level: number }[]; minutesLeft: string | null; roll?: number; plain?: boolean; napped?: boolean; row?: boolean }): Said[] {
   const s = o.session;
   // His verdict is a corny mining pun (Tyler, 2026-11-13), one of a few per case so it isn't the same every day.
   // `plain`: the quick quiz has no mole, so its one verdict (a session of misses) stays in plain words.
@@ -33,6 +33,13 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   const depth: Said[] = (s.depth_days ?? 0) > 0
     ? [{ text: `+${depthText(s.depth_days!)} of memory${extraText(s.depth_days!, extra)}. You dug that.`, hint: `How much longer the exercises you passed today will now last, added up (at most 30 days each)${extraText(s.depth_days!, extra) ? "; extra is what came after today’s goal" : ""}` }]
     : [];
+  // `row` (the full end screen, F-new-r7-115): its numbers stand in the row under the ring, so he never says one of them
+  // again. He keeps a rare thing the row had no room for, and then and now, which is never a number there.
+  if (o.row) {
+    const shown = new Set<string>(endTiles(o).map((t) => t.key));
+    rare.splice(0, rare.length, ...rare.filter((l) => !shown.has(l.rare!.kind)));
+    depth.length = 0;
+  }
   const common: Said[] = o.minutesLeft ? [{ text: `${o.minutesLeft} min to today’s goal. Your call.` }] : [];
   // The verdict opens unless something rare does; then it is one more everyday line.
   const opens = rare.length && s.kept > 0 ? [] : [verdict];
