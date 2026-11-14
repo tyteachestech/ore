@@ -547,7 +547,7 @@ function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }:
         {more}
       </span>
       <Hint text={k ? gemHint(k, p.line) : p.line}>
-        <span className="home-level">
+        <span className="home-level" role="img" aria-label={k ? gemHint(k, p.line) : p.line} tabIndex={0}>
           {k ? (
             <>
               <GemRing k={k} size={26} />

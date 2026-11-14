@@ -85,7 +85,7 @@ const PLACEHOLDER: Record<Intent, string> = {
 // That also drops the `<!-- page N -->` / `<!-- chapter N -->` markers. Links open in the browser.
 // Math is `$$…$$` only (intake writes inline TeX that way), so a price's `$` never reads as math.
 const remarkPlugins = [remarkGfm, [remarkMath, { singleDollarTextMath: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["remarkPlugins"]>;
-const rehypePlugins = [[rehypeKatex, { output: "html", throwOnError: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
+const rehypePlugins = [[rehypeKatex, { output: "htmlAndMathml", throwOnError: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
 // A click on a link is handled by the reader (`followLink`). Footnotes (`footnotes` in text.ts) keep
 // their "^" in the text for the index, drawn as a small raised number.
 const caret = (children: ReactNode) => (typeof children === "string" && children.startsWith("^") ? <><span className="fn-caret">^</span>{children.slice(1)}</> : children);
@@ -457,7 +457,7 @@ function ColumnHead({ children, style }: { children?: ReactNode; style?: CSSProp
       {cols && (
         <Hint text={on ? "Show this column" : "Cover this column to test yourself"}>
           <button className="col-cover" data-noindex="" aria-label={on ? "Show this column" : "Cover this column"} aria-pressed={on} onClick={() => cols.toggle(i)}>
-            {on ? <Eye size={14} /> : <EyeSlash size={14} />}
+            {on ? <Eye size={14} aria-hidden="true" /> : <EyeSlash size={14} aria-hidden="true" />}
           </button>
         </Hint>
       )}
@@ -3208,7 +3208,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   return (
     <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && panelShown ? " noting" : ""}${barsHidden && !find.open ? " bars-hidden" : ""}`} ref={readerRef}>
-      <div className={`reader-pane${hidden ? " hidden-src" : ""}`} aria-hidden={hidden || undefined}>
+      <div className={`reader-pane${hidden ? " hidden-src" : ""}`}>
       {/* Learn this's Read now (D97): back to the passage he left, as Books offers after following a link. ⌘[ too. */}
       {p.back && !closedBook && (
         <Hint text="Back to the passage you left" keys="nav-back" side="top">
@@ -3250,7 +3250,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           {!PHONE && (
             <Hint text={hideSource ? "Show the source" : "Hide the source while you write"} keys="hide-source">
               <button className={`width-toggle${hideSource ? " on" : ""}`} aria-label={hideSource ? "Show the source" : "Hide the source"} aria-pressed={hideSource} onClick={toggleHide}>
-                {hideSource ? <EyeSlash size={16} /> : <Eye size={16} />}
+                {hideSource ? <EyeSlash size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
               </button>
             </Hint>
           )}
@@ -3310,7 +3310,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         </div>
       )}
       <HideDots hidden={hidden} box={scrollRef} page={pageRef} />
-      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
+      {/* Only the words hide (F118): the toolbar above them, with Show the source, stays in reach of VoiceOver. */}
+      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} aria-hidden={hidden || undefined} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} {...(PHONE ? { onTouchStart, onTouchMove, onTouchEnd } : {})} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
             {/* A book's cover or a PDF's first page at the top (D77): the picture is the source. A page's

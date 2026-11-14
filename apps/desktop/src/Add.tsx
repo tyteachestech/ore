@@ -173,6 +173,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
           ref={ref}
           className="panel-input add-input"
           aria-label="Link, file path or text"
+          aria-describedby={error ? "add-error" : undefined}
           value={value}
           readOnly={busy}
           rows={1}
@@ -221,7 +222,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
         />
         {offer && <Copied entry={offer} onAdd={() => void submit([offer])} />}
         <div className="panel-foot">
-          {busy ? <span><Working label="Adding…" /></span> : error ? <span className="err">{error}</span> : isFeed ? (
+          {busy ? <span><Working label="Adding…" /></span> : error ? <span id="add-error" className="err" role="alert">{error}</span> : isFeed ? (
             <span className="add-kind">
               <Rss size={14} aria-hidden="true" />
               Feed · {feed!.title} · {feedProof(feed!)}

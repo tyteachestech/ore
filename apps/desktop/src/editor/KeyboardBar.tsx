@@ -27,6 +27,9 @@ const TABLE: [TableEdit, string][] = [
 ];
 
 /** Fades the bar's right edge while more buttons sit past it. */
+/** Sent by the note editor (`barWatch`) after its selection or text changes (F52). */
+export const EDITOR_UPDATE = "ore:editor-update";
+
 const more = (el: HTMLElement | null) => void el?.toggleAttribute("data-more", el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
 
 /** The iPhone's bar over the keyboard while he writes a note (Notion, Bear): + opens the / menu,
@@ -51,7 +54,9 @@ export function KeyboardBar({ view, targets, onPicture }: { view: () => EditorVi
     document.addEventListener("focusin", check);
     document.addEventListener("focusout", check);
     document.addEventListener("selectionchange", check);
+    document.addEventListener(EDITOR_UPDATE, check);
     return () => {
+      document.removeEventListener(EDITOR_UPDATE, check);
       document.removeEventListener("focusin", check);
       document.removeEventListener("focusout", check);
       document.removeEventListener("selectionchange", check);
