@@ -367,13 +367,15 @@ export async function htmlToDoc(html: string, url: string, min = 200): Promise<W
     wikiMath(document as unknown as Document);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document);
+    // A byline only in the head's `<link rel="author" content="…">` (jaykmody.com), which Defuddle doesn't read (F162).
+    const linked = document.querySelector('link[rel~="author"][content]')?.getAttribute("content") ?? undefined;
     // linkedom's window is the real one where there is one (the iPhone's web view), and its
     // getComputedStyle throws on a parsed element: without a window Defuddle reads styles as it does on the Mac.
     Object.defineProperty(document, "defaultView", { value: null });
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
     const markdown = inlineMath(htmlTables(r.content.trim()));
     if (markdown.length > min) {
-      return { title: siteless(r.title, h1) || url, author: paper ?? poster ?? cleanAuthor(r.author), published: cleanDate(r.published), markdown: markdown + "\n" };
+      return { title: siteless(r.title, h1) || url, author: paper ?? poster ?? cleanAuthor(r.author) ?? cleanAuthor(linked), published: cleanDate(r.published), markdown: markdown + "\n" };
     }
   } catch {
     // fall through to Readability
