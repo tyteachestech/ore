@@ -211,6 +211,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const before = useRef<Today | null>(null);
   /** Today as the session started, for the quick quiz's ring. */
   const [start, setStart] = useState<Today | null>(null);
+  /** The local day `before` was read on. */
+  const beforeDay = useRef("");
   /** The ratings of this session, newest last, to take back with ⌘Z one after another (Anki's Undo): each
    *  review's ts and the session as it was before it. */
   const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget }[]>([]);
@@ -259,6 +261,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         }
         const t = ore<Today>("today").then((t) => {
           before.current = t;
+          beforeDay.current = new Date().toLocaleDateString("sv");
           setStart(t);
         }, () => {});
         // --start: a session opens on a likely recall (D176); the quick quiz asks the card that is next.
@@ -601,7 +604,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     setBusy(true);
     let goalClosed = false, saved = false;
     try {
-      const elapsed = Date.now() - shownAt.current;
+      // A wall clock set back since it showed (a time zone fix, a sync) never makes it negative (F-new-clock-back).
+      const elapsed = Math.max(0, Date.now() - shownAt.current);
       await sessionReady.current;
       const args = [
         card.id,
@@ -619,6 +623,18 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       // An everyday rating leaves a moment still showing to run its time.
       if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
+      // Past midnight the day's minutes start again: read the new day's Today, as if it was read just before this
+      // rating, so the goal and the ring count today's minutes, not yesterday's plus these (F-new-goal-midnight).
+      if (before.current && new Date().toLocaleDateString("sv") !== beforeDay.current) {
+        const t = await ore<Today>("today").catch(() => null);
+        if (t) {
+          const add = Math.min(elapsed, ACTIVE_CAP_MS, t.active_ms);
+          before.current = { ...t, active_ms: t.active_ms - add, met: t.active_ms - add >= t.goal_ms };
+          beforeDay.current = new Date().toLocaleDateString("sv");
+          setStart(before.current);
+          activeMs.current = add;
+        }
+      }
       // The day's goal closing (D65) is told by the mole; the session flows on (D246).
       const b = before.current;
       goalClosed = !!b && b.counts && !b.met && b.active_ms + activeMs.current >= b.goal_ms;
@@ -728,7 +744,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   /** What he has on screen, for ⌘Z after a Later. An Explain answer still being checked comes back to check
    *  again (that grade is dropped as it moves on), with what he typed and how sure he was. */
   const shownNow = (c: CardFull): Shown => {
-    const base = { card: c, answer, conf, elapsed: Date.now() - shownAt.current };
+    const base = { card: c, answer, conf, elapsed: Math.max(0, Date.now() - shownAt.current) };
     if (phase !== "checked" || (c.kind === "prompt" && !inHead && !marks && !gradeError))
       return { ...base, phase: "answer", inHead: false, grade: null, marks: null, remark: false, gradeError: null, passage: null, quoteAt: 0, passageGone: null, asking: false };
     // Ask open (D192): it comes back open, its chat kept as closing and opening it keeps it.

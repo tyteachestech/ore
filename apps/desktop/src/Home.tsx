@@ -15,7 +15,7 @@ import { archivedOnly, SkillChips, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
 import { Thumb } from "./Thumb";
 import { Roll } from "./Roll";
-import { count, errorText, load, typedLast, useKeptScroll, useLibraryChanges, type Notify } from "./util";
+import { count, errorText, load, typedLast, useKeptScroll, useDay, useLibraryChanges, type Notify } from "./util";
 import { focusQuietly } from "./focus-near";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
 import { RowSensor } from "./drag";
@@ -132,7 +132,9 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
     );
   }, []);
   const changes = useLibraryChanges();
-  useEffect(refresh, [refresh, reload, changes]);
+  // A new day after midnight: the minutes start again and what is due grows, without a reload.
+  const day = useDay();
+  useEffect(refresh, [refresh, reload, changes, day]);
 
   const [picking, setPicking] = useState(false);
   /** Start review shows once the skill list has loaded too: a click before it would start every skill unasked. */

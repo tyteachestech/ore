@@ -11029,6 +11029,89 @@ journey("phone: ⌘Z on a rating after leaving Review puts Today's minutes back 
   await until("Today takes the undone rating back", async () => (await ring.getAttribute("aria-label")) === before, 5000);
 }, "phone");
 
+journey("phone: Today starts the new day at midnight without a reload (F-new-home-midnight)", async (page) => {
+  // Left open overnight, Home kept yesterday's minutes (and "All caught up" with no Start review) until a reload.
+  const late = new Date();
+  late.setHours(23, 50, 0, 0);
+  await page.clock.install({ time: late });
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  const ring = page.locator(".home-goal [aria-label$='minutes today']").first();
+  await ring.waitFor();
+  const before = await ring.getAttribute("aria-label");
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  await sure.waitFor();
+  await page.clock.fastForward("03:00");
+  const field = page.locator(".phone-full textarea:visible");
+  if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+  await tap(page, sure);
+  const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+  if (await check.count()) await tap(page, check);
+  await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+  for (let i = 0; i < 3 && (await page.locator(".phone-full .review").count()); i++) {
+    await tap(page, page.getByRole("button", { name: "Leave review" }));
+    await page.waitForTimeout(400);
+  }
+  await until("Review is closed", async () => !(await page.locator(".phone-full .review").count()));
+  await until("Today counts the rating", async () => (await ring.getAttribute("aria-label")) !== before);
+  // Past midnight, with the app still open: the new day's minutes start from none.
+  await page.clock.fastForward("09:00:00");
+  await until("Today shows the new day", async () => (await ring.getAttribute("aria-label")) === before, 5000);
+}, "phone");
+
+journey("phone: a rating still saves after the clock is set back (F-new-clock-back)", async (page) => {
+  // The time on an exercise came out negative, core refused it ("elapsed_ms: Too small"), and nothing saved.
+  await page.clock.install({ time: new Date("2027-03-12T20:00:00Z") });
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const rate = async () => {
+    const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+    await sure.waitFor();
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+  };
+  await rate();
+  await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).waitFor();
+  await page.clock.setSystemTime(new Date("2027-03-11T20:01:00Z"));
+  await rate();
+  await page.waitForTimeout(800);
+  const failed = await page.locator(".toast").filter({ hasText: /elapsed|Couldn/ }).count();
+  if (failed) throw new Error(`the rating after the clock went back failed: ${await page.locator(".toast").first().innerText()}`);
+}, "phone");
+
+journey("phone: a session across midnight counts only the new day's minutes toward its goal (F-new-goal-midnight)", async (page) => {
+  // 4 minutes before midnight and 6 after said "Goal met" on a 10-minute goal: yesterday's were added in.
+  const late = new Date();
+  late.setHours(23, 55, 0, 0);
+  await page.clock.install({ time: late });
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  for (const wait of ["02:00", "02:00", "03:00", "03:00"]) {
+    const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+    await sure.waitFor();
+    await page.clock.fastForward(wait);
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+    await page.waitForTimeout(600);
+  }
+  await page.waitForTimeout(1500);
+  if (await page.getByText("Goal met").count()) throw new Error("the goal was said met with 6 of today's 10 minutes");
+}, "phone");
+
 journey("phone: a source added on the phone and a new skill each take ⌘Z (F160)", async (page) => {
   const words = "Spacing out practice sessions makes what is learned last longer than cramming it into one sitting. ".repeat(12);
   const article = `<html><head><title>Spacing on the phone</title></head><body><article><h1>Spacing on the phone</h1>${`<p>${words}</p>`.repeat(3)}</article></body></html>`;

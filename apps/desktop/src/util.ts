@@ -340,6 +340,21 @@ export function singleFlight<T>(run: () => Promise<T>): () => Promise<T> {
   return () => (going ??= run().finally(() => (going = null)));
 }
 
+/** Today's local date ("2026-11-14"): changes when midnight passes, checked every 30 s and when the window comes
+ *  back, so a screen left open overnight (Home's Today) reads the new day instead of keeping yesterday's (F-new-home-midnight). */
+export function useDay(): string {
+  const key = () => new Date().toLocaleDateString("sv");
+  const [day, setDay] = useState(key);
+  useEffect(() => {
+    const check = () => setDay(key());
+    const every = setInterval(check, 30_000);
+    addEventListener("focus", check);
+    document.addEventListener("visibilitychange", check);
+    return () => (clearInterval(every), removeEventListener("focus", check), document.removeEventListener("visibilitychange", check));
+  }, []);
+  return day;
+}
+
 /** Changes when a step made before this screen opened lands: a dependency of the effect that loads its data. */
 export function useLibraryChanges(): number {
   const [n, setN] = useState(0);
