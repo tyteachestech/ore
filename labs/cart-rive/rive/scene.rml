@@ -1,5 +1,5 @@
 <Rive version="1" kind="fragment">
-<Artboard name="CartEnding" id="0:472" width="1280" height="800" defaultStateMachineId="0:471" viewModelId="0:322" styleId="0:473">
+<Artboard name="CartEnding" id="0:472" width="1280" height="800" defaultStateMachineId="0:471" viewModelId="0:325" styleId="0:473">
 <LayoutComponentStyle name="Artboard Style" id="0:473"/>
 <StateMachine name="Cart ending" id="0:471">
 <StateMachineLayer name="Scene">
@@ -13,7 +13,7 @@
 <TransitionViewModelCondition opValue="lessThanOrEqual">
 <TransitionPropertyViewModelComparator>
 <BindablePropertyNumber>
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="636"/>
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="636"/>
 </BindablePropertyNumber>
 </TransitionPropertyViewModelComparator>
 <TransitionValueNumberComparator value="6"/>
@@ -23,7 +23,7 @@
 <TransitionViewModelCondition opValue="greaterThan">
 <TransitionPropertyViewModelComparator>
 <BindablePropertyNumber>
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="636"/>
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="636"/>
 </BindablePropertyNumber>
 </TransitionPropertyViewModelComparator>
 <TransitionValueNumberComparator value="6"/>
@@ -31,7 +31,7 @@
 <TransitionViewModelCondition opValue="lessThanOrEqual">
 <TransitionPropertyViewModelComparator>
 <BindablePropertyNumber>
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="636"/>
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="636"/>
 </BindablePropertyNumber>
 </TransitionPropertyViewModelComparator>
 <TransitionValueNumberComparator value="12"/>
@@ -41,7 +41,7 @@
 <TransitionViewModelCondition opValue="greaterThan">
 <TransitionPropertyViewModelComparator>
 <BindablePropertyNumber>
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="636"/>
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="636"/>
 </BindablePropertyNumber>
 </TransitionPropertyViewModelComparator>
 <TransitionValueNumberComparator value="12"/>
@@ -49,7 +49,7 @@
 <TransitionViewModelCondition opValue="lessThanOrEqual">
 <TransitionPropertyViewModelComparator>
 <BindablePropertyNumber>
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="636"/>
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="636"/>
 </BindablePropertyNumber>
 </TransitionPropertyViewModelComparator>
 <TransitionValueNumberComparator value="18"/>
@@ -59,7 +59,7 @@
 <TransitionViewModelCondition opValue="greaterThan">
 <TransitionPropertyViewModelComparator>
 <BindablePropertyNumber>
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="636"/>
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="636"/>
 </BindablePropertyNumber>
 </TransitionPropertyViewModelComparator>
 <TransitionValueNumberComparator value="18"/>
@@ -67,7 +67,7 @@
 <TransitionViewModelCondition opValue="lessThanOrEqual">
 <TransitionPropertyViewModelComparator>
 <BindablePropertyNumber>
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="636"/>
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="636"/>
 </BindablePropertyNumber>
 </TransitionPropertyViewModelComparator>
 <TransitionValueNumberComparator value="24"/>
@@ -77,7 +77,7 @@
 <TransitionViewModelCondition opValue="greaterThan">
 <TransitionPropertyViewModelComparator>
 <BindablePropertyNumber>
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="636"/>
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="636"/>
 </BindablePropertyNumber>
 </TransitionPropertyViewModelComparator>
 <TransitionValueNumberComparator value="24"/>
@@ -99,13 +99,13 @@
 <AnimationState id="0:470" animationId="0:140" speed="0.6438" x="360" y="320">
 <StateTransition stateToId="0:461" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
 </AnimationState>
-<AnimationState id="0:461" animationId="0:141" x="560" y="0">
+<AnimationState id="0:461" animationId="0:144" x="560" y="0">
 <StateTransition stateToId="0:462" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
 </AnimationState>
-<AnimationState id="0:462" animationId="0:153" x="760" y="0">
+<AnimationState id="0:462" animationId="0:156" x="760" y="0">
 <StateTransition stateToId="0:463" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
 </AnimationState>
-<AnimationState id="0:463" animationId="0:194" x="960" y="0"/>
+<AnimationState id="0:463" animationId="0:197" x="960" y="0"/>
 </StateMachineLayer>
 <StateMachineLayer name="Ore">
 <AnyState x="0" y="380"/>
@@ -113,19 +113,19 @@
 <EntryState x="0" y="500">
 <StateTransition stateToId="0:464"/>
 </EntryState>
-<AnimationState id="0:464" animationId="0:195" x="160" y="500">
+<AnimationState id="0:464" animationId="0:198" x="160" y="500">
 <StateTransition stateToId="0:465" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
 </AnimationState>
-<AnimationState id="0:465" animationId="0:196" x="360" y="500"/>
+<AnimationState id="0:465" animationId="0:199" x="360" y="500"/>
 </StateMachineLayer>
 </StateMachine>
-<Event name="land" id="0:201"/>
-<Event name="stoneLand" id="0:146"/>
-<Event name="knock" id="0:164"/>
-<Event name="settled" id="0:192"/>
-<Event name="speak" id="0:193"/>
+<Event name="land" id="0:204"/>
+<Event name="stoneLand" id="0:149"/>
+<Event name="knock" id="0:167"/>
+<Event name="settled" id="0:195"/>
+<Event name="speak" id="0:196"/>
 <Node name="Scene" scaleX="1" scaleY="1">
-<Node name="Bang" id="0:191" x="676" y="175.85" rotation="0.08" opacity="0">
+<Node name="Bang" id="0:194" x="676" y="175.85" rotation="0.08" opacity="0">
 <Shape name="bang F5F6F7">
 <Ellipse x="0" y="-13.6" width="2.5" height="2.5"/>
 <Ellipse x="0" y="-10.2" width="2.5" height="2.5"/>
@@ -136,7 +136,7 @@
 </Shape>
 </Node>
 <Node name="Bubble" x="0" y="0">
-<TranslationConstraint targetId="0:455"/>
+<TranslationConstraint targetId="0:458"/>
 <Node name="Bubble show" id="0:115" opacity="0">
 <Node name="Bubble grow" id="0:119">
 <Shape name="bubble F5F6F7">
@@ -170,208 +170,217 @@
 </Node>
 </Node>
 <Node name="Zs" id="0:114" x="0" y="0">
-<TranslationConstraint targetId="0:454"/>
+<TranslationConstraint targetId="0:457"/>
 <Node name="Z0" id="0:127" opacity="0">
 <Shape name="z DCDDDE">
-<Ellipse x="-3.4" y="-3.4" width="2.7" height="2.7"/>
-<Ellipse x="0" y="-3.4" width="2.7" height="2.7"/>
-<Ellipse x="3.4" y="-3.4" width="2.7" height="2.7"/>
-<Ellipse x="0" y="0" width="2.7" height="2.7"/>
-<Ellipse x="-3.4" y="3.4" width="2.7" height="2.7"/>
-<Ellipse x="0" y="3.4" width="2.7" height="2.7"/>
-<Ellipse x="3.4" y="3.4" width="2.7" height="2.7"/>
+<Ellipse x="-4.35" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="-1.45" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="1.45" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="4.35" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="1.45" y="-1.45" width="2.4" height="2.4"/>
+<Ellipse x="-1.45" y="1.45" width="2.4" height="2.4"/>
+<Ellipse x="-4.35" y="4.35" width="2.4" height="2.4"/>
+<Ellipse x="-1.45" y="4.35" width="2.4" height="2.4"/>
+<Ellipse x="1.45" y="4.35" width="2.4" height="2.4"/>
+<Ellipse x="4.35" y="4.35" width="2.4" height="2.4"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
 <Node name="Z1" id="0:128" opacity="0">
 <Shape name="z DCDDDE">
-<Ellipse x="-3.4" y="-3.4" width="2.7" height="2.7"/>
-<Ellipse x="0" y="-3.4" width="2.7" height="2.7"/>
-<Ellipse x="3.4" y="-3.4" width="2.7" height="2.7"/>
-<Ellipse x="0" y="0" width="2.7" height="2.7"/>
-<Ellipse x="-3.4" y="3.4" width="2.7" height="2.7"/>
-<Ellipse x="0" y="3.4" width="2.7" height="2.7"/>
-<Ellipse x="3.4" y="3.4" width="2.7" height="2.7"/>
+<Ellipse x="-4.35" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="-1.45" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="1.45" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="4.35" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="1.45" y="-1.45" width="2.4" height="2.4"/>
+<Ellipse x="-1.45" y="1.45" width="2.4" height="2.4"/>
+<Ellipse x="-4.35" y="4.35" width="2.4" height="2.4"/>
+<Ellipse x="-1.45" y="4.35" width="2.4" height="2.4"/>
+<Ellipse x="1.45" y="4.35" width="2.4" height="2.4"/>
+<Ellipse x="4.35" y="4.35" width="2.4" height="2.4"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
 <Node name="Z2" id="0:129" opacity="0">
 <Shape name="z DCDDDE">
-<Ellipse x="-3.4" y="-3.4" width="2.7" height="2.7"/>
-<Ellipse x="0" y="-3.4" width="2.7" height="2.7"/>
-<Ellipse x="3.4" y="-3.4" width="2.7" height="2.7"/>
-<Ellipse x="0" y="0" width="2.7" height="2.7"/>
-<Ellipse x="-3.4" y="3.4" width="2.7" height="2.7"/>
-<Ellipse x="0" y="3.4" width="2.7" height="2.7"/>
-<Ellipse x="3.4" y="3.4" width="2.7" height="2.7"/>
+<Ellipse x="-4.35" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="-1.45" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="1.45" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="4.35" y="-4.35" width="2.4" height="2.4"/>
+<Ellipse x="1.45" y="-1.45" width="2.4" height="2.4"/>
+<Ellipse x="-1.45" y="1.45" width="2.4" height="2.4"/>
+<Ellipse x="-4.35" y="4.35" width="2.4" height="2.4"/>
+<Ellipse x="-1.45" y="4.35" width="2.4" height="2.4"/>
+<Ellipse x="1.45" y="4.35" width="2.4" height="2.4"/>
+<Ellipse x="4.35" y="4.35" width="2.4" height="2.4"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
 </Node>
-<Node name="Crumb 0" id="0:154" x="668.29" y="191.73" opacity="0">
+<Node name="Crumb 0" id="0:157" x="668.29" y="191.73" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="1.8" height="1.8"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 1" id="0:155" x="660.32" y="197.75" opacity="0">
+<Node name="Crumb 1" id="0:158" x="660.32" y="197.75" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="1.8" height="1.8"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 2" id="0:156" x="651.1" y="193.86" opacity="0">
+<Node name="Crumb 2" id="0:159" x="651.1" y="193.86" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="1.8" height="1.8"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 3" id="0:157" x="649.87" y="183.94" opacity="0">
+<Node name="Crumb 3" id="0:160" x="649.87" y="183.94" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="1.8" height="1.8"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 4" id="0:158" x="657.85" y="177.91" opacity="0">
+<Node name="Crumb 4" id="0:161" x="657.85" y="177.91" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="1.8" height="1.8"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 5" id="0:159" x="667.06" y="181.8" opacity="0">
+<Node name="Crumb 5" id="0:162" x="667.06" y="181.8" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="1.8" height="1.8"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 6" id="0:165" x="616" y="255.85" opacity="0">
+<Node name="Crumb 6" id="0:168" x="616" y="255.85" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="6" height="6"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 7" id="0:166" x="616" y="255.85" opacity="0">
+<Node name="Crumb 7" id="0:169" x="616" y="255.85" opacity="0">
 <Shape name="crumb A9AAAC">
 <Ellipse x="0" y="0" width="8" height="8"/>
 <Fill><SolidColor colorValue="FFA9AAAC"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 8" id="0:167" x="616" y="255.85" opacity="0">
+<Node name="Crumb 8" id="0:170" x="616" y="255.85" opacity="0">
 <Shape name="crumb A9AAAC">
 <Ellipse x="0" y="0" width="6" height="6"/>
 <Fill><SolidColor colorValue="FFA9AAAC"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 9" id="0:168" x="616" y="255.85" opacity="0">
+<Node name="Crumb 9" id="0:171" x="616" y="255.85" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="9" height="9"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 10" id="0:169" x="616" y="255.85" opacity="0">
+<Node name="Crumb 10" id="0:172" x="616" y="255.85" opacity="0">
 <Shape name="crumb A9AAAC">
 <Ellipse x="0" y="0" width="7" height="7"/>
 <Fill><SolidColor colorValue="FFA9AAAC"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 11" id="0:170" x="664" y="255.85" opacity="0">
+<Node name="Crumb 11" id="0:173" x="664" y="255.85" opacity="0">
 <Shape name="crumb A9AAAC">
 <Ellipse x="0" y="0" width="6" height="6"/>
 <Fill><SolidColor colorValue="FFA9AAAC"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 12" id="0:171" x="664" y="255.85" opacity="0">
+<Node name="Crumb 12" id="0:174" x="664" y="255.85" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="9" height="9"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 13" id="0:172" x="664" y="255.85" opacity="0">
+<Node name="Crumb 13" id="0:175" x="664" y="255.85" opacity="0">
 <Shape name="crumb A9AAAC">
 <Ellipse x="0" y="0" width="7" height="7"/>
 <Fill><SolidColor colorValue="FFA9AAAC"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 14" id="0:173" x="664" y="255.85" opacity="0">
+<Node name="Crumb 14" id="0:176" x="664" y="255.85" opacity="0">
 <Shape name="crumb A9AAAC">
 <Ellipse x="0" y="0" width="6" height="6"/>
 <Fill><SolidColor colorValue="FFA9AAAC"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 15" id="0:174" x="664" y="255.85" opacity="0">
+<Node name="Crumb 15" id="0:177" x="664" y="255.85" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="8" height="8"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 16" id="0:175" x="616" y="255.85" opacity="0">
+<Node name="Crumb 16" id="0:178" x="616" y="255.85" opacity="0">
 <Shape name="crumb A9AAAC">
 <Ellipse x="0" y="0" width="5" height="5"/>
 <Fill><SolidColor colorValue="FFA9AAAC"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 17" id="0:176" x="664" y="255.85" opacity="0">
+<Node name="Crumb 17" id="0:179" x="664" y="255.85" opacity="0">
 <Shape name="crumb A9AAAC">
 <Ellipse x="0" y="0" width="5" height="5"/>
 <Fill><SolidColor colorValue="FFA9AAAC"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 18" id="0:177" x="616" y="255.85" opacity="0">
+<Node name="Crumb 18" id="0:180" x="616" y="255.85" opacity="0">
 <Shape name="crumb DCDDDE">
 <Ellipse x="0" y="0" width="5" height="5"/>
 <Fill><SolidColor colorValue="FFDCDDDE"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 19" id="0:178" x="664" y="255.85" opacity="0">
+<Node name="Crumb 19" id="0:181" x="664" y="255.85" opacity="0">
 <Shape name="crumb A9AAAC">
 <Ellipse x="0" y="0" width="5" height="5"/>
 <Fill><SolidColor colorValue="FFA9AAAC"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 20" id="0:184" x="620" y="255.85" opacity="0">
+<Node name="Crumb 20" id="0:187" x="620" y="255.85" opacity="0">
 <Shape name="crumb 5C5E64">
 <Ellipse x="0" y="0" width="2" height="2"/>
 <Fill><SolidColor colorValue="FF5C5E64"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 21" id="0:185" x="664" y="255.85" opacity="0">
+<Node name="Crumb 21" id="0:188" x="664" y="255.85" opacity="0">
 <Shape name="crumb 5C5E64">
 <Ellipse x="0" y="0" width="2.8" height="2.8"/>
 <Fill><SolidColor colorValue="FF5C5E64"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 22" id="0:186" x="612" y="255.85" opacity="0">
+<Node name="Crumb 22" id="0:189" x="612" y="255.85" opacity="0">
 <Shape name="crumb 5C5E64">
 <Ellipse x="0" y="0" width="2" height="2"/>
 <Fill><SolidColor colorValue="FF5C5E64"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 23" id="0:187" x="672" y="255.85" opacity="0">
+<Node name="Crumb 23" id="0:190" x="672" y="255.85" opacity="0">
 <Shape name="crumb 5C5E64">
 <Ellipse x="0" y="0" width="2.8" height="2.8"/>
 <Fill><SolidColor colorValue="FF5C5E64"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 24" id="0:188" x="604" y="255.85" opacity="0">
+<Node name="Crumb 24" id="0:191" x="604" y="255.85" opacity="0">
 <Shape name="crumb 5C5E64">
 <Ellipse x="0" y="0" width="2" height="2"/>
 <Fill><SolidColor colorValue="FF5C5E64"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 25" id="0:189" x="680" y="255.85" opacity="0">
+<Node name="Crumb 25" id="0:192" x="680" y="255.85" opacity="0">
 <Shape name="crumb 5C5E64">
 <Ellipse x="0" y="0" width="2.8" height="2.8"/>
 <Fill><SolidColor colorValue="FF5C5E64"/></Fill>
 </Shape>
 </Node>
-<Node name="Crumb 26" id="0:190" x="596" y="255.85" opacity="0">
+<Node name="Crumb 26" id="0:193" x="596" y="255.85" opacity="0">
 <Shape name="crumb 5C5E64">
 <Ellipse x="0" y="0" width="2" height="2"/>
 <Fill><SolidColor colorValue="FF5C5E64"/></Fill>
 </Shape>
 </Node>
 <Node name="Mound at" x="640" y="258.43">
-<Node name="Mound" id="0:179" opacity="0">
+<Node name="Mound" id="0:182" opacity="0">
 <Shape name="mound 909193">
 <Ellipse x="-55" y="-8.6" width="5.2" height="5.2"/>
 <Ellipse x="-12" y="-7.4" width="4.4" height="4.4"/>
@@ -429,7 +438,7 @@
 </Node>
 </Node>
 <Node name="Dirt" x="640" y="257.85">
-<Node name="Dirt mid" id="0:180">
+<Node name="Dirt mid" id="0:183">
 <Shape name="dirt 5C5E64">
 <Ellipse x="-17.45" y="0.26" width="2.44" height="2.44"/>
 <Ellipse x="-14.55" y="0.26" width="2.44" height="2.44"/>
@@ -643,9 +652,9 @@
 </Shape>
 <Node name="Bucket" id="0:105" x="34" y="-19">
 <Node name="Seat" id="0:109" x="-35" y="-60" rotation="-1.5708">
-<TranslationConstraint id="0:108" targetId="0:456" strength="0"/>
+<TranslationConstraint id="0:108" targetId="0:459" strength="0"/>
 </Node>
-<Node name="LipHang" id="0:456" x="14" y="-42"/>
+<Node name="LipHang" id="0:459" x="14" y="-42"/>
 <Shape name="bucket F5F6F7">
 <Ellipse x="-72" y="-40" width="2.8" height="2.8"/>
 <Ellipse x="-68.8" y="-40" width="2.8" height="2.8"/>
@@ -1253,11 +1262,11 @@
 <Ellipse x="-1.6" y="-1.6" width="4.8" height="4.8"/>
 <Fill><SolidColor colorValue="FF121316"/></Fill>
 </Shape>
-<Node name="Stone 0" id="0:457" x="-64" y="-47">
-<TransformConstraint id="0:143" targetId="0:144" strength="0"/>
+<Node name="Stone 0" id="0:141" x="-64" y="-47">
+<TransformConstraint id="0:146" targetId="0:147" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:319" propertyKey="18" converterId="0:444"/>
-<Node name="Spin" id="0:145">
+<DataBindContext sourcePathIds="0:325-0:322" propertyKey="18" converterId="0:447"/>
+<Node name="Spin" id="0:148">
 <Shape name="stone F3C7DB">
 <Ellipse x="-3.2" y="-2.6" width="3.4" height="3.4"/>
 <Fill><SolidColor colorValue="FFF3C7DB"/></Fill>
@@ -1305,11 +1314,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Stone 1" id="0:458" x="-52" y="-49">
-<TransformConstraint id="0:147" targetId="0:148" strength="0"/>
+<Node name="Stone 1" id="0:142" x="-52" y="-49">
+<TransformConstraint id="0:150" targetId="0:151" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:319" propertyKey="18" converterId="0:448"/>
-<Node name="Spin" id="0:149">
+<DataBindContext sourcePathIds="0:325-0:322" propertyKey="18" converterId="0:451"/>
+<Node name="Spin" id="0:152">
 <Shape name="stone D4C8F4">
 <Ellipse x="-3.2" y="-2.6" width="3.4" height="3.4"/>
 <Fill><SolidColor colorValue="FFD4C8F4"/></Fill>
@@ -1357,11 +1366,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Stone 2" id="0:459" x="-59" y="-55">
-<TransformConstraint id="0:150" targetId="0:151" strength="0"/>
+<Node name="Stone 2" id="0:143" x="-59" y="-55">
+<TransformConstraint id="0:153" targetId="0:154" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:319" propertyKey="18" converterId="0:452"/>
-<Node name="Spin" id="0:152">
+<DataBindContext sourcePathIds="0:325-0:322" propertyKey="18" converterId="0:455"/>
+<Node name="Spin" id="0:155">
 <Shape name="stone BDE1F3">
 <Ellipse x="-3.2" y="-2.6" width="3.4" height="3.4"/>
 <Fill><SolidColor colorValue="FFBDE1F3"/></Fill>
@@ -1409,11 +1418,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 0" id="0:197" x="-3" y="-44.5">
-<TransformConstraint id="0:198" targetId="0:199" strength="0"/>
+<Node name="Ore 0" id="0:200" x="-3" y="-44.5">
+<TransformConstraint id="0:201" targetId="0:202" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:324"/>
-<Node name="Fade" id="0:200">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:327"/>
+<Node name="Fade" id="0:203">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1421,11 +1430,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 1" id="0:202" x="-10.3" y="-44.5">
-<TransformConstraint id="0:203" targetId="0:204" strength="0"/>
+<Node name="Ore 1" id="0:205" x="-10.3" y="-44.5">
+<TransformConstraint id="0:206" targetId="0:207" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:328"/>
-<Node name="Fade" id="0:205">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:331"/>
+<Node name="Fade" id="0:208">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1433,11 +1442,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 2" id="0:206" x="-17.6" y="-44.5">
-<TransformConstraint id="0:207" targetId="0:208" strength="0"/>
+<Node name="Ore 2" id="0:209" x="-17.6" y="-44.5">
+<TransformConstraint id="0:210" targetId="0:211" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:332"/>
-<Node name="Fade" id="0:209">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:335"/>
+<Node name="Fade" id="0:212">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1445,11 +1454,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 3" id="0:210" x="-24.9" y="-44.5">
-<TransformConstraint id="0:211" targetId="0:212" strength="0"/>
+<Node name="Ore 3" id="0:213" x="-24.9" y="-44.5">
+<TransformConstraint id="0:214" targetId="0:215" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:336"/>
-<Node name="Fade" id="0:213">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:339"/>
+<Node name="Fade" id="0:216">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1457,11 +1466,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 4" id="0:214" x="-32.2" y="-44.5">
-<TransformConstraint id="0:215" targetId="0:216" strength="0"/>
+<Node name="Ore 4" id="0:217" x="-32.2" y="-44.5">
+<TransformConstraint id="0:218" targetId="0:219" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:340"/>
-<Node name="Fade" id="0:217">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:343"/>
+<Node name="Fade" id="0:220">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1469,11 +1478,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 5" id="0:218" x="-39.5" y="-44.5">
-<TransformConstraint id="0:219" targetId="0:220" strength="0"/>
+<Node name="Ore 5" id="0:221" x="-39.5" y="-44.5">
+<TransformConstraint id="0:222" targetId="0:223" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:344"/>
-<Node name="Fade" id="0:221">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:347"/>
+<Node name="Fade" id="0:224">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1481,11 +1490,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 6" id="0:222" x="-46.8" y="-44.5">
-<TransformConstraint id="0:223" targetId="0:224" strength="0"/>
+<Node name="Ore 6" id="0:225" x="-46.8" y="-44.5">
+<TransformConstraint id="0:226" targetId="0:227" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:348"/>
-<Node name="Fade" id="0:225">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:351"/>
+<Node name="Fade" id="0:228">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1493,11 +1502,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 7" id="0:226" x="-54.1" y="-44.5">
-<TransformConstraint id="0:227" targetId="0:228" strength="0"/>
+<Node name="Ore 7" id="0:229" x="-54.1" y="-44.5">
+<TransformConstraint id="0:230" targetId="0:231" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:352"/>
-<Node name="Fade" id="0:229">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:355"/>
+<Node name="Fade" id="0:232">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1505,11 +1514,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 8" id="0:230" x="-61.4" y="-44.5">
-<TransformConstraint id="0:231" targetId="0:232" strength="0"/>
+<Node name="Ore 8" id="0:233" x="-61.4" y="-44.5">
+<TransformConstraint id="0:234" targetId="0:235" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:356"/>
-<Node name="Fade" id="0:233">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:359"/>
+<Node name="Fade" id="0:236">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1517,11 +1526,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 9" id="0:234" x="-68.7" y="-44.5">
-<TransformConstraint id="0:235" targetId="0:236" strength="0"/>
+<Node name="Ore 9" id="0:237" x="-68.7" y="-44.5">
+<TransformConstraint id="0:238" targetId="0:239" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:360"/>
-<Node name="Fade" id="0:237">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:363"/>
+<Node name="Fade" id="0:240">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1529,11 +1538,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 10" id="0:238" x="-6.6" y="-51">
-<TransformConstraint id="0:239" targetId="0:240" strength="0"/>
+<Node name="Ore 10" id="0:241" x="-6.6" y="-51">
+<TransformConstraint id="0:242" targetId="0:243" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:364"/>
-<Node name="Fade" id="0:241">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:367"/>
+<Node name="Fade" id="0:244">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1541,11 +1550,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 11" id="0:242" x="-13.9" y="-51">
-<TransformConstraint id="0:243" targetId="0:244" strength="0"/>
+<Node name="Ore 11" id="0:245" x="-13.9" y="-51">
+<TransformConstraint id="0:246" targetId="0:247" strength="0"/>
 <Node name="Counted" opacity="1">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:368"/>
-<Node name="Fade" id="0:245">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:371"/>
+<Node name="Fade" id="0:248">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1553,11 +1562,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 12" id="0:246" x="-21.2" y="-51">
-<TransformConstraint id="0:247" targetId="0:248" strength="0"/>
+<Node name="Ore 12" id="0:249" x="-21.2" y="-51">
+<TransformConstraint id="0:250" targetId="0:251" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:372"/>
-<Node name="Fade" id="0:249">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:375"/>
+<Node name="Fade" id="0:252">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1565,11 +1574,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 13" id="0:250" x="-28.5" y="-51">
-<TransformConstraint id="0:251" targetId="0:252" strength="0"/>
+<Node name="Ore 13" id="0:253" x="-28.5" y="-51">
+<TransformConstraint id="0:254" targetId="0:255" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:376"/>
-<Node name="Fade" id="0:253">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:379"/>
+<Node name="Fade" id="0:256">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1577,11 +1586,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 14" id="0:254" x="-35.8" y="-51">
-<TransformConstraint id="0:255" targetId="0:256" strength="0"/>
+<Node name="Ore 14" id="0:257" x="-35.8" y="-51">
+<TransformConstraint id="0:258" targetId="0:259" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:380"/>
-<Node name="Fade" id="0:257">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:383"/>
+<Node name="Fade" id="0:260">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1589,11 +1598,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 15" id="0:258" x="-43.1" y="-51">
-<TransformConstraint id="0:259" targetId="0:260" strength="0"/>
+<Node name="Ore 15" id="0:261" x="-43.1" y="-51">
+<TransformConstraint id="0:262" targetId="0:263" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:384"/>
-<Node name="Fade" id="0:261">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:387"/>
+<Node name="Fade" id="0:264">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1601,11 +1610,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 16" id="0:262" x="-50.4" y="-51">
-<TransformConstraint id="0:263" targetId="0:264" strength="0"/>
+<Node name="Ore 16" id="0:265" x="-50.4" y="-51">
+<TransformConstraint id="0:266" targetId="0:267" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:388"/>
-<Node name="Fade" id="0:265">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:391"/>
+<Node name="Fade" id="0:268">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1613,11 +1622,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 17" id="0:266" x="-57.7" y="-51">
-<TransformConstraint id="0:267" targetId="0:268" strength="0"/>
+<Node name="Ore 17" id="0:269" x="-57.7" y="-51">
+<TransformConstraint id="0:270" targetId="0:271" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:392"/>
-<Node name="Fade" id="0:269">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:395"/>
+<Node name="Fade" id="0:272">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1625,11 +1634,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 18" id="0:270" x="-65" y="-51">
-<TransformConstraint id="0:271" targetId="0:272" strength="0"/>
+<Node name="Ore 18" id="0:273" x="-65" y="-51">
+<TransformConstraint id="0:274" targetId="0:275" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:396"/>
-<Node name="Fade" id="0:273">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:399"/>
+<Node name="Fade" id="0:276">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1637,11 +1646,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 19" id="0:274" x="-10.2" y="-57.5">
-<TransformConstraint id="0:275" targetId="0:276" strength="0"/>
+<Node name="Ore 19" id="0:277" x="-10.2" y="-57.5">
+<TransformConstraint id="0:278" targetId="0:279" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:400"/>
-<Node name="Fade" id="0:277">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:403"/>
+<Node name="Fade" id="0:280">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1649,11 +1658,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 20" id="0:278" x="-17.5" y="-57.5">
-<TransformConstraint id="0:279" targetId="0:280" strength="0"/>
+<Node name="Ore 20" id="0:281" x="-17.5" y="-57.5">
+<TransformConstraint id="0:282" targetId="0:283" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:404"/>
-<Node name="Fade" id="0:281">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:407"/>
+<Node name="Fade" id="0:284">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1661,11 +1670,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 21" id="0:282" x="-24.8" y="-57.5">
-<TransformConstraint id="0:283" targetId="0:284" strength="0"/>
+<Node name="Ore 21" id="0:285" x="-24.8" y="-57.5">
+<TransformConstraint id="0:286" targetId="0:287" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:408"/>
-<Node name="Fade" id="0:285">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:411"/>
+<Node name="Fade" id="0:288">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1673,11 +1682,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 22" id="0:286" x="-32.1" y="-57.5">
-<TransformConstraint id="0:287" targetId="0:288" strength="0"/>
+<Node name="Ore 22" id="0:289" x="-32.1" y="-57.5">
+<TransformConstraint id="0:290" targetId="0:291" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:412"/>
-<Node name="Fade" id="0:289">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:415"/>
+<Node name="Fade" id="0:292">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1685,11 +1694,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 23" id="0:290" x="-39.4" y="-57.5">
-<TransformConstraint id="0:291" targetId="0:292" strength="0"/>
+<Node name="Ore 23" id="0:293" x="-39.4" y="-57.5">
+<TransformConstraint id="0:294" targetId="0:295" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:416"/>
-<Node name="Fade" id="0:293">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:419"/>
+<Node name="Fade" id="0:296">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1697,11 +1706,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 24" id="0:294" x="-46.7" y="-57.5">
-<TransformConstraint id="0:295" targetId="0:296" strength="0"/>
+<Node name="Ore 24" id="0:297" x="-46.7" y="-57.5">
+<TransformConstraint id="0:298" targetId="0:299" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:420"/>
-<Node name="Fade" id="0:297">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:423"/>
+<Node name="Fade" id="0:300">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1709,11 +1718,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 25" id="0:298" x="-54" y="-57.5">
-<TransformConstraint id="0:299" targetId="0:300" strength="0"/>
+<Node name="Ore 25" id="0:301" x="-54" y="-57.5">
+<TransformConstraint id="0:302" targetId="0:303" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:424"/>
-<Node name="Fade" id="0:301">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:427"/>
+<Node name="Fade" id="0:304">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1721,11 +1730,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 26" id="0:302" x="-13.8" y="-64">
-<TransformConstraint id="0:303" targetId="0:304" strength="0"/>
+<Node name="Ore 26" id="0:305" x="-13.8" y="-64">
+<TransformConstraint id="0:306" targetId="0:307" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:428"/>
-<Node name="Fade" id="0:305">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:431"/>
+<Node name="Fade" id="0:308">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1733,11 +1742,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 27" id="0:306" x="-21.1" y="-64">
-<TransformConstraint id="0:307" targetId="0:308" strength="0"/>
+<Node name="Ore 27" id="0:309" x="-21.1" y="-64">
+<TransformConstraint id="0:310" targetId="0:311" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:432"/>
-<Node name="Fade" id="0:309">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:435"/>
+<Node name="Fade" id="0:312">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1745,11 +1754,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 28" id="0:310" x="-28.4" y="-64">
-<TransformConstraint id="0:311" targetId="0:312" strength="0"/>
+<Node name="Ore 28" id="0:313" x="-28.4" y="-64">
+<TransformConstraint id="0:314" targetId="0:315" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:436"/>
-<Node name="Fade" id="0:313">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:439"/>
+<Node name="Fade" id="0:316">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1757,11 +1766,11 @@
 </Node>
 </Node>
 </Node>
-<Node name="Ore 29" id="0:314" x="-35.7" y="-64">
-<TransformConstraint id="0:315" targetId="0:316" strength="0"/>
+<Node name="Ore 29" id="0:317" x="-35.7" y="-64">
+<TransformConstraint id="0:318" targetId="0:319" strength="0"/>
 <Node name="Counted" opacity="0">
-<DataBindContext sourcePathIds="0:322-0:318" propertyKey="18" converterId="0:440"/>
-<Node name="Fade" id="0:317">
+<DataBindContext sourcePathIds="0:325-0:321" propertyKey="18" converterId="0:443"/>
+<Node name="Fade" id="0:320">
 <Shape name="ore 5FCF8A">
 <Ellipse x="0" y="0" width="6.6" height="6.6"/>
 <Fill><SolidColor colorValue="FF5FCF8A"/></Fill>
@@ -1773,13 +1782,13 @@
 </Node>
 </Node>
 </Node>
-<Node name="Mole" id="0:142" x="640" y="236.9">
+<Node name="Mole" id="0:145" x="640" y="236.9">
 <TransformConstraint id="0:107" targetId="0:109" strength="0" name="Rides the cart"/>
-<ClippingShape sourceId="0:453" name="Above the dirt"/>
+<ClippingShape sourceId="0:456" name="Above the dirt"/>
 <Node name="Lying" id="0:116" x="0" y="0" rotation="1.5708" opacity="0">
 <Node name="Sized" scaleX="0.45" scaleY="0.45">
-<Node name="ZAnchor" id="0:454" x="-61.09" y="-107.64"/>
-<Node name="NoseAnchor" id="0:455" x="-27.64" y="-78.55"/>
+<Node name="ZAnchor" id="0:457" x="-61.09" y="-107.64"/>
+<Node name="NoseAnchor" id="0:458" x="-27.64" y="-78.55"/>
 <Node name="Standing" x="-2.91" y="-33.45" rotation="-1.5708">
 <Node name="Head" id="0:122">
 <Node name="Helmet at" x="0" y="-29.09">
@@ -4931,7 +4940,7 @@
 <Node name="Bob" id="0:117">
 <Node name="Squash" id="0:130">
 <Node name="Breath" id="0:118">
-<Node name="PawL" id="0:182" x="-34.33" y="-1.75" opacity="0">
+<Node name="PawL" id="0:185" x="-34.33" y="-1.75" opacity="0">
 <Shape name="paw F5F6F7">
 <Ellipse x="0.12" y="4.28" width="2.39" height="2.39"/>
 <Ellipse x="5.99" y="1.11" width="2.39" height="2.39"/>
@@ -5028,7 +5037,7 @@
 <Fill><SolidColor colorValue="FF121316"/></Fill>
 </Shape>
 </Node>
-<Node name="PawR" id="0:183" x="34.33" y="-1.75" opacity="0">
+<Node name="PawR" id="0:186" x="34.33" y="-1.75" opacity="0">
 <Shape name="paw F5F6F7">
 <Ellipse x="-2.44" y="4.19" width="2.39" height="2.39"/>
 <Ellipse x="-5.53" y="1.19" width="2.39" height="2.39"/>
@@ -5126,7 +5135,7 @@
 </Shape>
 </Node>
 <Node name="Head" id="0:133" x="0" y="2.91">
-<Node name="EyeL" id="0:160" x="-12.8" y="-33.75">
+<Node name="EyeL" id="0:163" x="-12.8" y="-33.75">
 <Node name="Open" id="0:110">
 <Shape name="eye F5F6F7">
 <Ellipse x="1.75" y="-1.63" width="1.92" height="1.92"/>
@@ -5150,7 +5159,7 @@
 </Shape>
 </Node>
 </Node>
-<Node name="EyeR" id="0:161" x="16.29" y="-33.75">
+<Node name="EyeR" id="0:164" x="16.29" y="-33.75">
 <Node name="Open" id="0:111">
 <Shape name="eye F5F6F7">
 <Ellipse x="1.75" y="-1.63" width="1.92" height="1.92"/>
@@ -5653,7 +5662,7 @@
 <Fill><SolidColor colorValue="FFF096AC"/></Fill>
 </Shape>
 <Node name="SnoreL" id="0:125" x="-2.62" y="-27.35">
-<Node name="LobeL" id="0:162">
+<Node name="LobeL" id="0:165">
 <Shape name="lobe F5F6F7">
 <Ellipse x="-15.04" y="23.97" width="2.33" height="2.33"/>
 <Ellipse x="0.06" y="12.57" width="2.27" height="2.27"/>
@@ -5770,7 +5779,7 @@
 </Node>
 </Node>
 <Node name="SnoreR" id="0:126" x="2.62" y="-27.35">
-<Node name="LobeR" id="0:163">
+<Node name="LobeR" id="0:166">
 <Shape name="lobe F5F6F7">
 <Ellipse x="15.19" y="23.97" width="2.09" height="2.09"/>
 <Ellipse x="6.46" y="18.3" width="2.33" height="2.33"/>
@@ -5892,7 +5901,7 @@
 <Ellipse x="3.11" y="-11.69" width="2.09" height="2.09"/>
 <Fill><SolidColor colorValue="FF2B2C2F"/></Fill>
 </Shape>
-<Node name="Paw shade" id="0:181" opacity="0">
+<Node name="Paw shade" id="0:184" opacity="0">
 <Shape name="shade 444548">
 <Ellipse x="-14.34" y="-2.97" width="1.92" height="1.92"/>
 <Ellipse x="14.75" y="-2.97" width="1.92" height="1.92"/>
@@ -9253,237 +9262,237 @@
 </Shape>
 </Node>
 <Node name="ore target 0" x="640" y="270.5">
-<DataBindContext sourcePathIds="0:322-0:320" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:321" propertyKey="14"/>
-<Node name="Aim" id="0:323">
-<Node name="Aim in" id="0:199" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:323" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:324" propertyKey="14"/>
+<Node name="Aim" id="0:326">
+<Node name="Aim in" id="0:202" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 1" x="661.1" y="272.72">
-<DataBindContext sourcePathIds="0:322-0:325" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:326" propertyKey="14"/>
-<Node name="Aim" id="0:327">
-<Node name="Aim in" id="0:204" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:328" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:329" propertyKey="14"/>
+<Node name="Aim" id="0:330">
+<Node name="Aim in" id="0:207" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 2" x="681.28" y="279.28">
-<DataBindContext sourcePathIds="0:322-0:329" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:330" propertyKey="14"/>
-<Node name="Aim" id="0:331">
-<Node name="Aim in" id="0:208" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:332" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:333" propertyKey="14"/>
+<Node name="Aim" id="0:334">
+<Node name="Aim in" id="0:211" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 3" x="699.66" y="289.88">
-<DataBindContext sourcePathIds="0:322-0:333" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:334" propertyKey="14"/>
-<Node name="Aim" id="0:335">
-<Node name="Aim in" id="0:212" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:336" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:337" propertyKey="14"/>
+<Node name="Aim" id="0:338">
+<Node name="Aim in" id="0:215" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 4" x="715.43" y="304.08">
-<DataBindContext sourcePathIds="0:322-0:337" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:338" propertyKey="14"/>
-<Node name="Aim" id="0:339">
-<Node name="Aim in" id="0:216" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:340" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:341" propertyKey="14"/>
+<Node name="Aim" id="0:342">
+<Node name="Aim in" id="0:219" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 5" x="727.9" y="321.25">
-<DataBindContext sourcePathIds="0:322-0:341" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:342" propertyKey="14"/>
-<Node name="Aim" id="0:343">
-<Node name="Aim in" id="0:220" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:344" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:345" propertyKey="14"/>
+<Node name="Aim" id="0:346">
+<Node name="Aim in" id="0:223" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 6" x="736.53" y="340.63">
-<DataBindContext sourcePathIds="0:322-0:345" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:346" propertyKey="14"/>
-<Node name="Aim" id="0:347">
-<Node name="Aim in" id="0:224" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:348" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:349" propertyKey="14"/>
+<Node name="Aim" id="0:350">
+<Node name="Aim in" id="0:227" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 7" x="740.94" y="361.39">
-<DataBindContext sourcePathIds="0:322-0:349" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:350" propertyKey="14"/>
-<Node name="Aim" id="0:351">
-<Node name="Aim in" id="0:228" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:352" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:353" propertyKey="14"/>
+<Node name="Aim" id="0:354">
+<Node name="Aim in" id="0:231" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 8" x="740.94" y="382.61">
-<DataBindContext sourcePathIds="0:322-0:353" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:354" propertyKey="14"/>
-<Node name="Aim" id="0:355">
-<Node name="Aim in" id="0:232" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:356" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:357" propertyKey="14"/>
+<Node name="Aim" id="0:358">
+<Node name="Aim in" id="0:235" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 9" x="736.53" y="403.37">
-<DataBindContext sourcePathIds="0:322-0:357" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:358" propertyKey="14"/>
-<Node name="Aim" id="0:359">
-<Node name="Aim in" id="0:236" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:360" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:361" propertyKey="14"/>
+<Node name="Aim" id="0:362">
+<Node name="Aim in" id="0:239" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 10" x="727.9" y="422.75">
-<DataBindContext sourcePathIds="0:322-0:361" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:362" propertyKey="14"/>
-<Node name="Aim" id="0:363">
-<Node name="Aim in" id="0:240" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:364" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:365" propertyKey="14"/>
+<Node name="Aim" id="0:366">
+<Node name="Aim in" id="0:243" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 11" x="715.43" y="439.92">
-<DataBindContext sourcePathIds="0:322-0:365" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:366" propertyKey="14"/>
-<Node name="Aim" id="0:367">
-<Node name="Aim in" id="0:244" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:368" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:369" propertyKey="14"/>
+<Node name="Aim" id="0:370">
+<Node name="Aim in" id="0:247" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 12" x="699.66" y="454.12">
-<DataBindContext sourcePathIds="0:322-0:369" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:370" propertyKey="14"/>
-<Node name="Aim" id="0:371">
-<Node name="Aim in" id="0:248" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:372" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:373" propertyKey="14"/>
+<Node name="Aim" id="0:374">
+<Node name="Aim in" id="0:251" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 13" x="681.28" y="464.72">
-<DataBindContext sourcePathIds="0:322-0:373" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:374" propertyKey="14"/>
-<Node name="Aim" id="0:375">
-<Node name="Aim in" id="0:252" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:376" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:377" propertyKey="14"/>
+<Node name="Aim" id="0:378">
+<Node name="Aim in" id="0:255" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 14" x="661.1" y="471.28">
-<DataBindContext sourcePathIds="0:322-0:377" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:378" propertyKey="14"/>
-<Node name="Aim" id="0:379">
-<Node name="Aim in" id="0:256" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:380" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:381" propertyKey="14"/>
+<Node name="Aim" id="0:382">
+<Node name="Aim in" id="0:259" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 15" x="640" y="473.5">
-<DataBindContext sourcePathIds="0:322-0:381" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:382" propertyKey="14"/>
-<Node name="Aim" id="0:383">
-<Node name="Aim in" id="0:260" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:384" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:385" propertyKey="14"/>
+<Node name="Aim" id="0:386">
+<Node name="Aim in" id="0:263" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 16" x="618.9" y="471.28">
-<DataBindContext sourcePathIds="0:322-0:385" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:386" propertyKey="14"/>
-<Node name="Aim" id="0:387">
-<Node name="Aim in" id="0:264" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:388" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:389" propertyKey="14"/>
+<Node name="Aim" id="0:390">
+<Node name="Aim in" id="0:267" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 17" x="598.72" y="464.72">
-<DataBindContext sourcePathIds="0:322-0:389" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:390" propertyKey="14"/>
-<Node name="Aim" id="0:391">
-<Node name="Aim in" id="0:268" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:392" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:393" propertyKey="14"/>
+<Node name="Aim" id="0:394">
+<Node name="Aim in" id="0:271" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 18" x="580.34" y="454.12">
-<DataBindContext sourcePathIds="0:322-0:393" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:394" propertyKey="14"/>
-<Node name="Aim" id="0:395">
-<Node name="Aim in" id="0:272" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:396" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:397" propertyKey="14"/>
+<Node name="Aim" id="0:398">
+<Node name="Aim in" id="0:275" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 19" x="564.57" y="439.92">
-<DataBindContext sourcePathIds="0:322-0:397" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:398" propertyKey="14"/>
-<Node name="Aim" id="0:399">
-<Node name="Aim in" id="0:276" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:400" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:401" propertyKey="14"/>
+<Node name="Aim" id="0:402">
+<Node name="Aim in" id="0:279" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 20" x="552.1" y="422.75">
-<DataBindContext sourcePathIds="0:322-0:401" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:402" propertyKey="14"/>
-<Node name="Aim" id="0:403">
-<Node name="Aim in" id="0:280" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:404" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:405" propertyKey="14"/>
+<Node name="Aim" id="0:406">
+<Node name="Aim in" id="0:283" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 21" x="543.47" y="403.37">
-<DataBindContext sourcePathIds="0:322-0:405" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:406" propertyKey="14"/>
-<Node name="Aim" id="0:407">
-<Node name="Aim in" id="0:284" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:408" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:409" propertyKey="14"/>
+<Node name="Aim" id="0:410">
+<Node name="Aim in" id="0:287" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 22" x="539.06" y="382.61">
-<DataBindContext sourcePathIds="0:322-0:409" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:410" propertyKey="14"/>
-<Node name="Aim" id="0:411">
-<Node name="Aim in" id="0:288" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:412" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:413" propertyKey="14"/>
+<Node name="Aim" id="0:414">
+<Node name="Aim in" id="0:291" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 23" x="539.06" y="361.39">
-<DataBindContext sourcePathIds="0:322-0:413" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:414" propertyKey="14"/>
-<Node name="Aim" id="0:415">
-<Node name="Aim in" id="0:292" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:416" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:417" propertyKey="14"/>
+<Node name="Aim" id="0:418">
+<Node name="Aim in" id="0:295" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 24" x="543.47" y="340.63">
-<DataBindContext sourcePathIds="0:322-0:417" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:418" propertyKey="14"/>
-<Node name="Aim" id="0:419">
-<Node name="Aim in" id="0:296" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:420" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:421" propertyKey="14"/>
+<Node name="Aim" id="0:422">
+<Node name="Aim in" id="0:299" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 25" x="552.1" y="321.25">
-<DataBindContext sourcePathIds="0:322-0:421" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:422" propertyKey="14"/>
-<Node name="Aim" id="0:423">
-<Node name="Aim in" id="0:300" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:424" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:425" propertyKey="14"/>
+<Node name="Aim" id="0:426">
+<Node name="Aim in" id="0:303" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 26" x="564.57" y="304.08">
-<DataBindContext sourcePathIds="0:322-0:425" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:426" propertyKey="14"/>
-<Node name="Aim" id="0:427">
-<Node name="Aim in" id="0:304" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:428" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:429" propertyKey="14"/>
+<Node name="Aim" id="0:430">
+<Node name="Aim in" id="0:307" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 27" x="580.34" y="289.88">
-<DataBindContext sourcePathIds="0:322-0:429" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:430" propertyKey="14"/>
-<Node name="Aim" id="0:431">
-<Node name="Aim in" id="0:308" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:432" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:433" propertyKey="14"/>
+<Node name="Aim" id="0:434">
+<Node name="Aim in" id="0:311" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 28" x="598.72" y="279.28">
-<DataBindContext sourcePathIds="0:322-0:433" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:434" propertyKey="14"/>
-<Node name="Aim" id="0:435">
-<Node name="Aim in" id="0:312" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:436" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:437" propertyKey="14"/>
+<Node name="Aim" id="0:438">
+<Node name="Aim in" id="0:315" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="ore target 29" x="618.9" y="272.72">
-<DataBindContext sourcePathIds="0:322-0:437" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:438" propertyKey="14"/>
-<Node name="Aim" id="0:439">
-<Node name="Aim in" id="0:316" scaleX="2.3182" scaleY="2.3182"/>
+<DataBindContext sourcePathIds="0:325-0:440" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:441" propertyKey="14"/>
+<Node name="Aim" id="0:442">
+<Node name="Aim in" id="0:319" scaleX="2.3182" scaleY="2.3182"/>
 </Node>
 </Node>
 <Node name="stone target 0" x="640" y="372">
-<DataBindContext sourcePathIds="0:322-0:441" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:442" propertyKey="14"/>
-<Node name="Aim" id="0:443">
-<Node name="Aim in" id="0:144" scaleX="1" scaleY="1"/>
+<DataBindContext sourcePathIds="0:325-0:444" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:445" propertyKey="14"/>
+<Node name="Aim" id="0:446">
+<Node name="Aim in" id="0:147" scaleX="1" scaleY="1"/>
 </Node>
 </Node>
 <Node name="stone target 1" x="700" y="372">
-<DataBindContext sourcePathIds="0:322-0:445" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:446" propertyKey="14"/>
-<Node name="Aim" id="0:447">
-<Node name="Aim in" id="0:148" scaleX="1" scaleY="1"/>
-</Node>
-</Node>
-<Node name="stone target 2" x="760" y="372">
-<DataBindContext sourcePathIds="0:322-0:449" propertyKey="13"/>
-<DataBindContext sourcePathIds="0:322-0:450" propertyKey="14"/>
-<Node name="Aim" id="0:451">
+<DataBindContext sourcePathIds="0:325-0:448" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:449" propertyKey="14"/>
+<Node name="Aim" id="0:450">
 <Node name="Aim in" id="0:151" scaleX="1" scaleY="1"/>
 </Node>
 </Node>
-<Shape name="Above the dirt" id="0:453">
+<Node name="stone target 2" x="760" y="372">
+<DataBindContext sourcePathIds="0:325-0:452" propertyKey="13"/>
+<DataBindContext sourcePathIds="0:325-0:453" propertyKey="14"/>
+<Node name="Aim" id="0:454">
+<Node name="Aim in" id="0:154" scaleX="1" scaleY="1"/>
+</Node>
+</Node>
+<Shape name="Above the dirt" id="0:456">
 <Rectangle x="640" y="-243.31" width="1680" height="1000"/>
 </Shape>
 </Node>
@@ -10217,7 +10226,55 @@
 <KeyFrameDouble value="-60" frame="20" interpolationType="cubic">
 <CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
 </KeyFrameDouble>
-<KeyFrameDouble value="-42" frame="58" interpolationType="hold"/>
+<KeyFrameDouble value="-49.5" frame="58" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:141">
+<KeyedProperty property="x">
+<KeyFrameDouble value="-64" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="-64" frame="8" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="4" frame="48" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="y">
+<KeyFrameDouble value="-47" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="-47" frame="8" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="-45.5" frame="48" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:142">
+<KeyedProperty property="x">
+<KeyFrameDouble value="-52" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="-52" frame="13" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="-5" frame="53" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="y">
+<KeyFrameDouble value="-49" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="-49" frame="13" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="-45.5" frame="53" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:143">
+<KeyedProperty property="x">
+<KeyFrameDouble value="-59" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="-59" frame="18" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="-14" frame="58" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="y">
+<KeyFrameDouble value="-55" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="-55" frame="18" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="-45.5" frame="58" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
 <KeyedObject objectId="0:108">
@@ -10656,7 +10713,7 @@
 </KeyedProperty>
 </KeyedObject>
 </LinearAnimation>
-<LinearAnimation name="Left hanging" id="0:141" duration="96" fps="60">
+<LinearAnimation name="Left hanging" id="0:144" duration="96" fps="60">
 <KeyedObject objectId="0:108">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0.28" frame="0" interpolationType="cubic">
@@ -10670,7 +10727,10 @@
 <KeyFrameDouble value="-35" frame="0" interpolationType="hold"/>
 </KeyedProperty>
 <KeyedProperty property="y">
-<KeyFrameDouble value="-42" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="-49.5" frame="0" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="-42" frame="16" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
 <KeyedObject objectId="0:107">
@@ -10679,7 +10739,7 @@
 <KeyFrameDouble value="0" frame="30" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:142">
+<KeyedObject objectId="0:145">
 <KeyedProperty property="x">
 <KeyFrameDouble value="640" frame="0" interpolationType="hold"/>
 </KeyedProperty>
@@ -11566,24 +11626,85 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:143">
+<KeyedObject objectId="0:141">
+<KeyedProperty property="x">
+<KeyFrameDouble value="4" frame="0" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="5" frame="2" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="y">
+<KeyFrameDouble value="-45.5" frame="0" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:146">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="0" frame="4" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="2" interpolationType="linear"/>
+<KeyFrameDouble value="1" frame="28" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:147">
+<KeyedProperty property="y">
+<KeyFrameDouble value="-170.5666" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="-170.5666" frame="2" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="28" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:148">
+<KeyedProperty property="rotation">
+<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="0" frame="2" interpolationType="linear"/>
+<KeyFrameDouble value="5.2" frame="28" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="opacity">
+<KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="0" frame="31" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="scaleX">
+<KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="1.3" frame="28" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.16" y1="1" x2="0.3" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="1" frame="31" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="scaleY">
+<KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="1.3" frame="28" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.16" y1="1" x2="0.3" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="1" frame="31" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:142">
+<KeyedProperty property="x">
+<KeyFrameDouble value="-5" frame="0" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="5" frame="8" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="y">
+<KeyFrameDouble value="-45.5" frame="0" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:150">
+<KeyedProperty property="strength">
+<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="0" frame="8" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="34" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:144">
+<KeyedObject objectId="0:151">
 <KeyedProperty property="y">
-<KeyFrameDouble value="-442.3879" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="-442.3879" frame="4" interpolationType="linear"/>
+<KeyFrameDouble value="-170.5666" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="-170.5666" frame="8" interpolationType="linear"/>
 <KeyFrameDouble value="0" frame="34" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:145">
+<KeyedObject objectId="0:152">
 <KeyedProperty property="rotation">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="0" frame="4" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="8" interpolationType="linear"/>
 <KeyFrameDouble value="5.2" frame="34" interpolationType="hold"/>
 </KeyedProperty>
 <KeyedProperty property="opacity">
@@ -11605,24 +11726,35 @@
 <KeyFrameDouble value="1" frame="37" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:147">
+<KeyedObject objectId="0:143">
+<KeyedProperty property="x">
+<KeyFrameDouble value="-14" frame="0" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="5" frame="14" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="y">
+<KeyFrameDouble value="-45.5" frame="0" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:153">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="0" frame="10" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="14" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="40" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:148">
+<KeyedObject objectId="0:154">
 <KeyedProperty property="y">
-<KeyFrameDouble value="-434.4809" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="-434.4809" frame="10" interpolationType="linear"/>
+<KeyFrameDouble value="-170.5666" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="-170.5666" frame="14" interpolationType="linear"/>
 <KeyFrameDouble value="0" frame="40" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:149">
+<KeyedObject objectId="0:155">
 <KeyedProperty property="rotation">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="0" frame="10" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="14" interpolationType="linear"/>
 <KeyFrameDouble value="5.2" frame="40" interpolationType="hold"/>
 </KeyedProperty>
 <KeyedProperty property="opacity">
@@ -11644,54 +11776,15 @@
 <KeyFrameDouble value="1" frame="43" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:150">
-<KeyedProperty property="strength">
-<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="0" frame="16" interpolationType="linear"/>
-<KeyFrameDouble value="1" frame="46" interpolationType="hold"/>
-</KeyedProperty>
-</KeyedObject>
-<KeyedObject objectId="0:151">
-<KeyedProperty property="y">
-<KeyFrameDouble value="-443.6999" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="-443.6999" frame="16" interpolationType="linear"/>
-<KeyFrameDouble value="0" frame="46" interpolationType="hold"/>
-</KeyedProperty>
-</KeyedObject>
-<KeyedObject objectId="0:152">
-<KeyedProperty property="rotation">
-<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="0" frame="16" interpolationType="linear"/>
-<KeyFrameDouble value="5.2" frame="46" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="opacity">
-<KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="0" frame="49" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="scaleX">
-<KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="1.3" frame="46" interpolationType="cubic">
-<CubicEaseInterpolator x1="0.16" y1="1" x2="0.3" y2="1"/>
-</KeyFrameDouble>
-<KeyFrameDouble value="1" frame="49" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="scaleY">
-<KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="1.3" frame="46" interpolationType="cubic">
-<CubicEaseInterpolator x1="0.16" y1="1" x2="0.3" y2="1"/>
-</KeyFrameDouble>
-<KeyFrameDouble value="1" frame="49" interpolationType="hold"/>
-</KeyedProperty>
-</KeyedObject>
-<KeyedObject objectId="0:146">
+<KeyedObject objectId="0:149">
 <KeyedProperty property="trigger">
+<KeyFrameCallback frame="28"/>
 <KeyFrameCallback frame="34"/>
 <KeyFrameCallback frame="40"/>
-<KeyFrameCallback frame="46"/>
 </KeyedProperty>
 </KeyedObject>
 </LinearAnimation>
-<LinearAnimation name="Wake and dive" id="0:153" duration="226" fps="60">
+<LinearAnimation name="Wake and dive" id="0:156" duration="226" fps="60">
 <KeyedObject objectId="0:107">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
@@ -11770,7 +11863,7 @@
 <KeyFrameDouble value="0" frame="4" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:154">
+<KeyedObject objectId="0:157">
 <KeyedProperty property="x">
 <KeyFrameDouble value="668.2929" frame="4" interpolationType="linear"/>
 <KeyFrameDouble value="684.872" frame="13" interpolationType="hold"/>
@@ -11788,7 +11881,7 @@
 <KeyFrameDouble value="0" frame="13" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:155">
+<KeyedObject objectId="0:158">
 <KeyedProperty property="x">
 <KeyFrameDouble value="660.3151" frame="4" interpolationType="linear"/>
 <KeyFrameDouble value="663.0273" frame="15" interpolationType="hold"/>
@@ -11806,7 +11899,7 @@
 <KeyFrameDouble value="0" frame="15" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:156">
+<KeyedObject objectId="0:159">
 <KeyedProperty property="x">
 <KeyFrameDouble value="651.1045" frame="4" interpolationType="linear"/>
 <KeyFrameDouble value="630.3623" frame="17" interpolationType="hold"/>
@@ -11824,7 +11917,7 @@
 <KeyFrameDouble value="0" frame="17" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:157">
+<KeyedObject objectId="0:160">
 <KeyedProperty property="x">
 <KeyFrameDouble value="649.8716" frame="4" interpolationType="linear"/>
 <KeyFrameDouble value="633.2925" frame="13" interpolationType="hold"/>
@@ -11842,7 +11935,7 @@
 <KeyFrameDouble value="0" frame="13" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:158">
+<KeyedObject objectId="0:161">
 <KeyedProperty property="x">
 <KeyFrameDouble value="657.8494" frame="4" interpolationType="linear"/>
 <KeyFrameDouble value="655.1372" frame="15" interpolationType="hold"/>
@@ -11860,7 +11953,7 @@
 <KeyFrameDouble value="0" frame="15" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:159">
+<KeyedObject objectId="0:162">
 <KeyedProperty property="x">
 <KeyFrameDouble value="667.06" frame="4" interpolationType="linear"/>
 <KeyFrameDouble value="687.8022" frame="17" interpolationType="hold"/>
@@ -11930,7 +12023,7 @@
 <KeyFrameDouble value="1" frame="159" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:160">
+<KeyedObject objectId="0:163">
 <KeyedProperty property="scaleX">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="2" frame="5" interpolationType="cubic">
@@ -12000,7 +12093,7 @@
 <KeyFrameDouble value="1" frame="159" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:161">
+<KeyedObject objectId="0:164">
 <KeyedProperty property="scaleX">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="2" frame="5" interpolationType="cubic">
@@ -12073,7 +12166,7 @@
 <KeyFrameDouble value="0.93" frame="64" interpolationType="cubic">
 <CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
 </KeyFrameDouble>
-<KeyFrameDouble value="1.1" frame="72" interpolationType="hold"/>
+<KeyFrameDouble value="1.05" frame="72" interpolationType="hold"/>
 <KeyFrameDouble value="1.16" frame="92" interpolationType="hold"/>
 <KeyFrameDouble value="1.16" frame="114" interpolationType="cubic">
 <CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
@@ -12106,7 +12199,7 @@
 <KeyFrameDouble value="1.05" frame="64" interpolationType="cubic">
 <CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
 </KeyFrameDouble>
-<KeyFrameDouble value="0.93" frame="72" interpolationType="hold"/>
+<KeyFrameDouble value="0.97" frame="72" interpolationType="hold"/>
 <KeyFrameDouble value="0.9" frame="92" interpolationType="hold"/>
 <KeyFrameDouble value="0.9" frame="114" interpolationType="cubic">
 <CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
@@ -12192,10 +12285,7 @@
 <KeyFrameDouble value="0.24" frame="170" interpolationType="cubic">
 <CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
 </KeyFrameDouble>
-<KeyFrameDouble value="-0.05" frame="183" interpolationType="cubic">
-<CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
-</KeyFrameDouble>
-<KeyFrameDouble value="0" frame="193" interpolationType="cubic">
+<KeyFrameDouble value="0" frame="189" interpolationType="cubic">
 <CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
 </KeyFrameDouble>
 </KeyedProperty>
@@ -12208,10 +12298,7 @@
 <KeyFrameDouble value="4" frame="170" interpolationType="cubic">
 <CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
 </KeyFrameDouble>
-<KeyFrameDouble value="-0.5" frame="183" interpolationType="cubic">
-<CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
-</KeyFrameDouble>
-<KeyFrameDouble value="0" frame="193" interpolationType="cubic">
+<KeyFrameDouble value="0" frame="189" interpolationType="cubic">
 <CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
 </KeyFrameDouble>
 </KeyedProperty>
@@ -12240,7 +12327,7 @@
 <KeyFrameDouble value="2.91" frame="63" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:162">
+<KeyedObject objectId="0:165">
 <KeyedProperty property="rotation">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="5" interpolationType="cubic">
@@ -12275,7 +12362,7 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:163">
+<KeyedObject objectId="0:166">
 <KeyedProperty property="rotation">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="5" interpolationType="cubic">
@@ -12310,7 +12397,7 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:142">
+<KeyedObject objectId="0:145">
 <KeyedProperty property="rotation">
 <KeyFrameDouble value="-0.6981" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0.3" frame="5" interpolationType="cubic">
@@ -12539,7 +12626,7 @@
 <KeyFrameDouble value="1" frame="53" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:165">
+<KeyedObject objectId="0:168">
 <KeyedProperty property="x">
 <KeyFrameDouble value="616" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="532" frame="96" interpolationType="hold"/>
@@ -12557,7 +12644,7 @@
 <KeyFrameDouble value="0" frame="96" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:166">
+<KeyedObject objectId="0:169">
 <KeyedProperty property="x">
 <KeyFrameDouble value="616" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="522.6667" frame="107" interpolationType="hold"/>
@@ -12575,7 +12662,7 @@
 <KeyFrameDouble value="0" frame="107" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:167">
+<KeyedObject objectId="0:170">
 <KeyedProperty property="x">
 <KeyFrameDouble value="616" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="537.1667" frame="115" interpolationType="hold"/>
@@ -12593,7 +12680,7 @@
 <KeyFrameDouble value="0" frame="115" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:168">
+<KeyedObject objectId="0:171">
 <KeyedProperty property="x">
 <KeyFrameDouble value="616" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="579.8333" frame="103" interpolationType="hold"/>
@@ -12611,7 +12698,7 @@
 <KeyFrameDouble value="0" frame="103" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:169">
+<KeyedObject objectId="0:172">
 <KeyedProperty property="x">
 <KeyFrameDouble value="616" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="592" frame="120" interpolationType="hold"/>
@@ -12629,7 +12716,7 @@
 <KeyFrameDouble value="0" frame="120" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:170">
+<KeyedObject objectId="0:173">
 <KeyedProperty property="x">
 <KeyFrameDouble value="664" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="676.3333" frame="109" interpolationType="hold"/>
@@ -12647,7 +12734,7 @@
 <KeyFrameDouble value="0" frame="109" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:171">
+<KeyedObject objectId="0:174">
 <KeyedProperty property="x">
 <KeyFrameDouble value="664" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="710" frame="118" interpolationType="hold"/>
@@ -12665,7 +12752,7 @@
 <KeyFrameDouble value="0" frame="118" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:172">
+<KeyedObject objectId="0:175">
 <KeyedProperty property="x">
 <KeyFrameDouble value="664" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="721.75" frame="105" interpolationType="hold"/>
@@ -12683,7 +12770,7 @@
 <KeyFrameDouble value="0" frame="105" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:173">
+<KeyedObject objectId="0:176">
 <KeyedProperty property="x">
 <KeyFrameDouble value="664" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="766.5" frame="113" interpolationType="hold"/>
@@ -12701,7 +12788,7 @@
 <KeyFrameDouble value="0" frame="113" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:174">
+<KeyedObject objectId="0:177">
 <KeyedProperty property="x">
 <KeyFrameDouble value="664" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="754" frame="99" interpolationType="hold"/>
@@ -12719,7 +12806,7 @@
 <KeyFrameDouble value="0" frame="99" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:175">
+<KeyedObject objectId="0:178">
 <KeyedProperty property="x">
 <KeyFrameDouble value="616" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="577" frame="90" interpolationType="hold"/>
@@ -12737,7 +12824,7 @@
 <KeyFrameDouble value="0" frame="90" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:176">
+<KeyedObject objectId="0:179">
 <KeyedProperty property="x">
 <KeyFrameDouble value="664" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="706" frame="90" interpolationType="hold"/>
@@ -12755,7 +12842,7 @@
 <KeyFrameDouble value="0" frame="90" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:177">
+<KeyedObject objectId="0:180">
 <KeyedProperty property="x">
 <KeyFrameDouble value="616" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="600.6667" frame="95" interpolationType="hold"/>
@@ -12773,7 +12860,7 @@
 <KeyFrameDouble value="0" frame="95" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:178">
+<KeyedObject objectId="0:181">
 <KeyedProperty property="x">
 <KeyFrameDouble value="664" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="679.75" frame="93" interpolationType="hold"/>
@@ -12791,24 +12878,28 @@
 <KeyFrameDouble value="0" frame="93" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:179">
+<KeyedObject objectId="0:182">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="74" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="80" interpolationType="hold"/>
 </KeyedProperty>
+<KeyedProperty property="scaleX">
+<KeyFrameDouble value="0.6" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="0.6" frame="74" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.16" y1="1" x2="0.3" y2="1"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="1" frame="94" interpolationType="hold"/>
+</KeyedProperty>
 <KeyedProperty property="scaleY">
-<KeyFrameDouble value="0.05" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="0.05" frame="74" interpolationType="cubic">
-<CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
+<KeyFrameDouble value="0.6" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="0.6" frame="74" interpolationType="cubic">
+<CubicEaseInterpolator x1="0.16" y1="1" x2="0.3" y2="1"/>
 </KeyFrameDouble>
-<KeyFrameDouble value="1.08" frame="102" interpolationType="cubic">
-<CubicEaseInterpolator x1="0.42" y1="0" x2="0.58" y2="1"/>
-</KeyFrameDouble>
-<KeyFrameDouble value="1" frame="110" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="94" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:180">
+<KeyedObject objectId="0:183">
 <KeyedProperty property="y">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="72" interpolationType="cubic">
@@ -12838,13 +12929,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:181">
+<KeyedObject objectId="0:184">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="1" frame="92" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:182">
+<KeyedObject objectId="0:185">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="1" frame="92" interpolationType="hold"/>
@@ -12865,7 +12956,7 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:183">
+<KeyedObject objectId="0:186">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="1" frame="92" interpolationType="hold"/>
@@ -12886,133 +12977,133 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:184">
-<KeyedProperty property="x">
-<KeyFrameDouble value="620" frame="110" interpolationType="linear"/>
-<KeyFrameDouble value="607.5" frame="125" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="y">
-<KeyFrameDouble value="255.85" frame="110" interpolationType="cubicValue">
-<CubicValueInterpolator x1="0.33333334" y1="238.35" x2="0.6666667" y2="244.8083"/>
-</KeyFrameDouble>
-<KeyFrameDouble value="275.225" frame="125" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="opacity">
-<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="110" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="121" interpolationType="linear"/>
-<KeyFrameDouble value="0" frame="125" interpolationType="hold"/>
-</KeyedProperty>
-</KeyedObject>
-<KeyedObject objectId="0:185">
-<KeyedProperty property="x">
-<KeyFrameDouble value="664" frame="111" interpolationType="linear"/>
-<KeyFrameDouble value="686.6667" frame="128" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="y">
-<KeyFrameDouble value="255.85" frame="111" interpolationType="cubicValue">
-<CubicValueInterpolator x1="0.33333334" y1="233.3722" x2="0.6666667" y2="241.6676"/>
-</KeyFrameDouble>
-<KeyFrameDouble value="280.7361" frame="128" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="opacity">
-<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="111" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="124" interpolationType="linear"/>
-<KeyFrameDouble value="0" frame="128" interpolationType="hold"/>
-</KeyedProperty>
-</KeyedObject>
-<KeyedObject objectId="0:186">
-<KeyedProperty property="x">
-<KeyFrameDouble value="612" frame="110" interpolationType="linear"/>
-<KeyFrameDouble value="577.1667" frame="129" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="y">
-<KeyFrameDouble value="255.85" frame="110" interpolationType="cubicValue">
-<CubicValueInterpolator x1="0.33333334" y1="227.7722" x2="0.6666667" y2="238.1343"/>
-</KeyFrameDouble>
-<KeyFrameDouble value="286.9361" frame="129" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="opacity">
-<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="110" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="125" interpolationType="linear"/>
-<KeyFrameDouble value="0" frame="129" interpolationType="hold"/>
-</KeyedProperty>
-</KeyedObject>
 <KeyedObject objectId="0:187">
 <KeyedProperty property="x">
-<KeyFrameDouble value="672" frame="111" interpolationType="linear"/>
-<KeyFrameDouble value="721" frame="132" interpolationType="hold"/>
+<KeyFrameDouble value="620" frame="110" interpolationType="linear"/>
+<KeyFrameDouble value="610.8333" frame="121" interpolationType="hold"/>
 </KeyedProperty>
 <KeyedProperty property="y">
-<KeyFrameDouble value="255.85" frame="111" interpolationType="cubicValue">
-<CubicValueInterpolator x1="0.33333334" y1="221.55" x2="0.6666667" y2="234.2083"/>
+<KeyFrameDouble value="255.85" frame="110" interpolationType="cubicValue">
+<CubicValueInterpolator x1="0.33333334" y1="243.0167" x2="0.6666667" y2="243.0676"/>
 </KeyFrameDouble>
-<KeyFrameDouble value="293.825" frame="132" interpolationType="hold"/>
+<KeyFrameDouble value="256.0028" frame="121" interpolationType="hold"/>
 </KeyedProperty>
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="111" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="128" interpolationType="linear"/>
-<KeyFrameDouble value="0" frame="132" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="110" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="117" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="121" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
 <KeyedObject objectId="0:188">
 <KeyedProperty property="x">
-<KeyFrameDouble value="604" frame="110" interpolationType="linear"/>
-<KeyFrameDouble value="538.8333" frame="133" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="y">
-<KeyFrameDouble value="255.85" frame="110" interpolationType="cubicValue">
-<CubicValueInterpolator x1="0.33333334" y1="214.7056" x2="0.6666667" y2="229.8898"/>
-</KeyFrameDouble>
-<KeyFrameDouble value="301.4028" frame="133" interpolationType="hold"/>
-</KeyedProperty>
-<KeyedProperty property="opacity">
-<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="110" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="129" interpolationType="linear"/>
-<KeyFrameDouble value="0" frame="133" interpolationType="hold"/>
-</KeyedProperty>
-</KeyedObject>
-<KeyedObject objectId="0:189">
-<KeyedProperty property="x">
-<KeyFrameDouble value="680" frame="111" interpolationType="linear"/>
-<KeyFrameDouble value="763.3333" frame="136" interpolationType="hold"/>
+<KeyFrameDouble value="664" frame="111" interpolationType="linear"/>
+<KeyFrameDouble value="680" frame="123" interpolationType="hold"/>
 </KeyedProperty>
 <KeyedProperty property="y">
 <KeyFrameDouble value="255.85" frame="111" interpolationType="cubicValue">
-<CubicValueInterpolator x1="0.33333334" y1="207.2389" x2="0.6666667" y2="225.1787"/>
+<CubicValueInterpolator x1="0.33333334" y1="239.9833" x2="0.6666667" y2="239.45"/>
 </KeyFrameDouble>
-<KeyFrameDouble value="309.6694" frame="136" interpolationType="hold"/>
+<KeyFrameDouble value="254.25" frame="123" interpolationType="hold"/>
 </KeyedProperty>
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="1" frame="111" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="132" interpolationType="linear"/>
-<KeyFrameDouble value="0" frame="136" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="119" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="123" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:190">
+<KeyedObject objectId="0:189">
 <KeyedProperty property="x">
-<KeyFrameDouble value="596" frame="110" interpolationType="linear"/>
-<KeyFrameDouble value="492.5" frame="137" interpolationType="hold"/>
+<KeyFrameDouble value="612" frame="110" interpolationType="linear"/>
+<KeyFrameDouble value="586.3333" frame="124" interpolationType="hold"/>
 </KeyedProperty>
 <KeyedProperty property="y">
 <KeyFrameDouble value="255.85" frame="110" interpolationType="cubicValue">
-<CubicValueInterpolator x1="0.33333334" y1="199.15" x2="0.6666667" y2="220.075"/>
+<CubicValueInterpolator x1="0.33333334" y1="235.1611" x2="0.6666667" y2="235.3426"/>
 </KeyFrameDouble>
-<KeyFrameDouble value="318.625" frame="137" interpolationType="hold"/>
+<KeyFrameDouble value="256.3944" frame="124" interpolationType="hold"/>
 </KeyedProperty>
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="1" frame="110" interpolationType="hold"/>
-<KeyFrameDouble value="1" frame="133" interpolationType="linear"/>
-<KeyFrameDouble value="0" frame="137" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="120" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="124" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:190">
+<KeyedProperty property="x">
+<KeyFrameDouble value="672" frame="111" interpolationType="linear"/>
+<KeyFrameDouble value="707" frame="126" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="y">
+<KeyFrameDouble value="255.85" frame="111" interpolationType="cubicValue">
+<CubicValueInterpolator x1="0.33333334" y1="231.35" x2="0.6666667" y2="230.8083"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="254.225" frame="126" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="opacity">
+<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="111" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="122" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="126" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
 <KeyedObject objectId="0:191">
+<KeyedProperty property="x">
+<KeyFrameDouble value="604" frame="110" interpolationType="linear"/>
+<KeyFrameDouble value="555.8333" frame="127" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="y">
+<KeyFrameDouble value="255.85" frame="110" interpolationType="cubicValue">
+<CubicValueInterpolator x1="0.33333334" y1="225.4389" x2="0.6666667" y2="225.8009"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="256.9361" frame="127" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="opacity">
+<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="110" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="123" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="127" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:192">
+<KeyedProperty property="x">
+<KeyFrameDouble value="680" frame="111" interpolationType="linear"/>
+<KeyFrameDouble value="740" frame="129" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="y">
+<KeyFrameDouble value="255.85" frame="111" interpolationType="cubicValue">
+<CubicValueInterpolator x1="0.33333334" y1="220.85" x2="0.6666667" y2="220.35"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="254.35" frame="129" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="opacity">
+<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="111" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="125" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="129" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:193">
+<KeyedProperty property="x">
+<KeyFrameDouble value="596" frame="110" interpolationType="linear"/>
+<KeyFrameDouble value="519.3333" frame="130" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="y">
+<KeyFrameDouble value="255.85" frame="110" interpolationType="cubicValue">
+<CubicValueInterpolator x1="0.33333334" y1="213.85" x2="0.6666667" y2="214.4426"/>
+</KeyFrameDouble>
+<KeyFrameDouble value="257.6278" frame="130" interpolationType="hold"/>
+</KeyedProperty>
+<KeyedProperty property="opacity">
+<KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="110" interpolationType="hold"/>
+<KeyFrameDouble value="1" frame="126" interpolationType="linear"/>
+<KeyFrameDouble value="0" frame="130" interpolationType="hold"/>
+</KeyedProperty>
+</KeyedObject>
+<KeyedObject objectId="0:194">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="1" frame="14" interpolationType="hold"/>
@@ -13063,30 +13154,30 @@
 <KeyFrameDouble value="161.85" frame="109" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:164">
+<KeyedObject objectId="0:167">
 <KeyedProperty property="trigger">
 <KeyFrameCallback frame="72"/>
 <KeyFrameCallback frame="110"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:192">
+<KeyedObject objectId="0:195">
 <KeyedProperty property="trigger">
 <KeyFrameCallback frame="136"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:193">
+<KeyedObject objectId="0:196">
 <KeyedProperty property="trigger">
 <KeyFrameCallback frame="196"/>
 </KeyedProperty>
 </KeyedObject>
 </LinearAnimation>
-<LinearAnimation name="At rest" id="0:194" duration="240" fps="60" loopValue="loop">
-<KeyedObject objectId="0:179">
+<LinearAnimation name="At rest" id="0:197" duration="240" fps="60" loopValue="loop">
+<KeyedObject objectId="0:182">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:181">
+<KeyedObject objectId="0:184">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 </KeyedProperty>
@@ -13106,7 +13197,7 @@
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:182">
+<KeyedObject objectId="0:185">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 </KeyedProperty>
@@ -13116,7 +13207,7 @@
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:183">
+<KeyedObject objectId="0:186">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 </KeyedProperty>
@@ -13150,9 +13241,9 @@
 </KeyedProperty>
 </KeyedObject>
 </LinearAnimation>
-<LinearAnimation name="Ore waits" id="0:195" duration="60" fps="60"/>
-<LinearAnimation name="Ore flies" id="0:196" duration="243" fps="120">
-<KeyedObject objectId="0:197">
+<LinearAnimation name="Ore waits" id="0:198" duration="60" fps="60"/>
+<LinearAnimation name="Ore flies" id="0:199" duration="243" fps="120">
+<KeyedObject objectId="0:200">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-3" frame="0" interpolationType="cubic">
 <CubicEaseInterpolator x1="0.42" y1="0" x2="1" y2="1"/>
@@ -13166,14 +13257,14 @@
 <KeyFrameDouble value="-45.5" frame="22" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:198">
+<KeyedObject objectId="0:201">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="22" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="68" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:199">
+<KeyedObject objectId="0:202">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-67.0666" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-67.0666" frame="22" interpolationType="linear"/>
@@ -13204,13 +13295,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:200">
+<KeyedObject objectId="0:203">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="94" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:202">
+<KeyedObject objectId="0:205">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-10.3" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-10.3" frame="5" interpolationType="cubic">
@@ -13226,14 +13317,14 @@
 <KeyFrameDouble value="-45.5" frame="27" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:203">
+<KeyedObject objectId="0:206">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="27" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="73" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:204">
+<KeyedObject objectId="0:207">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-69.2846" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-69.2846" frame="27" interpolationType="linear"/>
@@ -13264,13 +13355,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:205">
+<KeyedObject objectId="0:208">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="99" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:206">
+<KeyedObject objectId="0:209">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-17.6" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-17.6" frame="10" interpolationType="cubic">
@@ -13286,14 +13377,14 @@
 <KeyFrameDouble value="-45.5" frame="32" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:207">
+<KeyedObject objectId="0:210">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="32" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="78" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:208">
+<KeyedObject objectId="0:211">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-75.8418" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-75.8418" frame="32" interpolationType="linear"/>
@@ -13324,13 +13415,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:209">
+<KeyedObject objectId="0:212">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="104" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:210">
+<KeyedObject objectId="0:213">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-24.9" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-24.9" frame="15" interpolationType="cubic">
@@ -13346,14 +13437,14 @@
 <KeyFrameDouble value="-45.5" frame="37" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:211">
+<KeyedObject objectId="0:214">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="37" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="83" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:212">
+<KeyedObject objectId="0:215">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-86.4514" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-86.4514" frame="37" interpolationType="linear"/>
@@ -13384,13 +13475,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:213">
+<KeyedObject objectId="0:216">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="109" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:214">
+<KeyedObject objectId="0:217">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-32.2" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-32.2" frame="20" interpolationType="cubic">
@@ -13406,14 +13497,14 @@
 <KeyFrameDouble value="-45.5" frame="42" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:215">
+<KeyedObject objectId="0:218">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="42" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="88" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:216">
+<KeyedObject objectId="0:219">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-100.6499" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-100.6499" frame="42" interpolationType="linear"/>
@@ -13444,13 +13535,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:217">
+<KeyedObject objectId="0:220">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="114" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:218">
+<KeyedObject objectId="0:221">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-39.5" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-39.5" frame="25" interpolationType="cubic">
@@ -13466,14 +13557,14 @@
 <KeyFrameDouble value="-45.5" frame="47" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:219">
+<KeyedObject objectId="0:222">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="47" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="93" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:220">
+<KeyedObject objectId="0:223">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-117.8166" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-117.8166" frame="47" interpolationType="linear"/>
@@ -13504,13 +13595,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:221">
+<KeyedObject objectId="0:224">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="119" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:222">
+<KeyedObject objectId="0:225">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-46.8" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-46.8" frame="30" interpolationType="cubic">
@@ -13526,14 +13617,14 @@
 <KeyFrameDouble value="-45.5" frame="52" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:223">
+<KeyedObject objectId="0:226">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="52" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="98" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:224">
+<KeyedObject objectId="0:227">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-137.2014" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-137.2014" frame="52" interpolationType="linear"/>
@@ -13564,13 +13655,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:225">
+<KeyedObject objectId="0:228">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="124" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:226">
+<KeyedObject objectId="0:229">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-54.1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-54.1" frame="35" interpolationType="cubic">
@@ -13586,14 +13677,14 @@
 <KeyFrameDouble value="-45.5" frame="57" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:227">
+<KeyedObject objectId="0:230">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="57" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="103" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:228">
+<KeyedObject objectId="0:231">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-157.957" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-157.957" frame="57" interpolationType="linear"/>
@@ -13624,13 +13715,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:229">
+<KeyedObject objectId="0:232">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="129" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:230">
+<KeyedObject objectId="0:233">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-61.4" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-61.4" frame="40" interpolationType="cubic">
@@ -13646,14 +13737,14 @@
 <KeyFrameDouble value="-45.5" frame="62" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:231">
+<KeyedObject objectId="0:234">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="62" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="108" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:232">
+<KeyedObject objectId="0:235">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-179.1763" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-179.1763" frame="62" interpolationType="linear"/>
@@ -13684,13 +13775,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:233">
+<KeyedObject objectId="0:236">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="134" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:234">
+<KeyedObject objectId="0:237">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-68.7" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-68.7" frame="45" interpolationType="cubic">
@@ -13706,14 +13797,14 @@
 <KeyFrameDouble value="-45.5" frame="67" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:235">
+<KeyedObject objectId="0:238">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="67" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="113" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:236">
+<KeyedObject objectId="0:239">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-199.9318" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-199.9318" frame="67" interpolationType="linear"/>
@@ -13744,13 +13835,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:237">
+<KeyedObject objectId="0:240">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="139" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:238">
+<KeyedObject objectId="0:241">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-6.6" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-6.6" frame="50" interpolationType="cubic">
@@ -13766,14 +13857,14 @@
 <KeyFrameDouble value="-45.5" frame="72" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:239">
+<KeyedObject objectId="0:242">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="72" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="118" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:240">
+<KeyedObject objectId="0:243">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-219.3166" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-219.3166" frame="72" interpolationType="linear"/>
@@ -13804,13 +13895,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:241">
+<KeyedObject objectId="0:244">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="144" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:242">
+<KeyedObject objectId="0:245">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-13.9" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-13.9" frame="55" interpolationType="cubic">
@@ -13826,14 +13917,14 @@
 <KeyFrameDouble value="-45.5" frame="77" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:243">
+<KeyedObject objectId="0:246">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="77" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="123" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:244">
+<KeyedObject objectId="0:247">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-236.4834" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-236.4834" frame="77" interpolationType="linear"/>
@@ -13864,13 +13955,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:245">
+<KeyedObject objectId="0:248">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="149" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:246">
+<KeyedObject objectId="0:249">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-21.2" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-21.2" frame="60" interpolationType="cubic">
@@ -13886,14 +13977,14 @@
 <KeyFrameDouble value="-45.5" frame="82" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:247">
+<KeyedObject objectId="0:250">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="82" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="128" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:248">
+<KeyedObject objectId="0:251">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-250.6818" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-250.6818" frame="82" interpolationType="linear"/>
@@ -13924,13 +14015,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:249">
+<KeyedObject objectId="0:252">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="154" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:250">
+<KeyedObject objectId="0:253">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-28.5" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-28.5" frame="65" interpolationType="cubic">
@@ -13946,14 +14037,14 @@
 <KeyFrameDouble value="-45.5" frame="87" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:251">
+<KeyedObject objectId="0:254">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="87" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="133" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:252">
+<KeyedObject objectId="0:255">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-261.2915" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-261.2915" frame="87" interpolationType="linear"/>
@@ -13984,13 +14075,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:253">
+<KeyedObject objectId="0:256">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="159" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:254">
+<KeyedObject objectId="0:257">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-35.8" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-35.8" frame="70" interpolationType="cubic">
@@ -14006,14 +14097,14 @@
 <KeyFrameDouble value="-45.5" frame="92" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:255">
+<KeyedObject objectId="0:258">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="92" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="138" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:256">
+<KeyedObject objectId="0:259">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-267.8486" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-267.8486" frame="92" interpolationType="linear"/>
@@ -14044,13 +14135,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:257">
+<KeyedObject objectId="0:260">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="164" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:258">
+<KeyedObject objectId="0:261">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-43.1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-43.1" frame="75" interpolationType="cubic">
@@ -14066,14 +14157,14 @@
 <KeyFrameDouble value="-45.5" frame="97" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:259">
+<KeyedObject objectId="0:262">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="97" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="143" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:260">
+<KeyedObject objectId="0:263">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-270.0666" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-270.0666" frame="97" interpolationType="linear"/>
@@ -14104,13 +14195,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:261">
+<KeyedObject objectId="0:264">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="169" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:262">
+<KeyedObject objectId="0:265">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-50.4" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-50.4" frame="80" interpolationType="cubic">
@@ -14126,14 +14217,14 @@
 <KeyFrameDouble value="-45.5" frame="102" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:263">
+<KeyedObject objectId="0:266">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="102" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="148" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:264">
+<KeyedObject objectId="0:267">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-267.8486" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-267.8486" frame="102" interpolationType="linear"/>
@@ -14164,13 +14255,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:265">
+<KeyedObject objectId="0:268">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="174" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:266">
+<KeyedObject objectId="0:269">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-57.7" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-57.7" frame="85" interpolationType="cubic">
@@ -14186,14 +14277,14 @@
 <KeyFrameDouble value="-45.5" frame="107" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:267">
+<KeyedObject objectId="0:270">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="107" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="153" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:268">
+<KeyedObject objectId="0:271">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-261.2915" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-261.2915" frame="107" interpolationType="linear"/>
@@ -14224,13 +14315,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:269">
+<KeyedObject objectId="0:272">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="179" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:270">
+<KeyedObject objectId="0:273">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-65" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-65" frame="90" interpolationType="cubic">
@@ -14246,14 +14337,14 @@
 <KeyFrameDouble value="-45.5" frame="112" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:271">
+<KeyedObject objectId="0:274">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="112" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="158" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:272">
+<KeyedObject objectId="0:275">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-250.6818" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-250.6818" frame="112" interpolationType="linear"/>
@@ -14284,13 +14375,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:273">
+<KeyedObject objectId="0:276">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="184" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:274">
+<KeyedObject objectId="0:277">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-10.2" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-10.2" frame="95" interpolationType="cubic">
@@ -14306,14 +14397,14 @@
 <KeyFrameDouble value="-45.5" frame="117" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:275">
+<KeyedObject objectId="0:278">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="117" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="163" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:276">
+<KeyedObject objectId="0:279">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-236.4834" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-236.4834" frame="117" interpolationType="linear"/>
@@ -14344,13 +14435,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:277">
+<KeyedObject objectId="0:280">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="189" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:278">
+<KeyedObject objectId="0:281">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-17.5" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-17.5" frame="100" interpolationType="cubic">
@@ -14366,14 +14457,14 @@
 <KeyFrameDouble value="-45.5" frame="122" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:279">
+<KeyedObject objectId="0:282">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="122" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="168" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:280">
+<KeyedObject objectId="0:283">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-219.3166" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-219.3166" frame="122" interpolationType="linear"/>
@@ -14404,13 +14495,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:281">
+<KeyedObject objectId="0:284">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="194" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:282">
+<KeyedObject objectId="0:285">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-24.8" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-24.8" frame="105" interpolationType="cubic">
@@ -14426,14 +14517,14 @@
 <KeyFrameDouble value="-45.5" frame="127" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:283">
+<KeyedObject objectId="0:286">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="127" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="173" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:284">
+<KeyedObject objectId="0:287">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-199.9318" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-199.9318" frame="127" interpolationType="linear"/>
@@ -14464,13 +14555,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:285">
+<KeyedObject objectId="0:288">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="199" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:286">
+<KeyedObject objectId="0:289">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-32.1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-32.1" frame="110" interpolationType="cubic">
@@ -14486,14 +14577,14 @@
 <KeyFrameDouble value="-45.5" frame="132" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:287">
+<KeyedObject objectId="0:290">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="132" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="178" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:288">
+<KeyedObject objectId="0:291">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-179.1763" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-179.1763" frame="132" interpolationType="linear"/>
@@ -14524,13 +14615,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:289">
+<KeyedObject objectId="0:292">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="204" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:290">
+<KeyedObject objectId="0:293">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-39.4" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-39.4" frame="115" interpolationType="cubic">
@@ -14546,14 +14637,14 @@
 <KeyFrameDouble value="-45.5" frame="137" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:291">
+<KeyedObject objectId="0:294">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="137" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="183" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:292">
+<KeyedObject objectId="0:295">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-157.957" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-157.957" frame="137" interpolationType="linear"/>
@@ -14584,13 +14675,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:293">
+<KeyedObject objectId="0:296">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="209" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:294">
+<KeyedObject objectId="0:297">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-46.7" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-46.7" frame="120" interpolationType="cubic">
@@ -14606,14 +14697,14 @@
 <KeyFrameDouble value="-45.5" frame="142" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:295">
+<KeyedObject objectId="0:298">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="142" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="188" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:296">
+<KeyedObject objectId="0:299">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-137.2014" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-137.2014" frame="142" interpolationType="linear"/>
@@ -14644,13 +14735,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:297">
+<KeyedObject objectId="0:300">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="214" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:298">
+<KeyedObject objectId="0:301">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-54" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-54" frame="125" interpolationType="cubic">
@@ -14666,14 +14757,14 @@
 <KeyFrameDouble value="-45.5" frame="147" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:299">
+<KeyedObject objectId="0:302">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="147" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="193" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:300">
+<KeyedObject objectId="0:303">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-117.8166" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-117.8166" frame="147" interpolationType="linear"/>
@@ -14704,13 +14795,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:301">
+<KeyedObject objectId="0:304">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="219" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:302">
+<KeyedObject objectId="0:305">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-13.8" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-13.8" frame="130" interpolationType="cubic">
@@ -14726,14 +14817,14 @@
 <KeyFrameDouble value="-45.5" frame="152" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:303">
+<KeyedObject objectId="0:306">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="152" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="198" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:304">
+<KeyedObject objectId="0:307">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-100.6499" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-100.6499" frame="152" interpolationType="linear"/>
@@ -14764,13 +14855,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:305">
+<KeyedObject objectId="0:308">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="224" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:306">
+<KeyedObject objectId="0:309">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-21.1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-21.1" frame="135" interpolationType="cubic">
@@ -14786,14 +14877,14 @@
 <KeyFrameDouble value="-45.5" frame="157" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:307">
+<KeyedObject objectId="0:310">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="157" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="203" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:308">
+<KeyedObject objectId="0:311">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-86.4514" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-86.4514" frame="157" interpolationType="linear"/>
@@ -14824,13 +14915,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:309">
+<KeyedObject objectId="0:312">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="229" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:310">
+<KeyedObject objectId="0:313">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-28.4" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-28.4" frame="140" interpolationType="cubic">
@@ -14846,14 +14937,14 @@
 <KeyFrameDouble value="-45.5" frame="162" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:311">
+<KeyedObject objectId="0:314">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="162" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="208" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:312">
+<KeyedObject objectId="0:315">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-75.8418" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-75.8418" frame="162" interpolationType="linear"/>
@@ -14884,13 +14975,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:313">
+<KeyedObject objectId="0:316">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="234" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:314">
+<KeyedObject objectId="0:317">
 <KeyedProperty property="x">
 <KeyFrameDouble value="-35.7" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-35.7" frame="145" interpolationType="cubic">
@@ -14906,14 +14997,14 @@
 <KeyFrameDouble value="-45.5" frame="167" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:315">
+<KeyedObject objectId="0:318">
 <KeyedProperty property="strength">
 <KeyFrameDouble value="0" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="167" interpolationType="linear"/>
 <KeyFrameDouble value="1" frame="213" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:316">
+<KeyedObject objectId="0:319">
 <KeyedProperty property="y">
 <KeyFrameDouble value="-69.2846" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="-69.2846" frame="167" interpolationType="linear"/>
@@ -14944,13 +15035,13 @@
 </KeyFrameDouble>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:317">
+<KeyedObject objectId="0:320">
 <KeyedProperty property="opacity">
 <KeyFrameDouble value="1" frame="0" interpolationType="hold"/>
 <KeyFrameDouble value="0" frame="239" interpolationType="hold"/>
 </KeyedProperty>
 </KeyedObject>
-<KeyedObject objectId="0:201">
+<KeyedObject objectId="0:204">
 <KeyedProperty property="trigger">
 <KeyFrameCallback frame="68"/>
 <KeyFrameCallback frame="73"/>
@@ -14986,177 +15077,177 @@
 </KeyedObject>
 </LinearAnimation>
 </Artboard>
-<DataConverterRangeMapper id="0:324" name="ore 0 counted" minInput="0" maxInput="1" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:328" name="ore 1 counted" minInput="1" maxInput="2" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:332" name="ore 2 counted" minInput="2" maxInput="3" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:336" name="ore 3 counted" minInput="3" maxInput="4" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:340" name="ore 4 counted" minInput="4" maxInput="5" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:344" name="ore 5 counted" minInput="5" maxInput="6" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:348" name="ore 6 counted" minInput="6" maxInput="7" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:352" name="ore 7 counted" minInput="7" maxInput="8" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:356" name="ore 8 counted" minInput="8" maxInput="9" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:360" name="ore 9 counted" minInput="9" maxInput="10" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:364" name="ore 10 counted" minInput="10" maxInput="11" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:368" name="ore 11 counted" minInput="11" maxInput="12" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:372" name="ore 12 counted" minInput="12" maxInput="13" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:376" name="ore 13 counted" minInput="13" maxInput="14" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:380" name="ore 14 counted" minInput="14" maxInput="15" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:384" name="ore 15 counted" minInput="15" maxInput="16" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:388" name="ore 16 counted" minInput="16" maxInput="17" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:392" name="ore 17 counted" minInput="17" maxInput="18" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:396" name="ore 18 counted" minInput="18" maxInput="19" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:400" name="ore 19 counted" minInput="19" maxInput="20" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:404" name="ore 20 counted" minInput="20" maxInput="21" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:408" name="ore 21 counted" minInput="21" maxInput="22" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:412" name="ore 22 counted" minInput="22" maxInput="23" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:416" name="ore 23 counted" minInput="23" maxInput="24" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:420" name="ore 24 counted" minInput="24" maxInput="25" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:424" name="ore 25 counted" minInput="25" maxInput="26" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:428" name="ore 26 counted" minInput="26" maxInput="27" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:432" name="ore 27 counted" minInput="27" maxInput="28" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:436" name="ore 28 counted" minInput="28" maxInput="29" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:440" name="ore 29 counted" minInput="29" maxInput="30" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:444" name="stone 0 counted" minInput="0" maxInput="1" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:448" name="stone 1 counted" minInput="1" maxInput="2" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<DataConverterRangeMapper id="0:452" name="stone 2 counted" minInput="2" maxInput="3" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
-<ViewModel name="CartEnding" id="0:322" defaultInstanceId="0:474">
-<ViewModelPropertyNumber name="ore" id="0:318"/>
-<ViewModelPropertyNumber name="stones" id="0:319"/>
-<ViewModelPropertyNumber name="ore0x" id="0:320"/>
-<ViewModelPropertyNumber name="ore0y" id="0:321"/>
-<ViewModelPropertyNumber name="ore1x" id="0:325"/>
-<ViewModelPropertyNumber name="ore1y" id="0:326"/>
-<ViewModelPropertyNumber name="ore2x" id="0:329"/>
-<ViewModelPropertyNumber name="ore2y" id="0:330"/>
-<ViewModelPropertyNumber name="ore3x" id="0:333"/>
-<ViewModelPropertyNumber name="ore3y" id="0:334"/>
-<ViewModelPropertyNumber name="ore4x" id="0:337"/>
-<ViewModelPropertyNumber name="ore4y" id="0:338"/>
-<ViewModelPropertyNumber name="ore5x" id="0:341"/>
-<ViewModelPropertyNumber name="ore5y" id="0:342"/>
-<ViewModelPropertyNumber name="ore6x" id="0:345"/>
-<ViewModelPropertyNumber name="ore6y" id="0:346"/>
-<ViewModelPropertyNumber name="ore7x" id="0:349"/>
-<ViewModelPropertyNumber name="ore7y" id="0:350"/>
-<ViewModelPropertyNumber name="ore8x" id="0:353"/>
-<ViewModelPropertyNumber name="ore8y" id="0:354"/>
-<ViewModelPropertyNumber name="ore9x" id="0:357"/>
-<ViewModelPropertyNumber name="ore9y" id="0:358"/>
-<ViewModelPropertyNumber name="ore10x" id="0:361"/>
-<ViewModelPropertyNumber name="ore10y" id="0:362"/>
-<ViewModelPropertyNumber name="ore11x" id="0:365"/>
-<ViewModelPropertyNumber name="ore11y" id="0:366"/>
-<ViewModelPropertyNumber name="ore12x" id="0:369"/>
-<ViewModelPropertyNumber name="ore12y" id="0:370"/>
-<ViewModelPropertyNumber name="ore13x" id="0:373"/>
-<ViewModelPropertyNumber name="ore13y" id="0:374"/>
-<ViewModelPropertyNumber name="ore14x" id="0:377"/>
-<ViewModelPropertyNumber name="ore14y" id="0:378"/>
-<ViewModelPropertyNumber name="ore15x" id="0:381"/>
-<ViewModelPropertyNumber name="ore15y" id="0:382"/>
-<ViewModelPropertyNumber name="ore16x" id="0:385"/>
-<ViewModelPropertyNumber name="ore16y" id="0:386"/>
-<ViewModelPropertyNumber name="ore17x" id="0:389"/>
-<ViewModelPropertyNumber name="ore17y" id="0:390"/>
-<ViewModelPropertyNumber name="ore18x" id="0:393"/>
-<ViewModelPropertyNumber name="ore18y" id="0:394"/>
-<ViewModelPropertyNumber name="ore19x" id="0:397"/>
-<ViewModelPropertyNumber name="ore19y" id="0:398"/>
-<ViewModelPropertyNumber name="ore20x" id="0:401"/>
-<ViewModelPropertyNumber name="ore20y" id="0:402"/>
-<ViewModelPropertyNumber name="ore21x" id="0:405"/>
-<ViewModelPropertyNumber name="ore21y" id="0:406"/>
-<ViewModelPropertyNumber name="ore22x" id="0:409"/>
-<ViewModelPropertyNumber name="ore22y" id="0:410"/>
-<ViewModelPropertyNumber name="ore23x" id="0:413"/>
-<ViewModelPropertyNumber name="ore23y" id="0:414"/>
-<ViewModelPropertyNumber name="ore24x" id="0:417"/>
-<ViewModelPropertyNumber name="ore24y" id="0:418"/>
-<ViewModelPropertyNumber name="ore25x" id="0:421"/>
-<ViewModelPropertyNumber name="ore25y" id="0:422"/>
-<ViewModelPropertyNumber name="ore26x" id="0:425"/>
-<ViewModelPropertyNumber name="ore26y" id="0:426"/>
-<ViewModelPropertyNumber name="ore27x" id="0:429"/>
-<ViewModelPropertyNumber name="ore27y" id="0:430"/>
-<ViewModelPropertyNumber name="ore28x" id="0:433"/>
-<ViewModelPropertyNumber name="ore28y" id="0:434"/>
-<ViewModelPropertyNumber name="ore29x" id="0:437"/>
-<ViewModelPropertyNumber name="ore29y" id="0:438"/>
-<ViewModelPropertyNumber name="stone0x" id="0:441"/>
-<ViewModelPropertyNumber name="stone0y" id="0:442"/>
-<ViewModelPropertyNumber name="stone1x" id="0:445"/>
-<ViewModelPropertyNumber name="stone1y" id="0:446"/>
-<ViewModelPropertyNumber name="stone2x" id="0:449"/>
-<ViewModelPropertyNumber name="stone2y" id="0:450"/>
+<DataConverterRangeMapper id="0:327" name="ore 0 counted" minInput="0" maxInput="1" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:331" name="ore 1 counted" minInput="1" maxInput="2" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:335" name="ore 2 counted" minInput="2" maxInput="3" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:339" name="ore 3 counted" minInput="3" maxInput="4" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:343" name="ore 4 counted" minInput="4" maxInput="5" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:347" name="ore 5 counted" minInput="5" maxInput="6" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:351" name="ore 6 counted" minInput="6" maxInput="7" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:355" name="ore 7 counted" minInput="7" maxInput="8" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:359" name="ore 8 counted" minInput="8" maxInput="9" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:363" name="ore 9 counted" minInput="9" maxInput="10" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:367" name="ore 10 counted" minInput="10" maxInput="11" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:371" name="ore 11 counted" minInput="11" maxInput="12" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:375" name="ore 12 counted" minInput="12" maxInput="13" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:379" name="ore 13 counted" minInput="13" maxInput="14" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:383" name="ore 14 counted" minInput="14" maxInput="15" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:387" name="ore 15 counted" minInput="15" maxInput="16" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:391" name="ore 16 counted" minInput="16" maxInput="17" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:395" name="ore 17 counted" minInput="17" maxInput="18" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:399" name="ore 18 counted" minInput="18" maxInput="19" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:403" name="ore 19 counted" minInput="19" maxInput="20" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:407" name="ore 20 counted" minInput="20" maxInput="21" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:411" name="ore 21 counted" minInput="21" maxInput="22" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:415" name="ore 22 counted" minInput="22" maxInput="23" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:419" name="ore 23 counted" minInput="23" maxInput="24" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:423" name="ore 24 counted" minInput="24" maxInput="25" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:427" name="ore 25 counted" minInput="25" maxInput="26" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:431" name="ore 26 counted" minInput="26" maxInput="27" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:435" name="ore 27 counted" minInput="27" maxInput="28" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:439" name="ore 28 counted" minInput="28" maxInput="29" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:443" name="ore 29 counted" minInput="29" maxInput="30" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:447" name="stone 0 counted" minInput="0" maxInput="1" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:451" name="stone 1 counted" minInput="1" maxInput="2" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<DataConverterRangeMapper id="0:455" name="stone 2 counted" minInput="2" maxInput="3" minOutput="0" maxOutput="1" clampLower="true" clampUpper="true"/>
+<ViewModel name="CartEnding" id="0:325" defaultInstanceId="0:474">
+<ViewModelPropertyNumber name="ore" id="0:321"/>
+<ViewModelPropertyNumber name="stones" id="0:322"/>
+<ViewModelPropertyNumber name="ore0x" id="0:323"/>
+<ViewModelPropertyNumber name="ore0y" id="0:324"/>
+<ViewModelPropertyNumber name="ore1x" id="0:328"/>
+<ViewModelPropertyNumber name="ore1y" id="0:329"/>
+<ViewModelPropertyNumber name="ore2x" id="0:332"/>
+<ViewModelPropertyNumber name="ore2y" id="0:333"/>
+<ViewModelPropertyNumber name="ore3x" id="0:336"/>
+<ViewModelPropertyNumber name="ore3y" id="0:337"/>
+<ViewModelPropertyNumber name="ore4x" id="0:340"/>
+<ViewModelPropertyNumber name="ore4y" id="0:341"/>
+<ViewModelPropertyNumber name="ore5x" id="0:344"/>
+<ViewModelPropertyNumber name="ore5y" id="0:345"/>
+<ViewModelPropertyNumber name="ore6x" id="0:348"/>
+<ViewModelPropertyNumber name="ore6y" id="0:349"/>
+<ViewModelPropertyNumber name="ore7x" id="0:352"/>
+<ViewModelPropertyNumber name="ore7y" id="0:353"/>
+<ViewModelPropertyNumber name="ore8x" id="0:356"/>
+<ViewModelPropertyNumber name="ore8y" id="0:357"/>
+<ViewModelPropertyNumber name="ore9x" id="0:360"/>
+<ViewModelPropertyNumber name="ore9y" id="0:361"/>
+<ViewModelPropertyNumber name="ore10x" id="0:364"/>
+<ViewModelPropertyNumber name="ore10y" id="0:365"/>
+<ViewModelPropertyNumber name="ore11x" id="0:368"/>
+<ViewModelPropertyNumber name="ore11y" id="0:369"/>
+<ViewModelPropertyNumber name="ore12x" id="0:372"/>
+<ViewModelPropertyNumber name="ore12y" id="0:373"/>
+<ViewModelPropertyNumber name="ore13x" id="0:376"/>
+<ViewModelPropertyNumber name="ore13y" id="0:377"/>
+<ViewModelPropertyNumber name="ore14x" id="0:380"/>
+<ViewModelPropertyNumber name="ore14y" id="0:381"/>
+<ViewModelPropertyNumber name="ore15x" id="0:384"/>
+<ViewModelPropertyNumber name="ore15y" id="0:385"/>
+<ViewModelPropertyNumber name="ore16x" id="0:388"/>
+<ViewModelPropertyNumber name="ore16y" id="0:389"/>
+<ViewModelPropertyNumber name="ore17x" id="0:392"/>
+<ViewModelPropertyNumber name="ore17y" id="0:393"/>
+<ViewModelPropertyNumber name="ore18x" id="0:396"/>
+<ViewModelPropertyNumber name="ore18y" id="0:397"/>
+<ViewModelPropertyNumber name="ore19x" id="0:400"/>
+<ViewModelPropertyNumber name="ore19y" id="0:401"/>
+<ViewModelPropertyNumber name="ore20x" id="0:404"/>
+<ViewModelPropertyNumber name="ore20y" id="0:405"/>
+<ViewModelPropertyNumber name="ore21x" id="0:408"/>
+<ViewModelPropertyNumber name="ore21y" id="0:409"/>
+<ViewModelPropertyNumber name="ore22x" id="0:412"/>
+<ViewModelPropertyNumber name="ore22y" id="0:413"/>
+<ViewModelPropertyNumber name="ore23x" id="0:416"/>
+<ViewModelPropertyNumber name="ore23y" id="0:417"/>
+<ViewModelPropertyNumber name="ore24x" id="0:420"/>
+<ViewModelPropertyNumber name="ore24y" id="0:421"/>
+<ViewModelPropertyNumber name="ore25x" id="0:424"/>
+<ViewModelPropertyNumber name="ore25y" id="0:425"/>
+<ViewModelPropertyNumber name="ore26x" id="0:428"/>
+<ViewModelPropertyNumber name="ore26y" id="0:429"/>
+<ViewModelPropertyNumber name="ore27x" id="0:432"/>
+<ViewModelPropertyNumber name="ore27y" id="0:433"/>
+<ViewModelPropertyNumber name="ore28x" id="0:436"/>
+<ViewModelPropertyNumber name="ore28y" id="0:437"/>
+<ViewModelPropertyNumber name="ore29x" id="0:440"/>
+<ViewModelPropertyNumber name="ore29y" id="0:441"/>
+<ViewModelPropertyNumber name="stone0x" id="0:444"/>
+<ViewModelPropertyNumber name="stone0y" id="0:445"/>
+<ViewModelPropertyNumber name="stone1x" id="0:448"/>
+<ViewModelPropertyNumber name="stone1y" id="0:449"/>
+<ViewModelPropertyNumber name="stone2x" id="0:452"/>
+<ViewModelPropertyNumber name="stone2y" id="0:453"/>
 <ViewModelInstance name="Default" id="0:474" exports="true">
-<ViewModelInstanceNumber propertyValue="12" viewModelPropertyId="0:318"/>
-<ViewModelInstanceNumber propertyValue="1" viewModelPropertyId="0:319"/>
-<ViewModelInstanceNumber propertyValue="640" viewModelPropertyId="0:320"/>
-<ViewModelInstanceNumber propertyValue="270.5" viewModelPropertyId="0:321"/>
-<ViewModelInstanceNumber propertyValue="661.1" viewModelPropertyId="0:325"/>
-<ViewModelInstanceNumber propertyValue="272.72" viewModelPropertyId="0:326"/>
-<ViewModelInstanceNumber propertyValue="681.28" viewModelPropertyId="0:329"/>
-<ViewModelInstanceNumber propertyValue="279.28" viewModelPropertyId="0:330"/>
-<ViewModelInstanceNumber propertyValue="699.66" viewModelPropertyId="0:333"/>
-<ViewModelInstanceNumber propertyValue="289.88" viewModelPropertyId="0:334"/>
-<ViewModelInstanceNumber propertyValue="715.43" viewModelPropertyId="0:337"/>
-<ViewModelInstanceNumber propertyValue="304.08" viewModelPropertyId="0:338"/>
-<ViewModelInstanceNumber propertyValue="727.9" viewModelPropertyId="0:341"/>
-<ViewModelInstanceNumber propertyValue="321.25" viewModelPropertyId="0:342"/>
-<ViewModelInstanceNumber propertyValue="736.53" viewModelPropertyId="0:345"/>
-<ViewModelInstanceNumber propertyValue="340.63" viewModelPropertyId="0:346"/>
-<ViewModelInstanceNumber propertyValue="740.94" viewModelPropertyId="0:349"/>
-<ViewModelInstanceNumber propertyValue="361.39" viewModelPropertyId="0:350"/>
-<ViewModelInstanceNumber propertyValue="740.94" viewModelPropertyId="0:353"/>
-<ViewModelInstanceNumber propertyValue="382.61" viewModelPropertyId="0:354"/>
-<ViewModelInstanceNumber propertyValue="736.53" viewModelPropertyId="0:357"/>
-<ViewModelInstanceNumber propertyValue="403.37" viewModelPropertyId="0:358"/>
-<ViewModelInstanceNumber propertyValue="727.9" viewModelPropertyId="0:361"/>
-<ViewModelInstanceNumber propertyValue="422.75" viewModelPropertyId="0:362"/>
-<ViewModelInstanceNumber propertyValue="715.43" viewModelPropertyId="0:365"/>
-<ViewModelInstanceNumber propertyValue="439.92" viewModelPropertyId="0:366"/>
-<ViewModelInstanceNumber propertyValue="699.66" viewModelPropertyId="0:369"/>
-<ViewModelInstanceNumber propertyValue="454.12" viewModelPropertyId="0:370"/>
-<ViewModelInstanceNumber propertyValue="681.28" viewModelPropertyId="0:373"/>
-<ViewModelInstanceNumber propertyValue="464.72" viewModelPropertyId="0:374"/>
-<ViewModelInstanceNumber propertyValue="661.1" viewModelPropertyId="0:377"/>
-<ViewModelInstanceNumber propertyValue="471.28" viewModelPropertyId="0:378"/>
-<ViewModelInstanceNumber propertyValue="640" viewModelPropertyId="0:381"/>
-<ViewModelInstanceNumber propertyValue="473.5" viewModelPropertyId="0:382"/>
-<ViewModelInstanceNumber propertyValue="618.9" viewModelPropertyId="0:385"/>
-<ViewModelInstanceNumber propertyValue="471.28" viewModelPropertyId="0:386"/>
-<ViewModelInstanceNumber propertyValue="598.72" viewModelPropertyId="0:389"/>
-<ViewModelInstanceNumber propertyValue="464.72" viewModelPropertyId="0:390"/>
-<ViewModelInstanceNumber propertyValue="580.34" viewModelPropertyId="0:393"/>
-<ViewModelInstanceNumber propertyValue="454.12" viewModelPropertyId="0:394"/>
-<ViewModelInstanceNumber propertyValue="564.57" viewModelPropertyId="0:397"/>
-<ViewModelInstanceNumber propertyValue="439.92" viewModelPropertyId="0:398"/>
-<ViewModelInstanceNumber propertyValue="552.1" viewModelPropertyId="0:401"/>
-<ViewModelInstanceNumber propertyValue="422.75" viewModelPropertyId="0:402"/>
-<ViewModelInstanceNumber propertyValue="543.47" viewModelPropertyId="0:405"/>
-<ViewModelInstanceNumber propertyValue="403.37" viewModelPropertyId="0:406"/>
-<ViewModelInstanceNumber propertyValue="539.06" viewModelPropertyId="0:409"/>
-<ViewModelInstanceNumber propertyValue="382.61" viewModelPropertyId="0:410"/>
-<ViewModelInstanceNumber propertyValue="539.06" viewModelPropertyId="0:413"/>
-<ViewModelInstanceNumber propertyValue="361.39" viewModelPropertyId="0:414"/>
-<ViewModelInstanceNumber propertyValue="543.47" viewModelPropertyId="0:417"/>
-<ViewModelInstanceNumber propertyValue="340.63" viewModelPropertyId="0:418"/>
-<ViewModelInstanceNumber propertyValue="552.1" viewModelPropertyId="0:421"/>
-<ViewModelInstanceNumber propertyValue="321.25" viewModelPropertyId="0:422"/>
-<ViewModelInstanceNumber propertyValue="564.57" viewModelPropertyId="0:425"/>
-<ViewModelInstanceNumber propertyValue="304.08" viewModelPropertyId="0:426"/>
-<ViewModelInstanceNumber propertyValue="580.34" viewModelPropertyId="0:429"/>
-<ViewModelInstanceNumber propertyValue="289.88" viewModelPropertyId="0:430"/>
-<ViewModelInstanceNumber propertyValue="598.72" viewModelPropertyId="0:433"/>
-<ViewModelInstanceNumber propertyValue="279.28" viewModelPropertyId="0:434"/>
-<ViewModelInstanceNumber propertyValue="618.9" viewModelPropertyId="0:437"/>
-<ViewModelInstanceNumber propertyValue="272.72" viewModelPropertyId="0:438"/>
-<ViewModelInstanceNumber propertyValue="640" viewModelPropertyId="0:441"/>
-<ViewModelInstanceNumber propertyValue="372" viewModelPropertyId="0:442"/>
-<ViewModelInstanceNumber propertyValue="700" viewModelPropertyId="0:445"/>
-<ViewModelInstanceNumber propertyValue="372" viewModelPropertyId="0:446"/>
-<ViewModelInstanceNumber propertyValue="760" viewModelPropertyId="0:449"/>
-<ViewModelInstanceNumber propertyValue="372" viewModelPropertyId="0:450"/>
+<ViewModelInstanceNumber propertyValue="12" viewModelPropertyId="0:321"/>
+<ViewModelInstanceNumber propertyValue="1" viewModelPropertyId="0:322"/>
+<ViewModelInstanceNumber propertyValue="640" viewModelPropertyId="0:323"/>
+<ViewModelInstanceNumber propertyValue="270.5" viewModelPropertyId="0:324"/>
+<ViewModelInstanceNumber propertyValue="661.1" viewModelPropertyId="0:328"/>
+<ViewModelInstanceNumber propertyValue="272.72" viewModelPropertyId="0:329"/>
+<ViewModelInstanceNumber propertyValue="681.28" viewModelPropertyId="0:332"/>
+<ViewModelInstanceNumber propertyValue="279.28" viewModelPropertyId="0:333"/>
+<ViewModelInstanceNumber propertyValue="699.66" viewModelPropertyId="0:336"/>
+<ViewModelInstanceNumber propertyValue="289.88" viewModelPropertyId="0:337"/>
+<ViewModelInstanceNumber propertyValue="715.43" viewModelPropertyId="0:340"/>
+<ViewModelInstanceNumber propertyValue="304.08" viewModelPropertyId="0:341"/>
+<ViewModelInstanceNumber propertyValue="727.9" viewModelPropertyId="0:344"/>
+<ViewModelInstanceNumber propertyValue="321.25" viewModelPropertyId="0:345"/>
+<ViewModelInstanceNumber propertyValue="736.53" viewModelPropertyId="0:348"/>
+<ViewModelInstanceNumber propertyValue="340.63" viewModelPropertyId="0:349"/>
+<ViewModelInstanceNumber propertyValue="740.94" viewModelPropertyId="0:352"/>
+<ViewModelInstanceNumber propertyValue="361.39" viewModelPropertyId="0:353"/>
+<ViewModelInstanceNumber propertyValue="740.94" viewModelPropertyId="0:356"/>
+<ViewModelInstanceNumber propertyValue="382.61" viewModelPropertyId="0:357"/>
+<ViewModelInstanceNumber propertyValue="736.53" viewModelPropertyId="0:360"/>
+<ViewModelInstanceNumber propertyValue="403.37" viewModelPropertyId="0:361"/>
+<ViewModelInstanceNumber propertyValue="727.9" viewModelPropertyId="0:364"/>
+<ViewModelInstanceNumber propertyValue="422.75" viewModelPropertyId="0:365"/>
+<ViewModelInstanceNumber propertyValue="715.43" viewModelPropertyId="0:368"/>
+<ViewModelInstanceNumber propertyValue="439.92" viewModelPropertyId="0:369"/>
+<ViewModelInstanceNumber propertyValue="699.66" viewModelPropertyId="0:372"/>
+<ViewModelInstanceNumber propertyValue="454.12" viewModelPropertyId="0:373"/>
+<ViewModelInstanceNumber propertyValue="681.28" viewModelPropertyId="0:376"/>
+<ViewModelInstanceNumber propertyValue="464.72" viewModelPropertyId="0:377"/>
+<ViewModelInstanceNumber propertyValue="661.1" viewModelPropertyId="0:380"/>
+<ViewModelInstanceNumber propertyValue="471.28" viewModelPropertyId="0:381"/>
+<ViewModelInstanceNumber propertyValue="640" viewModelPropertyId="0:384"/>
+<ViewModelInstanceNumber propertyValue="473.5" viewModelPropertyId="0:385"/>
+<ViewModelInstanceNumber propertyValue="618.9" viewModelPropertyId="0:388"/>
+<ViewModelInstanceNumber propertyValue="471.28" viewModelPropertyId="0:389"/>
+<ViewModelInstanceNumber propertyValue="598.72" viewModelPropertyId="0:392"/>
+<ViewModelInstanceNumber propertyValue="464.72" viewModelPropertyId="0:393"/>
+<ViewModelInstanceNumber propertyValue="580.34" viewModelPropertyId="0:396"/>
+<ViewModelInstanceNumber propertyValue="454.12" viewModelPropertyId="0:397"/>
+<ViewModelInstanceNumber propertyValue="564.57" viewModelPropertyId="0:400"/>
+<ViewModelInstanceNumber propertyValue="439.92" viewModelPropertyId="0:401"/>
+<ViewModelInstanceNumber propertyValue="552.1" viewModelPropertyId="0:404"/>
+<ViewModelInstanceNumber propertyValue="422.75" viewModelPropertyId="0:405"/>
+<ViewModelInstanceNumber propertyValue="543.47" viewModelPropertyId="0:408"/>
+<ViewModelInstanceNumber propertyValue="403.37" viewModelPropertyId="0:409"/>
+<ViewModelInstanceNumber propertyValue="539.06" viewModelPropertyId="0:412"/>
+<ViewModelInstanceNumber propertyValue="382.61" viewModelPropertyId="0:413"/>
+<ViewModelInstanceNumber propertyValue="539.06" viewModelPropertyId="0:416"/>
+<ViewModelInstanceNumber propertyValue="361.39" viewModelPropertyId="0:417"/>
+<ViewModelInstanceNumber propertyValue="543.47" viewModelPropertyId="0:420"/>
+<ViewModelInstanceNumber propertyValue="340.63" viewModelPropertyId="0:421"/>
+<ViewModelInstanceNumber propertyValue="552.1" viewModelPropertyId="0:424"/>
+<ViewModelInstanceNumber propertyValue="321.25" viewModelPropertyId="0:425"/>
+<ViewModelInstanceNumber propertyValue="564.57" viewModelPropertyId="0:428"/>
+<ViewModelInstanceNumber propertyValue="304.08" viewModelPropertyId="0:429"/>
+<ViewModelInstanceNumber propertyValue="580.34" viewModelPropertyId="0:432"/>
+<ViewModelInstanceNumber propertyValue="289.88" viewModelPropertyId="0:433"/>
+<ViewModelInstanceNumber propertyValue="598.72" viewModelPropertyId="0:436"/>
+<ViewModelInstanceNumber propertyValue="279.28" viewModelPropertyId="0:437"/>
+<ViewModelInstanceNumber propertyValue="618.9" viewModelPropertyId="0:440"/>
+<ViewModelInstanceNumber propertyValue="272.72" viewModelPropertyId="0:441"/>
+<ViewModelInstanceNumber propertyValue="640" viewModelPropertyId="0:444"/>
+<ViewModelInstanceNumber propertyValue="372" viewModelPropertyId="0:445"/>
+<ViewModelInstanceNumber propertyValue="700" viewModelPropertyId="0:448"/>
+<ViewModelInstanceNumber propertyValue="372" viewModelPropertyId="0:449"/>
+<ViewModelInstanceNumber propertyValue="760" viewModelPropertyId="0:452"/>
+<ViewModelInstanceNumber propertyValue="372" viewModelPropertyId="0:453"/>
 </ViewModelInstance>
 </ViewModel>
 </Rive>

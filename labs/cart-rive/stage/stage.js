@@ -39,7 +39,7 @@ function draw(t) {
   seen.stoneLand.forEach((at, j) => {
     if (t < at) return;
     const [x, y] = gemPlace(j), pop = 1 + 0.5 * Math.exp(-14 * (t - at));
-    ctx.fillStyle = "#7aa2f7";
+    ctx.fillStyle = ["#f2a0c4", "#b9a2f2", "#8fd0f0"][j];
     for (const [gx, gy] of [[0, -2], [-1, -1], [0, -1], [1, -1], [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0], [-1, 1], [0, 1], [1, 1], [0, 2]]) ctx.fillRect(x + (gx - 0.5) * 3.2 * pop, y + dy * 0.4 + (gy - 0.5) * 3.2 * pop, 3.2 * pop, 3.2 * pop);
   });
   document.getElementById("say").classList.toggle("on", seen.speak.some((at) => t >= at));
