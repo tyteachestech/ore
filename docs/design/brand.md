@@ -79,7 +79,7 @@ Every sound has a visual twin. The ambience radio (Cave, Rain, Lamp, Deep mine, 
 
 ## The mark
 
-The app icon is a pickaxe in white-to-grey halftone dots on the dark tile. The wordmark is "ore_" in Poppins ExtraBold Italic with a green underscore, used only where the name is written.
+The app icon is a pickaxe in white-to-grey halftone dots on the dark tile. Where the name is written it is a plain "Ore" in Geist beside the icon: there is no wordmark.
 
 ## Formats
 

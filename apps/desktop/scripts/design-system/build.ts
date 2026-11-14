@@ -190,20 +190,18 @@ for (const [folder, name, group, height, subtitle, guide] of previews) {
   write(`components/${folder}/README.md`, `# ${folder}\n\n${guide}\n`);
 }
 
-// The cover: the app icon and the wordmark over the palette's blocks and a dot grid. The icon is the page's own
+// The cover: the app icon and the name over the palette's blocks and a dot grid. The icon is the page's own
 // upload of src-tauri/icons/icon.png (Logos); upload it again and change this id if the icon is redrawn.
 const ICON = "/_blob/310cbe6f56d1f15a6a5958a31cdd1408";
 const dotGrid = Array.from({ length: 5 }, (_, y) => Array.from({ length: 15 }, (_, x) => `<circle cx="${232 + x * 16}" cy="${24 + y * 16}" r="1.5"/>`).join("")).join("");
 write("components/Cover/preview.html", `<!-- @dsCard height=300 -->
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@1,800&display=swap">
 <style>
   html, body { margin: 0; padding: 0; background: var(--bg); }
   .c { position: relative; width: 960px; height: 300px; overflow: hidden; }
   .c svg { position: absolute; left: 480px; top: 0; }
   .q { fill: var(--question-solid); } .a { fill: var(--apply-solid); } .k { fill: var(--keep-solid); } .cd { fill: var(--card-solid); } .l { fill: var(--lamp); } .p { fill: var(--bg-raised); } .dot { fill: var(--faint); }
   .t { position: absolute; left: 48px; bottom: 44px; max-width: 400px; }
-  .t h1 { margin: 0; font: italic 800 120px/.92 Poppins, Geist, sans-serif; color: var(--text); letter-spacing: -.02em; }
-  .t h1 i { color: var(--c-green); font-style: inherit; }
+  .t h1 { margin: 0; font: 600 64px/1 Geist, sans-serif; color: var(--text); letter-spacing: -.03em; }
   .t p { margin: 12px 0 0; font: 13px/18px var(--mono); color: var(--muted); }
   .icon { position: absolute; left: 40px; top: 28px; width: 72px; height: 72px; }
 </style>
@@ -222,7 +220,7 @@ write("components/Cover/preview.html", `<!-- @dsCard height=300 -->
     <circle class="l" cx="420" cy="156" r="20"/>
   </svg>
   <img class="icon" src="${ICON}" alt="Ore's app icon: a pickaxe in dots">
-  <div class="t"><h1>ore<i>_</i></h1><p>Calm learning, drawn in dots.</p></div>
+  <div class="t"><h1>Ore</h1><p>Calm learning, drawn in dots.</p></div>
 </div>
 `);
 console.log(`design system written to ${join(out, "project")}`);
