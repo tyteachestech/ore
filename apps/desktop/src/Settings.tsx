@@ -44,6 +44,17 @@ const VENDORS: { id: Vendor; label: string }[] = [
 const TIMES = Array.from({ length: 33 }, (_, i) => `${String(6 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
 const clock = (t: string) => new Date(`2000-01-01T${t}:00`).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
+// Settings share one file and native side effects. Keep their order even when the panel
+// closes and opens again; a failed write must not stop the choices queued behind it.
+let settingsWrites: Promise<unknown> = Promise.resolve();
+/** A queued write failed since the form last matched the file, so the next one to land reads it back. */
+let settingsFailed = false;
+function queueSettings<T>(run: () => Promise<T>): Promise<T> {
+  const next = settingsWrites.then(run, run);
+  settingsWrites = next.catch(() => {});
+  return next;
+}
+
 const LAST = "ore.settings";
 const home = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
 
@@ -78,7 +89,13 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
 
   const changes = useLibraryChanges();
   useEffect(() => {
-    ore<Data>("settings").then(setData, (e) => setError(errorText(e)));
+    let live = true;
+    const before = dataRef.current;
+    queueSettings(() => ore<Data>("settings")).then(
+      (r) => { if (live && dataRef.current === before) { dataRef.current = r; setData(r); } },
+      (e) => live && setError(errorText(e)),
+    );
+    return () => { live = false; };
   }, [changes]);
 
   // The models to pick from, asked of the provider's own CLI each time Settings opens or the provider
@@ -117,17 +134,30 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     const prev = dataRef.current;
     setData(next);
     dataRef.current = next;
-    try {
-      await run();
-    } catch (e) {
-      setData(prev);
-      dataRef.current = prev;
-      // From ⌘Z or ⇧⌘Z (no step of its own): the history says why and keeps the step.
-      if (!step) throw e;
-      notify(errorText(e), "error");
-      return;
-    }
-    if (step) notify(step.message, "quiet", step.undo, step.redo);
+    return queueSettings(async () => {
+      try {
+        await run();
+      } catch (e) {
+        settingsFailed = true;
+        // An older failure must not roll back a newer choice. If this is still the newest,
+        // read what actually saved: another queued choice may itself have failed.
+        if (dataRef.current === next) {
+          const restored = await ore<Data>("settings").catch(() => prev);
+          if (dataRef.current === next) { setData(restored); dataRef.current = restored; }
+        }
+        if (!step) throw e;
+        notify(errorText(e), "error");
+        return;
+      }
+      // Once the latest choice lands, reconcile the whole form. Its optimistic copy may
+      // still include another field whose earlier write failed. Never overwrite a newer edit.
+      if (settingsFailed && dataRef.current === next) {
+        settingsFailed = false;
+        const saved = await ore<Data>("settings").catch(() => null);
+        if (saved && dataRef.current === next) { setData(saved); dataRef.current = saved; }
+      }
+      if (step) notify(step.message, "quiet", step.undo, step.redo);
+    });
   };
   /** What each goal setting is called in an Undone toast. */
   const NAMES: Record<string, string> = { minutes: "Minutes a day", "weekdays-only": "Weekdays only", "new-per-day": "New exercises a day", plan: "When you review", remix: "Remix exercises" };
@@ -161,10 +191,10 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     const d = dataRef.current;
     if (!d) return;
     const was = { ai: d.ai, model: d.model };
-    return change({ ...d, ai: v, model: v === "claude" ? "sonnet" : "" }, async () => {
+    const next = { ...d, ai: v, model: v === "claude" ? "sonnet" : "" };
+    return change(next, async () => {
       const r = await ore<Data>("settings", opt("ai", v));
-      setData(r);
-      dataRef.current = r;
+      if (dataRef.current === next) { setData(r); dataRef.current = r; }
     }, record ? { message: "Changed the AI provider", undo: () => setVendor(was.ai, false).then(() => setModel(was.model, false)), redo: () => setVendor(v, false) } : undefined);
   };
   const setModel = async (m: string, record = true): Promise<void> => {
@@ -415,7 +445,9 @@ function QuizShortcut({ notify }: { notify: Notify }) {
       <button
         className={`settings-btn${recording ? " rec" : ""}`}
         aria-label={combo ? `Quick quiz shortcut: ${label(combo)}. Press to change` : "Record quick quiz shortcut"}
-        onClick={() => {
+        onClick={(e) => {
+          // WebKit does not focus buttons on a mouse click; the recorder receives keys here.
+          e.currentTarget.focus();
           setError(null);
           setRecording((r) => !r);
         }}

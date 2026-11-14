@@ -11990,6 +11990,249 @@ journey("a11y: reader toggle icons stay decorative in both states (F117)", async
 
 // —— run ——
 
+/** Original local articles: a fresh feed per journey, never a live publisher or a shared preview. */
+function noteFeed() {
+  const title = `Note persistence ${Date.now()}`;
+  const server: ReturnType<typeof Bun.serve> = Bun.serve({ port: 0, fetch: (r: Request): Response => new URL(r.url).pathname === "/feed.xml"
+    ? new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>${title}</title><link>http://localhost/</link><item><title>${title}</title><link>http://localhost:${server.port}/post.html</link><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } })
+    : new Response(`<html><head><title>${title}</title></head><body><article><h1>${title}</h1>${"<p>Explain the principle before looking at the answer. Compare your prediction with the evidence, then try another example after a delay. Write what changed in your understanding.</p>".repeat(6)}</article></body></html>`, { headers: { "content-type": "text/html" } }) });
+  return { title, server, url: `http://localhost:${server.port}/feed.xml` };
+}
+
+journey("feed: leaving and reopening waits for the pending note (F143)", async (page) => {
+  const feed = noteFeed();
+  try {
+    await ore("feed", "follow", feed.url, "--skill=teaching");
+    await page.getByRole("button", { name: "Feed", exact: true }).click();
+    await page.locator(".row.post").filter({ hasText: feed.title }).click();
+    const editor = page.getByRole("textbox", { name: "Source note", exact: true });
+    await editor.waitFor();
+    const posts = (await ore("feed")) as { posts: { title: string; preview: string }[] };
+    const id = posts.posts.find((p) => p.title === feed.title)!.preview;
+    await hold(page, "notes");
+    await editor.fill("Keep the words I just wrote before leaving.");
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await until("the note write is held", () => isHeld(page, "notes"));
+    // Let cleanup run while the write is held: it must not discard the source.
+    await page.waitForTimeout(200);
+    await release(page, "notes");
+    await until("the original source has its note", async () => {
+      const note = await ore("notes", id) as { text?: string };
+      return !!note.text?.includes("Keep the words I just wrote");
+    });
+    // Kept posts leave Feed. Reload here isolates persistence from the separate list-refresh guard.
+    await page.reload();
+    await openSource(page, feed.title);
+    await until("the reopened note has the original words", async () => (await editor.innerText()).includes("Keep the words I just wrote"));
+    // The second mounted editor must also wait behind the previous editor's save.
+    await hold(page, "notes");
+    await editor.fill("A newer draft survives reopening while the write waits.");
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await until("the second note write is held", () => isHeld(page, "notes"));
+    await openSource(page, feed.title);
+    await release(page, "notes");
+    await until("the new editor loads after the old save", async () => (await editor.innerText()).includes("A newer draft survives reopening"));
+  } finally {
+    await release(page, "notes");
+    await ore("feed", "unfollow", feed.url);
+    feed.server.stop();
+  }
+});
+
+journey("feed: a note keeps the reader and skill list current (F144)", async (page) => {
+  const feed = noteFeed();
+  try {
+    await ore("feed", "follow", feed.url, "--skill=teaching");
+    await page.getByRole("button", { name: "Feed", exact: true }).click();
+    await page.locator(".row.post").filter({ hasText: feed.title }).click();
+    const editor = page.getByRole("textbox", { name: "Source note", exact: true });
+    await editor.fill("Keep this post with my note and show it in Teaching.");
+    await until("the reader shows that the post is saved", async () => !(await page.getByText("Not saved", { exact: true }).count()) && !!(await page.getByRole("button", { name: "Finish", exact: true }).count()));
+    await page.getByRole("navigation", { name: "Skills" }).getByRole("button", { name: "Teaching", exact: true }).click();
+    await page.getByRole("tab", { name: "To read", exact: true }).click();
+    await page.getByRole("row").filter({ hasText: feed.title }).waitFor();
+  } finally {
+    await ore("feed", "unfollow", feed.url);
+    feed.server.stop();
+  }
+});
+
+journey("settings: rapid choices save in order across reopening (F145)", async (page) => {
+  await ore("goal", "--minutes=10");
+  await page.keyboard.press("Meta+,");
+  const panel = page.getByRole("dialog", { name: "Settings" });
+  await panel.getByRole("tab", { name: "Review", exact: true }).click();
+  const goal = panel.getByRole("radiogroup", { name: "Minutes a day", exact: true });
+  await goal.getByRole("radio", { name: "10", exact: true }).waitFor();
+  await hold(page, "goal");
+  await goal.getByRole("radio", { name: "5", exact: true }).click();
+  await until("the first goal change is held", () => isHeld(page, "goal"));
+  await goal.getByRole("radio", { name: "10", exact: true }).click();
+  await page.waitForTimeout(200); // allow an incorrectly concurrent newer write to land first
+  await release(page, "goal");
+  await until("both changes have settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+  if ((await ore("settings") as { review: { goal_minutes: number } }).review.goal_minutes !== 10) throw new Error("the older goal overwrote the last choice of 10");
+  await panel.getByRole("button", { name: "Close settings" }).click();
+  await page.keyboard.press("Meta+,");
+  await until("reopening shows the saved last choice", async () => (await goal.locator('[aria-checked="true"]').innerText()) === "10");
+  // Closing Settings must not create a second independent write queue.
+  await hold(page, "goal");
+  await goal.getByRole("radio", { name: "5", exact: true }).click();
+  await until("the old panel's write is held", () => isHeld(page, "goal"));
+  await panel.getByRole("button", { name: "Close settings" }).click();
+  await page.keyboard.press("Meta+,");
+  await release(page, "goal");
+  await until("the reopened panel waits for pending writes", async () => (await goal.locator('[aria-checked="true"]').innerText()) === "5");
+  await goal.getByRole("radio", { name: "10", exact: true }).click();
+  await until("the final choice is saved", async () => (await ore("settings") as { review: { goal_minutes: number } }).review.goal_minutes === 10);
+});
+
+journey("skill rename: pending Undo preserves the preceding source (F146)", async (page) => {
+  const name = `Rename trial ${Date.now()}`;
+  const skill = await ore("skills", "add", name) as { id: string };
+  const title = `Source before rename ${Date.now()}`;
+  try {
+    await page.reload();
+    await page.keyboard.press("Meta+n");
+    await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nThis source must survive undoing the next rename.`);
+    await page.keyboard.press("Enter");
+    await page.getByRole("heading", { name: title, exact: true }).waitFor();
+    await until("the import has settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+    const source = (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === title)!;
+    await page.getByRole("navigation", { name: "Skills" }).getByRole("button", { name, exact: true }).click();
+    await page.getByRole("heading", { name, exact: true }).getByRole("button").click();
+    await page.getByRole("textbox", { name: `Rename ${name}` }).fill(`${name} renamed`);
+    await hold(page, "skills set");
+    await page.getByRole("heading", { name: "Your note", exact: true }).click();
+    await until("the rename is held", () => isHeld(page, "skills set"));
+    await page.keyboard.press("Meta+z");
+    await release(page, "skills set");
+    await until("the rename and Undo have settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+    const archived = await ore("ls", "--archived") as { id: string }[];
+    if (archived.some((i) => i.id === source.id)) throw new Error("Undo archived the preceding source instead of the pending rename");
+    await page.getByRole("heading", { name, exact: true }).waitFor();
+    await page.keyboard.press("Meta+Shift+z");
+    await page.getByRole("heading", { name: `${name} renamed`, exact: true }).waitFor();
+    await page.keyboard.press("Meta+z");
+    await page.getByRole("heading", { name, exact: true }).waitFor();
+  } finally {
+    await release(page, "skills set");
+    await ore("skills", "rm", skill.id);
+  }
+});
+
+journey("quick quiz: clicking the recorder takes keyboard focus in WebKit (F147)", async (page) => {
+  await page.keyboard.press("Meta+,");
+  const panel = page.getByRole("dialog", { name: "Settings" });
+  await panel.getByRole("tab", { name: "Review", exact: true }).click();
+  const recorder = panel.getByRole("button", { name: /Quick quiz shortcut:|Record quick quiz shortcut/ });
+  await recorder.click();
+  await until("the recorder takes focus", () => recorder.evaluate((el) => el === document.activeElement));
+  await page.keyboard.press("Control+Alt+w");
+  await until("the typed shortcut is displayed", async () => (await recorder.innerText()) === "⌃⌥W");
+  await recorder.click();
+  await page.keyboard.press("Escape");
+  if ((await recorder.innerText()) !== "⌃⌥W" || !(await panel.count())) throw new Error("Esc should cancel recording and keep Settings open");
+  await panel.getByRole("button", { name: "Close settings" }).click();
+  await page.keyboard.press("Meta+,");
+  await until("the shortcut survives reopening", async () => (await recorder.innerText()) === "⌃⌥W");
+}, "webkit");
+
+journey("feed: a failed departing note keeps its preview for retry (F143)", async (page) => {
+  const feed = noteFeed();
+  try {
+    await ore("feed", "follow", feed.url);
+    await page.getByRole("button", { name: "Feed", exact: true }).click();
+    await page.locator(".row.post").filter({ hasText: feed.title }).click();
+    const editor = page.getByRole("textbox", { name: "Source note", exact: true });
+    await editor.waitFor();
+    const posts = (await ore("feed")) as { posts: { title: string; preview: string }[] };
+    const id = posts.posts.find((p) => p.title === feed.title)!.preview;
+    await failNext(page, "notes", "The disk is temporarily unavailable.");
+    await editor.fill("Recover these words after a failed save.");
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await page.locator(".toast").filter({ hasText: "Notes not saved" }).last().waitFor();
+    await ore("show", id); // cleanup must not delete the only source the draft belongs to
+    await failNext(page, "notes", null);
+    await page.getByRole("button", { name: "Feed", exact: true }).click();
+    await page.getByRole("button", { name: "Recent", exact: true }).click();
+    await page.getByRole("menuitemradio", { name: "All", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await page.locator(".row.post").filter({ hasText: feed.title }).click();
+    await until("the failed draft returns", async () => (await editor.innerText()).includes("Recover these words"));
+    await until("the recovered draft is saved on its original source", async () => (await ore("notes", id) as { text: string }).text.includes("Recover these words"));
+  } finally {
+    await failNext(page, "notes", null);
+    await ore("feed", "unfollow", feed.url);
+    feed.server.stop();
+  }
+});
+
+journey("notes: closing a pane and remounting a skill keep pending words (F143)", async (page) => {
+  await openSource(page, AGENTS);
+  const editor = page.getByRole("textbox", { name: "Source note", exact: true });
+  await editor.fill("Words written just before closing the note pane.");
+  await page.getByRole("tab", { name: "Collected", exact: true }).click();
+  await page.getByRole("tab", { name: "Source note", exact: true }).click();
+  await until("closing the pane keeps the last words", async () => (await editor.innerText()).includes("Words written just before closing"));
+  const name = `Pending skill note ${Date.now()}`;
+  const skill = await ore("skills", "add", name) as { id: string };
+  try {
+    await page.reload();
+    const nav = page.getByRole("navigation", { name: "Skills" }).getByRole("button", { name, exact: true });
+    await nav.click();
+    const note = page.getByRole("textbox", { name: "Skill note", exact: true });
+    await note.waitFor();
+    await hold(page, "notes");
+    await note.fill("The next editor must wait for this skill note.");
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await until("the skill note is held", () => isHeld(page, "notes"));
+    await nav.click();
+    await release(page, "notes");
+    await until("the skill note loads after its pending save", async () => (await note.innerText()).includes("The next editor must wait"));
+  } finally {
+    await release(page, "notes");
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await ore("skills", "rm", skill.id);
+  }
+});
+
+journey("settings: a failed older choice does not roll back the latest choice (F145)", async (page) => {
+  await ore("goal", "--minutes=10", "--new-per-day=10");
+  await page.keyboard.press("Meta+,");
+  const panel = page.getByRole("dialog", { name: "Settings" });
+  await panel.getByRole("tab", { name: "Review", exact: true }).click();
+  const goal = panel.getByRole("radiogroup", { name: "Minutes a day", exact: true });
+  await goal.getByRole("radio", { name: "10", exact: true }).waitFor();
+  await page.route("**/ore", async (route) => {
+    const args = (route.request().postDataJSON() as { args: string[] }).args;
+    if (args[0] === "goal" && args.includes("--minutes=5")) return route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify("The disk refused this change. Try again.") });
+    await route.continue();
+  });
+  await hold(page, "goal");
+  await goal.getByRole("radio", { name: "5", exact: true }).click();
+  await until("the older write is held", () => isHeld(page, "goal"));
+  await goal.getByRole("radio", { name: "15", exact: true }).click();
+  await release(page, "goal");
+  await page.locator(".toast").filter({ hasText: "The disk refused" }).waitFor();
+  await until("the later choice survives the failure", async () => (await ore("settings") as { review: { goal_minutes: number } }).review.goal_minutes === 15 && (await goal.locator('[aria-checked="true"]').innerText()) === "15");
+  // A later change to another setting must not carry the failed field into displayed state.
+  const fresh = panel.getByRole("radiogroup", { name: "New exercises a day", exact: true });
+  await hold(page, "goal");
+  await goal.getByRole("radio", { name: "5", exact: true }).click();
+  await until("the failing choice waits before a different setting", () => isHeld(page, "goal"));
+  await fresh.getByRole("radio", { name: "20", exact: true }).click();
+  await release(page, "goal");
+  await until("both displayed fields match what saved", async () => (await fresh.locator('[aria-checked="true"]').innerText()) === "20" && (await goal.locator('[aria-checked="true"]').innerText()) === "15");
+  // A latest choice that fails rolls back to the actual saved value and can be tried again.
+  await goal.getByRole("radio", { name: "5", exact: true }).click();
+  await until("a failed latest choice returns to the saved value", async () => (await goal.locator('[aria-checked="true"]').innerText()) === "15");
+  await page.unroute("**/ore");
+  await fresh.getByRole("radio", { name: "10", exact: true }).click();
+  await goal.getByRole("radio", { name: "10", exact: true }).click();
+  await until("the queue still accepts changes after failure", async () => (await ore("settings") as { review: { goal_minutes: number } }).review.goal_minutes === 10);
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
