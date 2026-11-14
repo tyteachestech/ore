@@ -330,6 +330,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   // A layout cleanup runs before React removes the DOM, while the editor still has focus.
   useLayoutEffect(
     () => () => {
+      // The parent can stay mounted while this pane closes. Report the last words before
+      // the delayed editor listener and pull reader disappear, then save through its owner.
+      const p = live.current.p;
+      const text = p.pull?.current?.();
+      if (text != null) { p.onChange(text); p.onBlur?.(); }
       const v = editor.current?.action((ctx) => ctx.get(editorViewCtx));
       if (v?.hasFocus()) handoff = { pos: v.state.selection.head, at: performance.now() };
       const place = live.current.p.place;

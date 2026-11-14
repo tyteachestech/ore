@@ -9,7 +9,7 @@ import { join } from "node:path";
 export const doclingHome = () => process.env.ORE_DOCLING_HOME || join(homedir(), "Library", "Application Support", "Ore", "docling");
 
 /** The mark the download writes last. Named for its reader, so an install from before Granite-Docling
- *  (D-new-granite-docling), which lacks the VLM extra and its weights, is not taken for one and is offered again. */
+ *  (D273), which lacks the VLM extra and its weights, is not taken for one and is offered again. */
 export const READY = "ready-granite";
 
 /** Docling's command, once the download has finished (its `ready` mark is written last, so a download

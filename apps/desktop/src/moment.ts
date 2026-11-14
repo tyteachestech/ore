@@ -2,8 +2,8 @@ import type { CardGem, CardHistory } from "./ore";
 import type { Mood } from "./Mole";
 
 /** The moment after a rating (D237): shown only when the exercise's gem changes for good or a hard recall
- *  bought a lot. `days`: memory added (FSRS stability). `line`: one true sentence about this case, never a
- *  phrase picked from a bank. Everything else gets no moment: a rating he gives a hundred times a day moves on. */
+ *  bought a lot. `days`: memory added (FSRS stability). `line`: what became of the gem, in a word or two, and how long since he
+ *  saw it (D271): the days are the message, the words only name it. Everything else gets no moment: a rating he gives a hundred times a day moves on. */
 export type Moment = { from: CardGem; to: CardGem; days: number; line: string; tone: "cut" | "miss" | "deep"; kind: "cut" | "won" | "polished" | "deep" | "miss" };
 
 /** The mole's pose for each kind of moment (D258), sized to how rare it is: winning a gem back is the hardest
@@ -19,7 +19,7 @@ const DAY = 86_400_000;
 
 const ago = (ts: string | undefined, now: number): string => {
   const days = ts ? Math.round((now - Date.parse(ts)) / DAY) : 0;
-  return days >= 2 ? `Last seen ${days} days ago, and you still had it.` : "";
+  return days >= 2 ? `last seen ${days} days ago` : "";
 };
 
 /** `sure`: he said he was sure before the answer showed. `remix`: he answered a new case of it (D66). */
@@ -32,10 +32,10 @@ export function momentFor(history: CardHistory | undefined, rating: 1 | 2 | 3 | 
   const to: CardGem = { ...after, ...(polished ? { polished: true } : {}) };
   const seen = ago(history.reviews.at(-1)?.ts, o.now ?? Date.now());
   if (gem.kind === "cut" && to.kind === "dull")
-    return moment("miss", { from, to, days: 0, line: o.sure ? "You were sure, and a miss you were sure of is the one a correction fixes best." : "Loose, not lost: it was cut once, so it comes back faster." });
+    return moment("miss", { from, to, days: 0, line: "Came loose" });
   if (gem.kind !== "cut" && to.kind === "cut")
-    return moment(gem.kind === "dull" ? "won" : "cut", { from, to, days, line: gem.kind === "dull" ? "Won back. It keeps a gold rim." : [seen, "Cut: you'd still recall this three weeks from now."].filter(Boolean).join(" ") });
-  if (to.kind === "cut" && polished && !gem.polished) return moment("polished", { from, to, days, line: "Polished: you recalled it on a new case." });
-  if (to.kind === "cut" && days >= DEEP_DAYS && seen) return moment("deep", { from, to, days, line: seen });
+    return moment(gem.kind === "dull" ? "won" : "cut", { from, to, days, line: gem.kind === "dull" ? "Won back" : ["Cut", seen].filter(Boolean).join(" · ") });
+  if (to.kind === "cut" && polished && !gem.polished) return moment("polished", { from, to, days, line: "Polished" });
+  if (to.kind === "cut" && days >= DEEP_DAYS && seen) return moment("deep", { from, to, days, line: seen[0]!.toUpperCase() + seen.slice(1) });
   return null;
 }

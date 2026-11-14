@@ -75,7 +75,7 @@ export function tidyLatex(s: string): string {
  *  everything: uv (MIT/Apache-2.0) fetches Python and Docling (MIT) with its VLM extra (mlx and mlx-vlm,
  *  MIT; transformers, Apache-2.0), and Docling fetches one model, Granite-Docling (granite-docling-258M,
  *  Apache-2.0): its MLX build on Apple silicon, its transformers build elsewhere. Every licence is
- *  permissive, so Ore stays free to be sold as open source (D-new-granite-docling). Docling's standard
+ *  permissive, so Ore stays free to be sold as open source (D273). Docling's standard
  *  models (TableFormer, CodeFormulaV2: CDLA-Permissive-2.0) are not downloaded. */
 const UV = "0.11.32";
 const DOCLING = "2.142.0";

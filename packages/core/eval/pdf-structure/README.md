@@ -17,7 +17,7 @@ Only the scripts live here. The papers and keys are fetched when it is run, so n
    key formula (0 to 100, LaTeX spelling normalised) and the mean best cell F1 of each key table.
 
 `pages/` holds five pages whose answers are known from their own sources, for when the papers aren't at hand
-(the 2026-11-14 rescore, D-new-granite-docling): `bench-a`, `bench-b`, `inline-math` and `dense` as Typst
+(the 2026-11-14 rescore, D273): `bench-a`, `bench-b`, `inline-math` and `dense` as Typst
 sources (compile with the `typst` Python wheel, Apache-2.0), plus the intake fixture `tables.pdf`, each with
 its `.keys.json`. Score Ore's own doc.md for each (pdf.js text with the reader's regions swapped in) by running
 `regionsFrom` and `pdfToDoc` on the reader's JSON.

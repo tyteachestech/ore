@@ -471,6 +471,14 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
       <Hint text={gemHint(k, p.line)}>
         <Popover.Trigger asChild>
           <button className="hero-strength" aria-label={gemHint(k, p.line)}>
+            {/* The iPhone's header (D272): the rocks in the order they grow, walking into the level ring and the cut count. */}
+            <span className="strength-line" aria-hidden="true">
+              {([["rough", k.growing - k.ready - k.win_back], ["dull", k.win_back], ["ready", k.ready]] as const).map(([kind, n]) =>
+                n > 0 ? <span key={kind} className="strength-step"><Gem kind={kind} size={18} />{n}</span> : null,
+              )}
+              <span className="strength-end"><GemRing k={k} size={28} />{k.solid}</span>
+              <span className="strength-lv">Lv {k.level}</span>
+            </span>
             <GemRing k={k} size={56} badge />
             <span className="strength-side">
               <span className="strength-big"><Roll id={`solid:${s.skill}`} value={k.solid} /></span>

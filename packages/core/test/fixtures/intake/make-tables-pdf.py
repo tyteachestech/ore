@@ -1,6 +1,6 @@
 # Makes files/tables.pdf: a page of a paper with a table and a numbered display formula between
 # paragraphs, the parts pdf.js reads as plain lines and Docling reads as structure (D125). Its reading
-# by Granite-Docling (D-new-granite-docling), saved as files/tables.docling.json with the page images
+# by Granite-Docling (D273), saved as files/tables.docling.json with the page images
 # dropped, comes from the command runDocling runs:
 #   docling convert files/tables.pdf --to json --pipeline vlm --vlm-model granite_docling --image-export-mode placeholder
 # Run: python3 make-tables-pdf.py (needs reportlab).
