@@ -21,11 +21,11 @@ export function MoleSays({ lines, run = true, tail = "left", className = "", chi
   const n = still() ? text.length : Math.min(typed, text.length);
   const done = n >= text.length;
   useEffect(() => {
-    if (done) return;
+    if (!run || done) return;
     // A breath after a sentence's end or a comma, as a game's text box takes.
     const id = setTimeout(() => setTyped(n + 1), /[.,!?]/.test(text[n - 1] ?? "") ? TYPE_MS * 8 : TYPE_MS);
     return () => clearTimeout(id);
-  }, [done, n, text]);
+  }, [run, done, n, text]);
   useEffect(() => {
     if (!run || !done || over || within || lines.length < 2) return;
     const id = setTimeout(() => (setAt((i) => i + 1), setTyped(0)), HOLD_MS);

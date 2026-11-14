@@ -1,45 +1,17 @@
 import * as Popover from "@radix-ui/react-popover";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { bigScreen, CHANNELS, clock, grid, icon, ICONS, paint, powerDown, text, textWidth, type ChannelId, type Grid } from "./ambience-art";
 import { channelName, level, toggle, useAmbience } from "./ambience";
 import { dots } from "./dots";
 import { Hint } from "./Hint";
+import { AMBER, ring, useCanvas } from "./Lamp";
 
 /* The ambience radio (D254): a round button at the bottom left, the mole's twin at the bottom right (D160). Off until
    he picks a channel. While one plays, its icon glows amber in the button and a ring of dots breathes with the sound;
    hovering shows the channel and how long it has played. A click opens the big screen over five pads, one per channel.
    Desktop only. Motion stops when Reduce Motion is on, and nothing draws while the window is hidden. */
 
-const AMBER = "255,178,36";
-const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const now = () => performance.now() / 1000;
-
-/** Redraws `draw` every frame while `on`, at the canvas's device scale. */
-function useCanvas(on: boolean, w: number, h: number, draw: (ctx: CanvasRenderingContext2D, t: number) => void) {
-  const ref = useRef<HTMLCanvasElement>(null);
-  const fn = useRef(draw);
-  fn.current = draw;
-  useEffect(() => {
-    const c = ref.current;
-    if (!c) return;
-    const dpr = Math.min(3, devicePixelRatio || 1);
-    c.width = w * dpr; c.height = h * dpr;
-    const ctx = c.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    // Reduce Motion: a still picture, redrawn once a second so the clock still counts.
-    let raf = 0, timer = 0;
-    const tick = () => {
-      fn.current(ctx, still() ? 0 : now());
-      if (!on) return;
-      if (still()) timer = window.setTimeout(tick, 1000);
-      else raf = requestAnimationFrame(tick);
-    };
-    tick();
-    return () => (cancelAnimationFrame(raf), clearTimeout(timer));
-  }, [on, w, h]);
-  return ref;
-}
 
 const COLS = 59, ROWS = 22, S = 5;
 
@@ -127,11 +99,7 @@ function OrbPlaying({ playing }: { playing: ChannelId }) {
       ctx.fillStyle = `rgba(${AMBER},${v})`;
       ctx.beginPath(); ctx.arc(o + x * d + d / 2, o + y * d + d / 2, d * 0.42, 0, 7); ctx.fill();
     }
-    for (let k = 0; k < 24; k++) {
-      const a = (k / 24) * Math.PI * 2 - Math.PI / 2, w = 0.5 + 0.5 * Math.sin(k * 1.7 + t * 3);
-      ctx.fillStyle = `rgba(${AMBER},${0.25 + 0.6 * lv.current * w})`;
-      ctx.beginPath(); ctx.arc(c + Math.cos(a) * 21, c + Math.sin(a) * 21, 1.1 + lv.current * 1.1 * w, 0, 7); ctx.fill();
-    }
+    ring(ctx, c, 21, 24, lv.current, t);
   });
   return <canvas ref={ref} className="radio-orb-dots" style={{ width: ORB, height: ORB }} aria-hidden="true" />;
 }

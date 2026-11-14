@@ -300,6 +300,7 @@ img.thumb { filter: brightness(0.86); }
 .list .row:not(.post) .row-main { gap: 2px; }
 .list .row:not(.post) .title { font-weight: 500; }
 .row .kind-line { color: var(--faint); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.row:is(:hover, .on, .sel) .kind-line { color: var(--muted); }
 .row .row-q { flex: none; align-self: center; display: inline-flex; color: var(--question-solid); }
 .hint-q { display: flex; flex-direction: column; gap: 2px; }
 .hint-q span::before { content: "? "; color: var(--question-solid); }
@@ -768,8 +769,9 @@ img.thumb { filter: brightness(0.86); }
 .doc td.covered:hover::after { background: color-mix(in srgb, var(--bg-active), var(--text) 8%); }
 .doc td.covered:focus-visible { outline: none; }
 .doc td.covered:focus-visible::after { box-shadow: 0 0 0 2px var(--focus); }
-.doc th:has(.col-cover) { position: relative; }
-.doc th:has(.col-cover[aria-pressed="true"]) { padding-right: 30px; } /* room for the button while it stays; on hover alone it sits over the heading's end */
+/* The button's room is kept whether it shows or not (F119): on hover it sits beside the heading, never over
+   its end, and the column doesn't shift when it appears or stays. */
+.doc th:has(.col-cover) { position: relative; padding-right: 30px; }
 .doc .col-cover { position: absolute; top: 50%; right: 4px; translate: 0 -50%; display: inline-flex; padding: 1px; border-radius: 6px; color: var(--faint); background: var(--bg); opacity: 0; }
 .doc th:hover .col-cover, .doc .col-cover:focus-visible, .doc .col-cover[aria-pressed="true"] { opacity: 1; }
 .doc .col-cover:hover { color: var(--text); background: var(--bg-hover); }
@@ -985,6 +987,10 @@ body.resizing iframe { pointer-events: none; }
 .listen-bar { display: flex; align-items: center; gap: 2px; padding: 2px 4px; border-radius: 999px; background: var(--bg-raised); border: 1px solid var(--border); }
 .listen-bar .ctl { height: 26px; min-width: 26px; border-radius: 999px; }
 .listen-bar .ctl.rate { border-color: transparent; }
+/* Reading aloud is running: the lamp (D263). The button's icon turns amber inside a ring of dots that follows each
+   word; paused, it is the plain grey control again. */
+.listen-bar .ctl.lamp, .listen-bar .ctl.lamp:hover:not(:disabled) { position: relative; color: var(--lamp); }
+.lamp-ring { position: absolute; inset: 0; margin: auto; pointer-events: none; }
 .intent.remove, .intent.icon { flex: 0 0 26px; }
 .intent.icon:hover { color: var(--text); }
 /* Look Up (D83): the dictionary entry in the popup's place, Books' definition card. */
@@ -1537,6 +1543,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .strength-side { display: flex; flex-direction: column; gap: 4px; }
 .near-goal { display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-family: var(--mono); font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .near-goal > span { display: inline-flex; align-items: center; gap: 5px; color: var(--faint); font-size: 12px; }
+.hero-strength:is(:hover, [aria-expanded="true"]) .near-goal > span:not(.near-glow) { color: var(--muted); }
 .near-goal > .near-glow { color: var(--text); font-size: inherit; }
 .home-level .near-goal { gap: 10px; font-size: 12px; margin-left: 6px; }
 .home-solid { color: var(--text); font-family: var(--round); font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -1547,6 +1554,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .strength-legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .strength-depth { margin: 0; color: var(--muted); font-size: 12px; }
 .strength-depth b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.home-level:focus-visible, .strength-legend > span:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .strength-legend span { display: inline-flex; align-items: center; gap: 6px; }
 
 .strength-growth { position: relative; margin: 0; }
@@ -2126,6 +2134,7 @@ button.home-plan:hover { color: var(--text); }
 .review-rate button:hover:not(:disabled) { background: var(--bg-hover); }
 .review-rate button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--border); }
 .review-rate button:focus-visible { outline: none; box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--focus); }
+.review-rate button.suggested:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .review-rate button:disabled { opacity: 0.5; }
 .review-rate .rate-1 { --rate: var(--c-red); }
 .review-rate .rate-2 { --rate: var(--c-orange); }
@@ -3190,6 +3199,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor .ask-me { border-radius: 12px; background: none; box-shadow: inset 0 0 0 1px var(--border); color: var(--muted); }
 .tutor .ask-text { position: relative; flex: 0 1 auto; max-width: 92%; padding: 9px 12px; border-radius: 12px; background: var(--bg-active); }
 /* Chips inside a bubble sit one step above its fill. */
+.tutor .ask-text :is(.cite, .tutor-sources) { color: var(--text-read); }
 .tutor .ask-text :is(.cite, .tutor-sources, code) { background: color-mix(in srgb, var(--text) 9%, var(--bg-active)); }
 .tutor .ask-text .tutor-acts button:hover:not(:disabled), .tutor .ask-text .tutor-acts button:focus-visible, .tutor .ask-text .library-sources button:hover, .tutor .ask-text .library-sources button:focus-visible { background: color-mix(in srgb, var(--text) 9%, var(--bg-active)); }
 .tutor .ask-ai.newest .ask-text::after { content: ""; position: absolute; left: 18px; top: 100%; width: 9px; height: 9px; background: var(--bg-active); clip-path: polygon(0 0, 9px 0, 9px 3px, 6px 3px, 6px 6px, 3px 6px, 3px 9px, 0 9px); }
