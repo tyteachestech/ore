@@ -57,6 +57,8 @@ const Z = [[0, 0], [1, 0], [2, 0], [3, 0], [2, 1], [1, 2], [0, 3], [1, 3], [2, 3
 const dots = (rows: readonly string[], x0: number, y0: number) =>
   rows.flatMap((row, y) => [...row].map((t, x) => (t === "." ? null : <circle key={`${x},${y}`} className={`cart-${t}`} cx={x0 + x + 0.5} cy={y0 + y + 0.5} r={RADIUS[t]} />)));
 
+/** How long a piece of the load takes to slide down the tipped bucket to its low lip, before it falls from there. */
+const SLIDE = 150;
 const GRAVITY = 2600, HOP = -90;
 /** A throw from rest under gravity: how long it flies to land `dy` px lower, after a small hop up out of the bucket. */
 export const flight = (dy: number) => (-HOP + Math.sqrt(HOP * HOP + 2 * GRAVITY * Math.max(0, dy))) / GRAVITY;
@@ -137,15 +139,33 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
     };
     play(rail, [{ opacity: 0 }, { opacity: 1 }], { duration: T2, easing: OUT });
     roll(-(stop + W + 20), 0, MOMENT, OUT);
+    // The brake: the wheels lock before it has stopped and it skids the last of the way, nose down, then rocks back.
+    const far = -(stop + W + 20) / (2.5 * CELL), locked = Math.round((far * 0.12) / (2 * Math.PI)) * 2 * Math.PI;
+    for (const w of wheels) play(w, [{ transform: `rotate(${far}rad)`, easing: OUT }, { transform: `rotate(${locked}rad)`, offset: 0.4 }, { transform: `rotate(${locked}rad)` }], { duration: MOMENT });
+    cart.style.transformOrigin = `${(WHEELS[1] + 2.5) * CELL}px ${H}px`;
+    play(cart, [0, 0, 3, -1, 0].map((turn, i) => ({ transform: `rotate(${turn}deg)`, offset: [0, 0.45, 0.72, 0.88, 1][i], easing: IN_OUT })), { duration: MOMENT + T2, composite: "add" });
     // Its own momentum throws the bucket forward as it stops.
     later(MOMENT - 100, () => play(bucket, [{ transform: "rotate(0deg)" }, { transform: "rotate(58deg)" }], { duration: T4, easing: SPRING }));
 
     const circles = [...ring.querySelectorAll("circle")], gap = lit.length ? Math.max(18, Math.min(60, 600 / lit.length)) : 0;
     const POUR = MOMENT + 180, poured = POUR + lit.length * gap, stoned = poured + stones.length * 130;
     let left = lit.length;
+    // What is in the bucket slides down it to the low lip and falls from there, so the heap drains toward the lip.
+    const slide = (node: SVGElement | undefined, x: number, y: number, ms: number) => {
+      if (!node) return;
+      play(node, [{ transform: `translate(${x}px, ${y}px)` }, { transform: `translate(${LIP[0] - 1}px, ${LIP[1] - 1.4}px)` }], { duration: SLIDE, easing: "ease-in" });
+      later(ms, () => node.setAttribute("visibility", "hidden"));
+    };
+    const drained = new Set<number>();
+    lit.forEach((_, k) => later(Math.max(0, POUR + k * gap - SLIDE), () => {
+      const h = Math.floor((k * heap.length) / lit.length), dot = heap[h];
+      if (!dot || drained.has(h)) return;
+      drained.add(h);
+      // A circle is placed by its centre, so its slide is measured from there.
+      play(dot, [{ transform: "translate(0, 0)" }, { transform: `translate(${LIP[0] - 1 - Number(dot.getAttribute("cx"))}px, ${LIP[1] - 1.4 - Number(dot.getAttribute("cy"))}px)` }], { duration: SLIDE, easing: "ease-in" });
+      later(SLIDE, () => dot.setAttribute("visibility", "hidden"));
+    }));
     lit.forEach((n, k) => later(POUR + k * gap, () => {
-      // The heap drains as the ore leaves.
-      heap[Math.floor((k * heap.length) / lit.length)]?.setAttribute("visibility", "hidden");
       const c = circles[n];
       // A dot the ring doesn't have still counts as poured, or the ring would never be told it is full.
       if (!c) { if (--left === 0) calls.current.onPoured(); return; }
@@ -161,8 +181,11 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       });
     }));
     if (!lit.length) later(POUR, () => calls.current.onPoured());
+    stones.forEach((_, i) => later(Math.max(0, poured + i * 130 - SLIDE), () => {
+      const [x = 0, y = 0] = (roughIn[i]?.getAttribute("transform") ?? "").match(/-?[\d.]+/g)?.map(Number) ?? [];
+      slide(roughIn[i], x, y, SLIDE);
+    }));
     stones.forEach((_, i) => later(poured + i * 130, () => {
-      roughIn[i]?.setAttribute("visibility", "hidden");
       const slot = host.querySelectorAll(".review-cut > span")[i]?.querySelector(".gem");
       const rough = roughs[i];
       if (!slot || !rough) return calls.current.onStone(i);

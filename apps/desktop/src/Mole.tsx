@@ -147,10 +147,10 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // look down, his feet running on air while his arms go, then he stops and looks at us before he drops.
   fall: { from: { whole: 1, side: 0, hat: -0.8 }, to: { ...FALL, hat: 0.9, bang: 1 }, loop: 3000, still: FALL,
     at: [[330, { to: { ly: 1, bang: 0, hat: 0.3 } }],
-      ...[0, 1, 2, 3, 4].map((i): [number, Beat] => [450 + i * 108, { to: { legs: i % 2 ? -1 : 1, arms: i % 2 ? 1 : 0.55, tilt: i % 2 ? 0.2 : -0.2 }, kick: { legs: i % 2 ? -30 : 30 } }]),
+      ...[0, 1, 2, 3, 4].map((i): [number, Beat] => [450 + i * 108, { to: { legs: i % 2 ? -1 : 1, arms: i % 2 ? 0.8 : 1.5, tilt: i % 2 ? 0.2 : -0.2 }, kick: { legs: i % 2 ? -30 : 30 } }]),
       [985, { to: { legs: 0, arms: 1, tilt: 0, ly: 0, hat: 0 } }]] },
-  // Dropping feet first: arms and helmet left behind over him, feet together.
-  dive: { from: { whole: 1, side: 0 }, to: { ...FALL, hat: 1.4, arms: 1, legs: 0, tilt: 0 }, loop: 3000, still: { ...FALL, hat: 1.4, arms: 1, legs: 0 } },
+  // Dropping feet first: his arms go straight up over him and his helmet is left behind, feet together.
+  dive: { from: { whole: 1, side: 0 }, to: { ...FALL, hat: 1.4, arms: 2, legs: 0, tilt: 0 }, loop: 3000, still: { ...FALL, hat: 1.4, arms: 2, legs: 0 } },
 };
 
 /** The puppet's moving parts: its values, their speeds, where they are headed, and the move playing. */

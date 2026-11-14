@@ -143,6 +143,9 @@ test("the fall off the cart has weight, and the bucket never turns through him: 
     expect(backed).toBe(2);
     // The cart's hop is added to its roll, never in place of it.
     expect(seen.some((a) => a.cls === "cart" && a.o.composite === "add" && a.keys.some((k) => k.transform === "translateY(-4px)"))).toBe(true);
+    // The load slides down the tipped bucket to its low lip before it falls, and the wheels lock before the cart has stopped.
+    expect(seen.some((a) => a.cls.startsWith("cart-ore-in") && a.keys.length === 2 && a.keys[0]!.transform === "translate(0, 0)")).toBe(true);
+    expect(seen.some((a) => a.cls === "cart-wheel" && a.keys.length === 3 && a.keys[1]!.transform === a.keys[2]!.transform)).toBe(true);
     await s.done();
   } finally { proto.animate = plain; jest.useRealTimers(); }
 });
