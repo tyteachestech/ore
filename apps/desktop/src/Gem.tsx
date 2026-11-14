@@ -71,7 +71,7 @@ export function Gem({ kind, size = 16, breathe, seam, polished, fuse, band }: { 
   const shine = kind === "cut" && !!polished;
   const rows = kind === "rough" || kind === "ready" ? (large ? ROUGH_L : ROUGH) : large ? CUT_L : CUT;
   return (
-    <svg className="gem" data-kind={kind} data-breathe={breathe || undefined} data-polished={shine || undefined} width={size} height={size} viewBox={large ? "-1 -2.5 16 16" : "-1 -2 12 12"} aria-hidden="true">
+    <svg className="gem" data-kind={kind} data-breathe={breathe || undefined} width={size} height={size} viewBox={large ? "-1 -2.5 16 16" : "-1 -2 12 12"} aria-hidden="true">
       {dots(rows, fuse ?? FUSE[kind], { outline: kind === "empty", face: kind === "ready" && fuse === undefined, gold: !!seam && (kind === "cut" || kind === "dull"), band })}
       {shine && sparkle(large ? 12 : 8.5, large ? 0.5 : 0, large)}
     </svg>
