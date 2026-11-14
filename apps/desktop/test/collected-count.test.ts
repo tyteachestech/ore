@@ -1,4 +1,4 @@
-// The reader's collected chips name what they count: one of a thing is singular (F-new-one-questions).
+// The reader's collected chips name what they count: one of a thing is singular (F164).
 import { expect, test } from "bun:test";
 import { collectedCount } from "../src/Collected";
 import { count } from "../src/util";

@@ -29,17 +29,17 @@ Design-specificity: authored, as round 7. Cognitive load: 2 of 8 fail (minimal c
 decision points as round 7.
 
 ## Fixed in this PR
-- **One of a thing was plural in six places.** The reader's chips said "1 key points collected here" (F-new-one-questions);
+- **One of a thing was plural in six places.** The reader's chips said "1 key points collected here" (F164);
   Add said "Text · 1 words" and "Course · 1 lessons"; a drop of one file said "Added 1 sources", and of one already
   there "All 1 are already here"; a one-lesson course said "Added 1 lessons"; Home's week read "of 1 days" to a
-  screen reader (F-new-one-sources).
+  screen reader (F165).
   ![chip](shots/2026-11-14-round-8/fix-chip-count.png)
   ![add](shots/2026-11-14-round-8/fix-add-one-word.png)
 - **Searching the Shortcuts sheet for "markdown" found nothing**, though every menu calls ⌘C "Copy as Markdown": the
-  sheet's row said only "Copy with the source". It now carries both names (F-new-copy-names).
+  sheet's row said only "Copy with the source". It now carries both names (F166).
   ![shortcuts](shots/2026-11-14-round-8/fix-shortcuts-markdown.png)
 - Add's field said "a link, a file, or any text"; the empty lists that point at it say "a link, a file or any text".
-  One wording (F-new-add-comma).
+  One wording (F167).
 - A new guard: no control explains itself with the system's `title=` (`hints.test.ts`). The two that keep one are
   listed with the reason (the icon grid's 205 cells, a transcript's timestamps: a `<Hint>` each would cost speed).
 

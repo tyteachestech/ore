@@ -1,4 +1,4 @@
-// One thing keeps one name wherever it shows (round 8's consistency pass, F-new-copy-names, F-new-add-comma).
+// One thing keeps one name wherever it shows (round 8's consistency pass, F166, F167).
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { BINDINGS } from "../src/keys";
