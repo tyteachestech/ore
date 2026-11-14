@@ -407,6 +407,8 @@ export function PhoneApp() {
   const [archived, setArchived] = useState<Item[] | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skill, setSkill] = useState<string | null>(start.skill);
+  const skillNow = useRef(skill);
+  skillNow.current = skill;
   const [skillNote, setSkillNote] = useState(!!start.skillNote);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(start.openId);
@@ -1015,7 +1017,6 @@ export function PhoneApp() {
           {naming ? (
             <NewSkill skills={skills} onDone={(made) => {
               // Made, the keyboard goes as its page opens (Files' New Folder); let go, focus goes back to New skill.
-              if (made) (document.activeElement as HTMLElement | null)?.blur();
               flushSync(() => {
                 setNaming(false);
                 if (!made) return;
@@ -1024,8 +1025,15 @@ export function PhoneApp() {
                 setDrawer(false);
               });
               if (!made) return newSkillRef.current?.focus({ preventScroll: true });
+              // Focus on its page's Back, not on <body>: the keyboard goes, and keys still have a place to act.
+              document.querySelector<HTMLElement>(".phone-full .phone-back")?.focus({ preventScroll: true });
               // On the history, as on the Mac: Undo deletes it (F160).
-              skillMade(made, notify, () => void refresh(), (id) => setSkill((k) => (k === id ? null : k)));
+              // Undone, its page closes and focus goes to the menu button that leads back to it.
+              skillMade(made, notify, () => void refresh(), (id) => {
+                if (skillNow.current !== id) return;
+                flushSync(() => setSkill(null));
+                document.querySelector<HTMLElement>(".phone-bar [aria-label='Open menu']")?.focus({ preventScroll: true });
+              });
               void refresh();
             }} />
           ) : (
