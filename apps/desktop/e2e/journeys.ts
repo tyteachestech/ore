@@ -1420,11 +1420,18 @@ journey("tutor stop and copy: the send button stops a reply (⌘. too), words wr
     await field.fill("Stop me late");
     await page.keyboard.press("Enter");
     await until("the call carries its stream id", async () => !!id);
+    await page.evaluate(([p]) => (window as any).__emit("ore-progress", p), [{ stream: id, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }] as const);
     await page.evaluate(([p]) => (window as any).__emit("ore-progress", p), [{ stream: id, reply: "Half a thought [1" }] as const);
     await tutor.getByText("Half a thought", { exact: true }).waitFor();
     await page.keyboard.press("Meta+.");
     await tutor.getByText("Stopped", { exact: true }).waitFor();
     await tutor.getByText("Half a thought", { exact: true }).waitFor();
+    // Saved with who wrote it, as a whole reply is (F-new-tutor-stop-stamp).
+    await until("the stopped reply is saved with its AI stamp", async () => {
+      const chats = (await ore("chat")) as { id: string }[];
+      const chat = (await ore("chat", chats[0]!.id)) as { turns: { reply?: string; ai?: { model: string } }[] };
+      return chat.turns.some((t) => t.reply === "Half a thought" && t.ai?.model === "mock");
+    });
     held.shift()!();
     await page.waitForTimeout(300);
     if (await tutor.getByText("Reply 3").count()) throw new Error("a stopped reply was replaced by the late one");

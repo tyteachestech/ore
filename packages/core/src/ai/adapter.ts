@@ -349,6 +349,13 @@ export function parseOutput(output: unknown): unknown {
   return JSON.parse(text);
 }
 
+/** Who will answer a task, before it runs: a reply stopped while it streams still records its vendor, model and
+ *  prompt version (F-new-tutor-stop-stamp). The model is the one picked, or the vendor's default when none is. */
+export function aiStampFor(lib: Library, name: PromptName): AiStamp {
+  const vendor = chooseVendor(lib);
+  return { vendor, model: aiModel(lib, vendor) ?? (vendor === "codex" ? codexConfiguredModel() : undefined) ?? `${vendor}-default`, prompt_version: loadPrompt(name).version };
+}
+
 // Run one AI task. Invalid output (bad JSON, schema or check failure) is
 // retried once with the error appended; a second failure is an error.
 export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<AgentResult<T>> {
