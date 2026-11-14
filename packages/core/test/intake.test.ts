@@ -1136,6 +1136,17 @@ describe("import coverage: audio and podcasts", () => {
     return f;
   };
 
+  test("an audio file's own title, artist and chapters come in (F-new-audio-tags)", async () => {
+    for (const ext of ["mp3", "m4a"]) {
+      const item = await addSource(await tempLibrary(), join(FIX, "audio", `chaptered.${ext}`));
+      expect(item.meta).toMatchObject({ title: "Chaptered Audio Learning", author: "Ore Fixture Author" });
+      // An MP4's chapter track reads under `bun` (the CLI) but not under `bun test`; the MP3's ID3 chapters read in both.
+      if (ext === "m4a") continue;
+      expect(item.body).toStartWith("### Recall chapter\n\n[00:00] Welcome back to the show.");
+      expect(item.body).toContain("### Spacing chapter\n\n[00:04] Today we talk about spaced repetition.");
+    }
+  });
+
   test("an audio link is titled by its own file name, not where it redirects", async () => {
     const url = "https://www.buzzsprout.com/123/episodes/17456166-travel-with-kids.mp3";
     globalThis.fetch = (async () => {

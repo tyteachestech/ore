@@ -128,15 +128,33 @@ const damaged = (what: string, app?: string) => (e: Error): never => {
   throw e;
 };
 
+/** An audio file's title, artist and chapters from its own tags (ID3, MP4); none when it has none or they won't read. */
+async function audioTags(bytes: Uint8Array, ext: string): Promise<{ title?: string; author?: string; chapters: { title: string; start_time: number }[] }> {
+  try {
+    const { parseBuffer } = await import("music-metadata");
+    const mimeType = ({ m4a: "audio/mp4", mp4: "audio/mp4", aac: "audio/aac", mp3: "audio/mpeg", wav: "audio/wav", flac: "audio/flac", aiff: "audio/aiff" } as Record<string, string>)[ext];
+    const info = mimeType ? { mimeType } : undefined;
+    // A chapter track the reader can't follow still leaves the title and artist.
+    const m = await parseBuffer(bytes, info, { includeChapters: true, skipCovers: true, duration: true }).catch(() => parseBuffer(bytes, info, { skipCovers: true }));
+    const chapters = (m.format.chapters ?? []).filter((c) => c.title?.trim()).map((c) => ({ title: c.title, start_time: c.timeScale ? c.start / c.timeScale : c.start }));
+    return { title: m.common.title?.trim() || undefined, author: m.common.artist?.trim() || undefined, chapters };
+  } catch {
+    return { chapters: [] };
+  }
+}
+
 /** A source draft from a file's bytes, whatever it came from (a link or a file), by its kind. */
 async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: string, base = url, opts: AddOptions = {}): Promise<NewItem> {
   if (AUDIO_TYPES.includes(kind)) {
     // Speech to a timed transcript, read like a subtitle file's (D96).
+    // The file's own tags name it, its speaker and its chapters, as a player shows them (F-new-audio-tags).
+    const tags = await audioTags(bytes, kind);
     const vtt = await (await import("./audio.ts")).transcribe(bytes, kind, opts.onProgress, opts.language);
     // A podcast host's file name ("17456166-summer-shorts-…") as words, its id dropped.
-    const title = fileStem(name).replace(/^\d{5,}[-_ ]+/, "").replace(/[-_]+/g, " ").trim() || fileStem(name);
+    const stem = fileStem(name).replace(/^\d{5,}[-_ ]+/, "").replace(/[-_]+/g, " ").trim() || fileStem(name);
+    const title = tags.title ?? stem[0]!.toUpperCase() + stem.slice(1);
     // The audio itself is the original, kept to play in place (D122, D167); the timed transcript beside it.
-    return { type: "article", title: title[0]!.toUpperCase() + title.slice(1), url, body: vttToBody(vtt), source: { ext: kind, data: bytes }, transcript: vtt };
+    return { type: "article", title, author: tags.author, url, body: vttToBody(vtt, tags.chapters), source: { ext: kind, data: bytes }, transcript: vtt };
   }
   if (kind === "pdf") {
     const p = await pdfToDoc(bytes, opts.regions).catch(async (e) => {
