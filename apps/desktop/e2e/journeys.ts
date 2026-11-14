@@ -1426,7 +1426,7 @@ journey("tutor stop and copy: the send button stops a reply (⌘. too), words wr
     await page.keyboard.press("Meta+.");
     await tutor.getByText("Stopped", { exact: true }).waitFor();
     await tutor.getByText("Half a thought", { exact: true }).waitFor();
-    // Saved with who wrote it, as a whole reply is (F-new-tutor-stop-stamp).
+    // Saved with who wrote it, as a whole reply is (F186).
     await until("the stopped reply is saved with its AI stamp", async () => {
       const chats = (await ore("chat")) as { id: string }[];
       const chat = (await ore("chat", chats[0]!.id)) as { turns: { reply?: string; ai?: { model: string } }[] };
@@ -7522,7 +7522,7 @@ journey("review: editing an Explain card corrects a key point too; it's there wh
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-journey("review: saving an edit to the question keeps an answer changed outside meanwhile (F-new-card-save-clobbers)", async (page) => {
+journey("review: saving an edit to the question keeps an answer changed outside meanwhile (F174)", async (page) => {
   await startReview(page, /Teaching/);
   const entry = ((await ore("due")) as { id: string; question: string }[]).find((e) => e.question.startsWith("Explain why rereading"))!;
   const show = async () => (await ore("card", "show", entry.id)) as { question: string; answer: string };
@@ -7558,7 +7558,7 @@ async function awayAndBack(page: Page) {
   });
 }
 
-journey("review: back from time away, the exercise on screen shows a question changed outside (F-new-outside-stale)", async (page) => {
+journey("review: back from time away, the exercise on screen shows a question changed outside (F173)", async (page) => {
   await startReview(page, /Teaching/);
   const q = page.locator(".review-q");
   const shown = await q.innerText();
@@ -7575,7 +7575,7 @@ journey("review: back from time away, the exercise on screen shows a question ch
   }
 });
 
-journey("source note: back from time away, the note shows text added outside (F-new-outside-stale)", async (page) => {
+journey("source note: back from time away, the note shows text added outside (F173)", async (page) => {
   await openSource(page, AGENTS);
   await page.getByRole("tab", { name: "Source note" }).click();
   const editor = page.getByRole("textbox", { name: "Source note", exact: true });
@@ -8413,7 +8413,7 @@ journey("finish: drafting that fails after Done stays in front of “Finished”
   await until("Try again drafts both", async () => drafted.length === 2);
 });
 
-journey("prequestions: a Try again still running when he leaves and opens the source again shows its wait, and never starts a second run (F-new-enrich-reopen)", async (page) => {
+journey("prequestions: a Try again still running when he leaves and opens the source again shows its wait, and never starts a second run (F185)", async (page) => {
   const title = `Prequestions retried ${Date.now()}`;
   const fail = (on: Record<string, unknown>) => page.evaluate((on) => Object.assign(window as unknown as Record<string, unknown>, on), on);
   await fail({ __ORE_FAIL: { enrich: "Codex isn’t installed." } });
@@ -11135,7 +11135,7 @@ journey("phone: ⌘Z on a rating after leaving Review puts Today's minutes back 
   await until("Today takes the undone rating back", async () => (await ring.getAttribute("aria-label")) === before, 5000);
 }, "phone");
 
-journey("phone: Today starts the new day at midnight without a reload (F-new-home-midnight)", async (page) => {
+journey("phone: Today starts the new day at midnight without a reload (F172)", async (page) => {
   // Left open overnight, Home kept yesterday's minutes (and "All caught up" with no Start review) until a reload.
   const late = new Date();
   late.setHours(23, 50, 0, 0);
@@ -11167,7 +11167,7 @@ journey("phone: Today starts the new day at midnight without a reload (F-new-hom
   await until("Today shows the new day", async () => (await ring.getAttribute("aria-label")) === before, 5000);
 }, "phone");
 
-journey("phone: a rating still saves after the clock is set back (F-new-clock-back)", async (page) => {
+journey("phone: a rating still saves after the clock is set back (F183)", async (page) => {
   // The time on an exercise came out negative, core refused it ("elapsed_ms: Too small"), and nothing saved.
   await page.clock.install({ time: new Date("2027-03-12T20:00:00Z") });
   await page.reload();
@@ -11193,7 +11193,7 @@ journey("phone: a rating still saves after the clock is set back (F-new-clock-ba
   if (failed) throw new Error(`the rating after the clock went back failed: ${await page.locator(".toast").first().innerText()}`);
 }, "phone");
 
-journey("phone: a session across midnight counts only the new day's minutes toward its goal (F-new-goal-midnight)", async (page) => {
+journey("phone: a session across midnight counts only the new day's minutes toward its goal (F184)", async (page) => {
   // 4 minutes before midnight and 6 after said "Goal met" on a 10-minute goal: yesterday's were added in.
   const late = new Date();
   late.setHours(23, 55, 0, 0);
@@ -12394,7 +12394,7 @@ journey("source rename: pending Undo takes back the rename, not the source added
   }
 });
 
-journey("source rename: ⌘Z leaves a title set outside since, and says so (F-new-rename-undo-clobbers)", async (page) => {
+journey("source rename: ⌘Z leaves a title set outside since, and says so (F175)", async (page) => {
   const title = `Source renamed twice ${Date.now()}`;
   await page.reload();
   await page.keyboard.press("Meta+n");

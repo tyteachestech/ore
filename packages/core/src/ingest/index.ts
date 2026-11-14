@@ -147,7 +147,7 @@ async function audioTags(bytes: Uint8Array, ext: string): Promise<{ title?: stri
 async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: string, base = url, opts: AddOptions = {}): Promise<NewItem> {
   if (AUDIO_TYPES.includes(kind)) {
     // Speech to a timed transcript, read like a subtitle file's (D96).
-    // The file's own tags name it, its speaker and its chapters, as a player shows them (F-new-audio-tags).
+    // The file's own tags name it, its speaker and its chapters, as a player shows them (F180).
     const tags = await audioTags(bytes, kind);
     const vtt = await (await import("./audio.ts")).transcribe(bytes, kind, opts.onProgress, opts.language);
     // A podcast host's file name ("17456166-summer-shorts-…") as words, its id dropped.
@@ -376,7 +376,7 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
     await res.body?.cancel();
     throw new Error(google);
   }
-  // A download names itself (a Google Doc's export: "Study Guide.docx", F-new-google-doc-title); else the link's last part.
+  // A download names itself (a Google Doc's export: "Study Guide.docx", F179); else the link's last part.
   const urlName = downloadName(res.headers.get("content-disposition")) ?? decodeURIComponent(new URL(res.url || url).pathname.split("/").pop() || url);
   // Video is never read as a page: the whole file would download and parse as HTML. Audio is transcribed.
   if ((/^(audio|video)\//.test(ctype) || /\.(ogg|opus|mp4|mov|m4v|webm)$/i.test(urlName)) && !kindOf(urlName, ctype)) {
@@ -393,7 +393,7 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   const name = AUDIO_TYPES.includes(kind) ? decodeURIComponent(new URL(url).pathname.split("/").pop() || urlName) : urlName;
   const draft = await fromBytes(bytes, kind, name, url, res.url || rw?.url || url, opts);
   if (rw?.kind !== "fetch") return draft;
-  // A GitHub link to a code file is code: one fenced block, titled by its file name (F-new-github-code-file).
+  // A GitHub link to a code file is code: one fenced block, titled by its file name (F178).
   const lang = rw.base && draft.type === "markdown" ? CODE_EXT[extname(urlName).slice(1).toLowerCase()] : undefined;
   if (lang !== undefined) {
     const text = decodeText(bytes).replace(/\s+$/, "");

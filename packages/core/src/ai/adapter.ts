@@ -350,7 +350,7 @@ export function parseOutput(output: unknown): unknown {
 }
 
 /** Who will answer a task, before it runs: a reply stopped while it streams still records its vendor, model and
- *  prompt version (F-new-tutor-stop-stamp). The model is the one picked, or the vendor's default when none is. */
+ *  prompt version (F186). The model is the one picked, or the vendor's default when none is. */
 export function aiStampFor(lib: Library, name: PromptName): AiStamp {
   const vendor = chooseVendor(lib);
   return { vendor, model: aiModel(lib, vendor) ?? (vendor === "codex" ? codexConfiguredModel() : undefined) ?? `${vendor}-default`, prompt_version: loadPrompt(name).version };

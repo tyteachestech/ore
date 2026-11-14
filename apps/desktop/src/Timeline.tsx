@@ -21,7 +21,7 @@ const count = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`;
 /** Midnight that starts the local day of `t`. */
 const dayStart = (t: number) => new Date(t).setHours(0, 0, 0, 0);
 /** "in 12 days", "tomorrow", "later today": by the days on his calendar, not 24-hour spans, so 09:00 tomorrow
- *  said at 22:55 is "tomorrow" (F-new-next-review-day). */
+ *  said at 22:55 is "tomorrow" (F182). */
 export function inWords(iso: string, now = Date.now()): string {
   const days = Math.round((dayStart(Date.parse(iso)) - dayStart(now)) / DAY);
   return days <= 0 ? "later today" : days === 1 ? "tomorrow" : days < 30 ? `in ${days} days` : days < 365 ? `in ${count(Math.round(days / 30), "month")}` : `in ${count(Math.round(days / 365), "year")}`;

@@ -171,7 +171,7 @@ export function useTutorChat(notify: Notify) {
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
     const stop = await listen<{ stream?: string; reply?: string; searching?: boolean; ai?: TutorTurn["ai"] }>("ore-progress", ({ payload: p }) => {
-      // Who is answering, said first: a reply stopped part way is saved with it (F-new-tutor-stop-stamp).
+      // Who is answering, said first: a reply stopped part way is saved with it (F186).
       if (p.stream === t.id && mine() && p.ai) return void answering.current.set(t.id, p.ai);
       if (p.stream === t.id && mine() && p.reply !== undefined) pulse("tutor"); // words arriving: the mole's lamp follows them (D263)
       if (p.stream === t.id && mine()) patch(chat, t.id, p.reply !== undefined ? { partial: p.reply } : p.searching ? { searching: true } : { searching: false, searched: true });

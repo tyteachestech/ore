@@ -112,7 +112,7 @@ describe("a damaged library", () => {
     expect((await doctor(lib)).issues.some((i) => i.message.startsWith("a copy of"))).toBe(true);
   });
 
-  test("two folders ending in the same id open as the one listed (F-new-duplicate-id)", async () => {
+  test("two folders ending in the same id open as the one listed (F176)", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Retrieval practice beats rereading." });
     const copy = join(dirname(item.dir), `duplicate-${item.meta.id}`);

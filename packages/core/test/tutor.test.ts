@@ -246,7 +246,7 @@ describe("tutor: the web", () => {
     // The run starts the answer over, then the search starts; the reply's first words come at once and
     // later ones a few times a second (these all came within 50 ms, so only the first shows).
     expect(seen.filter((p) => !(p as object).hasOwnProperty("ai"))).toEqual([{ reply: "" }, { searching: true }, { reply: "Your sources" }]);
-    // Who is answering comes first, so a reply stopped part way still records it (F-new-tutor-stop-stamp).
+    // Who is answering comes first, so a reply stopped part way still records it (F186).
     expect(seen[0]).toMatchObject({ ai: { vendor: "claude", prompt_version: expect.stringMatching(/^tutor@\d+$/) } });
     expect(r.reply).toBe("Your sources don't say é.");
     expect(readFileSync(join(binDir, "argv.json"), "utf8")).toContain("--include-partial-messages");

@@ -298,7 +298,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   // comes up twice. Past the day's new-card limits, so a draft it didn't rate stays; the card on screen
   // goes only if he hasn't started on it.
   // Back after time away does the same, since the CLI, `/ore` or the phone may have rated, changed or deleted one
-  // (F-new-outside-stale); the next card loads again, and the one on screen too if he hasn't started on it.
+  // (F173); the next card loads again, and the one on screen too if he hasn't started on it.
   useEffect(() => {
     const reconcile = (outside: boolean) =>
       ore<DueEntry[]>("due", "--all", ...pickArgs(pick, source)).then((fresh) => {
@@ -612,7 +612,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     setBusy(true);
     let goalClosed = false, saved = false;
     try {
-      // A wall clock set back since it showed (a time zone fix, a sync) never makes it negative (F-new-clock-back).
+      // A wall clock set back since it showed (a time zone fix, a sync) never makes it negative (F183).
       const elapsed = Math.max(0, Date.now() - shownAt.current);
       await sessionReady.current;
       const args = [
@@ -632,7 +632,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
       // Past midnight the day's minutes start again: read the new day's Today, as if it was read just before this
-      // rating, so the goal and the ring count today's minutes, not yesterday's plus these (F-new-goal-midnight).
+      // rating, so the goal and the ring count today's minutes, not yesterday's plus these (F184).
       if (before.current && new Date().toLocaleDateString("sv") !== beforeDay.current) {
         const t = await ore<Today>("today").catch(() => null);
         if (t) {
@@ -887,7 +887,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
 
   /** A card's new wording, and an Explain card's key points when given, on the history: undo puts the old
    *  ones back (and on screen, if it still is). */
-  /** Only what changed from `from` is written, so a field edited outside meanwhile keeps its edit (F-new-card-save-clobbers). */
+  /** Only what changed from `from` is written, so a field edited outside meanwhile keeps its edit (F174). */
   const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true, from: { question: string; answer: string; rubric?: string[] } = c) => {
     const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric };
     const changed = [

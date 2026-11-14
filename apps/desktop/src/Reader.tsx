@@ -1183,7 +1183,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     }
   };
 
-  // Opened again while its Try again still runs: it shows the wait, then the result (F-new-enrich-reopen).
+  // Opened again while its Try again still runs: it shows the wait, then the result (F185).
   useEffect(() => void (enriching.has(p.id) && retryEnrich()), [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const notifyNow = useRef(p.notify);
@@ -2911,7 +2911,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     let now = before;
     try {
       await inOrder(id, async () => {
-        // Undo or redo: a title set outside since (`ore edit`, the phone) is newer, and stays (F-new-rename-undo-clobbers).
+        // Undo or redo: a title set outside since (`ore edit`, the phone) is newer, and stays (F175).
         if (!undoable && (now = (await ore<{ title: string }>("show", id)).title) !== before) throw new Error(`Left as “${now}”: it was renamed since`);
         return ore("edit", id, "--title", t);
       });

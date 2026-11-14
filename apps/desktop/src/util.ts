@@ -341,7 +341,7 @@ export function singleFlight<T>(run: () => Promise<T>): () => Promise<T> {
 }
 
 /** Said when the library may have changed outside the app (back after time away, the phone's pull): the CLI, `/ore`
- *  or the other device wrote beside it. Every open screen reads again (F-new-outside-stale). */
+ *  or the other device wrote beside it. Every open screen reads again (F173). */
 export const LIBRARY_BACK = "ore:library-back";
 export function wakeScreens() {
   for (const wake of screens.keys()) wake();
@@ -349,7 +349,7 @@ export function wakeScreens() {
 }
 
 /** Today's local date ("2026-11-14"): changes when midnight passes, checked every 30 s and when the window comes
- *  back, so a screen left open overnight (Home's Today) reads the new day instead of keeping yesterday's (F-new-home-midnight). */
+ *  back, so a screen left open overnight (Home's Today) reads the new day instead of keeping yesterday's (F172). */
 export function useDay(): string {
   const key = () => new Date().toLocaleDateString("sv");
   const [day, setDay] = useState(key);

@@ -43,8 +43,8 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
   });
   // Node's build of mammoth takes a Buffer; its browser build (the iPhone app) takes the bytes themselves.
   const input = (typeof Buffer !== "undefined" ? { buffer: Buffer.from(data) } : { arrayBuffer: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) }) as { buffer: Buffer };
-  // Code paragraphs (Word's and Pandoc's "Source Code" style) keep their lines and indent, fenced (F-new-docx-code);
-  // comments come along at the end instead of vanishing (F-new-docx-comments).
+  // Code paragraphs (Word's and Pandoc's "Source Code" style) keep their lines and indent, fenced (F177);
+  // comments come along at the end instead of vanishing (F187).
   const styleMap = ["p[style-name='Source Code'] => pre:separator('\\n')", "p[style-name='HTML Preformatted'] => pre:separator('\\n')", "comment-reference => sup"];
   const { value } = await mammoth.convertToHtml(input, { convertImage, styleMap });
   const { document } = parseHTML(`<html><body>${value}</body></html>`);

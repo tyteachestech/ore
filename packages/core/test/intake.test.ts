@@ -190,7 +190,7 @@ describe("import coverage: web pages", () => {
     expect(count(item.body, /^#{1,6} /gm)).toBeGreaterThanOrEqual(5);
   });
 
-  test("GitHub link to a code file reads it as code, titled by its file name (F-new-github-code-file)", async () => {
+  test("GitHub link to a code file reads it as code, titled by its file name (F178)", async () => {
     const raw = "https://raw.githubusercontent.com/ore-learn/examples/main/src/spacing.py";
     serve({ [raw]: { body: web("spacing.py"), type: "text/plain; charset=utf-8" } });
     const item = await addSource(await tempLibrary(), "https://github.com/ore-learn/examples/blob/main/src/spacing.py");
@@ -201,7 +201,7 @@ describe("import coverage: web pages", () => {
     expect(item.body.trimEnd()).toEndWith("print(next_gap(1, 2))\n```");
   });
 
-  test("a public Google Doc is titled by its name, from the download (F-new-google-doc-title)", async () => {
+  test("a public Google Doc is titled by its name, from the download (F179)", async () => {
     const exp = "https://docs.google.com/document/d/1AbC_dEf/export?format=docx";
     serve({ [exp]: { body: readFileSync(file("google-export.docx")), type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers: { "content-disposition": `attachment; filename="Study Guide.docx"; filename*=UTF-8''Constitution%20Study%20Guide.docx` } } });
     const item = await addSource(await tempLibrary(), "https://docs.google.com/document/d/1AbC_dEf/edit?usp=sharing");
@@ -413,7 +413,7 @@ describe("import coverage: files", () => {
     expect(item.body).toContain("Mix problem types");
   });
 
-  test("Word: code keeps its lines and indent, fenced, and comments come along (F-new-docx-code, F-new-docx-comments)", async () => {
+  test("Word: code keeps its lines and indent, fenced, and comments come along (F177, F187)", async () => {
     // Made for Ore with Pandoc (docs/reviews/2026-11-14-codex-sweep-2/fixtures/make-fixtures.py).
     const item = await addSource(await tempLibrary(), file("word-code.docx"));
     expect(item.meta.title).toBe("Office Learning");
@@ -1136,7 +1136,7 @@ describe("import coverage: audio and podcasts", () => {
     return f;
   };
 
-  test("an audio file's own title, artist and chapters come in (F-new-audio-tags)", async () => {
+  test("an audio file's own title, artist and chapters come in (F180)", async () => {
     for (const ext of ["mp3", "m4a"]) {
       const item = await addSource(await tempLibrary(), join(FIX, "audio", `chaptered.${ext}`));
       expect(item.meta).toMatchObject({ title: "Chaptered Audio Learning", author: "Ore Fixture Author" });

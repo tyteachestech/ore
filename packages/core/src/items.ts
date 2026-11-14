@@ -232,7 +232,7 @@ export function findItem(lib: Library, ref: string): Item {
     const id = d.slice(-26);
     return id === key || id.startsWith(key) || id.endsWith(key);
   });
-  // Folders all ending in one id are a copy (Finder, iCloud): open the one the lists show (F-new-duplicate-id).
+  // Folders all ending in one id are a copy (Finder, iCloud): open the one the lists show (F176).
   if (hits.length > 1 && new Set(hits.map((d) => d.slice(-26))).size === 1) {
     const one = oncePerId(readable(hits, readItemDir))[0];
     if (one) return one;
