@@ -362,7 +362,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
       <button className="pill-btn" onClick={() => void check()} disabled={checking}>
         Try again
       </button>
-      <button className="pill-btn" onClick={() => unfollow(f)}>
+      <button className="settings-btn" onClick={() => unfollow(f)}>
         Unfollow
       </button>
     </div>

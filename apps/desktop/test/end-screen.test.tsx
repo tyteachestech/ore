@@ -282,6 +282,10 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   expect(body.querySelectorAll(".end-emblem").length).toBe(0);
   expect(body.querySelectorAll(".review-end > .review-cut").length).toBe(1);
   expect(body.querySelectorAll(".review-kept").length).toBe(1);
+  // Its title says what was done, never a cheer.
+  expect(body.querySelector("h2")!.textContent).toBe("Goal met");
+  await act(async () => root.render(<TooltipProvider><EndScreen quick end={end(["ai"], today(true, 600_000))} skills={skills} onDone={() => {}} onAgain={() => {}} onTry={() => {}} /></TooltipProvider>));
+  expect(body.querySelector("h2")!.textContent).toBe("5 answered");
   await act(async () => (root.unmount(), body.remove()));
   reduce = false;
 });

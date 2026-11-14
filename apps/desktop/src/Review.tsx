@@ -1600,7 +1600,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const closed = t.met && !!b && !b.met;
   // Caught up short of the goal still counts (D60), but it isn't the goal being met.
   const short = t.counts && t.caught_up && t.active_ms < t.goal_ms;
-  const title = short ? "All caught up · today counts" : closed ? "Goal met!" : "Nice work";
+  // The quick quiz's title says what happened, never a cheer (Tyler 2026-11-14).
+  const title = short ? "All caught up · today counts" : closed ? "Goal met" : `${s.reviews} answered`;
   const ups = t.skills.filter((k) => k.level > (b?.skills.find((x) => x.skill === k.skill)?.level ?? k.level));
   // D190: the cart tips this session's ore into the ring, once, when there is something to tip: ring dots this
   // session lit, or gems it cut. Not in the quick quiz, on the phone, or under Reduce Motion.

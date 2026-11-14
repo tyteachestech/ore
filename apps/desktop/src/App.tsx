@@ -64,7 +64,7 @@ const TABS: { id: Tab; label: string; key: KeyId }[] = [
 ];
 
 /** Source kinds as he would say them. */
-const KIND: Record<string, string> = { article: "article", youtube: "video", pdf: "pdf", epub: "book", markdown: "text", snippet: "snippet" };
+const KIND: Record<string, string> = { article: "Article", youtube: "Video", pdf: "PDF", epub: "Book", markdown: "Text", snippet: "Snippet" };
 
 /** Sources a skill page lists before "Show all". */
 const SKILL_CAP = 8;
