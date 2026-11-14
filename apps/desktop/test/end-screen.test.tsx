@@ -166,6 +166,8 @@ test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem 
   expect(s.body.querySelector(".review-cut")!.getAttribute("aria-label")).toBe("2 became solid, 1 won back, 1 polished");
   // The mole speaks (D243); the depth is a number in the row of results.
   expect(s.q(".end-says .says-line")).toBe(1);
+  // The box is an outline with no tail (D263): nothing is drawn in it but the line.
+  expect(s.q(".end-says svg.says-tail")).toBe(0);
   expect(s.body.querySelector('.end-tally [data-key="depth"]')!.textContent).toBe("+41days of memory");
   await s.done();
   // More gems than fit: the count covers the polished ones left out too.
