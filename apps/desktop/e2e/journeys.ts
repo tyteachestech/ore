@@ -2349,6 +2349,20 @@ journey("figure cards: a drag over a zoomed figure draws a box, what's under it 
   await until("Undo retires the card", async () => ((await ore("card", "show", id)) as { state: string }).state === "retired");
 });
 
+journey("hidden source keeps Show the source in the accessibility tree (F118)", async (page) => {
+  await openSource(page, TESTING);
+  const reader = page.locator(".reader");
+  await page.getByRole("button", { name: "Hide the source", exact: true }).click();
+  const hidden = await reader.ariaSnapshot();
+  if (!hidden.includes('button "Show the source"')) throw new Error("Show the source is missing from the accessibility tree");
+  if (hidden.includes(TESTING)) throw new Error("the hidden source's title is still in the accessibility tree");
+  const show = page.getByRole("button", { name: "Show the source", exact: true });
+  await show.focus();
+  await page.keyboard.press("Enter");
+  await until("showing the source restores its accessible text", async () => (await reader.ariaSnapshot()).includes(TESTING));
+  await page.getByRole("button", { name: "Hide the source", exact: true }).waitFor();
+});
+
 journey("tables: a heading's button covers its column, a click or Enter shows a cell, right-click on a covered one makes an exercise of it and Undo takes it back (D200)", async (page) => {
   const made = (await (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Sampling settings\n\nHow the draw is made.\n\n| Setting | What it changes | Range |\n|---|---|---|\n| Temperature | How flat the odds are | 0 to 1.5 |\n| Top-p | How much of the tail stays | 0.8 to 1 |\n| Top-k | How many words stay | 20 to 100 |\n\nChange one at a time." }) })).json()) as { id: string };
   try {
@@ -2391,6 +2405,29 @@ journey("tables: a heading's button covers its column, a click or Enter shows a 
     await page.getByRole("menuitem", { name: "Show", exact: true }).waitFor();
     if (await page.getByRole("menuitem", { name: "Make an exercise of this cell" }).count()) throw new Error("the row's own name offers an exercise");
     await page.keyboard.press("Escape");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
+journey("tables: a narrow heading's cover button sits beside its text on hover, never over it (F119)", async (page) => {
+  // "Term" is its column's widest content, so the column is no wider than the word.
+  const made = (await (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Narrow headings\n\nA short glossary.\n\n| Term | Meaning |\n|---|---|\n| a | The first letter of the alphabet |\n| b | The second letter of the alphabet |\n\nThat is all." }) })).json()) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Narrow headings");
+    const head = page.locator(".doc table th").first();
+    await head.hover();
+    const button = head.getByRole("button", { name: "Cover this column" });
+    await until("the button shows on hover", async () => (await button.evaluate((b) => getComputedStyle(b).opacity)) === "1");
+    const { text, btn } = await head.evaluate((th) => {
+      const r = document.createRange();
+      r.selectNodeContents(th.firstChild!);
+      const t = r.getBoundingClientRect();
+      const b = th.querySelector(".col-cover")!.getBoundingClientRect();
+      return { text: { left: t.left, right: t.right }, btn: { left: b.left, right: b.right } };
+    });
+    if (text.right > btn.left) throw new Error(`the button (from ${btn.left.toFixed(1)}px) covers the heading's text (to ${text.right.toFixed(1)}px)`);
   } finally {
     await ore("archive", made.id).catch(() => {});
   }
@@ -11554,6 +11591,172 @@ journey("phone: a half-typed answer to What do you already know? survives a rela
   await page.locator(".phone-reader .doc").first().waitFor();
   await until("the answer comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Retrieval changes what I can remember");
 }, "phone");
+
+journey("a11y: reader equations expose mathematical content (F110)", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Accessible equation\n\nThe relation is\n\n$$E = mc^2$$\n\nEnergy and mass.");
+  await page.keyboard.press("Enter");
+  await page.locator(".doc .katex").waitFor();
+  const tree = await page.locator(".doc").ariaSnapshot();
+  if (!tree.includes("math") || !(await page.locator(".doc math").count())) throw new Error(`Equation missing from accessibility tree: ${tree}`);
+  if (!(await page.locator(".doc math").textContent())?.includes("E")) throw new Error("Equation lost its content");
+});
+
+journey("a11y: failed Add announces and describes the retained input (F112)", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const input = page.getByLabel("Link, file path or text");
+  const text = "# Unsaved learning note\n\nKeep these words after a failed save.";
+  await input.fill(text);
+  await failNext(page, "add", "The disk is full. Free space and try again.");
+  await page.keyboard.press("Enter");
+  const error = page.locator(".add-box .err");
+  await error.waitFor();
+  if (!(await page.locator(".add-box").ariaSnapshot()).includes("alert:")) throw new Error("Add error is not announced as an alert");
+  if ((await input.getAttribute("aria-describedby")) !== await error.getAttribute("id") || !(await error.getAttribute("id"))) throw new Error("Add error does not describe the input");
+  if ((await input.inputValue()) !== text || !(await input.evaluate((e) => e === document.activeElement))) throw new Error("Failure lost input or focus");
+  await input.fill(text + " More.");
+  if (await input.getAttribute("aria-describedby")) throw new Error("Cleared error still describes the input");
+  await failNext(page, "add", null);
+  await page.keyboard.press("Escape");
+});
+
+journey("a11y: revealing a Fact announces its answer and rating phase (F113)", async (page) => {
+  await startReview(page, /Learning/);
+  await page.locator(".quiz-sure").waitFor();
+  const live = page.locator(".review .sr-only[aria-live]");
+  const before = await live.innerText();
+  await page.keyboard.press("3");
+  const answer = page.locator(".review-answer");
+  await answer.waitFor();
+  const said = await live.innerText();
+  if (said === before || !said.includes((await answer.innerText()).trim()) || !said.includes("Rate your recall")) throw new Error(`Answer not announced: ${said}`);
+  await page.keyboard.press("Escape");
+});
+
+journey("a11y: gem counts say their meaning and reveal hints by keyboard (F114)", async (page) => {
+  const home = page.locator('.home-skill[data-id="learning"] .home-level');
+  await home.waitFor();
+  const homeTree = await home.ariaSnapshot();
+  if (!homeTree.includes("cut gems") || !homeTree.includes("recall")) throw new Error(`Home count has no meaning: ${homeTree}`);
+  await page.locator('.home-skill[data-id="learning"] .home-open').focus();
+  // More is between the name and count; walk the actual Tab order.
+  for (let i = 0; i < 4 && !(await home.evaluate((e) => e === document.activeElement)); i++) await page.keyboard.press("Tab");
+  if (!(await home.evaluate((e) => e === document.activeElement))) throw new Error("Home count cannot be reached by Tab");
+  await page.getByRole("tooltip").filter({ hasText: "recall" }).waitFor();
+  await page.getByRole("button", { name: "Learning", exact: true }).first().click();
+  const trigger = page.locator(".hero-strength");
+  await trigger.click();
+  const pop = page.locator(".strength-pop");
+  if (!(await pop.getAttribute("aria-label"))) throw new Error("Gem breakdown dialog is unnamed");
+  const entries = pop.locator(".strength-legend > span");
+  if (!(await entries.count())) throw new Error("No gem states to check");
+  await pop.focus();
+  for (const entry of await entries.all()) {
+    const tree = await entry.ariaSnapshot();
+    if (!/Polished|Won back|Cut:|Nearly cut|Missed:|Rough:|Not reviewed/.test(tree)) throw new Error(`Gem state has no meaning: ${tree}`);
+    if ((await entry.getAttribute("tabindex")) !== "0") throw new Error("Gem meaning cannot be reached by keyboard");
+    await page.keyboard.press("Tab");
+    if (!(await entry.evaluate((e) => e === document.activeElement))) throw new Error(`Tab missed gem state: ${await entry.getAttribute("aria-label")}; focused ${await page.locator(":focus").evaluate((e) => e.outerHTML)}`);
+    await page.locator('.hint[data-state$="open"]').filter({ hasText: (await entry.getAttribute("aria-label"))!.split(" · ").slice(1).join(" · ") }).first().waitFor();
+  }
+  await page.keyboard.press("Escape");
+  await pop.waitFor({ state: "hidden" });
+  // Focus goes back to the gem once the breakdown has finished leaving.
+  await until("closing the breakdown puts focus back on its gem", async () => await trigger.evaluate((e) => e === document.activeElement));
+});
+
+journey("a11y: the suggested rating has a keyboard focus ring (F115)", async (page) => {
+  await startReview(page, /Learning/);
+  await page.locator(".quiz-sure").waitFor();
+  await page.keyboard.press("3");
+  const good = page.locator(".review-rate .suggested");
+  await good.waitFor();
+  const before = await good.evaluate((e) => getComputedStyle(e).boxShadow);
+  await page.locator(".review-rate .rate-2").focus();
+  await page.keyboard.press("Tab");
+  if (!(await good.evaluate((e) => e === document.activeElement && e.matches(":focus-visible")))) throw new Error("Tab did not focus suggested rating");
+  const after = await good.evaluate((e) => ({ shadow: getComputedStyle(e).boxShadow, outline: getComputedStyle(e).outlineStyle }));
+  if (after.shadow === before && after.outline === "none") throw new Error(`Suggested rating has no focus indicator: ${before}`);
+  await page.keyboard.press("Escape");
+});
+
+journey("a11y: tutor citations and hovered secondary text meet AA contrast (F116)", async (page) => {
+  const results: { text: string; ratio: number }[] = [];
+  const measure = async (target: Locator) => {
+    results.push(await target.evaluate((el) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 1;
+      const ctx = canvas.getContext("2d")!;
+      const rgb = (color: string) => {
+        ctx.clearRect(0, 0, 1, 1);
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, 1, 1);
+        return [...ctx.getImageData(0, 0, 1, 1).data];
+      };
+      const layers: number[][] = [];
+      for (let e: Element | null = el; e; e = e.parentElement) layers.unshift(rgb(getComputedStyle(e).backgroundColor));
+      let bg = [255, 255, 255];
+      for (const layer of layers) bg = bg.map((v, i) => layer[i]! * layer[3]! / 255 + v * (1 - layer[3]! / 255));
+      const lum = (color: number[]) => color.slice(0, 3).reduce((v, c, i) => {
+        const s = c / 255;
+        return v + (s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4) * [0.2126, 0.7152, 0.0722][i]!;
+      }, 0);
+      const a = lum(rgb(getComputedStyle(el).color)), b = lum(bg);
+      return { text: el.textContent ?? "", ratio: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05) };
+    }));
+  };
+  await page.getByRole("button", { name: "Learning", exact: true }).first().click();
+  const row = page.locator(".row").filter({ hasText: TESTING }).first();
+  await row.hover();
+  await measure(row.locator(".kind-line"));
+  await page.locator(".hero-strength").hover();
+  const loose = page.locator(".hero-strength .near-goal > span:not(.near-glow)");
+  await loose.waitFor();
+  await measure(loose);
+  await openSource(page, TESTING);
+  await page.keyboard.press("Meta+j");
+  await page.getByRole("textbox", { name: "Message the tutor" }).fill("Why does this work?");
+  await page.keyboard.press("Enter");
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  await tutor.locator(".cite").first().waitFor();
+  for (const cite of await tutor.locator(".cite-name").all()) await measure(cite);
+  const sources = tutor.getByRole("button", { name: "Sources", exact: true });
+  await measure(sources);
+  await sources.focus();
+  if (!(await sources.ariaSnapshot()).includes('button "Sources"')) throw new Error("Sources lost its accessible name");
+  console.log("      contrast", JSON.stringify(results));
+  if (results.some((r) => r.ratio < 4.5)) throw new Error(`Text contrast below 4.5:1: ${JSON.stringify(results)}`);
+  await page.keyboard.press("Escape");
+});
+
+journey("a11y: reader toggle icons stay decorative in both states (F117)", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill("# Accessible table\n\n| Term | Meaning |\n|---|---|\n| Recall | Retrieve from memory |\n\nTry remembering the meaning.");
+  await page.keyboard.press("Enter");
+  const cover = page.getByRole("button", { name: "Cover this column", exact: true }).first();
+  await cover.waitFor();
+  const check = async (control: Locator) => {
+    const tree = await control.ariaSnapshot();
+    if (!tree.includes("button") || tree.includes("img")) throw new Error(`Decorative icon exposed: ${tree}`);
+  };
+  await check(cover);
+  await page.locator(".doc th").first().hover();
+  await cover.focus();
+  await page.keyboard.press("Enter");
+  const show = page.getByRole("button", { name: "Show this column", exact: true });
+  await check(show);
+  await page.keyboard.press("Enter");
+  await check(cover);
+  const hide = page.getByRole("button", { name: "Hide the source", exact: true });
+  await check(hide);
+  await hide.click();
+  const source = page.locator('.width-toggle[aria-label="Show the source"]');
+  await until("source toggle says Show", async () => (await source.getAttribute("aria-label")) === "Show the source");
+  // The hidden reader pane also hides its toolbar from the tree (tracked separately).
+  if (await source.locator('svg:not([aria-hidden="true"])').count()) throw new Error("Show source icon is not decorative");
+  await source.click();
+  await check(hide);
+});
 
 // —— run ——
 
