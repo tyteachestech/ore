@@ -135,7 +135,7 @@ async function audioTags(bytes: Uint8Array, ext: string): Promise<{ title?: stri
     const mimeType = ({ m4a: "audio/mp4", mp4: "audio/mp4", aac: "audio/aac", mp3: "audio/mpeg", wav: "audio/wav", flac: "audio/flac", aiff: "audio/aiff" } as Record<string, string>)[ext];
     const info = mimeType ? { mimeType } : undefined;
     // A chapter track the reader can't follow still leaves the title and artist.
-    const m = await parseBuffer(bytes, info, { includeChapters: true, skipCovers: true, duration: true }).catch(() => parseBuffer(bytes, info, { skipCovers: true }));
+    const m = await parseBuffer(bytes, info, { includeChapters: true, skipCovers: true }).catch(() => parseBuffer(bytes, info, { skipCovers: true }));
     const chapters = (m.format.chapters ?? []).filter((c) => c.title?.trim()).map((c) => ({ title: c.title, start_time: c.timeScale ? c.start / c.timeScale : c.start }));
     return { title: m.common.title?.trim() || undefined, author: m.common.artist?.trim() || undefined, chapters };
   } catch {
@@ -377,7 +377,9 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
     throw new Error(google);
   }
   // A download names itself (a Google Doc's export: "Study Guide.docx", F179); else the link's last part.
-  const urlName = downloadName(res.headers.get("content-disposition")) ?? decodeURIComponent(new URL(res.url || url).pathname.split("/").pop() || url);
+  // Only a name that says what the file is: a generic "download" or "file.bin" never hides the link's own type.
+  const given = downloadName(res.headers.get("content-disposition"));
+  const urlName = (given && kindOf(given) ? given : undefined) ?? decodeURIComponent(new URL(res.url || url).pathname.split("/").pop() || url);
   // Video is never read as a page: the whole file would download and parse as HTML. Audio is transcribed.
   if ((/^(audio|video)\//.test(ctype) || /\.(ogg|opus|mp4|mov|m4v|webm)$/i.test(urlName)) && !kindOf(urlName, ctype)) {
     await res.body?.cancel();

@@ -215,7 +215,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const beforeDay = useRef("");
   /** The ratings of this session, newest last, to take back with ⌘Z one after another (Anki's Undo): each
    *  review's ts and the session as it was before it. */
-  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget }[]>([]);
+  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget; day: string; ms: number }[]>([]);
   const last = undos.at(-1);
   /** Cards retired in this session: taking back a rating before one brings the queue back without it. */
   const retired = useRef(new Set<string>());
@@ -641,6 +641,9 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
           beforeDay.current = new Date().toLocaleDateString("sv");
           setStart(before.current);
           activeMs.current = add;
+          // Yesterday's goal note was yesterday's: today's goal is told when it closes.
+          goalTold.current = false;
+          setGoalSaid(false);
         }
       }
       // The day's goal closing (D65) is told by the mole; the session flows on (D246).
@@ -698,7 +701,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
           );
         },
       );
-    setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
+    setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget, day: beforeDay.current, ms: Math.min(elapsed, ACTIVE_CAP_MS) }]);
     // Every rating is a step, a miss too: a rating always moves "Exercise N of M" on, and a miss adds its retry
     // as one more step (D59).
     setDone((n) => n + 1);
@@ -723,7 +726,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         setEnd(null);
       }
       reviewed.current--;
-      activeMs.current = last.activeMs;
+      // A rating from before midnight's rollover: the count is the new day's now, so only its own time comes off.
+      activeMs.current = last.day === beforeDay.current ? last.activeMs : Math.max(0, activeMs.current - last.ms);
       putOffIds.current = new Set(last.off);
       // D177's one more goes with the rating that earned it.
       wonLast.current = last.won;
