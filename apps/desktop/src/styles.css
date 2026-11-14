@@ -851,7 +851,7 @@ img.thumb { filter: brightness(0.86); }
 }
 .popup.wide { width: 440px; }
 .intents { grid-column: 1; margin: 0 0 8px; }
-.intent { flex: 1; height: 26px; border-radius: 6px; color: var(--muted); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+.intent { flex: 1; height: 26px; border-radius: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .intent:hover { background: var(--bg-hover); }
 /* Each type keeps its colour on the icon; the chosen one fills with the same tint it paints in the text. */
 .intent.keep { --hue: var(--keep-solid); --tint: var(--keep); } .intent.card { --hue: var(--card-solid); --tint: var(--card); }
@@ -1541,6 +1541,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .gem-ring[data-finishes] > .dot-ring { filter: drop-shadow(0 0 3px var(--skill, var(--accent))); }
 .gem-ring-lv { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); padding: 0 6px; height: 16px; line-height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); font-family: var(--round); font-size: 10px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .strength-side { display: flex; flex-direction: column; gap: 4px; }
+.strength-line { display: none; }
 .near-goal { display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-family: var(--mono); font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .near-goal > span { display: inline-flex; align-items: center; gap: 5px; color: var(--faint); font-size: 12px; }
 .hero-strength:is(:hover, [aria-expanded="true"]) .near-goal > span:not(.near-glow) { color: var(--muted); }
@@ -1620,6 +1621,8 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .skill-col.side .question-quote .note { margin: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-col.side .question-quote .from { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-col.side .question.done .question-quote .note { text-decoration: line-through; }
+/* On the phone a question gets two lines, as a title does (D256, F139): one line cut most of them mid-thought. */
+.phone .skill-col.side .question-quote .note { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; line-height: 1.3; }
 .q-lead { position: absolute; right: 8px; top: 9px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; }
 .q-lead::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--question-solid); }
 .q-lead:hover { background: var(--bg-hover); }
@@ -2806,7 +2809,15 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .kb-hide { flex: none; width: 44px; }
 .phone .quiz-close { min-width: 44px; min-height: 44px; }
 .phone .review-tools button { min-width: 44px; min-height: 44px; }
-.phone .review-moment { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+/* Thumb reach (F137): what he taps on every exercise sits at the foot of the screen, over the home indicator, as
+   Apple puts an app's main actions: how sure he is on an exercise he answers in his head, and the ratings once the
+   answer is out. A typed answer keeps its buttons under the field, which the keyboard already lifts to the thumb. */
+.phone .review { --foot: max(32px, calc(env(safe-area-inset-bottom, 0px) + 16px)); }
+.phone .review-body { padding-bottom: var(--foot); }
+.phone .review-card { min-height: 100%; }
+.phone .review-card:not(:has(textarea)) > #review-sure, .phone .review-card > .review-memory, .phone .review-card > :not(.review-memory) + .review-rate { margin-top: auto; }
+.phone .review-card > .review-passage, .phone .review-card > .review-answer { margin-bottom: 24px; }
+/* What the last answer won shows over the next exercise, so it stands clear above the buttons at the foot (F137). */
 /* Menu rows at iOS's 44pt; the highlight popup's types and icons, and "What do you already know?", too. */
 .phone .menu-item { height: 44px; }
 /* A submenu (a source's Skills) has no room beside its menu at phone width: it rises as a sheet across the bottom.
@@ -2972,7 +2983,15 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-skill { padding: 8px 20px 40px; }
 .phone .phone-skill .skill-page { display: block; overflow: visible; }
 .phone .phone-skill .skill-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; padding: 4px 0 20px; }
-.phone .phone-skill .skill-hero .hero-strength { grid-column: 2; margin: -4px 0 0 -12px; }
+/* The rocks in the order they grow, a dotted path between, ending in the level ring and the cut count (D272). */
+.phone .phone-skill .skill-hero .hero-strength { grid-column: 2; margin: -14px -12px -10px -12px; min-height: 44px; }
+.phone .phone-skill .hero-strength > :is(.gem-ring, .strength-side) { display: none; }
+.phone .phone-skill .strength-line { flex: 1; min-width: 0; display: flex; align-items: center; color: var(--muted); font-family: var(--mono); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.phone .phone-skill .strength-step { flex: 1; display: flex; align-items: center; gap: 5px; }
+.phone .phone-skill .strength-step::after { content: ""; flex: 1; min-width: 8px; height: 2px; margin: 0 8px; background: radial-gradient(circle, var(--faint) 1px, transparent 1.2px) 0 0 / 7px 2px repeat-x; opacity: 0.7; }
+.phone .phone-skill .strength-end { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 17px; font-weight: 600; }
+.phone .phone-skill .strength-lv { margin-left: 8px; font-size: 11px; }
+.phone .phone-skill .skill-name-row .skill-importance { margin-left: auto; }
 .phone .phone-skill .skill-goal span { white-space: normal; }
 .phone .phone-skill .skill-col { padding-inline: 0; margin-inline: 0; }
 .phone .phone-skill .skill-cols.one { display: flex; flex-direction: column; gap: 24px; padding: 0; }
@@ -3328,6 +3347,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* The exercise's gem beside its reviews (D237): one line, the gem on the timeline's midline. */
 .review-memory { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
 .review-memory .timeline { flex: 1; margin-top: 0; }
+/* Its width holds while the pointer crosses the ratings, so the line never changes length under the dots. */
+.timeline-next { flex: none; min-width: 17ch; text-align: right; color: var(--faint); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .review-memory + .review-rate { margin-top: 14px; }
 .review-gem { flex: none; display: inline-grid; border-radius: 4px; }
 .review-gem:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -3336,25 +3357,35 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .review-rate button[data-armed]:focus-visible { box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--rate), 0 0 0 4px var(--focus); }
 .review-guard { margin: 10px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
 /* The moment after a rating that changed the gem: it sits over the next card and never holds it back. */
-.review-moment { position: absolute; z-index: 5; left: 50%; bottom: 56px; display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(520px, calc(100% - 32px)); padding: 10px 16px 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-raised, var(--bg)); translate: -50% 0; overflow: hidden; animation: moment-rise var(--t-4) var(--ease-out) both, moment-leave var(--t-3) var(--ease-out) 3.7s forwards; pointer-events: none; }
+/* D271: the reward after a rating is a chip in the head bar: the gem, then the days it added in
+   dots, then what became of it. It never sits over the question or a button. */
+.review-moment { position: absolute; z-index: 5; left: 50%; top: 6px; display: flex; align-items: center; gap: 10px; height: 40px; width: max-content; max-width: calc(100% - 32px); padding: 0 16px 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-raised, var(--bg)); translate: -50% 0; overflow: hidden; animation: moment-drop var(--t-4) var(--ease-out) both, moment-leave var(--t-3) var(--ease-out) 3.7s forwards; pointer-events: none; }
 .review-moment[data-tone="miss"] { animation-delay: 0s, 5.7s; }
-/* D246: the goal's note stays until the next rating and carries his way out, so it takes the pointer. */
-/* The goal's note (D246): the mole and his speech box (D245), told once and kept until the next rating. */
+.moment-days { display: flex; align-items: center; gap: 6px; color: var(--muted); font: 500 12px/14px var(--mono); }
+.moment-days .dot-number { flex: none; }
+.moment-days .dot-number circle { fill: var(--text); }
+.moment-why { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }
+.review-moment[data-days] .moment-why::before { content: "· "; }
+/* The quick quiz and the iPhone have no room beside the buttons for more than the gem and its days. */
+:is(.quick, .phone) .review-moment { position: static; flex: none; translate: none; }
+.quick .review-moment { height: 30px; }
+.quick .quick-ring { order: -1; }
+.phone .review-moment .moment-mole { display: none; }
+:is(.quick, .phone) .review-moment[data-days] .moment-why { display: none; }
 .review-goal { position: absolute; z-index: 5; left: 50%; bottom: 56px; display: flex; align-items: flex-end; gap: 12px; translate: -50% 0; animation: moment-rise var(--t-4) var(--ease-out) both; }
 .review-goal .says { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; white-space: nowrap; }
 .moment-done { flex: none; height: 24px; padding: 0 10px; border-radius: 999px; color: var(--muted); font-size: 13px; font-weight: 600; }
 .moment-done:hover, .moment-done:focus-visible { background: var(--bg-hover); color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .review-goal { animation: none; } }
-.moment-mole { flex: none; align-self: flex-end; display: inline-grid; margin: 0 0 -10px 4px; }
+.moment-mole { flex: none; align-self: flex-end; display: inline-grid; margin: 0 0 -14px 2px; }
 .moment-gem { flex: none; display: inline-grid; }
 .moment-gem > .gem { grid-area: 1 / 1; }
 .moment-gem > .gem:first-child { animation: moment-was var(--t-3) var(--ease-out) 350ms both; }
 .moment-gem > .gem:last-child { animation: moment-now var(--t-moment) var(--ease-spring) 350ms both; }
 .review-moment[data-tone="miss"] .moment-gem > .gem:last-child { animation-timing-function: var(--ease-out); animation-duration: var(--t-4); }
-.moment-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--muted); font-size: 13px; line-height: 18px; }
-.moment-text b { color: var(--text); font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
 @keyframes moment-rise { from { opacity: 0; transform: translateY(8px); } }
-@keyframes moment-leave { to { opacity: 0; transform: translateY(4px); } }
+@keyframes moment-drop { from { opacity: 0; transform: translateY(-8px); } }
+@keyframes moment-leave { to { opacity: 0; transform: translateY(-4px); } }
 @keyframes moment-was { to { opacity: 0; transform: scale(0.9); } }
 @keyframes moment-now { from { opacity: 0; transform: scale(0.8); } }
 /* Still (the global rule stops every animation): only the gem it became shows. */

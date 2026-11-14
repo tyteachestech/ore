@@ -1,3 +1,4 @@
+import { rememberToday } from "./ReviewPick";
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, Clock, PencilSimple, ThumbsDown, Trash, X } from "./icons";
 import { listen } from "@tauri-apps/api/event";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
@@ -418,7 +419,11 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       }
       // The try line is a nicety: the end screen never waits on or fails for it.
       const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
-      setEnd({ session: receipt, today: await ore<Today>("today"), before: before.current, next: await next });
+      // Home draws the Today it last read until a fresh one lands (F125): hand it this one,
+      // so Done doesn't show the morning's progress and then push the list down when the goal line appears.
+      const today = await ore<Today>("today");
+      rememberToday(today);
+      setEnd({ session: receipt, today, before: before.current, next: await next });
     } catch (e) {
       notify(errorText(e), "error");
       onClose();
@@ -1043,6 +1048,23 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     <Trap off={paused || under}>
     <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused} data-gives-back="" data-done={done} data-steps={done + left}>
       <div className="review-head" data-tauri-drag-region>
+        {moment && !end && (
+          // D271: a chip in the head bar, clear of the question and of every button he presses.
+          <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} data-days={moment.days > 0 || undefined} role="status">
+            {!quick && <span className="moment-mole"><Mole bare size={48} mood={MOMENT_MOOD[moment.kind]} /></span>}
+            <span className="moment-gem" aria-hidden="true">
+              <Gem kind={moment.from.kind} size={24} seam={moment.from.seam} polished={moment.from.polished} />
+              <Gem kind={moment.to.kind} size={24} seam={moment.to.seam} polished={moment.to.polished} />
+            </span>
+            {moment.days > 0 && (
+              <b className="moment-days">
+                <DotNumber value={`+${moment.days}`} height={18} />
+                <span className="sr-only">+{moment.days}</span> {moment.days === 1 ? "day" : "days"}
+              </b>
+            )}
+            <span className="moment-why">{moment.line}</span>
+          </div>
+        )}
         {quick ? (
           // The quick quiz has no fixed length; what matters is that it counts toward today's goal (D60).
           start && !end && start.counts && (
@@ -1120,19 +1142,6 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                 <button className="moment-done" onClick={() => void finish()}>Done</button>
               </Hint>
             </MoleSays>
-          </div>
-        )}
-        {moment && !end && (
-          <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} role="status">
-            {!quick && <span className="moment-mole"><Mole bare size={48} mood={MOMENT_MOOD[moment.kind]} /></span>}
-            <span className="moment-gem" aria-hidden="true">
-              <Gem kind={moment.from.kind} size={36} seam={moment.from.seam} polished={moment.from.polished} />
-              <Gem kind={moment.to.kind} size={36} seam={moment.to.seam} polished={moment.to.polished} />
-            </span>
-            <span className="moment-text">
-              {moment.days > 0 && <b>+{moment.days} {moment.days === 1 ? "day" : "days"}</b>}
-              <span>{moment.line}</span>
-            </span>
           </div>
         )}
         {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} />}
@@ -1406,7 +1415,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
           </div>
         )}
       </div>
-      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} />}
+      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} draft={entry.state === "draft"} />}
     </div>
     </Trap>
   );
@@ -1425,7 +1434,7 @@ function nothingDue(t: Today | null, pick: string[] | null, source?: string): st
 
 /** The review footer: the keys for this step, Raycast's action bar (DESIGN.md). `suggested`: the rating ↵ gives,
  *  named in the bar as its button is (Again, Hard, Good or Easy); none, no ↵. */
-function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; kind: CardFull["kind"]; suggested?: number; variant: boolean; inHead: boolean }) {
+function KeyFoot({ phase, kind, suggested, variant, inHead, draft }: { phase: Phase; kind: CardFull["kind"]; suggested?: number; variant: boolean; inHead: boolean; draft: boolean }) {
   const map = useKeymap();
   const k = (id: KeyId) => label(map[id]);
   const rows: [string, string][] =
@@ -1436,7 +1445,7 @@ function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; ki
           ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
             [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
           : [["1 2 3", "How sure, then show"], [k("later"), "Later"], ["Esc", "Leave"]]
-        : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], ["Esc", "Leave"]];
+        : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], [k("retire-card"), draft ? "Delete" : "Retire"], ["Esc", "Leave"]];
   return (
     <div className="review-keys" aria-hidden="true">
       {rows.map(([key, what]) => (
@@ -1666,7 +1675,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const skill = (id: string) => skills.find((x) => x.id === id);
   const named = ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level }));
   const said = endSays({
-    session: s, today: t, closed, short, roll, ups: named, plain: quick, napped: nap,
+    session: s, today: t, closed, short, roll, ups: named, plain: quick, napped: nap, row: !quick,
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   });
   const tiles = endTiles({ session: s, ups: named });
