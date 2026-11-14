@@ -253,12 +253,13 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       });
       // The bucket drops back, its lip flicking him up a little, and the cart backs out the way it came. He does
       // not: asleep on nothing, sagging; then awake with a start, up off nothing and bigger, limbs going; then down.
-      const gone = stoned + 340, SLEEP = MOMENT - 100, BRACE = ms("--t-3", 200), START = 330, HANG = 780, SAG = 4, JUMP = 18, NEAR = 0.72;
-      // Asleep on nothing he bobs with his breath, clear of the dirt line, so it reads as air and not a perch.
+      const gone = stoned + 340, SLEEP = 40, BRACE = ms("--t-3", 200), START = 330, HANG = 780, SAG = 4, JUMP = 18, NEAR = 0.72;
+      // Asleep on nothing only for the lip's flick and one sag, then he braces (Tyler, 2026-11-14: "He's just floating
+      // in the air for a while, sleeping. It looks weird").
       later(stoned + 160, () => { play(cart, HOPPED.map((y) => ({ transform: `translateY(${y}px)` })), { duration: T4, easing: OUT, composite: "add" }); });
       later(stoned + 160, () => play(rider, [
-        { transform: asleep(...end) }, { transform: asleep(end[0] + 3, end[1] - 6, end[2] - 5), easing: IN_OUT, offset: 0.2 },
-        { transform: asleep(end[0], end[1] + SAG, end[2]), easing: IN_OUT, offset: 0.45 }, { transform: asleep(end[0], end[1] + SAG - 5, end[2] - 3), easing: IN_OUT, offset: 0.72 }, { transform: asleep(end[0], end[1] + SAG, end[2]) },
+        { transform: asleep(...end) }, { transform: asleep(end[0] + 3, end[1] - 6, end[2] - 5), easing: IN_OUT, offset: 0.45 },
+        { transform: asleep(end[0], end[1] + SAG, end[2]) },
       ], { duration: gone + SLEEP - stoned - 160, easing: OUT }));
       // He braces before he starts (anticipation): a dip and a curl, still asleep to look at.
       later(gone + SLEEP, () => play(rider, [{ transform: asleep(end[0], end[1] + SAG, end[2]) }, { transform: asleep(end[0], end[1] + SAG + 7, end[2] + 14) }], { duration: BRACE, easing: OUT }));
