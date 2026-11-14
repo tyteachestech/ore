@@ -40,6 +40,8 @@ export function ownsUndo(el: EventTarget | null): boolean {
 export class History {
   private past: Step[] = [];
   private future: Step[] = [];
+  /** Called whenever what ⌘Z or ⇧⌘Z would take changes (the iPhone tells its shake and swipe gestures, F161). */
+  onChange?: () => void;
 
   constructor(
     private onFail?: (step: Step, error: unknown, what: "undo" | "redo") => void,
@@ -53,6 +55,7 @@ export class History {
       const i = from.indexOf(step);
       if (i >= 0) from.splice(i, 1);
       if (!to.includes(step)) to.push(step);
+      this.onChange?.();
       this.onFail?.(step, e, what);
     });
   }
@@ -62,6 +65,7 @@ export class History {
     stepAt = ++tick;
     this.past = [...this.past.slice(1 - LIMIT), step];
     this.future = [];
+    this.onChange?.();
   }
 
   /** Takes back the newest step and returns it. A step that can't be redone ends the redo run,
@@ -71,6 +75,7 @@ export class History {
     if (!step) return;
     this.watch(step, step.undo(), "undo");
     this.future = step.redo ? [...this.future, step] : [];
+    this.onChange?.();
     return step;
   }
 
@@ -80,6 +85,7 @@ export class History {
     if (!step?.redo) return;
     this.past.push(step);
     this.watch(step, step.redo(), "redo");
+    this.onChange?.();
     return step;
   }
 
@@ -91,6 +97,7 @@ export class History {
     const run = step.undo();
     this.future = step.redo ? [...this.future.filter((s) => s !== step), step] : [];
     this.watch(step, run, "undo");
+    this.onChange?.();
     return true;
   }
 
@@ -100,6 +107,7 @@ export class History {
     this.future = this.future.filter((s) => s !== step);
     this.past.push(step);
     this.watch(step, step.redo(), "redo");
+    this.onChange?.();
     return true;
   }
 
@@ -107,6 +115,15 @@ export class History {
   forget(step: Step) {
     this.past = this.past.filter((s) => s !== step);
     this.future = this.future.filter((s) => s !== step);
+    this.onChange?.();
+  }
+
+  /** What ⌘Z and ⇧⌘Z would take back or do again. */
+  get undoName() {
+    return this.past.at(-1)?.message;
+  }
+  get redoName() {
+    return this.future.at(-1)?.message;
   }
 
   get canUndo() {

@@ -15,6 +15,7 @@ import { ranked } from "../match";
 import { SkillPage } from "../SkillPage";
 import { PhoneSettings } from "./Settings";
 import { planReminders } from "./reminder";
+import { useNativeUndo } from "./native-undo";
 import { SkillIcon } from "../IconPicker";
 import { NoteBody, useNotes, type SideTab } from "../Notes";
 import { PixelBook, PixelNote } from "../PixelIcon";
@@ -444,7 +445,8 @@ export function PhoneApp() {
   /** Add a link from a skill's page files it there. */
   const [addTo, setAddTo] = useState<string | undefined>();
   const [tick, setTick] = useState(0);
-  const { notify, view: toast } = useToast();
+  const { notify, view: toast, history, undo, redo } = useToast();
+  useNativeUndo(history, undo, redo);
   const actions = useRef([]);
   const [drawer, setDrawer] = useState(false);
   const shell = useRef<HTMLDivElement>(null);

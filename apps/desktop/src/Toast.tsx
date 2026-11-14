@@ -249,5 +249,5 @@ export function useToast() {
       ))}
     </div>
   );
-  return { notify, progress, clear, view };
+  return { notify, progress, clear, view, history: history.current, undo, redo };
 }

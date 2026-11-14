@@ -152,3 +152,28 @@ test("a step that lands is reported, so screens opened since can read their data
   await new Promise((r) => setTimeout(r, 0));
   expect(landed).toBe(1);
 });
+
+test("it names what undo and redo would take and says each time that changes, for the iPhone's shake and swipe (F161)", async () => {
+  const h = new History();
+  const seen: [string | undefined, string | undefined][] = [];
+  h.onChange = () => seen.push([h.undoName, h.redoName]);
+  h.push(step("a"));
+  h.push(step("b"));
+  h.undo();
+  h.redo();
+  h.forget(h.undo()!);
+  h.push({ message: "c", undo: () => Promise.reject(new Error("offline")) });
+  h.undo();
+  await new Promise((r) => setTimeout(r, 0));
+  expect(seen).toEqual([
+    ["a", undefined],
+    ["b", undefined],
+    ["a", "b"],
+    ["b", undefined],
+    ["a", "b"],
+    ["a", undefined],
+    ["c", undefined],
+    ["a", undefined],
+    ["c", undefined], // its undo failed: it is back on top
+  ]);
+});
