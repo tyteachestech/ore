@@ -496,9 +496,13 @@ export function PhoneApp() {
   useEffect(() => {
     if (loaded && reviewing?.source && !items!.some((i) => i.id === reviewing.source)) setReviewing(null);
   }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Until the library has said the saved source is still there, its reader stays shut over Today: opened at
+  // once, it showed `no item matches "01M4…"` for as long as the two lists took to load (F120).
+  const [startKnown, setStartKnown] = useState(!start.openId);
   useEffect(() => {
     const id = start.openId;
-    if (!loaded || !id || items!.some((i) => i.id === id)) return;
+    if (!loaded || !id) return;
+    if (items!.some((i) => i.id === id)) return setStartKnown(true);
     void ore<Item[]>("ls", "--archived")
       .then((archived) => {
         if (archived.some((i) => i.id === id)) return;
@@ -509,7 +513,8 @@ export function PhoneApp() {
           return null;
         });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setStartKnown(true));
     // Once, on the first list: later a missing source is one he just archived from inside it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
@@ -834,7 +839,7 @@ export function PhoneApp() {
           />
         </Boundary>
       </Screen>
-    ) : openId ? (
+    ) : openId && (startKnown || openId !== start.openId) ? (
       <Screen className="phone-full phone-reader phone-source" onBack={() => setOpenId(null)} onForward={setNoting}>
         {/* From the note, Back returns to the source, as the left-edge swipe does. */}
         <Back label={noting ? "Source" : "Back"} onClick={() => (noting ? setNoting(false) : setOpenId(null))} />
