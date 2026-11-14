@@ -8,7 +8,7 @@ import { listCards, listItems, localDay, readAnnotations, today } from "../../..
 // The library the product video is filmed on (scripts/mock/seed-demo.ts). What the camera needs from it is held
 // here, so a change to scheduling or to the seed can't quietly leave a session that cuts no gem.
 // Seeded at each of these times of his day: just after midnight the morning's reviews once fell on yesterday,
-// and the day stood at 0 minutes (F-new-demo-seed-midnight).
+// and the day stood at 0 minutes (F104).
 const clock = (h: number, m: number) => { const d = new Date(); d.setHours(h, m, 0, 0); return d; };
 for (const [name, now] of [["midday", clock(12, 30)], ["just after midnight", clock(0, 4)], ["just before midnight", clock(23, 58)]] as const)
 test(`the demo library is set up to film, seeded ${name}: the day nearly done, gems to cut, a level within reach`, async () => {
