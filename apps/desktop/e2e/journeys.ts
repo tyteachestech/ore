@@ -3121,7 +3121,7 @@ journey("prequestions stay in reach: once he has started a source, Reading for l
   try {
     await openSource(page, TESTING);
     await openSource(page, AGENTS);
-    const chip = page.getByRole("button", { name: /^Reading for \d+$/ });
+    const chip = page.getByRole("button", { name: /^Reading for \d+ questions?$/ });
     await chip.waitFor();
     if (await page.locator(".preq-head").getAttribute("aria-expanded") === "true") await page.locator(".preq-head").click();
     await page.locator(".reader-scroll, .reader").first().evaluate((el) => el.scrollTo(0, el.scrollHeight));
@@ -11952,7 +11952,7 @@ journey("phone: a source's edit fields and the note's keyboard bar answer a 44pt
   if (!(await page.locator(".preq-input").count())) await tap(page, page.locator(".preq-head"));
   await fits44(page, ".preq-input", "the empty answer to What do you already know?");
   await action(/^Finish/);
-  await fits44(page, '[aria-label="Leave anything out?"]', "Finish's Leave anything out?");
+  await fits44(page, '[aria-label="Skip a part of this source?"]', "Finish's Skip a part of this source?");
   await tap(page, page.getByRole("button", { name: "Close quiz" }));
   await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
   await tap(page, page.locator(".phone-reader [contenteditable=true]").first());

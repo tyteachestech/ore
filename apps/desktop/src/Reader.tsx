@@ -48,7 +48,7 @@ import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from ".
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer, type Player } from "./Video";
 import { ownsMediaKey } from "./media-keys";
 import { FillingLine, useFilling } from "./Filling";
-import { errorText, focusQuietly, inOrder, kept, load, save, useFocusBack, useLibraryChanges, wakeOnLanding, type Notify } from "./util";
+import { errorText, focusQuietly, inOrder, kept, load, readingFor, save, useFocusBack, useLibraryChanges, wakeOnLanding, type Notify } from "./util";
 import { mergeAnns } from "./anns";
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
@@ -3807,7 +3807,7 @@ function ReadingFor({ qs, onOpen }: { qs: NonNullable<Doc["prequestions"]>; onOp
     <HoverCard.Root openDelay={150} closeDelay={150}>
       <HoverCard.Trigger asChild>
         <button className="collected-chip reading-for" onClick={onOpen}>
-          Reading for {qs.length}
+          {readingFor(qs.length)}
         </button>
       </HoverCard.Trigger>
       <HoverCard.Portal>

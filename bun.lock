@@ -89,7 +89,7 @@
         "fflate": "^0.8.3",
         "linkedom": "^0.18.13",
         "mammoth": "1.11.0",
-        "music-metadata": "11",
+        "music-metadata": "11.16.1",
         "node-diff3": "3.1.2",
         "pdfjs-dist": "^6.4.299",
         "ts-fsrs": "^5.4.2",

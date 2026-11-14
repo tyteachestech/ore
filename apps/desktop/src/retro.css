@@ -164,8 +164,10 @@
 .phone .home-read { border-radius: 0; }
 
 /* Primary buttons: flat paper white, mono caps (claude.dev's "Try Claude Code"). */
-.pill-btn, .home .pill-btn.home-go, .review-pick .pill-btn.home-go { background: var(--paper); color: var(--ink); box-shadow: none; border-radius: 6px; font-family: var(--mono); font-weight: 500; letter-spacing: 0.06em; }
+.pill-btn, .home .pill-btn.home-go, .review-pick .pill-btn.home-go, .quiz .pill-btn.quiz-go, .review .pill-btn.quiz-go { background: var(--paper); color: var(--ink); box-shadow: none; border-radius: 6px; font-family: var(--mono); font-weight: 500; letter-spacing: 0.06em; }
 .pill-btn:active:not(:disabled) { box-shadow: none; }
+/* The focus ring is `paper` too, so inside a paper button it can't be seen: it sits outside, on the page (F189). */
+.pill-btn:focus-visible { outline-offset: 2px; }
 
 /* Bars are a row of dots (D184, `DotBar` in Ring.tsx): small and grey on the track, full size where it is filled. */
 .dot-bar { display: flex; align-items: center; gap: 2px; height: 6px; border-radius: 0; background: none; overflow: visible; --fill: var(--c-green); }
