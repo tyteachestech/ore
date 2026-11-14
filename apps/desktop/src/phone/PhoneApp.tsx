@@ -15,13 +15,14 @@ import { ranked } from "../match";
 import { SkillPage } from "../SkillPage";
 import { PhoneSettings } from "./Settings";
 import { planReminders } from "./reminder";
+import { useNativeUndo } from "./native-undo";
 import { SkillIcon } from "../IconPicker";
 import { NoteBody, useNotes, type SideTab } from "../Notes";
 import { PixelBook, PixelNote } from "../PixelIcon";
 import type { LinkTarget, NoteEditorHandle } from "../editor/NoteEditor";
 import { holdMenu, WithMenu, type MenuAction } from "../Menu";
 import { Palette } from "../Palette";
-import { SkillEditor, skillGroups } from "../Skills";
+import { SkillEditor, skillGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
 import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, shareOpen, shareSkills, type Item, type Skill, touched } from "../ore";
@@ -30,7 +31,7 @@ import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
 import { Working } from "../Working";
-import { errorText, stepLanded, useKeptScroll, type Notify } from "../util";
+import { errorText, inOrder, stepLanded, useKeptScroll, type Notify } from "../util";
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   const now = useRef(drag);
@@ -407,6 +408,8 @@ export function PhoneApp() {
   const [archived, setArchived] = useState<Item[] | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skill, setSkill] = useState<string | null>(start.skill);
+  const skillNow = useRef(skill);
+  skillNow.current = skill;
   const [skillNote, setSkillNote] = useState(!!start.skillNote);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(start.openId);
@@ -442,7 +445,8 @@ export function PhoneApp() {
   /** Add a link from a skill's page files it there. */
   const [addTo, setAddTo] = useState<string | undefined>();
   const [tick, setTick] = useState(0);
-  const { notify, view: toast } = useToast();
+  const { notify, view: toast, history, undo, redo } = useToast();
+  useNativeUndo(history, undo, redo);
   const actions = useRef([]);
   const [drawer, setDrawer] = useState(false);
   const shell = useRef<HTMLDivElement>(null);
@@ -553,7 +557,12 @@ export function PhoneApp() {
       setReading(true);
       const r = await ore<{ added: { id: string; inbox: string; title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import", "--owe");
       for (const a of r.added) came.current.set(a.inbox, a.id);
-      for (const a of r.added) notify(a.kept ? `Already here: “${a.title}”` : `Added “${a.title}”`, "info");
+      // A new one is a step, as on the Mac: Undo archives it (F160).
+      const archive = (id: string, on: boolean) => () => ore("archive", id, ...(on ? [] : ["--undo"])).finally(() => void refresh());
+      for (const a of r.added) {
+        if (a.kept) notify(`Already here: “${a.title}”`, "info");
+        else notify(`Added “${a.title}”`, "info", archive(a.id, true), archive(a.id, false));
+      }
       for (const f of r.failed) {
         const mac = macOnly(f.error);
         notify(mac ?? `Couldn’t read ${f.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]} here. Your Mac will try it.`, mac ? "info" : "error");
@@ -746,11 +755,13 @@ export function PhoneApp() {
     t = t.trim();
     if (!t || t === before) return true;
     setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, title: t } : i)) ?? all);
+    // On the history at once, so a quick ⌘Z takes this back, never the step before it (F146, F156); off it again if the write fails.
+    const forget = undoable ? notify(`Renamed to “${t}”`, "quiet", () => retitle(item, t, before, false), () => retitle(item, before, t, false)) : () => {};
     try {
-      await ore("edit", item.id, "--title", t);
-      if (undoable) notify(`Renamed to “${t}”`, "quiet", () => retitle(item, t, before, false), () => retitle(item, before, t, false));
+      await inOrder(item.id, () => ore("edit", item.id, "--title", t));
       return true;
     } catch (e) {
+      forget();
       setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, title: before } : i)) ?? all);
       if (!undoable) throw e;
       notify(errorText(e), "error");
@@ -841,6 +852,8 @@ export function PhoneApp() {
               open(item, at);
             }}
             onClose={(again) => (again ? setReviewing({ ...reviewing, run: reviewing.run + 1 }) : endReview())}
+            // A rating undone after Review closed: Today, mounted under it all along, reads its numbers again (F159).
+            onLogged={() => setTick((t) => t + 1)}
             notify={notify}
           />
         </Boundary>
@@ -1006,7 +1019,6 @@ export function PhoneApp() {
           {naming ? (
             <NewSkill skills={skills} onDone={(made) => {
               // Made, the keyboard goes as its page opens (Files' New Folder); let go, focus goes back to New skill.
-              if (made) (document.activeElement as HTMLElement | null)?.blur();
               flushSync(() => {
                 setNaming(false);
                 if (!made) return;
@@ -1014,8 +1026,17 @@ export function PhoneApp() {
                 setSkill(made.id);
                 setDrawer(false);
               });
-              if (!made) newSkillRef.current?.focus({ preventScroll: true });
-              if (made) void refresh();
+              if (!made) return newSkillRef.current?.focus({ preventScroll: true });
+              // Focus on its page's Back, not on <body>: the keyboard goes, and keys still have a place to act.
+              document.querySelector<HTMLElement>(".phone-full .phone-back")?.focus({ preventScroll: true });
+              // On the history, as on the Mac: Undo deletes it (F160).
+              // Undone, its page closes and focus goes to the menu button that leads back to it.
+              skillMade(made, notify, () => void refresh(), (id) => {
+                if (skillNow.current !== id) return;
+                flushSync(() => setSkill(null));
+                document.querySelector<HTMLElement>(".phone-bar [aria-label='Open menu']")?.focus({ preventScroll: true });
+              });
+              void refresh();
             }} />
           ) : (
             <button ref={newSkillRef} className="phone-drawer-quiet" onClick={() => setNaming(true)}>

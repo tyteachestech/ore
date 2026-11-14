@@ -156,7 +156,7 @@ window.addEventListener(
 
 /** The caret of an editor that had focus as it unmounted. A remount for outside text (a merged
  *  save) mounts the next one in the same commit, which takes it, so typing carries on there. */
-let handoff: { pos: number; at: number } | null = null;
+let handoff: { pos: number; at: number; note?: string } | null = null;
 /** The selection each note (by `place`) had when its editor last closed. */
 const places = new Map<string, { anchor: number; head: number }>();
 
@@ -276,7 +276,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     let base: string | null = null;
     let read: (() => string) | null = null;
     const original = live.current.p.text;
-    const caret = handoff && performance.now() - handoff.at < 500 ? handoff.pos : null;
+    // Only the same note's next editor (text from outside remounts it): another note's never takes the keys (F158).
+    const caret = handoff && handoff.note === live.current.p.noteArgs?.join(" ") && performance.now() - handoff.at < 500 ? handoff.pos : null;
     const kept = caret === null && live.current.p.place ? places.get(live.current.p.place) : undefined;
     // Each editor gets its own element, removed at once on unmount: creation is async, so an
     // editor still being created must never share the DOM with the next one.
@@ -336,7 +337,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       const text = p.pull?.current?.();
       if (text != null) { p.onChange(text); p.onBlur?.(); }
       const v = editor.current?.action((ctx) => ctx.get(editorViewCtx));
-      if (v?.hasFocus()) handoff = { pos: v.state.selection.head, at: performance.now() };
+      if (v?.hasFocus()) handoff = { pos: v.state.selection.head, at: performance.now(), note: p.noteArgs?.join(" ") };
       const place = live.current.p.place;
       if (v && place) places.set(place, { anchor: v.state.selection.anchor, head: v.state.selection.head });
     },
