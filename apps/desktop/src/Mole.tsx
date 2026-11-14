@@ -12,7 +12,8 @@ export const REST = { y: 0, top: -0.3, rx: 10.2, ex: 2.6, hx: 0, lx: 0, ly: 0, o
   // Read by the traced mole only (D251). wink: his right eye shut. frown: both brows down over his eyes. hat: rows the
   // helmet sits up (down over his brows when negative). tilt: the helmet tipped (radians). lamp: the lamp flared.
   // droop: the moustache hanging in. puff: the moustache blown out.
-  wink: 0, frown: 0, hat: 0, tilt: 0, lamp: 0, droop: 0, puff: 0,
+  // glow: the lamp lit and throwing rays, for a thing that is running (the lamp, D263).
+  wink: 0, frown: 0, hat: 0, tilt: 0, lamp: 0, glow: 0, droop: 0, puff: 0,
   // Drawn marks, as in a comic (the traced mole only). star: his eyes as stars. blush: his cheeks pink. twinkle: a star
   // popping beside his winking eye. ask, bang: a "?" and a "!" over his helmet. The rest run from 0 to 1 and show nothing at either end: tear, a drop down his
   // cheek; sweat, a bead down his temple; steam, a puff out of each side of his helmet; zzz, two Zs rising off him;
@@ -26,7 +27,7 @@ export type State = typeof REST;
 type Key = keyof State;
 const KEYS = Object.keys(REST) as Key[];
 /** Spring per value: [stiffness, damping]. Eyes snap; the body carries a little bounce. */
-const SPRING: Record<Key, [number, number]> = { y: [130, 12], top: [210, 15], rx: [210, 16], ex: [200, 22], hx: [70, 13], lx: [90, 15], ly: [90, 15], open: [900, 52], tall: [420, 26], arc: [320, 30], pawL: [260, 14], pawR: [260, 14], pw: [260, 24], kick: [160, 9], mouth: [380, 22], wink: [900, 52], frown: [320, 30], hat: [210, 16], tilt: [160, 14], lamp: [200, 18], droop: [120, 18], puff: [260, 12],
+const SPRING: Record<Key, [number, number]> = { y: [130, 12], top: [210, 15], rx: [210, 16], ex: [200, 22], hx: [70, 13], lx: [90, 15], ly: [90, 15], open: [900, 52], tall: [420, 26], arc: [320, 30], pawL: [260, 14], pawR: [260, 14], pw: [260, 24], kick: [160, 9], mouth: [380, 22], wink: [900, 52], frown: [320, 30], hat: [210, 16], tilt: [160, 14], lamp: [200, 18], glow: [60, 14], droop: [120, 18], puff: [260, 12],
   star: [300, 22], blush: [90, 16], twinkle: [420, 20], ask: [380, 17], bang: [520, 19], tear: [5, 4.5], sweat: [5, 4.5], steam: [90, 19], zzz: [7, 5.3], spark: [6, 4.9],
   whole: [900, 60], breath: [16, 7], arms: [220, 17], legs: [300, 14], side: [900, 60] };
 
@@ -71,11 +72,13 @@ const NAP: Partial<State> = { whole: 1, open: 0, hat: -0.9, droop: 0.4 }, DOZE: 
 const BLINK: (ms: number) => [number, Beat][] = (ms) => [[ms, { to: { open: 0 } }], [ms + 120, { to: { open: 1 } }]];
 /* Sizes here are in dots, and a dot is under 2px in the button and the chat: a move that shifts less than a row
    and a half is not seen. Each hop is a squat first (anticipation), then the spring up, then the dirt as he lands. */
+/** How lit his lamp is while he thinks with nothing arriving; words arriving take it to 1 (`signal`). */
+const GLOW = 0.45;
 export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // Up out of the hole with a spray of dirt, then a blink.
   peek: { from: { y: 21 }, at: [[260, { kick: { kick: 9 } }], ...BLINK(1200)], end: 1500, still: {} },
   // Looks up to one side and taps a paw twice, blinks, then the other.
-  thinking: { to: { lx: 1, ly: -1, hx: 0.6 }, loop: 4000, still: { lx: 1, ly: -1 },
+  thinking: { to: { lx: 1, ly: -1, hx: 0.6, glow: GLOW }, loop: 4000, still: { lx: 1, ly: -1, glow: 0.7 },
     at: [[400, { kick: { pawR: TAP } }], [800, { kick: { pawR: TAP } }], ...BLINK(1500), [2000, { to: { lx: -1, hx: -0.6 } }], [2400, { kick: { pawL: TAP } }], [2800, { kick: { pawL: TAP } }], ...BLINK(3500)] },
   // A squat, then arc eyes, the moustache spread wide and a hop with both paws thrown up, and the dirt as he lands.
   happy: { to: { top: SQUAT }, end: 1700, still: HAPPY,
@@ -205,13 +208,15 @@ const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
  *  5 to 9 s and glances to a side every 15 to 20 s. `look` (hover or focus on its button) faces him with a blink.
  *  `cue` replays the mood for a new event (another reply landing). Frames run only while it moves. Still under
  *  reduced motion and while the window is hidden (a mood shows its still pose). */
-export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false }: { size?: number; mood?: Mood; cue?: unknown; look?: boolean; bare?: boolean }) {
+export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false, signal }: { size?: number; mood?: Mood; cue?: unknown; look?: boolean; bare?: boolean; /** While he thinks, how much is happening right now, 0 to 1: his lamp follows it (D263). */ signal?: () => number }) {
   const svg = useRef<SVGSVGElement>(null);
   const tones = useRef<Record<string, SVGPathElement | null>>({});
   const p = useRef(puppet());
   const run = useRef({ frame: 0, last: 0 });
   const looking = useRef(look);
   looking.current = look;
+  const sig = useRef(signal);
+  sig.current = signal;
 
   // `data-mood` is the move it is playing (or showing still), for tests.
   const draw = () => {
@@ -223,6 +228,7 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
   const tick = (now: number) => {
     const dt = Math.min(0.033, Math.max(0, (now - run.current.last) / 1000));
     run.current.last = now;
+    if (sig.current && p.current.mood === "thinking") p.current.to.glow = GLOW + (1 - GLOW) * sig.current();
     const moving = advance(p.current, now, dt);
     draw();
     run.current.frame = moving ? requestAnimationFrame(tick) : 0;

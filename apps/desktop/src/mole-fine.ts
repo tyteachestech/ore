@@ -192,7 +192,13 @@ export function fineDots(s: State): FineDot[] {
   }
   const hat = layer();
   for (const p of HELMET) { const [x, y] = head(tilted(p), 0, tip, 1.12); hat.push([x, y, p.r, p.tone, true]); }
-  for (const p of LAMP) { const [x, y] = head(tilted(p), 0, tip, 1.12); hat.push([x, y, p.r * (1 + 0.3 * clamp(s.lamp)), p.tone, true]); }
+  // Lit (the lamp, D263): its dots swell and four short rays stand off it, all in place.
+  const lit = clamp(s.glow), lamp = LAMP.map((p) => [...head(tilted(p), 0, tip, 1.12), p.r] as const);
+  for (const [x, y, r] of lamp) hat.push([x, y, r * (1 + 0.3 * clamp(s.lamp) + 0.35 * lit), "lamp", true]);
+  if (lit > 0.02 && lamp.length) {
+    const cx = lamp.reduce((a, p) => a + p[0], 0) / lamp.length, cy = lamp.reduce((a, p) => a + p[1], 0) / lamp.length;
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, -1], [0.7, -0.7], [-0.7, -0.7]] as const) hat.push([cx + dx * 2.3, cy + dy * 2.3, 0.42 * lit, "lamp", true]);
+  }
 
   // The face looks where he looks: eyes most, nose and moustache a little less. Eyes never rise into the brim.
   const fx = s.lx * 0.5, ex = s.lx * 0.3, ey = Math.max(0, s.ly) * 0.3, fy = s.ly * 0.2;
