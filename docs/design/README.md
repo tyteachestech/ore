@@ -23,6 +23,7 @@ Proposals Tyler picked from, with the reasoning, by area. `../DECISIONS.md` is t
 - [`skill-goals-and-parts.md`](skill-goals-and-parts.md) — a goal per skill; parts deferred (D102)
 
 **Style**
+- [`brand.md`](brand.md) — the brand guidelines on one page: feel, voice, eight rules, colour, type, motion, the mole, the mark (D263)
 - [`signature-style.md`](signature-style.md) — the look being re-picked: brief, picks so far, what it amends (D129)
 
 Notes, the iPhone and the tutor have no design doc of their own: their decisions are in `../DECISIONS.md` (D38, D78 and D145, D128), with the note editor's Notion audit in [`../reviews/2026-11-06-notion-parity.md`](../reviews/2026-11-06-notion-parity.md).

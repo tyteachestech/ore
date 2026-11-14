@@ -1,20 +1,27 @@
 import { expect, test } from "bun:test";
 import { $ } from "bun";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { listCards, listItems, readAnnotations, today } from "../../../packages/core/src/index.ts";
+import { listCards, listItems, localDay, readAnnotations, today } from "../../../packages/core/src/index.ts";
 
 // The library the product video is filmed on (scripts/mock/seed-demo.ts). What the camera needs from it is held
 // here, so a change to scheduling or to the seed can't quietly leave a session that cuts no gem.
-test("the demo library is set up to film: the day nearly done, gems to cut, a level within reach", async () => {
+// Seeded at each of these times of his day: just after midnight the morning's reviews once fell on yesterday,
+// and the day stood at 0 minutes (F104).
+// `bun test` runs in UTC whatever the machine's zone, without saying so in the environment: the seed is a new
+// process, so it is told the test's zone, or on a Mac in Pacific time its midnight is not the test's (F104).
+const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const clock = (h: number, m: number) => { const d = new Date(); d.setHours(h, m, 0, 0); return d; };
+for (const [name, now] of [["midday", clock(12, 30)], ["just after midnight", clock(0, 4)], ["just before midnight", clock(23, 58)]] as const)
+test(`the demo library is set up to film, seeded ${name}: the day nearly done, gems to cut, a level within reach`, async () => {
   const root = join(mkdtempSync(join(tmpdir(), "ore-demo-")), "lib");
   try {
-    await $`bun ${join(import.meta.dir, "../scripts/mock/seed-demo.ts")} ${root}`.quiet();
+    await $`bun ${join(import.meta.dir, "../scripts/mock/seed-demo.ts")} ${root}`.env({ ...process.env, ORE_SEED_NOW: now.toISOString(), TZ: zone }).quiet();
     const lib = { root };
     // It never writes over a library.
     expect((await $`bun ${join(import.meta.dir, "../scripts/mock/seed-demo.ts")} ${root}`.quiet().nothrow()).exitCode).not.toBe(0);
-    const t = today(lib);
+    const t = today(lib, now);
     // Most of today's ten minutes are done, so a short session closes the day on camera.
     expect(t.met).toBe(false);
     expect(t.active_ms).toBeGreaterThan(t.goal_ms * 0.7);
@@ -31,8 +38,10 @@ test("the demo library is set up to film: the day nearly done, gems to cut, a le
     expect(t.skills.some((s) => s.mended > 0)).toBe(true);
     expect(t.skills.some((s) => s.polished > 0)).toBe(true);
     // The week reads as a kept habit, with a miss in it.
-    const past = t.week.filter((d) => d.date < new Date().toISOString().slice(0, 10));
+    const past = t.week.filter((d) => d.date < localDay(now));
     if (past.length >= 3) expect(past.some((d) => d.status === "met")).toBe(true);
+    // Every source has its picture (D77), so no list on camera shows a bare kind icon.
+    for (const i of listItems(lib)) expect(existsSync(join(i.dir, "thumbnail.svg"))).toBe(true);
     // Every exercise opens at its passage: its highlight is in its source.
     const marks = new Set(listItems(lib).flatMap((i) => readAnnotations(i).map((a) => a.id)));
     const cards = listCards(lib);
@@ -46,7 +55,7 @@ test("the demo library is set up to film: the day nearly done, gems to cut, a le
 }, 30_000);
 
 // Inspect the saved sources, the same Markdown the reader receives.
-test("demo source bodies contain no single-dollar math (F105)", async () => {
+test("demo source bodies contain no single-dollar math (F126)", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ore-demo-math-"));
   const root = join(dir, "lib");
   try {
@@ -90,7 +99,7 @@ function sampleCurve(path: string): [number, number][] {
   return points;
 }
 
-test("demo forgetting curves fall monotonically above the axis and match their stability (F106)", async () => {
+test("demo forgetting curves fall monotonically above the axis and match their stability (F127)", async () => {
   const dir = mkdtempSync(join(tmpdir(), "ore-demo-curves-"));
   const root = join(dir, "lib");
   try {

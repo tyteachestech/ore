@@ -5,6 +5,7 @@
 // Every word here was written for Ore (no copied text); studies are named where a fact rests on one.
 // On the Mac: ORE_LIBRARY=~/OreDemo open -n /Applications/Ore.app   (never seed over ~/Ore)
 import { addMess } from "./mess.ts";
+import { demoThumb } from "./demo-thumbs.ts";
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -22,13 +23,19 @@ const lib = { root };
 let seed = 7;
 const rnd = () => ((seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 2 ** 31);
 const DAY = 86400_000;
-const now = Date.now();
+// ORE_SEED_NOW: the moment the library is seeded as of, for the test to seed at any time of day.
+const now = process.env.ORE_SEED_NOW ? Date.parse(process.env.ORE_SEED_NOW) : Date.now();
 const at = (daysAgo: number) => new Date(now - daysAgo * DAY);
+// Today, in his own time zone, belongs to the filmed session: the replay never lands a review on it, and this
+// morning's few stand between its midnight and now, whatever the hour the library is seeded at.
+const midnight = new Date(now);
+midnight.setHours(0, 0, 0, 0);
+const sinceMidnight = (now - midnight.getTime()) / DAY;
 const iso = (daysAgo: number) => at(daysAgo).toISOString().replace(/\.\d+Z$/, "Z");
 
 // The skills a new library starts with that this person never used.
 for (const id of ["creativity", "self-regulation-motivation"]) await removeSkill(lib, id);
-for (const [id, look] of [
+const LOOKS: Record<string, { icon: string; color: string; collection: string }> = Object.fromEntries([
   ["ai", { icon: "mc:ai", color: "purple", collection: "Work" }],
   ["learning", { icon: "mc:brain", color: "pink", collection: "Work" }],
   ["teaching", { icon: "mc:black_board", color: "blue", collection: "Work" }],
@@ -36,7 +43,10 @@ for (const [id, look] of [
   ["creator-business", { icon: "mc:briefcase", color: "orange", collection: "Craft" }],
   ["habits", { icon: "mc:leaf", color: "green", collection: "Life" }],
   ["focus-attention", { icon: "mc:target", color: "red", collection: "Life" }],
-] as const) await setSkillLook(lib, id, look);
+]);
+for (const [id, look] of Object.entries(LOOKS)) await setSkillLook(lib, id, look);
+// The skills' colours as the app draws them (styles.css `--c-*`), for the sources' pictures.
+const COLOURS: Record<string, string> = { purple: "#b98af5", pink: "#f38bb8", blue: "#6aa8f7", yellow: "#e8c24a", orange: "#ffa657", green: "#5fcf8a", red: "#ff7b72" };
 
 /** One thing to remember from a source: a Fact (question, answer) or, with a rubric, an Explain. The answer is a
  *  sentence of the source's own text, so its exercise opens at the passage. `when`: where its memory stands
@@ -300,6 +310,8 @@ for (const s of SOURCES) {
     type: s.type, title: s.title, body: text, skills: s.skills, author: s.author,
     assets: s.body ? [{ name: "curves.svg", data: new TextEncoder().encode(CURVES) }] : undefined,
   });
+  // Its picture (D77), as an import would have left it: a share card, a PDF's first page or a book's cover.
+  writeFileSync(join(item.dir, "thumbnail.svg"), demoThumb(s.title, s.type, COLOURS[LOOKS[s.skills[0]!]!.color]!));
   await updateItemMeta(lib, item.meta.id, (m) => ({
     ...m, captured_at: iso(s.age), status: s.status,
     finished_at: s.status === "done" ? iso(Math.max(0, s.age - 2 - Math.floor(rnd() * 4))) : undefined,
@@ -333,7 +345,7 @@ for (const s of SOURCES) {
     let t = p.first, n = 0, usedVariant = false, last = p.first;
     const fixed = p.ratings === "life" ? null : p.ratings;
     while (fixed ? n < fixed.length : true) {
-      if (t <= 0.6) break;
+      if (t <= sinceMidnight + 0.01) break;
       const missNow = p.miss !== undefined && (p.miss === -1 ? false : n === p.miss);
       const rating = fixed ? fixed[n]! : missNow ? 1 : rnd() < 0.12 ? 4 : rnd() < 0.1 ? 2 : 3;
       const variant = p.variant && !usedVariant && n >= 4 ? `${card.meta.id}-V1` : undefined;
@@ -345,9 +357,9 @@ for (const s of SOURCES) {
       const gap = (new Date(r.due_next).getTime() - at(t).getTime()) / DAY;
       const next = t - gap - (fixed ? 0 : rnd() < 0.25 ? 1 + Math.floor(rnd() * 2) : 0);
       // "missed": the last review before today is the miss, so it stands dull, waiting to be won back.
-      if (p.miss === -1 && next <= 0.6 && rating !== 1 && n > 3) {
+      if (p.miss === -1 && next <= sinceMidnight + 0.01 && rating !== 1 && n > 3) {
         const back = Math.min(t - 1, 6);
-        if (back > 0.6) { await recordReview(lib, card.meta.id, { rating: 1, confidence: 3, now: at(back), elapsed_ms: 20_000 }); reviews++; }
+        if (back > sinceMidnight + 0.01) { await recordReview(lib, card.meta.id, { rating: 1, confidence: 3, now: at(back), elapsed_ms: 20_000 }); reviews++; }
         break;
       }
       t = next;
@@ -364,15 +376,19 @@ for (const s of SOURCES) {
 await setReviewSettings(lib, { goal_minutes: 10, plan: "my first coffee", new_per_day: 4 });
 let k = 0;
 for (const day of [10, 9, 8, 6, 5, 4, 2, 1, 0]) {
-  const session = await startSession(lib, at(day ? day + 0.01 : 0.06));
+  // This morning's start: 90 minutes ago, or midnight when the day is younger than that.
+  const morning = Math.min(sinceMidnight, 0.06), step = morning / 6;
+  // A past day's ten minutes sit around its own noon, so none spills over a midnight into its neighbour.
+  const noon = day + sinceMidnight - 0.5;
+  const session = await startSession(lib, at(day ? noon + 0.01 : morning));
   for (let i = 0; i < (day ? 4 : 3); i++, reviews++) {
     // Only a memory last reviewed before that day: a card's reviews stay in time order.
     while (settled[k % settled.length]!.last <= day + 0.5) k++;
     const card = settled[k++ % settled.length]!;
     card.last = day;
-    await recordReview(lib, card.id, { rating: 3, confidence: 2, now: at(day ? day - i * 0.002 : 0.05 - i * 0.004), elapsed_ms: 165_000 + Math.floor(rnd() * 15_000), session: session.id });
+    await recordReview(lib, card.id, { rating: 3, confidence: 2, now: at(day ? noon - i * 0.002 : morning - (i + 1) * step), elapsed_ms: 165_000 + Math.floor(rnd() * 15_000), session: session.id });
   }
-  await endSession(lib, at(day ? day - 0.01 : 0.03));
+  await endSession(lib, at(day ? noon - 0.01 : step));
 }
 
 // Skill notes, as he would keep them.

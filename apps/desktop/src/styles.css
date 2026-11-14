@@ -300,19 +300,22 @@ img.thumb { filter: brightness(0.86); }
 .list .row:not(.post) .row-main { gap: 2px; }
 .list .row:not(.post) .title { font-weight: 500; }
 .row .kind-line { color: var(--faint); font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.row:is(:hover, .on, .sel) .kind-line { color: var(--muted); }
 .row .row-q { flex: none; align-self: center; display: inline-flex; color: var(--question-solid); }
 .hint-q { display: flex; flex-direction: column; gap: 2px; }
 .hint-q span::before { content: "? "; color: var(--question-solid); }
 .row-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .row .row-line .title { flex: 0 1 auto; }
-.row-line .chips-button { flex: 0 1 auto; gap: 0; overflow: hidden; }
+.row-line .chips-button { flex: 0 1 auto; gap: 0; }
 .row .sub { min-width: 0; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-line .course-next { max-width: none; flex: 0 1 auto; min-width: 0; }
 .row-line .by { flex: 0 1 auto; max-width: 24ch; min-width: 0; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-line .by.from-site { font-style: italic; }
 .row-line .chips-button + .course-next::before, .row-line .by + .chips-add + .course-next::before { content: "·"; margin-right: 6px; color: var(--faint); font-size: 12px; }
-/* Chips that don't fit end in an ellipsis, each, never sliced at the row's edge. */
+/* Chips that don't fit end in an ellipsis, each, never sliced at the row's edge. The chips hide their own overflow,
+   never the rounded button around them: WebKit draws a masked icon's colour along a rounded clip's corner (F105). */
 .row-line .chips { flex-wrap: nowrap; min-width: 0; }
+.chips-button > .chips { overflow: hidden; }
 .row-line .chips .chip { min-width: 0; }
 /* A skill beside the byline sits on its line, now that nothing boxes it. */
 .row-line .chip { height: auto; line-height: inherit; }
@@ -766,8 +769,9 @@ img.thumb { filter: brightness(0.86); }
 .doc td.covered:hover::after { background: color-mix(in srgb, var(--bg-active), var(--text) 8%); }
 .doc td.covered:focus-visible { outline: none; }
 .doc td.covered:focus-visible::after { box-shadow: 0 0 0 2px var(--focus); }
-.doc th:has(.col-cover) { position: relative; }
-.doc th:has(.col-cover[aria-pressed="true"]) { padding-right: 30px; } /* room for the button while it stays; on hover alone it sits over the heading's end */
+/* The button's room is kept whether it shows or not (F119): on hover it sits beside the heading, never over
+   its end, and the column doesn't shift when it appears or stays. */
+.doc th:has(.col-cover) { position: relative; padding-right: 30px; }
 .doc .col-cover { position: absolute; top: 50%; right: 4px; translate: 0 -50%; display: inline-flex; padding: 1px; border-radius: 6px; color: var(--faint); background: var(--bg); opacity: 0; }
 .doc th:hover .col-cover, .doc .col-cover:focus-visible, .doc .col-cover[aria-pressed="true"] { opacity: 1; }
 .doc .col-cover:hover { color: var(--text); background: var(--bg-hover); }
@@ -983,6 +987,10 @@ body.resizing iframe { pointer-events: none; }
 .listen-bar { display: flex; align-items: center; gap: 2px; padding: 2px 4px; border-radius: 999px; background: var(--bg-raised); border: 1px solid var(--border); }
 .listen-bar .ctl { height: 26px; min-width: 26px; border-radius: 999px; }
 .listen-bar .ctl.rate { border-color: transparent; }
+/* Reading aloud is running: the lamp (D263). The button's icon turns amber inside a ring of dots that follows each
+   word; paused, it is the plain grey control again. */
+.listen-bar .ctl.lamp, .listen-bar .ctl.lamp:hover:not(:disabled) { position: relative; color: var(--lamp); }
+.lamp-ring { position: absolute; inset: 0; margin: auto; pointer-events: none; }
 .intent.remove, .intent.icon { flex: 0 0 26px; }
 .intent.icon:hover { color: var(--text); }
 /* Look Up (D83): the dictionary entry in the popup's place, Books' definition card. */
@@ -1535,6 +1543,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .strength-side { display: flex; flex-direction: column; gap: 4px; }
 .near-goal { display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-family: var(--mono); font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .near-goal > span { display: inline-flex; align-items: center; gap: 5px; color: var(--faint); font-size: 12px; }
+.hero-strength:is(:hover, [aria-expanded="true"]) .near-goal > span:not(.near-glow) { color: var(--muted); }
 .near-goal > .near-glow { color: var(--text); font-size: inherit; }
 .home-level .near-goal { gap: 10px; font-size: 12px; margin-left: 6px; }
 .home-solid { color: var(--text); font-family: var(--round); font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
@@ -1545,6 +1554,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .strength-legend { display: flex; flex-wrap: wrap; gap: 14px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .strength-depth { margin: 0; color: var(--muted); font-size: 12px; }
 .strength-depth b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.home-level:focus-visible, .strength-legend > span:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .strength-legend span { display: inline-flex; align-items: center; gap: 6px; }
 
 .strength-growth { position: relative; margin: 0; }
@@ -1995,7 +2005,7 @@ button.home-plan:hover { color: var(--text); }
 :root:not(.phone) .home-read:hover .home-meter.small, .home-read:has(.more[aria-expanded="true"]) .home-meter.small { visibility: hidden; }
 .home-read:has(.home-open:focus-visible) { box-shadow: inset 0 0 0 1px var(--focus); }
 /* The title comes first: long skill pills give way to it, ending in … (DESIGN: long text). */
-.home-read .chips-button { max-width: 40%; overflow: hidden; }
+.home-read .chips-button { max-width: 40%; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
 .home-read .chip { min-width: 0; }
 /* The same 16:9 picture as the source list (D114), big enough to know a source by. */
@@ -2124,6 +2134,7 @@ button.home-plan:hover { color: var(--text); }
 .review-rate button:hover:not(:disabled) { background: var(--bg-hover); }
 .review-rate button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 var(--border); }
 .review-rate button:focus-visible { outline: none; box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--focus); }
+.review-rate button.suggested:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .review-rate button:disabled { opacity: 0.5; }
 .review-rate .rate-1 { --rate: var(--c-red); }
 .review-rate .rate-2 { --rate: var(--c-orange); }
@@ -2218,18 +2229,14 @@ button.home-plan:hover { color: var(--text); }
 .end-emblem ~ .review-try ~ .review-foot { margin-top: 12px; }
 .end-emblem ~ .review-foot { margin-top: 40px; }
 /* The mole speaks (D243) from his speech box (D245), right of his head; it grows out of him once. */
-.says.end-says { position: absolute; left: calc(50% + 62px); top: 12px; z-index: 2; width: min(216px, calc(50vw - 78px)); min-height: 52px; transform-origin: 0 60%; animation: end-says var(--t-4) var(--ease-out); }
+.says.end-says { position: absolute; left: calc(50% + 62px); top: 12px; z-index: 2; width: max-content; max-width: min(248px, calc(50vw - 78px)); transform-origin: 0 50%; animation: end-says var(--t-4) var(--ease-out); }
 @keyframes end-says { from { opacity: 0; transform: translateX(-6px) scale(0.96); } }
 @media (prefers-reduced-motion: reduce) { .says.end-says { animation: none; } }
-/* The mole's speech box (D245, `MoleSays`): an old game's dialogue box in his own drawing. Flat, its corners cut
-   in the 3px steps of its stair tail (D159); the mono, typed out a letter at a time; his block (D186) rides the
-   last letter and blinks once the line is whole. The letters still to come hold their place unseen. */
-.says { position: relative; z-index: 0; box-sizing: border-box; padding: 9px 12px 10px; text-align: left; }
-.says::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--bg-active); clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px, 100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%, 6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px), 0 6px, 3px 6px, 3px 3px, 6px 3px); }
-.says-tail { position: absolute; top: 15px; fill: var(--bg-active); }
-.says[data-tail="left"] .says-tail { left: -9px; }
-.says[data-tail="right"] .says-tail { right: -9px; }
-.says-line { margin: 0; font: 400 12px/1.5 var(--mono); letter-spacing: 0.01em; color: var(--text); overflow-wrap: anywhere; }
+/* The mole's speech box (D245, `MoleSays`; its look D266, the Rive cart ending's box): a hairline
+   outline on the page's own ground, 6px corners, no fill and no tail, 10px more on the right for his block; the mono, typed out a letter at a time; his
+   block (D186) rides the last letter and blinks once the line is whole. The letters to come hold their place unseen. */
+.says { position: relative; box-sizing: border-box; padding: 6px 20px 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); text-align: left; }
+.says-line { margin: 0; font: 400 13px/1.5 var(--mono); letter-spacing: 0.01em; color: var(--text); overflow-wrap: anywhere; }
 .says-line:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 .says-rest { visibility: hidden; }
 /* A rare line's mark (D247): the thing's own drawing, 16px, on the words' midline. */
@@ -2878,7 +2885,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-source .find-bar input { font-size: 16px; }
 .phone-source .find-bar button { width: 44px; height: 44px; }
 .phone .mynotes-text { padding-top: 12px; }
-.add-box .chips-button { max-width: 260px; overflow: hidden; }
+.add-box .chips-button { max-width: 260px; }
+.add-box .chips-button .chip { min-width: 0; } /* each name ends in an ellipsis; the rounded button clips nothing (F105) */
 .add-skills { display: inline-flex; min-width: 0; }
 /* The video card on the phone (D92): no gutter, so each timestamp leads its paragraph. */
 .phone .doc .video-card { margin: 0 -8px 24px; }
@@ -3187,6 +3195,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor .ask-me { border-radius: 12px; background: none; box-shadow: inset 0 0 0 1px var(--border); color: var(--muted); }
 .tutor .ask-text { position: relative; flex: 0 1 auto; max-width: 92%; padding: 9px 12px; border-radius: 12px; background: var(--bg-active); }
 /* Chips inside a bubble sit one step above its fill. */
+.tutor .ask-text :is(.cite, .tutor-sources) { color: var(--text-read); }
 .tutor .ask-text :is(.cite, .tutor-sources, code) { background: color-mix(in srgb, var(--text) 9%, var(--bg-active)); }
 .tutor .ask-text .tutor-acts button:hover:not(:disabled), .tutor .ask-text .tutor-acts button:focus-visible, .tutor .ask-text .library-sources button:hover, .tutor .ask-text .library-sources button:focus-visible { background: color-mix(in srgb, var(--text) 9%, var(--bg-active)); }
 .tutor .ask-ai.newest .ask-text::after { content: ""; position: absolute; left: 18px; top: 100%; width: 9px; height: 9px; background: var(--bg-active); clip-path: polygon(0 0, 9px 0, 9px 3px, 6px 3px, 6px 6px, 3px 6px, 3px 9px, 0 9px); }

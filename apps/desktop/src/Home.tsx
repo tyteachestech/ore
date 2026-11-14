@@ -118,7 +118,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   const [today, setToday] = useState<Today | null>(lastToday);
   const [error, setError] = useState<string | null>(null);
   // Home stays mounted under Review: when it hands back, take the Today it read at its end screen before the first
-  // paint, so the goal line is already there instead of pushing the list down a moment later (F104).
+  // paint, so the goal line is already there instead of pushing the list down a moment later (F125).
   useLayoutEffect(() => { const t = lastToday(); if (t) setToday(t); }, [reload]);
 
   const refresh = useCallback(() => {
@@ -550,7 +550,7 @@ function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }:
         {more}
       </span>
       <Hint text={k ? gemHint(k, p.line) : p.line}>
-        <span className="home-level">
+        <span className="home-level" role="img" aria-label={k ? gemHint(k, p.line) : p.line} tabIndex={0}>
           {k ? (
             <>
               <GemRing k={k} size={26} />

@@ -419,7 +419,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       }
       // The try line is a nicety: the end screen never waits on or fails for it.
       const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
-      // Home draws the Today it last read until a fresh one lands (F104): hand it this one,
+      // Home draws the Today it last read until a fresh one lands (F125): hand it this one,
       // so Done doesn't show the morning's progress and then push the list down when the goal line appears.
       const today = await ore<Today>("today");
       rememberToday(today);
@@ -1095,7 +1095,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
 
       {/* VoiceOver hears each new card and the key points as marked (by the AI, or by him), not only the end screen. */}
       <div className="sr-only" aria-live="polite">
-        {card && !end && queue?.length ? `Exercise ${done + 1}. ${card.question.replace(/_{4,}/g, "blank")}${marks?.some((m) => m !== undefined) ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
+        {card && !end && queue?.length ? `Exercise ${done + 1}. ${card.question.replace(/_{4,}/g, "blank")}${phase === "checked" && card.kind === "card" ? `. Answer: ${card.answer}. Rate your recall.` : ""}${marks?.some((m) => m !== undefined) ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
       </div>
       <div className="review-body">
         {error && (
