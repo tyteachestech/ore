@@ -33,7 +33,7 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   const depth: Said[] = (s.depth_days ?? 0) > 0
     ? [{ text: `+${depthText(s.depth_days!)} of memory${extraText(s.depth_days!, extra)}. You dug that.`, hint: `How much longer the exercises you passed today will now last, added up (at most 30 days each)${extraText(s.depth_days!, extra) ? "; extra is what came after today’s goal" : ""}` }]
     : [];
-  // `row` (the full end screen, F-new-r7z134): its numbers stand in the row under the ring, so he never says one of them
+  // `row` (the full end screen, F137): its numbers stand in the row under the ring, so he never says one of them
   // again. He keeps a rare thing the row had no room for, and then and now, which is never a number there.
   if (o.row) {
     const shown = new Set<string>(endTiles(o).map((t) => t.key));

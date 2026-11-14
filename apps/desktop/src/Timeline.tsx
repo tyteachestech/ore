@@ -41,7 +41,7 @@ export function Timeline({ history, rating }: { history: CardHistory; rating: 1 
         <i className={`next rate-${rating}`} style={{ left: `${nextX}%` }} />
       </Hint>
     </div>
-    {/* What the hollow dot means, in words (F-new-r7z130): the line's own label says the same to VoiceOver. */}
+    {/* What the hollow dot means, in words (F133): the line's own label says the same to VoiceOver. */}
     <span className="timeline-next" aria-hidden="true">next {inWords(history.next[rating])}</span>
     </>
   );
