@@ -35,4 +35,10 @@ describe("review timeline (D149)", () => {
     expect(inWords(at(95), T0)).toBe("in 3 months");
     expect(inWords(at(800), T0)).toBe("in 2 years");
   });
+
+  test("one month and one year are said in the singular", () => {
+    expect(inWords(at(35), T0)).toBe("in 1 month");
+    expect(inWords(at(400), T0)).toBe("in 1 year");
+  });
 });
+

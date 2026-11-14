@@ -3,7 +3,7 @@
 // phone twin; reading looks are set in the reader's Aa. Every change saves at once, with Undo.
 import * as Switch from "@radix-ui/react-switch";
 import { useEffect, useRef, useState } from "react";
-import { GOALS, Group, NEW, PlanField, Row, Seg } from "../Settings";
+import { GOALS, Group, newOptions, PlanField, Row, Seg } from "../Settings";
 import { ore, opt, pullFromMac } from "../ore";
 import { errorText, type Notify } from "../util";
 import { syncState } from "./fs";
@@ -59,7 +59,7 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
               <Seg label="Minutes a day" value={String(review.goal_minutes)} options={GOALS.map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("goal_minutes", Number(v))} />
             </Row>
             <Row title="New exercises a day" text="Exercises seen for the first time each day. Reviews are never capped.">
-              <Seg label="New exercises a day" value={String(review.new_per_day)} options={NEW.map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("new_per_day", Number(v))} />
+              <Seg label="New exercises a day" value={String(review.new_per_day)} options={newOptions(review.new_per_day).map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("new_per_day", Number(v))} />
             </Row>
             <Row title="Weekdays only" text="Weekends never count against your week." htmlFor="weekdays">
               <Switch.Root id="weekdays" className="switch" checked={review.weekdays_only} onCheckedChange={(v) => void set("weekdays_only", v)}>
