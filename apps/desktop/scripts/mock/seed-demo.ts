@@ -5,6 +5,7 @@
 // Every word here was written for Ore (no copied text); studies are named where a fact rests on one.
 // On the Mac: ORE_LIBRARY=~/OreDemo open -n /Applications/Ore.app   (never seed over ~/Ore)
 import { addMess } from "./mess.ts";
+import { demoThumb } from "./demo-thumbs.ts";
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -34,7 +35,7 @@ const iso = (daysAgo: number) => at(daysAgo).toISOString().replace(/\.\d+Z$/, "Z
 
 // The skills a new library starts with that this person never used.
 for (const id of ["creativity", "self-regulation-motivation"]) await removeSkill(lib, id);
-for (const [id, look] of [
+const LOOKS: Record<string, { icon: string; color: string; collection: string }> = Object.fromEntries([
   ["ai", { icon: "mc:ai", color: "purple", collection: "Work" }],
   ["learning", { icon: "mc:brain", color: "pink", collection: "Work" }],
   ["teaching", { icon: "mc:black_board", color: "blue", collection: "Work" }],
@@ -42,7 +43,10 @@ for (const [id, look] of [
   ["creator-business", { icon: "mc:briefcase", color: "orange", collection: "Craft" }],
   ["habits", { icon: "mc:leaf", color: "green", collection: "Life" }],
   ["focus-attention", { icon: "mc:target", color: "red", collection: "Life" }],
-] as const) await setSkillLook(lib, id, look);
+]);
+for (const [id, look] of Object.entries(LOOKS)) await setSkillLook(lib, id, look);
+// The skills' colours as the app draws them (styles.css `--c-*`), for the sources' pictures.
+const COLOURS: Record<string, string> = { purple: "#b98af5", pink: "#f38bb8", blue: "#6aa8f7", yellow: "#e8c24a", orange: "#ffa657", green: "#5fcf8a", red: "#ff7b72" };
 
 /** One thing to remember from a source: a Fact (question, answer) or, with a rubric, an Explain. The answer is a
  *  sentence of the source's own text, so its exercise opens at the passage. `when`: where its memory stands
@@ -300,6 +304,8 @@ for (const s of SOURCES) {
     type: s.type, title: s.title, body: text, skills: s.skills, author: s.author,
     assets: s.body ? [{ name: "curves.svg", data: new TextEncoder().encode(CURVES) }] : undefined,
   });
+  // Its picture (D77), as an import would have left it: a share card, a PDF's first page or a book's cover.
+  writeFileSync(join(item.dir, "thumbnail.svg"), demoThumb(s.title, s.type, COLOURS[LOOKS[s.skills[0]!]!.color]!));
   await updateItemMeta(lib, item.meta.id, (m) => ({
     ...m, captured_at: iso(s.age), status: s.status,
     finished_at: s.status === "done" ? iso(Math.max(0, s.age - 2 - Math.floor(rnd() * 4))) : undefined,
