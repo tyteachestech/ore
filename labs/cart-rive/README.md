@@ -112,3 +112,15 @@ Two things reached this thread before the build: a shared memory note listing wh
 weak and what it added (squash and stretch, a lagging helmet, 14 dirt dots, a ring knock, a cart hop), and one
 truncated line of `docs/DECISIONS.md` describing the cart ending. No clip, frame, code or pull request was
 opened. The dirt count and the lagging helmet here may owe something to that note.
+
+## Fourth pass (2026-11-14)
+
+Tyler's comparison: Rive's motion is better, the code version's still side view is better, and neither should
+lift him much before he drops into his spot.
+
+- Side view: his real traced head, turned on its side and facing us, on a deeper belly-up body in overalls.
+- The rise is cut: he drifts up 14 px while he hangs (was more), the wake lifts him 8 px, and the pop out of
+  the hole overshoots by 5 px.
+- He stops 10 px higher on the tipped bucket (`SLIDE = 36`), so his feet clear the dirt line while he is tilted.
+
+Clip: `cart-rive-v4.mp4`, frames `cart-rive-v4-frames.png`, both recorded from the published file in the web runtime.

@@ -108,84 +108,76 @@ const I = (k) => (ids[k] ??= newId());
 
 // Asleep he is seen from the side, flat on his back: x runs from his helmet (left) to his feet, y is up from the
 // load he lies on. My own drawing, on his grid.
-const LY = { body: [], head: [], helmet: [], face: [], tache: [], arm: [], feet: [] };
-for (let y = -16; y <= 1; y++) for (let x = -22; x <= 15; x++) {
-  const e = (Math.abs((x - 2) / 11) ** 2.4 + Math.abs((y + 0.4) / 12.6) ** 2.4) ** (1 / 2.4); // a round belly, not a mound
-  if (e <= 1 && y <= 0) {
-    const low = y > -3; // in the shade, against the load
-    const overalls = x >= -1 || (e > 0.8 && x >= -7 && y < -3); // legs and belly in overalls; a strap over the chest
-    if (x === -1 && e > 0.8 && y < -3) LY.body.push([x, y, 0.44, 9]); // its button
-    else if (overalls) LY.body.push([x, y, low ? 0.34 : 0.4, low ? 3 : y <= -8 ? 6 : 5]);
-    else LY.body.push([x, y, low ? 0.36 : 0.42, low ? 5 : 7]);
-  }
-  const h = Math.hypot(x + 12.5, y + 5.4);
-  if (h <= 5.7) LY.head.push([x, y, 0.42 - 0.006 * h * h, y > -3 ? 5 : 7]);
-  const c = Math.hypot(x + 13, y + 5.4);
-  if (c <= 6.9 && x <= -17) LY.helmet.push([x, y, 0.43 - 0.003 * c * c, c > 5.9 ? 6 : y < -6 ? 9 : 8]);
-  if (x === -16 && y >= -13 && y <= 2) LY.helmet.push([x, y, 0.45, 9]);
+const LY = { body: [], arm: [], feet: [] };
+const LY_NECK = [-9, -12.5], LY_HEAD = 0.88;
+for (let y = -20; y <= 1; y++) for (let x = -12; x <= 17; x++) {
+  const e = (Math.abs((x - 3) / 12.4) ** 2.1 + Math.abs((y + 0.4) / 17.4) ** 2.1) ** (1 / 2.1); // a round belly, not a mound
+  if (e > 1 || y > 0) continue;
+  const low = y > -3; // in the shade, against the load
+  const overalls = x >= 0 || (e > 0.82 && x >= -6 && y < -3); // legs and belly in overalls; a strap over the chest
+  if (x === 0 && e > 0.82 && y < -8) LY.body.push([x, y, 0.44, 9]); // its button
+  else if (overalls) LY.body.push([x, y, low ? 0.32 : 0.4 - 0.06 * e, low ? 3 : y <= -11 ? 5 : 4]);
+  else LY.body.push([x, y, low ? 0.36 : 0.44 - 0.04 * e, low ? 6 : 9]);
 }
-LY.helmet.push(...[[-19, -10], [-18, -10], [-19, -11], [-18, -11]].map(([x, y]) => [x, y, 0.4, "lamp"]));
-LY.face.push([-11, -11, 0.44, "nose"], [-10, -11, 0.42, "nose"], [-10.5, -12, 0.4, "nose"]);
-LY.face.push([-14.4, -8.2, 0.32, "eye"], [-13.6, -7.5, 0.36, "eye"], [-12.6, -7.3, 0.36, "eye"], [-11.7, -7.7, 0.32, "eye"]);
-// One half of the moustache, drooping from under his nose toward his chin.
-for (let y = -13; y <= -4; y++) for (let x = -11; x <= -4; x++) { const u = (x + 7.8) * 0.8 + (y + 7.6) * 0.6, v = -(x + 7.8) * 0.6 + (y + 7.6) * 0.8, m = Math.hypot(u / 3.4, v / 1.8); if (m <= 1) LY.tache.push([x, y, 0.45 - 0.07 * m, 9]); }
-for (let i = 0; i <= 5; i++) LY.arm.push([i - 5, -8 - i * 0.8, 0.38, 6], [i - 5, -7 - i * 0.8, 0.36, 6]);
-LY.arm.push(...[[1, -13], [2, -13], [1, -12], [2, -12], [1.5, -14]].map(([x, y]) => [x, y, 0.42, 9]));
-for (const [dx, dy, tone] of [[1.7, 0.5, 6], [0, 0, 8]]) for (const [x, y] of [[0, -1], [1, -1], [0, -2], [1, -2], [0, -3], [1, -3], [0, -4], [1, -4], [0.5, -5]]) LY.feet.push([12 + x + dx, y + dy - 1, y === -5 ? 0.34 : 0.4, tone]);
+for (let i = 0; i <= 5; i++) LY.arm.push([i - 5, -13 - i * 0.9, 0.38, 6], [i - 5, -12 - i * 0.9, 0.36, 6]);
+LY.arm.push(...[[1, -18.5], [2, -18.5], [1, -17.5], [2, -17.5], [1.5, -19.5]].map(([x, y]) => [x, y, 0.42, 9]));
+for (const [dx, dy, tone] of [[1.7, 0.5, 6], [0, 0, 8]]) for (const [x, y] of [[0, -1], [1, -1], [0, -2], [1, -2], [0, -3], [1, -3], [0, -4], [1, -4], [0.5, -5]]) LY.feet.push([14 + x + dx, y + dy - 2, y === -5 ? 0.34 : 0.4, tone]);
 const lyAt = (px, py) => ({ x: n2(px * P), y: n2(py * P) });
 const lyPart = (key, name, list, px, py, extra = "") => node(name, { id: I(key), ...lyAt(px, py) }, [extra, dotShapes(mine(list, px, py), name), backing(mine(list, px, py))]);
-const LY_NOSE = [-10.5, -12.8];
-const LY_AT = [-22, 10]; // where the side view sits, from the front view's root
-function lyingXml() {
-  return node("Lying", { id: I("lying"), x: LY_AT[0], y: LY_AT[1], rotation: n4(Math.PI / 2), opacity: 0 }, [
-    node("ZAnchor", { id: I("zAnchor"), ...lyAt(-6, -19) }),
-    lyPart("lyArm", "Arm", LY.arm, -5, -7),
-    node("Head", { id: I("lyHead"), ...lyAt(-8, -3) }, [
-      node("NoseAnchor", { id: I("noseAnchor"), ...lyAt(LY_NOSE[0] + 8, LY_NOSE[1] + 3) }),
-      node("Moustache", { id: I("lyTache"), ...lyAt(-10 + 8, -10 + 3) }, [dotShapes(mine(LY.tache, -10, -10), "moustache"), backing(mine(LY.tache, -10, -10))]),
-      dotShapes(mine(LY.face, -8, -3), "face"),
-      node("Helmet", { id: I("lyHelm") }, [dotShapes(mine(LY.helmet, -8, -3), "helmet"), backing(mine(LY.helmet, -8, -3))]),
-      dotShapes(mine(LY.head, -8, -3), "head"), backing(mine(LY.head, -8, -3)),
-    ]),
-    lyPart("lyFeet", "Feet", LY.feet, 12, -1),
-    node("Body", { id: I("lyBody"), ...lyAt(2, 0) }, [dotShapes(mine(LY.body, 2, 0), "body"), backing(mine(LY.body, 2, 0))]),
-  ]);
-}
-
-function moleXml() {
+const LY_NOSE = [LY_NECK[0] + (NOSE[1] - HEAD[1]) * LY_HEAD, LY_NECK[1] - (NOSE[0] - HEAD[0]) * LY_HEAD - 1.4]; // just over his nose
+const LY_AT = [-22, 22]; // where the side view sits, from the front view's root
+const HELM_PIVOT = [0, -15.5];
+/** His head, from the traced drawing: eyes, helmet and lamp, nose, the two halves of the moustache, fur. p prefixes the ids. */
+function headKids(p = "", shut = false, neckless = false) {
   const eye = (s, cx, cy) => {
     const open = [...part(`eye${s}`, "eye", cx, cy), ...part(`glint${s}`, "glint", cx, cy)];
-    const shut = mine([[-1.05, 0.25, 0.3, "eye"], [-0.35, 0.6, 0.33, "eye"], [0.35, 0.6, 0.33, "eye"], [1.05, 0.25, 0.3, "eye"]], 0, 0);
-    return node(`Eye${s}`, { id: I(`eye${s}`), ...inHead(cx, cy) }, [
-      node("Open", { id: I(`open${s}`) }, dotShapes(open, "eye")),
-      node("Shut", { id: I(`shut${s}`), opacity: 0 }, dotShapes(shut, "lid")),
+    const lid = mine([[-1.05, 0.25, 0.3, "eye"], [-0.35, 0.6, 0.33, "eye"], [0.35, 0.6, 0.33, "eye"], [1.05, 0.25, 0.3, "eye"]], 0, 0);
+    return node(`Eye${s}`, { id: I(`${p}eye${s}`), ...inHead(cx, cy) }, [
+      node("Open", { id: I(`${p}open${s}`), opacity: shut ? 0 : undefined }, dotShapes(open, "eye")),
+      node("Shut", { id: I(`${p}shut${s}`), opacity: shut ? 1 : 0 }, dotShapes(lid, "lid")),
     ]);
   };
-  const lobe = (s, sign) => node(`Snore${s}`, { id: I(`snore${s}`), ...inHead(sign * 0.9, -10.4) }, node(`Lobe${s}`, { id: I(`lobe${s}`) }, [
+  const lobe = (s, sign) => node(`Snore${s}`, { id: I(`${p}snore${s}`), ...inHead(sign * 0.9, -10.4) }, node(`Lobe${s}`, { id: I(`${p}lobe${s}`) }, [
     dotShapes(part(`lobe${s}`, undefined, sign * 0.9, -10.4), "lobe"), backing(part(`lobe${s}`, undefined, sign * 0.9, -10.4)),
   ]));
+  // neckless: without the shoulders the rest drawing shows at the rim of his hole
+  const hp = (name, tone) => part(name, tone, ...HEAD).filter(([, y]) => !neckless || y < 0.6 * P);
+  const helmet = part("helmet", undefined, ...HELM_PIVOT), lamp = part("lamp", "lamp", ...HELM_PIVOT);
+  return [
+    eye("L", -4.4, -12.6), eye("R", 5.6, -12.6),
+    node("Helmet at", { x: n2((HELM_PIVOT[0] - HEAD[0]) * P), y: n2((HELM_PIVOT[1] - HEAD[1]) * P) }, node("Helmet", { id: I(`${p}helm`) }, [dotShapes(lamp, "lamp"), dotShapes(helmet, "helmet"), backing(helmet)])),
+    dotShapes(hp("nose", "nose"), "nose"),
+    lobe("L", -1), lobe("R", 1),
+    dotShapes(hp("gap"), "gap"),
+    dotShapes(hp("fur"), "fur"), backing(hp("fur")),
+  ];
+}
+function lyingXml() {
+  return node("Lying", { id: I("lying"), x: LY_AT[0], y: LY_AT[1], rotation: n4(Math.PI / 2), opacity: 0 }, [
+    node("ZAnchor", { id: I("zAnchor"), ...lyAt(-12, -31) }),
+    lyPart("lyArm", "Arm", LY.arm, -5, -12.5),
+    // His own head, turned on its side and facing us: the old cartoon cheat for "flat on his back".
+    node("Head", { id: I("lyHead"), ...lyAt(...LY_NECK) }, [
+      node("NoseAnchor", { id: I("noseAnchor"), ...lyAt(LY_NOSE[0] - LY_NECK[0], LY_NOSE[1] - LY_NECK[1]) }),
+      node("Turned", { rotation: n4(-Math.PI / 2), scaleX: LY_HEAD, scaleY: LY_HEAD }, headKids("ly", true, true)),
+    ]),
+    lyPart("lyFeet", "Feet", LY.feet, 14, -2),
+    node("Body", { id: I("lyBody"), ...lyAt(3, 0) }, [dotShapes(mine(LY.body, 3, 0), "body"), backing(mine(LY.body, 3, 0))]),
+  ]);
+}
+function moleXml() {
   // In the hole his paws rest on the rim (the traced drawing); out of it he has arms. One of the two is shown.
   const paw = (s, sign) => node(`Paw${s}`, { id: I(`paw${s}`), ...at(sign * 11.8, -2.6), opacity: 0 }, [
     dotShapes(part(`paw${s}`, undefined, sign * 11.8, -2.6), "paw"), backing(part(`paw${s}`, undefined, sign * 11.8, -2.6)),
   ]);
   const arm = (s, sign) => node(`Arm${s}`, { id: I(`arm${s}`), ...at(sign * 10.6, 1.6) }, [dotShapes(mine(armDots, 0, 0), "arm"), backing(mine(armDots, 0, 0))]);
   const foot = (s, sign) => node(`Foot${s}`, { id: I(`foot${s}`), ...at(sign * 5, 12.8) }, [dotShapes(mine(footDots, 0, 0), "foot"), backing(mine(footDots, 0, 0))]);
-  const headPivot = HEAD, helmPivot = [0, -15.5];
-  const hp = (name, tone) => part(name, tone, ...headPivot);
-  const helmet = part("helmet", undefined, ...helmPivot), lamp = part("lamp", "lamp", ...helmPivot);
   return node("Mole", { id: I("mole"), x: HOLE_X, y: n2(GROUND + ORIGIN_Y * P) }, [
     el("TransformConstraint", { id: I("moleSeat"), targetId: I("seat"), strength: 0, name: "Rides the cart" }),
     el("ClippingShape", { sourceId: I("holeClip"), name: "Above the dirt" }),
     lyingXml(),
     node("Bob", { id: I("bob") }, node("Squash", { id: I("sq") }, node("Breath", { id: I("br") }, [
-      node("Head", { id: I("head"), ...at(...headPivot) }, [
-        eye("L", -4.4, -12.6), eye("R", 5.6, -12.6),
-        node("Helmet at", { x: n2((helmPivot[0] - headPivot[0]) * P), y: n2((helmPivot[1] - headPivot[1]) * P) }, node("Helmet", { id: I("helm") }, [dotShapes(lamp, "lamp"), dotShapes(helmet, "helmet"), backing(helmet)])),
-        dotShapes(hp("nose", "nose"), "nose"),
-        lobe("L", -1), lobe("R", 1),
-        dotShapes(hp("gap"), "gap"),
-        dotShapes(hp("fur"), "fur"), backing(hp("fur")),
-      ]),
+      node("Head", { id: I("head"), ...at(...HEAD) }, headKids()),
       paw("L", -1), paw("R", 1),
       arm("L", -1), arm("R", 1),
       node("Body", { id: I("body"), ...at(0, 8) }, [dotShapes(mine(bellyDots, 0, 8), "belly"), dotShapes(mine(bodyDots, 0, 8), "body"), backing(mine([...bodyDots, ...bellyDots], 0, 8))]),
@@ -198,7 +190,7 @@ function moleXml() {
 const CART = { stopX: 0, pivot: [34, -19], tip: (50 * Math.PI) / 180, wheelR: 8 };
 const rot = ([x, y], a) => [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
 const SEAT0 = [-32, -74]; // where he lies, in the bucket's space: across the heap, head to the back
-const SLIDE = 46; // how far down the tipped bucket he slides, px
+const SLIDE = 36; // how far down the tipped bucket he slides, px
 const SEAT1 = [SEAT0[0], -62]; // once the load has gone from under him he lies on the rim
 CART.stopX = HOLE_X - CART.pivot[0] - rot(SEAT1, CART.tip)[0] - SLIDE * Math.cos(CART.tip);
 const PIVOT_W = [CART.stopX + CART.pivot[0], GROUND + CART.pivot[1]]; // the bucket's hinge, in the world, once stopped
@@ -360,16 +352,17 @@ const deg = (d) => (d * Math.PI) / 180;
 const G = 4100; // the mole's gravity, px/s²: cartoon weight
 
 // Asleep: one breath is 54 frames. Belly rises, he bobs, the moustache flutters on the way out, Zs rise.
-const BREATH = 54, LYARM_Y = -7 * P;
+const BREATH = 54, LYARM_Y = -12.5 * P;
 function asleep(a, frames, period = BREATH) {
   for (let c = 0; c * period < frames; c++) {
     const f = (t) => Math.min(frames, c * period + t * period);
     a.k("br", "scaleX", [[f(0), 1], [f(0.45), 0.985], [f(1), 1]]).k("br", "scaleY", [[f(0), 1], [f(0.45), 1.045], [f(1), 1]]);
     a.k("bob", "y", [[f(0), 0], [f(0.45), -3], [f(1), 0]]);
     a.s("bubble", [[f(0), 1], [f(0.45), 0.45], [f(1), 1]]); // in: it shrinks; out: it grows
-    a.k("lyBody", "scaleY", [[f(0), 1], [f(0.45), 1.09], [f(1), 1]]).k("lyArm", "y", [[f(0), LYARM_Y], [f(0.45), LYARM_Y - 2.2], [f(1), LYARM_Y]]);
+    a.k("lyBody", "scaleY", [[f(0), 1], [f(0.45), 1.06], [f(1), 1]]).k("lyArm", "y", [[f(0), LYARM_Y], [f(0.45), LYARM_Y - 2.6], [f(1), LYARM_Y]]);
     a.k("lyHead", "rotation", [[f(0), 0], [f(0.45), -0.05], [f(1), 0]]);
-    a.k("lyTache", "rotation", [[f(0), 0, "h"], [f(0.5), 0], [f(0.6), -0.3], [f(0.68), -0.08], [f(0.76), -0.3], [f(0.84), -0.1], [f(0.92), -0.24], [f(1), 0]]);
+    a.k("lysnoreL", "rotation", [[f(0), 0, "h"], [f(0.5), 0], [f(0.6), 0.3], [f(0.68), 0.08], [f(0.76), 0.3], [f(0.84), 0.1], [f(0.92), 0.24], [f(1), 0]]);
+    a.k("lysnoreR", "rotation", [[f(0), 0, "h"], [f(0.5), 0], [f(0.6), -0.3], [f(0.68), -0.08], [f(0.76), -0.3], [f(0.84), -0.1], [f(0.92), -0.24], [f(1), 0]]);
     a.k("snoreL", "rotation", [[f(0), 0, "h"], [f(0.5), 0], [f(0.6), 0.3], [f(0.68), 0.08], [f(0.76), 0.3], [f(0.84), 0.1], [f(0.92), 0.24], [f(1), 0]]);
     a.k("snoreR", "rotation", [[f(0), 0, "h"], [f(0.5), 0], [f(0.6), -0.3], [f(0.68), -0.08], [f(0.76), -0.3], [f(0.84), -0.1], [f(0.92), -0.24], [f(1), 0]]);
   }
@@ -422,7 +415,7 @@ const A1 = new Anim("Roll in", 54);
   a.k("armL", "rotation", [[0, -0.9, "h"], [28, -0.9, "o"], [34, -0.5, "io"], [42, -0.9]]).k("armR", "rotation", [[0, 0.9, "h"], [28, 0.9, "o"], [34, 1.5, "io"], [44, 0.2, "io"], [54, 0.1]]);
   a.k("footL", "rotation", [[0, 0.25, "h"], [28, 0.25, "o"], [34, -0.4, "io"], [42, 0.3, "io"], [50, 0.2]]).k("footR", "rotation", [[0, -0.25, "h"], [28, -0.25, "o"], [35, -0.7, "io"], [43, 0.1, "io"], [51, -0.2]]);
   a.k("lyFeet", "rotation", [[0, 0, "h"], [27, 0, "o"], [33, 0.5, "io"], [40, -0.2, "io"], [47, 0.08, "io"], [53, 0]]);
-  a.k("lyHelm", "x", [[0, 0, "h"], [27, 0, "o"], [32, 4, "io"], [41, 1.5]]);
+  a.k("lyhelm", "y", [[0, 0, "h"], [27, 0, "o"], [32, 4, "io"], [41, 1.5]]);
   a.k("lyBody", "scaleX", [[0, 1, "h"], [26, 1, "o"], [32, 0.93, "io"], [38, 1.04, "io"], [45, 1]]);
   a.k("lyArm", "rotation", [[0, 0, "h"], [27, 0, "o"], [33, -0.5, "io"], [41, 0.12, "io"], [48, 0]]);
   // Sparks off the locked wheels.
@@ -448,14 +441,14 @@ const A2 = new Anim("Pour", 60);
   a.k("head", "rotation", [[0, 0.03], [60, 0.14]]);
   a.k("armL", "rotation", [[0, -0.9, "h"]]).k("armR", "rotation", [[0, 0.1], [60, -0.2]]);
   a.k("footL", "rotation", [[0, 0.2, "h"]]).k("footR", "rotation", [[0, -0.2, "h"]]);
-  a.k("lyFeet", "rotation", [[0, 0, "h"]]).k("lyHelm", "x", [[0, 1.5, "h"]]).k("lyBody", "scaleX", [[0, 1, "h"]]).k("lyArm", "rotation", [[0, 0], [60, 0.25]]);
+  a.k("lyFeet", "rotation", [[0, 0, "h"]]).k("lyhelm", "y", [[0, 1.5, "h"]]).k("lyBody", "scaleX", [[0, 1, "h"]]).k("lyArm", "rotation", [[0, 0], [60, 0.25]]);
 }
 
 // 3. The stones drop while he slides the rest of the way, faster and faster, off the lip. The bucket falls back,
 // the cart backs out, and he stays where he was, asleep on nothing (1.8 s).
 const A3 = new Anim("Left hanging", 108);
 const OFF = 30; // the frame he leaves the lip
-const FLOAT = 36;
+const FLOAT = 14; // Tyler: he should not go up much before he drops into his spot
 {
   const a = A3, t = CART.tip, X = CART.stopX, B = OFF - 2;
   a.k("seatSlide", "strength", [[0, CREEP, [0.7, 0, 1, 0.6]], [OFF, 1, "h"]]);
@@ -486,7 +479,7 @@ const FLOAT = 36;
   a.k("lying", "rotation", [[0, Math.PI / 2, "h"], [o + 24, Math.PI / 2, "io"], [o + 44, flat - 0.1, "io"], [o + 54, flat + 0.04, "io"], [o + 62, flat]]);
   a.k("lyArm", "rotation", [[0, 0.25, "in"], [o, 1.0, "io"], [o + 10, -0.3, "io"], [o + 20, 0.5, "io"], [o + 32, 0.9, "io"], [o + 44, 1.15, "io"], [o + 56, 1.05]]);
   a.k("lyFeet", "rotation", [[0, 0, "h"], [o - 10, 0, "in"], [o, 0.45, "io"], [o + 9, -0.4, "io"], [o + 19, 0.2, "io"], [o + 29, -0.08, "io"], [o + 39, 0]]);
-  a.k("lyHelm", "x", [[0, 1.5, "h"], [o, 1.5, "o"], [o + 6, -3, "io"], [o + 14, 1, "io"], [o + 22, 0]]);
+  a.k("lyhelm", "y", [[0, 1.5, "h"], [o, 1.5, "o"], [o + 6, -3, "io"], [o + 14, 1, "io"], [o + 22, 0]]);
   a.k("lyBody", "scaleX", [[0, 1, "h"], [o, 1, "o"], [o + 5, 1.06, "io"], [o + 11, 0.97, "io"], [o + 17, 1.02, "io"], [o + 23, 1]]);
   for (let j = 0; j < MAX_STONES; j++) {
     const L = 2 + j * 5, T = 27, h = 58;
@@ -501,7 +494,7 @@ const FLOAT = 36;
 
 // 4. The bubble pops. Eyes wide. He scrambles on nothing, stops, looks down, looks at us, and drops into his
 // hole, helmet last. Then up he pops as if nothing happened.
-const RISE = 22, T_DROP = 58;
+const RISE = 8, T_DROP = 58;
 const FEET = (12.8 + 2 - ORIGIN_Y) * P; // his soles, below his root
 const fallFrames = (d) => Math.sqrt((2 * d) / G) * 60;
 const T_KNOCK = Math.round(T_DROP + fallFrames(FLOOR - FEET - (HANG[1] - FLOAT - RISE)));
@@ -568,7 +561,7 @@ const A4 = new Anim("Wake and dive", T_POP + 117);
   a.k("mole", "x", [[U, rx, "h"]]).k("mole", "rotation", [[U, 0, "h"]]).k("mole", "y", [[U, ry + 78, "h"]]);
   a.k("helm", "y", [[U, 4, "h"]]).k("helm", "rotation", [[U, 0.1, "h"]]);
   // The empty beat (0.3 s), then up he pops: wide-eyed, helmet late and askew.
-  a.k("mole", "y", [[T_POP, ry + 78, [0.1, 0.75, 0.3, 1]], [T_POP + 6, ry - 13, "io"], [T_POP + 13, ry + 3.5, "io"], [T_POP + 19, ry - 1, "io"], [T_POP + 24, ry]]);
+  a.k("mole", "y", [[T_POP, ry + 78, [0.1, 0.75, 0.3, 1]], [T_POP + 6, ry - 5, "io"], [T_POP + 13, ry + 2, "io"], [T_POP + 19, ry - 0.5, "io"], [T_POP + 24, ry]]);
   a.k("sq", "scaleY", [[U, 1.16, "h"], [T_POP + 5, 1.16, "io"], [T_POP + 12, 0.92, "io"], [T_POP + 18, 1.03, "io"], [T_POP + 24, 1]]).k("sq", "scaleX", [[U, 0.9, "h"], [T_POP + 5, 0.9, "io"], [T_POP + 12, 1.06, "io"], [T_POP + 18, 0.98, "io"], [T_POP + 24, 1]]);
   a.k("pawL", "rotation", [[U, 0.5, "h"], [T_POP + 7, 0.5, "io"], [T_POP + 14, -0.14, "io"], [T_POP + 20, 0.04, "io"], [T_POP + 25, 0]]).k("pawR", "rotation", [[U, -0.5, "h"], [T_POP + 8, -0.5, "io"], [T_POP + 15, 0.14, "io"], [T_POP + 21, -0.04, "io"], [T_POP + 26, 0]]);
   a.k("lobeL", "rotation", [[T_POP + 5, 0, "o"], [T_POP + 9, -0.35, "io"], [T_POP + 16, 0.2, "io"], [T_POP + 23, -0.06, "io"], [T_POP + 29, 0]]).k("lobeR", "rotation", [[T_POP + 5, 0, "o"], [T_POP + 9, 0.35, "io"], [T_POP + 16, -0.2, "io"], [T_POP + 23, 0.06, "io"], [T_POP + 29, 0]]);
