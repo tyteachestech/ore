@@ -11029,6 +11029,34 @@ journey("phone: ⌘Z on a rating after leaving Review puts Today's minutes back 
   await until("Today takes the undone rating back", async () => (await ring.getAttribute("aria-label")) === before, 5000);
 }, "phone");
 
+journey("phone: a source added on the phone and a new skill each take ⌘Z (F160)", async (page) => {
+  const words = "Spacing out practice sessions makes what is learned last longer than cramming it into one sitting. ".repeat(12);
+  const article = `<html><head><title>Spacing on the phone</title></head><body><article><h1>Spacing on the phone</h1>${`<p>${words}</p>`.repeat(3)}</article></body></html>`;
+  await page.route("https://example.com/articles/spacing-phone", (r) => r.fulfill({ status: 200, contentType: "text/html; charset=utf-8", headers: { "access-control-allow-origin": "*" }, body: article }));
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input.field").fill("https://example.com/articles/spacing-phone");
+  await tap(page, page.locator(".add-link button"));
+  const added = page.locator(".toast").filter({ hasText: "Added “Spacing on the phone”" });
+  await added.waitFor();
+  if (!(await added.locator(".toast-undo").count())) throw new Error("the Added toast has no Undo");
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast").filter({ hasText: "Undone: Added “Spacing on the phone”" }).waitFor();
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await page.locator(".phone-sources").waitFor();
+  await until("Undo takes the source out of Sources", async () => !(await page.locator(".phone-sources").getByText("Spacing on the phone").count()));
+  const name = `Phone skill ${Date.now()}`;
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "New skill" }));
+  await page.getByRole("textbox", { name: "New skill name" }).fill(name);
+  await page.keyboard.press("Enter");
+  await page.locator(".phone-skill").getByText(name).first().waitFor();
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast").filter({ hasText: `Undone: Created skill ${name}` }).waitFor();
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await until("Undo takes the skill out of the drawer", async () => !(await page.locator(".phone-drawer").getByText(name).count()));
+}, "phone");
+
 journey("phone: the last rating of a review shows the end screen, not Wrapping up", async (page) => {
   // The phone's `ore` runs in the page, so a rating saves inside the tap's own event: the queue emptied while
   // Review was still busy, and the end screen waited for a tap on Close.

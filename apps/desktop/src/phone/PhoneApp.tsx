@@ -21,7 +21,7 @@ import { PixelBook, PixelNote } from "../PixelIcon";
 import type { LinkTarget, NoteEditorHandle } from "../editor/NoteEditor";
 import { holdMenu, WithMenu, type MenuAction } from "../Menu";
 import { Palette } from "../Palette";
-import { SkillEditor, skillGroups } from "../Skills";
+import { SkillEditor, skillGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
 import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, shareOpen, shareSkills, type Item, type Skill, touched } from "../ore";
@@ -553,7 +553,12 @@ export function PhoneApp() {
       setReading(true);
       const r = await ore<{ added: { id: string; inbox: string; title: string; kept: boolean }[]; failed: { url: string; error: string }[] }>("inbox", "--import", "--owe");
       for (const a of r.added) came.current.set(a.inbox, a.id);
-      for (const a of r.added) notify(a.kept ? `Already here: “${a.title}”` : `Added “${a.title}”`, "info");
+      // A new one is a step, as on the Mac: Undo archives it (F160).
+      const archive = (id: string, on: boolean) => () => ore("archive", id, ...(on ? [] : ["--undo"])).finally(() => void refresh());
+      for (const a of r.added) {
+        if (a.kept) notify(`Already here: “${a.title}”`, "info");
+        else notify(`Added “${a.title}”`, "info", archive(a.id, true), archive(a.id, false));
+      }
       for (const f of r.failed) {
         const mac = macOnly(f.error);
         notify(mac ?? `Couldn’t read ${f.url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0]} here. Your Mac will try it.`, mac ? "info" : "error");
@@ -1018,8 +1023,10 @@ export function PhoneApp() {
                 setSkill(made.id);
                 setDrawer(false);
               });
-              if (!made) newSkillRef.current?.focus({ preventScroll: true });
-              if (made) void refresh();
+              if (!made) return newSkillRef.current?.focus({ preventScroll: true });
+              // On the history, as on the Mac: Undo deletes it (F160).
+              skillMade(made, notify, () => void refresh(), (id) => setSkill((k) => (k === id ? null : k)));
+              void refresh();
             }} />
           ) : (
             <button ref={newSkillRef} className="phone-drawer-quiet" onClick={() => setNaming(true)}>
