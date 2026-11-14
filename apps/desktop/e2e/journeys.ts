@@ -11774,7 +11774,7 @@ function noteFeed() {
   return { title, server, url: `http://localhost:${server.port}/feed.xml` };
 }
 
-journey("feed: leaving and reopening waits for the pending note (F-new-feed-close-before-note-save)", async (page) => {
+journey("feed: leaving and reopening waits for the pending note (F128)", async (page) => {
   const feed = noteFeed();
   try {
     await ore("feed", "follow", feed.url, "--skill=teaching");
@@ -11814,7 +11814,7 @@ journey("feed: leaving and reopening waits for the pending note (F-new-feed-clos
   }
 });
 
-journey("feed: a note keeps the reader and skill list current (F-new-feed-note-kept-stale)", async (page) => {
+journey("feed: a note keeps the reader and skill list current (F129)", async (page) => {
   const feed = noteFeed();
   try {
     await ore("feed", "follow", feed.url, "--skill=teaching");
@@ -11832,7 +11832,7 @@ journey("feed: a note keeps the reader and skill list current (F-new-feed-note-k
   }
 });
 
-journey("settings: rapid choices save in order across reopening (F-new-settings-write-order)", async (page) => {
+journey("settings: rapid choices save in order across reopening (F130)", async (page) => {
   await ore("goal", "--minutes=10");
   await page.keyboard.press("Meta+,");
   const panel = page.getByRole("dialog", { name: "Settings" });
@@ -11862,7 +11862,7 @@ journey("settings: rapid choices save in order across reopening (F-new-settings-
   await until("the final choice is saved", async () => (await ore("settings") as { review: { goal_minutes: number } }).review.goal_minutes === 10);
 });
 
-journey("skill rename: pending Undo preserves the preceding source (F-new-skill-rename-pending-undo)", async (page) => {
+journey("skill rename: pending Undo preserves the preceding source (F131)", async (page) => {
   const name = `Rename trial ${Date.now()}`;
   const skill = await ore("skills", "add", name) as { id: string };
   const title = `Source before rename ${Date.now()}`;
@@ -11896,7 +11896,7 @@ journey("skill rename: pending Undo preserves the preceding source (F-new-skill-
   }
 });
 
-journey("quick quiz: clicking the recorder takes keyboard focus in WebKit (F-new-quick-quiz-recorder-focus)", async (page) => {
+journey("quick quiz: clicking the recorder takes keyboard focus in WebKit (F132)", async (page) => {
   await page.keyboard.press("Meta+,");
   const panel = page.getByRole("dialog", { name: "Settings" });
   await panel.getByRole("tab", { name: "Review", exact: true }).click();
@@ -11913,7 +11913,7 @@ journey("quick quiz: clicking the recorder takes keyboard focus in WebKit (F-new
   await until("the shortcut survives reopening", async () => (await recorder.innerText()) === "⌃⌥W");
 }, "webkit");
 
-journey("feed: a failed departing note keeps its preview for retry (F-new-feed-close-before-note-save)", async (page) => {
+journey("feed: a failed departing note keeps its preview for retry (F128)", async (page) => {
   const feed = noteFeed();
   try {
     await ore("feed", "follow", feed.url);
@@ -11943,7 +11943,7 @@ journey("feed: a failed departing note keeps its preview for retry (F-new-feed-c
   }
 });
 
-journey("notes: closing a pane and remounting a skill keep pending words (F-new-feed-close-before-note-save)", async (page) => {
+journey("notes: closing a pane and remounting a skill keep pending words (F128)", async (page) => {
   await openSource(page, AGENTS);
   const editor = page.getByRole("textbox", { name: "Source note", exact: true });
   await editor.fill("Words written just before closing the note pane.");
@@ -11972,7 +11972,7 @@ journey("notes: closing a pane and remounting a skill keep pending words (F-new-
   }
 });
 
-journey("settings: a failed older choice does not roll back the latest choice (F-new-settings-write-order)", async (page) => {
+journey("settings: a failed older choice does not roll back the latest choice (F130)", async (page) => {
   await ore("goal", "--minutes=10", "--new-per-day=10");
   await page.keyboard.press("Meta+,");
   const panel = page.getByRole("dialog", { name: "Settings" });
