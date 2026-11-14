@@ -9,12 +9,15 @@ import { listCards, listItems, localDay, readAnnotations, today } from "../../..
 // here, so a change to scheduling or to the seed can't quietly leave a session that cuts no gem.
 // Seeded at each of these times of his day: just after midnight the morning's reviews once fell on yesterday,
 // and the day stood at 0 minutes (F104).
+// `bun test` runs in UTC whatever the machine's zone, without saying so in the environment: the seed is a new
+// process, so it is told the test's zone, or on a Mac in Pacific time its midnight is not the test's (F104).
+const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const clock = (h: number, m: number) => { const d = new Date(); d.setHours(h, m, 0, 0); return d; };
 for (const [name, now] of [["midday", clock(12, 30)], ["just after midnight", clock(0, 4)], ["just before midnight", clock(23, 58)]] as const)
 test(`the demo library is set up to film, seeded ${name}: the day nearly done, gems to cut, a level within reach`, async () => {
   const root = join(mkdtempSync(join(tmpdir(), "ore-demo-")), "lib");
   try {
-    await $`bun ${join(import.meta.dir, "../scripts/mock/seed-demo.ts")} ${root}`.env({ ...process.env, ORE_SEED_NOW: now.toISOString() }).quiet();
+    await $`bun ${join(import.meta.dir, "../scripts/mock/seed-demo.ts")} ${root}`.env({ ...process.env, ORE_SEED_NOW: now.toISOString(), TZ: zone }).quiet();
     const lib = { root };
     // It never writes over a library.
     expect((await $`bun ${join(import.meta.dir, "../scripts/mock/seed-demo.ts")} ${root}`.quiet().nothrow()).exitCode).not.toBe(0);
