@@ -5,6 +5,8 @@
 //   pixel icon      a 16-grid dot sprite (icons.tsx, PixelIcon.tsx, skill icons) drawn at a size other than 20 or 40px (16 in a chip), so
 //                   it is off the sizes the set is tuned at, or cut by a parent that hides overflow, so it reads as clipped,
 //                   or bigger than the button it sits in, so it sits off the button's centre (F20)
+//   icon bleed      a masked skill icon in the rounded corner of a parent that hides overflow: WebKit (the Mac app) lets
+//                   the icon's unmasked colour through along the corner's soft edge, a hairline arc beside the icon (F-new-icon-bleed)
 // Run against the mock (scripts/mock/README.md): bun apps/desktop/scripts/mock/style-check.ts [http://localhost:1420/]
 // `bun run e2e` runs it too, on its own mock (ORE_BRIDGE names that mock's bridge port).
 import { chromium, type Page } from "playwright";
@@ -60,6 +62,13 @@ async function audit(page: Page, screen: string) {
         const s = getComputedStyle(up);
         if (s.overflowX === "visible" && s.overflowY === "visible" && s.clipPath === "none") continue;
         const u = up.getBoundingClientRect();
+        if (el.matches(".skill-icon.glyph")) {
+          const corners = [["TopLeft", u.left, u.top], ["TopRight", u.right, u.top], ["BottomLeft", u.left, u.bottom], ["BottomRight", u.right, u.bottom]] as const;
+          for (const [side, x, y] of corners) {
+            const rad = parseFloat(s.getPropertyValue(`border-${side.replace(/[A-Z]/g, (c, i) => (i ? "-" : "") + c.toLowerCase())}-radius`)) || 0;
+            if (rad && r.left < x + rad && r.right > x - rad && r.top < y + rad && r.bottom > y - rad) { out.push(`icon bleed: ${name(el)} in the rounded corner of ${name(up)}, which hides overflow`); break; }
+          }
+        }
         if (u.width && (r.left < u.left - 0.5 || r.right > u.right + 0.5 || r.top < u.top - 0.5 || r.bottom > u.bottom + 0.5)) {
           // A scrolled-away icon is hidden, not clipped.
           if (r.bottom > u.top && r.top < u.bottom && r.right > u.left && r.left < u.right) out.push(`pixel icon: ${name(el)} cut by ${name(up)}`);
