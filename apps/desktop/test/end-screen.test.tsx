@@ -348,7 +348,7 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
 test("a rare line leads the mole's lines and wears its own mark (D247)", async () => {
   jest.useFakeTimers();
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
-  // The row under the ring shows the two pulled back, so the rare thing left for him to say is the long gap (F129).
+  // The row under the ring shows the two pulled back, so the rare thing left for him to say is the long gap (F-new-r7x129).
   Object.assign(e.session, { depth_days: 41, rescued: 2, longest_days: 18 });
   const s = await mount(e as never);
   await act(async () => void jest.advanceTimersByTime(560));
@@ -534,7 +534,7 @@ test("D258: then-and-now gets the curious pose on the mounted end screen, withou
   await s.done();
 });
 
-// F129
+// F-new-r7x129
 test("on the full end screen the mole never says a number the row under the ring already shows", async () => {
   const { endSays, endTiles } = await import("../src/end-says");
   const base = { today: today(true, 600_000) as never, closed: false, short: false, ups: [], minutesLeft: null, row: true };
@@ -552,7 +552,7 @@ test("on the full end screen the mole never says a number the row under the ring
   expect(endSays({ ...base, session: session({ longest_days: 18, then_now: { then_ts: new Date(Date.now() - 28 * 864e5).toISOString() } }) })[0]!.rare?.kind).toBe("then");
 });
 
-// F125
+// F-new-r7x125
 test("the memory line ends by saying in words when the next review falls for the rating in hand", async () => {
   const { Timeline } = await import("../src/Timeline");
   const at = (days: number) => new Date(Date.now() + days * 864e5 + 6e4).toISOString();

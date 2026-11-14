@@ -400,12 +400,12 @@ journey("reader width: a recording's transcript keeps about the column an articl
   if (transcript < article - 20) throw new Error(`transcript column ${transcript}px, article ${article}px at the same window`);
 });
 
-// F120
+// F-new-r7x120
 journey("highlight popup: on a recording, where Play takes a second column of tools, each type's name stays on one line", async (page) => {
   await openSource(page, "Lecture 4");
   await page.locator(".page.video").waitFor();
   await select(page, "testing yourself");
-  // F121: a recording has no video, so its Play says only "Play from here".
+  // F-new-r7x121: a recording has no video, so its Play says only "Play from here".
   await page.locator(".popup .popup-tools").getByRole("button", { name: "Play from here", exact: true }).waitFor();
   const tall = await page.locator(".popup .intents .intent").evaluateAll((els) =>
     els
@@ -8806,7 +8806,7 @@ journey("review: a card that fails to load offers Try again, focused, which load
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-// F127
+// F-new-r7x127
 journey("⌘K opens without the ambience channels; typing one's name finds it (D254)", async (page) => {
   await page.keyboard.press("Meta+KeyK");
   const rows = page.locator("[cmdk-item]");
@@ -8838,7 +8838,7 @@ journey("review: once an Explain exercise is checked, the key bar names the sugg
     await until("the key bar says ↵ Hard", async () => /↵\s*Hard/.test(await keys.innerText())).catch(async () => {
       throw new Error(`the key bar reads: ${await keys.innerText()}`);
     });
-    // F125: Retire is a tool under the ratings like Ask, Edit and Later, so the bar names its key too.
+    // F-new-r7x125: Retire is a tool under the ratings like Ask, Edit and Later, so the bar names its key too.
     if (!/⇧⌘⌫\s*Retire/.test(await keys.innerText())) throw new Error(`the key bar doesn't name Retire: ${await keys.innerText()}`);
   } finally {
     await page.unroute(/\/ore$/);
@@ -10190,7 +10190,7 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
   if (small.length) throw new Error(`taps under 44 pt on the skill page: ${small.join(", ")}`);
 }, "phone");
 
-journey("phone: in Review the buttons he taps on every exercise sit at the foot of the screen, and what the last answer won stands above them (F128)", async (page) => {
+journey("phone: in Review the buttons he taps on every exercise sit at the foot of the screen, and what the last answer won stands above them (F-new-r7x128)", async (page) => {
   // How sure he is, then the ratings, sat mid-screen with the bottom 40% empty: a reach for one thumb.
   await tap(page, page.getByRole("button", { name: "Start review" }).first());
   await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
@@ -10225,7 +10225,7 @@ journey("phone: in Review the buttons he taps on every exercise sit at the foot 
   if (!seen) throw new Error("no exercise answered in his head came up");
 }, "phone");
 
-journey("phone: a long question on a skill page takes two lines before it cuts (F130)", async (page) => {
+journey("phone: a long question on a skill page takes two lines before it cuts (F-new-r7x130)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
   const note = page.locator(".phone-skill .question-quote .note").first();
