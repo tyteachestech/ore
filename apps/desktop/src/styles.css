@@ -1541,6 +1541,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .gem-ring[data-finishes] > .dot-ring { filter: drop-shadow(0 0 3px var(--skill, var(--accent))); }
 .gem-ring-lv { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); padding: 0 6px; height: 16px; line-height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); font-family: var(--round); font-size: 10px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .strength-side { display: flex; flex-direction: column; gap: 4px; }
+.strength-line { display: none; }
 .near-goal { display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-family: var(--mono); font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .near-goal > span { display: inline-flex; align-items: center; gap: 5px; color: var(--faint); font-size: 12px; }
 .hero-strength:is(:hover, [aria-expanded="true"]) .near-goal > span:not(.near-glow) { color: var(--muted); }
@@ -2976,7 +2977,15 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-skill { padding: 8px 20px 40px; }
 .phone .phone-skill .skill-page { display: block; overflow: visible; }
 .phone .phone-skill .skill-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; padding: 4px 0 20px; }
-.phone .phone-skill .skill-hero .hero-strength { grid-column: 2; margin: -4px 0 0 -12px; }
+/* The rocks in the order they grow, a dotted path between, ending in the level ring and the cut count (D272). */
+.phone .phone-skill .skill-hero .hero-strength { grid-column: 2; margin: -14px -12px -10px -12px; min-height: 44px; }
+.phone .phone-skill .hero-strength > :is(.gem-ring, .strength-side) { display: none; }
+.phone .phone-skill .strength-line { flex: 1; min-width: 0; display: flex; align-items: center; color: var(--muted); font-family: var(--mono); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.phone .phone-skill .strength-step { flex: 1; display: flex; align-items: center; gap: 5px; }
+.phone .phone-skill .strength-step::after { content: ""; flex: 1; min-width: 8px; height: 2px; margin: 0 8px; background: radial-gradient(circle, var(--faint) 1px, transparent 1.2px) 0 0 / 7px 2px repeat-x; opacity: 0.7; }
+.phone .phone-skill .strength-end { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 17px; font-weight: 600; }
+.phone .phone-skill .strength-lv { margin-left: 8px; font-size: 11px; }
+.phone .phone-skill .skill-name-row .skill-importance { margin-left: auto; }
 .phone .phone-skill .skill-goal span { white-space: normal; }
 .phone .phone-skill .skill-col { padding-inline: 0; margin-inline: 0; }
 .phone .phone-skill .skill-cols.one { display: flex; flex-direction: column; gap: 24px; padding: 0; }

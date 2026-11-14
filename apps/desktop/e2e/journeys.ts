@@ -4633,6 +4633,7 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   const tabY = async () => (await tabs.getByRole("tab", { name: "To read" }).boundingBox())!.y;
   const y0 = await tabY();
   await page.locator(".hero-strength").waitFor();
+  if (await page.locator(".hero-strength .strength-line").isVisible()) throw new Error("the iPhone's rock line shows on the Mac's skill page");
   if ((await tabY()) !== y0) throw new Error(`the tabs moved from ${y0} to ${await tabY()} when the header's gems loaded`);
   await tabs.getByRole("tab", { name: "Done" }).hover();
   await page.getByRole("tooltip").filter({ hasText: "Done" }).waitFor();
@@ -10269,6 +10270,28 @@ journey("phone: in Review the buttons he taps on every exercise sit at the foot 
     await tap(page, good);
   }
   if (!seen) throw new Error("no exercise answered in his head came up");
+}, "phone");
+
+journey("phone: a skill's header is one line of its rocks in the order they grow, ending in the level ring and the cut count (F141)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
+  const line = page.locator(".phone-skill .strength-line");
+  await line.waitFor();
+  const got = await line.evaluate((el) => {
+    const x = (q: string) => [...el.querySelectorAll(q)].map((e) => Math.round(e.getBoundingClientRect().left));
+    const kinds = [...el.querySelectorAll(".strength-step svg.gem")].map((g) => (g as HTMLElement).dataset.kind);
+    const shown = (q: string) => !!el.closest(".hero-strength")!.querySelector<HTMLElement>(q)?.offsetWidth;
+    return { kinds, xs: [...x(".strength-step"), ...x(".strength-end .gem-ring"), ...x(".strength-lv")], rows: new Set([...el.children].map((c) => Math.round(c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2))).size, big: shown(":scope > .gem-ring") || shown(".strength-side"), end: el.querySelector(".strength-end")!.textContent, wide: document.documentElement.scrollWidth };
+  });
+  const order = ["rough", "dull", "ready"];
+  if (!got.kinds.length || got.kinds.some((k, i) => order.indexOf(k!) < 0 || (i > 0 && order.indexOf(k!) <= order.indexOf(got.kinds[i - 1]!)))) throw new Error(`the rocks read ${got.kinds.join()}, not in the order rough, missed, nearly cut`);
+  if (got.xs.join() !== [...got.xs].sort((a, b) => a - b).join()) throw new Error(`the line is out of order: ${got.xs.join()}`);
+  if (got.rows !== 1) throw new Error("the rock line wraps or its parts sit off one midline");
+  if (got.big) throw new Error("the Mac's big ring or count still shows under the line");
+  if (!/^\d+$/.test(got.end ?? "")) throw new Error(`the line ends in "${got.end}", not the cut count`);
+  if (got.wide > 390) throw new Error(`the page scrolls sideways: ${got.wide}`);
+  const note = (await page.locator(".phone-skill .phone-note-row").boundingBox())!.y;
+  if (note > 190) throw new Error(`Your note starts at ${Math.round(note)} pt: the header takes too much room`);
 }, "phone");
 
 journey("phone: a long question on a skill page takes two lines before it cuts (F139)", async (page) => {
