@@ -786,7 +786,7 @@ export function App() {
     previews.current.delete(left);
     settleNote(left).then((saved) => saved ? ore<{ result: string }>("feed", "close", left) : null).then(
       (r) => {
-        if (!r) return; // A failed note keeps its preview and recoverable draft.
+        if (!r) { previews.current.set(left, title); return; } // A failed note keeps its preview and draft, and leaving again retries.
         if (r.result === "kept") {
           notify(`Kept “${title}” in your library`);
           void refresh();

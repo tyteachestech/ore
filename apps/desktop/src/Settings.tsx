@@ -45,6 +45,8 @@ const clock = (t: string) => new Date(`2000-01-01T${t}:00`).toLocaleTimeString(u
 // Settings share one file and native side effects. Keep their order even when the panel
 // closes and opens again; a failed write must not stop the choices queued behind it.
 let settingsWrites: Promise<unknown> = Promise.resolve();
+/** A queued write failed since the form last matched the file, so the next one to land reads it back. */
+let settingsFailed = false;
 function queueSettings<T>(run: () => Promise<T>): Promise<T> {
   const next = settingsWrites.then(run, run);
   settingsWrites = next.catch(() => {});
@@ -134,6 +136,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
       try {
         await run();
       } catch (e) {
+        settingsFailed = true;
         // An older failure must not roll back a newer choice. If this is still the newest,
         // read what actually saved: another queued choice may itself have failed.
         if (dataRef.current === next) {
@@ -146,7 +149,8 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
       }
       // Once the latest choice lands, reconcile the whole form. Its optimistic copy may
       // still include another field whose earlier write failed. Never overwrite a newer edit.
-      if (dataRef.current === next) {
+      if (settingsFailed && dataRef.current === next) {
+        settingsFailed = false;
         const saved = await ore<Data>("settings").catch(() => null);
         if (saved && dataRef.current === next) { setData(saved); dataRef.current = saved; }
       }

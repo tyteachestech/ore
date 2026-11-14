@@ -242,17 +242,19 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
     // Reserve this action before waiting: Undo must never take the preceding import instead.
     // Replays run in order behind the original write, including a quick Undo then Redo.
     const to = (name: string) => () => {
-      const next = chain.then(() => landed ? ore("skills", "set", skill.id, opt("name", name)).then(onRenamed) : undefined);
+      const next = chain.then(() => landed ? ore("skills", "set", skill.id, opt("name", name)).then(onRenamed) : Promise.reject(new Error("The rename didn’t save, so there is nothing to undo")));
       chain = next.catch(() => {});
       return next;
     };
-    const forget = notify(`Renamed “${skill.name}” to “${v}”`, "info", to(skill.name), to(v));
+    // One slot: a failed write's error takes the place of this toast.
+    const slot = `rename-${skill.id}`;
+    const forget = notify(`Renamed “${skill.name}” to “${v}”`, "info", to(skill.name), to(v), undefined, undefined, slot);
     try {
       await write;
       return close();
     } catch (e) {
       forget();
-      notify(errorText(e), "error");
+      notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot);
       return false;
     } finally {
       setSaving((busy.current = false));

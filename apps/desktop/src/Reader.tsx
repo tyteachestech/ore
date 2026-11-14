@@ -732,10 +732,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const margin = useRef<MarginHandle | null>(null);
   const notesField = useRef<NoteEditorHandle>(null);
   const sideBody = useRef<HTMLDivElement>(null);
-  const notes = useSourceNote(p.id, p.notify, () => {
+  /** A Feed post became a source: a highlight or a note kept it. */
+  const markKept = () => {
     setDoc((cur) => cur && { ...cur, preview: undefined, captured_at: new Date().toISOString() });
     p.onChanged();
-  });
+  };
+  const notes = useSourceNote(p.id, p.notify, markKept);
   // D34.4: the finish step hides the text, highlights, notes and the source note.
   const closedBook = p.finishing;
   // The quiz panel blurs the source until an attempt is checked, then steps through passages (D52, D55).
@@ -1123,9 +1125,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const waiting = !!doc && !doc.preview && !doc.enriched_at && !doc.prequestions?.length && !gaveUp;
   /** His first highlight kept a Feed post: it is a source now, and its prequestions are on the way. */
   const keptFromFeed = (ann: Annotation) => {
-    if (!ann.kept_from_feed) return;
-    setDoc((cur) => cur && { ...cur, preview: undefined, captured_at: new Date().toISOString() });
-    p.onChanged();
+    if (ann.kept_from_feed) markKept();
   };
   useEffect(() => {
     if (!waiting) return;
