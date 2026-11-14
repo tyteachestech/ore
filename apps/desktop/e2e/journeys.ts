@@ -7277,7 +7277,7 @@ journey("review: a card's passage reads as the page shows it, without its Markdo
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-for (const ratedBefore of [false, true]) journey(`review: a Tutor card with no passage still offers Open in source after the answer, and it opens that source; ${ratedBefore ? "earned end screen" : "no ratings"} (F106)`, async (page) => {
+for (const ratedBefore of [false, true]) journey(`review: a Tutor card with no passage still offers Open in source after the answer, and it opens that source; ${ratedBefore ? "earned end screen" : "no ratings"} (F107)`, async (page) => {
   const log = oreCalls(page);
   const donor = ((await ore("due")) as { id: string; kind: string; question: string }[]).find(x => x.kind === "card" && !x.question.includes("Story Spine"));
   if (ratedBefore && !donor) throw new Error("needs a due Fact exercise before the Tutor exercise");
