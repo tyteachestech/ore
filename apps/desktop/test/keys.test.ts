@@ -166,3 +166,19 @@ test("a saved shortcut the rules now refuse is dropped when the keymap loads", a
   expect(Object.keys(fresh.saved())).toEqual(["add"]);
   delete (globalThis as Record<string, unknown>).localStorage;
 });
+
+test("the shortcuts sheet lists no key for the main-point line, which D32 dropped", async () => {
+  const { FIXED } = await import("../src/keys");
+  expect(FIXED.map((f) => f.label).filter((l) => /main point/i.test(l))).toEqual([]);
+});
+
+test("the sheet lists the Go to keys in the order of their digits: Home ⌘0, To read ⌘1, Done ⌘2, Feed ⌘3", async () => {
+  const { BINDINGS } = await import("../src/keys");
+  expect(BINDINGS.filter((b) => /^Meta\+Digit\d$/.test(b.combo) && b.group === "General").map((b) => b.id)).toEqual(["home", "go-toread", "go-done", "go-feed"]);
+});
+
+test("New exercises a day offers the value in the library when it is off the list, so one is always shown picked", async () => {
+  const { newOptions } = await import("../src/Settings");
+  expect(newOptions(10)).toEqual([0, 5, 10, 20]);
+  expect(newOptions(4)).toEqual([0, 4, 5, 10, 20]);
+});

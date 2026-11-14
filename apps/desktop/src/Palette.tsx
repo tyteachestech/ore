@@ -11,7 +11,8 @@ import { useSwipeDown } from "./phone/sheet";
 import { errorText, useFocusWhileMounted } from "./util";
 import { Trap } from "./Trap";
 
-export type Action = { id: string; label: string; hint?: string; keywords?: string[]; run: () => void };
+/** `typed`: a row found only once he types (F136), so one of a set, like an ambience channel, never crowds the list ⌘K opens on. */
+export type Action = { id: string; label: string; hint?: string; keywords?: string[]; typed?: boolean; run: () => void };
 
 type Props = {
   actions: Action[];
@@ -214,7 +215,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
       group(
         "Actions",
         [
-          ...actions.map((a) => ({ value: a.label, label: a.label, keywords: a.keywords, extra: a.hint && <kbd>{a.hint}</kbd>, run: a.run })),
+          ...actions.filter((a) => query || !a.typed).map((a) => ({ value: a.label, label: a.label, keywords: a.keywords, extra: a.hint && <kbd>{a.hint}</kbd>, run: a.run })),
           { value: "New skill…", label: "New skill…", keywords: ["add skill", "create skill"], run: () => open({ kind: "skill", collection: current?.collection ?? "" }) },
           { value: "New collection…", label: "New collection…", keywords: ["section", "group", "folder", "create collection"], run: () => open({ kind: "collection" }) },
         ],
