@@ -15,7 +15,7 @@ import { archivedOnly, SkillChips, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
 import { Thumb } from "./Thumb";
 import { Roll } from "./Roll";
-import { errorText, load, typedLast, useKeptScroll, useLibraryChanges, type Notify } from "./util";
+import { count, errorText, load, typedLast, useKeptScroll, useLibraryChanges, type Notify } from "./util";
 import { focusQuietly } from "./focus-near";
 import { DndContext, useDraggable, useSensor, useSensors, type DragMoveEvent } from "@dnd-kit/core";
 import { RowSensor } from "./drag";
@@ -629,7 +629,7 @@ function Unreadable({ list }: { list: Today["unreadable"] }) {
 function Week({ week }: { week: Today["week"] }) {
   const now = day();
   return (
-    <div className="home-week" role="img" aria-label={`${week.filter((d) => d.status === "met").length} of ${week.filter((d) => d.status !== "off").length} days met this week`}>
+    <div className="home-week" role="img" aria-label={`${week.filter((d) => d.status === "met").length} of ${count(week.filter((d) => d.status !== "off").length, "day")} met this week`}>
       {week.map((d, i) => (
         <Hint key={d.date} text={`${new Date(`${d.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" })} · ${d.status === "off" ? "off" : `${minutes(d.active_ms)} min`}`}>
           <span className={`home-day ${d.status}${d.date === now ? " today" : ""}${d.date > now ? " later" : ""}`}>

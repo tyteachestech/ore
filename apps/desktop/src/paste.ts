@@ -89,8 +89,8 @@ export const entryName = (e: Entry) =>
  *  dropped twice, a link added before), so it never claims more than went in. */
 export function manyAdded(n: number, here: number): string {
   const added = n - here;
-  if (!here) return `Added ${n} sources`;
-  if (!added) return `All ${n} are already here`;
+  if (!here) return `Added ${n} source${n === 1 ? "" : "s"}`;
+  if (!added) return n === 1 ? "It is already here" : `All ${n} are already here`;
   return `Added ${added} source${added > 1 ? "s" : ""}; ${here} ${here > 1 ? "were" : "was"} already here`;
 }
 

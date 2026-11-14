@@ -57,6 +57,7 @@ describe("shortcut hints", () => {
 const ICON_ONLY_OK: Record<string, string> = {
   "Palette.tsx Close": "phone only (PHONE): a touch screen has no hover",
   "Reader.tsx Find in source": "phone only (PHONE): a touch screen has no hover",
+  "IconPicker.tsx label(icon)": "one of hundreds of cells in the icon grid; the filter field names them, and a tooltip each would cost the grid its speed",
   "phone/PhoneApp.tsx Open menu": "the phone app: a touch screen has no hover",
   "phone/PhoneApp.tsx Search": "the phone app: a touch screen has no hover",
   "phone/PhoneApp.tsx Add a link": "the phone app: a touch screen has no hover",
@@ -68,7 +69,6 @@ const ICON_ONLY_OK: Record<string, string> = {
   "editor/KeyboardBar.tsx Move down": "the phone's keyboard bar while a block moves (PHONE): a touch screen has no hover",
   "editor/KeyboardBar.tsx Done moving": "the phone's keyboard bar while a block moves (PHONE): a touch screen has no hover",
   "Video.tsx player.playing ? \"Pause\" : \"Play\"": "the video itself, clicked to play or pause as on YouTube; a hint would sit over the picture",
-  "IconPicker.tsx label(icon)": "one of hundreds of cells in the icon grid; the filter field names them, and a tooltip each would cost the grid its speed",
 };
 
 /** Index of the `>` that ends the tag opening at `i`, past braces and strings inside it. */
@@ -216,4 +216,20 @@ describe("dismiss buttons", () => {
     expect(() => dismissScan("x.tsx", `<button>Cancel`)).toThrow("no </button>");
     expect(() => dismissScan("x.tsx", `<button onClick={() => {}`)).toThrow("never closes");
   });
+});
+
+// A hover line comes from <Hint>, never the system's own `title=` (slow, unstyled, and no key). One that
+// stays is listed here with the reason.
+const TITLE_OK: Record<string, string> = {
+  "Video.tsx": "an iframe's title is its accessible name, not a hover line",
+  "IconPicker.tsx": "one of 205 cells in the icon grid (ICON_ONLY_OK above): a Hint each would cost the grid its speed",
+  "Reader.tsx": "a transcript's timestamps: one per paragraph, thousands in a long recording, too many to give a Hint each",
+};
+
+test("no control explains itself with a native title=", () => {
+  const dir = join(import.meta.dir, "../src");
+  const files = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(d, e.name)) : /\.tsx$/.test(e.name) ? [join(d, e.name)] : []));
+  const found = files(dir).filter((f) => /<[a-z][^>]*\stitle=/.test(readFileSync(f, "utf8"))).map((f) => relative(dir, f));
+  expect(found.filter((f) => !(f in TITLE_OK))).toEqual([]);
+  expect(Object.keys(TITLE_OK).filter((f) => !found.includes(f))).toEqual([]);
 });
