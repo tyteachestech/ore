@@ -58,6 +58,8 @@ import { Working } from "./Working";
 
 /** Background enrich gets this long after capture before the reader stops waiting for it. */
 const ENRICH_GIVE_UP_MS = 20 * 60_000;
+/** Enrichment runs he started with Try again, by source, so leaving and opening it again never starts a second. */
+const enriching = new Map<string, Promise<unknown>>();
 /** Listening speed, kept apart from a video's (D50): a voice and a speaker don't match at 1x. */
 const LISTEN_RATE = "ore.listen.rate";
 /** The chapter block's prompts (D115): shown on empty lines, never saved. */
@@ -722,7 +724,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const keys = useKeymap();
   const [tip, setTip] = useState<{ id: string; x: number; y: number; text: string } | null>(null);
   const [gaveUp, setGaveUp] = useState(false);
-  const [retrying, setRetrying] = useState(false);
+  const [retrying, setRetrying] = useState(() => enriching.has(p.id));
   /** The block live in the source note: a chapter's recall (D115) or the tutor's exercise (D128.6). */
   const [block, setBlock] = useState<ChapterEnd | Practice | null>(null);
   const scaffolded = useRef<ChapterEnd | Practice | null>(null);
@@ -1165,8 +1167,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   const retryEnrich = async () => {
     setRetrying(true);
+    const id = p.id;
+    // One run per source, whoever asked: a source left and opened again while it runs waits on the same one.
+    let run = enriching.get(id);
+    if (!run) enriching.set(id, (run = ore("enrich", id).finally(() => enriching.delete(id))));
     try {
-      await ore("enrich", p.id);
+      await run;
       const d = (await ore<Item[]>("ls")).find((i) => i.id === p.id);
       if (d) setDoc((cur) => cur && { ...cur, prequestions: d.prequestions, skills: d.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at, enrich_error: undefined, enrich_skipped: undefined });
       p.onChanged();
@@ -1176,6 +1182,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       setRetrying(false);
     }
   };
+
+  // Opened again while its Try again still runs: it shows the wait, then the result (F-new-enrich-reopen).
+  useEffect(() => void (enriching.has(p.id) && retryEnrich()), [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const notifyNow = useRef(p.notify);
   notifyNow.current = p.notify;

@@ -8406,6 +8406,36 @@ journey("finish: drafting that fails after Done stays in front of “Finished”
   await until("Try again drafts both", async () => drafted.length === 2);
 });
 
+journey("prequestions: a Try again still running when he leaves and opens the source again shows its wait, and never starts a second run (F-new-enrich-reopen)", async (page) => {
+  const title = `Prequestions retried ${Date.now()}`;
+  const fail = (on: Record<string, unknown>) => page.evaluate((on) => Object.assign(window as unknown as Record<string, unknown>, on), on);
+  await fail({ __ORE_FAIL: { enrich: "Codex isn’t installed." } });
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# ${title}\n\nA short page whose prequestions failed to be written the first time.`);
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("whose prequestions failed").waitFor();
+  await until("the import has settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+  // Past the 20 minutes enrichment gets: opened again, it says it couldn't.
+  await page.evaluate(() => { const real = Date.now; Date.now = () => real() + 21 * 60_000; });
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await openSource(page, title);
+  const retry = page.locator(".preq-retry");
+  await retry.waitFor();
+  const runs: string[] = [];
+  page.on("request", (r) => r.method() === "POST" && (r.postData() ?? "").includes('"args":["enrich"') && runs.push(r.postData()!));
+  await fail({ __ORE_FAIL: {}, __ORE_SLOW: { enrich: 4000 } });
+  await retry.click();
+  await until("the run started", async () => runs.length === 1);
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await openSource(page, title);
+  await page.waitForTimeout(500);
+  if (await page.getByText("Couldn’t write prequestions").count()) throw new Error("opened again mid-run, it says it couldn't write them");
+  if (await retry.count()) await retry.click();
+  await page.waitForTimeout(300);
+  if (runs.length !== 1) throw new Error(`${runs.length} enrich runs`);
+  await fail({ __ORE_SLOW: {} });
+});
+
 journey("undo that fails: the toast says why, and ⌘Z tries the same step again", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const row = page.locator(".row").filter({ hasText: AGENTS }).first();
