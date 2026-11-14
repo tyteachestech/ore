@@ -6774,6 +6774,52 @@ journey("review: a rating always moves the session one step on, and a miss adds 
   }
 });
 
+journey("Home: Done after meeting the goal keeps Continue reading still from its first paint (F125)", async (page) => {
+  const log = oreCalls(page);
+  const was = (await ore("today")) as { goal_minutes: number };
+  try {
+    await ore("goal", "--minutes", "1");
+    await page.reload();
+    await page.locator(".home-read").first().waitFor();
+    await startReview(page, null);
+    // Advance only the review's elapsed clock; the real CLI records the rating and computes Today.
+    await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 61_000; });
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await page.locator(".review-goal").waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator(".review-end").waitFor();
+    // Widen the real refresh window, without changing Today's reply.
+    await page.evaluate(() => {
+      const w = window as unknown as { __ORE_SLOW: Record<string, number>; homeFrames: number[]; stopHomeFrames: boolean };
+      w.__ORE_SLOW = { today: 500 };
+      w.homeFrames = [];
+      w.stopHomeFrames = false;
+      const frame = () => {
+        const row = document.querySelector(".home-read");
+        if (!document.querySelector(".review") && row) w.homeFrames.push(row.getBoundingClientRect().y);
+        if (!w.stopHomeFrames) requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
+    await page.locator(".review-foot").getByRole("button", { name: "Done", exact: true }).click();
+    await page.locator(".home-goal-text p").filter({ hasText: "Goal met" }).waitFor();
+    await page.waitForTimeout(250);
+    const frames = await page.evaluate(() => {
+      const w = window as unknown as { homeFrames: number[]; stopHomeFrames: boolean };
+      w.stopHomeFrames = true;
+      return w.homeFrames;
+    });
+    if (frames.length < 2) throw new Error("no first and settled Home paints measured");
+    console.log(`      Continue reading first=${frames[0]}, settled=${frames.at(-1)}, range=${Math.max(...frames) - Math.min(...frames)}px (${frames.length} frames)`);
+    if (Math.max(...frames) - Math.min(...frames) > 0.5) throw new Error(`Continue reading moved after Done: ${JSON.stringify(frames)}`);
+    if (process.env.ORE_E2E_SHOT) await page.screenshot({ path: process.env.ORE_E2E_SHOT });
+  } finally {
+    await log.undoAll();
+    await ore("goal", "--minutes", String(was.goal_minutes));
+  }
+});
+
 journey("review: when the day's goal closes the mole says so and the session goes on; Esc ends it on the end screen (D246)", async (page) => {
   const log = oreCalls(page);
   const was = (await ore("today")) as { goal_minutes: number; met: boolean; due: number };
