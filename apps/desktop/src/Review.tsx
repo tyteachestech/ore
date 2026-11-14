@@ -23,7 +23,7 @@ import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { LapCentre, lapPlan, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, kept, LIBRARY_BACK, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { MOMENT_MOOD, momentFor, type Moment } from "./moment";
@@ -297,17 +297,25 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
   // comes up twice. Past the day's new-card limits, so a draft it didn't rate stays; the card on screen
   // goes only if he hasn't started on it.
+  // Back after time away does the same, since the CLI, `/ore` or the phone may have rated, changed or deleted one
+  // (F-new-outside-stale); the next card loads again, and the one on screen too if he hasn't started on it.
   useEffect(() => {
-    if (quick || PHONE) return;
-    const un = listen("quiz-closed", () => {
+    const reconcile = (outside: boolean) =>
       ore<DueEntry[]>("due", "--all", ...pickArgs(pick, source)).then((fresh) => {
         const due = new Set(fresh.map((e) => e.id));
         const s = now.current;
         const started = s.phase !== "answer" || !!s.answer.trim();
+        if (outside) dropAhead();
+        if (outside && !started && s.card && due.has(s.card.id)) {
+          const id = s.card.id;
+          loadCard(id).then((c) => now.current.card?.id === id && now.current.phase === "answer" && !now.current.answer.trim() && setCard(c), () => {});
+        }
         setQueue((q) => q && (q.every((e) => due.has(e.id)) ? q : q.filter((e, i) => due.has(e.id) || (i === 0 && started))));
       }, () => {});
-    });
-    return () => void un.then((f) => f());
+    const back = () => void reconcile(true);
+    addEventListener(LIBRARY_BACK, back);
+    const un = quick || PHONE ? null : listen("quiz-closed", () => void reconcile(false));
+    return () => (removeEventListener(LIBRARY_BACK, back), void un?.then((f) => f()));
   }, [quick, pick, source]);
 
   /** A fresh start on a card: no answer, no marks, its clock not yet started. */

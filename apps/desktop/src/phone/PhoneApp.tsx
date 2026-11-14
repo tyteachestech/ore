@@ -31,7 +31,7 @@ import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
 import { Working } from "../Working";
-import { errorText, inOrder, stepLanded, useKeptScroll, type Notify } from "../util";
+import { errorText, inOrder, stepLanded, useKeptScroll, wakeScreens, type Notify } from "../util";
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   const now = useRef(drag);
@@ -475,6 +475,7 @@ export function PhoneApp() {
   /** The Mac's changes have come in: every screen reads again, and the reminders follow a goal met there. */
   const pulled = () => {
     setTick((t) => t + 1);
+    wakeScreens();
     void refresh();
     void planReminders();
   };

@@ -7539,6 +7539,51 @@ journey("review: saving an edit to the question keeps an answer changed outside 
   }
 });
 
+/** Leaves the window for over 10 s and comes back, as he does after using the CLI, `/ore` or the phone. */
+async function awayAndBack(page: Page) {
+  await page.evaluate(async () => {
+    dispatchEvent(new Event("blur"));
+    await new Promise((r) => setTimeout(r, 50));
+    const real = Date.now;
+    Date.now = () => real() + 11_000;
+    dispatchEvent(new Event("focus"));
+    Date.now = real;
+  });
+}
+
+journey("review: back from time away, the exercise on screen shows a question changed outside (F-new-outside-stale)", async (page) => {
+  await startReview(page, /Teaching/);
+  const q = page.locator(".review-q");
+  const shown = await q.innerText();
+  const entry = ((await ore("due", "--all")) as { id: string; question: string }[]).find((e) => shown.includes(e.question.slice(0, 30)))!;
+  const original = ((await ore("card", "show", entry.id)) as { question: string }).question;
+  try {
+    await ore("card", "set", entry.id, "--question", `${original} (rewritten outside)`);
+    await awayAndBack(page);
+    await until("the new question shows", async () => (await q.innerText()).includes("(rewritten outside)"));
+  } finally {
+    await ore("card", "set", entry.id, "--question", original);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  }
+});
+
+journey("source note: back from time away, the note shows text added outside (F-new-outside-stale)", async (page) => {
+  await openSource(page, AGENTS);
+  await page.getByRole("tab", { name: "Source note" }).click();
+  const editor = page.getByRole("textbox", { name: "Source note", exact: true });
+  await editor.waitFor();
+  const id = (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === AGENTS)!.id;
+  const before = ((await ore("notes", id)) as { text: string }).text;
+  try {
+    await ore("notes", id, "--set", `${before}\n\nWritten by the phone.`.trimStart());
+    await awayAndBack(page);
+    await until("the outside words show", async () => (await editor.innerText()).includes("Written by the phone."));
+  } finally {
+    await ore("notes", id, "--set", before);
+  }
+});
+
 journey("review: retiring a card keeps ⌘Z for the ratings before it, and so does a retire that fails", async (page) => {
   await startReview(page, null);
   const q = page.locator(".review-q");

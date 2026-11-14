@@ -1114,7 +1114,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         opened.current = p.id;
       },
       // A read again after ⌘Z that fails leaves the page as it is: nothing about the open source failed.
-      (e) => live && opened.current !== p.id && setError(errorText(e)),
+      // One gone from the library meanwhile (deleted or moved outside Ore) says so instead of staying on screen.
+      (e) => live && (opened.current !== p.id ? setError(errorText(e)) : /^no item matches/.test(errorText(e)) && setError("This source is no longer in your library: it was moved or deleted outside Ore.")),
     );
     return () => {
       live = false;
