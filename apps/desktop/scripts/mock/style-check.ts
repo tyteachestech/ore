@@ -6,7 +6,7 @@
 //                   it is off the sizes the set is tuned at, or cut by a parent that hides overflow, so it reads as clipped,
 //                   or bigger than the button it sits in, so it sits off the button's centre (F20)
 //   icon bleed      a masked skill icon in the rounded corner of a parent that hides overflow: WebKit (the Mac app) lets
-//                   the icon's unmasked colour through along the corner's soft edge, a hairline arc beside the icon (F-new-icon-bleed)
+//                   the icon's unmasked colour through along the corner's soft edge, a hairline arc beside the icon (F105)
 // Run against the mock (scripts/mock/README.md): bun apps/desktop/scripts/mock/style-check.ts [http://localhost:1420/]
 // `bun run e2e` runs it too, on its own mock (ORE_BRIDGE names that mock's bridge port).
 import { chromium, type Page } from "playwright";

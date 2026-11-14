@@ -312,7 +312,7 @@ img.thumb { filter: brightness(0.86); }
 .row-line .by.from-site { font-style: italic; }
 .row-line .chips-button + .course-next::before, .row-line .by + .chips-add + .course-next::before { content: "·"; margin-right: 6px; color: var(--faint); font-size: 12px; }
 /* Chips that don't fit end in an ellipsis, each, never sliced at the row's edge. The chips hide their own overflow,
-   never the rounded button around them: WebKit draws a masked icon's colour along a rounded clip's corner (F-new-icon-bleed). */
+   never the rounded button around them: WebKit draws a masked icon's colour along a rounded clip's corner (F105). */
 .row-line .chips { flex-wrap: nowrap; min-width: 0; }
 .chips-button > .chips { overflow: hidden; }
 .row-line .chips .chip { min-width: 0; }
@@ -2881,7 +2881,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-source .find-bar button { width: 44px; height: 44px; }
 .phone .mynotes-text { padding-top: 12px; }
 .add-box .chips-button { max-width: 260px; }
-.add-box .chips-button .chip { min-width: 0; } /* each name ends in an ellipsis; the rounded button clips nothing (F-new-icon-bleed) */
+.add-box .chips-button .chip { min-width: 0; } /* each name ends in an ellipsis; the rounded button clips nothing (F105) */
 .add-skills { display: inline-flex; min-width: 0; }
 /* The video card on the phone (D92): no gutter, so each timestamp leads its paragraph. */
 .phone .doc .video-card { margin: 0 -8px 24px; }
