@@ -3,7 +3,7 @@ import { resizeDrag } from "./drag";
 import { clampSide } from "./split";
 import * as Tabs from "@radix-ui/react-tabs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { NoteEditor, type LinkTarget, type NoteEditorHandle } from "./editor/NoteEditor";
 import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
@@ -46,9 +46,26 @@ type MyNotes = {
  *  them here, and opening it again shows the draft and saves it, instead of the older text on disk. */
 const unsaved = new Map<string, { text: string; base: string }>();
 
+/** The queue belongs to the note, not its mounted editor. Reopening waits for the last
+ * editor's writes, and preview cleanup waits before deciding whether it is empty. */
+const writes = new Map<string, Promise<unknown>>();
+function queueNote<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const next = (writes.get(key) ?? Promise.resolve()).then(run, run);
+  const settled = next.catch(() => {});
+  writes.set(key, settled);
+  void settled.then(() => { if (writes.get(key) === settled) writes.delete(key); });
+  return next;
+}
+export async function settleNote(key: string): Promise<boolean> {
+  while (writes.has(key)) await writes.get(key);
+  return !unsaved.has(key);
+}
+
 /** One note: loaded with `ore notes`, autosaved with `--set` ~800ms after the last edit, on blur,
  *  and when the view closes. */
-export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
+export function useNotes(ref: NoteRef, notify: Notify, onKept?: () => void): MyNotes {
+  const kept = useRef(onKept);
+  kept.current = onKept;
   const key = args(ref).join(" ");
   const [text, setText] = useState<string | null>(null);
   const [dir, setDir] = useState<string | null>(null);
@@ -64,7 +81,6 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
    *  note's base on, so the save queued behind it is based on what it wrote. */
   const bases = useRef(new Map<string, string>());
   const timer = useRef(0);
-  const chain = useRef<Promise<unknown>>(Promise.resolve());
   /** The note the refs above belong to: a write or load for another note never touches them. */
   const owner = useRef(key);
   /** Reads the open editor's text (NoteEditor sets it). */
@@ -72,10 +88,8 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
 
   /** Runs CLI writes one at a time, in order. */
   const queue = useCallback(<T,>(run: () => Promise<T>): Promise<T> => {
-    const next = chain.current.then(run, run);
-    chain.current = next.catch(() => {});
-    return next;
-  }, []);
+    return queueNote(key, run);
+  }, [key]);
 
   const apply = useCallback((t: string) => {
     pull.current = null; // the editor showing the old text is about to be replaced
@@ -93,7 +107,7 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     const now = owner.current === key ? pull.current?.() : null;
     if (now != null && (draft.current !== null || now !== saved.current)) draft.current = now;
     const t = draft.current;
-    if (t === null || t === saved.current) return chain.current.then(() => !unsaved.has(key));
+    if (t === null || t === saved.current) return settleNote(key);
     saved.current = t;
     // --base is read when the write runs, after the previous write's result has moved it on (else
     // two saves in flight merge his own first save back in as an outside change and duplicate
@@ -102,6 +116,7 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     return queue(() => ore<Notes & { merged: boolean }>("notes", ...key.split(" "), opt("set", t), opt("base", at()))).then(
       (r) => {
         unsaved.delete(key);
+        if (r.kept_from_feed) kept.current?.();
         // What the editor shows now, as above: a key pressed in its last 200 ms is not in the draft yet, and
         // showing the merged text over it would drop those words.
         const shown = owner.current === key ? pull.current?.() : null;
@@ -122,6 +137,10 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     );
   }, [key, notify, queue]);
 
+  // Capture the editor before its passive cleanup clears pull and destroys it. This applies
+  // to every source and skill note; NoteEditor also flushes when just its pane closes.
+  useLayoutEffect(() => () => { void flush(); }, [flush]);
+
   const edit = useCallback(
     (t: string) => {
       draft.current = t;
@@ -140,6 +159,7 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
         // The file as it is now (not what this editor last based a save on, which a merge can leave behind).
         const before = (await queue(() => ore<Notes>("notes", ...key.split(" "))).catch(() => undefined))?.text;
         const r = await queue(() => ore<Notes>("notes", ...key.split(" "), opt("append", t), opt("heading", heading)));
+        if (r.kept_from_feed) kept.current?.();
         if (owner.current === key) apply(r.text);
         // On the history, as every change is. The step writes the file itself (--base keeps what he has typed
         // since) and says so, so whichever copy of the note is open then reads it again.
@@ -211,7 +231,6 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
       live = false;
       window.removeEventListener("ore:note-written", written);
       window.removeEventListener("beforeunload", leave);
-      leave();
     };
   }, [key, tries, apply, flush, notify, queue]);
 
@@ -222,7 +241,7 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
 }
 
 /** The source note (D31) for one source. */
-export const useSourceNote = (id: string, notify: Notify) => useNotes(useMemo(() => ({ item: id }), [id]), notify);
+export const useSourceNote = (id: string, notify: Notify, onKept?: () => void) => useNotes(useMemo(() => ({ item: id }), [id]), notify, onKept);
 
 type EditorProps = {
   notes: MyNotes;

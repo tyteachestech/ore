@@ -488,12 +488,38 @@ function swapRegions(items: Item[], regions: Region[], blocks: string[]): Item[]
   return out;
 }
 
+/** The letters and digits of a text, for matching a reader's cell to pdf.js's items whatever their
+ *  spacing, dots or dashes. */
+const bare = (t: string) => t.normalize("NFKC").replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
+
 function table(r: Extract<Region, { kind: "table" }>, items: Item[]): string {
   const grid = Array.from({ length: r.rows }, () => Array.from({ length: r.cols }, () => ""));
+  // A cell with no box (Granite-Docling places only the whole table) takes the first unused run of
+  // pdf.js items that spells the same letters and digits, in reading order, so its powers and bold
+  // stay; with none, the reader's own text.
+  const used = new Set<Item>();
+  const spelled = (text: string): Item[] => {
+    const want = bare(text);
+    if (!want) return [];
+    for (let s = 0; s < items.length; s++) {
+      if (!bare(items[s]!.str)) continue; // a dash or a space starts no cell's run
+      let got = "";
+      for (let e = s; e < items.length && !used.has(items[e]!); e++) {
+        got += bare(items[e]!.str);
+        if (got === want) {
+          const run = items.slice(s, e + 1);
+          for (const i of run) used.add(i);
+          return run;
+        }
+        if (!want.startsWith(got)) break;
+      }
+    }
+    return [];
+  };
   for (const c of r.cells) {
     if (c.row >= r.rows || c.col >= r.cols) continue;
     // A cell's text may wrap: a step down to the next line ends one, a raised power doesn't.
-    const its = items.filter((i) => inside(i, c.box));
+    const its = c.box ? items.filter((i) => inside(i, c.box!)) : spelled(c.text);
     const own = pageLines(its.map((i, n) => ({ ...i, eol: i.eol || (!!its[n + 1] && its[n + 1]!.y < i.y - (i.size || 8) * 0.6) })))
       .map((l) => l.text)
       .join(" ");

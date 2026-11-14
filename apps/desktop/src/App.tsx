@@ -24,7 +24,7 @@ import { Radio } from "./Radio";
 import { CHANNELS } from "./ambience-art";
 import { stop as stopAmbience, toggle as playAmbience, ambienceState } from "./ambience";
 import { Reader, type PracticeRef } from "./Reader";
-import { setSidebarShown, useSideWidth, type SideTab } from "./Notes";
+import { settleNote, setSidebarShown, useSideWidth, type SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
 import { Settings, useReminderAgent, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
@@ -784,8 +784,9 @@ export function App() {
     if (!left || left === openId || !previews.current.has(left)) return;
     const title = previews.current.get(left)!;
     previews.current.delete(left);
-    ore<{ result: string }>("feed", "close", left).then(
+    settleNote(left).then((saved) => saved ? ore<{ result: string }>("feed", "close", left) : null).then(
       (r) => {
+        if (!r) { previews.current.set(left, title); return; } // A failed note keeps its preview and draft, and leaving again retries.
         if (r.result === "kept") {
           notify(`Kept “${title}” in your library`);
           void refresh();
@@ -1889,7 +1890,7 @@ export function App() {
     { id: "tutor", label: tutorOpen ? "Close the tutor" : "Tutor chat…", hint: label(keys.tutor), keywords: ["ask", "library", "question", "chat", "answer", "ai", "quiz"], run: () => (tutorOpen ? closeTutor() : openTutor()) },
     ...(PHONE ? [] : [
       { id: "ambience", label: "Ambience…", hint: label(keys.ambience), keywords: ["sound", "music", "focus", "noise", "radio"], run: () => requestAnimationFrame(() => requestAnimationFrame(() => setRadioOpen(true))) },
-      ...CHANNELS.filter((c) => ambienceState().playing !== c.id).map((c) => ({ id: `ambience-${c.id}`, label: `Play ${c.name}`, keywords: ["sound", "music", "radio"], run: () => void playAmbience(c.id) })),
+      ...CHANNELS.filter((c) => ambienceState().playing !== c.id).map((c) => ({ id: `ambience-${c.id}`, label: `Play ${c.name}`, keywords: ["sound", "music", "radio"], typed: true, run: () => void playAmbience(c.id) })),
       ...(ambienceState().playing ? [{ id: "ambience-stop", label: "Stop ambience", keywords: ["sound", "music", "silence", "mute"], run: stopAmbience }] : []),
     ]),
     ...(tutor.turns.length ? [{ id: "tutor-new", label: "New tutor chat", keywords: ["ask", "chat", "clear"], run: () => { tutor.fresh(); openTutor(); } }] : []),

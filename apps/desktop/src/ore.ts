@@ -237,7 +237,7 @@ export type Skill = { id: string; name: string; priority?: Priority; archived?: 
 export type SearchHit = { kind: string; ref: string; item?: string; title: string; snippet?: string; annotation?: string };
 
 /** `ore notes`: a source note or a skill note (notes.md) as it now is; `dir` is its folder, absolute. */
-export type Notes = { item?: string; skill?: string; text: string; path: string; dir: string };
+export type Notes = { kept_from_feed?: boolean; item?: string; skill?: string; text: string; path: string; dir: string };
 
 /** `ore backlinks`: a line in another note that links here (D39). */
 export type Backlink = { from: { kind: "item" | "skill"; id: string; title: string }; heading: string | null; line: string };
