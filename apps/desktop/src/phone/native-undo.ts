@@ -1,13 +1,15 @@
 // The iPhone's own ways to undo (F161, Tyler 2026-11-14: "for iOS use shake and 3 finger swipe"): shake for
 // Undo and Redo, a three-finger swipe left to undo and right to redo, as in Notes and Mail. UIKit asks the
 // first responder's undo manager; the shell (apps/phone/ios/Undo.swift) answers with one that mirrors this
-// window's history, so the gestures name and take back the same steps ⌘Z does. Typing in a field keeps the
-// field's own undo, as `ownsUndo` does for ⌘Z.
+// window's history, so the gestures name and take back the same steps ⌘Z does. In a text field or the note,
+// the field's own undo answers.
 import { useEffect } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { History } from "../history";
 
-const editing = (el: Element | null) => !!el && ((el as HTMLElement).isContentEditable || el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+// Where he types: a checkbox, a radio or a slider has no typing to undo, so the app's steps stay in reach there.
+const editing = (el: Element | null) =>
+  !!el && ((el as HTMLElement).isContentEditable || el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && !/^(checkbox|radio|range|button|submit|reset|color|file)$/.test((el as HTMLInputElement).type)));
 
 export function useNativeUndo(history: History, undo: () => void, redo: () => void): void {
   useEffect(() => {

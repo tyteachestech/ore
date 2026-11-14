@@ -3,8 +3,8 @@
 // redo. UIKit sends both to the first responder's undo manager, which in a web view is WKContentView's, and that
 // one only holds the page's typing. So WKContentView answers with `AppUndo`, which mirrors the window's history
 // (apps/desktop/src/phone/native-undo.ts tells it the next step each way through lib.rs `undo_state`) and runs a
-// step by calling back into the page. While he types in a field that has its own typing to undo, the field's
-// manager answers instead, as ⌘Z does there (`ownsUndo`).
+// step by calling back into the page. While focus is in a text field or the note, the field's own manager
+// answers instead, as the note keeps ⌘Z for its typing.
 import ObjectiveC
 import UIKit
 import WebKit
@@ -55,7 +55,9 @@ private func install() {
   let undoSel = #selector(getter: UIResponder.undoManager)
   let undo: @convention(block) (AnyObject) -> UndoManager? = { this in
     let theirs = theirUndo.map { unsafeBitCast($0, to: UndoGetter.self)(this, undoSel) } ?? nil
-    if inField, let t = theirs, t.canUndo || t.canRedo { return t }
+    // In a field it is always the field's: WebKit records its typing on this same getter, so the first keystroke
+    // must find the field's manager, not ours.
+    if inField { return theirs }
     if app.web == nil { app.web = webView(of: this) }
     return app
   }

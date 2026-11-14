@@ -142,7 +142,14 @@ export function useNotes(ref: NoteRef, notify: Notify, onKept?: () => void): MyN
         if (shown != null && shown !== t) draft.current = shown;
         // An agent or a recall changed the file meanwhile and the CLI merged it in. With no newer
         // typing, show the merged text; otherwise keep his draft and merge again on the next save.
-        if (owner.current === key && r.merged && draft.current === t) return apply(r.text), true;
+        if (owner.current === key && r.merged && draft.current === t) {
+          // An outside change merged in doesn't start a new run: his typing before it stays one step.
+          const run = opened.current.get(key);
+          apply(r.text);
+          if (run !== undefined) opened.current.set(key, run);
+          wrote.current.set(key, r.text);
+          return true;
+        }
         bases.current.set(key, r.merged ? t : r.text);
         if (owner.current === key && r.merged) saved.current = null;
         return true;
@@ -158,9 +165,12 @@ export function useNotes(ref: NoteRef, notify: Notify, onKept?: () => void): MyN
 
   // Capture the editor before its passive cleanup clears pull and destroys it. This applies
   // to every source and skill note; NoteEditor also flushes when just its pane closes.
+  // The step goes on the history as the editor closes, before the save lands, so it sits under anything he does next.
   const close = useCallback(() => {
     const k = key;
-    void flush().then((ok) => ok && checkpoint(k));
+    const now = (owner.current === k ? pull.current?.() : null) ?? draft.current ?? undefined;
+    void flush();
+    if (owner.current === k) checkpoint(k, now);
   }, [key, flush, checkpoint]);
   useLayoutEffect(() => close, [close]);
 
