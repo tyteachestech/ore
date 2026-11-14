@@ -1,0 +1,65 @@
+diff --git a/labs/cart-rive/gen.mjs b/labs/cart-rive/gen.mjs
+index 46142cb..ae9c1d4 100644
+--- a/labs/cart-rive/gen.mjs
++++ b/labs/cart-rive/gen.mjs
+@@ -512,7 +512,9 @@ for (let j = 0; j < MAX_STONES; j++) ids[`stoneAim${j}`] = ids[`stoneAimIn${j}`]
+ const mole = moleXml(), cart = cartXml();
+ 
+ // How long the pour lasts for each amount of ore: the last piece has left, and a breath.
+-const pourSeconds = (n) => Math.max(0.45, (n * STEP) / 120 + 0.12);
++// How much slower he slides off the tipped bucket than the pour needs (1: the bucket drops back as the last piece leaves).
++const SLIDE_TIME = 1.3;
++const pourSeconds = (n) => Math.max(0.45, (n * STEP) / 120 + 0.12) * SLIDE_TIME;
+ const BANDS = [6, 12, 18, 24, 30];
+ const sm = (() => {
+   const s = { roll: newId(), hang: newId(), wake: newId(), rest: newId(), wait: newId(), fly: newId() };
+diff --git a/labs/cart-rive/rive/scene.rml b/labs/cart-rive/rive/scene.rml
+index 9bae6c8..bb41edb 100644
+--- a/labs/cart-rive/rive/scene.rml
++++ b/labs/cart-rive/rive/scene.rml
+@@ -84,19 +84,19 @@
+ </TransitionViewModelCondition>
+ </StateTransition>
+ </AnimationState>
+-<AnimationState id="0:452" animationId="0:136" speed="2.2222" x="360" y="0">
++<AnimationState id="0:452" animationId="0:136" speed="1.7094" x="360" y="0">
+ <StateTransition stateToId="0:447" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+ </AnimationState>
+-<AnimationState id="0:453" animationId="0:136" speed="1.6129" x="360" y="80">
++<AnimationState id="0:453" animationId="0:136" speed="1.2407" x="360" y="80">
+ <StateTransition stateToId="0:447" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+ </AnimationState>
+-<AnimationState id="0:454" animationId="0:136" speed="1.1494" x="360" y="160">
++<AnimationState id="0:454" animationId="0:136" speed="0.8842" x="360" y="160">
+ <StateTransition stateToId="0:447" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+ </AnimationState>
+-<AnimationState id="0:455" animationId="0:136" speed="0.8929" x="360" y="240">
++<AnimationState id="0:455" animationId="0:136" speed="0.6868" x="360" y="240">
+ <StateTransition stateToId="0:447" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+ </AnimationState>
+-<AnimationState id="0:456" animationId="0:136" speed="0.7299" x="360" y="320">
++<AnimationState id="0:456" animationId="0:136" speed="0.5615" x="360" y="320">
+ <StateTransition stateToId="0:447" enableExitTime="true" exitTimeIsPercetange="true" exitTime="100"/>
+ </AnimationState>
+ <AnimationState id="0:447" animationId="0:137" x="560" y="0">
+diff --git a/labs/cart-rive/rive/timing.json b/labs/cart-rive/rive/timing.json
+index 1ab5a6b..bfc697b 100644
+--- a/labs/cart-rive/rive/timing.json
++++ b/labs/cart-rive/rive/timing.json
+@@ -11,11 +11,11 @@
+  "GROUND": 257.85,
+  "P": 2.909090909090909,
+  "pourSeconds": {
+-  "6": 0.45,
+-  "12": 0.62,
+-  "18": 0.87,
+-  "24": 1.12,
+-  "30": 1.37
++  "6": 0.5850000000000001,
++  "12": 0.806,
++  "18": 1.131,
++  "24": 1.4560000000000002,
++  "30": 1.7810000000000001
+  },
+  "rollIn": 0.9,
+  "hang": 1.35,

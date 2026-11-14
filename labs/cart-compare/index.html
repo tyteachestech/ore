@@ -1,0 +1,89 @@
+<title>Cart ending A/B</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* One column: the ending, A or B, then the pick. Labels stay hidden until he picks. */
+  :root { --bg: #121316; --fg: #f5f6f7; --muted: #8b8d93; --line: #2b2d31; --on: #f5f6f7; --on-fg: #121316;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace; color-scheme: dark; }
+  html, body { height: 100%; }
+  body { background: var(--bg); color: var(--fg); font: 13px/1.4 var(--mono); padding-block: 16px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  main { max-width: 1040px; margin: 0 auto; display: grid; gap: 16px; }
+  .bar { display: flex; gap: 8px; align-items: center; }
+  button { font: inherit; color: var(--fg); background: none; border: 1px solid var(--line); border-radius: 6px; height: 32px; min-width: 44px; padding: 0 12px; cursor: pointer; }
+  button[aria-pressed="true"] { background: var(--on); color: var(--on-fg); border-color: var(--on); }
+  button:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  #replay { margin-left: auto; }
+  #frame { position: relative; width: 100%; aspect-ratio: 760 / 560; max-width: 760px; justify-self: center; overflow: hidden; border-radius: 6px; background: #1b1b1b; }
+  #frame iframe { position: absolute; left: 0; top: 0; width: 1280px; height: 800px; border: 0; transform-origin: 0 0; pointer-events: none; }
+  #pick { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  #pick span { color: var(--muted); }
+  #result { display: grid; gap: 4px; }
+  #result p { margin: 0; }
+  .faint { color: var(--muted); }
+</style>
+<main>
+  <div class="bar" role="tablist">
+    <button id="tA" role="tab" aria-pressed="true">A</button>
+    <button id="tB" role="tab" aria-pressed="false">B</button>
+    <button id="replay" aria-label="Play again">&#8635;</button>
+  </div>
+  <div id="frame"><iframe id="view" title="Cart ending"></iframe></div>
+  <div id="pick"><span>Which is better?</span><button id="pA">A</button><button id="pB">B</button></div>
+  <div id="result" hidden></div>
+</main>
+<script>
+  // Which version is A is drawn once per visit and kept for its replays.
+  const PAGES = { code: "code/index.html", rive: "rive/stage/index.html?runtime=vendor/lite/" };
+  // Each screen cut to the same 760 by 560 window, its ring at the same place (the two stages lay it out differently).
+  const CUT = { code: [260, 5], rive: [260, 113] };
+  let order;
+  try { order = JSON.parse(sessionStorage.getItem("order")); } catch {}
+  if (!order) { order = Math.random() < 0.5 ? ["code", "rive"] : ["rive", "code"]; try { sessionStorage.setItem("order", JSON.stringify(order)); } catch {} }
+  const NAME = { code: "Code", rive: "Rive" };
+  const device = /iPhone|iPad/.test(navigator.userAgent) ? "iPhone" : /Mac/.test(navigator.userAgent) ? "Mac" : "other";
+  const $ = (id) => document.getElementById(id);
+  let showing = 0, picked = null;
+  const runs = { code: [], rive: [] };
+
+  const view = $("view"), frame = $("frame");
+  const fit = () => { const [x, y] = CUT[order[showing]]; view.style.transform = `scale(${frame.clientWidth / 760}) translate(${-x}px, ${-y}px)`; };
+  new ResizeObserver(fit).observe(frame);
+  function play(i) {
+    showing = i;
+    $("tA").setAttribute("aria-pressed", i === 0); $("tB").setAttribute("aria-pressed", i === 1);
+    view.src = "about:blank"; fit();
+    requestAnimationFrame(() => (view.src = PAGES[order[i]] + (PAGES[order[i]].includes("?") ? "&" : "?") + "n=" + Date.now()));
+  }
+  $("tA").onclick = () => play(0); $("tB").onclick = () => play(1); $("replay").onclick = () => play(showing);
+
+  // Frame timing from the page inside: each frame's gap, measured against the screen's own refresh (the middle gap).
+  function stats(gaps) {
+    const g = gaps.slice(1), s = [...g].sort((a, b) => a - b), mid = s[s.length >> 1];
+    const dropped = g.reduce((n, x) => n + Math.max(0, Math.round(x / mid) - 1), 0);
+    return { hz: Math.round(1000 / mid), frames: g.length, dropped, worst_ms: Math.round(s[s.length - 1]), p95_ms: +s[Math.floor(s.length * 0.95)].toFixed(1) };
+  }
+  const line = (v) => { const r = runs[v]; if (!r.length) return `${NAME[v]}: not played yet`; const d = r.map((x) => x.dropped);
+    return `${NAME[v]}: ${r.length} play${r.length > 1 ? "s" : ""} at ${r.at(-1).hz} Hz, dropped ${d.join(", ")} of ~${r.at(-1).frames} frames, worst gap ${Math.max(...r.map((x) => x.worst_ms))} ms`; };
+
+  let db = null;
+  addEventListener("load", () => window.claude?.use?.("db").then((x) => (db = x)).catch(() => {}));
+  const save = (coll, data) => db?.collection(coll).add({ ...data, device, ua: navigator.userAgent, at: new Date().toISOString() }).catch(() => {});
+
+  addEventListener("message", (e) => {
+    if (e.source !== view.contentWindow || !e.data?.frames) return;
+    const v = order[showing], s = stats(e.data.frames);
+    runs[v].push(s); save("runs", { version: v, ...s });
+    if (picked) reveal();
+  });
+
+  function reveal() {
+    const r = $("result"); r.hidden = false;
+    r.replaceChildren(...[`You picked ${"AB"[picked]}: ${NAME[order[picked]]}. A was ${NAME[order[0]]}, B was ${NAME[order[1]]}.`, line(order[0]), line(order[1])]
+      .map((t, i) => Object.assign(document.createElement("p"), { textContent: t, className: i ? "faint" : "" })));
+  }
+  const pick = (i) => { if (picked !== null) return; picked = i; $("p" + "AB"[i]).setAttribute("aria-pressed", true);
+    save("picks", { pick: order[i], a: order[0], b: order[1], plays: { code: runs.code.length, rive: runs.rive.length } }); reveal(); };
+  $("pA").onclick = () => pick(0); $("pB").onclick = () => pick(1);
+
+  play(0);
+</script>
