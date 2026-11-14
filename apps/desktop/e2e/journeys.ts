@@ -6115,8 +6115,13 @@ journey("review: Start review clicked before the skills have loaded still asks w
   await pick.or(page.locator(".review")).first().waitFor();
   if (!(await pick.isVisible())) throw new Error("a review started without asking what to review");
   await until("every skill with cards due is listed", async () => (await pick.getByRole("checkbox").count()) > 1);
+  // The rows that came in late are ticked like any others, so ↵ starts so ↵ starts.
+  const unticked = await pick.locator('[role=checkbox][aria-checked="false"]').count();
+  if (unticked) throw new Error(`${unticked} rows that loaded after the sheet opened came in unticked`);
+  await page.keyboard.press("Enter");
+  await page.locator(".review-q").waitFor();
   await page.keyboard.press("Escape");
-  await pick.waitFor({ state: "detached" });
+  await page.locator(".review").waitFor({ state: "detached" });
 });
 
 journey("review: Open in source pauses on the card; Back to Review picks it up where he was", async (page) => {
@@ -6737,12 +6742,21 @@ async function startReview(page: Page, only: RegExp | null) {
   const pick = page.getByRole("dialog", { name: "What to review" });
   await page.getByRole("button", { name: "Start review" }).click();
   await pick.waitFor();
+  await pick.getByRole("checkbox").first().waitFor(); // the rows can land after the sheet
   for (const row of await pick.getByRole("checkbox").all()) {
     const want = !only || only.test(await row.innerText());
     if ((await row.getAttribute("aria-checked") === "true") !== want) await row.click();
   }
   await page.keyboard.press("Enter");
-  await page.locator(".review-q").waitFor();
+  // No question within the wait says what was on screen instead (F142: cause not found).
+  await page.locator(".review-q").waitFor().catch(async (e) => {
+    const seen = await page.evaluate(() => ({
+      sheet: [...document.querySelectorAll(".review-pick [role=checkbox]")].map((r) => `${r.querySelector(".name")?.textContent}:${r.getAttribute("aria-checked")}`),
+      focus: `${document.activeElement?.tagName}.${document.activeElement?.className}`,
+      review: document.querySelector(".review")?.textContent?.slice(0, 200) ?? null,
+    }));
+    throw new Error(`${(e as Error).message}\n      on screen: ${JSON.stringify(seen)}`);
+  });
 }
 
 journey("review: a rating always moves the session one step on, and a miss adds its retry as one more step (D59)", async (page) => {
