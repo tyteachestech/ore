@@ -1,6 +1,6 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, readdir, rm } from "node:fs/promises";
-import { doclingHome, doclingPath } from "./docling-path.ts";
+import { doclingHome, doclingPath, READY } from "./docling-path.ts";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -65,7 +65,7 @@ export function regionsFrom(doc: DoclingDoc): Region[] {
  *  environment dropped. */
 export function tidyLatex(s: string): string {
   let t = s.trim().replace(/\s+/g, " ").replace(/^(?:\\ )+/, "");
-  const n = t.match(/(?:(?:&|\\q?quad|\\[ ,;])\s*)+\(\s*(\d+)\s*\)\s*$/);
+  const n = t.match(/(?:(?:&|(?<!\\)\\q?quad|(?<!\\)\\[ ,;])\s*)+\(\s*(\d+)\s*\)\s*$/);
   if (n) t = `${t.slice(0, n.index).trim()} \\tag{${n[1]}}`;
   if (!/\\begin\{/.test(t)) t = t.replace(/(?<!\\)&/g, " ").replace(/\s+/g, " ").trim();
   return t;
@@ -79,7 +79,8 @@ export function tidyLatex(s: string): string {
  *  models (TableFormer, CodeFormulaV2: CDLA-Permissive-2.0) are not downloaded. */
 const UV = "0.11.32";
 const DOCLING = "2.142.0";
-const MODEL = process.arch === "arm64" ? "granitedocling_mlx" : "granitedocling";
+// mlx-vlm installs only on macOS on Apple silicon.
+const MODEL = process.platform === "darwin" && process.arch === "arm64" ? "granitedocling_mlx" : "granitedocling";
 
 export { doclingHome, doclingPath } from "./docling-path.ts";
 
@@ -115,7 +116,7 @@ export async function installDocling(onStep: (step: number, of: number, label: s
   await rm(env.UV_CACHE_DIR, { recursive: true, force: true });
   await rm(join(home, "uv.tar.gz"), { force: true });
   await rm(dirname(uv), { recursive: true, force: true });
-  writeFileSync(join(home, "ready"), `docling ${DOCLING}\n`);
+  writeFileSync(join(home, READY), `docling ${DOCLING}\n`);
   return home;
 }
 

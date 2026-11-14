@@ -137,3 +137,8 @@ describe("PDF tables and formulas (D125)", () => {
     expect(tidyLatex("\\mathcal { L } = p ( z ) \\, ( 7 )")).toBe("\\mathcal { L } = p ( z ) \\tag{7}");
   });
 });
+
+test("tidyLatex: a line break's backslash before a number is not a separator", () => {
+  expect(tidyLatex("a = b \\\\ ( 2 )")).toBe("a = b \\\\ ( 2 )");
+  expect(tidyLatex("a = b \\quad ( 1 )")).toBe("a = b \\tag{1}");
+});
