@@ -3310,7 +3310,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         </div>
       )}
       <HideDots hidden={hidden} box={scrollRef} page={pageRef} />
-      {/* Only the words hide (F112): the toolbar above them, with Show the source, stays in reach of VoiceOver. */}
+      {/* Only the words hide (F118): the toolbar above them, with Show the source, stays in reach of VoiceOver. */}
       <div className="reader-scroll" ref={scrollRef} tabIndex={-1} aria-hidden={hidden || undefined} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} {...(PHONE ? { onTouchStart, onTouchMove, onTouchEnd } : {})} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">

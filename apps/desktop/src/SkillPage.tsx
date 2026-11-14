@@ -481,7 +481,7 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
       </Hint>
       <Popover.Portal>
         <Popover.Content
-          // The page's own keys take Esc before Radix sees it, so the breakdown closes itself (F108).
+          // The page's own keys take Esc before Radix sees it, so the breakdown closes itself (F114).
           onKeyDown={(e) => { if (e.key === "Escape" && !escTaken(e.nativeEvent)) { e.preventDefault(); setOpen(false); } }}
           aria-label="Gem breakdown" className="popover strength-pop" data-color={color} side="bottom" align="end" sideOffset={6} collisionPadding={12}>
           <div className="strength">

@@ -2349,7 +2349,7 @@ journey("figure cards: a drag over a zoomed figure draws a box, what's under it 
   await until("Undo retires the card", async () => ((await ore("card", "show", id)) as { state: string }).state === "retired");
 });
 
-journey("hidden source keeps Show the source in the accessibility tree (F112)", async (page) => {
+journey("hidden source keeps Show the source in the accessibility tree (F118)", async (page) => {
   await openSource(page, TESTING);
   const reader = page.locator(".reader");
   await page.getByRole("button", { name: "Hide the source", exact: true }).click();
@@ -2410,7 +2410,7 @@ journey("tables: a heading's button covers its column, a click or Enter shows a 
   }
 });
 
-journey("tables: a narrow heading's cover button sits beside its text on hover, never over it (F113)", async (page) => {
+journey("tables: a narrow heading's cover button sits beside its text on hover, never over it (F119)", async (page) => {
   // "Term" is its column's widest content, so the column is no wider than the word.
   const made = (await (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Narrow headings\n\nA short glossary.\n\n| Term | Meaning |\n|---|---|\n| a | The first letter of the alphabet |\n| b | The second letter of the alphabet |\n\nThat is all." }) })).json()) as { id: string };
   try {
@@ -11592,7 +11592,7 @@ journey("phone: a half-typed answer to What do you already know? survives a rela
   await until("the answer comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Retrieval changes what I can remember");
 }, "phone");
 
-journey("a11y: reader equations expose mathematical content (F104)", async (page) => {
+journey("a11y: reader equations expose mathematical content (F110)", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill("# Accessible equation\n\nThe relation is\n\n$$E = mc^2$$\n\nEnergy and mass.");
   await page.keyboard.press("Enter");
@@ -11602,7 +11602,7 @@ journey("a11y: reader equations expose mathematical content (F104)", async (page
   if (!(await page.locator(".doc math").textContent())?.includes("E")) throw new Error("Equation lost its content");
 });
 
-journey("a11y: failed Add announces and describes the retained input (F106)", async (page) => {
+journey("a11y: failed Add announces and describes the retained input (F112)", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   const input = page.getByLabel("Link, file path or text");
   const text = "# Unsaved learning note\n\nKeep these words after a failed save.";
@@ -11620,7 +11620,7 @@ journey("a11y: failed Add announces and describes the retained input (F106)", as
   await page.keyboard.press("Escape");
 });
 
-journey("a11y: revealing a Fact announces its answer and rating phase (F107)", async (page) => {
+journey("a11y: revealing a Fact announces its answer and rating phase (F113)", async (page) => {
   await startReview(page, /Learning/);
   await page.locator(".quiz-sure").waitFor();
   const live = page.locator(".review .sr-only[aria-live]");
@@ -11633,7 +11633,7 @@ journey("a11y: revealing a Fact announces its answer and rating phase (F107)", a
   await page.keyboard.press("Escape");
 });
 
-journey("a11y: gem counts say their meaning and reveal hints by keyboard (F108)", async (page) => {
+journey("a11y: gem counts say their meaning and reveal hints by keyboard (F114)", async (page) => {
   const home = page.locator('.home-skill[data-id="learning"] .home-level');
   await home.waitFor();
   const homeTree = await home.ariaSnapshot();
@@ -11665,7 +11665,7 @@ journey("a11y: gem counts say their meaning and reveal hints by keyboard (F108)"
   await until("closing the breakdown puts focus back on its gem", async () => await trigger.evaluate((e) => e === document.activeElement));
 });
 
-journey("a11y: the suggested rating has a keyboard focus ring (F109)", async (page) => {
+journey("a11y: the suggested rating has a keyboard focus ring (F115)", async (page) => {
   await startReview(page, /Learning/);
   await page.locator(".quiz-sure").waitFor();
   await page.keyboard.press("3");
@@ -11680,7 +11680,7 @@ journey("a11y: the suggested rating has a keyboard focus ring (F109)", async (pa
   await page.keyboard.press("Escape");
 });
 
-journey("a11y: tutor citations and hovered secondary text meet AA contrast (F110)", async (page) => {
+journey("a11y: tutor citations and hovered secondary text meet AA contrast (F116)", async (page) => {
   const results: { text: string; ratio: number }[] = [];
   const measure = async (target: Locator) => {
     results.push(await target.evaluate((el) => {
@@ -11729,7 +11729,7 @@ journey("a11y: tutor citations and hovered secondary text meet AA contrast (F110
   await page.keyboard.press("Escape");
 });
 
-journey("a11y: reader toggle icons stay decorative in both states (F111)", async (page) => {
+journey("a11y: reader toggle icons stay decorative in both states (F117)", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   await page.getByLabel("Link, file path or text").fill("# Accessible table\n\n| Term | Meaning |\n|---|---|\n| Recall | Retrieve from memory |\n\nTry remembering the meaning.");
   await page.keyboard.press("Enter");
