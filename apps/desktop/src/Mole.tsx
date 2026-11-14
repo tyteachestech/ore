@@ -143,11 +143,14 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // head, his belly and moustache rising on each snore, the foot in the air bobbing.
   doze: { from: DOZE, to: DOZE, loop: 3000, still: DOZE,
     at: [[0, { to: { breath: 1 } }], [1300, { to: { breath: 0 }, kick: { puff: 2 } }], [2000, { to: { legs: 1 } }], [2250, { to: { legs: 0 } }]] },
-  // Falling: eyes wide, mouth an O, arms flung out and his feet running on nothing. His helmet, pressed down by the
-  // start up, floats off his brows a beat late.
-  fall: { from: { whole: 1, side: 0, hat: -0.8 }, to: FALL, loop: 240, still: FALL, at: [[0, { to: { legs: 1, arms: 0.55, tilt: -0.2 }, kick: { legs: 30 } }], [120, { to: { legs: -1, arms: 1, tilt: 0.2 }, kick: { legs: -30 } }]] },
-  // Diving head first: what was thrashing is swept back by the air, his helmet pushed down to his brows, feet together.
-  dive: { from: { whole: 1, side: 0 }, to: { ...FALL, hat: -0.5, arms: 0.55, legs: 0, tilt: 0 }, loop: 3000, still: { ...FALL, hat: -0.5, arms: 0.55, legs: 0 } },
+  // Awake on nothing: a start (eyes wide, a "!", arms flung out, his helmet floating off his brows a beat late), a
+  // look down, his feet running on air while his arms go, then he stops and looks at us before he drops.
+  fall: { from: { whole: 1, side: 0, hat: -0.8 }, to: { ...FALL, hat: 0.9, bang: 1 }, loop: 3000, still: FALL,
+    at: [[330, { to: { ly: 1, bang: 0, hat: 0.3 } }],
+      ...[0, 1, 2, 3, 4].map((i): [number, Beat] => [450 + i * 108, { to: { legs: i % 2 ? -1 : 1, arms: i % 2 ? 1 : 0.55, tilt: i % 2 ? 0.2 : -0.2 }, kick: { legs: i % 2 ? -30 : 30 } }]),
+      [985, { to: { legs: 0, arms: 1, tilt: 0, ly: 0, hat: 0 } }]] },
+  // Dropping feet first: arms and helmet left behind over him, feet together.
+  dive: { from: { whole: 1, side: 0 }, to: { ...FALL, hat: 1.4, arms: 1, legs: 0, tilt: 0 }, loop: 3000, still: { ...FALL, hat: 1.4, arms: 1, legs: 0 } },
 };
 
 /** The puppet's moving parts: its values, their speeds, where they are headed, and the move playing. */

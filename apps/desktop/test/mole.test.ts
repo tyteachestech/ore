@@ -189,10 +189,10 @@ test("traced: out of the ground he has a whole body and no dirt; asleep his eyes
   // Asleep his paws are behind his head; falling they are flung out past it.
   const wide = (d: ReturnType<typeof fineDots>) => Math.max(...d.filter(([, , , t]) => t === "fine-9").map(([x]) => Math.abs(x - 11)));
   expect(wide(fall)).toBeGreaterThan(wide(nap) + 3);
-  // Diving, the air sweeps him back: arms in from where they were flung, helmet down toward his brows.
+  // Dropping feet first, what is loose is left behind over him: arms still flung out, helmet up off his brows.
   const dive = fine(MOVES.dive.still), hatTop = (d: ReturnType<typeof fineDots>) => Math.min(...d.filter(([, , , t]) => t === "lamp").map(([, y]) => y));
-  expect(wide(dive)).toBeLessThan(wide(fall) - 1);
-  expect(hatTop(dive)).toBeGreaterThan(hatTop(fall) + 0.5);
+  expect(wide(dive)).toBeGreaterThan(wide(nap) + 3);
+  expect(hatTop(dive)).toBeLessThan(hatTop(fall) - 0.5);
   // His belly rises as he breathes in.
   expect(ink(fine({ ...MOVES.nap.still, breath: 1 }), "fine-7")).toBeGreaterThan(ink(nap, "fine-7"));
 });

@@ -116,7 +116,7 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
   await plain.done();
 });
 
-test("the fall off the cart has weight, and the bucket never turns through him: he lies along its tipped rim, is pressed short then pulled long, dives swept back, throws dirt, knocks the ring, and the cart hops as he leaves it", async () => {
+test("the fall off the cart has weight, and the bucket never turns through him: he lies along its tipped rim, is pressed short then pulled long, drops feet first, throws dirt, knocks the ring, and the cart hops as he leaves it", async () => {
   jest.useFakeTimers();
   const proto = w.Element.prototype as unknown as Record<string, unknown>, plain = proto.animate;
   const seen: { cls: string; keys: Record<string, string>[]; o: { composite?: string } }[] = [];
