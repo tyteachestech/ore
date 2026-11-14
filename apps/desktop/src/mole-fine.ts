@@ -251,10 +251,11 @@ export function fineDots(s: State): FineDot[] {
 
   if (body) {
     // Under his head, on the same pitch: belly, feet, legs, torso, then the arms behind it all. Units are his dots.
-    const b = clamp(s.breath), k = clamp(s.arms), under = layer();
-    const mixed = (a: number, c: number) => a + (c - a) * k;
+    const b = clamp(s.breath), k = clamp(s.arms, 0, 2), under = layer();
+    // Arms: folded behind his head (0), flung out (1), straight up over it (2).
+    const mixed = (a: number, c: number, e: number) => (k <= 1 ? a + (c - a) * k : c + (e - c) * (k - 1));
     const TONES: FineTone[] = ["fine-7", "fine-9", "fine-4", "fine-5", "fine-9", "fine-4"], d = [0, 0, 0, 0, 0, 0];
-    const ex = mixed(17.5, 16), ey2 = mixed(-7, -3), hx = mixed(11, 21), hy = mixed(-17, -11);
+    const ex = mixed(17.5, 16, 15), ey2 = mixed(-7, -3, -8), hx = mixed(11, 21, 17), hy = mixed(-17, -11, -20);
     for (let j = -21; j <= 26; j++) for (let i = -24; i <= 24; i++) {
       const x = i + 0.07, y = j - 0.02, ax = Math.abs(x);
       const kick = clamp((x < 0 ? -1 : 1) * s.legs) * 2.2, fy = 23 - kick, lx = 6.4 + kick * 0.5;

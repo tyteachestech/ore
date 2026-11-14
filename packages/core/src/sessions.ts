@@ -34,6 +34,9 @@ export interface SessionReceipt {
   /** The part of `depth_days` from exercises he answered after today's goal had closed (D246): the end
    *  screen says how much of the session was extra. Absent when none was. */
   depth_extra_days?: number;
+  /** The memories kept this session by each card's first skill, most first: the end screen names them one
+   *  skill at a time. Absent when none was kept. */
+  kept_skills?: { skill: string; n: number }[];
   /** The longest gap, in whole days, between a card he passed this session and when he last saw it (D177):
    *  the end screen names it, so spacing's delayed gain is something he sees. */
   longest_days?: number;
@@ -190,7 +193,13 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
   }
   const gaps = kept.flatMap((x) => (x.state_before.reps > 0 && x.state_before.last_review ? [Math.floor((Date.parse(x.ts) - Date.parse(x.state_before.last_review)) / 864e5)] : []));
   const longest = Math.max(0, ...gaps);
-  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), ...(thenNow ? { then_now: thenNow } : {}), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(caughtUp ? { caught_up: true } : {}) };
+  const bySkill = new Map<string, number>();
+  for (const x of kept) {
+    const skill = skillOf(x.card);
+    bySkill.set(skill, (bySkill.get(skill) ?? 0) + 1);
+  }
+  const keptSkills = [...bySkill].map(([skill, n]) => ({ skill, n })).sort((x, y) => y.n - x.n);
+  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), ...(thenNow ? { then_now: thenNow } : {}), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(keptSkills.length ? { kept_skills: keptSkills } : {}), ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
   if (openSessionId(lib) === id) unlinkSync(paths.openSession(lib));
   return r;

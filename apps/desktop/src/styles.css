@@ -1537,6 +1537,30 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .dot-ring .soon { fill: var(--ring); opacity: 0.55; transform: scale(0.85); }
 @media (prefers-reduced-motion: reduce) { .dot-ring circle { transition: none; } }
 .ring .dot-ring { --ring: var(--c-green); }
+/* A lap past the full ring (the end screen's bonus minutes): the dots it lights again are a little bigger and
+   carry a white centre, so where the bonus stops is plain; past a second full lap, bigger again. Each lands white. */
+.dot-ring .over { transform: scale(1.2); animation: over-in var(--t-4) var(--ease-out); }
+.dot-ring .over2 { transform: scale(1.34); animation: over-in var(--t-4) var(--ease-out); }
+.dot-ring .core { fill: #fff; transform: none; transition: transform var(--t-3) var(--ease-out); animation: core-in var(--t-4) var(--ease-out) both; }
+.dot-ring .core.big { transform: scale(1.75); }
+@keyframes over-in { from { fill: #fff; transform: scale(1.6); } }
+@keyframes core-in { from { transform: scale(0); } }
+/* Crossing the goal as the minutes count: one ring of dots thrown outward, once (white and wider at twice the goal). */
+.ring-throw { position: absolute; inset: 0; pointer-events: none; }
+.ring-throw i { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--c-green); animation: ring-throw var(--t-moment) var(--ease-out) both; }
+.ring-throw[data-big] i { background: #fff; }
+@keyframes ring-throw { from { opacity: 1; transform: rotate(var(--a)) translateY(calc(-1 * var(--r))); } to { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--r) - var(--far))) scale(0.4); } }
+/* White sparkles over the bonus dots: a cross of five dots that opens and fades. */
+.ring-sparkle { position: absolute; width: 0; height: 0; pointer-events: none; animation: sparkle var(--t-moment) var(--ease-in-out) both; }
+.ring-sparkle[data-twice] { --reach: 5px; }
+.ring-sparkle i { position: absolute; width: 3px; height: 3px; margin: -1.5px; border-radius: 50%; background: #fff; }
+.ring-sparkle i:nth-child(1) { width: 4px; height: 4px; margin: -2px; }
+.ring-sparkle i:nth-child(2) { transform: translateX(var(--reach, 4px)); }
+.ring-sparkle i:nth-child(3) { transform: translateX(calc(-1 * var(--reach, 4px))); }
+.ring-sparkle i:nth-child(4) { transform: translateY(var(--reach, 4px)); }
+.ring-sparkle i:nth-child(5) { transform: translateY(calc(-1 * var(--reach, 4px))); }
+@keyframes sparkle { 0%, 100% { opacity: 0; transform: scale(0.3); } 50% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .dot-ring .over, .dot-ring .over2, .dot-ring .core, .ring-throw i, .ring-sparkle { animation: none; } .ring-throw, .ring-sparkle { display: none; } }
 [data-color="gray"] .gem-ring .dot-ring { --ring: var(--text); }
 .gem-ring[data-finishes] > .dot-ring { filter: drop-shadow(0 0 3px var(--skill, var(--accent))); }
 .gem-ring-lv { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); padding: 0 6px; height: 16px; line-height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); font-family: var(--round); font-size: 10px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -2156,10 +2180,6 @@ button.home-plan:hover { color: var(--text); }
 .review-end { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 4vh auto 0; max-width: 420px; animation: card-in var(--t-4) ease-out both; }
 /* The mole stands on the ring: its row of dirt just above the ring, clear of its fill (D169). */
 .review-mole { display: block; line-height: 0; margin-bottom: 2px; width: 96px; height: calc(96px * 18 / 22); }
-/* D255: he lands off the cart with a squash, then springs back to his height. */
-.review-mole.fell { transform-origin: 50% 100%; animation: mole-land var(--t-4) var(--ease-spring) both; }
-@keyframes mole-land { from { transform: scale(1.14, 0.8); } }
-@media (prefers-reduced-motion: reduce) { .review-mole.fell { animation: none; } }
 /* The cart's tip (D190): a layer as wide as the window over the end screen, so the cart crosses it on a rail just
    over the ring. Its ore is the ring's own dot, in size and colour; a rough stone is the gem it becomes. */
 .review-end.carted { position: relative; }
@@ -2179,7 +2199,13 @@ button.home-plan:hover { color: var(--text); }
 .rich-ore { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ore-rich); box-shadow: 0 0 5px var(--c-green); vertical-align: 1px; }
 .cart-rough { margin: -9px 0 0 -9px; line-height: 0; }
 /* The mole asleep on the load (D255). Its wrapper's own point is the middle of his body: the foot of the head's box. */
+/* The ground he falls into: a clip set as he falls, so his body goes under the dirt line. */
+.cart-ground { position: absolute; inset: 0; }
 .cart-mole { position: absolute; left: 0; top: 0; width: 96px; height: calc(96px * 18 / 22); margin: calc(-96px * 18 / 22) 0 0 -48px; transform-origin: 50% 100%; line-height: 0; will-change: transform; }
+.cart-mole-body { display: block; width: 100%; height: 100%; will-change: transform; filter: url(#cart-solid); }
+.cart-bucket { filter: url(#cart-solid-fine); }
+.cart-solid-fill { flood-color: var(--bg); }
+.cart-dirt { position: absolute; left: 0; top: 0; margin: -4px 0 0 -4px; border-radius: 50%; background: color-mix(in oklab, var(--text) 78%, var(--bg)); will-change: transform; }
 .cart-zzz { position: absolute; left: -30px; top: -110px; width: 110px; height: 86px; overflow: visible; fill: var(--muted); }
 .cart-zzz g { animation: cart-zzz 1400ms infinite both; }
 .cart-zzz g:nth-child(2) { animation-delay: 250ms; }
@@ -2196,6 +2222,23 @@ button.home-plan:hover { color: var(--text); }
 .end-emblem::before { content: ""; position: absolute; inset: -48px 0 -72px; z-index: -1; pointer-events: none; background-image: radial-gradient(circle, color-mix(in oklab, var(--text) 16%, transparent) 1.1px, transparent 1.6px); background-size: 9px 9px; background-position: center; -webkit-mask-image: radial-gradient(closest-side, #000, transparent); mask-image: radial-gradient(closest-side, #000, transparent); }
 .end-ring { position: relative; display: grid; place-items: center; }
 .end-ring > * { grid-area: 1 / 1; }
+/* What stands in the ring: the day's minutes in its dots, "min" and what came after the goal on a chip in the
+   ring's green, and one line for the skill the session fed most. */
+.end-lap { display: flex; flex-direction: column; align-items: center; font: 400 12px/1 var(--mono); color: var(--muted); animation: end-lap-in var(--t-4) var(--ease-out); }
+.end-lap-n { display: block; color: var(--text); }
+.end-lap-min { display: flex; align-items: center; justify-content: center; height: 20px; margin-top: 10px; }
+.end-lap-plus { display: grid; place-items: center; height: 20px; padding: 0 7px; margin-left: 7px; border-radius: 10px; background: var(--c-green); color: #0f2a19; animation: end-plus-in var(--t-4) var(--ease-out); }
+.end-lap .end-lap-plus .dot-number circle { fill: #0f2a19; }
+.end-lap-plus:focus-visible, .end-lap-reel:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.end-lap-reel { display: block; height: 24px; margin-top: 8px; overflow: hidden; border-radius: 6px; animation: end-lap-in var(--t-4) var(--ease-out); }
+.end-lap-rows { display: flex; flex-direction: column; transition: transform var(--t-4) var(--ease-out); }
+.end-lap-rows > span { display: flex; align-items: center; justify-content: center; gap: 6px; height: 24px; max-width: 150px; color: var(--text); white-space: nowrap; }
+.end-lap-rows > span > span:not(.skill-icon) { overflow: hidden; text-overflow: ellipsis; }
+.end-lap-rows .skill-icon.glyph { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; }
+.end-lap-rows b { font-weight: 500; color: var(--skill, var(--text)); }
+@keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes end-plus-in { from { opacity: 0; max-width: 0; padding: 0; margin-left: 0; } to { max-width: 48px; } }
+@media (prefers-reduced-motion: reduce) { .end-lap, .end-lap-reel, .end-lap-plus { animation: none; } .end-lap-rows { transition: none; } }
 /* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
    Each lands in hard steps, one after another, then is still. */
 .end-tally { list-style: none; display: flex; justify-content: center; gap: 16px; margin: 20px 0 0; padding: 0; }
@@ -2225,8 +2268,16 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-head { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .end-tally li, .end-tally .end-mark circle { animation: none !important; } }
 .end-ring > .review-cut { position: relative; flex-wrap: wrap; align-items: center; max-width: 160px; gap: 6px 8px; margin: 0; }
-/* The mole sits on the ring: its row of dirt rests on the ring's top dots. */
-.end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: -12px; }
+/* The mole comes up out of a mound of dirt that stands just clear of the ring: its bonus dots are bigger (Tyler, 2026-11-14, D274). */
+.end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: 4px; }
+/* The mound, in front of him: it heaps up from its foot as he comes up, or as he lands in it off the cart. */
+.mole-mound { position: absolute; left: 0; bottom: 0; transform-origin: 50% 100%; animation: mound-in var(--t-moment) var(--ease-spring) both; }
+.mole-mound .back { fill: var(--bg); }
+.mole-mound .lit { fill: color-mix(in srgb, var(--text) 52%, var(--bg)); }
+.mole-mound .earth { fill: color-mix(in srgb, var(--text) 30%, var(--bg)); }
+.mole-mound .deep { fill: color-mix(in srgb, var(--text) 14%, var(--bg)); }
+@keyframes mound-in { from { transform: scale(0.7, 0); } }
+@media (prefers-reduced-motion: reduce) { .mole-mound { animation: none; } }
 /* Two groups: what the session won, then what comes next. */
 .end-emblem ~ .review-try { margin-top: 40px; }
 .end-emblem ~ .review-try ~ .review-foot { margin-top: 12px; }
@@ -2242,10 +2293,6 @@ button.home-plan:hover { color: var(--text); }
 .says-line { margin: 0; font: 400 13px/1.5 var(--mono); letter-spacing: 0.01em; color: var(--text); overflow-wrap: anywhere; }
 .says-line:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 .says-rest { visibility: hidden; }
-/* A rare line's mark (D247): the thing's own drawing, 16px, on the words' midline. */
-.says-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 8px; vertical-align: middle; color: var(--muted); }
-.says-mark > * { grid-area: 1 / 1; }
-.says-mark > .skill-icon { width: 16px; height: 16px; }
 .says-block { position: relative; display: inline-block; width: 0; height: 1em; vertical-align: -0.12em; }
 .says-block::after { content: ""; position: absolute; left: 2px; top: 0; width: 0.55em; height: 100%; background: var(--text); }
 .says:not([data-typing]) .says-block::after { animation: block-blink 1s steps(1) infinite; }

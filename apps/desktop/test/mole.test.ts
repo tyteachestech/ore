@@ -189,6 +189,11 @@ test("traced: out of the ground he has a whole body and no dirt; asleep his eyes
   // Asleep his paws are behind his head; falling they are flung out past it.
   const wide = (d: ReturnType<typeof fineDots>) => Math.max(...d.filter(([, , , t]) => t === "fine-9").map(([x]) => Math.abs(x - 11)));
   expect(wide(fall)).toBeGreaterThan(wide(nap) + 3);
+  // Dropping feet first, what is loose is left behind over him: paws straight up, higher than flung out, helmet up off his brows.
+  const dive = fine(MOVES.dive.still), hatTop = (d: ReturnType<typeof fineDots>) => Math.min(...d.filter(([, , , t]) => t === "lamp").map(([, y]) => y));
+  const pawTop = (d: ReturnType<typeof fineDots>) => Math.min(...d.filter(([x, , , t]) => t === "fine-9" && Math.abs(x - 11) > 9).map(([, y]) => y));
+  expect(pawTop(dive)).toBeLessThan(pawTop(fall) - 3);
+  expect(hatTop(dive)).toBeLessThan(hatTop(fall) - 0.5);
   // His belly rises as he breathes in.
   expect(ink(fine({ ...MOVES.nap.still, breath: 1 }), "fine-7")).toBeGreaterThan(ink(nap, "fine-7"));
 });
@@ -218,4 +223,14 @@ test("traced: asleep in profile he lies along the foot of the box, head to the l
 test("traced: no dot of the helmet is alone a shade whiter than the dots round it", () => {
   const top = fine().filter(([, y, , t]) => t === "fine-9" && y < 8);
   for (const [x, y] of top) expect(top.some(([a, b]) => (a !== x || b !== y) && Math.hypot(a - x, b - y) < 1)).toBe(true);
+});
+
+test("waking from his sleep on the cart he is the front view from the first frame, never the sleeper stood on end (F154)", () => {
+  const s = puppet();
+  start(s, "doze", 0);
+  for (let t = 16; t < 2000; t += 16) advance(s, t, 0.016);
+  expect(s.v.side).toBeGreaterThan(0.5);
+  start(s, "fall", 2000);
+  expect(s.v.side).toBeLessThan(0.5);
+  expect(s.v.whole).toBeGreaterThan(0.5);
 });
