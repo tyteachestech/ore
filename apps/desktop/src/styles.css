@@ -769,8 +769,9 @@ img.thumb { filter: brightness(0.86); }
 .doc td.covered:hover::after { background: color-mix(in srgb, var(--bg-active), var(--text) 8%); }
 .doc td.covered:focus-visible { outline: none; }
 .doc td.covered:focus-visible::after { box-shadow: 0 0 0 2px var(--focus); }
-.doc th:has(.col-cover) { position: relative; }
-.doc th:has(.col-cover[aria-pressed="true"]) { padding-right: 30px; } /* room for the button while it stays; on hover alone it sits over the heading's end */
+/* The button's room is kept whether it shows or not (F113): on hover it sits beside the heading, never over
+   its end, and the column doesn't shift when it appears or stays. */
+.doc th:has(.col-cover) { position: relative; padding-right: 30px; }
 .doc .col-cover { position: absolute; top: 50%; right: 4px; translate: 0 -50%; display: inline-flex; padding: 1px; border-radius: 6px; color: var(--faint); background: var(--bg); opacity: 0; }
 .doc th:hover .col-cover, .doc .col-cover:focus-visible, .doc .col-cover[aria-pressed="true"] { opacity: 1; }
 .doc .col-cover:hover { color: var(--text); background: var(--bg-hover); }
