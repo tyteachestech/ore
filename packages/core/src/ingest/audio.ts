@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { release, tmpdir } from "node:os";
 import { join } from "node:path";
 import { madeThisRun } from "../cancel.ts";
+import { cleanDate } from "./check.ts";
 import { run, swiftHelper } from "./swift.ts";
 
 // Audio and podcast episodes (D96 phase 3): transcribed on the Mac with Apple's on-device speech
@@ -79,7 +80,7 @@ export interface Episode {
   title?: string;
   show?: string;
   published?: string;
-  /** The speech's language as the show's feed names it ("es-419"), so it is heard in it. */
+  /** The speech's language as its feed or episode names it ("es-419"), so it is heard in it. */
   language?: string;
   /** The episode's or show's own picture, where the directory or page names one. */
   artwork?: string;
@@ -138,7 +139,7 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
   const meta = metaOf(html);
   const audio = pageAudio(html, url, true);
   if (!audio) throw new Error("Couldn’t find the episode’s audio on that page. Add the Apple Podcasts link to the episode, or its audio file, instead.");
-  return { audio, title: meta("og:title"), show: meta("og:site_name"), artwork: meta("og:image") };
+  return { audio, title: meta("og:title"), show: meta("og:site_name"), published: cleanDate(meta("article:published_time")), artwork: meta("og:image"), language: pageAudioLanguage(html) };
 }
 
 /** An Apple Podcasts episode the lookup no longer lists (it gives a show's newest 200; a daily show
@@ -216,7 +217,7 @@ export function pageAudio(html: string, url: string, player = false): string | u
   };
   const meta = metaOf(html);
   const og = abs(meta("og:audio") ?? meta("og:audio:url") ?? meta("og:audio:secure_url"));
-  const declared = ldEpisodeAudio(html) ?? (og && /episode/i.test(meta("og:type") ?? "") && AUDIO_FILE.test(og) ? og : undefined);
+  const declared = ldEpisodeAudio(html)?.audio ?? (og && /episode/i.test(meta("og:type") ?? "") && AUDIO_FILE.test(og) ? og : undefined);
   if (declared) return abs(declared);
   // A player's own og:audio is its episode, whatever its address looks like (as before D215).
   if (player && og) return og;
@@ -250,9 +251,16 @@ export function pageAudio(html: string, url: string, player = false): string | u
   return found.size === 1 ? [...found.values()][0] : undefined;
 }
 
+/** The spoken language of the episode whose audio pageAudio chooses. A site's UI language is not
+ *  evidence of what its recording speaks; only the episode's own inLanguage is used. */
+export function pageAudioLanguage(html: string): string | undefined {
+  return ldEpisodeAudio(html)?.language;
+}
+
 /** The audio a page's JSON-LD names as the page's own: a page-level (or @graph) PodcastEpisode's or
- *  RadioEpisode's `associatedMedia` or `audio`, when it is audio by its address or `encodingFormat`. */
-function ldEpisodeAudio(html: string): string | undefined {
+ *  RadioEpisode's `associatedMedia` or `audio`, when it is audio by its address or `encodingFormat`,
+ *  and the spoken language declared on that same episode. */
+function ldEpisodeAudio(html: string): Pick<Episode, "audio" | "language"> | undefined {
   const media = (v: unknown): string | undefined =>
     [v].flat().flatMap((m) => {
       const o = m && typeof m === "object" ? (m as Record<string, unknown>) : {};
@@ -270,7 +278,7 @@ function ldEpisodeAudio(html: string): string | undefined {
     for (const n of nodes) {
       if (!n || typeof n !== "object" || ![n["@type"]].flat().some((t) => /^(?:PodcastEpisode|RadioEpisode)$/.test(String(t)))) continue;
       const u = media(n.associatedMedia) ?? media(n.audio);
-      if (u) return u;
+      if (u) return { audio: u, language: languageTag(typeof n.inLanguage === "string" ? n.inLanguage : undefined) };
     }
   }
   return undefined;
