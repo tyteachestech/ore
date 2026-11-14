@@ -79,52 +79,62 @@ const at = (px, py) => ({ x: n2(px * P), y: n2((py - ORIGIN_Y) * P) }); // a piv
 const HEAD = [0, -1]; // where the head turns
 const inHead = (px, py) => ({ x: n2((px - HEAD[0]) * P), y: n2((py - HEAD[1]) * P) });
 
-// The body the rest drawing never shows: a stout barrel under the head, a pale belly, two small feet.
-const bodyDots = [], bellyDots = [], footDots = [], armDots = [];
-// Stout and round, short-limbed: a wide egg in miner's overalls (dark, small dots), bib and two straps over
-// his pale front, a button on each strap.
-for (let y = 0; y <= 13; y++) for (let x = -13; x <= 13; x++) {
-  const d = Math.hypot(x / 12.2, (y - 6.3) / 7.2);
-  if (d > 1) continue;
-  const overalls = y >= 7 || (Math.abs(x) <= 5 && y >= 3) || ((Math.abs(x) === 5 || Math.abs(x) === 6) && y < 3);
-  const button = Math.abs(x) === 5 && y === 3;
-  if (button) bellyDots.push([x, y, 0.42, 9]);
-  else if (overalls) bodyDots.push([x, y, 0.41 - 0.08 * d * d, d > 0.88 ? 4 : 6]);
-  else bellyDots.push([x, y, 0.43 - 0.1 * d * d, d > 0.8 ? 7 : 9]);
+// The body the rest drawing never shows, as the app draws it whole (mole-fine.ts, `s.whole`): a stout torso, a pale
+// belly, short legs with flat feet, and arms that hang from the shoulder. Each part is its own set of dots so it can turn.
+const seg = (x, y, x1, y1, x2, y2, r) => { const dx = x2 - x1, dy = y2 - y1, t = Math.max(0, Math.min(1, ((x - x1) * dx + (y - y1) * dy) / (dx * dx + dy * dy))); return Math.hypot(x - x1 - dx * t, y - y1 - dy * t) - r; };
+const oval = (x, y, cx, cy, rx, ry) => (Math.hypot((x - cx) / rx, (y - cy) / ry) - 1) * Math.min(rx, ry);
+/** Dots of the first shape a point is in; a dark dot where a shape ends over one below it. fns: [distance, tone(x, y), group]. */
+function carve(fns, x0, x1, y0, y1, noRim = []) {
+  const out = {};
+  for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) {
+    const x = i + 0.07, y = j - 0.02, d = fns.map(([f]) => f(x, y));
+    for (let n = 0; n < fns.length; n++) {
+      let tone;
+      if (d[n] < 0) tone = fns[n][1](x, y);
+      else if (!noRim.includes(n) && d[n] < 0.8) for (let m = n + 1; m < fns.length; m++) if (d[m] < -0.4) { tone = 2; break; }
+      if (tone !== undefined) { (out[fns[n][2]] ??= []).push([x, y, 0.4, tone]); break; }
+    }
+  }
+  return out;
 }
-// A short arm that hangs from the shoulder: grey sleeve, pale paw.
-for (let y = 0; y <= 8; y++) for (let x = -2; x <= 2; x++) {
-  const paw = y >= 6, w = paw ? 2.5 : 2.1;
-  if (Math.abs(x) > w || (y === 8 && Math.abs(x) > 1) || (y === 0 && Math.abs(x) > 1)) continue;
-  armDots.push([x, y, paw ? 0.42 : Math.abs(x) === 2 ? 0.3 : 0.38, paw ? 9 : Math.abs(x) === 2 ? 4 : 6]);
-}
-for (let y = 0; y <= 2; y++) for (let x = -2; x <= 2; x++) {
-  if (Math.hypot(x / 2.6, (y - 1) / 1.5) > 1) continue;
-  footDots.push([x, y, y === 2 ? 0.34 : 0.4, y === 0 ? 7 : 8]);
-}
+const SHOULDER = [9.5, 2.5], HIP = [5, 16], ARM_HANG = 2.09; // the arm is drawn raised, as he falls; at rest it hangs, turned this far
+const FRONT = carve([
+  [(x, y) => oval(Math.abs(x), y, 0, 11, 7.6, 6.4), () => 7, "belly"],
+  [(x, y) => (x < 0 ? oval(-x, y, 8, 23, 3.5, 2.3) : 9), () => 9, "legL"],
+  [(x, y) => (x > 0 ? oval(x, y, 8, 23, 3.5, 2.3) : 9), () => 9, "legR"],
+  [(x, y) => (x < 0 ? seg(-x, y, 5, 16, 6.4, 21.5, 2.9) : 9), () => 4, "legL"],
+  [(x, y) => (x > 0 ? seg(x, y, 5, 16, 6.4, 21.5, 2.9) : 9), () => 4, "legR"],
+  [(x, y) => Math.min(oval(Math.abs(x), y, 0, 11.5, 13, 8.6), oval(Math.abs(x), y, 0, 5, 11.6, 7)), (x, y) => (y > 16 ? 4 : 5), "torso"],
+], -24, 24, -3, 26, [0]);
+const ARM = carve([
+  [(x, y) => oval(x, y, 21, -11, 3, 3), () => 9, "arm"],
+  [(x, y) => Math.min(seg(x, y, 9.5, 2.5, 16, -3, 2.5), seg(x, y, 16, -3, 21, -11, 2.3)), () => 4, "arm"],
+], 5, 26, -16, 7).arm.map(([x, y, r, t]) => { const dx = x - SHOULDER[0], dy = y - SHOULDER[1], c = Math.cos(ARM_HANG), n = Math.sin(ARM_HANG); return [dx * c - dy * n, dx * n + dy * c, r, t]; });
 
 const ids = {};
 const I = (k) => (ids[k] ??= newId());
 
-// Asleep he is seen from the side, flat on his back: x runs from his helmet (left) to his feet, y is up from the
-// load he lies on. My own drawing, on his grid.
-const LY = { body: [], arm: [], feet: [] };
-const LY_NECK = [-9, -12.5], LY_HEAD = 0.88;
-for (let y = -20; y <= 1; y++) for (let x = -12; x <= 17; x++) {
-  const e = (Math.abs((x - 3) / 12.4) ** 2.1 + Math.abs((y + 0.4) / 17.4) ** 2.1) ** (1 / 2.1); // a round belly, not a mound
-  if (e > 1 || y > 0) continue;
-  const low = y > -3; // in the shade, against the load
-  const overalls = x >= 0 || (e > 0.82 && x >= -6 && y < -3); // legs and belly in overalls; a strap over the chest
-  if (x === 0 && e > 0.82 && y < -8) LY.body.push([x, y, 0.44, 9]); // its button
-  else if (overalls) LY.body.push([x, y, low ? 0.32 : 0.4 - 0.06 * e, low ? 3 : y <= -11 ? 5 : 4]);
-  else LY.body.push([x, y, low ? 0.36 : 0.44 - 0.04 * e, low ? 6 : 9]);
-}
-for (let i = 0; i <= 5; i++) LY.arm.push([i - 5, -13 - i * 0.9, 0.38, 6], [i - 5, -12 - i * 0.9, 0.36, 6]);
-LY.arm.push(...[[1, -18.5], [2, -18.5], [1, -17.5], [2, -17.5], [1.5, -19.5]].map(([x, y]) => [x, y, 0.42, 9]));
-for (const [dx, dy, tone] of [[1.7, 0.5, 6], [0, 0, 8]]) for (const [x, y] of [[0, -1], [1, -1], [0, -2], [1, -2], [0, -3], [1, -3], [0, -4], [1, -4], [0.5, -5]]) LY.feet.push([14 + x + dx, y + dy - 2, y === -5 ? 0.34 : 0.4, tone]);
+// Asleep he is the app's own side view (mole-fine.ts `sideDots`): drawn standing in profile, facing right (x forward,
+// y down), then laid on his back: helmet tipped over his eyes, a lobe of the moustache on his chest, a paw behind
+// his head, a belly like a hill and two flat feet. Shown smaller on the cart, as the app shows him.
+const LY_SCALE = 0.55;
+const turn = (x, y, a, px, py) => { const c = Math.cos(a), n = Math.sin(a); return [px + (x - px) * c - (y - py) * n, py + (x - px) * n + (y - py) * c]; };
+const raw = (name, tone) => { const a = PARTS[name], out = []; for (let i = 0; i < a.length; i += 4) out.push([a[i], a[i + 1], a[i + 2], tone ?? grey(a[i + 3])]); return out; };
+const SIDE = carve([
+  [(x, y) => seg(x, y, 0.5, 23.2, 10.5, 23.2, 2.7), () => 9, "feet"],
+  [(x, y) => oval(x, y, 10.6, 9, 6.6, 8.4), () => 7, "body"],
+  [(x, y) => oval(x, y, -8, -18.5, 2.6, 3), () => 9, "arm"],
+  [(x, y) => seg(x, y, -2.5, 1.5, -9, -14.5, 2.6), () => 5, "arm"],
+  [(x, y) => oval(x, y, 10.6, -7.6, 3.6, 3.2), () => 5, "head"],
+  [(x, y) => oval(x, y, 0, -10, 11.2, 11), () => 5, "head"],
+  [(x, y) => oval(x, y, 2.8, 8.5, 14, 12.6), (x) => (x < -5 ? 4 : 5), "body"],
+  [(x, y) => seg(x, y, 4.5, 24.6, 14, 24.6, 2.5), () => 7, "feet"],
+], -14, 28, -27, 30, [1, 4]);
+SIDE.hat = [...raw("lamp", "lamp").map(([x, y, r, t]) => [...turn(x + 7.5, y + 0.6, 0.42, 0, -10), r, t]), ...raw("helmet").map(([x, y, r, t]) => [...turn(x + 1.5, y, 0.42, 0, -10), r, t])];
+SIDE.nose = raw("nose", "nose").map(([x, y, r, t]) => [13.6 + x, -8.2 + y + 10, r, t]);
+SIDE.lobe = raw("lobeL").map(([x, y, r, t]) => [...turn(x + 0.9 + 11.2, y + 10.4 - 6.6, 0.25, 11.2, -6.6), r, t]);
 const lyAt = (px, py) => ({ x: n2(px * P), y: n2(py * P) });
-const lyPart = (key, name, list, px, py, extra = "") => node(name, { id: I(key), ...lyAt(px, py) }, [extra, dotShapes(mine(list, px, py), name), backing(mine(list, px, py))]);
-const LY_NOSE = [LY_NECK[0] + (NOSE[1] - HEAD[1]) * LY_HEAD, LY_NECK[1] - (NOSE[0] - HEAD[0]) * LY_HEAD - 1.4]; // just over his nose
+const LY_NOSE = [-9.5 * LY_SCALE, -27 * LY_SCALE]; // just over his nose, from the side view's own point
 const LY_AT = [-22, 22]; // where the side view sits, from the front view's root
 const HELM_PIVOT = [0, -15.5];
 /** His head, from the traced drawing: eyes, helmet and lamp, nose, the two halves of the moustache, fur. p prefixes the ids. */
@@ -142,6 +152,7 @@ function headKids(p = "", shut = false, neckless = false) {
   ]));
   // neckless: without the shoulders the rest drawing shows at the rim of his hole
   const hp = (name, tone) => part(name, tone, ...HEAD).filter(([, y]) => !neckless || y < 0.6 * P);
+  const shaded = ([, y, , t]) => !neckless && y > (-2.5 - HEAD[1]) * P && t < 4;
   const helmet = part("helmet", undefined, ...HELM_PIVOT), lamp = part("lamp", "lamp", ...HELM_PIVOT);
   return [
     eye("L", -4.4, -12.6), eye("R", 5.6, -12.6),
@@ -149,29 +160,40 @@ function headKids(p = "", shut = false, neckless = false) {
     dotShapes(hp("nose", "nose"), "nose"),
     lobe("L", -1), lobe("R", 1),
     dotShapes(hp("gap"), "gap"),
-    dotShapes(hp("fur"), "fur"), backing(hp("fur")),
+    // The shadows his paws cast on his chest go with the paws (mole-fine.ts): whole, those dots are plain fur.
+    p ? "" : node("Paw shade", { id: I("pawShade"), opacity: 0 }, dotShapes(hp("fur").filter(shaded), "shade")),
+    dotShapes(hp("fur").map((d) => (shaded(d) ? [d[0], d[1], d[2], 5] : d)), "fur"), backing(hp("fur")),
   ];
 }
 function lyingXml() {
-  return node("Lying", { id: I("lying"), x: LY_AT[0], y: LY_AT[1], rotation: n4(Math.PI / 2), opacity: 0 }, [
-    node("ZAnchor", { id: I("zAnchor"), ...lyAt(-12, -31) }),
-    lyPart("lyArm", "Arm", LY.arm, -5, -12.5),
-    // His own head, turned on its side and facing us: the old cartoon cheat for "flat on his back".
-    node("Head", { id: I("lyHead"), ...lyAt(...LY_NECK) }, [
-      node("NoseAnchor", { id: I("noseAnchor"), ...lyAt(LY_NOSE[0] - LY_NECK[0], LY_NOSE[1] - LY_NECK[1]) }),
-      node("Turned", { rotation: n4(-Math.PI / 2), scaleX: LY_HEAD, scaleY: LY_HEAD }, headKids("ly", true, true)),
+  const sp = (name, list, px, py, a = {}, extra = []) => node(name, { ...a, x: n2(px * P), y: n2(py * P) }, [...extra, dotShapes(mine(list, px, py), name), backing(mine(list, px, py))]);
+  return node("Lying", { id: I("lying"), x: LY_AT[0], y: LY_AT[1], rotation: n4(Math.PI / 2), opacity: 0 }, node("Sized", { scaleX: LY_SCALE, scaleY: LY_SCALE }, [
+    node("ZAnchor", { id: I("zAnchor"), ...lyAt(-17, -33) }),
+    node("NoseAnchor", { id: I("noseAnchor"), ...lyAt(-9.5, -27) }),
+    // standing in profile, laid back: (x, y) of the drawing lands at (y - 1, -x - 11.5)
+    node("Standing", { ...lyAt(-1, -11.5), rotation: n4(-Math.PI / 2) }, [
+      node("Head", { id: I("lyHead") }, [
+        node("Helmet at", { x: 0, y: n2(-10 * P) }, node("Helmet", { id: I("lyhelm") }, [dotShapes(mine(SIDE.hat, 0, -10), "helmet"), backing(mine(SIDE.hat, 0, -10))])),
+        dotShapes(mine(SIDE.nose, 0, 0), "nose"),
+        sp("Lobe", SIDE.lobe, 11.2, -6.6, { id: I("lysnoreL") }),
+        node("Arm at", { x: n2(-2.5 * P), y: n2(1.5 * P) }, node("Arm", { id: I("lyArm") }, [dotShapes(mine(SIDE.arm, -2.5, 1.5), "arm"), backing(mine(SIDE.arm, -2.5, 1.5))])),
+        dotShapes(mine(SIDE.head, 0, 0), "head"), backing(mine(SIDE.head, 0, 0)),
+      ]),
+      node("Unused", { id: I("lysnoreR") }),
+      sp("Feet", SIDE.feet, 0, 23.5, { id: I("lyFeet") }),
+      sp("Body", SIDE.body, -11.5, 8.5, { id: I("lyBody") }),
     ]),
-    lyPart("lyFeet", "Feet", LY.feet, 14, -2),
-    node("Body", { id: I("lyBody"), ...lyAt(3, 0) }, [dotShapes(mine(LY.body, 3, 0), "body"), backing(mine(LY.body, 3, 0))]),
-  ]);
+  ]));
 }
 function moleXml() {
   // In the hole his paws rest on the rim (the traced drawing); out of it he has arms. One of the two is shown.
   const paw = (s, sign) => node(`Paw${s}`, { id: I(`paw${s}`), ...at(sign * 11.8, -2.6), opacity: 0 }, [
     dotShapes(part(`paw${s}`, undefined, sign * 11.8, -2.6), "paw"), backing(part(`paw${s}`, undefined, sign * 11.8, -2.6)),
   ]);
-  const arm = (s, sign) => node(`Arm${s}`, { id: I(`arm${s}`), ...at(sign * 10.6, 1.6) }, [dotShapes(mine(armDots, 0, 0), "arm"), backing(mine(armDots, 0, 0))]);
-  const foot = (s, sign) => node(`Foot${s}`, { id: I(`foot${s}`), ...at(sign * 5, 12.8) }, [dotShapes(mine(footDots, 0, 0), "foot"), backing(mine(footDots, 0, 0))]);
+  const B = [0, 8], inB = (px, py) => ({ x: n2((px - B[0]) * P), y: n2((py - B[1]) * P) });
+  const armDots = (sign) => mine(ARM.map(([x, y, r, t]) => [sign * x, y, r, t]), 0, 0);
+  const arm = (s, sign) => node(`Arm${s}`, { id: I(`arm${s}`), ...inB(sign * SHOULDER[0], SHOULDER[1]) }, [dotShapes(armDots(sign), "arm"), backing(armDots(sign))]);
+  const foot = (s, sign) => node(`Foot${s}`, { id: I(`foot${s}`), ...inB(sign * HIP[0], HIP[1]) }, [dotShapes(mine(FRONT[`leg${s}`], sign * HIP[0], HIP[1]), "leg"), backing(mine(FRONT[`leg${s}`], sign * HIP[0], HIP[1]))]);
   return node("Mole", { id: I("mole"), x: HOLE_X, y: n2(GROUND + ORIGIN_Y * P) }, [
     el("TransformConstraint", { id: I("moleSeat"), targetId: I("seat"), strength: 0, name: "Rides the cart" }),
     el("ClippingShape", { sourceId: I("holeClip"), name: "Above the dirt" }),
@@ -179,9 +201,13 @@ function moleXml() {
     node("Bob", { id: I("bob") }, node("Squash", { id: I("sq") }, node("Breath", { id: I("br") }, [
       node("Head", { id: I("head"), ...at(...HEAD) }, headKids()),
       paw("L", -1), paw("R", 1),
-      arm("L", -1), arm("R", 1),
-      node("Body", { id: I("body"), ...at(0, 8) }, [dotShapes(mine(bellyDots, 0, 8), "belly"), dotShapes(mine(bodyDots, 0, 8), "body"), backing(mine([...bodyDots, ...bellyDots], 0, 8))]),
-      foot("L", -1), foot("R", 1),
+      // belly over legs over torso over arms, as the app stacks them
+      node("Body", { id: I("body"), ...at(...B) }, [
+        dotShapes(mine(FRONT.belly, ...B), "belly"), backing(mine(FRONT.belly, ...B)),
+        foot("L", -1), foot("R", 1),
+        dotShapes(mine(FRONT.torso, ...B), "torso"), backing(mine(FRONT.torso, ...B)),
+        arm("L", -1), arm("R", 1),
+      ]),
     ]))),
   ]);
 }
@@ -280,7 +306,7 @@ function zsXml() {
     ...[0, 1, 2].map((k) => node(`Z${k}`, { id: I(`z${k}`), opacity: 0 }, dotShapes(z, "z"))),
   ]);
 }
-const BUB = 12;
+const BUB = 8;
 function bubbleXml() {
   // A ring of pale dots with a glint, over a disc of the page colour so it reads against his pale face.
   const d = [];
@@ -352,14 +378,14 @@ const deg = (d) => (d * Math.PI) / 180;
 const G = 4100; // the mole's gravity, px/s²: cartoon weight
 
 // Asleep: one breath is 54 frames. Belly rises, he bobs, the moustache flutters on the way out, Zs rise.
-const BREATH = 54, LYARM_Y = -12.5 * P;
+const BREATH = 54, LYARM_Y = 0;
 function asleep(a, frames, period = BREATH) {
   for (let c = 0; c * period < frames; c++) {
     const f = (t) => Math.min(frames, c * period + t * period);
     a.k("br", "scaleX", [[f(0), 1], [f(0.45), 0.985], [f(1), 1]]).k("br", "scaleY", [[f(0), 1], [f(0.45), 1.045], [f(1), 1]]);
     a.k("bob", "y", [[f(0), 0], [f(0.45), -3], [f(1), 0]]);
     a.s("bubble", [[f(0), 1], [f(0.45), 0.45], [f(1), 1]]); // in: it shrinks; out: it grows
-    a.k("lyBody", "scaleY", [[f(0), 1], [f(0.45), 1.06], [f(1), 1]]).k("lyArm", "y", [[f(0), LYARM_Y], [f(0.45), LYARM_Y - 2.6], [f(1), LYARM_Y]]);
+    a.k("lyBody", "scaleX", [[f(0), 1], [f(0.45), 1.06], [f(1), 1]]).k("lyArm", "x", [[f(0), 0], [f(0.45), 2.6], [f(1), 0]]);
     a.k("lyHead", "rotation", [[f(0), 0], [f(0.45), -0.05], [f(1), 0]]);
     a.k("lysnoreL", "rotation", [[f(0), 0, "h"], [f(0.5), 0], [f(0.6), 0.3], [f(0.68), 0.08], [f(0.76), 0.3], [f(0.84), 0.1], [f(0.92), 0.24], [f(1), 0]]);
     a.k("lysnoreR", "rotation", [[f(0), 0, "h"], [f(0.5), 0], [f(0.6), -0.3], [f(0.68), -0.08], [f(0.76), -0.3], [f(0.84), -0.1], [f(0.92), -0.24], [f(1), 0]]);
@@ -416,7 +442,7 @@ const A1 = new Anim("Roll in", 54);
   a.k("footL", "rotation", [[0, 0.25, "h"], [28, 0.25, "o"], [34, -0.4, "io"], [42, 0.3, "io"], [50, 0.2]]).k("footR", "rotation", [[0, -0.25, "h"], [28, -0.25, "o"], [35, -0.7, "io"], [43, 0.1, "io"], [51, -0.2]]);
   a.k("lyFeet", "rotation", [[0, 0, "h"], [27, 0, "o"], [33, 0.5, "io"], [40, -0.2, "io"], [47, 0.08, "io"], [53, 0]]);
   a.k("lyhelm", "y", [[0, 0, "h"], [27, 0, "o"], [32, 4, "io"], [41, 1.5]]);
-  a.k("lyBody", "scaleX", [[0, 1, "h"], [26, 1, "o"], [32, 0.93, "io"], [38, 1.04, "io"], [45, 1]]);
+  a.k("lyBody", "scaleY", [[0, 1, "h"], [26, 1, "o"], [32, 0.93, "io"], [38, 1.04, "io"], [45, 1]]);
   a.k("lyArm", "rotation", [[0, 0, "h"], [27, 0, "o"], [33, -0.5, "io"], [41, 0.12, "io"], [48, 0]]);
   // Sparks off the locked wheels.
   for (let s = 0; s < 6; s++) {
@@ -441,7 +467,7 @@ const A2 = new Anim("Pour", 60);
   a.k("head", "rotation", [[0, 0.03], [60, 0.14]]);
   a.k("armL", "rotation", [[0, -0.9, "h"]]).k("armR", "rotation", [[0, 0.1], [60, -0.2]]);
   a.k("footL", "rotation", [[0, 0.2, "h"]]).k("footR", "rotation", [[0, -0.2, "h"]]);
-  a.k("lyFeet", "rotation", [[0, 0, "h"]]).k("lyhelm", "y", [[0, 1.5, "h"]]).k("lyBody", "scaleX", [[0, 1, "h"]]).k("lyArm", "rotation", [[0, 0], [60, 0.25]]);
+  a.k("lyFeet", "rotation", [[0, 0, "h"]]).k("lyhelm", "y", [[0, 1.5, "h"]]).k("lyBody", "scaleY", [[0, 1, "h"]]).k("lyArm", "rotation", [[0, 0], [60, 0.25]]);
 }
 
 // 3. The stones drop while he slides the rest of the way, faster and faster, off the lip. The bucket falls back,
@@ -480,7 +506,7 @@ const FLOAT = 14; // Tyler: he should not go up much before he drops into his sp
   a.k("lyArm", "rotation", [[0, 0.25, "in"], [o, 1.0, "io"], [o + 10, -0.3, "io"], [o + 20, 0.5, "io"], [o + 32, 0.9, "io"], [o + 44, 1.15, "io"], [o + 56, 1.05]]);
   a.k("lyFeet", "rotation", [[0, 0, "h"], [o - 10, 0, "in"], [o, 0.45, "io"], [o + 9, -0.4, "io"], [o + 19, 0.2, "io"], [o + 29, -0.08, "io"], [o + 39, 0]]);
   a.k("lyhelm", "y", [[0, 1.5, "h"], [o, 1.5, "o"], [o + 6, -3, "io"], [o + 14, 1, "io"], [o + 22, 0]]);
-  a.k("lyBody", "scaleX", [[0, 1, "h"], [o, 1, "o"], [o + 5, 1.06, "io"], [o + 11, 0.97, "io"], [o + 17, 1.02, "io"], [o + 23, 1]]);
+  a.k("lyBody", "scaleY", [[0, 1, "h"], [o, 1, "o"], [o + 5, 1.06, "io"], [o + 11, 0.97, "io"], [o + 17, 1.02, "io"], [o + 23, 1]]);
   for (let j = 0; j < MAX_STONES; j++) {
     const L = 2 + j * 5, T = 27, h = 58;
     a.k(`stoneFly${j}`, "strength", [[0, 0, "h"], [L, 0, "l"], [L + T, 1, "h"]]);
@@ -495,14 +521,15 @@ const FLOAT = 14; // Tyler: he should not go up much before he drops into his sp
 // 4. The bubble pops. Eyes wide. He scrambles on nothing, stops, looks down, looks at us, and drops into his
 // hole, helmet last. Then up he pops as if nothing happened.
 const RISE = 8, T_DROP = 58;
-const FEET = (12.8 + 2 - ORIGIN_Y) * P; // his soles, below his root
+const FEET = (25.3 - ORIGIN_Y) * P; // his soles, below his root
 const fallFrames = (d) => Math.sqrt((2 * d) / G) * 60;
-const T_KNOCK = Math.round(T_DROP + fallFrames(FLOOR - FEET - (HANG[1] - FLOAT - RISE)));
-const T_GONE = Math.ceil(T_DROP + fallFrames(REST[1] + 78 - (HANG[1] - FLOAT - RISE)));
+const WAKE_Y = FLOOR - FEET - 8; // awake he is drawn whole and full size, his soles just over the dirt
+const T_KNOCK = Math.round(T_DROP + fallFrames(FLOOR - FEET - (WAKE_Y - RISE)));
+const T_GONE = Math.ceil(T_DROP + fallFrames(REST[1] + 78 - (WAKE_Y - RISE)));
 const T_POP = T_GONE + 18, T_SETTLED = T_POP + 27, T_SPEAK = T_POP + 87;
 const A4 = new Anim("Wake and dive", T_POP + 117);
 {
-  const a = A4, hx = HANG[0], hy = HANG[1] - FLOAT, [rx, ry] = REST, top = hy - RISE;
+  const a = A4, hx = HANG[0], hy = HANG[1] - FLOAT, [rx, ry] = REST, wy = WAKE_Y, top = wy - RISE;
   a.k("moleSeat", "strength", [[0, 0, "h"]]).k("rail", "opacity", [[0, 0, "h"]]).k("cart", "x", [[0, -140, "h"]]);
   a.k("br", "scaleX", [[0, 1, "h"]]).k("br", "scaleY", [[0, 1, "h"]]).k("bob", "y", [[0, 0, "h"]]);
   a.k("snoreL", "rotation", [[0, 0, "h"]]).k("snoreR", "rotation", [[0, 0, "h"]]);
@@ -515,7 +542,7 @@ const A4 = new Anim("Wake and dive", T_POP + 117);
   a.k("zs", "opacity", [[0, 1, "h"], [4, 1, "l"], [8, 0, "h"]]).s("zs", [[0, 1, "h"], [4, 1, "o"], [8, 1.5, "h"]]);
   // The cut: on the pop the side view gives way to the front view, bolt upright.
   a.k("lying", "opacity", [[0, 1, "h"], [5, 0, "h"]]).k("bob", "opacity", [[0, 0, "h"], [5, 1, "h"]]).k("lying", "rotation", [[0, Math.PI / 2 - CART.tip, "h"]]);
-  a.k("lyBody", "scaleY", [[0, 1, "o"], [4, 0.85, "h"]]).k("lyArm", "rotation", [[0, 1.05, "h"]]).k("lyFeet", "rotation", [[0, 0, "o"], [4, -0.5, "h"]]);
+  a.k("lyBody", "scaleX", [[0, 1, "o"], [4, 0.85, "h"]]).k("lyArm", "rotation", [[0, 1.05, "h"]]).k("lyFeet", "rotation", [[0, 0, "o"], [4, -0.5, "h"]]);
   // Eyes: shut, then very open. A long stare before anything else moves.
   for (const s of ["L", "R"]) {
     a.k(`shut${s}`, "opacity", [[0, 1, "h"], [5, 0, "h"], [T_POP + 45, 1, "h"], [T_POP + 50, 0, "h"]]).k(`open${s}`, "opacity", [[0, 0, "h"], [5, 1, "h"], [T_POP + 45, 0, "h"], [T_POP + 50, 1, "h"]]);
@@ -529,7 +556,8 @@ const A4 = new Anim("Wake and dive", T_POP + 117);
   // The scramble: upright in a blink, limbs windmilling, climbing on nothing.
   const S0 = 20, S1 = 44;
   a.k("mole", "rotation", [[0, HANG_ROT, "h"], [5, -0.1, "h"], [S0, -0.1, "o"], [S0 + 7, 0.14, "io"], [S0 + 12, -0.05, "io"], [S0 + 17, 0, "h"]]);
-  a.k("mole", "y", [[0, hy, "h"], [S0, hy, "out"], [S1, top, "h"]]);
+  a.s("bob", [[0, 1, "h"], [5, 0.62, "o"], [10, 1.06, "io"], [15, 1, "h"]]); // he grows as he starts awake, as in the app
+  a.k("mole", "y", [[0, hy, "h"], [5, wy, "h"], [S0, wy, "out"], [S1, top, "h"]]);
   const xs = [[0, hx, "h"]]; for (let f = S0 + 8, i = 0; f < S1; f += 2, i++) xs.push([f, hx + (i % 2 ? 1.6 : -1.6), "h"]); xs.push([S1, hx, "h"]);
   a.k("mole", "x", xs);
   const run = (f0, f1, step, a0, a1) => { const ks = []; for (let f = f0, i = 0; f <= f1; f += step, i++) ks.push([f, i % 2 ? a1 : a0, "io"]); return ks; };
@@ -544,7 +572,7 @@ const A4 = new Anim("Wake and dive", T_POP + 117);
   a.k("sq", "scaleY", [[S1 + 9, 1, "io"], [T_DROP - 2, 0.93, "in"], [T_DROP + 5, 1.22, "h"]]).k("sq", "scaleX", [[S1 + 9, 1, "io"], [T_DROP - 2, 1.05, "in"], [T_DROP + 5, 0.86, "h"]]);
   // The drop: gravity, feet first, arms left behind overhead, and the helmet a beat late.
   a.fall("mole", "y", T_DROP, T_GONE, top, 0, G, "h");
-  a.k("armL", "rotation", [[T_DROP, 0.15, "o"], [T_DROP + 5, 2.9, "h"]]).k("armR", "rotation", [[T_DROP, -0.15, "o"], [T_DROP + 5, -2.9, "h"]]);
+  a.k("armL", "rotation", [[T_DROP, 0.15, "o"], [T_DROP + 5, 2.2, "h"]]).k("armR", "rotation", [[T_DROP, -0.15, "o"], [T_DROP + 5, -2.2, "h"]]);
   a.k("helm", "y", [[T_DROP, 0, "out"], [T_DROP + 4, -17, "in"], [T_DROP + 9, 0, "h"]]).k("helm", "rotation", [[T_DROP, 0, "io"], [T_DROP + 4, 0.25, "io"], [T_DROP + 9, 0.1, "h"]]);
   a.k("lobeL", "rotation", [[T_DROP, 0.2, "o"], [T_DROP + 4, 0.75, "h"]]).k("lobeR", "rotation", [[T_DROP, -0.2, "o"], [T_DROP + 4, -0.75, "h"]]);
   // The hit: the host is told (the ring is the page's), dirt flies, the dirt line gives.
@@ -557,6 +585,7 @@ const A4 = new Anim("Wake and dive", T_POP + 117);
   a.crumb(T_GONE + 6, 14, HOLE_X + 26, GROUND - 60, 4, 0, 2300, 1.2, "dirt"); // one that went higher than the rest
   // Underground, out of sight: arms away, paws on, everything straight.
   const U = T_GONE + 1;
+  a.k("pawShade", "opacity", [[0, 0, "h"], [U, 1, "h"]]);
   for (const s of ["L", "R"]) a.k(`arm${s}`, "opacity", [[0, 1, "h"], [U, 0, "h"]]).k(`paw${s}`, "opacity", [[0, 0, "h"], [U, 1, "h"]]).k(`foot${s}`, "rotation", [[U, 0, "h"]]).k(`lobe${s}`, "rotation", [[U, 0, "h"]]);
   a.k("mole", "x", [[U, rx, "h"]]).k("mole", "rotation", [[U, 0, "h"]]).k("mole", "y", [[U, ry + 78, "h"]]);
   a.k("helm", "y", [[U, 4, "h"]]).k("helm", "rotation", [[U, 0.1, "h"]]);
@@ -579,7 +608,7 @@ const A4 = new Anim("Wake and dive", T_POP + 117);
 
 // 5. Rest: he blinks now and then.
 const A5 = new Anim("At rest", 240, { loop: true });
-A5.k("lying", "opacity", [[0, 0, "h"]]).k("bob", "opacity", [[0, 1, "h"]]);
+A5.k("pawShade", "opacity", [[0, 1, "h"]]).k("lying", "opacity", [[0, 0, "h"]]).k("bob", "opacity", [[0, 1, "h"]]);
 for (const s of ["L", "R"]) A5.k(`arm${s}`, "opacity", [[0, 0, "h"]]).k(`paw${s}`, "opacity", [[0, 1, "h"]]);
 for (const s of ["L", "R"]) A5.k(`shut${s}`, "opacity", [[0, 0, "h"], [150, 1, "h"], [155, 0, "h"]]).k(`open${s}`, "opacity", [[0, 1, "h"], [150, 0, "h"], [155, 1, "h"]]);
 

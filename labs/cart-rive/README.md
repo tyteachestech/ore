@@ -124,3 +124,16 @@ lift him much before he drops into his spot.
 - He stops 10 px higher on the tipped bucket (`SLIDE = 36`), so his feet clear the dirt line while he is tilted.
 
 Clip: `cart-rive-v4.mp4`, frames `cart-rive-v4-frames.png`, both recorded from the published file in the web runtime.
+
+## Fifth pass (2026-11-14): the blind test is over
+
+Tyler: keep Rive's motion, use the code version as the baseline look. The scene now draws the mole as the app does.
+
+- Asleep: the app's own side view (`sideDots` in `apps/desktop/src/mole-fine.ts`, from the cart-technique branch), carved
+  into parts (head, helmet, lobe, arm, belly, feet) so each can move; shown at 0.55 size on the cart, as the app shows him small.
+- Awake: the app's whole body (torso, belly, legs with flat feet, arms from the shoulder), full size, growing in as he wakes.
+  No overalls: that was this lab's own design.
+- The paw shadows on his chest show only with the paws, as in the app.
+- He wakes with his soles 8 px over the dirt, rises 8 px in the scramble, then drops.
+
+Clip: `cart-rive-v5.mp4`, frames `cart-rive-v5-frames.png`.
