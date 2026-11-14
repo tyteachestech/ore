@@ -11002,6 +11002,33 @@ journey("phone: a note's [[ link finds the library's sources", async (page) => {
   await page.locator(".note-menu-row").filter({ hasText: TESTING }).first().waitFor();
 }, "phone");
 
+journey("phone: ⌘Z on a rating after leaving Review puts Today's minutes back (F159)", async (page) => {
+  const ring = page.locator(".home-goal [aria-label$='minutes today']").first();
+  await ring.waitFor();
+  const before = await ring.getAttribute("aria-label");
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  await sure.waitFor();
+  // Three minutes on this exercise, so the rating shows in Today's minutes.
+  await page.evaluate(() => { const real = Date.now; Date.now = () => real() + 180_000; });
+  const field = page.locator(".phone-full textarea:visible");
+  if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+  await tap(page, sure);
+  const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+  if (await check.count()) await tap(page, check);
+  await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+  for (let i = 0; i < 3 && (await page.locator(".phone-full .review").count()); i++) {
+    await tap(page, page.getByRole("button", { name: "Leave review" }));
+    await page.waitForTimeout(400);
+  }
+  await until("Review is closed", async () => !(await page.locator(".phone-full .review").count()));
+  await until("Today counts the rating", async () => (await ring.getAttribute("aria-label")) !== before);
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast").filter({ hasText: /^Undone/ }).first().waitFor();
+  await until("Today takes the undone rating back", async () => (await ring.getAttribute("aria-label")) === before, 5000);
+}, "phone");
+
 journey("phone: the last rating of a review shows the end screen, not Wrapping up", async (page) => {
   // The phone's `ore` runs in the page, so a rating saves inside the tap's own event: the queue emptied while
   // Review was still busy, and the end screen waited for a tap on Close.
@@ -12149,6 +12176,78 @@ journey("source rename: pending Undo takes back the rename, not the source added
     await ore("archive", source.id);
   }
 });
+
+journey("source note: after leaving, ⌘Z takes back the note's edits, not the source added before (F157)", async (page) => {
+  const title = `Source with a note ${Date.now()}`;
+  await page.reload();
+  await page.keyboard.press("Meta+n");
+  await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nThis source must survive undoing its note.`);
+  await page.keyboard.press("Enter");
+  await page.getByRole("heading", { name: title, exact: true }).waitFor();
+  await until("the import has settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+  const source = (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === title)!;
+  const note = async () => ((await ore("notes", source.id)) as { text: string }).text.trim();
+  try {
+    await page.getByRole("tab", { name: "Source note" }).click();
+    const editor = page.getByRole("textbox", { name: "Source note", exact: true });
+    await editor.click();
+    await page.keyboard.type("Words I typed and then left.");
+    await until("the note autosaves", async () => (await note()) === "Words I typed and then left.", 5000);
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await page.locator(".home").waitFor();
+    await until("leaving has settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes back the note's edits", async () => (await note()) === "");
+    const archived = await ore("ls", "--archived") as { id: string }[];
+    if (archived.some((i) => i.id === source.id)) throw new Error("⌘Z archived the source instead of taking back its note");
+    await page.keyboard.press("Meta+Shift+z");
+    await until("⇧⌘Z puts them back", async () => (await note()) === "Words I typed and then left.");
+  } finally {
+    await ore("archive", source.id);
+  }
+});
+
+journey("⌘K from a source's note: the next source opens with the keys in its reader, not its note (F158)", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type(TESTING);
+  await page.getByRole("option", { name: new RegExp(TESTING.slice(0, 20)) }).first().waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+  await page.getByRole("tab", { name: "Source note" }).click();
+  const editor = page.getByRole("textbox", { name: "Source note", exact: true });
+  await editor.click();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type(AGENTS);
+  await page.getByRole("option", { name: new RegExp(AGENTS) }).first().waitFor();
+  // The Mac opens the next source's note within the editor's 500 ms handoff (a remount of the same note keeps
+  // its caret); the mock is slower, so its clock stands still until the new note is there.
+  await page.evaluate(() => {
+    const real = performance.now.bind(performance);
+    const at = real();
+    const w = window as unknown as { __thaw: () => void };
+    let still = true;
+    performance.now = () => (still ? at : real());
+    w.__thaw = () => void (still = false);
+  });
+  await page.keyboard.press("Enter");
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+  await page.locator(".note-editor .ProseMirror").waitFor();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => (window as unknown as { __thaw: () => void }).__thaw());
+  const item = (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === AGENTS)!;
+  const before = ((await ore("notes", item.id)) as { text: string }).text;
+  const seen: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    seen.push(String(await page.evaluate(() => { const a = document.activeElement as HTMLElement | null; return a?.getAttribute("aria-label") ?? a?.className ?? a?.tagName; })));
+    await page.waitForTimeout(200);
+  }
+  if (seen.includes("Source note")) throw new Error(`the keys went to the new source's note: ${seen.join(", ")}`);
+  await page.keyboard.press("]");
+  await page.waitForTimeout(1200);
+  const after = ((await ore("notes", item.id)) as { text: string }).text;
+  if (after !== before) throw new Error(`a reader key was typed into the note: ${JSON.stringify(after)}`);
+}, "webkit");
 
 journey("quick quiz: clicking the recorder takes keyboard focus in WebKit (F147)", async (page) => {
   await page.keyboard.press("Meta+,");
