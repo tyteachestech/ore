@@ -1,6 +1,6 @@
 Your name is `intake`. First read `codex-out/preamble.md` and follow it.
 
-PORTS
+Your ports: Mac app page http://localhost:1674/ with `window.__ORE_BRIDGE = 1675` (library `/Users/tylerpoelking/Developer/ore-wt/sweep2/codex-out/libs/intake`); iPhone app http://localhost:1680/ (its seed is a copy at `/Users/tylerpoelking/Developer/ore-wt/sweep2/codex-out/libs/intake-phone`; the page's writes stay in IndexedDB). WebKit server: `ws://[::1]:1683/`.
 
 ## Your focus: unusual things a learner adds
 Ore's core promise is that whatever someone learns from imports whole, as one `doc.md` (`CLAUDE.md` "Core promise", D96, D122). Known gaps are the `"gap:"` cells in `packages/core/test/intake-grid.test.ts` and `docs/reviews/2026-11-06-import-promise.md`: do not report those again. Add each item through the Mac app's Add (paste a link, drop or pick a file), then open the source and check its title, author, date, headings, images, tables, math, code and end against the original. Make the files yourself in your folder (scripts with Python, LibreOffice or pandoc if present, or download openly licensed ones).

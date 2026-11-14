@@ -1,0 +1,18 @@
+{
+  "id": "mwgnu31s-1",
+  "title": "Why does retrieval help?",
+  "carry": [],
+  "turns": [
+    {
+      "id": "mwgnu31s-1",
+      "message": "Why does retrieval help?",
+      "reply": "A partial explanation about spacing and recall.",
+      "citations": [],
+      "steps": [],
+      "marks": [],
+      "stopped": true
+    }
+  ],
+  "created": "2026-11-14T17:08:58.531Z",
+  "updated": "2026-11-14T17:08:58.613Z"
+}

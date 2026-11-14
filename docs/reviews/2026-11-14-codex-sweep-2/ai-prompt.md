@@ -1,6 +1,6 @@
 Your name is `ai`. First read `codex-out/preamble.md` and follow it.
 
-PORTS
+Your ports: Mac app page http://localhost:1676/ with `window.__ORE_BRIDGE = 1677` (library `/Users/tylerpoelking/Developer/ore-wt/sweep2/codex-out/libs/ai`); iPhone app http://localhost:1681/ (its seed is a copy at `/Users/tylerpoelking/Developer/ore-wt/sweep2/codex-out/libs/ai-phone`; the page's writes stay in IndexedDB). WebKit server: `ws://[::1]:1683/`.
 
 ## Your focus: AI that is slow, missing or wrong
 Every AI step in Ore is enrichment on add (exercises drafted from a source), grading an Explain answer in Review, the tutor chat, Ask your library (⌘K), explain/look up in the reader, and question variants. Read D21, D116 and anything on AI waits and failures in `docs/DECISIONS.md`, and `packages/core/src/ai/`. Here AI returns null; use `__ORE_FAIL` and `__ORE_SLOW` on each AI command (read `apps/desktop/scripts/mock/tauri.js` and `bridge.ts` for their names) to play each case:

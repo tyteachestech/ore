@@ -1,6 +1,6 @@
 Your name is `outside`. First read `codex-out/preamble.md` and follow it.
 
-PORTS
+Your ports: Mac app page http://localhost:1670/ with `window.__ORE_BRIDGE = 1671` (library `/Users/tylerpoelking/Developer/ore-wt/sweep2/codex-out/libs/outside`); iPhone app http://localhost:1678/ (its seed is a copy at `/Users/tylerpoelking/Developer/ore-wt/sweep2/codex-out/libs/outside-phone`; the page's writes stay in IndexedDB). WebKit server: `ws://[::1]:1683/`.
 
 ## Your focus: the library changes under the app
 Ore's files are canonical (D5) and live in iCloud Drive (D222); the phone, Finder, a text editor, Claude Code (`skills/ore`) and the `ore` CLI all write the same folder. Read D5, D78 and D222 in `docs/DECISIONS.md` and `packages/core/src/templates/library-agents.md` first. With the Mac app open on your library, change the library from your shell (as another device or tool would) and see what the app does, when it notices, and whether anything is lost:

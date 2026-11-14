@@ -1,6 +1,6 @@
 Your name is `time`. First read `codex-out/preamble.md` and follow it.
 
-PORTS
+Your ports: Mac app page http://localhost:1672/ with `window.__ORE_BRIDGE = 1673` (library `/Users/tylerpoelking/Developer/ore-wt/sweep2/codex-out/libs/time`); iPhone app http://localhost:1679/ (its seed is a copy at `/Users/tylerpoelking/Developer/ore-wt/sweep2/codex-out/libs/time-phone`; the page's writes stay in IndexedDB). WebKit server: `ws://[::1]:1683/`.
 
 ## Your focus: days, clocks and time away
 Ore is a daily habit over a backlog that never empties (`docs/design/daily-session.md`). Read D22 to D24 and anything on the daily goal, minutes and "today" in `docs/DECISIONS.md`, and `packages/core/src/queue.ts` and `scheduler.ts`. Use Playwright's `page.clock` and `page.emulateTimezone`-style context options (`timezoneId`) to move time in the page; to age the library, write past-dated records into your library's review logs the way the app writes them (read the code for the shape), never by hand-editing a file the app keeps open.
