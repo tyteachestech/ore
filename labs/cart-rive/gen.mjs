@@ -117,7 +117,7 @@ const I = (k) => (ids[k] ??= newId());
 // Asleep he is the app's own side view (mole-fine.ts `sideDots`): drawn standing in profile, facing right (x forward,
 // y down), then laid on his back: helmet tipped over his eyes, a lobe of the moustache on his chest, a paw behind
 // his head, a belly like a hill and two flat feet. Shown smaller on the cart, as the app shows him.
-const LY_SCALE = 0.55;
+const LY_SCALE = 0.45, NEAR = 0.72; // the app's sizes: asleep on the cart, and awake in the air before he grows into his spot
 const turn = (x, y, a, px, py) => { const c = Math.cos(a), n = Math.sin(a); return [px + (x - px) * c - (y - py) * n, py + (x - px) * n + (y - py) * c]; };
 const raw = (name, tone) => { const a = PARTS[name], out = []; for (let i = 0; i < a.length; i += 4) out.push([a[i], a[i + 1], a[i + 2], tone ?? grey(a[i + 3])]); return out; };
 const SIDE = carve([
@@ -523,7 +523,7 @@ const FLOAT = 14; // Tyler: he should not go up much before he drops into his sp
 const RISE = 8, T_DROP = 58;
 const FEET = (25.3 - ORIGIN_Y) * P; // his soles, below his root
 const fallFrames = (d) => Math.sqrt((2 * d) / G) * 60;
-const WAKE_Y = FLOOR - FEET - 8; // awake he is drawn whole and full size, his soles just over the dirt
+const WAKE_Y = FLOOR - FEET * NEAR - 28; // awake he is drawn whole, at NEAR size, his soles well clear of the dirt
 const T_KNOCK = Math.round(T_DROP + fallFrames(FLOOR - FEET - (WAKE_Y - RISE)));
 const T_GONE = Math.ceil(T_DROP + fallFrames(REST[1] + 78 - (WAKE_Y - RISE)));
 const T_POP = T_GONE + 18, T_SETTLED = T_POP + 27, T_SPEAK = T_POP + 87;
@@ -556,7 +556,7 @@ const A4 = new Anim("Wake and dive", T_POP + 117);
   // The scramble: upright in a blink, limbs windmilling, climbing on nothing.
   const S0 = 20, S1 = 44;
   a.k("mole", "rotation", [[0, HANG_ROT, "h"], [5, -0.1, "h"], [S0, -0.1, "o"], [S0 + 7, 0.14, "io"], [S0 + 12, -0.05, "io"], [S0 + 17, 0, "h"]]);
-  a.s("bob", [[0, 1, "h"], [5, 0.62, "o"], [10, 1.06, "io"], [15, 1, "h"]]); // he grows as he starts awake, as in the app
+  a.s("bob", [[0, 1, "h"], [5, LY_SCALE, "o"], [10, NEAR * 1.05, "io"], [15, NEAR, "h"], [T_DROP, NEAR, "in"], [T_KNOCK, 1, "h"]]); // he grows as he starts awake, as in the app
   a.k("mole", "y", [[0, hy, "h"], [5, wy, "h"], [S0, wy, "out"], [S1, top, "h"]]);
   const xs = [[0, hx, "h"]]; for (let f = S0 + 8, i = 0; f < S1; f += 2, i++) xs.push([f, hx + (i % 2 ? 1.6 : -1.6), "h"]); xs.push([S1, hx, "h"]);
   a.k("mole", "x", xs);
