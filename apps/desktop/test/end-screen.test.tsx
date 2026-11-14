@@ -91,15 +91,20 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
   expect(s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood")).toBe("doze");
   expect(s.q(".cart-zzz")).toBe(1);
   expect(s.q(".review-mole .mole")).toBe(0);
-  let awake = false;
+  let awake = false, grounded = false;
   for (let t = 0; t < 6000 && s.q(".cart-tip"); t += 20) {
     await act(async () => void jest.advanceTimersByTime(20));
-    // Awake in the air before he lands, and never two moles at once.
+    // Awake in the air before he lands, and never two moles at once: while he is on the cart or in the air, his hole is empty.
     if (s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood") === "fall") awake = true;
-    if (s.q(".cart-tip")) expect(s.q(".review-mole .mole")).toBe(0);
+    if (s.q(".cart-mole")) expect(s.body.querySelector(".review-mole .mole")?.getAttribute("data-mood") ?? "hole").toBe("hole");
+    // He falls into his hole: under the dirt line nothing of him is drawn, so the ring never crosses his belly (F94).
+    if (s.body.querySelector<HTMLElement>(".cart-ground")?.style.clipPath.startsWith("inset(")) grounded = true;
   }
   expect(awake).toBe(true);
-  expect(s.q(".review-mole .mole")).toBe(1);
+  expect(grounded).toBe(true);
+  // Down the hole, and up he pops: the same mole, and only then does he speak.
+  expect(s.body.querySelector(".review-mole .mole")?.getAttribute("data-mood")).toBe("pop");
+  expect(s.q(".end-says")).toBe(0);
   for (let i = 0; i < 200; i++) await act(async () => void jest.advanceTimersByTime(50));
   expect(s.body.querySelector(".end-says")!.textContent).toContain("Goal met. I supervised.");
   jest.useRealTimers();
@@ -109,6 +114,45 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
   expect(plain.q(".cart-tip .cart")).toBe(1);
   expect(plain.q(".cart-mole")).toBe(0);
   await plain.done();
+});
+
+test("the fall off the cart has weight, and the bucket never turns through him: he lies along its tipped rim, is pressed short then pulled long, drops feet first, throws dirt, knocks the ring, and the cart hops as he leaves it", async () => {
+  jest.useFakeTimers();
+  const proto = w.Element.prototype as unknown as Record<string, unknown>, plain = proto.animate;
+  const seen: { cls: string; keys: Record<string, string>[]; o: { composite?: string; duration?: number }; at: number }[] = [];
+  let now = 0;
+  proto.animate = function (this: Element, keys: Record<string, string>[], o: { composite?: string; duration?: number }) { seen.push({ cls: this.getAttribute("class") ?? this.tagName, keys, o, at: now }); return { cancel() {} }; };
+  try {
+    const s = await mount(end(["ai"]));
+    const backed = s.q("#cart-solid") + s.q("#cart-solid-fine");
+    let dived = false, dirt = 0;
+    for (let t = 0; t < 6000 && s.q(".cart-tip"); t += 20) {
+      await act(async () => void jest.advanceTimersByTime(20));
+      now = t + 20;
+      if (s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood") === "dive") dived = true;
+      dirt = Math.max(dirt, s.q(".cart-dirt"));
+    }
+    expect(dived).toBe(true);
+    expect(dirt).toBeGreaterThanOrEqual(8);
+    // Squash and stretch are on his body, inside the wrapper that places him: shorter than 1 along his length, then longer.
+    const pulls = seen.filter((a) => a.cls === "cart-mole-body").flatMap((a) => a.keys.map((k) => Number(/scale\(([\d.]+), ([\d.]+)\)/.exec(k.transform!)![2])));
+    expect(Math.min(...pulls)).toBeLessThan(0.9);
+    expect(Math.max(...pulls)).toBeGreaterThan(1.15);
+    // F155: tipped, he lies along the bucket's rim at the bucket's own angle (58°) and slides
+    // down it, so the bucket never turns through him; and his dots and the bucket's are backed, so neither shows through the other.
+    const slide = seen.filter((a) => a.cls === "cart-mole" && a.keys.length > 13 && a.keys[0]!.transform!.includes("scale(0.45)"))[0]!;
+    for (const k of slide.keys) expect(k.transform).toContain("rotate(58deg)");
+    expect(backed).toBe(2);
+    // His slide is over when the next move takes him, however short the pour: he never jumps the rest of the way.
+    const next = seen.filter((a) => a.cls === "cart-mole" && a.at > slide.at)[0]!;
+    expect(slide.at + slide.o.duration!).toBeLessThanOrEqual(next.at + 20);
+    // The cart's hop is added to its roll, never in place of it.
+    expect(seen.some((a) => a.cls === "cart" && a.o.composite === "add" && a.keys.some((k) => k.transform === "translateY(-4px)"))).toBe(true);
+    // The load slides down the tipped bucket to its low lip before it falls, and the wheels lock before the cart has stopped.
+    expect(seen.some((a) => a.cls.startsWith("cart-ore-in") && a.keys.length === 2 && a.keys[0]!.transform === "translate(0px, 0px)")).toBe(true);
+    expect(seen.some((a) => a.cls === "cart-wheel" && a.keys.length === 3 && a.keys[1]!.transform === a.keys[2]!.transform)).toBe(true);
+    await s.done();
+  } finally { proto.animate = plain; jest.useRealTimers(); }
 });
 
 test("a gem cut with the ring already full: the cart still comes, carrying only the stone", async () => {
@@ -345,7 +389,7 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   expect(endSays({ ...base, session: session({ longest_days: 3, rescued: 6 }) })).toHaveLength(1);
 });
 
-test("a rare line leads the mole's lines and wears its own mark (D247)", async () => {
+test("a rare line leads the mole's lines, in words alone: no icon in his speech box (D247 as amended)", async () => {
   jest.useFakeTimers();
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
   // The row under the ring shows the two pulled back, so the rare thing left for him to say is the long gap (F138).
@@ -354,8 +398,12 @@ test("a rare line leads the mole's lines and wears its own mark (D247)", async (
   await act(async () => void jest.advanceTimersByTime(560));
   const line = s.body.querySelector(".end-says .says-line")!;
   expect(line.textContent).toBe("18 days gone and you still had it.");
-  // The clock, the drawing a long gap already has.
-  expect(line.querySelectorAll(".says-mark svg").length).toBe(1);
+  // Tyler, 2026-11-14: "remove the random ass icon in the text box".
+  expect(line.querySelectorAll("svg, .gem, .skill-icon").length).toBe(0);
+  // He comes up through a mound of dirt, drawn in front of him and solid, so nothing of him shows between its dots.
+  const mound = s.body.querySelector(".end-emblem .review-mole .mole + .mole-mound")!;
+  expect(mound.querySelectorAll("circle").length).toBeGreaterThan(100);
+  expect(mound.querySelectorAll("circle.back").length).toBe(mound.querySelectorAll("circle:not(.back)").length);
   jest.useRealTimers();
   await s.done();
 });
