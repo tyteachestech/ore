@@ -52,7 +52,7 @@ describe("PDF tables and formulas (D125)", () => {
     const now = findItem(lib, item.meta.id);
     expect(now.body).toContain("## Spacing and recall\n\nLearners who spread");
     expect(now.body).toContain(`group.\n\n${TABLE}\n\nTable 1:`);
-    expect(now.body).toContain("stability S:\n\n$$\nR ( t ) = e ^ { - t / S } , \\quad S _ { n + 1 } = S _ { n } \\cdot ( 1 + a )\n$$\n\nEach successful");
+    expect(now.body).toContain("stability S:\n\n$$\nR ( t ) = e ^ { - t / S } , \\quad S _ { n + 1 } = S _ { n } \\cdot ( 1 + \\alpha )\n$$\n\nEach successful");
     for (const s of PROSE) expect(now.body).toContain(s);
     expect(now.body).not.toMatch(/412\s+91%/); // the cells are not also left as a line
     expect(readAnnotations(now).find((a) => a.id === kept.id)?.status).not.toBe("orphaned");
@@ -101,10 +101,23 @@ describe("PDF tables and formulas (D125)", () => {
     if (t.kind !== "table") throw new Error("no table");
     // Docling marks a row near the bottom as a header too (ResNet's "FLOPs" row).
     const marked: Region = { ...t, cells: t.cells.map((c) => (c.row === 3 ? { ...c, header: true } : c)) };
-    const inner: Region = { kind: "formula", page: 1, box: t.cells[5]!.box, latex: "412" };
+    const { l, r, t: top, b } = t.box;
+    const inner: Region = { kind: "formula", page: 1, box: { l: l + (r - l) / 3, r: r - (r - l) / 3, t: top - (top - b) / 3, b: b + (top - b) / 3 }, latex: "412" };
     const body = (await pdfToDoc(new Uint8Array(readFileSync(join(FIX, "tables.pdf"))), [marked, inner, ...regions.filter((r) => r.kind === "formula")])).body;
     expect(body).toContain(TABLE);
     expect(body).not.toContain("$$\n412");
+  });
+
+  test("a Granite-Docling cell, which has no box, takes pdf.js's own text for it where the two agree, so powers and bold stay", async () => {
+    const t = regionsFrom(JSON.parse(readFileSync(LAYOUT, "utf8"))).find((r) => r.kind === "table")!;
+    if (t.kind !== "table") throw new Error("no table");
+    expect(t.cells.every((c) => !c.box)).toBe(true);
+    // The model spells a cell its own way ("10 19" for a power); pdf.js's reading of the same characters wins.
+    const odd: Region = { ...t, cells: t.cells.map((c) => (c.text === "91%" ? { ...c, text: "9 1 %" } : c.text === "Massed" ? { ...c, text: "Massed (crammed)" } : c)) };
+    const body = (await pdfToDoc(new Uint8Array(readFileSync(join(FIX, "tables.pdf"))), [odd])).body;
+    expect(body).toContain("| Spaced | 412 | 91% | 74% |");
+    // A cell pdf.js has no match for keeps the model's text.
+    expect(body).toContain("| Massed (crammed) | 398 | 93% | 41% |");
   });
 
   test("Docling's boxes are turned to bottom-left points, and its LaTeX made safe for KaTeX", () => {
@@ -119,5 +132,8 @@ describe("PDF tables and formulas (D125)", () => {
     expect(tidyLatex("a & = b")).toBe("a = b");
     expect(tidyLatex("\\begin{aligned} a & = b \\end{aligned}")).toBe("\\begin{aligned} a & = b \\end{aligned}");
     expect(tidyLatex("f ( x ) = ( 2 )")).toBe("f ( x ) = ( 2 )"); // a bracket that isn't an equation number stays
+    // Granite-Docling sets the number after a space, and starts some formulas with a stray one.
+    expect(tidyLatex("\\ F F N ( x ) = b _ { 2 } \\quad \\ \\ ( 3 )")).toBe("F F N ( x ) = b _ { 2 } \\tag{3}");
+    expect(tidyLatex("\\mathcal { L } = p ( z ) \\, ( 7 )")).toBe("\\mathcal { L } = p ( z ) \\tag{7}");
   });
 });

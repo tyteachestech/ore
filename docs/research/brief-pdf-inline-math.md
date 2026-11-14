@@ -59,3 +59,27 @@ CDLA-Permissive-2.0 is a permissive data licence, but D120's list doesn't name i
 ## Found along the way
 
 pdf.js drops some powers and indices from the prose. `a x^2 + b x` reads as `𝑎𝑥 + 𝑏𝑥` (its raised `2` is followed by a raised space), and `lambda_i` reads as `𝜆` in "the smallest 𝜆ᵢ". It's logged as F-new-pdf-script-dropped.
+
+## Rescore before the switch (2026-11-14)
+
+Tyler picked option 3 for its licences (D-new-granite-docling), on condition that it scores at least as well. The scorer behind D125 is `packages/core/eval/pdf-structure` (each key formula's best LaTeX match, each key table's best cell F1). The four arXiv papers it was run on weren't on this Mac, so it ran on five pages whose answers are known from their sources:
+
+- `bench-a`, written for this test in Typst: a two-column page with 8 display formulas modelled on the bake-off papers' kinds (attention, a feed-forward layer, a positional wave, a learning-rate schedule, a residual block, a variational bound, a sampling step) and 2 tables, one with headers spanning two columns and powers in its cells, one with ± values and bold.
+- `bench-b`, written for this test in Typst: 6 harder formulas (cases, a sum with limits, an integral, a matrix, a softmax fraction, a policy gradient) and 2 tables, one ruled with bold cells and a dash, one with cells spanning two rows.
+- `tables.pdf`, `inline-math.pdf` and `dense.pdf`, as above.
+
+17 formulas and 6 tables in all. "Ore" is Ore's own doc.md: pdf.js's text with the reader's tables and formulas swapped in, as the app saves it.
+
+| | Formulas | Tables | Time, one page |
+|---|---|---|---|
+| pdf.js alone | 0 | 0 | instant |
+| Standard pipeline, its own Markdown | 97 | 90 | 24 to 234 s |
+| Standard pipeline, in Ore | 96 | 92 | |
+| Granite-Docling, its own Markdown | 92 | 94 | 7 to 14 s, model load included |
+| Granite-Docling, in Ore | 96 | 94 | |
+
+Granite's own Markdown scores lower on formulas only because its stray inline `$` scraps on `dense.pdf` confuse the scorer's `$$` matching; Ore takes only its display formulas and scores 100 there.
+
+What changed in Ore to get there: Granite boxes a table but not its cells, so each cell takes the first unused run of pdf.js items in the table that spells the same letters and digits (so `2.3·10¹⁹` and bold stay; the model alone writes `2.3 · 10 19` and drops bold), and the model's text where none does. It writes an equation's number after a space (`\quad ( 1 )`), which becomes `\tag{1}`. The prose was identical to the standard pipeline's on all five pages, so highlights don't move.
+
+What is still worse: a header set over two rows stays two rows (the model marks no cell as a header, so the old join doesn't apply), and a cell holding only a dash takes the model's hyphen. Still to do: rescore on the bake-off papers when they are next on the Mac (fetch them as the scorer's README says).
