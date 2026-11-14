@@ -112,6 +112,16 @@ describe("a damaged library", () => {
     expect((await doctor(lib)).issues.some((i) => i.message.startsWith("a copy of"))).toBe(true);
   });
 
+  test("two folders ending in the same id open as the one listed (F-new-duplicate-id)", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Retrieval practice beats rereading." });
+    const copy = join(dirname(item.dir), `duplicate-${item.meta.id}`);
+    cpSync(item.dir, copy, { recursive: true });
+    const listed = listItems(lib).find((i) => i.meta.id === item.meta.id)!;
+    expect(findItem(lib, item.meta.id).dir).toBe(listed.dir);
+    expect(findItem(lib, item.meta.id.slice(-8)).dir).toBe(listed.dir);
+  });
+
   test("a renamed folder deleted after a search leaves no hits behind", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Interleaving mixes problem types." });
