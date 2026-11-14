@@ -1044,7 +1044,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused} data-gives-back="" data-done={done} data-steps={done + left}>
       <div className="review-head" data-tauri-drag-region>
         {moment && !end && (
-          // D-new-reward-days: a chip in the head bar, clear of the question and of every button he presses.
+          // D271: a chip in the head bar, clear of the question and of every button he presses.
           <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} data-days={moment.days > 0 || undefined} role="status">
             {!quick && <span className="moment-mole"><Mole bare size={48} mood={MOMENT_MOOD[moment.kind]} /></span>}
             <span className="moment-gem" aria-hidden="true">

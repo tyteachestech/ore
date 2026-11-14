@@ -3,7 +3,7 @@ import type { Mood } from "./Mole";
 
 /** The moment after a rating (D237): shown only when the exercise's gem changes for good or a hard recall
  *  bought a lot. `days`: memory added (FSRS stability). `line`: what became of the gem, in a word or two, and how long since he
- *  saw it (D-new-reward-days): the days are the message, the words only name it. Everything else gets no moment: a rating he gives a hundred times a day moves on. */
+ *  saw it (D271): the days are the message, the words only name it. Everything else gets no moment: a rating he gives a hundred times a day moves on. */
 export type Moment = { from: CardGem; to: CardGem; days: number; line: string; tone: "cut" | "miss" | "deep"; kind: "cut" | "won" | "polished" | "deep" | "miss" };
 
 /** The mole's pose for each kind of moment (D258), sized to how rare it is: winning a gem back is the hardest
