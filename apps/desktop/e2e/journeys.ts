@@ -2324,6 +2324,20 @@ journey("figure cards: a drag over a zoomed figure draws a box, what's under it 
   await until("Undo retires the card", async () => ((await ore("card", "show", id)) as { state: string }).state === "retired");
 });
 
+journey("hidden source keeps Show the source in the accessibility tree (F112)", async (page) => {
+  await openSource(page, TESTING);
+  const reader = page.locator(".reader");
+  await page.getByRole("button", { name: "Hide the source", exact: true }).click();
+  const hidden = await reader.ariaSnapshot();
+  if (!hidden.includes('button "Show the source"')) throw new Error("Show the source is missing from the accessibility tree");
+  if (hidden.includes(TESTING)) throw new Error("the hidden source's title is still in the accessibility tree");
+  const show = page.getByRole("button", { name: "Show the source", exact: true });
+  await show.focus();
+  await page.keyboard.press("Enter");
+  await until("showing the source restores its accessible text", async () => (await reader.ariaSnapshot()).includes(TESTING));
+  await page.getByRole("button", { name: "Hide the source", exact: true }).waitFor();
+});
+
 journey("tables: a heading's button covers its column, a click or Enter shows a cell, right-click on a covered one makes an exercise of it and Undo takes it back (D200)", async (page) => {
   const made = (await (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Sampling settings\n\nHow the draw is made.\n\n| Setting | What it changes | Range |\n|---|---|---|\n| Temperature | How flat the odds are | 0 to 1.5 |\n| Top-p | How much of the tail stays | 0.8 to 1 |\n| Top-k | How many words stay | 20 to 100 |\n\nChange one at a time." }) })).json()) as { id: string };
   try {
@@ -2366,6 +2380,29 @@ journey("tables: a heading's button covers its column, a click or Enter shows a 
     await page.getByRole("menuitem", { name: "Show", exact: true }).waitFor();
     if (await page.getByRole("menuitem", { name: "Make an exercise of this cell" }).count()) throw new Error("the row's own name offers an exercise");
     await page.keyboard.press("Escape");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
+journey("tables: a narrow heading's cover button sits beside its text on hover, never over it (F113)", async (page) => {
+  // "Term" is its column's widest content, so the column is no wider than the word.
+  const made = (await (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Narrow headings\n\nA short glossary.\n\n| Term | Meaning |\n|---|---|\n| a | The first letter of the alphabet |\n| b | The second letter of the alphabet |\n\nThat is all." }) })).json()) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Narrow headings");
+    const head = page.locator(".doc table th").first();
+    await head.hover();
+    const button = head.getByRole("button", { name: "Cover this column" });
+    await until("the button shows on hover", async () => (await button.evaluate((b) => getComputedStyle(b).opacity)) === "1");
+    const { text, btn } = await head.evaluate((th) => {
+      const r = document.createRange();
+      r.selectNodeContents(th.firstChild!);
+      const t = r.getBoundingClientRect();
+      const b = th.querySelector(".col-cover")!.getBoundingClientRect();
+      return { text: { left: t.left, right: t.right }, btn: { left: b.left, right: b.right } };
+    });
+    if (text.right > btn.left) throw new Error(`the button (from ${btn.left.toFixed(1)}px) covers the heading's text (to ${text.right.toFixed(1)}px)`);
   } finally {
     await ore("archive", made.id).catch(() => {});
   }
