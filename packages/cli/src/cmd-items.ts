@@ -12,6 +12,7 @@ import {
   restoreCut,
   redoCut,
   addPageText,
+  canReimport,
   hasPageText,
   undoPageText,
   redoPageText,
@@ -244,6 +245,7 @@ export const itemCommands: Record<string, Command> = {
         ...((item.meta.type === "youtube" || item.meta.video) && { transcript: transcriptOf(item) }),
         ...(item.meta.type !== "youtube" && !item.meta.video && { audio: audioOf(item, lib) ?? undefined }),
         ...(hasPageText(item) && { page_text: true }),
+        ...(canReimport(item) && { reimport: true }),
         ...(item.meta.owed?.length && { fills_here: await canFill(item) }),
       };
       const text = f.annotations

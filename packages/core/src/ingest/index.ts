@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import type { Region } from "./docling.ts";
 import { doclingPath } from "./docling-path.ts";
 import { homedir } from "node:os";
@@ -732,18 +732,23 @@ export interface Reimported {
 const REPLACED = (name: string) => name === "doc.md" || name === "transcript.vtt" || name === "layout.json" || name.startsWith("source.") || name === "page.html";
 const stash = (lib: Library, id: string) => join(lib.root, ".ore", "reimport", id);
 
+/** Keeps a replaced file for Undo. On the Mac's APFS a copy is a clone, sharing the blocks until either
+ *  changes, so a recording (up to 200 MB) isn't stored twice; elsewhere it is a plain copy. Not a hard
+ *  link: iCloud can evict or replace a synced file whose inode the unsynced stash shares. */
+const keepFile = (from: string, to: string) => copyFileSync(from, to, constants.COPYFILE_FICLONE);
+
 /** Swaps a source's text files (doc.md body and kind, source.*, transcript.vtt) with the ones in `from`,
  *  keeping the rest of its frontmatter (status, skills, progress) as it is now. */
 function swapFiles(item: Item, from: string) {
   const tmp = `${from}.swap`;
   rmSync(tmp, { recursive: true, force: true });
   mkdirSync(tmp, { recursive: true });
-  for (const f of readdirSync(item.dir).filter(REPLACED)) copyFileSync(join(item.dir, f), join(tmp, f));
+  for (const f of readdirSync(item.dir).filter(REPLACED)) keepFile(join(item.dir, f), join(tmp, f));
   writeAtomic(join(tmp, "highlights.json"), JSON.stringify(latestRevs(annotationRevs(item.dir))));
   const old = parseFrontmatter(readFileSync(join(from, "doc.md"), "utf8"));
   const was = ItemMetaSchema.parse(old.data);
   for (const f of readdirSync(item.dir).filter(REPLACED)) unlinkSync(join(item.dir, f));
-  for (const f of readdirSync(from).filter((f) => REPLACED(f) && f !== "doc.md")) copyFileSync(join(from, f), join(item.dir, f));
+  for (const f of readdirSync(from).filter((f) => REPLACED(f) && f !== "doc.md")) keepFile(join(from, f), join(item.dir, f));
   const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, page_added: was.page_added, author: was.author, published: was.published, structure: was.structure, text_sha256: was.text_sha256 };
   writeAtomic(item.docPath, stringifyFrontmatter(meta, old.body));
   rmSync(from, { recursive: true, force: true });
@@ -768,19 +773,29 @@ async function lessonOf(item: Item): Promise<CourseLesson> {
 export async function reimportSource(lib: Library, ref: string, { local = false, regions: read, onProgress, turn = (f) => f() }: { local?: boolean; regions?: Region[]; onProgress?: AddOptions["onProgress"]; turn?: Turn } = {}): Promise<Reimported> {
   const item = findItem(lib, ref);
   const { url, course, type } = item.meta;
-  // A file is read again from the copy kept beside it (source.*), so a better reader reaches it. Text
-  // (a Markdown file, pasted text) reads the same every time, so there is nothing to read again.
   // `local` reads the kept copy of a link's file too (a PDF's tables, read from the copy they came from).
-  const copy = readdirSync(item.dir).find((f) => f.startsWith("source.") && !/\.(md|markdown|txt|text)$/i.test(f) && kindOf(f));
+  const copy = keptOriginal(item.dir);
   const kept = url && !(local && copy) ? undefined : copy;
-  if (type === "snippet" || (!url && !kept)) throw new Error("Only a source added from a link or a file can be reimported.");
+  if (!canReimport(item)) throw new Error("Only a source added from a link or a file can be reimported.");
   const regions = read ?? layoutOf(item.dir);
   // A pasted page (source.html beside a Markdown source) is read as it was pasted.
   const pasted = type === "markdown" && !url && kept === "source.html";
-  const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)), onProgress }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }));
+  const draft = await (async () => withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)), onProgress }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions })))().catch(async (e: Error) => {
+    // A recording that can't be heard again here, from its file or its link, keeps the transcript it has: nothing to paste.
+    const { PASTE_STEP } = await import("./audio.ts");
+    throw PASTE_STEP.test(e.message) ? new Error(e.message.replace(PASTE_STEP, " Its transcript is as it was.")) : e;
+  });
   if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
-  return turn(() => rewrite(lib, item, draft, regions));
+  return turn(() => rewrite(lib, item, draft, regions, kept));
 }
+
+/** The original a file source is read again from: the copy kept beside it (source.*), so a better reader
+ *  reaches it (a recording heard again, D167; a Word file, a screenshot). Text (a Markdown file, pasted
+ *  text) reads the same every time, so there is nothing to read again. */
+const keptOriginal = (dir: string) => readdirSync(dir).find((f) => f.startsWith("source.") && !/\.(md|markdown|txt|text)$/i.test(f) && kindOf(f));
+
+/** Whether Reimport has an original to read: a link, or a file's kept copy (D93). The ⋯ menu offers it by this. */
+export const canReimport = (item: Item) => item.meta.type !== "snippet" && (!!item.meta.url || !!keptOriginal(item.dir));
 
 /** One library change at a time where commands share a process (the iPhone): the reading above can take
  *  minutes and holds nothing; the writing below takes its turn. */
@@ -788,7 +803,7 @@ export type Turn = <T>(f: () => Promise<T>) => Promise<T>;
 
 /** `draft`, read again from where `item` came from, in its place: the old version stashed for Undo, its
  *  highlights moved to the new text. */
-async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[] | undefined): Promise<Reimported> {
+async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[] | undefined, kept?: string): Promise<Reimported> {
   // As it is now: he may have renamed or filed it while it was read, and one he deleted is not brought back.
   const item = findItem(lib, was.meta.id);
   const { url, course } = item.meta;
@@ -809,10 +824,12 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
   await withLock(paths.lock(lib), () => {
     rmSync(dir, { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
-    for (const f of readdirSync(item.dir).filter(REPLACED)) copyFileSync(join(item.dir, f), join(dir, f));
+    for (const f of readdirSync(item.dir).filter(REPLACED)) keepFile(join(item.dir, f), join(dir, f));
     writeAtomic(join(dir, "highlights.json"), JSON.stringify(latestRevs(annotationRevs(item.dir))));
-    for (const f of readdirSync(item.dir).filter((f) => REPLACED(f) && f !== "doc.md")) unlinkSync(join(item.dir, f));
-    if (draft.source) writeAtomic(join(item.dir, `source.${draft.source.ext}`), draft.source.data);
+    // A file read again from its kept copy keeps that copy as it is: the same bytes need no second write.
+    const same = draft.source && kept === `source.${draft.source.ext}` ? kept : undefined;
+    for (const f of readdirSync(item.dir).filter((f) => REPLACED(f) && f !== "doc.md" && f !== same)) unlinkSync(join(item.dir, f));
+    if (draft.source && !same) writeAtomic(join(item.dir, `source.${draft.source.ext}`), draft.source.data);
     if (draft.transcript) writeAtomic(join(item.dir, "transcript.vtt"), draft.transcript);
     if (draft.page) writeAtomic(join(item.dir, "page.html"), draft.page);
     if (regions?.length) writeAtomic(join(item.dir, "layout.json"), JSON.stringify(regions));
@@ -957,7 +974,7 @@ export async function undoReimport(lib: Library, ref: string): Promise<Item> {
     const tmp = swapFiles(item, dir);
     // The swap's other side becomes the stash, so the next call redoes.
     mkdirSync(dir, { recursive: true });
-    for (const f of readdirSync(tmp)) copyFileSync(join(tmp, f), join(dir, f));
+    for (const f of readdirSync(tmp)) keepFile(join(tmp, f), join(dir, f));
     rmSync(tmp, { recursive: true, force: true });
   });
   const now = readItemDir(item.dir);

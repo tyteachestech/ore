@@ -2609,6 +2609,20 @@ journey("a recording plays in place: its player over the transcript, his highlig
   await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
+journey("a recording added from a file offers Reimport, and one that can't be heard again here keeps its transcript and highlights (F181)", async (page) => {
+  await openSource(page, "Lecture 4");
+  await page.locator(".player.audio").waitFor();
+  const text = await page.locator(".doc").innerText();
+  await page.locator(".doc-head h1").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Reimport" }).click();
+  // The cloud can't hear speech, and the Mac hears no words in the lecture's tone: either way it says so.
+  const said = page.locator(".toast").filter({ hasText: "Its transcript is as it was" });
+  await said.waitFor({ timeout: 30_000 });
+  if ((await said.innerText()).includes("paste")) throw new Error("a failed Reimport told him to paste a transcript");
+  if ((await page.locator(".doc").innerText()) !== text) throw new Error("a failed Reimport changed the transcript");
+  await until("both highlights stay", async () => (await page.locator(".player.audio .scrub-tick").count()) === 2);
+});
+
 journey("a recording: a finger's scroll away from the spoken line stops following it, as the wheel does, and Back to current shows (D49)", async (page) => {
   await page.setViewportSize({ width: 1000, height: 320 });
   await openSource(page, "Lecture 4");
