@@ -137,3 +137,20 @@ Tyler: keep Rive's motion, use the code version as the baseline look. The scene 
 - He wakes with his soles 8 px over the dirt, rises 8 px in the scramble, then drops.
 
 Clip: `cart-rive-v5.mp4`, frames `cart-rive-v5-frames.png`.
+
+## Sixth to ninth pass (2026-11-14): a critic before every clip
+
+Rule since Tyler's "why is it not caught proactively": no clip goes to him until a fresh critic, given only frame
+sheets beside the code version's, has listed every defect and they are fixed. Four critics ran on these passes.
+
+What changed, against the code version as the baseline:
+- He lies in the bucket, drawn behind the cart (as the app does), centred on the load.
+- The side view keeps every part whole (no hole at the back of his head), one shade, its own profile helmet, a shorter brim.
+- Ore slides to the low lip and falls from it from rest, behind the cart; each ring dot lights as its piece lands.
+- The stones are rough gems in their colours: they slide to the lip with the last of the load and drop into the ring.
+- No brake sparks, no post on the rail; the rail stops where the dirt of his hole begins.
+- Waking, he grows once, over 0.4 s, soles still, to the size he is in his hole. No rise before the drop.
+- At rest the whole traced drawing shows (it was cut 5 dots short, which hid his paws), with clods of dirt banked round the hole.
+- The Zs are the app's Z on a 4 by 4 grid.
+
+Left as is, on purpose: ore for the ring's left half passes behind the front wheel; the side-to-front swap is a cut on the bubble's pop, as in the code version.
