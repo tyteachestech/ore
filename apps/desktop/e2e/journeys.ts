@@ -10613,6 +10613,20 @@ journey("phone: reopening on a source that left the library lands on Today, not 
   if (await page.locator(".phone-reader").count() || await page.getByText(/no item matches/).count()) throw new Error("the missing source's error is on screen");
 }, "phone");
 
+journey("phone: reopening on a source while the library can't be listed still opens it", async (page) => {
+  // Code review of #395 (F128): the saved source's reader waited for the first list, so a list that
+  // failed left it shut for good, and a tap on that source did nothing.
+  await phoneSource(page, TESTING);
+  await page.addInitScript("if (sessionStorage.getItem('ore-e2e-fail-ls')) window.__ORE_FAIL = { ls: 'The library is offline.' }");
+  await page.evaluate(() => sessionStorage.setItem("ore-e2e-fail-ls", "1"));
+  try {
+    await page.reload();
+    await page.locator(".phone-reader").waitFor();
+  } finally {
+    await page.evaluate(() => (sessionStorage.removeItem("ore-e2e-fail-ls"), ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {})));
+  }
+}, "phone");
+
 journey("phone: a link added is read on the phone itself; one it can't read waits for the Mac, and Remove takes it off", async (page) => {
   // D235: the link is saved to the inbox, then the phone imports it with the Mac's own importer.
   const para = "Mixing kinds of problems in one sitting makes each one harder to start and easier to keep. ";
