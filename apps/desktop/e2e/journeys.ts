@@ -885,6 +885,31 @@ journey("tutor mole: it sits at the bottom right on every screen, pages keep roo
   await button.waitFor();
 });
 
+journey("D254: palette plays and stops ambience; closing the panel keeps the sound, reopening keeps the channel", async (page) => {
+  const command = async (name: string) => {
+    await page.keyboard.press("Meta+KeyK");
+    await page.keyboard.type(name);
+    await page.getByRole("option", { name, exact: true }).click();
+  };
+  await command("Play Rain");
+  const orb = page.getByRole("button", { name: "Ambience: Rain playing", exact: true });
+  await orb.waitFor();
+  await orb.click();
+  const pop = page.locator(".popover.radio");
+  await pop.waitFor();
+  if ((await pop.getByRole("button", { name: "Rain", exact: true }).getAttribute("aria-pressed")) !== "true") throw new Error("the palette's playing channel is not selected");
+  await page.keyboard.press("Escape");
+  await pop.waitFor({ state: "detached" });
+  await orb.waitFor();
+  await orb.click();
+  await pop.waitFor();
+  if (!(await pop.getByRole("button", { name: "Rain", exact: true }).evaluate(el => el === document.activeElement))) throw new Error("reopening lost the selected channel's focus");
+  await page.keyboard.press("Escape");
+  await pop.waitFor({ state: "detached" });
+  await command("Stop ambience");
+  await page.getByRole("button", { name: "Ambience", exact: true }).waitFor();
+});
+
 journey("ambience radio: the mole's twin at the bottom left; its pads play a channel and stop it, Esc closes, ⌥⌘A opens, a missing file says so (D254)", async (page) => {
   const orb = page.getByRole("button", { name: /^Ambience/ });
   const vp = page.viewportSize()!;
@@ -5953,6 +5978,9 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   await moment.locator('.gem[data-kind="dull"]').waitFor();
   if (!(await moment.innerText()).includes("You were sure")) throw new Error(`the moment says: ${await moment.innerText()}`);
   if ((await moment.innerText()).includes("days")) throw new Error("a miss showed days added");
+  const mole = moment.locator(".mole");
+  if ((await mole.getAttribute("width")) !== "48") throw new Error("a rating's mole is not 48px");
+  if ((await mole.getAttribute("data-mood")) !== "set") throw new Error("a missed cut gem did not get the steady pose");
   // ⌘Z: the rating and its moment are both taken back.
   await page.keyboard.press("Meta+z");
   await moment.waitFor({ state: "detached" });
@@ -6650,6 +6678,14 @@ journey("review: when the day's goal closes the mole says so and the session goe
   if (was.met || was.due < 3) throw new Error(`needs an unmet goal and three exercises due: ${JSON.stringify({ met: was.met, due: was.due })}`);
   const q = page.locator(".review-q");
   const note = page.locator('.review-goal');
+  await page.addInitScript(() => {
+    const moods: string[] = [];
+    (window as unknown as { __goalMoods: string[] }).__goalMoods = moods;
+    new MutationObserver(() => {
+      const mood = document.querySelector(".review-goal .mole")?.getAttribute("data-mood");
+      if (mood && moods.at(-1) !== mood) moods.push(mood);
+    }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-mood"] });
+  });
   const good = page.getByRole("button", { name: "Good", exact: true });
   try {
     await ore("goal", "--minutes", "1");
@@ -6668,6 +6704,9 @@ journey("review: when the day's goal closes the mole says so and the session goe
     if (!/Goal met\. The rest is extra\./.test((await note.textContent()) ?? "")) throw new Error(`the note says ${JSON.stringify(await note.textContent())}`);
     await until("the next exercise", async () => (await q.innerText()) !== first);
     if (await page.locator(".review-end").count()) throw new Error("the session ended at the goal");
+    const moods = await page.evaluate(() => (window as unknown as { __goalMoods: string[] }).__goalMoods);
+    if (moods[0] !== "wave") throw new Error(`the goal note starts with ${JSON.stringify(moods)}, not its wave`);
+    if ((await note.locator(".mole").getAttribute("width")) !== "48") throw new Error("the goal note's mole is not 48px");
     // ⌘Z takes back the rating that closed the goal: the note goes with it, and closing it again tells it again.
     await page.keyboard.press("Meta+z");
     await until("⌘Z brings the first exercise back", async () => (await q.innerText()) === first);
@@ -6689,12 +6728,26 @@ journey("review: when the day's goal closes the mole says so and the session goe
     if (await page.locator(".review-end").count()) throw new Error("the session ended after the goal");
     await page.keyboard.press("Escape");
     await page.locator(".review-end").waitFor();
+    await page.locator(".review-end .ring.glint").waitFor();
+    const moving = await page.locator(".review-end .ring.glint circle").first().evaluate(el => {
+      const s = getComputedStyle(el); return { name: s.animationName, repeats: s.animationIterationCount };
+    });
+    if (moving.name !== "glint" || moving.repeats !== "1") throw new Error(`D257: the earned ring must glint once: ${JSON.stringify(moving)}`);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const movingStill = await page.locator(".review-end .glint circle").evaluateAll(els => els.filter(el => getComputedStyle(el).animationName !== "none").length);
+    if (movingStill) throw new Error(`D257: ${movingStill} dots animate under Reduce Motion`);
+    if ((await page.locator(".end-emblem").evaluate(el => getComputedStyle(el, "::after").animationName)) !== "none") throw new Error("D257: the field glints under Reduce Motion");
   } finally {
     await page.keyboard.press("Enter").catch(() => {});
     await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
     await log.undoAll();
     await ore("goal", "--minutes", String(was.goal_minutes));
+    await page.emulateMedia({ reducedMotion: "no-preference" });
   }
+  const home = page.locator(".home-goal .ring");
+  await home.waitFor();
+  if ((await home.getAttribute("class"))?.includes("glint")) throw new Error("D257: Home replayed the earned glint");
+  if ((await home.locator("circle").first().evaluate(el => getComputedStyle(el).animationName)) === "glint") throw new Error("D257: Home's dots replay the glint");
 });
 
 journey("review: a session whose receipt carries then and now shows the question with his answer then over his answer today (D248)", async (page) => {
@@ -7224,27 +7277,52 @@ journey("review: a card's passage reads as the page shows it, without its Markdo
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-journey("review: a Tutor card with no passage still offers Open in source after the answer, and it opens that source", async (page) => {
-  // The seed's Storytelling card: the tutor kept it, so it has its source but no passage in it.
-  await startReview(page, /Storytelling/);
-  const q = page.locator(".review-q");
-  const question = "Which word links the Story Spine's middle beats?";
-  // Journeys before this one share the library: a Storytelling card they missed is due again today, and then the
-  // new card is every fifth (D144), not first. Rate Good through the due ones until it comes up.
-  for (let n = 0; (await q.innerText()) !== question; n++) {
-    if (n === 8) throw new Error(`the card is ${await q.innerText()}`);
+for (const ratedBefore of [false, true]) journey(`review: a Tutor card with no passage still offers Open in source after the answer, and it opens that source; ${ratedBefore ? "earned end screen" : "no ratings"} (F107)`, async (page) => {
+  const log = oreCalls(page);
+  const donor = ((await ore("due")) as { id: string; kind: string; question: string }[]).find(x => x.kind === "card" && !x.question.includes("Story Spine"));
+  if (ratedBefore && !donor) throw new Error("needs a due Fact exercise before the Tutor exercise");
+  // Force both exits on every run, independent of earlier journeys' ratings and queue order.
+  await page.route(/\/ore$/, async route => {
+    const args = (route.request().postDataJSON() as { args?: string[] }).args ?? [];
+    if (args[0] !== "due" || !args.includes("--skill=storytelling-writing")) return route.fallback();
+    const response = await route.fetch();
+    const items = (await response.json()) as { id: string; question: string }[];
+    const target = items.find(x => x.question === "Which word links the Story Spine's middle beats?");
+    if (!target) throw new Error("the seeded Tutor exercise is missing");
+    await route.fulfill({ response, json: ratedBefore ? [donor, target] : [target] });
+  });
+  try {
+    // The seed's Storytelling card: the tutor kept it, so it has its source but no passage in it.
+    await startReview(page, /Storytelling/);
+    const q = page.locator(".review-q");
+    const question = "Which word links the Story Spine's middle beats?";
+    // Reach the target through the same rating path that made the original journey depend on queue order.
+    let rated = 0;
+    for (let n = 0; (await q.innerText()) !== question; n++) {
+      if (n === 8) throw new Error(`the card is ${await q.innerText()}`);
+      await reveal(page);
+      await page.waitForTimeout(350);
+      await page.getByRole("button", { name: "Good" }).click();
+      rated++;
+      await until("the next card", async () => (await q.innerText()) !== "" && (await page.locator(".review-rate").count()) === 0);
+    }
+    if (rated !== Number(ratedBefore)) throw new Error(`expected ${Number(ratedBefore)} earlier ratings, got ${rated}`);
     await reveal(page);
-    await page.waitForTimeout(350);
-    await page.getByRole("button", { name: "Good" }).click();
-    await until("the next card", async () => (await q.innerText()) !== "" && (await page.locator(".review-rate").count()) === 0);
+    await page.getByRole("button", { name: /Open in source/ }).click();
+    await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
+    await page.keyboard.press("Escape");
+    await until("back on the card", async () => (await q.isVisible()) && (await q.innerText()) === question);
+    await page.keyboard.press("Escape");
+    if (rated) {
+      // These ratings earn the ordinary end screen; its Done leaves Review. No ratings closes directly.
+      await page.locator(".review-end").waitFor();
+      await page.locator(".review-end").getByRole("button", { name: "Done", exact: true }).click();
+    }
+    await page.locator(".review").waitFor({ state: "detached" });
+  } finally {
+    await page.unroute(/\/ore$/);
+    await log.undoAll();
   }
-  await reveal(page);
-  await page.getByRole("button", { name: /Open in source/ }).click();
-  await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
-  await page.keyboard.press("Escape");
-  await until("back on the card", async () => (await q.isVisible()) && (await q.innerText()) === question);
-  await page.keyboard.press("Escape");
-  await page.locator(".review").waitFor({ state: "detached" });
 });
 
 journey("review: editing an Explain card corrects a key point too; it's there when the editor opens again, and ⌘Z puts it back", async (page) => {
@@ -10679,6 +10757,7 @@ journey("phone: the last rating of a review shows the end screen, not Wrapping u
     await rating.waitFor({ state: "detached" }).catch(() => {});
   }
   await until("the end screen comes up by itself", async () => !(await page.getByText("Wrapping up").count()) && (await page.locator(".phone-full .review-end").count()) > 0);
+  if (await page.locator(".phone-full .cart-tip, .phone-full .cart-mole").count()) throw new Error("D255: a cart ride appeared on the phone");
 }, "phone");
 
 /** What a tap at the middle of the element would land on, as its nearest button's accessible name. */
@@ -11029,6 +11108,11 @@ journey("phone: the note's keyboard bar moves a block, edits a table and adds a 
       });
       // A table cell swaps the block kinds for the table's edits.
       await tap(page, note.locator("td").filter({ hasText: "Gaps" }));
+      await until("F52: the one table-cell tap places the native caret in that cell", () => page.evaluate(() => {
+        const selection = getSelection(), node = selection?.anchorNode;
+        const cell = (node?.nodeType === Node.ELEMENT_NODE ? node as Element : node?.parentElement)?.closest("td");
+        return !!cell?.textContent?.includes("Gaps") && !!document.activeElement?.closest("[contenteditable=true]");
+      }));
       await bar.getByRole("button", { name: "Table actions" }).waitFor();
       if (await bar.getByRole("button", { name: "To-do" }).count()) throw new Error("the bar offers To-do inside a table cell");
       const rows = await note.locator("tr").count();
