@@ -1420,11 +1420,18 @@ journey("tutor stop and copy: the send button stops a reply (⌘. too), words wr
     await field.fill("Stop me late");
     await page.keyboard.press("Enter");
     await until("the call carries its stream id", async () => !!id);
+    await page.evaluate(([p]) => (window as any).__emit("ore-progress", p), [{ stream: id, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }] as const);
     await page.evaluate(([p]) => (window as any).__emit("ore-progress", p), [{ stream: id, reply: "Half a thought [1" }] as const);
     await tutor.getByText("Half a thought", { exact: true }).waitFor();
     await page.keyboard.press("Meta+.");
     await tutor.getByText("Stopped", { exact: true }).waitFor();
     await tutor.getByText("Half a thought", { exact: true }).waitFor();
+    // Saved with who wrote it, as a whole reply is (F186).
+    await until("the stopped reply is saved with its AI stamp", async () => {
+      const chats = (await ore("chat")) as { id: string }[];
+      const chat = (await ore("chat", chats[0]!.id)) as { turns: { reply?: string; ai?: { model: string } }[] };
+      return chat.turns.some((t) => t.reply === "Half a thought" && t.ai?.model === "mock");
+    });
     held.shift()!();
     await page.waitForTimeout(300);
     if (await tutor.getByText("Reply 3").count()) throw new Error("a stopped reply was replaced by the late one");
@@ -7515,6 +7522,75 @@ journey("review: editing an Explain card corrects a key point too; it's there wh
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: saving an edit to the question keeps an answer changed outside meanwhile (F174)", async (page) => {
+  await startReview(page, /Teaching/);
+  const entry = ((await ore("due")) as { id: string; question: string }[]).find((e) => e.question.startsWith("Explain why rereading"))!;
+  const show = async () => (await ore("card", "show", entry.id)) as { question: string; answer: string };
+  const original = await show();
+  await reveal(page);
+  await page.getByRole("button", { name: "Edit exercise" }).click();
+  const field = page.locator(".review textarea").first();
+  await until("the editor has the question", async () => (await field.inputValue()) === original.question);
+  await field.fill(`${original.question} (edited)`);
+  // The /ore skill (or the phone) rewrites the answer while the editor is open.
+  await ore("card", "set", entry.id, "--answer", "An answer written outside");
+  try {
+    await page.getByRole("button", { name: "Save" }).click();
+    await until("the question saved", async () => (await show()).question === `${original.question} (edited)`);
+    const now = await show();
+    if (now.answer !== "An answer written outside") throw new Error(`the outside answer was written over: ${now.answer}`);
+  } finally {
+    await ore("card", "set", entry.id, "--question", original.question, "--answer", original.answer);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  }
+});
+
+/** Leaves the window for over 10 s and comes back, as he does after using the CLI, `/ore` or the phone. */
+async function awayAndBack(page: Page) {
+  await page.evaluate(async () => {
+    dispatchEvent(new Event("blur"));
+    await new Promise((r) => setTimeout(r, 50));
+    const real = Date.now;
+    Date.now = () => real() + 11_000;
+    dispatchEvent(new Event("focus"));
+    Date.now = real;
+  });
+}
+
+journey("review: back from time away, the exercise on screen shows a question changed outside (F173)", async (page) => {
+  await startReview(page, /Teaching/);
+  const q = page.locator(".review-q");
+  const shown = await q.innerText();
+  const entry = ((await ore("due", "--all")) as { id: string; question: string }[]).find((e) => shown.includes(e.question.slice(0, 30)))!;
+  const original = ((await ore("card", "show", entry.id)) as { question: string }).question;
+  try {
+    await ore("card", "set", entry.id, "--question", `${original} (rewritten outside)`);
+    await awayAndBack(page);
+    await until("the new question shows", async () => (await q.innerText()).includes("(rewritten outside)"));
+  } finally {
+    await ore("card", "set", entry.id, "--question", original);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  }
+});
+
+journey("source note: back from time away, the note shows text added outside (F173)", async (page) => {
+  await openSource(page, AGENTS);
+  await page.getByRole("tab", { name: "Source note" }).click();
+  const editor = page.getByRole("textbox", { name: "Source note", exact: true });
+  await editor.waitFor();
+  const id = (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === AGENTS)!.id;
+  const before = ((await ore("notes", id)) as { text: string }).text;
+  try {
+    await ore("notes", id, "--set", `${before}\n\nWritten by the phone.`.trimStart());
+    await awayAndBack(page);
+    await until("the outside words show", async () => (await editor.innerText()).includes("Written by the phone."));
+  } finally {
+    await ore("notes", id, "--set", before);
+  }
+});
+
 journey("review: retiring a card keeps ⌘Z for the ratings before it, and so does a retire that fails", async (page) => {
   await startReview(page, null);
   const q = page.locator(".review-q");
@@ -8335,6 +8411,36 @@ journey("finish: drafting that fails after Done stays in front of “Finished”
   page.on("request", (r) => r.method() === "POST" && (r.postData() ?? "").includes('"args":["enrich"') && drafted.push(r.postData()!));
   await both.getByRole("button", { name: "Try again" }).click();
   await until("Try again drafts both", async () => drafted.length === 2);
+});
+
+journey("prequestions: a Try again still running when he leaves and opens the source again shows its wait, and never starts a second run (F185)", async (page) => {
+  const title = `Prequestions retried ${Date.now()}`;
+  const fail = (on: Record<string, unknown>) => page.evaluate((on) => Object.assign(window as unknown as Record<string, unknown>, on), on);
+  await fail({ __ORE_FAIL: { enrich: "Codex isn’t installed." } });
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# ${title}\n\nA short page whose prequestions failed to be written the first time.`);
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("whose prequestions failed").waitFor();
+  await until("the import has settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+  // Past the 20 minutes enrichment gets: opened again, it says it couldn't.
+  await page.evaluate(() => { const real = Date.now; Date.now = () => real() + 21 * 60_000; });
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await openSource(page, title);
+  const retry = page.locator(".preq-retry");
+  await retry.waitFor();
+  const runs: string[] = [];
+  page.on("request", (r) => r.method() === "POST" && (r.postData() ?? "").includes('"args":["enrich"') && runs.push(r.postData()!));
+  await fail({ __ORE_FAIL: {}, __ORE_SLOW: { enrich: 4000 } });
+  await retry.click();
+  await until("the run started", async () => runs.length === 1);
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await openSource(page, title);
+  await page.waitForTimeout(500);
+  if (await page.getByText("Couldn’t write prequestions").count()) throw new Error("opened again mid-run, it says it couldn't write them");
+  if (await retry.count()) await retry.click();
+  await page.waitForTimeout(300);
+  if (runs.length !== 1) throw new Error(`${runs.length} enrich runs`);
+  await fail({ __ORE_SLOW: {} });
 });
 
 journey("undo that fails: the toast says why, and ⌘Z tries the same step again", async (page) => {
@@ -11029,6 +11135,89 @@ journey("phone: ⌘Z on a rating after leaving Review puts Today's minutes back 
   await until("Today takes the undone rating back", async () => (await ring.getAttribute("aria-label")) === before, 5000);
 }, "phone");
 
+journey("phone: Today starts the new day at midnight without a reload (F172)", async (page) => {
+  // Left open overnight, Home kept yesterday's minutes (and "All caught up" with no Start review) until a reload.
+  const late = new Date();
+  late.setHours(23, 50, 0, 0);
+  await page.clock.install({ time: late });
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  const ring = page.locator(".home-goal [aria-label$='minutes today']").first();
+  await ring.waitFor();
+  const before = await ring.getAttribute("aria-label");
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  await sure.waitFor();
+  await page.clock.fastForward("03:00");
+  const field = page.locator(".phone-full textarea:visible");
+  if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+  await tap(page, sure);
+  const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+  if (await check.count()) await tap(page, check);
+  await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+  for (let i = 0; i < 3 && (await page.locator(".phone-full .review").count()); i++) {
+    await tap(page, page.getByRole("button", { name: "Leave review" }));
+    await page.waitForTimeout(400);
+  }
+  await until("Review is closed", async () => !(await page.locator(".phone-full .review").count()));
+  await until("Today counts the rating", async () => (await ring.getAttribute("aria-label")) !== before);
+  // Past midnight, with the app still open: the new day's minutes start from none.
+  await page.clock.fastForward("09:00:00");
+  await until("Today shows the new day", async () => (await ring.getAttribute("aria-label")) === before, 5000);
+}, "phone");
+
+journey("phone: a rating still saves after the clock is set back (F183)", async (page) => {
+  // The time on an exercise came out negative, core refused it ("elapsed_ms: Too small"), and nothing saved.
+  await page.clock.install({ time: new Date("2027-03-12T20:00:00Z") });
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const rate = async () => {
+    const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+    await sure.waitFor();
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+  };
+  await rate();
+  await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).waitFor();
+  await page.clock.setSystemTime(new Date("2027-03-11T20:01:00Z"));
+  await rate();
+  await page.waitForTimeout(800);
+  const failed = await page.locator(".toast").filter({ hasText: /elapsed|Couldn/ }).count();
+  if (failed) throw new Error(`the rating after the clock went back failed: ${await page.locator(".toast").first().innerText()}`);
+}, "phone");
+
+journey("phone: a session across midnight counts only the new day's minutes toward its goal (F184)", async (page) => {
+  // 4 minutes before midnight and 6 after said "Goal met" on a 10-minute goal: yesterday's were added in.
+  const late = new Date();
+  late.setHours(23, 55, 0, 0);
+  await page.clock.install({ time: late });
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  for (const wait of ["02:00", "02:00", "03:00", "03:00"]) {
+    const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+    await sure.waitFor();
+    await page.clock.fastForward(wait);
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+    await page.waitForTimeout(600);
+  }
+  await page.waitForTimeout(1500);
+  if (await page.getByText("Goal met").count()) throw new Error("the goal was said met with 6 of today's 10 minutes");
+}, "phone");
+
 journey("phone: a source added on the phone and a new skill each take ⌘Z (F160)", async (page) => {
   const words = "Spacing out practice sessions makes what is learned last longer than cramming it into one sitting. ".repeat(12);
   const article = `<html><head><title>Spacing on the phone</title></head><body><article><h1>Spacing on the phone</h1>${`<p>${words}</p>`.repeat(3)}</article></body></html>`;
@@ -12201,6 +12390,31 @@ journey("source rename: pending Undo takes back the rename, not the source added
     await until("Redo renames it again", async () => (await ore("show", source.id) as { title: string }).title === `${title} renamed`);
   } finally {
     await release(page, "edit");
+    await ore("archive", source.id);
+  }
+});
+
+journey("source rename: ⌘Z leaves a title set outside since, and says so (F175)", async (page) => {
+  const title = `Source renamed twice ${Date.now()}`;
+  await page.reload();
+  await page.keyboard.press("Meta+n");
+  await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nRenamed in the app, then outside it.`);
+  await page.keyboard.press("Enter");
+  await page.getByRole("heading", { name: title, exact: true }).waitFor();
+  await until("the import has settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+  const source = (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === title)!;
+  const now = async () => (await ore("show", source.id) as { title: string }).title;
+  try {
+    await page.locator(".doc-head h1.renamable").click();
+    await page.locator(".doc-head .title-edit").fill(`${title} in the app`);
+    await page.keyboard.press("Enter");
+    await until("the rename saved", async () => (await now()) === `${title} in the app`);
+    await ore("edit", source.id, "--title", `${title} outside`);
+    await page.locator(".doc-body, .doc").first().click();
+    await page.keyboard.press("Meta+z");
+    await page.locator(".toast").filter({ hasText: "renamed since" }).waitFor();
+    if ((await now()) !== `${title} outside`) throw new Error(`Undo wrote over the outside title: ${await now()}`);
+  } finally {
     await ore("archive", source.id);
   }
 });

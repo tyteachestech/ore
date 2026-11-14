@@ -8,7 +8,7 @@ import { NoteEditor, type LinkTarget, type NoteEditorHandle } from "./editor/Not
 import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
 import { ore, opt, oreWith, type Backlink, type Notes } from "./ore";
-import { errorText, load, save, type Notify } from "./util";
+import { errorText, LIBRARY_BACK, load, save, type Notify } from "./util";
 
 /** Which note: a source note (D31) or a skill note (D41). */
 type NoteRef = { item: string } | { skill: string };
@@ -256,12 +256,17 @@ export function useNotes(ref: NoteRef, notify: Notify, onKept?: () => void): MyN
       void flush().then((ok) => ok && queue(() => ore<Notes>("notes", ...key.split(" "))).then((r) => live && draft.current === saved.current && apply(r.text), () => {}));
     };
     window.addEventListener("ore:note-written", written);
+    // Back after time away: the note as the file has it now (the phone, `/ore`), unless he has typed since his last save.
+    const outside = () =>
+      void queue(() => ore<Notes>("notes", ...key.split(" "))).then((r) => live && draft.current === saved.current && r.text !== saved.current && apply(r.text), () => {});
+    window.addEventListener(LIBRARY_BACK, outside);
     // Leaving (or quitting) writes what is pending; the CLI call outlives this view.
     const leave = () => void flush();
     window.addEventListener("beforeunload", leave);
     return () => {
       live = false;
       window.removeEventListener("ore:note-written", written);
+      window.removeEventListener(LIBRARY_BACK, outside);
       window.removeEventListener("beforeunload", leave);
     };
   }, [key, tries, apply, flush, notify, queue]);

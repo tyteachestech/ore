@@ -128,15 +128,33 @@ const damaged = (what: string, app?: string) => (e: Error): never => {
   throw e;
 };
 
+/** An audio file's title, artist and chapters from its own tags (ID3, MP4); none when it has none or they won't read. */
+async function audioTags(bytes: Uint8Array, ext: string): Promise<{ title?: string; author?: string; chapters: { title: string; start_time: number }[] }> {
+  try {
+    const { parseBuffer } = await import("music-metadata");
+    const mimeType = ({ m4a: "audio/mp4", mp4: "audio/mp4", aac: "audio/aac", mp3: "audio/mpeg", wav: "audio/wav", flac: "audio/flac", aiff: "audio/aiff" } as Record<string, string>)[ext];
+    const info = mimeType ? { mimeType } : undefined;
+    // A chapter track the reader can't follow still leaves the title and artist.
+    const m = await parseBuffer(bytes, info, { includeChapters: true, skipCovers: true }).catch(() => parseBuffer(bytes, info, { skipCovers: true }));
+    const chapters = (m.format.chapters ?? []).filter((c) => c.title?.trim()).map((c) => ({ title: c.title, start_time: c.timeScale ? c.start / c.timeScale : c.start }));
+    return { title: m.common.title?.trim() || undefined, author: m.common.artist?.trim() || undefined, chapters };
+  } catch {
+    return { chapters: [] };
+  }
+}
+
 /** A source draft from a file's bytes, whatever it came from (a link or a file), by its kind. */
 async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: string, base = url, opts: AddOptions = {}): Promise<NewItem> {
   if (AUDIO_TYPES.includes(kind)) {
     // Speech to a timed transcript, read like a subtitle file's (D96).
+    // The file's own tags name it, its speaker and its chapters, as a player shows them (F180).
+    const tags = await audioTags(bytes, kind);
     const vtt = await (await import("./audio.ts")).transcribe(bytes, kind, opts.onProgress, opts.language);
     // A podcast host's file name ("17456166-summer-shorts-…") as words, its id dropped.
-    const title = fileStem(name).replace(/^\d{5,}[-_ ]+/, "").replace(/[-_]+/g, " ").trim() || fileStem(name);
+    const stem = fileStem(name).replace(/^\d{5,}[-_ ]+/, "").replace(/[-_]+/g, " ").trim() || fileStem(name);
+    const title = tags.title ?? stem[0]!.toUpperCase() + stem.slice(1);
     // The audio itself is the original, kept to play in place (D122, D167); the timed transcript beside it.
-    return { type: "article", title: title[0]!.toUpperCase() + title.slice(1), url, body: vttToBody(vtt), source: { ext: kind, data: bytes }, transcript: vtt };
+    return { type: "article", title, author: tags.author, url, body: vttToBody(vtt, tags.chapters), source: { ext: kind, data: bytes }, transcript: vtt };
   }
   if (kind === "pdf") {
     const p = await pdfToDoc(bytes, opts.regions).catch(async (e) => {
@@ -279,6 +297,21 @@ export function decodeText(bytes: Uint8Array): string {
   }
 }
 
+/** A code file's extension and the language its fence names (GitHub links to code). */
+const CODE_EXT: Record<string, string> = { py: "python", js: "javascript", mjs: "javascript", ts: "typescript", tsx: "tsx", jsx: "jsx", rs: "rust", go: "go", c: "c", h: "c", cc: "cpp", cpp: "cpp", hpp: "cpp", java: "java", kt: "kotlin", swift: "swift", rb: "ruby", php: "php", cs: "csharp", sh: "bash", zsh: "bash", sql: "sql", r: "r", jl: "julia", lua: "lua", hs: "haskell", ml: "ocaml", ex: "elixir", scala: "scala", dart: "dart", m: "objectivec", toml: "toml", yaml: "yaml", yml: "yaml", json: "json", css: "css", scss: "scss", vue: "vue", svelte: "svelte", zig: "zig", nix: "nix", tex: "latex" };
+
+/** The file name a download gives itself (`content-disposition`), the UTF-8 form first. */
+export function downloadName(header: string | null): string | undefined {
+  if (!header) return undefined;
+  const star = header.match(/filename\*\s*=\s*(?:UTF-8|utf-8)''([^;]+)/)?.[1];
+  if (star) {
+    try {
+      return decodeURIComponent(star.trim().replace(/^"|"$/g, ""));
+    } catch {}
+  }
+  return header.match(/filename\s*=\s*"([^"]+)"/)?.[1] ?? (header.match(/filename\s*=\s*([^;]+)/)?.[1]?.trim() || undefined);
+}
+
 /** What a file is from its name and, for a link, the server's content type; null when Ore can't read it. */
 function kindOf(name: string, ctype = ""): string | null {
   const ext = extname(name).slice(1).toLowerCase();
@@ -343,7 +376,10 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
     await res.body?.cancel();
     throw new Error(google);
   }
-  const urlName = decodeURIComponent(new URL(res.url || url).pathname.split("/").pop() || url);
+  // A download names itself (a Google Doc's export: "Study Guide.docx", F179); else the link's last part.
+  // Only a name that says what the file is: a generic "download" or "file.bin" never hides the link's own type.
+  const given = downloadName(res.headers.get("content-disposition"));
+  const urlName = (given && kindOf(given) ? given : undefined) ?? decodeURIComponent(new URL(res.url || url).pathname.split("/").pop() || url);
   // Video is never read as a page: the whole file would download and parse as HTML. Audio is transcribed.
   if ((/^(audio|video)\//.test(ctype) || /\.(ogg|opus|mp4|mov|m4v|webm)$/i.test(urlName)) && !kindOf(urlName, ctype)) {
     await res.body?.cancel();
@@ -359,6 +395,14 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
   const name = AUDIO_TYPES.includes(kind) ? decodeURIComponent(new URL(url).pathname.split("/").pop() || urlName) : urlName;
   const draft = await fromBytes(bytes, kind, name, url, res.url || rw?.url || url, opts);
   if (rw?.kind !== "fetch") return draft;
+  // A GitHub link to a code file is code: one fenced block, titled by its file name (F178).
+  const lang = rw.base && draft.type === "markdown" ? CODE_EXT[extname(urlName).slice(1).toLowerCase()] : undefined;
+  if (lang !== undefined) {
+    const text = decodeText(bytes).replace(/\s+$/, "");
+    const fence = "`".repeat(Math.max(3, ...[...text.matchAll(/`{3,}/g)].map((m) => m[0].length + 1)));
+    const body = `${fence}${lang}\n${text}\n${fence}\n`;
+    return { ...draft, title: urlName, body, author: draft.author ?? rw.author, source: draft.source && { ...draft.source, data: body } };
+  }
   const body = rw.base && draft.type === "markdown" ? (await import("./links.ts")).absolutize(draft.body, rw.base) : draft.body;
   return { ...draft, body, author: draft.author ?? rw.author, source: draft.source && rw.base && draft.type === "markdown" ? { ...draft.source, data: body } : draft.source };
 }

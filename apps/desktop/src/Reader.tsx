@@ -58,6 +58,8 @@ import { Working } from "./Working";
 
 /** Background enrich gets this long after capture before the reader stops waiting for it. */
 const ENRICH_GIVE_UP_MS = 20 * 60_000;
+/** Enrichment runs he started with Try again, by source, so leaving and opening it again never starts a second. */
+const enriching = new Map<string, Promise<unknown>>();
 /** Listening speed, kept apart from a video's (D50): a voice and a speaker don't match at 1x. */
 const LISTEN_RATE = "ore.listen.rate";
 /** The chapter block's prompts (D115): shown on empty lines, never saved. */
@@ -722,7 +724,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const keys = useKeymap();
   const [tip, setTip] = useState<{ id: string; x: number; y: number; text: string } | null>(null);
   const [gaveUp, setGaveUp] = useState(false);
-  const [retrying, setRetrying] = useState(false);
+  const [retrying, setRetrying] = useState(() => enriching.has(p.id));
   /** The block live in the source note: a chapter's recall (D115) or the tutor's exercise (D128.6). */
   const [block, setBlock] = useState<ChapterEnd | Practice | null>(null);
   const scaffolded = useRef<ChapterEnd | Practice | null>(null);
@@ -1114,7 +1116,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         opened.current = p.id;
       },
       // A read again after ⌘Z that fails leaves the page as it is: nothing about the open source failed.
-      (e) => live && opened.current !== p.id && setError(errorText(e)),
+      // One gone from the library meanwhile (deleted or moved outside Ore) says so instead of staying on screen.
+      (e) => live && (opened.current !== p.id ? setError(errorText(e)) : /^no item matches/.test(errorText(e)) && setError("This source is no longer in your library: it was moved or deleted outside Ore.")),
     );
     return () => {
       live = false;
@@ -1164,8 +1167,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   const retryEnrich = async () => {
     setRetrying(true);
+    const id = p.id;
+    // One run per source, whoever asked: a source left and opened again while it runs waits on the same one.
+    let run = enriching.get(id);
+    if (!run) enriching.set(id, (run = ore("enrich", id).finally(() => enriching.delete(id))));
     try {
-      await ore("enrich", p.id);
+      await run;
       const d = (await ore<Item[]>("ls")).find((i) => i.id === p.id);
       if (d) setDoc((cur) => cur && { ...cur, prequestions: d.prequestions, skills: d.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at, enrich_error: undefined, enrich_skipped: undefined });
       p.onChanged();
@@ -1175,6 +1182,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       setRetrying(false);
     }
   };
+
+  // Opened again while its Try again still runs: it shows the wait, then the result (F185).
+  useEffect(() => void (enriching.has(p.id) && retryEnrich()), [p.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const notifyNow = useRef(p.notify);
   notifyNow.current = p.notify;
@@ -2898,13 +2908,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     setDoc((cur) => cur && cur.id === id ? { ...cur, title: t } : cur);
     // On the history at once, so a quick ⌘Z takes it back (F156); taken off again if the write fails.
     const forget = undoable ? p.notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false)) : () => {};
+    let now = before;
     try {
-      await inOrder(id, () => ore("edit", id, "--title", t));
+      await inOrder(id, async () => {
+        // Undo or redo: a title set outside since (`ore edit`, the phone) is newer, and stays (F175).
+        if (!undoable && (now = (await ore<{ title: string }>("show", id)).title) !== before) throw new Error(`Left as “${now}”: it was renamed since`);
+        return ore("edit", id, "--title", t);
+      });
       p.onChanged();
       return true;
     } catch (e) {
       forget();
-      setDoc((cur) => cur && cur.id === id ? { ...cur, title: before } : cur);
+      setDoc((cur) => cur && cur.id === id ? { ...cur, title: now } : cur);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       p.notify(errorText(e), "error");

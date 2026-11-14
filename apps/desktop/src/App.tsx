@@ -50,7 +50,7 @@ import { Thumb } from "./Thumb";
 import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
-import { count, errorText, focusQuietly, inOrder as inTurn, keepScroll, keptScrolls, load, save, usable } from "./util";
+import { count, errorText, focusQuietly, inOrder as inTurn, keepScroll, keptScrolls, load, save, usable, wakeScreens } from "./util";
 import { questionText } from "./Questions";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth, smaller, useReading, WIDTHS } from "./reading";
@@ -389,6 +389,7 @@ export function App() {
       left = 0;
       void refresh();
       void fromPhone();
+      wakeScreens();
     };
     addEventListener("blur", away);
     addEventListener("focus", back);

@@ -36,6 +36,13 @@ describe("review timeline (D149)", () => {
     expect(inWords(at(800), T0)).toBe("in 2 years");
   });
 
+  test("today and tomorrow are the days on his calendar, not 24-hour spans (F182)", () => {
+    const local = (d: number, h: number, m = 0) => new Date(2027, 3, d, h, m).getTime();
+    expect(inWords(new Date(local(22, 9, 55)).toISOString(), local(21, 22, 55))).toBe("tomorrow");
+    expect(inWords(new Date(local(23, 8)).toISOString(), local(21, 20))).toBe("in 2 days");
+    expect(inWords(new Date(local(21, 21)).toISOString(), local(21, 8))).toBe("later today");
+  });
+
   test("one month and one year are said in the singular", () => {
     expect(inWords(at(35), T0)).toBe("in 1 month");
     expect(inWords(at(400), T0)).toBe("in 1 year");
