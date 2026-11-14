@@ -5,7 +5,7 @@ import { still } from "./SideCursor";
 /** One letter of the mole's speech, and how long a full line holds before the next. */
 export const TYPE_MS = 28, HOLD_MS = 2600;
 
-/** The mole's speech box (D245): a hairline outlined box (D263). His lines, one at a time, typed out letter by
+/** The mole's speech box (D245): a hairline outlined box (D266). His lines, one at a time, typed out letter by
  *  letter in the mono with his block cursor (D186) at the words' end; a full line holds, then the next is typed.
  *  The pointer or the keyboard on the box holds the line. The whole line is in the page from its first letter
  *  (the letters to come are only unseen), so it never rewraps and a reader hears it whole. Under Reduce Motion

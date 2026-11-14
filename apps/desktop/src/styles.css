@@ -2232,7 +2232,7 @@ button.home-plan:hover { color: var(--text); }
 .says.end-says { position: absolute; left: calc(50% + 62px); top: 12px; z-index: 2; width: max-content; max-width: min(248px, calc(50vw - 78px)); transform-origin: 0 50%; animation: end-says var(--t-4) var(--ease-out); }
 @keyframes end-says { from { opacity: 0; transform: translateX(-6px) scale(0.96); } }
 @media (prefers-reduced-motion: reduce) { .says.end-says { animation: none; } }
-/* The mole's speech box (D245, `MoleSays`; its look D263, the Rive cart ending's box): a hairline
+/* The mole's speech box (D245, `MoleSays`; its look D266, the Rive cart ending's box): a hairline
    outline on the page's own ground, 6px corners, no fill and no tail, 10px more on the right for his block; the mono, typed out a letter at a time; his
    block (D186) rides the last letter and blinks once the line is whole. The letters to come hold their place unseen. */
 .says { position: relative; box-sizing: border-box; padding: 6px 20px 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); text-align: left; }
