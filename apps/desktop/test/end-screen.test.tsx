@@ -74,7 +74,7 @@ test("a session that filled the ring and cut a gem: the cart is there, the mole 
   expect(s.q(".cart-ore")).toBe(0);
   expect(s.q(".dot-ring .on")).toBe(30);
   // The stone that landed is cut where it stands: it ends as a gem of solid pixels (D239). Then it makes way
-  // for the day's minutes in the ring's centre (D-new-bonus-lap).
+  // for the day's minutes in the ring's centre (D274).
   expect(cut).toBeGreaterThan(50);
   for (let t = 0; t < 3000 && !s.q(".end-ring > .end-lap"); t += 20) await act(async () => void jest.advanceTimersByTime(20));
   jest.useRealTimers();
@@ -202,7 +202,7 @@ test("an ore whose ring dot is missing still counts, so the ring is told it is f
 test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem polished this session shows after the cut ones, and the session's depth is one line", async () => {
   const e = end(["ai", "ai"]) as unknown as { session: Record<string, unknown> };
   Object.assign(e.session, { grades: ["mended", "cut"], polished: ["ai"], depth_days: 41 });
-  // The gems are cut in the ring before they make way for the minutes (D-new-bonus-lap), so they are read there.
+  // The gems are cut in the ring before they make way for the minutes (D274), so they are read there.
   jest.useFakeTimers();
   const c = await mount(e as never, 0.9);
   let seams: number[] = [], n = 0, label: string | null = null;
@@ -297,7 +297,7 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   Object.assign(two.session, { depth_days: 41, depth_extra_days: 12 });
   const s = await mount(two as never);
   expect(s.q(".end-emblem .end-ring > .ring")).toBe(1);
-  // Settled, the ring holds the day's minutes; the gems were cut there first (D-new-bonus-lap).
+  // Settled, the ring holds the day's minutes; the gems were cut there first (D274).
   expect(s.q(".end-emblem .end-ring > .end-lap")).toBe(1);
   expect(s.q(".end-emblem .end-ring > .review-cut")).toBe(0);
   reduce = false;

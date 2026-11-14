@@ -1682,7 +1682,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const tiles = endTiles({ session: s, ups: named });
   // His pose is for the line he says (D258).
   const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
-  // D-new-bonus-lap: the full end screen's ring holds the day's minutes, and minutes past the goal go round again.
+  // D274: the full end screen's ring holds the day's minutes, and minutes past the goal go round again.
   // Gems the session cut are cut in the ring first (D239), then make way for the minutes; they wait for the
   // last stone, and a beat more so each cut is seen. Then the count has no room to run up to the goal, so it
   // starts there.
