@@ -396,6 +396,8 @@ export type SessionEnd = {
   polished?: string[];
   /** How much longer the exercises he passed now last, in days added up (D197). */
   depth_days?: number;
+  /** Memories kept this session by skill, most first; absent when none was kept. */
+  kept_skills?: { skill: string; n: number }[];
   /** The part of `depth_days` earned after the day's goal closed (D246). */
   depth_extra_days?: number;
   /** Then and now (D248), at most once in four weeks: an exercise he missed or guessed weeks ago and passed now, with both answers. */

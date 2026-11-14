@@ -497,6 +497,25 @@ describe("strength breakdown and peak level (D63)", () => {
     expect(end.depth_extra_days).toBe(extra);
   });
 
+  test("a session's end says how many memories each skill kept, most first", async () => {
+    const { lib, cards } = await library(3);
+    const [a, b, c] = cards.map((x) => x.meta.id) as [string, string, string];
+    const t = new Date("2026-01-01T09:00:00Z");
+    await startSession(lib, t);
+    await recordReview(lib, a, { rating: 3, confidence: 2, now: t });
+    await recordReview(lib, b, { rating: 3, confidence: 2, now: new Date(t.getTime() + 60e3) });
+    await recordReview(lib, c, { rating: 1, confidence: 2, now: new Date(t.getTime() + 120e3) });
+    const end = await endSession(lib, new Date(t.getTime() + 180e3));
+    const want = new Map<string, number>();
+    for (const x of cards.slice(0, 2)) want.set(x.meta.skills[0] ?? "", (want.get(x.meta.skills[0] ?? "") ?? 0) + 1);
+    expect(end.kept).toBe(2);
+    expect(end.kept_skills).toEqual([...want].map(([skill, n]) => ({ skill, n })).sort((x, y) => y.n - x.n));
+    // A session of misses has none.
+    await startSession(lib, new Date(t.getTime() + 864e5));
+    await recordReview(lib, c, { rating: 1, confidence: 2, now: new Date(t.getTime() + 864e5) });
+    expect((await endSession(lib, new Date(t.getTime() + 864e5 + 60e3))).kept_skills).toBeUndefined();
+  });
+
   test("then and now: an exercise he missed weeks ago and passed today comes with both answers, once in four weeks (D248)", async () => {
     const { lib, cards } = await library(3);
     const [a, b, c] = cards.map((x) => x.meta.id) as [string, string, string];

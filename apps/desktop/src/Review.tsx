@@ -21,6 +21,7 @@ import { PixelTry } from "./PixelIcon";
 import { endMood, endSays, endTiles, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
+import { LapCentre, lapPlan, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -1681,7 +1682,34 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const tiles = endTiles({ session: s, ups: named });
   // His pose is for the line he says (D258).
   const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
-  const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;
+  // D274: the full end screen's ring holds the day's minutes, and minutes past the goal go round again.
+  // Gems the session cut are cut in the ring first (D239), then make way for the minutes; they wait for the
+  // last stone, and a beat more so each cut is seen. Then the count has no room to run up to the goal, so it
+  // starts there.
+  const calm = still();
+  const [away, setAway] = useState(calm || !!quick || gems.length === 0);
+  useEffect(() => {
+    if (away || !full || landed < shown.length) return;
+    const id = setTimeout(() => setAway(true), pour ? 1100 : 1400 + gems.length * 90);
+    return () => clearTimeout(id);
+  }, [away, full, landed]);
+  const [plan] = useState(() => {
+    const p = lapPlan(b, t);
+    return away ? p : { ...p, from: Math.max(p.from, Math.min(p.to, p.goal || p.to)) };
+  });
+  const lap = useLap(plan, !quick && full && away);
+  const counted = lap.min === plan.to;
+  // The count crosses the goal on screen: then the dots it throws are the moment, and the burst stays out of it.
+  const crossing = !calm && plan.goal > 0 && plan.from < plan.goal && plan.to >= plan.goal;
+  const over = quick ? 0 : overDots(plan.goal ? lap.min - plan.goal : 0, plan.goal, ringDots(END_RING));
+  const ring = quick
+    ? <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={72} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
+    : (
+      // The ring follows the count, minute by minute; crossing the goal in the count is the moment (the dots it throws), so the burst is for a goal the count never crossed.
+      <Ring step={away && plan.goal > 0} value={!full ? part(b) : !away || !plan.goal ? part(t) : lap.min / plan.goal} from={part(b)} met={!full ? !!b?.met : !away || counted ? t.met : false} burst={closed && full && !crossing} over={over} hit={lap.hit} size={END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`}>
+        {counted && <Sparkles over={over} n={ringDots(END_RING)} />}
+      </Ring>
+    );
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
   return (
@@ -1707,7 +1735,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
             )}
             <div className="end-ring">
               {ring}
-              {cluster}
+              {away ? <LapCentre min={lap.min} goal={plan.goal} kept={s.kept_skills ?? []} skills={skills} run={counted && full} /> : cluster}
             </div>
           </div>
           <Tally tiles={tiles} go={full} skills={skills} onDone={() => setTallied(true)} />

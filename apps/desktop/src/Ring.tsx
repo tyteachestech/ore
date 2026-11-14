@@ -7,18 +7,23 @@ export const lit = (share: number, n: number) => (share >= 1 ? n : share <= 0 ? 
 export const ringDots = (size: number) => (size > 60 ? 30 : size > 36 ? 20 : 14);
 
 /** A ring of dots, one per step, from 12 o'clock (D183): the lit ones in `--ring` (the skill's colour, or green
- *  for the goal), then `ghost` dimmer ones, the rest as the track. Each dot lights a beat after the one before. */
-export function DotRing({ size, share, ghost = 0 }: { size: number; share: number; ghost?: number }) {
+ *  for the goal), then `ghost` dimmer ones, the rest as the track. Each dot lights a beat after the one before.
+ *  `over`: dots lit again on a lap past the full ring (the end screen's bonus minutes): each is a little bigger
+ *  and carries a white centre, so where the bonus stops is plain; past a second full lap they grow again. */
+export function DotRing({ size, share, ghost = 0, over = 0, step = false }: { size: number; share: number; ghost?: number; over?: number; /** Lit one step at a time by its caller, so no dot waits its turn. */ step?: boolean }) {
   const n = ringDots(size);
   const on = lit(share, n);
   const soon = Math.min(n, on + (ghost > 0 ? Math.max(1, Math.round(ghost * n)) : 0));
   const r = Math.min(6.5, ((2 * Math.PI * 43) / n) * 0.36);
+  const lap2 = Math.min(n, over), lap3 = Math.min(n, Math.max(0, over - n));
+  const at = (i: number) => { const a = (i / n) * 2 * Math.PI - Math.PI / 2; return { cx: +(50 + 43 * Math.cos(a)).toFixed(2), cy: +(50 + 43 * Math.sin(a)).toFixed(2) }; };
   return (
     <svg className="dot-ring" width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
       {Array.from({ length: n }, (_, i) => {
-        const a = (i / n) * 2 * Math.PI - Math.PI / 2;
-        return <circle key={i} className={i < on ? "on" : i < soon ? "soon" : undefined} cx={+(50 + 43 * Math.cos(a)).toFixed(2)} cy={+(50 + 43 * Math.sin(a)).toFixed(2)} r={+r.toFixed(2)} style={{ transitionDelay: `calc(${i} * var(--stagger))`, "--i": i } as React.CSSProperties} />;
+        const lit = i < on ? "on" : i < soon ? "soon" : "";
+        return <circle key={i} className={`${lit}${i < lap3 ? " over2" : i < lap2 ? " over" : ""}` || undefined} {...at(i)} r={+r.toFixed(2)} style={{ transitionDelay: step ? "0ms" : `calc(${i} * var(--stagger))`, "--i": i } as React.CSSProperties} />;
       })}
+      {Array.from({ length: lap2 }, (_, i) => <circle key={`core${i}`} className={i < lap3 ? "core big" : "core"} {...at(i)} r={+(r * 0.4).toFixed(2)} />)}
     </svg>
   );
 }
@@ -36,7 +41,7 @@ export function DotBar({ share, n, className }: { share: number; n: number; clas
 /** The daily goal as a ring (D60), like Apple Fitness's move ring: it fills from `from` to `value`
  *  when shown and plays one short burst when `burst` is set (D62; none under Reduce Motion), a glint running
  *  once round its dots with it (D257). */
-export function Ring({ value, from = 0, size = 64, met, burst = false, label }: { value: number; from?: number; size?: number; met: boolean; burst?: boolean; label: string }) {
+export function Ring({ value, from = 0, size = 64, met, burst = false, label, over = 0, hit = 0, step = false, children }: { step?: boolean; value: number; from?: number; size?: number; met: boolean; burst?: boolean; label: string; /** Bonus dots lit past the full ring (the end screen). */ over?: number; /** Goal lines crossed while it counted: each throws one ring of dots outward, the second a bigger one. */ hit?: number; children?: React.ReactNode }) {
   const [shown, setShown] = useState(from);
   const target = met ? 1 : Math.max(0, Math.min(1, value));
   useEffect(() => {
@@ -45,8 +50,14 @@ export function Ring({ value, from = 0, size = 64, met, burst = false, label }: 
   }, [target]);
   return (
     <div className={`ring${met ? " met" : ""}${burst ? " glint" : ""}`} style={{ width: size, height: size }} role="img" aria-label={label}>
-      <DotRing size={size} share={shown} />
+      <DotRing size={size} share={shown} over={over} step={step} />
       {burst && <span className="ring-burst" aria-hidden="true" />}
+      {hit > 0 && (
+        <span key={hit} className="ring-throw" data-big={hit > 1 || undefined} style={{ "--r": `${size * 0.47}px`, "--far": `${size * (hit > 1 ? 0.075 : 0.05)}px` } as React.CSSProperties} aria-hidden="true">
+          {Array.from({ length: hit > 1 ? 20 : 10 }, (_, i) => <i key={i} style={{ "--a": `${((i + 0.5) / (hit > 1 ? 20 : 10)) * 360}deg` } as React.CSSProperties} />)}
+        </span>
+      )}
+      {children}
     </div>
   );
 }
