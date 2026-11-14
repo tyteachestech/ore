@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, type RefObject } from "react";
 const FRAME = 28;
 /** A selection that follows a press in the sidebar within this long came from that click. */
 const CLICKED = 600;
-/** 3×5 cells of 2 px: the menu arrow of an 8-bit game. */
+/** 3×5 round dots, 2 px apart: a menu arrow in the house dots (D183). */
 const ARROW = ["X..", "XX.", "XXX", "XX.", "X.."];
 const H = ARROW.length * 2;
 
@@ -34,8 +34,8 @@ export function playHop(place: (v: number) => void, from: number, to: number, ti
 /** The arrow sprite, shared by the sidebar and the reader's outline. */
 export function Arrow({ ref, className }: { ref: RefObject<SVGSVGElement | null>; className: string }) {
   return (
-    <svg ref={ref} className={className} width={6} height={H} viewBox={`0 0 6 ${H}`} aria-hidden="true" shapeRendering="crispEdges">
-      {ARROW.flatMap((row, y) => [...row].map((c, x) => (c === "X" ? <rect key={`${x}.${y}`} x={x * 2} y={y * 2} width={2} height={2} /> : null)))}
+    <svg ref={ref} className={className} width={6} height={H} viewBox={`0 0 6 ${H}`} aria-hidden="true">
+      {ARROW.flatMap((row, y) => [...row].map((c, x) => (c === "X" ? <circle key={`${x}.${y}`} cx={x * 2 + 1} cy={y * 2 + 1} r={0.84} /> : null)))}
     </svg>
   );
 }

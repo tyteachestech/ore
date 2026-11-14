@@ -71,7 +71,7 @@ export function Gem({ kind, size = 16, breathe, seam, polished, fuse, band }: { 
   const shine = kind === "cut" && !!polished;
   const rows = kind === "rough" || kind === "ready" ? (large ? ROUGH_L : ROUGH) : large ? CUT_L : CUT;
   return (
-    <svg className="gem" data-kind={kind} data-breathe={breathe || undefined} data-polished={shine || undefined} width={size} height={size} viewBox={large ? "-1 -2.5 16 16" : "-1 -2 12 12"} aria-hidden="true">
+    <svg className="gem" data-kind={kind} data-breathe={breathe || undefined} width={size} height={size} viewBox={large ? "-1 -2.5 16 16" : "-1 -2 12 12"} aria-hidden="true">
       {dots(rows, fuse ?? FUSE[kind], { outline: kind === "empty", face: kind === "ready" && fuse === undefined, gold: !!seam && (kind === "cut" || kind === "dull"), band })}
       {shine && sparkle(large ? 12 : 8.5, large ? 0.5 : 0, large)}
     </svg>
@@ -134,8 +134,8 @@ export function gemHint(k: Pick<Strength, "solid" | "ready" | "ready_today" | "w
 }
 
 /** The gem being cut toward the next level: a ring of dots lights as solid memories grow, and dimmer dots
- *  after them show what today's nearly cut cards would add. When they would finish the level, the gem shimmers
- *  and the ring glows.
+ *  after them show what today's nearly cut cards would add. When they would finish the level, the gem swells
+ *  and settles.
  *  `badge` puts the level on the ring (the skill page); Home leaves it to the hover. */
 export function GemRing({ k, size = 52, badge }: { k: Pick<Strength, "solid" | "ready_today" | "level" | "next_level_at">; size?: number; badge?: boolean }) {
   const share = levelProgress(k).share;
@@ -143,7 +143,7 @@ export function GemRing({ k, size = 52, badge }: { k: Pick<Strength, "solid" | "
   const ghost = Math.min(1 - share, k.ready_today / span);
   const finishes = k.ready_today > 0 && share + k.ready_today / span >= 1;
   return (
-    <span className="gem-ring" data-finishes={finishes || undefined} style={{ width: size, height: size }}>
+    <span className="gem-ring" style={{ width: size, height: size }}>
       <DotRing size={size} share={share} ghost={ghost} />
       <Gem kind="cut" size={Math.round(size * 0.56)} breathe={finishes} />
       {badge && <span className="gem-ring-lv">Lv {k.level}</span>}

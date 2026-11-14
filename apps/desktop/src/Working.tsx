@@ -35,15 +35,15 @@ export function useLate(on = true) {
   return late;
 }
 
-/** 8-bit sprites drawn on a grid of 2 px cells ("X" is ink), crisp at any zoom (D113). */
+/** Small marks drawn as round dots 2 px apart ("X" is ink), the house dots (D183). */
 export const CHECK = ["......X", ".....XX", "X...XX.", "XX.XX..", ".XXX...", "..X...."];
 export const CROSS = ["X....X", ".X..X.", "..XX..", "..XX..", ".X..X.", "X....X"];
 export function Sprite({ rows, className }: { rows: string[]; className?: string }) {
   const w = rows[0]!.length * 2;
   const h = rows.length * 2;
   return (
-    <svg className={`sprite${className ? ` ${className}` : ""}`} width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" shapeRendering="crispEdges">
-      {rows.flatMap((row, y) => [...row].map((c, x) => (c === "X" ? <rect key={`${x}.${y}`} x={x * 2} y={y * 2} width={2} height={2} /> : null)))}
+    <svg className={`sprite${className ? ` ${className}` : ""}`} width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true">
+      {rows.flatMap((row, y) => [...row].map((c, x) => (c === "X" ? <circle key={`${x}.${y}`} cx={x * 2 + 1} cy={y * 2 + 1} r={0.84} /> : null)))}
     </svg>
   );
 }
@@ -76,7 +76,7 @@ export const MATRIX: Record<Stage, string[][]> = {
 export const STILL: Record<Stage, number> = { work: 0, read: 2, search: 1, write: 7, check: 6 };
 const PACE: Record<Stage, number> = { work: 100, read: 160, search: 110, write: 90, check: 120 };
 
-/** The 5×5 dot matrix: 2 px cells a pixel apart, lit in the text's colour, trailing cells at 40% and the
+/** The 5×5 dot matrix: 2 px round dots a pixel apart, lit in the text's colour, trailing cells at 40% and the
  *  unlit grid at 12%, so the matrix reads as one mark and not a dash. Still
  *  under reduced motion and in tests (no timers), on the stage's telling frame. */
 export function Matrix({ stage = "work", className }: { stage?: Stage; className?: string }) {
@@ -91,8 +91,8 @@ export function Matrix({ stage = "work", className }: { stage?: Stage; className
   }, [stage, still, frames.length]);
   const rows = frames[still ? STILL[stage] : i]!;
   return (
-    <svg className={`matrix${className ? ` ${className}` : ""}`} data-stage={stage} width={14} height={14} viewBox="0 0 14 14" aria-hidden="true" shapeRendering="crispEdges">
-      {rows.flatMap((row, y) => [...row].map((c, x) => <rect key={`${x}.${y}`} className={c === "x" ? "dim" : c === "." ? "off" : undefined} x={x * 3} y={y * 3} width={2} height={2} />))}
+    <svg className={`matrix${className ? ` ${className}` : ""}`} data-stage={stage} width={14} height={14} viewBox="0 0 14 14" aria-hidden="true">
+      {rows.flatMap((row, y) => [...row].map((c, x) => <circle key={`${x}.${y}`} className={c === "x" ? "dim" : c === "." ? "off" : undefined} cx={x * 3 + 1} cy={y * 3 + 1} r={0.84} />))}
     </svg>
   );
 }

@@ -1252,9 +1252,9 @@ export function TutorBubble({ onOpen, said = null, failed = false, thinking = fa
               <X size={10} aria-hidden="true" />
             </button>
           </Hint>
-          {/* The tail, a stair of 3px steps pointing at the mole: the one pixel part, since it says who is speaking. */}
+          {/* The tail points at the mole: it says who is speaking. A smooth wedge, no stepped pixels (Tyler 2026-11-14). */}
           <svg className="mole-says-tail" width="9" height="15" viewBox="0 0 9 15" aria-hidden="true">
-            <path d="M0 0h3v3h3v3h3v3h-3v3h-3v3h-3z" />
+            <path d="M0 0L8 6.5Q9 7.5 8 8.5L0 15z" />
           </svg>
         </div>
       )}
