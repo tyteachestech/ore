@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { $ } from "bun";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listCards, listItems, localDay, readAnnotations, today } from "../../../packages/core/src/index.ts";
@@ -40,6 +40,8 @@ test(`the demo library is set up to film, seeded ${name}: the day nearly done, g
     // The week reads as a kept habit, with a miss in it.
     const past = t.week.filter((d) => d.date < localDay(now));
     if (past.length >= 3) expect(past.some((d) => d.status === "met")).toBe(true);
+    // Every source has its picture (D77), so no list on camera shows a bare kind icon.
+    for (const i of listItems(lib)) expect(existsSync(join(i.dir, "thumbnail.svg"))).toBe(true);
     // Every exercise opens at its passage: its highlight is in its source.
     const marks = new Set(listItems(lib).flatMap((i) => readAnnotations(i).map((a) => a.id)));
     const cards = listCards(lib);
