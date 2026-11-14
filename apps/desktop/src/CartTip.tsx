@@ -253,7 +253,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       });
       // The bucket drops back, its lip flicking him up a little, and the cart backs out the way it came. He does
       // not: asleep on nothing, sagging; then awake with a start, up off nothing and bigger, limbs going; then down.
-      const gone = stoned + 340, SLEEP = MOMENT - 100, BRACE = ms("--t-3", 200), START = 330, HANG = 780, SAG = 4, JUMP = 8, NEAR = 0.72;
+      const gone = stoned + 340, SLEEP = MOMENT - 100, BRACE = ms("--t-3", 200), START = 330, HANG = 780, SAG = 4, JUMP = 18, NEAR = 0.72;
       // Asleep on nothing he bobs with his breath, clear of the dirt line, so it reads as air and not a perch.
       later(stoned + 160, () => { play(cart, HOPPED.map((y) => ({ transform: `translateY(${y}px)` })), { duration: T4, easing: OUT, composite: "add" }); });
       later(stoned + 160, () => play(rider, [
@@ -308,6 +308,9 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
         later(hit * 1000, () => {
           dirtLine.style.opacity = "";
           play(dirtLine, [{ opacity: 0 }, { opacity: 1 }], { duration: T2, easing: OUT, fill: "none" });
+          // His mound heaps up from its foot as he lands in it.
+          const mound = seat.querySelector(".mole-mound");
+          if (mound) play(mound, [{ transform: "scale(0.7, 0)" }, { transform: "scale(1)" }], { duration: MOMENT, easing: SPRING, fill: "none" });
           const hx = to.left - o.left + to.width / 2;
           DIRT.forEach(([vx, vy, r]) => {
             const d = document.createElement("span");

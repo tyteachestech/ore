@@ -315,3 +315,32 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
     </svg>
   );
 }
+
+/** The mound's clods on the fine grid, back to front: [column, rows above the dirt line, radius]. A big one at each
+ *  side of him, smaller ones along the front, low enough that his paws rest on them. */
+const CLODS: [number, number, number][] = [[-7.5, -0.4, 2.2], [40.5, -0.4, 2.2], [-2.5, 1.4, 4.3], [35.5, 1.6, 4.5], [4.5, -1.2, 3], [28.5, -1.1, 3.1], [10.5, -1.4, 2.4], [22, -1.3, 2.5], [16.5, -1.6, 2.3]];
+/** Its dots: [column, row, tone]. Each clod is lit along its top and dark at its foot, so it reads as a lump; all sit on one floor. */
+const MOUND: [number, number, "lit" | "earth" | "deep"][] = (() => {
+  const out: [number, number, "lit" | "earth" | "deep"][] = [];
+  for (let c = -10; c <= 43; c++) for (let r = -2; r <= 7; r++) {
+    const [x, y, R] = CLODS.findLast(([x, y, R]) => Math.hypot(c - x, r - y) <= R) ?? [0, 0, 0];
+    // The floor's two ends are rounded off.
+    if (!R || Math.abs(c - 16.5) > 25 + r * 1.5) continue;
+    const up = (r - y) / R, far = Math.hypot(c - x, r - y) / R;
+    out.push([c, r, r === -2 || (up < 0.1 && far > 0.72) ? "deep" : up > 0.25 && far > 0.55 ? "lit" : "earth"]);
+  }
+  return out;
+})();
+
+/** The mound of dirt the mole comes up through at a session's end, drawn in front of him in his own fine dots
+ *  (Tyler, 2026-11-14: "so it looks like he's popping out of a hole"). It lies over a `bare` mole of the same `size`. */
+export function Mound({ size = 96 }: { size?: number }) {
+  const u = COLS / 33;
+  return (
+    <svg className="mole-mound" width={size} height={(size * ROWS) / COLS} viewBox={`0 0 ${COLS} ${ROWS}`} overflow="visible" aria-hidden="true">
+      {/* Dots have gaps, so each sits on a square of the page: nothing of him shows through his mound. */}
+      {MOUND.map(([c, r]) => <rect key={`${c},${r}`} className="back" x={c * u} y={ROWS - 0.3 - (r + 0.5) * u} width={u * 1.02} height={u * 1.02} />)}
+      {MOUND.map(([c, r, tone]) => <circle key={`${c},${r}`} className={tone} cx={(c + 0.5) * u} cy={ROWS - 0.3 - r * u} r={0.42 * u} />)}
+    </svg>
+  );
+}

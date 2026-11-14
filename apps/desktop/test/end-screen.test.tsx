@@ -384,7 +384,7 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   expect(endSays({ ...base, session: session({ longest_days: 3, rescued: 6 }) })).toHaveLength(1);
 });
 
-test("a rare line leads the mole's lines and wears its own mark (D247)", async () => {
+test("a rare line leads the mole's lines, in words alone: no icon in his speech box (D247 as amended)", async () => {
   jest.useFakeTimers();
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
   Object.assign(e.session, { depth_days: 41, rescued: 2 });
@@ -392,8 +392,12 @@ test("a rare line leads the mole's lines and wears its own mark (D247)", async (
   await act(async () => void jest.advanceTimersByTime(560));
   const line = s.body.querySelector(".end-says .says-line")!;
   expect(line.textContent).toBe("2 pulled back just before you’d have lost them.");
-  // The gold-rimmed gem, the drawing a won-back memory already has.
-  expect(line.querySelectorAll(".says-mark .gem").length).toBe(1);
+  // Tyler, 2026-11-14: "remove the random ass icon in the text box".
+  expect(line.querySelectorAll("svg, .gem, .skill-icon").length).toBe(0);
+  // He comes up through a mound of dirt, drawn in front of him and solid, so nothing of him shows between its dots.
+  const mound = s.body.querySelector(".end-emblem .review-mole .mole + .mole-mound")!;
+  expect(mound.querySelectorAll("circle").length).toBeGreaterThan(100);
+  expect(mound.querySelectorAll("rect.back").length).toBe(mound.querySelectorAll("circle").length);
   jest.useRealTimers();
   await s.done();
 });

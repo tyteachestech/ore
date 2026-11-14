@@ -2225,8 +2225,16 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-head { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .end-tally li, .end-tally .end-mark circle { animation: none !important; } }
 .end-ring > .review-cut { position: relative; flex-wrap: wrap; align-items: center; max-width: 160px; gap: 6px 8px; margin: 0; }
-/* The mole sits on the ring: its row of dirt rests on the ring's top dots. */
-.end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: -12px; }
+/* The mole comes up out of a mound of dirt that sits on the ring's top dots, him clear of them (Tyler, 2026-11-14). */
+.end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: -3px; }
+/* The mound, in front of him: it heaps up from its foot as he comes up, or as he lands in it off the cart. */
+.mole-mound { position: absolute; left: 0; bottom: 0; transform-origin: 50% 100%; animation: mound-in var(--t-moment) var(--ease-spring) both; }
+.mole-mound .back { fill: var(--bg); }
+.mole-mound .lit { fill: color-mix(in srgb, var(--text) 52%, var(--bg)); }
+.mole-mound .earth { fill: color-mix(in srgb, var(--text) 30%, var(--bg)); }
+.mole-mound .deep { fill: color-mix(in srgb, var(--text) 14%, var(--bg)); }
+@keyframes mound-in { from { transform: scale(0.7, 0); } }
+@media (prefers-reduced-motion: reduce) { .mole-mound { animation: none; } }
 /* Two groups: what the session won, then what comes next. */
 .end-emblem ~ .review-try { margin-top: 40px; }
 .end-emblem ~ .review-try ~ .review-foot { margin-top: 12px; }
@@ -2242,10 +2250,6 @@ button.home-plan:hover { color: var(--text); }
 .says-line { margin: 0; font: 400 13px/1.5 var(--mono); letter-spacing: 0.01em; color: var(--text); overflow-wrap: anywhere; }
 .says-line:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 .says-rest { visibility: hidden; }
-/* A rare line's mark (D247): the thing's own drawing, 16px, on the words' midline. */
-.says-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 8px; vertical-align: middle; color: var(--muted); }
-.says-mark > * { grid-area: 1 / 1; }
-.says-mark > .skill-icon { width: 16px; height: 16px; }
 .says-block { position: relative; display: inline-block; width: 0; height: 1em; vertical-align: -0.12em; }
 .says-block::after { content: ""; position: absolute; left: 2px; top: 0; width: 0.55em; height: 100%; background: var(--text); }
 .says:not([data-typing]) .says-block::after { animation: block-blink 1s steps(1) infinite; }

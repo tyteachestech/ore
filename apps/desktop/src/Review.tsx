@@ -7,7 +7,7 @@ import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Cutting, Gem } from "./Gem";
 import { EndMark } from "./EndMark";
 import { SkillIcon } from "./IconPicker";
-import { Mole } from "./Mole";
+import { Mole, Mound } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
 import { still } from "./SideCursor";
 import { Hint } from "./Hint";
@@ -17,7 +17,7 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { endMood, endSays, endTiles, weeksAgo, type Said, type Tile } from "./end-says";
+import { endMood, endSays, endTiles, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { SkillChip } from "./Skills";
@@ -1664,14 +1664,11 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const [tallied, setTallied] = useState(false);
   const [roll] = useState(Math.random);
   const skill = (id: string) => skills.find((x) => x.id === id);
-  // D247: a rare line wears its own mark, in the drawing that thing already has: the skill's icon in its colour,
-  // the clock for a long gap, the gold-rimmed gem for one pulled back.
-  const mark = (l: Said) => (!l.rare ? undefined : l.rare.kind === "level" ? <SkillIcon icon={skill(l.rare.skill)?.icon} color={skill(l.rare.skill)?.color} dot /> : l.rare.kind === "long" || l.rare.kind === "then" ? <Clock size={16} /> : <Gem kind="cut" size={16} seam />);
   const named = ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level }));
   const said = endSays({
     session: s, today: t, closed, short, roll, ups: named, plain: quick, napped: nap,
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
-  }).map((l) => ({ ...l, mark: mark(l) }));
+  });
   const tiles = endTiles({ session: s, ups: named });
   // His pose is for the line he says (D258).
   const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
@@ -1694,7 +1691,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
         <>
           {/* D242: one emblem. The mole (D169) stands on the ring, and what the session won sits inside it. */}
           <div className="end-emblem" data-glint={(closed && full) || undefined}>
-            <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}</span>
+            <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}{up && <Mound />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
             {settled && (
               <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />
