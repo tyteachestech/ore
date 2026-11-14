@@ -10430,8 +10430,13 @@ journey("phone: reopening on a source that left the library lands on Today, not 
   // `no item matches "01M4…"` and a lowercase "back to sources" instead of the app.
   await page.evaluate(() => localStorage.setItem("ore-phone-place", JSON.stringify({ tab: "today", skill: null, openId: "01M4J53NB45RYFGW1DQNGWYGWD", review: null })));
   await page.reload();
+  // Today stays under an open source, so Start review being there says nothing about what is over it: the
+  // reader must never open on the missing source, or its error shows until the lists have loaded (F120).
+  await page.locator(".phone-root").waitFor();
+  if (await page.locator(".phone-reader").count()) throw new Error("the reader opened on a source the library hasn't confirmed yet");
   await page.getByRole("button", { name: "Start review" }).waitFor();
-  if (await page.getByText(/no item matches/).count()) throw new Error("the missing source's error is on screen");
+  await Bun.sleep(300);
+  if (await page.locator(".phone-reader").count() || await page.getByText(/no item matches/).count()) throw new Error("the missing source's error is on screen");
 }, "phone");
 
 journey("phone: a link added is read on the phone itself; one it can't read waits for the Mac, and Remove takes it off", async (page) => {
