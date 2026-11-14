@@ -64,7 +64,7 @@ export class Speaker {
   constructor(
     private list: Range[],
     public rate: number,
-    private on: { sentence: (i: number) => void; end: () => void; error: (why: string) => void },
+    private on: { sentence: (i: number) => void; end: () => void; error: (why: string) => void; /** A word begins: the beat the lamp follows (D263). */ word?: () => void },
   ) {}
 
   play(from = this.at) {
@@ -91,6 +91,7 @@ export class Speaker {
     const u = new SpeechSynthesisUtterance(this.list[i]!.toString().replace(/\s+/g, " "));
     u.rate = this.rate;
     u.onend = () => this.speak(i + 1, token);
+    u.onboundary = () => token === this.token && this.on.word?.();
     u.onerror = (e) => {
       // A cancel (pause, a new speed) ends the old utterance with an error; only a real one counts.
       if (token === this.token && e.error !== "canceled" && e.error !== "interrupted") this.on.error(e.error);

@@ -166,6 +166,8 @@ test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem 
   expect(s.body.querySelector(".review-cut")!.getAttribute("aria-label")).toBe("2 became solid, 1 won back, 1 polished");
   // The mole speaks (D243); the depth is a number in the row of results.
   expect(s.q(".end-says .says-line")).toBe(1);
+  // The box is an outline with no tail (D266): nothing is drawn in it but the line.
+  expect(s.q(".end-says svg.says-tail")).toBe(0);
   expect(s.body.querySelector('.end-tally [data-key="depth"]')!.textContent).toBe("+41days of memory");
   await s.done();
   // More gems than fit: the count covers the polished ones left out too.
@@ -192,9 +194,10 @@ test("the mole says one line at a session's end: typed out a letter at a time wi
   const s = await mount(e as never);
   const line = () => s.body.querySelector(".end-says .says-line");
   const typed = () => line()!.firstChild?.nodeType === 3 ? line()!.firstChild!.textContent : "";
-  // He speaks once he has come up and cheered.
+  // He speaks once he has come up and the results have landed.
   expect(s.q(".end-says")).toBe(0);
-  await act(async () => void jest.advanceTimersByTime(560));
+  // Step through the row as well as the mole: each React effect schedules the next result.
+  for (let i = 0; i < 28; i++) await act(async () => void jest.advanceTimersByTime(20));
   // The verdict first, and the whole line is in the page from its first letter: only the typed part shows,
   // the rest holds its place unseen, the block between them.
   expect(line()!.textContent).toBe("Gneiss work.");
@@ -447,4 +450,85 @@ test("the glint (D257): a light crosses the ring and the field behind it only wh
   // The marks beside the numbers are the one loop, and they too stand still under Reduce Motion.
   expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{ \.end-tally li, \.end-tally \.end-mark circle \{ animation: none !important; \} \}/);
   for (const [rule] of css.matchAll(/[^{}]*glint[^{}]*\{[^{}]*animation:[^{}]*\}/g)) expect(rule).not.toContain("infinite");
+});
+
+test("D252: the mole starts typing only after the last result lands (F106)", async () => {
+  jest.useFakeTimers();
+  const e = end([], today(true, 600_000), { ...today(true, 600_000), caught_up: true, new_waiting: 7 }) as unknown as { session: Record<string, unknown> };
+  Object.assign(e.session, { depth_days: 41, rescued: 2 });
+  const s = await mount(e as never);
+  // The line may reserve its space earlier; no visible letters may arrive while a tile is waiting.
+  for (let elapsed = 0; elapsed < 1200; elapsed += 20) {
+    const line = s.body.querySelector(".end-says .says-line");
+    if (s.q(".end-tally > li[data-wait]")) expect([...line?.childNodes ?? []].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("")).toBe("");
+    await act(async () => void jest.advanceTimersByTime(20));
+  }
+  expect(s.q(".end-tally > li[data-wait]")).toBe(0);
+  expect([...s.body.querySelector(".end-says .says-line")!.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join("").length).toBeGreaterThan(0);
+  await s.done();
+});
+
+test("D252: a caught-up session still names the new exercises held until tomorrow under the results", async () => {
+  reduce = true;
+  const s = await mount(end([], today(true, 600_000), { ...today(true, 600_000), caught_up: true, new_waiting: 7 }));
+  expect(s.body.querySelector(".end-tally + .quiz-faint")?.textContent).toContain("7");
+  expect(s.body.querySelector(".end-tally + .quiz-faint")?.textContent).toMatch(/new|tomorrow/i);
+  await s.done();
+});
+
+test("D255: the quick quiz never rides the cart even with ore and a gem", async () => {
+  jest.useFakeTimers();
+  const body = document.createElement("div"); document.body.append(body);
+  const root = createRoot(body);
+  try {
+    await act(async () => root.render(<TooltipProvider><EndScreen quick end={end(["ai"])} skills={skills} onDone={() => {}} onAgain={() => {}} onTry={() => {}} /></TooltipProvider>));
+    expect(body.querySelectorAll(".cart-tip, .cart-mole, .review-mole")).toHaveLength(0);
+    expect(body.querySelectorAll(".review-cut .gem")).toHaveLength(1);
+  } finally { await act(async () => root.unmount()); body.remove(); }
+});
+
+test("D257: each result glints only after its own count finishes, in landing order", async () => {
+  jest.useFakeTimers();
+  const raf = globalThis.requestAnimationFrame, caf = globalThis.cancelAnimationFrame;
+  const clock = jest.spyOn(performance, "now");
+  let now = 0, id = 0;
+  const frames = new Map<number, FrameRequestCallback>();
+  clock.mockImplementation(() => now);
+  globalThis.requestAnimationFrame = (fn) => (frames.set(++id, fn), id);
+  globalThis.cancelAnimationFrame = (n) => void frames.delete(n);
+  try {
+    const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
+    Object.assign(e.session, { depth_days: 41, rescued: 2 });
+    const s = await mount(e as never);
+    const first = new Map<string, number>();
+    for (now = 0; now <= 2000; now += 16) {
+      await act(async () => {
+        jest.advanceTimersByTime(16);
+        const due = [...frames.values()]; frames.clear();
+        for (const fn of due) fn(now);
+      });
+      const glints = [...s.body.querySelectorAll(".end-tally li:has(.dot-number.glint)")].map((el) => el.getAttribute("data-key")!);
+      for (const key of glints) if (!first.has(key)) first.set(key, now);
+      if (now < 600) expect(glints).toEqual([]);
+    }
+    expect([...first.keys()]).toEqual(["kept", "depth", "rescued"]);
+    expect(first.get("kept")!).toBeGreaterThanOrEqual(600);
+    expect(first.get("depth")! - first.get("kept")!).toBeGreaterThanOrEqual(300);
+    expect(first.get("rescued")! - first.get("depth")!).toBeGreaterThanOrEqual(300);
+    expect(s.q(".ring.glint, .end-emblem[data-glint]")).toBe(0); // goal was met before this session
+    await s.done();
+  } finally {
+    globalThis.requestAnimationFrame = raf; globalThis.cancelAnimationFrame = caf;
+    clock.mockRestore(); jest.useRealTimers();
+  }
+});
+
+test("D258: then-and-now gets the curious pose on the mounted end screen, without a victory hop", async () => {
+  jest.useFakeTimers();
+  const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
+  Object.assign(e.session, { then_now: { card: "c", question: "Why retrieval?", then_ts: new Date(Date.now() - 29 * 864e5).toISOString(), then: "No idea", now: "It strengthens recall" } });
+  const s = await mount(e as never);
+  await act(async () => void jest.advanceTimersByTime(560));
+  expect(s.body.querySelector(".review-mole .mole")?.getAttribute("data-mood")).toBe("curious");
+  await s.done();
 });

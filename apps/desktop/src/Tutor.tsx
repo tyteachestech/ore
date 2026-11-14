@@ -24,7 +24,11 @@ import { is } from "./keys";
 import { errorText, type Notify } from "./util";
 import { Working } from "./Working";
 import { mentionMatches, pointedAt, type Mention } from "./mentions";
+import { glow, pulse } from "./Lamp";
 import { Mole, type Mood } from "./Mole";
+
+/** How lately the reply being written gained words: the mole's lamp follows it (the lamp, D263). */
+const writing = () => glow("tutor", 900);
 import { firstWords, landedClosed } from "./mole-says";
 
 export type Citation = { n: number; item: string; title: string; heading: string; quote: string; text: string; start: number; end: number };
@@ -167,6 +171,7 @@ export function useTutorChat(notify: Notify) {
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
     const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
+      if (p.stream === t.id && mine() && p.reply !== undefined) pulse("tutor"); // words arriving: the mole's lamp follows them (D263)
       if (p.stream === t.id && mine()) patch(chat, t.id, p.reply !== undefined ? { partial: p.reply } : p.searching ? { searching: true } : { searching: false, searched: true });
     }).catch(() => () => {});
     try {
@@ -846,7 +851,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
         {/* The one mole (D186): it peeks over the field's edge, wonders while a reply is written and hops when one lands;
             the newest bubble's tail points down at it. What he pointed the chat at sits beside it. */}
         <div className="tutor-perch">
-          <span className="tutor-mole"><Mole bare size={36} mood={busy ? "thinking" : landed ? (landed.failed ? "surprised" : "happy") : "idle"} cue={landed?.id} /></span>
+          <span className="tutor-mole"><Mole bare size={36} mood={busy ? "thinking" : landed ? (landed.failed ? "surprised" : "happy") : "idle"} cue={landed?.id} signal={writing} /></span>
           {chips}
         </div>
         <div className="ask-input">
@@ -1264,7 +1269,7 @@ export function TutorBubble({ onOpen, said = null, failed = false, thinking = fa
           onFocus={() => setLook(true)}
           onBlur={() => setLook(false)}
         >
-          <Mole mood={mood} cue={said} look={look || !!said} />
+          <Mole mood={mood} cue={said} look={look || !!said} signal={writing} />
         </button>
       </Hint>
     </>

@@ -124,6 +124,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 
 | Doc | Status |
 | --- | --- |
+| [`brand.md`](docs/design/brand.md) | The brand guidelines on one page; `DESIGN.md` is the full spec (D263) |
 | [`daily-session.md`](docs/design/daily-session.md) | Who Ore is for and the daily session: a 10 min to 1 hour habit over a due backlog that never empties (D144) |
 | [`learning-system.md`](docs/design/learning-system.md) | The learn-and-apply loop the science asks for, what Ore has of it, and which rewards are safe to tune (proposed) |
 | [`review-plan.md`](docs/design/review-plan.md) | Home, Review mode, daily goal, "Ask about this" chat, delight rules (D58 to D62, built) |

@@ -30,7 +30,7 @@ import { BlockHandle, nearest, spot, type Spot } from "./BlockHandle";
 import { copiedFiles, pastesFiles } from "../copied";
 import { imageExt, noteImage } from "../paste";
 import { TableControls } from "./TableControls";
-import { KeyboardBar } from "./KeyboardBar";
+import { EDITOR_UPDATE, KeyboardBar } from "./KeyboardBar";
 import { SelectionBar, type Sel } from "./SelectionBar";
 import { WithMenu, type MenuAction } from "../Menu";
 import { blockAt, duplicate, moveBy, selectBlocks, selectedBlock, topGaps, turnAtCaret, type Kind } from "./blockops";
@@ -286,7 +286,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       original,
       // Also when the edit is taken back to the text as loaded, so the undone version is saved over.
       (md) => base !== null && live.current.p.onChange(keepUnedited(original, base, md)),
-      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, showSel)]), imagePaste(live), imageView(live), ...mathViews((pos) => live.current.editMath(pos)), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
+      [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, showSel)]), ...(PHONE ? [barWatch] : []), imagePaste(live), imageView(live), ...mathViews((pos) => live.current.editMath(pos)), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
     ).then((e) => {
       if (gone) return void e.destroy();
       editor.current = e;
@@ -818,6 +818,11 @@ function pickPictures(): Promise<File[]> {
     p.input.click();
   });
 }
+
+/** The iPhone's keyboard bar redraws when the editor's selection or text changes, not only on the page's
+ *  selectionchange: ProseMirror can read a tap in a table cell after the page's events have gone by, which left
+ *  the bar without Table actions (F52). */
+const barWatch = $prose(() => new Plugin({ view: () => ({ update: (v, prev) => void ((!prev.selection.eq(v.state.selection) || prev.doc !== v.state.doc) && document.dispatchEvent(new Event(EDITOR_UPDATE))) }) }));
 
 function imagePaste(live: Live) {
   return $prose(

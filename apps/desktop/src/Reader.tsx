@@ -43,6 +43,7 @@ import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { chunks, pageChunks, pageOf, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
+import { glow, LampRing, pulse } from "./Lamp";
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer, type Player } from "./Video";
 import { ownsMediaKey } from "./media-keys";
@@ -84,7 +85,7 @@ const PLACEHOLDER: Record<Intent, string> = {
 // That also drops the `<!-- page N -->` / `<!-- chapter N -->` markers. Links open in the browser.
 // Math is `$$…$$` only (intake writes inline TeX that way), so a price's `$` never reads as math.
 const remarkPlugins = [remarkGfm, [remarkMath, { singleDollarTextMath: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["remarkPlugins"]>;
-const rehypePlugins = [[rehypeKatex, { output: "html", throwOnError: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
+const rehypePlugins = [[rehypeKatex, { output: "htmlAndMathml", throwOnError: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
 // A click on a link is handled by the reader (`followLink`). Footnotes (`footnotes` in text.ts) keep
 // their "^" in the text for the index, drawn as a small raised number.
 const caret = (children: ReactNode) => (typeof children === "string" && children.startsWith("^") ? <><span className="fn-caret">^</span>{children.slice(1)}</> : children);
@@ -456,7 +457,7 @@ function ColumnHead({ children, style }: { children?: ReactNode; style?: CSSProp
       {cols && (
         <Hint text={on ? "Show this column" : "Cover this column to test yourself"}>
           <button className="col-cover" data-noindex="" aria-label={on ? "Show this column" : "Cover this column"} aria-pressed={on} onClick={() => cols.toggle(i)}>
-            {on ? <Eye size={14} /> : <EyeSlash size={14} />}
+            {on ? <Eye size={14} aria-hidden="true" /> : <EyeSlash size={14} aria-hidden="true" />}
           </button>
         </Hint>
       )}
@@ -1052,6 +1053,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         paint("hl-listen", [list[i]!]);
         showSentence();
       },
+      word: () => pulse("listen"),
       end: stopListening,
       error: (why) => {
         stopListening();
@@ -3209,7 +3211,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   return (
     <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && panelShown ? " noting" : ""}${barsHidden && !find.open ? " bars-hidden" : ""}`} ref={readerRef}>
-      <div className={`reader-pane${hidden ? " hidden-src" : ""}`} aria-hidden={hidden || undefined}>
+      <div className={`reader-pane${hidden ? " hidden-src" : ""}`}>
       {/* Learn this's Read now (D97): back to the passage he left, as Books offers after following a link. ⌘[ too. */}
       {p.back && !closedBook && (
         <Hint text="Back to the passage you left" keys="nav-back" side="top">
@@ -3224,7 +3226,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           {listen && (
             <div className="listen-bar" role="group" aria-label="Listening">
               <Hint text={listen.playing ? "Pause" : "Play"} keys="play">
-                <button className="ctl" aria-label={listen.playing ? "Pause" : "Play"} onClick={togglePause}>
+                {/* Reading aloud is running: the lamp (D263), its ring following each word as it is spoken. */}
+                <button className={`ctl${listen.playing ? " lamp" : ""}`} aria-label={listen.playing ? "Pause" : "Play"} onClick={togglePause}>
+                  {listen.playing && <LampRing size={26} level={() => 0.35 + 0.65 * glow("listen")} />}
                   {listen.playing ? <Pause size={15} weight="fill" /> : <Play size={15} weight="fill" />}
                 </button>
               </Hint>
@@ -3249,7 +3253,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           {!PHONE && (
             <Hint text={hideSource ? "Show the source" : "Hide the source while you write"} keys="hide-source">
               <button className={`width-toggle${hideSource ? " on" : ""}`} aria-label={hideSource ? "Show the source" : "Hide the source"} aria-pressed={hideSource} onClick={toggleHide}>
-                {hideSource ? <EyeSlash size={16} /> : <Eye size={16} />}
+                {hideSource ? <EyeSlash size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
               </button>
             </Hint>
           )}
@@ -3309,7 +3313,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         </div>
       )}
       <HideDots hidden={hidden} box={scrollRef} page={pageRef} />
-      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
+      {/* Only the words hide (F118): the toolbar above them, with Show the source, stays in reach of VoiceOver. */}
+      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} aria-hidden={hidden || undefined} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} {...(PHONE ? { onTouchStart, onTouchMove, onTouchEnd } : {})} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
             {/* A book's cover or a PDF's first page at the top (D77): the picture is the source. A page's

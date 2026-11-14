@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -44,8 +44,19 @@ afterAll(() => {
 });
 
 const realFetch = globalThis.fetch;
+let unserved: string[] = [];
+beforeEach(() => {
+  unserved = [];
+  // Refusals can catch a fetch error themselves; afterEach also checks that no live request was attempted.
+  globalThis.fetch = (async (input: string | URL | Request): Promise<Response> => {
+    const url = String(input instanceof Request ? input.url : input);
+    unserved.push(url);
+    throw new Error(`Unit tests must serve a local fixture: ${url}`);
+  }) as typeof fetch;
+});
 afterEach(() => {
   globalThis.fetch = realFetch;
+  expect(unserved).toEqual([]);
 });
 /** Serves saved pages by URL, with a content type; anything else is a 404. */
 function serve(pages: Record<string, { body: BodyInit; type: string }>) {
@@ -337,7 +348,9 @@ describe("import coverage: junk is refused with the next step", () => {
     await expect(addSource(await tempLibrary(), "https://traffic.megaphone.fm/EP1.mp3")).rejects.toThrow(/over 200 MB/);
   });
 
-  test("links Ore can't read yet say why at once", async () => {
+  test("links Ore can't read yet say why at once, without network access (F108)", async () => {
+    // Spotify reads its page before refusing it; this unit test must never contact the live site.
+    serve({});
     const lib = await tempLibrary();
     await expect(addSource(lib, "https://x.com/karpathy/status/1617979122625712128")).rejects.toThrow(/X only shows posts to signed-in browsers/);
     await expect(addSource(lib, "https://open.spotify.com/episode/4rOoJ6Egrf8K2IrywzwOMk")).rejects.toThrow(/Couldn’t read that Spotify episode’s page.*Apple Podcasts/);
@@ -951,7 +964,8 @@ describe("import coverage: from the browser tab", () => {
   const shell = web("wall-notion.html");
   const visible = Array.from({ length: 8 }, (_, i) => `Paragraph ${i + 1} of the team wiki: we review each card on the day it is due and keep notes short.`).join("\n\n");
 
-  test("a signed-in article comes in from the tab's HTML, with the tab's link", async () => {
+  test("a signed-in article comes in from the tab's HTML, with the tab's link (F109)", async () => {
+    serve({});
     const url = "https://www.astralcodexten.com/p/the-psychopolitics-of-trauma";
     const item = await addTab(await tempLibrary(), { tab: { browser: "Safari", url, title: "x", html: web("substack.html") } });
     expect(item.meta.url).toBe(url);
@@ -959,7 +973,8 @@ describe("import coverage: from the browser tab", () => {
     expect(item.body).toContain("Research prompt teacher mind learn habit");
   });
 
-  test("a page built in the browser (Notion) comes in as its visible text", async () => {
+  test("a page built in the browser (Notion) comes in as its visible text (F109)", async () => {
+    serve({});
     const url = "https://www.notion.so/Team-wiki-8c11dd01c9d24ad4b27b31d6f19e1fd8";
     const item = await addTab(await tempLibrary(), { tab: { browser: "Chrome", url, title: "Team wiki", html: shell, text: `Team wiki\n\n${visible}` } });
     expect(item.meta.title).toBe("Team wiki");
@@ -986,7 +1001,8 @@ describe("import coverage: from the browser tab", () => {
     expect((await reimportSource(lib, item.meta.id, { local: true })).changed).toBe(false);
   });
 
-  test("a tab still showing a sign-in says to sign in there", async () => {
+  test("a tab still showing a sign-in says to sign in there (F109)", async () => {
+    serve({});
     const url = "https://x.com/karpathy/status/1";
     await expect(addTab(await tempLibrary(), { tab: { browser: "Safari", url, html: shell, text: "Log in to X" } })).rejects.toThrow(/Safari is showing almost no text on x\.com.*Sign in there/);
   });
@@ -1240,6 +1256,26 @@ describe("import coverage: audio and podcasts", () => {
     const item = await addSource(await tempLibrary(), url);
     expect(item.meta.title).toBe("Episode 12: Memory");
     expect(item.meta.author).toBe("Learning Show");
+  });
+
+  test("a podcast player's episode keeps its published date (F122)", async () => {
+    const url = "https://overcast.fm/+Sundial";
+    const html = readFileSync(join(FIX, "audio/player-date.html"), "utf8");
+    const pages = (page: string) => ({
+      [url]: { body: page, type: HTML },
+      "https://audio.test/sundial.wav": { body: readFileSync(join(FIX, "audio/sundial.wav")), type: "audio/wav" },
+    });
+    serve(pages(html));
+    const item = await addSource(await tempLibrary(), url);
+    expect(item.meta).toMatchObject({ title: "Episode 12: Restoring a sundial", author: "Workshop Radio", published: "2026-10-21T09:30:00-07:00", url });
+    expect(item.body).toBe("[00:00] Welcome back to the show. Today we talk about spaced repetition.\n\n[01:00] Thanks for listening.\n");
+    expect(readFileSync(join(item.dir, "source.wav")).length).toBe(4096);
+    expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toBe(VTT);
+    // Invalid metadata is omitted, never saved as a date or replaced with today's date.
+    serve(pages(html.replace("2026-10-21T09:30:00-07:00", "whenever")));
+    expect((await addSource(await tempLibrary(), url)).meta.published).toBeUndefined();
+    serve(pages(html.replace(/<meta[^>]*article:published_time[^>]*>/, "")));
+    expect((await addSource(await tempLibrary(), url)).meta.published).toBeUndefined();
   });
 
   test("a player's page whose audio has its type mid-path still plays it", async () => {
@@ -1532,7 +1568,8 @@ describe("import coverage: videos heard from their sound", () => {
     else process.env.ORE_TRANSCRIBE = was;
   });
 
-  test("a YouTube video with no captions is heard: chapters, title and description kept", async () => {
+  test("a YouTube video with no captions is heard: chapters, title and description kept (F109)", async () => {
+    serve({});
     ytdlp(join(FIX, "video", "no-captions.info.json"));
     const seen: string[] = [];
     const item = await addSource(await tempLibrary(), "https://www.youtube.com/watch?v=Nc4pT10nSaA", { onProgress: (_d, label) => label && seen.push(label) });
@@ -1702,6 +1739,72 @@ describe("import coverage: other languages", () => {
     });
     const language = () => readFileSync(join(dir, "args"), "utf8").trim().split(" ").slice(1).join(" ");
     const feed = (lang: string, items = "") => `<?xml version="1.0"?><rss><channel><title>Radio Ambulante</title><language>${lang}</language>${items}</channel></rss>`;
+
+    test("a publisher's episode is heard in its declared spoken language from a link or tab (F123)", async () => {
+      const url = "https://workshop.test/episodes/sundial";
+      const html = readFileSync(join(FIX, "audio/episode-language.html"), "utf8");
+      const transcript = readFileSync(join(FIX, "audio/sundial.vtt"), "utf8");
+      writeFileSync(join(dir, "out.vtt"), transcript);
+      try {
+        serve({
+          [url]: { body: html, type: HTML },
+          "https://audio.test/sundial.wav": { body: readFileSync(join(FIX, "audio/sundial.wav")), type: "audio/wav" },
+        });
+        for (const tab of [false, true]) {
+          const lib = await tempLibrary();
+          const item = tab ? await addTab(lib, { tab: { browser: "Safari", url, title: "x", html } }) : await addSource(lib, url);
+          expect(language()).toBe("es-MX");
+          expect(item.meta).toMatchObject({ title: "Restaurar un reloj de sol", author: "Ana Torres", published: "2026-10-21", url });
+          expect(item.body).toBe("[00:00] El taller abre sus puertas.\n\n[00:30] Medimos la sombra antes de mover la pieza.\n\n[01:00] El reloj vuelve al jardín.\n");
+          expect(readFileSync(join(item.dir, "page.html"), "utf8")).toBe(html);
+          expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toBe(transcript);
+          expect(audioOf(item)).toMatchObject({ file: join(item.dir, "source.wav") });
+        }
+      } finally {
+        writeFileSync(join(dir, "out.vtt"), VTT);
+      }
+    });
+
+    test("a podcast player's episode uses its declared spoken language, not its UI language (F124)", async () => {
+      const url = "https://pca.st/episode/sundial";
+      const transcript = readFileSync(join(FIX, "audio/sundial.vtt"), "utf8");
+      serve({
+        [url]: { body: readFileSync(join(FIX, "audio/episode-language.html"), "utf8"), type: HTML },
+        "https://audio.test/sundial.wav": { body: readFileSync(join(FIX, "audio/sundial.wav")), type: "audio/wav" },
+      });
+      writeFileSync(join(dir, "out.vtt"), transcript);
+      try {
+        const item = await addSource(await tempLibrary(), url);
+        expect(language()).toBe("es-MX");
+        expect(item.meta).toMatchObject({ title: "Restaurar un reloj de sol", author: "Workshop Radio", published: "2026-10-21", url });
+        expect(item.body).toBe("[00:00] El taller abre sus puertas.\n\n[00:30] Medimos la sombra antes de mover la pieza.\n\n[01:00] El reloj vuelve al jardín.\n");
+        expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toBe(transcript);
+        expect(audioOf(item)).toMatchObject({ file: join(item.dir, "source.wav") });
+      } finally {
+        writeFileSync(join(dir, "out.vtt"), VTT);
+      }
+    });
+
+    test("an episode's missing or invalid spoken language leaves the chosen or Mac language alone", async () => {
+      const html = readFileSync(join(FIX, "audio/episode-language.html"), "utf8");
+      for (const [page, chosen, expected] of [
+        [html.replace('"es-mx"', '" es-mx "').replace('"PodcastEpisode"', '"RadioEpisode"'), undefined, "es-MX"],
+        [html.replace(', "inLanguage": "es-mx"', ""), undefined, ""],
+        [html.replace('"es-mx"', '"not a locale"'), "fr", "fr"],
+        [html.replace('"es-mx"', '{"name":"Spanish"}'), undefined, ""],
+        // An Article with audio at an episode URL is still heard, but its page language is not speech metadata.
+        [html.replace('"PodcastEpisode"', '"Article"'), undefined, ""],
+      ] as const) {
+        for (const url of ["https://workshop.test/episodes/sundial", "https://pca.st/episode/sundial"]) {
+          serve({
+            [url]: { body: page, type: HTML },
+            "https://audio.test/sundial.wav": { body: readFileSync(join(FIX, "audio/sundial.wav")), type: "audio/wav" },
+          });
+          await addSource(await tempLibrary(), url, { language: chosen });
+          expect(language()).toBe(expected);
+        }
+      }
+    });
 
     test("a Spanish show on Apple Podcasts is heard in Spanish, as its feed says", async () => {
       serve({
