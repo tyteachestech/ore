@@ -11,7 +11,7 @@ import { useSwipeDown } from "./phone/sheet";
 import { errorText, useFocusWhileMounted } from "./util";
 import { Trap } from "./Trap";
 
-/** `typed`: a row found only once he types (F-new-r7y129), so one of a set, like an ambience channel, never crowds the list ⌘K opens on. */
+/** `typed`: a row found only once he types (F132), so one of a set, like an ambience channel, never crowds the list ⌘K opens on. */
 export type Action = { id: string; label: string; hint?: string; keywords?: string[]; typed?: boolean; run: () => void };
 
 type Props = {
