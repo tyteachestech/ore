@@ -2896,12 +2896,14 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   async function retitle(id: string, before: string, t: string, undoable = true) {
     if (!t || t === before) return true;
     setDoc((cur) => cur && cur.id === id ? { ...cur, title: t } : cur);
+    // On the history at once, so a quick ⌘Z takes it back (F156); taken off again if the write fails.
+    const forget = undoable ? p.notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false)) : () => {};
     try {
       await inOrder(id, () => ore("edit", id, "--title", t));
       p.onChanged();
-      if (undoable) p.notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false));
       return true;
     } catch (e) {
+      forget();
       setDoc((cur) => cur && cur.id === id ? { ...cur, title: before } : cur);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;

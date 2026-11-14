@@ -12121,6 +12121,35 @@ journey("skill rename: pending Undo preserves the preceding source (F146)", asyn
   }
 });
 
+journey("source rename: pending Undo takes back the rename, not the source added before it (F156)", async (page) => {
+  const title = `Source to rename ${Date.now()}`;
+  await page.reload();
+  await page.keyboard.press("Meta+n");
+  await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nThis source must survive undoing its own rename.`);
+  await page.keyboard.press("Enter");
+  await page.getByRole("heading", { name: title, exact: true }).waitFor();
+  await until("the import has settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+  const source = (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === title)!;
+  try {
+    await page.locator(".doc-head h1.renamable").click();
+    await page.locator(".doc-head .title-edit").fill(`${title} renamed`);
+    await hold(page, "edit");
+    await page.keyboard.press("Enter");
+    await until("the rename is held", () => isHeld(page, "edit"));
+    await page.keyboard.press("Meta+z");
+    await release(page, "edit");
+    await until("the rename and Undo have settled", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING: number }).__ORE_PENDING));
+    const archived = await ore("ls", "--archived") as { id: string }[];
+    if (archived.some((i) => i.id === source.id)) throw new Error("Undo archived the source added before the pending rename");
+    await until("Undo puts the old title back", async () => (await ore("show", source.id) as { title: string }).title === title);
+    await page.keyboard.press("Meta+Shift+z");
+    await until("Redo renames it again", async () => (await ore("show", source.id) as { title: string }).title === `${title} renamed`);
+  } finally {
+    await release(page, "edit");
+    await ore("archive", source.id);
+  }
+});
+
 journey("quick quiz: clicking the recorder takes keyboard focus in WebKit (F147)", async (page) => {
   await page.keyboard.press("Meta+,");
   const panel = page.getByRole("dialog", { name: "Settings" });

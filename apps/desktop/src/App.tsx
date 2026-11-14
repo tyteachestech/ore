@@ -50,7 +50,7 @@ import { Thumb } from "./Thumb";
 import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
-import { errorText, focusQuietly, keepScroll, keptScrolls, load, save, usable } from "./util";
+import { errorText, focusQuietly, inOrder as inTurn, keepScroll, keptScrolls, load, save, usable } from "./util";
 import { questionText } from "./Questions";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth, smaller, useReading, WIDTHS } from "./reading";
@@ -1441,11 +1441,13 @@ export function App() {
   const retitle = async (id: string, before: string, t: string, undoable = true) => {
     if (!t || t === before) return true;
     setItems((all) => all?.map((i) => (i.id === id ? { ...i, title: t } : i)) ?? all);
+    // On the history at once, so a quick ⌘Z takes this back, never the step before it (F146, F156); off it again if the write fails.
+    const forget = undoable ? notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false)) : () => {};
     try {
-      await ore("edit", id, "--title", t);
-      if (undoable) notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false));
+      await inTurn(id, () => ore("edit", id, "--title", t));
       return true;
     } catch (e) {
+      forget();
       setItems((all) => all?.map((i) => (i.id === id ? { ...i, title: before } : i)) ?? all);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
@@ -1590,11 +1592,13 @@ export function App() {
   const recourse = async (id: string, before: string, t: string, undoable = true) => {
     if (!t || t === before) return true;
     setItems((all) => all?.map((i) => (i.course?.id === id ? { ...i, course: { ...i.course, title: t } } : i)) ?? all);
+    // On the history at once, so a quick ⌘Z takes this back, never the step before it (F146, F156); off it again if the write fails.
+    const forget = undoable ? notify(`Renamed to “${t}”`, "quiet", () => recourse(id, t, before, false), () => recourse(id, before, t, false)) : () => {};
     try {
-      await ore("course", "set", id, opt("title", t));
-      if (undoable) notify(`Renamed to “${t}”`, "quiet", () => recourse(id, t, before, false), () => recourse(id, before, t, false));
+      await inTurn(`course ${id}`, () => ore("course", "set", id, opt("title", t)));
       return true;
     } catch (e) {
+      forget();
       setItems((all) => all?.map((i) => (i.course?.id === id ? { ...i, course: { ...i.course, title: before } } : i)) ?? all);
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;

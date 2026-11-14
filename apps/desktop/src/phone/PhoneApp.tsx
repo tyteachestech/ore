@@ -30,7 +30,7 @@ import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
 import { Working } from "../Working";
-import { errorText, stepLanded, useKeptScroll, type Notify } from "../util";
+import { errorText, inOrder, stepLanded, useKeptScroll, type Notify } from "../util";
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   const now = useRef(drag);
@@ -746,11 +746,13 @@ export function PhoneApp() {
     t = t.trim();
     if (!t || t === before) return true;
     setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, title: t } : i)) ?? all);
+    // On the history at once, so a quick ⌘Z takes this back, never the step before it (F146, F156); off it again if the write fails.
+    const forget = undoable ? notify(`Renamed to “${t}”`, "quiet", () => retitle(item, t, before, false), () => retitle(item, before, t, false)) : () => {};
     try {
-      await ore("edit", item.id, "--title", t);
-      if (undoable) notify(`Renamed to “${t}”`, "quiet", () => retitle(item, t, before, false), () => retitle(item, before, t, false));
+      await inOrder(item.id, () => ore("edit", item.id, "--title", t));
       return true;
     } catch (e) {
+      forget();
       setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, title: before } : i)) ?? all);
       if (!undoable) throw e;
       notify(errorText(e), "error");
