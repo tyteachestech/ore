@@ -15,7 +15,7 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 - One icon set (Tyler, 2026-11-07, pixel only 2026-11-09, D157): every icon in the app is a 16-grid pixel MingCute sprite, never a smooth one or an emoji beside it. Skill icons too: `scripts/pixel-skill-icons.ts` redraws the curated set in `src/skill-icon-set.ts` into `src/skill-icons.json` (eroded before sampling so holes stay open; thin shapes drawn plain), hand fixes in `src/skill-icon-fixes.ts` win; every icon checked at 4× before joining.
 - Icons (Tyler's pick E of six sets, 2026-11-08, after the panel tabs A and the popup E): every sprite's pixels are round dots, Nothing's glyphs, a quarter bigger than asked (20px for 16, 40px at 24 and up; 16 in a chip), centred by their ink, with a 0.38 dot (D170, D171). Never in a box that cuts them; round ones share `Circle`'s outline, because a circle with long flat sides reads as cut off. `style-check.ts` (pixel icon) and `test/round-icons.test.ts` fail otherwise.
 - Big numbers in the mono; Geist Pixel retired. Labels in sentence case.
-- Wordmark: A "ore_" in Poppins ExtraBold Italic with a green cursor underscore.
+- Wordmark: A "ore_" in Poppins ExtraBold Italic with a green cursor underscore. Retired 2026-11-14 (D265): the name is plain Geist beside the icon.
 - App icon (D221, Tyler 2026-11-12): a plain pickaxe in halftone dots, white fading to gray, on the dark tile; Mac and iPhone. `apps/desktop/scripts/app-icon.ts`.
 - Railway touch: B Rail + stations (Home week as stations; Review's track and its cart went with D246, and the cart's run is now on the end screen, D190). The dot grid was dropped: no purpose.
 - Popup closing animation: A Settle (popup lifts away, margin mark pops in three pixel steps, the passage glows once).
@@ -37,8 +37,11 @@ Learning is anxiety-inducing, so the app feels calm, delightful and satisfying, 
 ## Picked (2026-11-10, D190)
 - The first signature moment (Tyler's pick B of three, played on a copy of the real end screen): a finished session lands with the cart rolling in and tipping its ore into the ring, rough stones dropping to be cut, the mole coming up after. Not picked: Light up (today, tuned), Mole strike. The sketch moved in straight lines and he called it amateur; the build draws the cart in dots with turning wheels and throws the ore on real arcs. Lesson: sketch the idea, but say it is a sketch before he sees it.
 
+## Picked (2026-11-14, D263)
+- The radio's playing button is a named motion, the lamp: amber dots breathing in place with the real sound, grey and still when off. It means "running right now". More places for it are Tyler's call, one at a time.
+- Brand guidelines: `docs/design/brand.md` is the one page; the browsable version with live components (https://claude.ai/artifact/NotsGBRDucobyz6q4vfNn4) is rebuilt from the app's code by `apps/desktop/scripts/design-system/build.ts`, replacing the hand-drawn kit of 2026-11-07.
+
 ## Open
-- A page showing every component.
 - Redraw Hand, ThumbsDown, Paperclip, Compass.
 - A Rive trial; sound.
 - A mascot later; sound after the look.

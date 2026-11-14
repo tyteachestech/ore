@@ -43,6 +43,7 @@ import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { chunks, pageChunks, pageOf, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
+import { glow, LampRing, pulse } from "./Lamp";
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer, type Player } from "./Video";
 import { ownsMediaKey } from "./media-keys";
@@ -1047,6 +1048,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         paint("hl-listen", [list[i]!]);
         showSentence();
       },
+      word: () => pulse("listen"),
       end: stopListening,
       error: (why) => {
         stopListening();
@@ -3221,7 +3223,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           {listen && (
             <div className="listen-bar" role="group" aria-label="Listening">
               <Hint text={listen.playing ? "Pause" : "Play"} keys="play">
-                <button className="ctl" aria-label={listen.playing ? "Pause" : "Play"} onClick={togglePause}>
+                {/* Reading aloud is running: the lamp (D263), its ring following each word as it is spoken. */}
+                <button className={`ctl${listen.playing ? " lamp" : ""}`} aria-label={listen.playing ? "Pause" : "Play"} onClick={togglePause}>
+                  {listen.playing && <LampRing size={26} level={() => 0.35 + 0.65 * glow("listen")} />}
                   {listen.playing ? <Pause size={15} weight="fill" /> : <Play size={15} weight="fill" />}
                 </button>
               </Hint>

@@ -985,6 +985,10 @@ body.resizing iframe { pointer-events: none; }
 .listen-bar { display: flex; align-items: center; gap: 2px; padding: 2px 4px; border-radius: 999px; background: var(--bg-raised); border: 1px solid var(--border); }
 .listen-bar .ctl { height: 26px; min-width: 26px; border-radius: 999px; }
 .listen-bar .ctl.rate { border-color: transparent; }
+/* Reading aloud is running: the lamp (D263). The button's icon turns amber inside a ring of dots that follows each
+   word; paused, it is the plain grey control again. */
+.listen-bar .ctl.lamp, .listen-bar .ctl.lamp:hover:not(:disabled) { position: relative; color: var(--lamp); }
+.lamp-ring { position: absolute; inset: 0; margin: auto; pointer-events: none; }
 .intent.remove, .intent.icon { flex: 0 0 26px; }
 .intent.icon:hover { color: var(--text); }
 /* Look Up (D83): the dictionary entry in the popup's place, Books' definition card. */
