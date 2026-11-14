@@ -1,6 +1,6 @@
 # PDF inline math: does Granite-Docling read it?
 
-A test of Granite-Docling (`ibm-granite/granite-docling-258M`) for the open gap "inline math stays plain text" (D125, F-new-pdf-inline-math). 2026-11-13, on Tyler's Mac (M4 Pro, 24 GB), Docling 2.142.0 (the version Ore pins), everything in a scratch folder.
+A test of Granite-Docling (`ibm-granite/granite-docling-258M`) for the open gap "inline math stays plain text" (D125, F148). 2026-11-13, on Tyler's Mac (M4 Pro, 24 GB), Docling 2.142.0 (the version Ore pins), everything in a scratch folder.
 
 ## The short version
 
@@ -48,14 +48,14 @@ The full transformers weights, which aren't the MLX conversion, gave the same te
 | docling-models, TableFormer (used today) | CDLA-Permissive-2.0 |
 | Typst (only to make the test pages) | Apache-2.0 |
 
-CDLA-Permissive-2.0 is a permissive data licence, but D120's list doesn't name it. So today's download already includes two sets of weights the rule doesn't cover (F-new-docling-model-license).
+CDLA-Permissive-2.0 is a permissive data licence, but D120's list doesn't name it. So today's download already includes two sets of weights the rule doesn't cover (F149).
 
 ## Options
 
 1. **Keep the gap open.** It costs nothing, and the intake grid stays honest.
 2. **Read inline math from pdf.js's own glyphs.** pdf.js already knows the math fonts and the raised and lowered glyphs (it writes powers today). A run of math-font items inside a line would become `$$…$$` (the reader's inline math, since `singleDollarTextMath` is off), with `^{}` and `_{}` built from the glyphs' heights. It needs no model, and it works on the iPhone. Simple formulas would come out right. Stacked fractions, roots and integral limits would not without more work. It rewrites the prose itself, so a highlight across a formula has to be re-anchored, which D125 avoided for display formulas. It's a medium-sized change. Mock and score it on the D125 bake-off papers first.
-3. **Granite-Docling in place of the standard pipeline**, for display formulas and tables only. It's about 5× faster and needs half the download, and all its weights are Apache-2.0, which settles F-new-docling-model-license. Before switching, it needs D125's bake-off rescored (formulas 95%, tables 81%). Its boxes sit on a 500-step grid, about 1.6 pt on a Letter page, coarse but enough for `swapRegions`. It doesn't help inline math.
+3. **Granite-Docling in place of the standard pipeline**, for display formulas and tables only. It's about 5× faster and needs half the download, and all its weights are Apache-2.0, which settles F149. Before switching, it needs D125's bake-off rescored (formulas 95%, tables 81%). Its boxes sit on a 500-step grid, about 1.6 pt on a Letter page, coarse but enough for `swapRegions`. It doesn't help inline math.
 
 ## Found along the way
 
-pdf.js drops some powers and indices from the prose. `a x^2 + b x` reads as `𝑎𝑥 + 𝑏𝑥` (its raised `2` is followed by a raised space), and `lambda_i` reads as `𝜆` in "the smallest 𝜆ᵢ". It's logged as F-new-pdf-script-dropped.
+pdf.js drops some powers and indices from the prose. `a x^2 + b x` reads as `𝑎𝑥 + 𝑏𝑥` (its raised `2` is followed by a raised space), and `lambda_i` reads as `𝜆` in "the smallest 𝜆ᵢ". It's logged as F150.
