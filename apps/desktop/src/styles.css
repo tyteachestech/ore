@@ -1620,7 +1620,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .skill-col.side .question-quote .note { margin: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-col.side .question-quote .from { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-col.side .question.done .question-quote .note { text-decoration: line-through; }
-/* On the phone a question gets two lines, as a title does (D256, F-new-r7-116): one line cut most of them mid-thought. */
+/* On the phone a question gets two lines, as a title does (D256, F130): one line cut most of them mid-thought. */
 .phone .skill-col.side .question-quote .note { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; line-height: 1.3; }
 .q-lead { position: absolute; right: 8px; top: 9px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; }
 .q-lead::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--question-solid); }
@@ -2802,7 +2802,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .kb-hide { flex: none; width: 44px; }
 .phone .quiz-close { min-width: 44px; min-height: 44px; }
 .phone .review-tools button { min-width: 44px; min-height: 44px; }
-/* Thumb reach (F-new-r7-114): what he taps on every exercise sits at the foot of the screen, over the home indicator, as
+/* Thumb reach (F128): what he taps on every exercise sits at the foot of the screen, over the home indicator, as
    Apple puts an app's main actions: how sure he is on an exercise he answers in his head, and the ratings once the
    answer is out. A typed answer keeps its buttons under the field, which the keyboard already lifts to the thumb. */
 .phone .review { --foot: max(32px, calc(env(safe-area-inset-bottom, 0px) + 16px)); }
@@ -2810,7 +2810,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .review-card { min-height: 100%; }
 .phone .review-card:not(:has(textarea)) > #review-sure, .phone .review-card > .review-memory, .phone .review-card > :not(.review-memory) + .review-rate { margin-top: auto; }
 .phone .review-card > .review-passage, .phone .review-card > .review-answer { margin-bottom: 24px; }
-/* What the last answer won shows over the next exercise, so it stands clear above the buttons at the foot (F-new-r7-114). */
+/* What the last answer won shows over the next exercise, so it stands clear above the buttons at the foot (F128). */
 .phone .review-moment { bottom: calc(var(--foot) + 96px); }
 /* Menu rows at iOS's 44pt; the highlight popup's types and icons, and "What do you already know?", too. */
 .phone .menu-item { height: 44px; }
