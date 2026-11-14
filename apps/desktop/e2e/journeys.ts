@@ -9403,7 +9403,8 @@ journey("toast: a long title is clipped to two lines, not a wall of text over th
     await until("⌘Z brings it back", async () => (await row.count()) === 1);
   } finally {
     // After the ⌘Z's own write: archived alongside it, the two raced and the source could stay out for the next journeys.
-    await settled(page);
+    // A call that never answers is named by the check as the journey ends; the archive runs anyway.
+    await settled(page).catch(() => {});
     await ore("archive", made.id);
   }
 });
