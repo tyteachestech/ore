@@ -61,7 +61,7 @@ a typed answer whose check fails: three unticked points and four ratings with no
 
 ## Tyler's picks (2026-11-14), built in the same PR
 1. Review names Retire in its key bar, and the memory line ends with "next in 1 month" (F125).
-2. What to review with its gem numbers in words: mocked for him on the Mac and the iPhone, not built. It would change D249, where he picked words on hover (F126).
+2. What to review with its gem numbers in words: mocked for him on the Mac and the iPhone, and declined: words there are prone to overflowing. D249 stands, words on hover (F126).
 3. ⌘K lists an ambience channel only once he types (F127).
 4. iPhone Review: how sure he is and the ratings sit at the foot of the screen; what the last answer won stands above them (F128).
 5. End screen: the mole never says a number the row under the ring already shows (F129, Mac and iPhone).
