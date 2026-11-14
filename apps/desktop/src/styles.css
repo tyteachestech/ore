@@ -1547,12 +1547,12 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 @keyframes core-in { from { transform: scale(0); } }
 /* Crossing the goal as the minutes count: one ring of dots thrown outward, once (white and wider at twice the goal). */
 .ring-throw { position: absolute; inset: 0; pointer-events: none; }
-.ring-throw i { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--c-green); animation: ring-throw 480ms var(--ease-out) both; }
-.ring-throw[data-big] i { background: #fff; animation-duration: 620ms; }
+.ring-throw i { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--c-green); animation: ring-throw var(--t-moment) var(--ease-out) both; }
+.ring-throw[data-big] i { background: #fff; }
 @keyframes ring-throw { from { opacity: 1; transform: rotate(var(--a)) translateY(calc(-1 * var(--r))); } to { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--r) - var(--far))) scale(0.4); } }
 /* White sparkles over the bonus dots: a cross of five dots that opens and fades. */
-.ring-sparkle { position: absolute; width: 0; height: 0; pointer-events: none; animation: sparkle 840ms var(--ease-in-out) both; }
-.ring-sparkle[data-twice] { animation-duration: 560ms; --reach: 5px; }
+.ring-sparkle { position: absolute; width: 0; height: 0; pointer-events: none; animation: sparkle var(--t-moment) var(--ease-in-out) both; }
+.ring-sparkle[data-twice] { --reach: 5px; }
 .ring-sparkle i { position: absolute; width: 3px; height: 3px; margin: -1.5px; border-radius: 50%; background: #fff; }
 .ring-sparkle i:nth-child(1) { width: 4px; height: 4px; margin: -2px; }
 .ring-sparkle i:nth-child(2) { transform: translateX(var(--reach, 4px)); }

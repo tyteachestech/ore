@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Hint } from "./Hint";
 import { SkillIcon } from "./IconPicker";
 import { DotNumber, minutes } from "./Ring";
@@ -8,11 +8,22 @@ import type { Skill, Today } from "./ore";
 /** The end screen's minutes: where the day stood before this session, where it stands now, and the goal they
  *  are measured against (0 when today has none: an off day under Weekdays only). */
 export type Lap = { from: number; to: number; goal: number };
-export const lapPlan = (before: Today | null, today: Today): Lap => ({ from: minutes(before?.active_ms ?? 0), to: minutes(today.active_ms), goal: today.counts && today.goal_ms > 0 ? today.goal_minutes : 0 });
+export function lapPlan(before: Today | null, today: Today): Lap {
+  const goal = today.counts && today.goal_ms > 0 ? today.goal_minutes : 0;
+  // Minutes round, the goal does not: 9 min 40 s is not 10, so a day short of its goal never shows the goal's number.
+  const side = (t: Today | null) => (!t ? 0 : !goal ? minutes(t.active_ms) : t.met ? Math.max(goal, minutes(t.active_ms)) : Math.min(goal - 1, minutes(t.active_ms)));
+  const from = side(before), to = Math.max(from, side(today));
+  return { from, to, goal };
+}
 
 /** How many ring dots `bonus` minutes past a goal of `goal` minutes light, at the ring's own rate, lap after
  *  lap. Any bonus lights one, as any progress does. */
-export const overDots = (bonus: number, goal: number, n: number) => (bonus <= 0 || goal <= 0 ? 0 : Math.max(1, Math.round((bonus / goal) * n)));
+export function overDots(bonus: number, goal: number, n: number) {
+  if (bonus <= 0 || goal <= 0) return 0;
+  // As on the first lap, a lap's last dot waits for the whole lap.
+  const laps = Math.floor(bonus / goal), rest = bonus - laps * goal;
+  return laps * n + (rest > 0 ? Math.min(n - 1, Math.max(1, Math.round((rest / goal) * n))) : 0);
+}
 
 /** The minutes the count shows on its way up, one at a time; a long session skips some so it never takes long,
  *  but always stops on the goal and on twice the goal, where the ring's moments are. */
@@ -29,10 +40,9 @@ export function lapSteps({ from, to, goal }: Lap): number[] {
 export function useLap(plan: Lap, go: boolean): { min: number; hit: number } {
   const calm = still();
   const [at, setAt] = useState(calm ? { min: plan.to, hit: 0 } : { min: plan.from, hit: 0 });
-  const steps = useRef(lapSteps(plan));
   useEffect(() => {
     if (!go || calm) return;
-    const list = steps.current, { goal } = plan;
+    const list = lapSteps(plan), { goal } = plan;
     const below = list.filter((m) => !goal || m <= goal).length, past = list.length - below;
     let i = 0, id: ReturnType<typeof setTimeout>;
     const next = () => {
@@ -63,7 +73,9 @@ export function LapCentre({ min, goal, kept, skills, run }: { min: number; goal:
     const id = setTimeout(() => setRow((r) => r + 1), 900);
     return () => clearTimeout(id);
   }, [run, row]);
-  const all = kept.map((k) => `${skills.find((s) => s.id === k.skill)?.name ?? k.skill} ${k.n}`).join(" · ");
+  // A memory filed under no skill is named as the review picker names it.
+  const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
+  const all = kept.map((k) => `${name(k.skill)} ${k.n}`).join(" · ");
   return (
     <div className="end-lap">
       <span className="end-lap-n" role="img" aria-label={`${min} ${min === 1 ? "minute" : "minutes"} today`}><DotNumber value={min} height={56} /></span>
@@ -84,7 +96,7 @@ export function LapCentre({ min, goal, kept, skills, run }: { min: number; goal:
                 return (
                   <span key={k.skill} className={i === row ? "end-lap-skill" : undefined} data-color={s?.color} aria-hidden={i !== row || undefined}>
                     <SkillIcon icon={s?.icon} color={s?.color} dot />
-                    <span>{s?.name ?? k.skill}</span>
+                    <span>{name(k.skill)}</span>
                     <b>+{k.n}</b>
                   </span>
                 );

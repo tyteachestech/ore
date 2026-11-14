@@ -46,6 +46,8 @@ test("the plan: minutes run from where the day stood to where it stands, and wha
   expect(lapPlan(today(4) as never, today(16) as never)).toEqual({ from: 4, to: 16, goal: 10 });
   // No goal today (a weekend under Weekdays only), or caught up short of it: minutes, and no bonus.
   expect(lapPlan(null, today(16, { counts: false }) as never)).toEqual({ from: 0, to: 16, goal: 0 });
+  // 9 min 40 s rounds to 10 but is not the goal: the count stops short of it, so nothing says the goal was met.
+  expect(lapPlan(null, { ...today(0), active_ms: 580_000, met: false } as never)).toEqual({ from: 0, to: 9, goal: 10 });
   expect(lapSteps({ from: 4, to: 16, goal: 10 })).toEqual([4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
   // A long session never takes long to count: at most 24 steps.
   expect(lapSteps({ from: 0, to: 90, goal: 10 }).length).toBeLessThanOrEqual(25);
@@ -60,6 +62,10 @@ test("bonus minutes become dots at the ring's own rate, lap after lap", () => {
   // Any bonus lights a dot, as any progress does.
   expect(overDots(1, 60, 30)).toBe(1);
   expect(overDots(5, 0, 30)).toBe(0);
+  // A lap's last dot waits for the whole lap, as the first lap's does: 119 of 60 is not twice the goal.
+  expect(overDots(59, 60, 30)).toBe(29);
+  expect(overDots(60, 60, 30)).toBe(30);
+  expect(overDots(61, 60, 30)).toBe(31);
 });
 
 test("a ring's bonus dots are bigger and carry a white centre; a third lap's are bigger again", async () => {

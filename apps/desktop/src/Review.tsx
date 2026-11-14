@@ -1699,12 +1699,14 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   });
   const lap = useLap(plan, !quick && full && away);
   const counted = lap.min === plan.to;
+  // The count crosses the goal on screen: then the dots it throws are the moment, and the burst stays out of it.
+  const crossing = !calm && plan.goal > 0 && plan.from < plan.goal && plan.to >= plan.goal;
   const over = quick ? 0 : overDots(plan.goal ? lap.min - plan.goal : 0, plan.goal, ringDots(END_RING));
   const ring = quick
     ? <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={72} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
     : (
       // The ring follows the count, minute by minute; crossing the goal in the count is the moment (the dots it throws), so the burst is for a goal the count never crossed.
-      <Ring step value={!full ? part(b) : !away || !plan.goal ? part(t) : lap.min / plan.goal} from={part(b)} met={!full ? !!b?.met : !away || counted ? t.met : false} burst={closed && full && (!away || (counted && lap.hit === 0))} over={over} hit={lap.hit} size={END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`}>
+      <Ring step={away && plan.goal > 0} value={!full ? part(b) : !away || !plan.goal ? part(t) : lap.min / plan.goal} from={part(b)} met={!full ? !!b?.met : !away || counted ? t.met : false} burst={closed && full && !crossing} over={over} hit={lap.hit} size={END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`}>
         {counted && <Sparkles over={over} n={ringDots(END_RING)} />}
       </Ring>
     );
