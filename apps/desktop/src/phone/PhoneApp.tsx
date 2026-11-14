@@ -474,6 +474,8 @@ export function PhoneApp() {
     void refresh();
     void planReminders();
   };
+  // Whether the library has answered for the source the saved place opens on (below, F120).
+  const [startKnown, setStartKnown] = useState(!start.openId);
   const refresh = useCallback(async () => {
     try {
       const [all, sk, w] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills"), ore<Waiting[]>("inbox")]);
@@ -486,6 +488,9 @@ export function PhoneApp() {
       if (tabNow.current === "archive") setArchived(await ore<Item[]>("ls", "--archived"));
     } catch (e) {
       setError(errorText(e));
+      // A library that can't be listed can't say the saved source is gone: its reader opens and says what is
+      // wrong itself, as before F120, instead of staying shut for good (F128).
+      setStartKnown(true);
     }
   }, []);
   useEffect(() => void (tab === "archive" && refresh()), [tab, refresh]);
@@ -498,7 +503,6 @@ export function PhoneApp() {
   }, [loaded]); // eslint-disable-line react-hooks/exhaustive-deps
   // Until the library has said the saved source is still there, its reader stays shut over Today: opened at
   // once, it showed `no item matches "01M4…"` for as long as the two lists took to load (F120).
-  const [startKnown, setStartKnown] = useState(!start.openId);
   useEffect(() => {
     const id = start.openId;
     if (!loaded || !id) return;
@@ -646,6 +650,8 @@ export function PhoneApp() {
   }, []);
 
   const open = (id: string, at?: string) => {
+    // A source he opens himself is never held back, the saved one included.
+    setStartKnown(true);
     setJumpTo(at);
     setFinishing(false);
     setNoting(false);
