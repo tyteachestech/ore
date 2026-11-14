@@ -382,6 +382,10 @@ export const copyFileSync = (a: string, b: string) => {
   const e = files.get(a)!;
   put(b, e.bytes ? "" : e.text, Date.now(), e.bytes);
 };
+// No hard links in the phone's library: a reimport's stash (core's keepFile) copies instead.
+export const linkSync = (_a: string, b: string): void => {
+  throw err("ENOTSUP", b);
+};
 export const mkdtempSync = (prefix: string) => {
   const d = `${prefix}${Math.random().toString(36).slice(2, 8)}`;
   mkdirSync(d);
@@ -443,6 +447,6 @@ export function utimesSync(p: string, _atime: Date | number, mtime: Date | numbe
 }
 
 export default {
-  existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, unlinkSync, rmSync, renameSync, copyFileSync, mkdtempSync,
+  existsSync, readFileSync, writeFileSync, appendFileSync, mkdirSync, unlinkSync, rmSync, renameSync, copyFileSync, linkSync, mkdtempSync,
   readdirSync, statSync, lstatSync, realpathSync, openSync, readSync, writeSync, closeSync, symlinkSync, cpSync, utimesSync,
 };

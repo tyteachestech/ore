@@ -93,6 +93,8 @@ export type Item = {
   /** Absolute paths: the item's folder and the original kept at capture (source.pdf, …), if any. */
   dir: string;
   source_file?: string;
+  /** `ore show`: Reimport has an original to read again, a link or a file's kept copy (D93). */
+  reimport?: boolean;
   /** Absolute path of thumbnail.* beside doc.md (D77), if the source has one. */
   thumbnail?: string;
   captured_at: string;
