@@ -550,18 +550,18 @@ const SAG = 3; // Tyler: he should not go up before he drops into his spot. He s
 
 // 4. The bubble pops. Eyes wide. He scrambles on nothing, stops, looks down, looks at us, and drops into his
 // hole, helmet last. Then up he pops as if nothing happened.
-const RISE = 0, T_DROP = 66, DEEP = 100;
+const RISE = 0, T_DROP = 84, DEEP = 100;
 const FEET = (25.3 - ORIGIN_Y) * P; // his soles, below his root
 const fallFrames = (d) => Math.sqrt((2 * d) / G) * 60;
 // The cut: the front view takes over on the middle of the sleeping body, at its size, and grows from there.
 const LY_MID = rot([2.5 * P * LY_SCALE, -14 * P * LY_SCALE], CART.tip), CUT = [HANG[0] + LY_MID[0], HANG[1] + SAG + LY_MID[1]];
 const BIG = NEAR; // he does not grow again before he drops
-const SOLES = FLOOR - 9; // where his soles stay from the cut to the drop
+const SOLES = FLOOR - 20; // where his soles stay from the cut to the drop
 const WAKE_Y = SOLES - FEET * NEAR; // awake: about where he hung, his soles clear of the dirt
 const T_KNOCK = Math.round(T_DROP + fallFrames(FLOOR - FEET * BIG - (WAKE_Y - RISE)));
 const T_GONE = Math.ceil(T_DROP + fallFrames(REST[1] + DEEP - (WAKE_Y - RISE)));
 const T_POP = T_GONE + 18, T_SETTLED = T_POP + 27, T_SPEAK = T_POP + 87;
-const S0 = 20, S1 = 44, GROWN = 30; // the frame he is full size
+const S0 = 20, S1 = 62, GROWN = 30; // the frame he is full size
 const A4 = new Anim("Wake and dive", T_POP + 117);
 {
   const a = A4, hx = HANG[0], hy = HANG[1] + SAG, [rx, ry] = REST, wy = WAKE_Y, top = wy - RISE;
@@ -589,12 +589,13 @@ const A4 = new Anim("Wake and dive", T_POP + 117);
   a.k("head", "rotation", [[0, 0.05, "o"], [9, -0.04, "io"], [16, 0, "h"]]).k("head", "y", [[0, at(...HEAD).y, "h"], [S1 + 2, at(...HEAD).y, "io"], [S1 + 6, at(...HEAD).y + 5, "io"], [S1 + 15, at(...HEAD).y + 5, "io"], [S1 + 19, at(...HEAD).y, "h"]]);
   a.k("lobeL", "rotation", [[0, 0, "h"], [5, 0, "o"], [9, 0.5, "io"], [15, 0.1, "io"], [20, 0.2, "h"]]).k("lobeR", "rotation", [[0, 0, "h"], [5, 0, "o"], [9, -0.5, "io"], [15, -0.1, "io"], [20, -0.2, "h"]]);
   // The scramble: upright in a blink, limbs windmilling, climbing on nothing.
+  const run = (f0, f1, step, a0, a1) => { const ks = []; for (let f = f0, i = 0; f <= f1; f += step, i++) ks.push([f, i % 2 ? a1 : a0, "io"]); return ks; };
   // Upright in a few frames; then he runs on nothing across to over his hole, rocking as he goes (the app's leans).
-  a.k("mole", "rotation", [[0, HANG_ROT, "h"], [5, 0.3, "o"], [13, -0.05, "io"], [S0, 0, "io"], [S0 + 4, 0.09, "io"], [S0 + 8, -0.19, "io"], [S0 + 12, 0.16, "io"], [S0 + 16, -0.17, "io"], [S0 + 20, 0.14, "io"], [S1, -0.06, "io"], [S1 + 5, 0, "h"]]);
+  a.k("mole", "rotation", [[0, HANG_ROT, "h"], [5, 0.3, "o"], [13, -0.05, "io"], [S0, 0, "io"], ...run(S0 + 5, S1 - 5, 5, 0.17, -0.19), [S1, -0.05, "io"], [S1 + 5, 0, "h"]]);
+  a.k("bob", "y", [[0, 0, "h"], [GROWN, 0, "io"], ...run(GROWN + 3, S1 - 3, 3, -4, 3), [S1 + 2, 0, "h"]]); // he pedals: a small bounce, no climb
   a.s("bob", [[0, 1, "h"], [5, LY_SCALE, "io"], [GROWN, NEAR, "h"]]); // he grows as he wakes, over a third of a second, never in a jump // he grows as he starts awake, as in the app
   a.k("mole", "y", [[0, hy, "h"], [5, SOLES - FEET * LY_SCALE, "io"], [GROWN, wy, "h"]]); // the same curve as his size, so his soles do not move
   a.k("mole", "x", [[0, hx, "h"], [5, CUT[0], "io"], [GROWN, HOLE_X, "h"]]); // he grows toward his hole: no slide after
-  const run = (f0, f1, step, a0, a1) => { const ks = []; for (let f = f0, i = 0; f <= f1; f += step, i++) ks.push([f, i % 2 ? a1 : a0, "io"]); return ks; };
   a.k("footL", "rotation", [[0, 0, "h"], [S0, 0, "o"], ...run(S0 + 3, S1 - 2, 3, 0.6, -0.6), [S1 + 3, 0.1, "h"]]);
   a.k("footR", "rotation", [[0, 0.2, "h"], [S0, 0.2, "o"], ...run(S0 + 3, S1 - 2, 3, -0.6, 0.6), [S1 + 3, -0.1, "h"]]);
   // Arms: thrown up beside his head as he wakes (the app's pose), pumping as he runs, never down by his feet.
