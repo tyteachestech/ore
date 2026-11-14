@@ -305,14 +305,16 @@ img.thumb { filter: brightness(0.86); }
 .hint-q span::before { content: "? "; color: var(--question-solid); }
 .row-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .row .row-line .title { flex: 0 1 auto; }
-.row-line .chips-button { flex: 0 1 auto; gap: 0; overflow: hidden; }
+.row-line .chips-button { flex: 0 1 auto; gap: 0; }
 .row .sub { min-width: 0; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-line .course-next { max-width: none; flex: 0 1 auto; min-width: 0; }
 .row-line .by { flex: 0 1 auto; max-width: 24ch; min-width: 0; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row-line .by.from-site { font-style: italic; }
 .row-line .chips-button + .course-next::before, .row-line .by + .chips-add + .course-next::before { content: "·"; margin-right: 6px; color: var(--faint); font-size: 12px; }
-/* Chips that don't fit end in an ellipsis, each, never sliced at the row's edge. */
+/* Chips that don't fit end in an ellipsis, each, never sliced at the row's edge. The chips hide their own overflow,
+   never the rounded button around them: WebKit draws a masked icon's colour along a rounded clip's corner (F105). */
 .row-line .chips { flex-wrap: nowrap; min-width: 0; }
+.chips-button > .chips { overflow: hidden; }
 .row-line .chips .chip { min-width: 0; }
 /* A skill beside the byline sits on its line, now that nothing boxes it. */
 .row-line .chip { height: auto; line-height: inherit; }
@@ -1995,7 +1997,7 @@ button.home-plan:hover { color: var(--text); }
 :root:not(.phone) .home-read:hover .home-meter.small, .home-read:has(.more[aria-expanded="true"]) .home-meter.small { visibility: hidden; }
 .home-read:has(.home-open:focus-visible) { box-shadow: inset 0 0 0 1px var(--focus); }
 /* The title comes first: long skill pills give way to it, ending in … (DESIGN: long text). */
-.home-read .chips-button { max-width: 40%; overflow: hidden; }
+.home-read .chips-button { max-width: 40%; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
 .home-read .chip { min-width: 0; }
 /* The same 16:9 picture as the source list (D114), big enough to know a source by. */
@@ -2878,7 +2880,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-source .find-bar input { font-size: 16px; }
 .phone-source .find-bar button { width: 44px; height: 44px; }
 .phone .mynotes-text { padding-top: 12px; }
-.add-box .chips-button { max-width: 260px; overflow: hidden; }
+.add-box .chips-button { max-width: 260px; }
+.add-box .chips-button .chip { min-width: 0; } /* each name ends in an ellipsis; the rounded button clips nothing (F105) */
 .add-skills { display: inline-flex; min-width: 0; }
 /* The video card on the phone (D92): no gutter, so each timestamp leads its paragraph. */
 .phone .doc .video-card { margin: 0 -8px 24px; }
