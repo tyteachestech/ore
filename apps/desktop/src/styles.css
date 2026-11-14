@@ -2228,6 +2228,7 @@ button.home-plan:hover { color: var(--text); }
 .end-lap-n { display: block; color: var(--text); }
 .end-lap-min { display: flex; align-items: center; justify-content: center; height: 20px; margin-top: 10px; }
 .end-lap-plus { display: grid; place-items: center; height: 20px; padding: 0 7px; margin-left: 7px; border-radius: 10px; background: var(--c-green); color: #0f2a19; animation: end-plus-in var(--t-4) var(--ease-out); }
+.end-lap .end-lap-plus .dot-number circle { fill: #0f2a19; }
 .end-lap-plus:focus-visible, .end-lap-reel:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .end-lap-reel { display: block; height: 24px; margin-top: 8px; overflow: hidden; border-radius: 6px; animation: end-lap-in var(--t-4) var(--ease-out); }
 .end-lap-rows { display: flex; flex-direction: column; transition: transform var(--t-4) var(--ease-out); }
@@ -2267,8 +2268,8 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-head { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .end-tally li, .end-tally .end-mark circle { animation: none !important; } }
 .end-ring > .review-cut { position: relative; flex-wrap: wrap; align-items: center; max-width: 160px; gap: 6px 8px; margin: 0; }
-/* The mole comes up out of a mound of dirt that sits on the ring's top dots, him clear of them (Tyler, 2026-11-14). */
-.end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: -3px; }
+/* The mole comes up out of a mound of dirt that stands just clear of the ring: its bonus dots are bigger (Tyler, 2026-11-14, D-new-bonus-lap). */
+.end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: 4px; }
 /* The mound, in front of him: it heaps up from its foot as he comes up, or as he lands in it off the cart. */
 .mole-mound { position: absolute; left: 0; bottom: 0; transform-origin: 50% 100%; animation: mound-in var(--t-moment) var(--ease-spring) both; }
 .mole-mound .back { fill: var(--bg); }
