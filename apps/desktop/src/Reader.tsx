@@ -2662,7 +2662,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         return (byId ?? heading)!.scrollIntoView({ block: heading ? "start" : "center" });
       }
       // The phone can't reimport (D78): the step is the Mac's.
-      return p.notify(`That part of the page wasn’t saved with it.${doc?.url && doc.type !== "snippet" ? (PHONE ? " Reimport the source on your Mac to fetch it again." : " Reimport the source from its ⋯ menu to fetch it again.") : ""}`, "error");
+      return p.notify(`That part of the page wasn’t saved with it.${doc?.reimport ? (PHONE ? " Reimport the source on your Mac to fetch it again." : " Reimport the source from its ⋯ menu to fetch it again.") : ""}`, "error");
     }
     if (/^(?:https?|mailto):/i.test(href)) return void openUrl(href).catch((e) => p.notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
     p.notify(`This links to “${dec(href)}”, a file beside the original that isn’t in Ore. Add it with ${label(keys.file)} to read it here.`, "error");

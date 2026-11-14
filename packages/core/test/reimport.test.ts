@@ -87,7 +87,7 @@ describe("reimport", () => {
     expect(readFileSync(item.docPath, "utf8")).toBe(before);
     expect(undoReimport(lib, item.meta.id)).rejects.toThrow("no reimport");
     const pasted = await addText(lib, "Just some text");
-    expect(reimportSource(lib, pasted.meta.id)).rejects.toThrow("from a link or a file");
+    await expect(reimportSource(lib, pasted.meta.id)).rejects.toThrow("from a link or a file");
   });
 
   test("a file is read again from the copy kept with it, so a better reader fixes text it once got wrong", async () => {
@@ -147,7 +147,7 @@ describe("reimport", () => {
     unlinkSync(join(audio.dir, "source.mp3"));
     expect(canReimport(findItem(lib, audio.meta.id))).toBe(false);
     const before = readFileSync(audio.docPath, "utf8");
-    expect(reimportSource(lib, audio.meta.id)).rejects.toThrow("from a link or a file");
+    await expect(reimportSource(lib, audio.meta.id)).rejects.toThrow("from a link or a file");
     expect(readFileSync(audio.docPath, "utf8")).toBe(before);
   });
 
@@ -156,6 +156,7 @@ describe("reimport", () => {
     hears(vtt(["Welcome to the lecture.", "Retrieval makes memories last.", "Sleep helps the memory settle.", "Cramming is the old way of the lecture hall."]));
     const item = await addSource(lib, recording());
     const audio = readFileSync(join(item.dir, "source.mp3"));
+    const ino = statSync(join(item.dir, "source.mp3")).ino;
     await renameItem(lib, item.meta.id, "Lecture 4");
     await setItemStatus(lib, item.meta.id, "reading");
     await setNotes(lib, item.meta.id, "My own thoughts on recall.");
@@ -177,9 +178,8 @@ describe("reimport", () => {
     // The audio is the same original, still there to play, and its new transcript beside it.
     expect(readFileSync(join(item.dir, "source.mp3")).equals(audio)).toBe(true);
     expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toContain("overnight");
-    // Undo keeps the old version without a second copy of the audio (a recording can be 200 MB).
-    const stashed = join(lib.root, ".ore", "reimport", item.meta.id, "source.mp3");
-    expect(statSync(stashed).ino).toBe(statSync(join(item.dir, "source.mp3")).ino);
+    // The kept audio (up to 200 MB) isn't written again: the same file, read in place.
+    expect(statSync(join(item.dir, "source.mp3")).ino).toBe(ino);
     const back = await undoReimport(lib, item.meta.id);
     expect(back.body).toContain("Cramming is the old way");
     expect(readAnnotations(back).map((a) => a.id)).toContain(goes.id);
@@ -204,6 +204,13 @@ describe("reimport", () => {
       expect(readAnnotations(findItem(lib, item.meta.id))).toHaveLength(1);
     }
     expect(existsSync(join(lib.root, ".ore", "reimport", item.meta.id))).toBe(false);
+    // The same for a recording added from its link: it is fetched again, then can't be heard.
+    hears(vtt(["Retrieval makes memories last."]));
+    globalThis.fetch = (async () => new Response(new Uint8Array(4096), { headers: { "content-type": "audio/mpeg" } })) as unknown as typeof fetch;
+    const linked = await addSource(lib, "https://media.example.com/lecture-on-recall.mp3");
+    hears({ code: 3 });
+    const e = await reimportSource(lib, linked.meta.id).then(() => undefined, (e: Error) => e);
+    expect(e?.message).toBe("Transcribing audio needs macOS 26 or later. Its transcript is as it was.");
   });
 
   test("a Word file is read again from its kept copy, so a better reader fixes what an older one got wrong (F181)", async () => {

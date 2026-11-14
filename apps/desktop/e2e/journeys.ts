@@ -2616,8 +2616,9 @@ journey("a recording added from a file offers Reimport, and one that can't be he
   await page.locator(".doc-head h1").click({ button: "right" });
   await page.getByRole("menuitem", { name: "Reimport" }).click();
   // The cloud can't hear speech, and the Mac hears no words in the lecture's tone: either way it says so.
-  await page.locator(".toast").filter({ hasText: "Its transcript is as it was" }).waitFor({ timeout: 30_000 });
-  if ((await page.locator(".toast").innerText()).includes("paste")) throw new Error("a failed Reimport told him to paste a transcript");
+  const said = page.locator(".toast").filter({ hasText: "Its transcript is as it was" });
+  await said.waitFor({ timeout: 30_000 });
+  if ((await said.innerText()).includes("paste")) throw new Error("a failed Reimport told him to paste a transcript");
   if ((await page.locator(".doc").innerText()) !== text) throw new Error("a failed Reimport changed the transcript");
   await until("both highlights stay", async () => (await page.locator(".player.audio .scrub-tick").count()) === 2);
 });

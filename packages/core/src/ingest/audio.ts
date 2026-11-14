@@ -43,6 +43,11 @@ export async function transcribe(data: Uint8Array, ext: string, onProgress?: Pro
   }
 }
 
+/** The step every "couldn't hear it" message here ends with, for an add. A Reimport has a transcript
+ *  already and keeps it, so it says that instead (`reimportSource`): keep the messages' last sentence
+ *  matching this. */
+export const PASTE_STEP = / If it has a transcript(?: or text)?, copy it and paste it here instead\.$/;
+
 /** Whether this machine can hear speech at all, before anything downloads: the stand-in transcriber
  *  (ORE_TRANSCRIBE; set empty, none), a device's own shell (`setTranscriber`), else macOS 26 or later (Darwin 25), where Apple's SpeechAnalyzer
  *  is. Whether it has a model for the speech's language is only known by trying. */

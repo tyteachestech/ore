@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, linkSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import type { Region } from "./docling.ts";
 import { doclingPath } from "./docling-path.ts";
 import { homedir } from "node:os";
@@ -732,27 +732,10 @@ export interface Reimported {
 const REPLACED = (name: string) => name === "doc.md" || name === "transcript.vtt" || name === "layout.json" || name.startsWith("source.") || name === "page.html";
 const stash = (lib: Library, id: string) => join(lib.root, ".ore", "reimport", id);
 
-const sameBytes = (path: string, data: string | Uint8Array) => {
-  try {
-    const bytes = typeof data === "string" ? Buffer.from(data) : data;
-    return statSync(path).size === bytes.length && readFileSync(path).equals(bytes);
-  } catch {
-    return false;
-  }
-};
-
-/** Keeps a replaced file for Undo. The original (source.*: a recording up to 200 MB) is never written in
- *  place, only replaced whole, so the stash shares it by a hard link instead of a second copy. */
-function keepFile(from: string, to: string) {
-  if (basename(from).startsWith("source.")) {
-    try {
-      return linkSync(from, to);
-    } catch {
-      // another volume, or a file system with no links: a copy
-    }
-  }
-  copyFileSync(from, to);
-}
+/** Keeps a replaced file for Undo. On the Mac's APFS a copy is a clone, sharing the blocks until either
+ *  changes, so a recording (up to 200 MB) isn't stored twice; elsewhere it is a plain copy. Not a hard
+ *  link: iCloud can evict or replace a synced file whose inode the unsynced stash shares. */
+const keepFile = (from: string, to: string) => copyFileSync(from, to, constants.COPYFILE_FICLONE);
 
 /** Swaps a source's text files (doc.md body and kind, source.*, transcript.vtt) with the ones in `from`,
  *  keeping the rest of its frontmatter (status, skills, progress) as it is now. */
@@ -797,12 +780,13 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const regions = read ?? layoutOf(item.dir);
   // A pasted page (source.html beside a Markdown source) is read as it was pasted.
   const pasted = type === "markdown" && !url && kept === "source.html";
-  const draft = await withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)), onProgress }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions }).catch((e: Error) => {
-    // A recording that can't be heard again here keeps the transcript it has; there is nothing to paste.
-    throw AUDIO_TYPES.includes(kindOf(kept)!) ? new Error(e.message.replace(/ If it has a transcript.*$/, "") + " Its transcript is as it was.") : e;
-  }));
+  const draft = await (async () => withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)), onProgress }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions })))().catch(async (e: Error) => {
+    // A recording that can't be heard again here, from its file or its link, keeps the transcript it has: nothing to paste.
+    const { PASTE_STEP } = await import("./audio.ts");
+    throw PASTE_STEP.test(e.message) ? new Error(e.message.replace(PASTE_STEP, " Its transcript is as it was.")) : e;
+  });
   if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
-  return turn(() => rewrite(lib, item, draft, regions));
+  return turn(() => rewrite(lib, item, draft, regions, kept));
 }
 
 /** The original a file source is read again from: the copy kept beside it (source.*), so a better reader
@@ -819,7 +803,7 @@ export type Turn = <T>(f: () => Promise<T>) => Promise<T>;
 
 /** `draft`, read again from where `item` came from, in its place: the old version stashed for Undo, its
  *  highlights moved to the new text. */
-async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[] | undefined): Promise<Reimported> {
+async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[] | undefined, kept?: string): Promise<Reimported> {
   // As it is now: he may have renamed or filed it while it was read, and one he deleted is not brought back.
   const item = findItem(lib, was.meta.id);
   const { url, course } = item.meta;
@@ -843,7 +827,7 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     for (const f of readdirSync(item.dir).filter(REPLACED)) keepFile(join(item.dir, f), join(dir, f));
     writeAtomic(join(dir, "highlights.json"), JSON.stringify(latestRevs(annotationRevs(item.dir))));
     // A file read again from its kept copy keeps that copy as it is: the same bytes need no second write.
-    const same = draft.source && sameBytes(join(item.dir, `source.${draft.source.ext}`), draft.source.data) ? `source.${draft.source.ext}` : undefined;
+    const same = draft.source && kept === `source.${draft.source.ext}` ? kept : undefined;
     for (const f of readdirSync(item.dir).filter((f) => REPLACED(f) && f !== "doc.md" && f !== same)) unlinkSync(join(item.dir, f));
     if (draft.source && !same) writeAtomic(join(item.dir, `source.${draft.source.ext}`), draft.source.data);
     if (draft.transcript) writeAtomic(join(item.dir, "transcript.vtt"), draft.transcript);
