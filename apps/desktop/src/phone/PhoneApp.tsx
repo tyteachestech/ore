@@ -843,6 +843,8 @@ export function PhoneApp() {
               open(item, at);
             }}
             onClose={(again) => (again ? setReviewing({ ...reviewing, run: reviewing.run + 1 }) : endReview())}
+            // A rating undone after Review closed: Today, mounted under it all along, reads its numbers again (F159).
+            onLogged={() => setTick((t) => t + 1)}
             notify={notify}
           />
         </Boundary>
