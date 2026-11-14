@@ -2,7 +2,7 @@
 
 Four Codex testers (`outside`, `time`, `intake`, `ai`; prompts and reports in this folder) ran on master `5a44d32` against the release build under the release CSP, one bridge and seeded scratch library each, the phone build, and one Playwright WebKit server. They reported 21 candidates. Claude re-ran every repro (Mac page, phone page where `page.clock` drives core, or the `ore` CLI on a scratch library) and read the suspected code. **18 are real and new**, listed as 17 items because OUTSIDE-3 and OUTSIDE-4 share one cause. 3 are dropped (below). None is already a row in `findings.md`. Severity is Claude's after re-running; where it differs from the tester's, the tester's is in brackets.
 
-The reports' screenshot links point at `codex-out/`, which isn't committed. The shots a fix needs are in `shots/`, named `<tester>-<file>`.
+The intake fixtures named below (made for Ore, shareable) are in `fixtures/`, with `make-fixtures.py`. The reports' screenshot links point at `codex-out/`, which isn't committed. The shots a fix needs are in `shots/`, named `<tester>-<file>`.
 
 ## S2
 
