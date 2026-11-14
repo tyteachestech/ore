@@ -6036,7 +6036,7 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   const moment = page.locator('.review-moment[data-tone="miss"]');
   await moment.waitFor();
   await moment.locator('.gem[data-kind="dull"]').waitFor();
-  if (!(await moment.innerText()).includes("You were sure")) throw new Error(`the moment says: ${await moment.innerText()}`);
+  if (!(await moment.innerText()).includes("Came loose")) throw new Error(`the moment says: ${await moment.innerText()}`);
   if ((await moment.innerText()).includes("days")) throw new Error("a miss showed days added");
   const mole = moment.locator(".mole");
   if ((await mole.getAttribute("width")) !== "48") throw new Error("a rating's mole is not 48px");
@@ -6048,6 +6048,48 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   await page.getByRole("button", { name: "Undo last rating" }).waitFor({ state: "detached" });
   if ((await q.innerText()) !== was) throw new Error("⌘Z did not leave the exercise showing");
   await until("Esc leaves", async () => (await page.keyboard.press("Escape"), (await page.locator(".review").count()) === 0));
+});
+
+journey("what a rating won shows as a chip in the head bar, its days in dots (F-new-reward-wordy)", async (page) => {
+  // A cut gem last seen 38 days ago, and a Good worth 61 more days: the biggest reward a rating has.
+  await page.route(/\/ore$/, async (route) => {
+    const args = (JSON.parse(route.request().postData() ?? "{}") as { args?: string[] }).args ?? [];
+    if (args[0] !== "card" || !args.includes("--review")) return route.fallback();
+    const r = await route.fetch();
+    const j = JSON.parse(await r.text()) as { history?: Record<string, unknown>; data?: { history?: Record<string, unknown> } };
+    const h = (j.data ?? j).history;
+    if (h) {
+      h.reviews = [{ ts: new Date(Date.now() - 38 * 86_400_000).toISOString(), rating: 3 }];
+      h.gem = { kind: "cut", after: { 1: { kind: "dull", days: 0 }, 2: { kind: "cut", days: 2 }, 3: { kind: "cut", days: 61 }, 4: { kind: "cut", days: 80 } } };
+    }
+    await route.fulfill({ response: r, body: JSON.stringify(j) });
+  });
+  try {
+    await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 3, gaps: [], feedback: "", covered: [true, true] } }));
+    await startReview(page, /Teaching/);
+    await page.getByRole("textbox", { name: "Your answer" }).fill("Fluency feels like knowing, so you overrate yourself");
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await page.getByRole("button", { name: "Check", exact: true }).click();
+    await page.locator(".review-rate .suggested").waitFor();
+    await page.waitForTimeout(400); // a rating key right after the answer shows is ignored
+    await page.keyboard.press("3");
+    const moment = page.locator(".review-moment");
+    await moment.waitFor();
+    if ((await moment.innerText()).replace(/\s+/g, " ").trim() !== "+61 days Last seen 38 days ago") throw new Error(`the chip says: ${await moment.innerText()}`);
+    // The days are a dot number, and the chip sits in the head bar: over no part of the exercise, on one line.
+    const m = await moment.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const dots = el.querySelector(".moment-days .dot-number")!;
+      return { dots: Math.round(dots.getBoundingClientRect().height), circles: dots.querySelectorAll("circle").length, over: Math.round(r.bottom - document.querySelector(".review-body")!.getBoundingClientRect().top), height: Math.round(r.height) };
+    });
+    if (m.dots < 18 || !m.circles) throw new Error(`the days are not a dot number: ${JSON.stringify(m)}`);
+    if (m.over > 0 || m.height > 44) throw new Error(`the chip is not in the head bar: ${JSON.stringify(m)}`);
+    await page.keyboard.press("Meta+z");
+    await moment.waitFor({ state: "detached" });
+  } finally {
+    await page.unroute(/\/ore$/);
+    await until("Esc leaves", async () => (await page.keyboard.press("Escape"), (await page.locator(".review").count()) === 0));
+  }
 });
 
 journey("review: with no AI marks (the check failed), the screen reader counts the ones he sets", async (page) => {

@@ -1043,6 +1043,23 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     <Trap off={paused || under}>
     <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused} data-gives-back="" data-done={done} data-steps={done + left}>
       <div className="review-head" data-tauri-drag-region>
+        {moment && !end && (
+          // D-new-reward-days: a chip in the head bar, clear of the question and of every button he presses.
+          <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} data-days={moment.days > 0 || undefined} role="status">
+            {!quick && <span className="moment-mole"><Mole bare size={48} mood={MOMENT_MOOD[moment.kind]} /></span>}
+            <span className="moment-gem" aria-hidden="true">
+              <Gem kind={moment.from.kind} size={24} seam={moment.from.seam} polished={moment.from.polished} />
+              <Gem kind={moment.to.kind} size={24} seam={moment.to.seam} polished={moment.to.polished} />
+            </span>
+            {moment.days > 0 && (
+              <b className="moment-days">
+                <DotNumber value={`+${moment.days}`} height={18} />
+                <span className="sr-only">+{moment.days}</span> {moment.days === 1 ? "day" : "days"}
+              </b>
+            )}
+            <span className="moment-why">{moment.line}</span>
+          </div>
+        )}
         {quick ? (
           // The quick quiz has no fixed length; what matters is that it counts toward today's goal (D60).
           start && !end && start.counts && (
@@ -1120,19 +1137,6 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                 <button className="moment-done" onClick={() => void finish()}>Done</button>
               </Hint>
             </MoleSays>
-          </div>
-        )}
-        {moment && !end && (
-          <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} role="status">
-            {!quick && <span className="moment-mole"><Mole bare size={48} mood={MOMENT_MOOD[moment.kind]} /></span>}
-            <span className="moment-gem" aria-hidden="true">
-              <Gem kind={moment.from.kind} size={36} seam={moment.from.seam} polished={moment.from.polished} />
-              <Gem kind={moment.to.kind} size={36} seam={moment.to.seam} polished={moment.to.polished} />
-            </span>
-            <span className="moment-text">
-              {moment.days > 0 && <b>+{moment.days} {moment.days === 1 ? "day" : "days"}</b>}
-              <span>{moment.line}</span>
-            </span>
           </div>
         )}
         {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} />}
