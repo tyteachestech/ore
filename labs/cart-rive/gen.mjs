@@ -120,7 +120,7 @@ const I = (k) => (ids[k] ??= newId());
 // Asleep he is the app's own side view (mole-fine.ts `sideDots`): drawn standing in profile, facing right (x forward,
 // y down), then laid on his back: helmet tipped over his eyes, a lobe of the moustache on his chest, a paw behind
 // his head, a belly like a hill and two flat feet. Shown smaller on the cart, as the app shows him.
-const LY_SCALE = 0.45, NEAR = 0.72; // the app's sizes: asleep on the cart, and awake in the air before he grows into his spot
+const LY_SCALE = 0.45, NEAR = 1; // asleep on the cart he is the app's size; awake he grows once, to the size he is in his hole (the app grows him twice)
 const turn = (x, y, a, px, py) => { const c = Math.cos(a), n = Math.sin(a); return [px + (x - px) * c - (y - py) * n, py + (x - px) * n + (y - py) * c]; };
 const raw = (name, tone) => { const a = PARTS[name], out = []; for (let i = 0; i < a.length; i += 4) out.push([a[i], a[i + 1], a[i + 2], tone ?? grey(a[i + 3])]); return out; };
 const SIDE = carve([
@@ -248,7 +248,7 @@ const SLOTS = [];
 [[10, -44.5], [9, -51], [7, -57.5], [4, -64]].forEach(([count, y], row) => {
   for (let c = 0; c < count; c++) SLOTS.push([-3 - row * 3.6 - c * 7.3, y]);
 });
-const STONE_SLOTS = [[-64, -47], [-52, -49], [-59, -55]]; // in the heap, at the back
+const STONE_SLOTS = [[-50, -49], [-63, -47.5], [-57, -57]]; // in the heap, at the back
 const ORE_R = 3.3;
 
 function cartXml() {
@@ -474,7 +474,7 @@ A1.warp = (f) => (f <= 26 ? (f * 40) / 26 : f + 14); // the roll takes longer, s
 
 // 2. The pour: he slides down the tipped bucket, slowly, then not. One second long; the state plays it faster for less ore.
 const CREEP = 0.28;
-const STONE_END = [[LIP[0] - 1, LIP[1]], [LIP[0] - 10, LIP[1]], [LIP[0] - 19, LIP[1]]]; // in a row at the lip
+const STONE_END = [[LIP[0] - 1, LIP[1]], [LIP[0] - 13, LIP[1]], [LIP[0] - 25, LIP[1]]]; // in a row at the lip
 const A2 = new Anim("Pour", 60);
 {
   const a = A2, t = CART.tip;
@@ -561,7 +561,7 @@ const WAKE_Y = SOLES - FEET * NEAR; // awake: about where he hung, his soles cle
 const T_KNOCK = Math.round(T_DROP + fallFrames(FLOOR - FEET * BIG - (WAKE_Y - RISE)));
 const T_GONE = Math.ceil(T_DROP + fallFrames(REST[1] + DEEP - (WAKE_Y - RISE)));
 const T_POP = T_GONE + 18, T_SETTLED = T_POP + 27, T_SPEAK = T_POP + 87;
-const S0 = 20, S1 = 44;
+const S0 = 20, S1 = 44, GROWN = 30; // the frame he is full size
 const A4 = new Anim("Wake and dive", T_POP + 117);
 {
   const a = A4, hx = HANG[0], hy = HANG[1] + SAG, [rx, ry] = REST, wy = WAKE_Y, top = wy - RISE;
@@ -591,9 +591,9 @@ const A4 = new Anim("Wake and dive", T_POP + 117);
   // The scramble: upright in a blink, limbs windmilling, climbing on nothing.
   // Upright in a few frames; then he runs on nothing across to over his hole, rocking as he goes (the app's leans).
   a.k("mole", "rotation", [[0, HANG_ROT, "h"], [5, 0.3, "o"], [13, -0.05, "io"], [S0, 0, "io"], [S0 + 4, 0.09, "io"], [S0 + 8, -0.19, "io"], [S0 + 12, 0.16, "io"], [S0 + 16, -0.17, "io"], [S0 + 20, 0.14, "io"], [S1, -0.06, "io"], [S1 + 5, 0, "h"]]);
-  a.s("bob", [[0, 1, "h"], [5, LY_SCALE, "io"], [S0 + 4, NEAR, "h"]]); // he grows as he wakes, over a third of a second, never in a jump // he grows as he starts awake, as in the app
-  a.k("mole", "y", [[0, hy, "h"], [5, SOLES - FEET * LY_SCALE, "io"], [S0 + 4, wy, "h"]]); // the same curve as his size, so his soles do not move
-  a.k("mole", "x", [[0, hx, "h"], [5, CUT[0], "h"], [S0, CUT[0], "io"], [S1, HOLE_X, "h"]]);
+  a.s("bob", [[0, 1, "h"], [5, LY_SCALE, "io"], [GROWN, NEAR, "h"]]); // he grows as he wakes, over a third of a second, never in a jump // he grows as he starts awake, as in the app
+  a.k("mole", "y", [[0, hy, "h"], [5, SOLES - FEET * LY_SCALE, "io"], [GROWN, wy, "h"]]); // the same curve as his size, so his soles do not move
+  a.k("mole", "x", [[0, hx, "h"], [5, CUT[0], "io"], [GROWN, HOLE_X, "h"]]); // he grows toward his hole: no slide after
   const run = (f0, f1, step, a0, a1) => { const ks = []; for (let f = f0, i = 0; f <= f1; f += step, i++) ks.push([f, i % 2 ? a1 : a0, "io"]); return ks; };
   a.k("footL", "rotation", [[0, 0, "h"], [S0, 0, "o"], ...run(S0 + 3, S1 - 2, 3, 0.6, -0.6), [S1 + 3, 0.1, "h"]]);
   a.k("footR", "rotation", [[0, 0.2, "h"], [S0, 0.2, "o"], ...run(S0 + 3, S1 - 2, 3, -0.6, 0.6), [S1 + 3, -0.1, "h"]]);
@@ -616,8 +616,8 @@ const A4 = new Anim("Wake and dive", T_POP + 117);
   const DIRT = [[-210, -260, 6], [-160, -380, 8], [-110, -470, 6], [-70, -340, 9], [-30, -520, 7], [20, -400, 6], [60, -500, 9], [105, -360, 7], [150, -440, 6], [200, -290, 8], [-130, -200, 5], [140, -190, 5], [-40, -250, 5], [45, -230, 5]];
   DIRT.forEach(([vx, vy, size], c) => a.crumb(T_KNOCK, Math.round((-vy / 650) * 60), HOLE_X + Math.sign(vx) * 24, GROUND - 2, vx, vy, 1300, size / 2, c % 3 ? 6 : 8));
   // The dirt banks up round the hole as what he threw comes down, never all at once.
-  a.k("mound", "opacity", [[0, 0, "h"], [T_KNOCK + 2, 0, "l"], [T_KNOCK + 8, 1, "h"]]);
-  a.s("mound", [[0, 0.6, "h"], [T_KNOCK + 2, 0.6, "o"], [T_KNOCK + 22, 1, "h"]]);
+  a.k("mound", "opacity", [[0, 0, "h"], [T_KNOCK + 2, 0, "l"], [T_KNOCK + 16, 1, "h"]]);
+  a.s("mound", [[0, 0.5, "h"], [T_KNOCK + 2, 0.5, "out"], [T_KNOCK + 34, 1, "h"]]);
   a.k("dirtMid", "y", [[0, 0, "h"], [T_KNOCK, 0, "o"], [T_KNOCK + 3, 2.2, "io"], [T_KNOCK + 8, -1.2, "io"], [T_KNOCK + 13, 1, "io"], [T_KNOCK + 18, 0, "h"], [T_POP, 0, "o"], [T_POP + 3, -4, "io"], [T_POP + 9, 1.5, "io"], [T_POP + 14, 0]]);
   // Underground, out of sight: arms away, paws on, everything straight.
   const U = T_GONE + 1;
