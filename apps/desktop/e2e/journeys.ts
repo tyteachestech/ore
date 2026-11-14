@@ -400,6 +400,29 @@ journey("reader width: a recording's transcript keeps about the column an articl
   if (transcript < article - 20) throw new Error(`transcript column ${transcript}px, article ${article}px at the same window`);
 });
 
+// F129
+journey("highlight popup: on a recording, where Play takes a second column of tools, each type's name stays on one line", async (page) => {
+  await openSource(page, "Lecture 4");
+  await page.locator(".page.video").waitFor();
+  await select(page, "testing yourself");
+  // F130: a recording has no video, so its Play says only "Play from here".
+  await page.locator(".popup .popup-tools").getByRole("button", { name: "Play from here", exact: true }).waitFor();
+  const tall = await page.locator(".popup .intents .intent").evaluateAll((els) =>
+    els
+      .filter((el) => {
+        // The button keeps its height, so a wrapped name shows only as a second line of text.
+        const r = document.createRange();
+        r.selectNodeContents(el.lastChild!);
+        return new Set([...r.getClientRects()].map((c) => Math.round(c.top))).size > 1 || el.scrollWidth > el.clientWidth;
+      })
+      .map((el) => el.textContent),
+  );
+  // Leaves the recording with the highlights it came with: a later journey counts its ticks.
+  await page.locator(".popup").getByRole("button", { name: "Remove highlight" }).click();
+  await page.locator(".popup").waitFor({ state: "detached" });
+  if (tall.length) throw new Error(`wrapped or cut: ${tall.join(", ")}`);
+});
+
 journey("reader width: a line holds about 66 characters at any text size, in Charter or Geist (D207)", async (page) => {
   const para = "Spacing your practice over days instead of cramming it into one evening tends to produce memories that last longer, because each return to the material comes after some forgetting has begun, and the effort of pulling it back strengthens the trace more than an easy repeat would. ";
   await page.getByRole("button", { name: "+ Add" }).click();
@@ -4610,6 +4633,7 @@ journey("skill page: the sources' folder tabs show To read, Done and the row det
   const tabY = async () => (await tabs.getByRole("tab", { name: "To read" }).boundingBox())!.y;
   const y0 = await tabY();
   await page.locator(".hero-strength").waitFor();
+  if (await page.locator(".hero-strength .strength-line").isVisible()) throw new Error("the iPhone's rock line shows on the Mac's skill page");
   if ((await tabY()) !== y0) throw new Error(`the tabs moved from ${y0} to ${await tabY()} when the header's gems loaded`);
   await tabs.getByRole("tab", { name: "Done" }).hover();
   await page.getByRole("tooltip").filter({ hasText: "Done" }).waitFor();
@@ -6013,7 +6037,7 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   const moment = page.locator('.review-moment[data-tone="miss"]');
   await moment.waitFor();
   await moment.locator('.gem[data-kind="dull"]').waitFor();
-  if (!(await moment.innerText()).includes("You were sure")) throw new Error(`the moment says: ${await moment.innerText()}`);
+  if (!(await moment.innerText()).includes("Came loose")) throw new Error(`the moment says: ${await moment.innerText()}`);
   if ((await moment.innerText()).includes("days")) throw new Error("a miss showed days added");
   const mole = moment.locator(".mole");
   if ((await mole.getAttribute("width")) !== "48") throw new Error("a rating's mole is not 48px");
@@ -6025,6 +6049,48 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   await page.getByRole("button", { name: "Undo last rating" }).waitFor({ state: "detached" });
   if ((await q.innerText()) !== was) throw new Error("⌘Z did not leave the exercise showing");
   await until("Esc leaves", async () => (await page.keyboard.press("Escape"), (await page.locator(".review").count()) === 0));
+});
+
+journey("what a rating won shows as a chip in the head bar, its days in dots (F140)", async (page) => {
+  // A cut gem last seen 38 days ago, and a Good worth 61 more days: the biggest reward a rating has.
+  await page.route(/\/ore$/, async (route) => {
+    const args = (JSON.parse(route.request().postData() ?? "{}") as { args?: string[] }).args ?? [];
+    if (args[0] !== "card" || !args.includes("--review")) return route.fallback();
+    const r = await route.fetch();
+    const j = JSON.parse(await r.text()) as { history?: Record<string, unknown>; data?: { history?: Record<string, unknown> } };
+    const h = (j.data ?? j).history;
+    if (h) {
+      h.reviews = [{ ts: new Date(Date.now() - 38 * 86_400_000).toISOString(), rating: 3 }];
+      h.gem = { kind: "cut", after: { 1: { kind: "dull", days: 0 }, 2: { kind: "cut", days: 2 }, 3: { kind: "cut", days: 61 }, 4: { kind: "cut", days: 80 } } };
+    }
+    await route.fulfill({ response: r, body: JSON.stringify(j) });
+  });
+  try {
+    await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 3, gaps: [], feedback: "", covered: [true, true] } }));
+    await startReview(page, /Teaching/);
+    await page.getByRole("textbox", { name: "Your answer" }).fill("Fluency feels like knowing, so you overrate yourself");
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await page.getByRole("button", { name: "Check", exact: true }).click();
+    await page.locator(".review-rate .suggested").waitFor();
+    await page.waitForTimeout(400); // a rating key right after the answer shows is ignored
+    await page.keyboard.press("3");
+    const moment = page.locator(".review-moment");
+    await moment.waitFor();
+    if ((await moment.innerText()).replace(/\s+/g, " ").trim() !== "+61 days Last seen 38 days ago") throw new Error(`the chip says: ${await moment.innerText()}`);
+    // The days are a dot number, and the chip sits in the head bar: over no part of the exercise, on one line.
+    const m = await moment.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      const dots = el.querySelector(".moment-days .dot-number")!;
+      return { dots: Math.round(dots.getBoundingClientRect().height), circles: dots.querySelectorAll("circle").length, over: Math.round(r.bottom - document.querySelector(".review-body")!.getBoundingClientRect().top), height: Math.round(r.height) };
+    });
+    if (m.dots < 18 || !m.circles) throw new Error(`the days are not a dot number: ${JSON.stringify(m)}`);
+    if (m.over > 0 || m.height > 44) throw new Error(`the chip is not in the head bar: ${JSON.stringify(m)}`);
+    await page.keyboard.press("Meta+z");
+    await moment.waitFor({ state: "detached" });
+  } finally {
+    await page.unroute(/\/ore$/);
+    await until("Esc leaves", async () => (await page.keyboard.press("Escape"), (await page.locator(".review").count()) === 0));
+  }
 });
 
 journey("review: with no AI marks (the check failed), the screen reader counts the ones he sets", async (page) => {
@@ -6049,8 +6115,13 @@ journey("review: Start review clicked before the skills have loaded still asks w
   await pick.or(page.locator(".review")).first().waitFor();
   if (!(await pick.isVisible())) throw new Error("a review started without asking what to review");
   await until("every skill with cards due is listed", async () => (await pick.getByRole("checkbox").count()) > 1);
+  // The rows that came in late are ticked like any others, so ↵ starts so ↵ starts.
+  const unticked = await pick.locator('[role=checkbox][aria-checked="false"]').count();
+  if (unticked) throw new Error(`${unticked} rows that loaded after the sheet opened came in unticked`);
+  await page.keyboard.press("Enter");
+  await page.locator(".review-q").waitFor();
   await page.keyboard.press("Escape");
-  await pick.waitFor({ state: "detached" });
+  await page.locator(".review").waitFor({ state: "detached" });
 });
 
 journey("review: Open in source pauses on the card; Back to Review picks it up where he was", async (page) => {
@@ -6671,12 +6742,21 @@ async function startReview(page: Page, only: RegExp | null) {
   const pick = page.getByRole("dialog", { name: "What to review" });
   await page.getByRole("button", { name: "Start review" }).click();
   await pick.waitFor();
+  await pick.getByRole("checkbox").first().waitFor(); // the rows can land after the sheet
   for (const row of await pick.getByRole("checkbox").all()) {
     const want = !only || only.test(await row.innerText());
     if ((await row.getAttribute("aria-checked") === "true") !== want) await row.click();
   }
   await page.keyboard.press("Enter");
-  await page.locator(".review-q").waitFor();
+  // No question within the wait says what was on screen instead (F142: cause not found).
+  await page.locator(".review-q").waitFor().catch(async (e) => {
+    const seen = await page.evaluate(() => ({
+      sheet: [...document.querySelectorAll(".review-pick [role=checkbox]")].map((r) => `${r.querySelector(".name")?.textContent}:${r.getAttribute("aria-checked")}`),
+      focus: `${document.activeElement?.tagName}.${document.activeElement?.className}`,
+      review: document.querySelector(".review")?.textContent?.slice(0, 200) ?? null,
+    }));
+    throw new Error(`${(e as Error).message}\n      on screen: ${JSON.stringify(seen)}`);
+  });
 }
 
 journey("review: a rating always moves the session one step on, and a miss adds its retry as one more step (D59)", async (page) => {
@@ -8787,6 +8867,20 @@ journey("review: a card that fails to load offers Try again, focused, which load
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+// F136
+journey("⌘K opens without the ambience channels; typing one's name finds it (D254)", async (page) => {
+  await page.keyboard.press("Meta+KeyK");
+  const rows = page.locator("[cmdk-item]");
+  await rows.filter({ hasText: "Ambience…" }).waitFor();
+  const plays = await rows.filter({ hasText: /^Play / }).allInnerTexts();
+  if (plays.length) throw new Error(`⌘K opened on ${plays.join(", ")}`);
+  await page.keyboard.type("rain");
+  await rows.filter({ hasText: "Play Rain" }).waitFor();
+  await page.keyboard.press("Escape"); // clears what he typed
+  await page.keyboard.press("Escape");
+  await rows.first().waitFor({ state: "detached" });
+});
+
 journey("review: once an Explain exercise is checked, the key bar names the suggested rating (↵ Hard), as its button does", async (page) => {
   await page.route(/\/ore$/, async (route) => {
     if (!(route.request().postData() ?? "").includes('"grade",')) return route.fallback();
@@ -8805,6 +8899,8 @@ journey("review: once an Explain exercise is checked, the key bar names the sugg
     await until("the key bar says ↵ Hard", async () => /↵\s*Hard/.test(await keys.innerText())).catch(async () => {
       throw new Error(`the key bar reads: ${await keys.innerText()}`);
     });
+    // F134: Retire is a tool under the ratings like Ask, Edit and Later, so the bar names its key too.
+    if (!/⇧⌘⌫\s*Retire/.test(await keys.innerText())) throw new Error(`the key bar doesn't name Retire: ${await keys.innerText()}`);
   } finally {
     await page.unroute(/\/ore$/);
     await page.keyboard.press("Escape");
@@ -10153,6 +10249,75 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
     return w < 44 || h < 44 ? [`${e.getAttribute("aria-label") ?? e.textContent?.trim().slice(0, 20)} ${Math.round(w)}×${Math.round(h)}`] : [];
   }));
   if (small.length) throw new Error(`taps under 44 pt on the skill page: ${small.join(", ")}`);
+}, "phone");
+
+journey("phone: in Review the buttons he taps on every exercise sit at the foot of the screen, and what the last answer won stands above them (F137)", async (page) => {
+  // How sure he is, then the ratings, sat mid-screen with the bottom 40% empty: a reach for one thumb.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const foot = (sel: string) => page.locator(sel).evaluate((el) => Math.round(innerHeight - el.getBoundingClientRect().bottom));
+  let seen = 0;
+  for (let i = 0; i < 12 && seen < 2; i++) {
+    const sure = page.getByRole("radio", { name: "Think so" });
+    await sure.or(page.locator(".phone-full .review-end")).first().waitFor();
+    if (!(await sure.count())) break;
+    const typed = (await page.locator(".phone-full textarea:visible").count()) > 0;
+    if (!typed) {
+      // An exercise answered in his head: nothing under the question but the three buttons, at the foot.
+      const gap = await foot(".quiz-sure");
+      if (gap > 60) throw new Error(`How sure are you? ends ${gap}px above the foot of the screen`);
+      const moment = page.locator(".review-moment");
+      if (await moment.count()) {
+        const over = await moment.evaluate((m) => Math.round(m.getBoundingClientRect().bottom - document.querySelector("#review-sure")!.getBoundingClientRect().top));
+        if (over > 0) throw new Error(`what the last answer won covers the confidence buttons by ${over}px`);
+      }
+    }
+    if (typed) await tap(page, page.getByRole("button", { name: "No idea" }));
+    else await tap(page, sure);
+    const good = page.getByRole("button", { name: "Good", exact: true });
+    await good.waitFor();
+    const gap = await foot(".review-rate");
+    const tall = await page.locator(".review-body").evaluate((b) => b.scrollHeight > b.clientHeight + 1);
+    // A long answer scrolls and the ratings follow it; a short one leaves them at the foot.
+    if (!tall && gap > 60) throw new Error(`the ratings end ${gap}px above the foot of the screen`);
+    if (!typed) seen++;
+    await tap(page, good);
+  }
+  if (!seen) throw new Error("no exercise answered in his head came up");
+}, "phone");
+
+journey("phone: a skill's header is one line of its rocks in the order they grow, ending in the level ring and the cut count (F141)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
+  const line = page.locator(".phone-skill .strength-line");
+  await line.waitFor();
+  const got = await line.evaluate((el) => {
+    const x = (q: string) => [...el.querySelectorAll(q)].map((e) => Math.round(e.getBoundingClientRect().left));
+    const kinds = [...el.querySelectorAll(".strength-step svg.gem")].map((g) => (g as HTMLElement).dataset.kind);
+    const shown = (q: string) => !!el.closest(".hero-strength")!.querySelector<HTMLElement>(q)?.offsetWidth;
+    return { kinds, xs: [...x(".strength-step"), ...x(".strength-end .gem-ring"), ...x(".strength-lv")], rows: new Set([...el.children].map((c) => Math.round(c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2))).size, big: shown(":scope > .gem-ring") || shown(".strength-side"), end: el.querySelector(".strength-end")!.textContent, wide: document.documentElement.scrollWidth };
+  });
+  const order = ["rough", "dull", "ready"];
+  if (!got.kinds.length || got.kinds.some((k, i) => order.indexOf(k!) < 0 || (i > 0 && order.indexOf(k!) <= order.indexOf(got.kinds[i - 1]!)))) throw new Error(`the rocks read ${got.kinds.join()}, not in the order rough, missed, nearly cut`);
+  if (got.xs.join() !== [...got.xs].sort((a, b) => a - b).join()) throw new Error(`the line is out of order: ${got.xs.join()}`);
+  if (got.rows !== 1) throw new Error("the rock line wraps or its parts sit off one midline");
+  if (got.big) throw new Error("the Mac's big ring or count still shows under the line");
+  if (!/^\d+$/.test(got.end ?? "")) throw new Error(`the line ends in "${got.end}", not the cut count`);
+  if (got.wide > 390) throw new Error(`the page scrolls sideways: ${got.wide}`);
+  const note = (await page.locator(".phone-skill .phone-note-row").boundingBox())!.y;
+  if (note > 190) throw new Error(`Your note starts at ${Math.round(note)} pt: the header takes too much room`);
+}, "phone");
+
+journey("phone: a long question on a skill page takes two lines before it cuts (F139)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }));
+  const note = page.locator(".phone-skill .question-quote .note").first();
+  await note.waitFor();
+  const lines = (text: string) => note.evaluate((el, text) => ((el.textContent = text), Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight))), text);
+  const two = await lines("Is a nap enough, or does it have to be a full night before it sticks?");
+  if (two !== 2) throw new Error(`a question a line and a half long shows on ${two} line(s)`);
+  const most = await lines("Is a nap enough, or does it have to be a full night before it sticks? ".repeat(4));
+  if (most !== 2) throw new Error(`a very long question shows on ${most} lines`);
 }, "phone");
 
 journey("phone: Review's confidence labels stay in their buttons at the largest text, and Open in source is a 44 pt tap (F100, F101)", async (page) => {
