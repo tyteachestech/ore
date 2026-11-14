@@ -732,7 +732,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const margin = useRef<MarginHandle | null>(null);
   const notesField = useRef<NoteEditorHandle>(null);
   const sideBody = useRef<HTMLDivElement>(null);
-  const notes = useSourceNote(p.id, p.notify);
+  const notes = useSourceNote(p.id, p.notify, () => {
+    setDoc((cur) => cur && { ...cur, preview: undefined, captured_at: new Date().toISOString() });
+    p.onChanged();
+  });
   // D34.4: the finish step hides the text, highlights, notes and the source note.
   const closedBook = p.finishing;
   // The quiz panel blurs the source until an attempt is checked, then steps through passages (D52, D55).

@@ -24,7 +24,7 @@ import { Radio } from "./Radio";
 import { CHANNELS } from "./ambience-art";
 import { stop as stopAmbience, toggle as playAmbience, ambienceState } from "./ambience";
 import { Reader, type PracticeRef } from "./Reader";
-import { setSidebarShown, useSideWidth, type SideTab } from "./Notes";
+import { settleNote, setSidebarShown, useSideWidth, type SideTab } from "./Notes";
 import type { LinkTarget } from "./editor/NoteEditor";
 import { Settings, useReminderAgent, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
@@ -784,8 +784,9 @@ export function App() {
     if (!left || left === openId || !previews.current.has(left)) return;
     const title = previews.current.get(left)!;
     previews.current.delete(left);
-    ore<{ result: string }>("feed", "close", left).then(
+    settleNote(left).then((saved) => saved ? ore<{ result: string }>("feed", "close", left) : null).then(
       (r) => {
+        if (!r) return; // A failed note keeps its preview and recoverable draft.
         if (r.result === "kept") {
           notify(`Kept “${title}” in your library`);
           void refresh();

@@ -235,14 +235,23 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
     // Focus goes back to the name after Enter; a click away leaves it where he clicked.
     const close = () => ((refocus.current = byKey), setDraft(null), true);
     if (v === skill.name) return close();
-    const to = (name: string) => () => ore("skills", "set", skill.id, opt("name", name)).then(onRenamed);
     setSaving((busy.current = true));
+    let landed = false;
+    const write = ore("skills", "set", skill.id, opt("name", v)).then(() => { landed = true; onRenamed(); });
+    let chain = write.catch(() => {});
+    // Reserve this action before waiting: Undo must never take the preceding import instead.
+    // Replays run in order behind the original write, including a quick Undo then Redo.
+    const to = (name: string) => () => {
+      const next = chain.then(() => landed ? ore("skills", "set", skill.id, opt("name", name)).then(onRenamed) : undefined);
+      chain = next.catch(() => {});
+      return next;
+    };
+    const forget = notify(`Renamed “${skill.name}” to “${v}”`, "info", to(skill.name), to(v));
     try {
-      await ore("skills", "set", skill.id, opt("name", v));
-      onRenamed();
-      notify(`Renamed “${skill.name}” to “${v}”`, "info", to(skill.name), to(v));
+      await write;
       return close();
     } catch (e) {
+      forget();
       notify(errorText(e), "error");
       return false;
     } finally {
