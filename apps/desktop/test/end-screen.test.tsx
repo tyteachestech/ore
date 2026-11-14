@@ -63,21 +63,24 @@ test("a session that filled the ring and cut a gem: the cart is there, the mole 
   expect(s.q(".dot-ring .on")).toBe(0);
   expect(s.q(".review-cut > span[data-wait]")).toBe(1);
   // A clock the test turns by hand, so the gap between the mole coming up and its reaction is exact on any runner.
-  let up = -1, react = -1;
+  let up = -1, react = -1, cut = 0;
   for (let t = 0; t < 6000 && !(react >= 0 && !s.q(".cart-tip")); t += 20) {
     await act(async () => void jest.advanceTimersByTime(20));
+    cut = Math.max(cut, s.q('.review-cut .gem[data-kind="cut"] rect'));
     if (up < 0 && s.q(".review-mole .mole")) up = t;
     if (up >= 0 && react < 0 && reacted(s.body)) react = t;
   }
-  jest.useRealTimers();
   expect(s.q(".cart-tip")).toBe(0);
   expect(s.q(".cart-ore")).toBe(0);
   expect(s.q(".dot-ring .on")).toBe(30);
-  expect(s.q(".review-cut > span[data-wait]")).toBe(0);
-  // The stone that landed is cut where it stands: it ends as a gem of solid pixels (D239).
-  for (const t0 = Date.now(); Date.now() - t0 < 3000 && s.q(".gem-cutting[data-cutting]"); ) await act(async () => void (await wait(40)));
-  expect(s.q(".gem-cutting[data-cutting]")).toBe(0);
-  expect(s.q('.review-cut .gem[data-kind="cut"] rect')).toBeGreaterThan(50);
+  // The stone that landed is cut where it stands: it ends as a gem of solid pixels (D239). Then it makes way
+  // for the day's minutes in the ring's centre (D-new-bonus-lap).
+  expect(cut).toBeGreaterThan(50);
+  for (let t = 0; t < 3000 && !s.q(".end-ring > .end-lap"); t += 20) await act(async () => void jest.advanceTimersByTime(20));
+  jest.useRealTimers();
+  expect(s.q(".end-ring > .end-lap")).toBe(1);
+  expect(s.q(".review-cut")).toBe(0);
+  expect(s.body.querySelector(".end-lap-n")!.getAttribute("aria-label")).toBe("10 minutes today");
   // The mole cheers once it is up (560ms), not when the cart has finished leaving.
   expect(react - up).toBeGreaterThanOrEqual(540);
   expect(react - up).toBeLessThanOrEqual(580);
@@ -197,17 +200,30 @@ test("an ore whose ring dot is missing still counts, so the ring is told it is f
 }, 10_000);
 
 test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem polished this session shows after the cut ones, and the session's depth is one line", async () => {
-  reduce = true;
   const e = end(["ai", "ai"]) as unknown as { session: Record<string, unknown> };
   Object.assign(e.session, { grades: ["mended", "cut"], polished: ["ai"], depth_days: 41 });
-  const s = await mount(e as never);
-  reduce = false;
-  const gems = [...s.body.querySelectorAll(".review-cut > span")];
-  expect(gems).toHaveLength(3);
-  const seams = gems.map((g) => g.querySelectorAll('rect[data-gold]').length);
+  // The gems are cut in the ring before they make way for the minutes (D-new-bonus-lap), so they are read there.
+  jest.useFakeTimers();
+  const c = await mount(e as never, 0.9);
+  let seams: number[] = [], n = 0, label: string | null = null;
+  for (let t = 0; t < 8000 && !c.q(".end-lap"); t += 20) {
+    await act(async () => void jest.advanceTimersByTime(20));
+    const gems = [...c.body.querySelectorAll(".review-cut > span")];
+    if (!gems.length) continue;
+    n = gems.length;
+    label = c.body.querySelector(".review-cut")!.getAttribute("aria-label");
+    const now = gems.map((g) => g.querySelectorAll('rect[data-gold]').length);
+    if (now.some(Boolean)) seams = now;
+  }
+  jest.useRealTimers();
+  await c.done();
+  expect(n).toBe(3);
   expect(seams[0]).toBeGreaterThan(0);
   expect(seams.slice(1)).toEqual([0, 0]);
-  expect(s.body.querySelector(".review-cut")!.getAttribute("aria-label")).toBe("2 became solid, 1 won back, 1 polished");
+  expect(label).toBe("2 became solid, 1 won back, 1 polished");
+  reduce = true;
+  const s = await mount(e as never);
+  reduce = false;
   // The mole speaks (D243); the depth is a number in the row of results.
   expect(s.q(".end-says .says-line")).toBe(1);
   // The box is an outline with no tail (D266): nothing is drawn in it but the line.
@@ -217,10 +233,15 @@ test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem 
   // More gems than fit: the count covers the polished ones left out too.
   const many = end(Array(8).fill("ai")) as unknown as { session: Record<string, unknown> };
   Object.assign(many.session, { polished: ["ai", "ai"] });
-  reduce = true;
-  const m = await mount(many as never);
-  reduce = false;
-  expect(m.body.querySelector(".review-cut > b")!.textContent).toBe("+2");
+  jest.useFakeTimers();
+  const m = await mount(many as never, 0.9);
+  let more: string | null = null;
+  for (let t = 0; t < 8000 && !m.q(".end-lap"); t += 20) {
+    await act(async () => void jest.advanceTimersByTime(20));
+    more = m.body.querySelector(".review-cut > b")?.textContent ?? more;
+  }
+  jest.useRealTimers();
+  expect(more).toBe("+2");
   await m.done();
   // Nothing gained, nothing said.
   reduce = true;
@@ -276,7 +297,15 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   Object.assign(two.session, { depth_days: 41, depth_extra_days: 12 });
   const s = await mount(two as never);
   expect(s.q(".end-emblem .end-ring > .ring")).toBe(1);
-  expect(s.q(".end-emblem .end-ring > .review-cut > span")).toBe(2);
+  // Settled, the ring holds the day's minutes; the gems were cut there first (D-new-bonus-lap).
+  expect(s.q(".end-emblem .end-ring > .end-lap")).toBe(1);
+  expect(s.q(".end-emblem .end-ring > .review-cut")).toBe(0);
+  reduce = false;
+  const first = await mount(two as never, 0.9);
+  expect(first.q(".end-emblem .end-ring > .review-cut > span")).toBe(2);
+  expect(first.q(".end-lap")).toBe(0);
+  await first.done();
+  reduce = true;
   // One row, three at most, in one order: kept, the days they added, then the rarest thing (here the gems cut).
   const row = [...s.body.querySelectorAll(".end-emblem + .end-tally > li")];
   expect(row.map((li) => li.getAttribute("data-key"))).toEqual(["kept", "depth", "cut"]);
@@ -296,9 +325,9 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   // The gem's own hint names its skill, so no icon repeats it under the gem.
   expect(s.q(".review-cut-skill")).toBe(0);
   await s.done();
-  // With no gem cut the ring holds nothing, and the row has what there is.
+  // With no gem cut the ring holds the minutes alone, and the row has what there is.
   const none = await mount(end([]));
-  expect(none.q(".end-ring > :not(.ring)")).toBe(0);
+  expect(none.q(".end-ring > :not(.ring):not(.end-lap)")).toBe(0);
   expect([...none.body.querySelectorAll(".end-tally > li")].map((li) => li.textContent)).toEqual(["5memories kept"]);
   await none.done();
   // The rarest thing takes the third place and wears its own colour: a new level its skill's, a memory pulled back the gold.

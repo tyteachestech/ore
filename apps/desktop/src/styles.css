@@ -1537,6 +1537,30 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .dot-ring .soon { fill: var(--ring); opacity: 0.55; transform: scale(0.85); }
 @media (prefers-reduced-motion: reduce) { .dot-ring circle { transition: none; } }
 .ring .dot-ring { --ring: var(--c-green); }
+/* A lap past the full ring (the end screen's bonus minutes): the dots it lights again are a little bigger and
+   carry a white centre, so where the bonus stops is plain; past a second full lap, bigger again. Each lands white. */
+.dot-ring .over { transform: scale(1.2); animation: over-in var(--t-4) var(--ease-out); }
+.dot-ring .over2 { transform: scale(1.34); animation: over-in var(--t-4) var(--ease-out); }
+.dot-ring .core { fill: #fff; transform: none; transition: transform var(--t-3) var(--ease-out); animation: core-in var(--t-4) var(--ease-out) both; }
+.dot-ring .core.big { transform: scale(1.75); }
+@keyframes over-in { from { fill: #fff; transform: scale(1.6); } }
+@keyframes core-in { from { transform: scale(0); } }
+/* Crossing the goal as the minutes count: one ring of dots thrown outward, once (white and wider at twice the goal). */
+.ring-throw { position: absolute; inset: 0; pointer-events: none; }
+.ring-throw i { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--c-green); animation: ring-throw 480ms var(--ease-out) both; }
+.ring-throw[data-big] i { background: #fff; animation-duration: 620ms; }
+@keyframes ring-throw { from { opacity: 1; transform: rotate(var(--a)) translateY(calc(-1 * var(--r))); } to { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--r) - var(--far))) scale(0.4); } }
+/* White sparkles over the bonus dots: a cross of five dots that opens and fades. */
+.ring-sparkle { position: absolute; width: 0; height: 0; pointer-events: none; animation: sparkle 840ms var(--ease-in-out) both; }
+.ring-sparkle[data-twice] { animation-duration: 560ms; --reach: 5px; }
+.ring-sparkle i { position: absolute; width: 3px; height: 3px; margin: -1.5px; border-radius: 50%; background: #fff; }
+.ring-sparkle i:nth-child(1) { width: 4px; height: 4px; margin: -2px; }
+.ring-sparkle i:nth-child(2) { transform: translateX(var(--reach, 4px)); }
+.ring-sparkle i:nth-child(3) { transform: translateX(calc(-1 * var(--reach, 4px))); }
+.ring-sparkle i:nth-child(4) { transform: translateY(var(--reach, 4px)); }
+.ring-sparkle i:nth-child(5) { transform: translateY(calc(-1 * var(--reach, 4px))); }
+@keyframes sparkle { 0%, 100% { opacity: 0; transform: scale(0.3); } 50% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .dot-ring .over, .dot-ring .over2, .dot-ring .core, .ring-throw i, .ring-sparkle { animation: none; } .ring-throw, .ring-sparkle { display: none; } }
 [data-color="gray"] .gem-ring .dot-ring { --ring: var(--text); }
 .gem-ring[data-finishes] > .dot-ring { filter: drop-shadow(0 0 3px var(--skill, var(--accent))); }
 .gem-ring-lv { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); padding: 0 6px; height: 16px; line-height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); font-family: var(--round); font-size: 10px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -2198,6 +2222,22 @@ button.home-plan:hover { color: var(--text); }
 .end-emblem::before { content: ""; position: absolute; inset: -48px 0 -72px; z-index: -1; pointer-events: none; background-image: radial-gradient(circle, color-mix(in oklab, var(--text) 16%, transparent) 1.1px, transparent 1.6px); background-size: 9px 9px; background-position: center; -webkit-mask-image: radial-gradient(closest-side, #000, transparent); mask-image: radial-gradient(closest-side, #000, transparent); }
 .end-ring { position: relative; display: grid; place-items: center; }
 .end-ring > * { grid-area: 1 / 1; }
+/* What stands in the ring: the day's minutes in its dots, "min" and what came after the goal on a chip in the
+   ring's green, and one line for the skill the session fed most. */
+.end-lap { display: flex; flex-direction: column; align-items: center; font: 400 12px/1 var(--mono); color: var(--muted); animation: end-lap-in var(--t-4) var(--ease-out); }
+.end-lap-n { display: block; color: var(--text); }
+.end-lap-min { display: flex; align-items: center; justify-content: center; height: 20px; margin-top: 10px; }
+.end-lap-plus { display: grid; place-items: center; height: 20px; padding: 0 7px; margin-left: 7px; border-radius: 10px; background: var(--c-green); color: #0f2a19; animation: end-plus-in var(--t-4) var(--ease-out); }
+.end-lap-plus:focus-visible, .end-lap-reel:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.end-lap-reel { display: block; height: 24px; margin-top: 8px; overflow: hidden; border-radius: 6px; animation: end-lap-in var(--t-4) var(--ease-out); }
+.end-lap-rows { display: flex; flex-direction: column; transition: transform var(--t-4) var(--ease-out); }
+.end-lap-rows > span { display: flex; align-items: center; justify-content: center; gap: 6px; height: 24px; max-width: 150px; color: var(--text); white-space: nowrap; }
+.end-lap-rows > span > span:not(.skill-icon) { overflow: hidden; text-overflow: ellipsis; }
+.end-lap-rows .skill-icon.glyph { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; }
+.end-lap-rows b { font-weight: 500; color: var(--skill, var(--text)); }
+@keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes end-plus-in { from { opacity: 0; max-width: 0; padding: 0; margin-left: 0; } to { max-width: 48px; } }
+@media (prefers-reduced-motion: reduce) { .end-lap, .end-lap-reel, .end-lap-plus { animation: none; } .end-lap-rows { transition: none; } }
 /* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
    Each lands in hard steps, one after another, then is still. */
 .end-tally { list-style: none; display: flex; justify-content: center; gap: 16px; margin: 20px 0 0; padding: 0; }
