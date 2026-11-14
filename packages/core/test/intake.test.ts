@@ -393,6 +393,19 @@ describe("import coverage: files", () => {
     expect(item.body).toContain("Mix problem types");
   });
 
+  test("Word: code keeps its lines and indent, fenced, and comments come along (F-new-docx-code, F-new-docx-comments)", async () => {
+    // Made for Ore with Pandoc (docs/reviews/2026-11-14-codex-sweep-2/fixtures/make-fixtures.py).
+    const item = await addSource(await tempLibrary(), file("word-code.docx"));
+    expect(item.meta.title).toBe("Office Learning");
+    expect(item.meta.author).toBe("Ore Fixture Author");
+    expect(item.body).toContain("START OFFICE: retrieval improves memory.");
+    expect(item.body).toContain("# Final lesson");
+    expect(item.body).toContain("```\ndef learn():\n    return 42\n```");
+    expect(item.body).toContain("| Recall | 9 |");
+    expect(item.body).toContain("COMMENT EVIDENCE: check the study sample.");
+    expect(item.body).toContain("END OFFICE: practice tomorrow.");
+  });
+
   test("Word: a never-titled file (Word's \"Document1\") is titled by its first heading", async () => {
     const item = await addSource(await tempLibrary(), file("document1.docx"));
     expect(item.meta.title).toBe("Retrieval practice");

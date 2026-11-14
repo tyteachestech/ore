@@ -43,8 +43,13 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
   });
   // Node's build of mammoth takes a Buffer; its browser build (the iPhone app) takes the bytes themselves.
   const input = (typeof Buffer !== "undefined" ? { buffer: Buffer.from(data) } : { arrayBuffer: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) }) as { buffer: Buffer };
-  const { value } = await mammoth.convertToHtml(input, { convertImage });
+  // Code paragraphs (Word's and Pandoc's "Source Code" style) keep their lines and indent, fenced (F-new-docx-code);
+  // comments come along at the end instead of vanishing (F-new-docx-comments).
+  const styleMap = ["p[style-name='Source Code'] => pre:separator('\\n')", "p[style-name='HTML Preformatted'] => pre:separator('\\n')", "comment-reference => sup"];
+  const { value } = await mammoth.convertToHtml(input, { convertImage, styleMap });
   const { document } = parseHTML(`<html><body>${value}</body></html>`);
+  // A code block reads as one fenced block: its line breaks as lines, inside <code> as turndown fences it.
+  for (const pre of document.querySelectorAll("pre")) pre.innerHTML = `<code>${pre.innerHTML.replace(/<br\s*\/?>/g, "\n")}</code>`;
   const body = td.turndown(document.body as unknown as HTMLElement).trim();
   if (!body) throw new Error("This Word file has no text to read.");
   const meta = coreProps(unzipSync(data));
