@@ -11,25 +11,32 @@ import { lit } from "./Ring";
    brighter in the heap and in the air (D197), so the harder recall is the better find. Drawn as the mole is: round dots on a grid, shade by dot size. */
 
 const CELL = 3;
-/** The cart on a 20 by 13 grid, W rim to D shade (a gem's letters). The bucket tips about its front foot. */
-const BUCKET = [".WWWWWWWWWWWWWWWWWW.", "..HHHHHHHHHHHMMMMD..", "..HHHHHHHHHHMMMMDD..", "...HHHHHHHHMMMMDD...", "...HHHHHHHMMMMDDD...", "....HHHHHMMMMDDD....", "....MMMMMMMDDDDD...."];
-const FRAME = "...DDDDDDDDDDDDDD...";
-const WHEEL = [".HHH.", "HM..H", "H.W.H", "H..MH", ".HHH."];
+/** The cart, 27 dots wide (Tyler, 2026-11-14: the bigger cart of the Rive build he set aside): a deep bucket, wider
+ *  at its rim, on a two-row frame over two spoked wheels. Its rim is `W`, its walls `H`, its belly `M` and `D` in a check. */
+const COLS = 27, ROWS = 13, INSET = 3;
+const BUCKET = Array.from({ length: ROWS }, (_, r) => {
+  const edge = Math.round((INSET * r) / (ROWS - 1));
+  return Array.from({ length: COLS }, (_, c) => (c < edge || c >= COLS - edge ? "." : r === 0 ? "W" : c === edge || c === COLS - edge - 1 || r === ROWS - 1 ? "H" : (c + r) % 2 ? "M" : "D")).join("");
+});
+const FRAME = ["H".repeat(COLS), "D".repeat(COLS)];
 const RADIUS: Record<string, number> = { W: 0.5, H: 0.44, M: 0.36, D: 0.27 };
-const BUCKET_TOP = 2, FRAME_ROW = 9, WHEEL_ROW = 10, WHEELS = [3, 12] as const;
-const HINGE = [16.5, 9] as const, LIP = [18.5, 2] as const;
+const FRAME_ROW = ROWS, WHEEL_Y = ROWS + 4.3, WHEEL_R = 2.7, WHEELS = [5.5, 21.5] as const;
+/** The bucket tips about its front foot; its load leaves by the front of its rim. */
+const HINGE = [COLS - INSET, ROWS] as const, LIP = [COLS - 0.5, 0] as const, TIP = 58;
 /** Rows of headroom over the bucket for its load. */
-const HEAD = 8;
-const W = 20 * CELL, H = (15 + HEAD) * CELL;
-/** Where the heap's ore sits: five dots half behind the rim, four on top of them. */
-const HEAP: [number, number][] = [[5.6, -0.3], [8.4, -0.3], [11.2, -0.3], [14, -0.3], [4.2, 1.9], [7, 1.9], [9.8, 1.9], [12.6, 1.9], [15.4, 1.9]];
+const HEAD = 11;
+const W = COLS * CELL, H = (ROWS + 7 + HEAD) * CELL;
+/** Where the heap's ore sits, a dot for each piece up to thirty: rows from the rim up, each filled from the lip back, and it pours in that order. */
+const HEAP: [number, number][] = [[10, -1.4], [9, -3.6], [7, -5.8], [4, -8]].flatMap(([n, y], row) => Array.from({ length: n! }, (_, c): [number, number] => [COLS - 2.2 - row * 1.2 - c * 2.43, y!]));
+/** How many pieces fill each row of the heap up to its back. */
+const FULL = [10, 19, 26, 30];
 const ROUGH = 6;
 /** The mole riding the load: drawn at the size he stands at on the ring, shown smaller on the cart: `DOZE` asleep (side on, about 80px long), growing as he starts awake. */
 const RIDER_PX = 96, DOZE = 0.45;
 /** The middle of each drawing's body from the foot of its box, in px at full size: asleep he lies over it, awake he straddles it. */
 const SLEEPER = [0, -45] as const, FALLER = [-1, -6] as const;
-/** How far he is tipped when his slide leaves him hanging past the lip (degrees). */
-const SLID = 58;
+/** How far he is tipped when his slide leaves him hanging past the lip (degrees): the bucket's own tip. */
+const SLID = TIP;
 /** How far the middle of his body lies off the tipped rim he slides down, in px: half his girth, so the bucket never crosses him. */
 const GIRTH = 22;
 /** How far over the foot of his seat the dirt line is: the top of the seated mole's row of dirt. */
@@ -104,7 +111,11 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
     const wheels = [...el.querySelectorAll<SVGGElement>(".cart-wheel")], heap = [...el.querySelectorAll<SVGCircleElement>(".cart-ore-in")], roughIn = [...el.querySelectorAll<SVGGElement>(".cart-rough-in")];
     const roughs = [...el.querySelectorAll<HTMLElement>(".cart-rough")], lip = el.querySelector<SVGCircleElement>(".cart-lip")!;
     // On the rail just over the ring, stopped where its tipped lip hangs over the ring's near side.
-    const floor = rb.top - hb.top - 2, stop = rb.left - bb.left + rb.width * 0.3 - W - 20;
+    // With the mole aboard it stops where the end of his slide leaves him over his hole.
+    const turned = (px: number, py: number, deg = TIP) => { const a = (deg * Math.PI) / 180, dx = px - HINGE[0] * CELL, dy = py - HINGE[1] * CELL; return [HINGE[0] * CELL + dx * Math.cos(a) - dy * Math.sin(a), HINGE[1] * CELL + dx * Math.sin(a) + dy * Math.cos(a)] as const; };
+    const off = [GIRTH * Math.sin((TIP * Math.PI) / 180), -GIRTH * Math.cos((TIP * Math.PI) / 180)] as const;
+    const hole = host.querySelector(".review-mole")?.getBoundingClientRect();
+    const floor = rb.top - hb.top - 2, stop = mole && hole ? hole.left + hole.width / 2 - bb.left - turned(LIP[0] * CELL, 0)[0] - off[0] : rb.left - bb.left + rb.width * 0.3 - W - 20;
     rail.style.top = `${floor - 1}px`;
     cart.style.top = `${floor - H}px`;
     cart.style.left = `${stop}px`;
@@ -135,17 +146,15 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
     // In from the left, braking hard; the wheels turn as far as it rolls.
     const roll = (from: number, to: number, ms: number, easing: string) => {
       play(cart, [{ transform: `translateX(${from}px)` }, { transform: `translateX(${to}px)` }], { duration: ms, easing });
-      for (const w of wheels) play(w, [{ transform: `rotate(${from / (2.5 * CELL)}rad)` }, { transform: `rotate(${to / (2.5 * CELL)}rad)` }], { duration: ms, easing });
+      for (const w of wheels) play(w, [{ transform: `rotate(${from / (WHEEL_R * CELL)}rad)` }, { transform: `rotate(${to / (WHEEL_R * CELL)}rad)` }], { duration: ms, easing });
     };
     play(rail, [{ opacity: 0 }, { opacity: 1 }], { duration: T2, easing: OUT });
     roll(-(stop + W + 20), 0, MOMENT, OUT);
-    // The brake: the wheels lock before it has stopped and it skids the last of the way, nose down, then rocks back.
-    const far = -(stop + W + 20) / (2.5 * CELL), locked = Math.round((far * 0.12) / (2 * Math.PI)) * 2 * Math.PI;
+    // The brake: the wheels lock before it has stopped and it skids the last of the way.
+    const far = -(stop + W + 20) / (WHEEL_R * CELL), locked = Math.round((far * 0.12) / (2 * Math.PI)) * 2 * Math.PI;
     for (const w of wheels) play(w, [{ transform: `rotate(${far}rad)`, easing: OUT }, { transform: `rotate(${locked}rad)`, offset: 0.4 }, { transform: `rotate(${locked}rad)` }], { duration: MOMENT });
-    cart.style.transformOrigin = `${(WHEELS[1] + 2.5) * CELL}px ${H}px`;
-    play(cart, [0, 0, 3, -1, 0].map((turn, i) => ({ transform: `rotate(${turn}deg)`, offset: [0, 0.45, 0.72, 0.88, 1][i], easing: IN_OUT })), { duration: MOMENT + T2, composite: "add" });
     // Its own momentum throws the bucket forward as it stops.
-    later(MOMENT - 100, () => play(bucket, [{ transform: "rotate(0deg)" }, { transform: "rotate(58deg)" }], { duration: T4, easing: SPRING }));
+    later(MOMENT - 100, () => play(bucket, [{ transform: "rotate(0deg)" }, { transform: `rotate(${TIP}deg)` }], { duration: T4, easing: SPRING }));
 
     const circles = [...ring.querySelectorAll("circle")], gap = lit.length ? Math.max(18, Math.min(60, 600 / lit.length)) : 0;
     const POUR = MOMENT + 180, poured = POUR + lit.length * gap, stoned = poured + stones.length * 130;
@@ -193,7 +202,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
     }));
 
     // Emptied, the bucket drops back and the cart rolls off the other way out.
-    later(stoned + 160, () => play(bucket, [{ transform: "rotate(58deg)" }, { transform: "rotate(0deg)" }], { duration: T4, easing: OUT }));
+    later(stoned + 160, () => play(bucket, [{ transform: `rotate(${TIP}deg)` }, { transform: "rotate(0deg)" }], { duration: T4, easing: OUT }));
     later(stoned + 340, () => {
       // It gathers speed across the screen: the roll runs twice as far as the window's edge, so the cart crosses
       // the edge at the curve's fastest and is clipped there. Nothing waits on it (the mole is already coming up).
@@ -208,11 +217,18 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       // Asleep he is drawn side on, already on his back (`doze`); awake he is the front view (`fall`). Each drawing's
       // middle sits elsewhere in the wrapper (which turns and scales about the foot of its box), so a place is worked
       // out for the middle of his body, and one drawing takes over from the other on the same spot.
+      // The dirt line of his hole is not there until he makes it (Tyler, 2026-11-14: it "should not appear so early").
+      const dirtLine = seat as HTMLElement;
+      dirtLine.style.opacity = "0";
       const place = (mid: readonly [number, number], cx: number, cy: number, turn: number, scale: number) => {
         const a = (turn * Math.PI) / 180, c = Math.cos(a), n = Math.sin(a);
         return `translate3d(${cx - scale * (mid[0] * c - mid[1] * n)}px, ${cy - scale * (mid[0] * n + mid[1] * c)}px, 0) rotate(${turn}deg) scale(${scale})`;
       };
-      const x = stop + W / 2 - 2, y = floor - 30 - DOZE * 45, ground = rider.parentElement!;
+      // He turns with the bucket as it tips, about its hinge, and ends half his girth over the middle of its rim, so the two never cross.
+      // On the flat he lies on top of the heap, however high it is; as the bucket tips he sinks through it to the rim.
+      const rows = lit.length ? 1 + FULL.filter((n) => lit.length > n).length : 0, lifted = Math.max(GIRTH, Math.min(4, rows) * 6.6 + 13);
+      const top0 = floor - H + HEAD * CELL, seatAt = (deg: number) => { const [px, py] = turned(W / 2, 0, deg), a = (deg * Math.PI) / 180, up = GIRTH + (lifted - GIRTH) * (1 - deg / TIP); return [stop + px + up * Math.sin(a), top0 + py - up * Math.cos(a), deg] as const; };
+      const [x, y] = seatAt(0), ground = rider.parentElement!;
       const asleep = (cx: number, cy: number, turn: number) => place(SLEEPER, cx, cy, turn, DOZE);
       // Squash and stretch: his body is pulled long (over 1) or pressed short along its own length, about its
       // middle and keeping its area, inside the wrapper that places him, so it never moves where he is.
@@ -224,20 +240,20 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       // The bucket tips under him, and while his bed pours out he slides down it, slowly, then faster, until he
       // hangs past the lip (Tyler, 2026-11-13: "he should be sliding slowly off the cart before fully falling").
       // From the tip on he is drawn over the cart, so its rim never crosses him.
-      const tip = MOMENT - 100, tipped = [x + 40, y - 16, SLID] as const;
-      let end = [x + 61, y + 14, SLID] as [number, number, number];
-      later(tip, () => { ground.style.zIndex = "1"; play(rider, [{ transform: asleep(x, y, 0) }, { transform: asleep(...tipped) }], { duration: T4, easing: SPRING }); });
+      const tip = MOMENT - 100, tipped = seatAt(TIP), TURNS = 12;
+      let end = [tipped[0] + 40, tipped[1] + 30, SLID] as [number, number, number];
+      later(tip, () => { ground.style.zIndex = "1"; play(rider, Array.from({ length: TURNS + 1 }, (_, i) => ({ transform: asleep(...seatAt((TIP * i) / TURNS)) })), { duration: T4, easing: SPRING }); });
       later(tip + T4, () => {
         // The lip of the tipped bucket: he ends with his middle well past it, head and shoulders in the open.
         const o = el.getBoundingClientRect(), at2 = at(lip.getBoundingClientRect(), o);
-        end = [at2.x + GIRTH * 0.85, at2.y - GIRTH * 0.53 - 2, SLID];
+        end = [at2.x + off[0], at2.y + off[1] - 2, SLID];
         const N = 14;
         // Most of the way in the last third: he creeps, then goes.
         play(rider, Array.from({ length: N + 1 }, (_, i) => { const t = (i / N) ** 3 * 0.8 + (i / N) * 0.2; return { transform: asleep(tipped[0] + (end[0] - tipped[0]) * t, tipped[1] + (end[1] - tipped[1]) * t, tipped[2] + (SLID - tipped[2]) * t) }; }), { duration: Math.max(T4, stoned + 160 - tip - T4), easing: "linear" });
       });
       // The bucket drops back, its lip flicking him up a little, and the cart backs out the way it came. He does
       // not: asleep on nothing, sagging; then awake with a start, up off nothing and bigger, limbs going; then down.
-      const gone = stoned + 340, SLEEP = MOMENT - 100, BRACE = ms("--t-3", 200), START = 330, HANG = 780, SAG = 4, JUMP = 32, NEAR = 0.72;
+      const gone = stoned + 340, SLEEP = MOMENT - 100, BRACE = ms("--t-3", 200), START = 330, HANG = 780, SAG = 4, JUMP = 8, NEAR = 0.72;
       // Asleep on nothing he bobs with his breath, clear of the dirt line, so it reads as air and not a perch.
       later(stoned + 160, () => { play(cart, HOPPED.map((y) => ({ transform: `translateY(${y}px)` })), { duration: T4, easing: OUT, composite: "add" }); });
       later(stoned + 160, () => play(rider, [
@@ -290,6 +306,8 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
         pull([SQUASH, STRETCH], hit * 1000, "ease-in");
         // The hit, as his feet meet the dirt: it flies, and the ring takes the knock, nearest dots first.
         later(hit * 1000, () => {
+          dirtLine.style.opacity = "";
+          play(dirtLine, [{ opacity: 0 }, { opacity: 1 }], { duration: T2, easing: OUT, fill: "none" });
           const hx = to.left - o.left + to.width / 2;
           DIRT.forEach(([vx, vy, r]) => {
             const d = document.createElement("span");
@@ -321,6 +339,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       anims.forEach((a) => a.cancel());
       cancelAnimationFrame(frame);
       if (rider?.parentElement) Object.assign(rider.parentElement.style, { clipPath: "", zIndex: "" });
+      if (rider && seat instanceof HTMLElement) seat.style.opacity = "";
     };
     // Plays once, for the session that just ended.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -350,27 +369,31 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
           {pose === "doze" && <svg className="cart-zzz" viewBox="0 0 28 22">{([[0, 16, 1.4], [9, 8, 1.7], [19, 0, 2]] as const).map(([x0, y0, p], n) => <g key={n}>{Z.map(([i, j]) => <circle key={`${i},${j}`} cx={x0 + (i + 0.5) * p} cy={y0 + (j + 0.5) * p} r={p * 0.4} />)}</g>)}</svg>}
         </span></span></span>
       )}
-      <svg className="cart" width={W} height={H} viewBox={`0 ${-HEAD} 20 ${15 + HEAD}`}>
+      <svg className="cart" width={W} height={H} viewBox={`0 ${-HEAD} ${COLS} ${ROWS + 7 + HEAD}`}>
+        {WHEELS.map((x) => (
+          <g key={x} className="cart-wheel">
+            <circle className="cart-W" cx={x} cy={WHEEL_Y} r={0.5} />
+            {Array.from({ length: 8 }, (_, i) => <circle key={i} className={i % 4 ? "cart-H" : "cart-W"} cx={x + (WHEEL_R - 0.5) * Math.cos((i * Math.PI) / 4)} cy={WHEEL_Y + (WHEEL_R - 0.5) * Math.sin((i * Math.PI) / 4)} r={i % 4 ? 0.4 : 0.5} />)}
+          </g>
+        ))}
+        {dots(FRAME, 0, FRAME_ROW)}
         {/* The rect fixes the group's box, so its foot is the same point whatever it carries. */}
-        <g className="cart-bucket" style={{ transformOrigin: `${HINGE[0] + 4}px ${HINGE[1] + 12}px` }}>
-          <rect x={-4} y={-12} width={28} height={24} fill="none" />
+        <g className="cart-bucket" style={{ transformOrigin: `${HINGE[0] + 4}px ${HINGE[1] + HEAD + 2}px` }}>
+          <rect x={-4} y={-HEAD - 2} width={COLS + 8} height={HEAD + ROWS + 6} fill="none" />
           {stones.slice(0, 3).map((color, i) => (
-            <g key={i} className="cart-rough-in" data-color={color} transform={`translate(${7.2 + i * 3.2 - (Math.min(3, stones.length) - 1) * 1.6} ${load > 5 ? -6.6 : load ? -4.4 : -3.2})`}>
+            // At the back of the heap, on the highest row that reaches there.
+            <g key={i} className="cart-rough-in" data-color={color} transform={`translate(${0.5 + i * 4.2} ${-6.4 - FULL.filter((n) => load >= n).length * 2.2 - (i === 1 ? 0.8 : 0)})`}>
               <Gem kind="rough" size={ROUGH} />
             </g>
           ))}
-          {HEAP.slice(HEAP.length - load).map(([x, y], i) => {
+          {HEAP.slice(0, load).map(([x, y], i) => {
             // The heap drains from its first dot, as the rich ore pours first.
             const isRich = i < Math.ceil((Math.min(rich, lit.length) * load) / Math.max(1, lit.length));
-            return <circle key={i} className={isRich ? "cart-ore-in rich" : "cart-ore-in"} cx={x} cy={y} r={isRich ? 1.7 : 1.3} />;
+            return <circle key={i} className={isRich ? "cart-ore-in rich" : "cart-ore-in"} cx={x} cy={y} r={isRich ? 1.4 : 1.1} />;
           })}
-          {dots(BUCKET, 0, BUCKET_TOP)}
+          {dots(BUCKET, 0, 0)}
           <circle className="cart-lip" cx={LIP[0]} cy={LIP[1]} r={0.1} />
         </g>
-        {dots([FRAME], 0, FRAME_ROW)}
-        {WHEELS.map((x) => (
-          <g key={x} className="cart-wheel">{dots(WHEEL, x, WHEEL_ROW)}</g>
-        ))}
       </svg>
       {stones.map((color, i) => (
         <span key={i} className="cart-rough" data-color={color} hidden><Gem kind="rough" size={ROUGH * CELL} /></span>

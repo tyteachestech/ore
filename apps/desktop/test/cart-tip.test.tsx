@@ -22,11 +22,11 @@ test("it hops up out of the bucket, then falls faster and faster, and a longer d
   expect(flight(300)).toBeLessThan(0.6);
 });
 
-test("the cart is round dots only, carries at most nine dots of ore and three stones, and is hidden from VoiceOver", () => {
+test("the cart is round dots only, carries at most thirty dots of ore and three stones, and is hidden from VoiceOver", () => {
   const html = (lit: number, stones: number) => renderToStaticMarkup(<CartTip host={null} lit={Array.from({ length: lit }, (_, i) => i)} stones={Array<string>(stones).fill("pink")} onStone={() => {}} onPoured={() => {}} onLeave={() => {}} onDone={() => {}} />);
-  const full = html(30, 8);
+  const full = html(40, 8);
   expect(full).toContain('aria-hidden="true"');
-  expect(full.match(/class="cart-ore-in"/g)?.length).toBe(9);
+  expect(full.match(/class="cart-ore-in"/g)?.length).toBe(30);
   expect(full.match(/class="cart-rough-in"/g)?.length).toBe(3);
   expect(full.match(/class="cart-rough"/g)?.length).toBe(8);
   expect(full).not.toMatch(/<path|<polygon|<line/);

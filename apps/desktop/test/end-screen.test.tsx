@@ -138,7 +138,7 @@ test("the fall off the cart has weight, and the bucket never turns through him: 
     expect(Math.max(...pulls)).toBeGreaterThan(1.15);
     // F-new-cart-through-mole: tipped, he lies along the bucket's rim at the bucket's own angle (58°) and slides
     // down it, so the bucket never turns through him; and his dots and the bucket's are backed, so neither shows through the other.
-    const slide = seen.filter((a) => a.cls === "cart-mole" && a.keys.length > 10 && a.keys[0]!.transform!.includes("scale(0.45)"))[0]!;
+    const slide = seen.filter((a) => a.cls === "cart-mole" && a.keys.length > 13 && a.keys[0]!.transform!.includes("scale(0.45)"))[0]!;
     for (const k of slide.keys) expect(k.transform).toContain("rotate(58deg)");
     expect(backed).toBe(2);
     // The cart's hop is added to its roll, never in place of it.
