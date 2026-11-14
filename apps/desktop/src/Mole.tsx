@@ -83,12 +83,12 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // A squat, then arc eyes, the moustache spread wide and a hop with both paws thrown up, and the dirt as he lands.
   happy: { to: { top: SQUAT }, end: 1700, still: HAPPY,
     at: [[110, { to: HAPPY, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [420, { kick: { kick: 7 } }]] },
-  // A jolt up with both paws, his helmet jumping off his brows, wide eyes, an O, and a "!" over him (the traced mole).
-// After his fall off the cart. `hole`: his hole with nobody up, only the dirt. `pop`: the dirt kicks as he goes in,
+  // After his fall off the cart. `hole`: his hole with nobody up, only the dirt. `pop`: the dirt kicks as he goes in,
   // a beat on the empty hole, then up with a start, helmet knocked askew, which he lets settle.
   hole: { from: { y: 21 }, to: { y: 21 }, loop: 60_000, still: { y: 21 } },
   pop: { from: { y: 21 }, to: { y: 21 }, kick: { kick: 12 }, end: 1900, still: { ...WIDE, bang: 1 },
     at: [[150, { kick: { kick: 6 } }], [260, { to: { ...WIDE, y: 0, bang: 1, tilt: 0.35, hat: 0.8 }, kick: { pawL: THROW, pawR: THROW } }], [400, { kick: { kick: 8 } }], [780, { to: { tilt: 0, hat: 0 } }], [900, { to: { bang: 0 } }]] },
+  // A jolt up with both paws, his helmet jumping off his brows, wide eyes, an O, and a "!" over him (the traced mole).
   surprised: { to: { ...WIDE, bang: 1 }, kick: { top: -JOLT, pawL: THROW, pawR: THROW, kick: 6 }, end: 1400, still: { ...WIDE, bang: 1 }, at: [[1000, { to: { bang: 0 } }]] },
   // Both paws waving, bobbing on each beat, then a squat, a last hop and it settles pleased.
   cheer: { to: { arc: 1, ex: 3 }, wave: 900, end: 2400, still: HAPPY,
@@ -338,8 +338,8 @@ export function Mound({ size = 96 }: { size?: number }) {
   const u = COLS / 33;
   return (
     <svg className="mole-mound" width={size} height={(size * ROWS) / COLS} viewBox={`0 0 ${COLS} ${ROWS}`} overflow="visible" aria-hidden="true">
-      {/* Dots have gaps, so each sits on a square of the page: nothing of him shows through his mound. */}
-      {MOUND.map(([c, r]) => <rect key={`${c},${r}`} className="back" x={c * u} y={ROWS - 0.3 - (r + 0.5) * u} width={u * 1.02} height={u * 1.02} />)}
+      {/* Dots have gaps, so each sits on a wider round of the page: nothing of him shows through his mound. */}
+      {MOUND.map(([c, r]) => <circle key={`b${c},${r}`} className="back" cx={(c + 0.5) * u} cy={ROWS - 0.3 - r * u} r={0.72 * u} />)}
       {MOUND.map(([c, r, tone]) => <circle key={`${c},${r}`} className={tone} cx={(c + 0.5) * u} cy={ROWS - 0.3 - r * u} r={0.42 * u} />)}
     </svg>
   );

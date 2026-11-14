@@ -28,6 +28,9 @@ test("the cart is round dots only, carries at most thirty dots of ore and three 
   expect(full).toContain('aria-hidden="true"');
   expect(full.match(/class="cart-ore-in"/g)?.length).toBe(30);
   expect(full.match(/class="cart-rough-in"/g)?.length).toBe(3);
+  // The bucket turns about its foot whatever it carries: the rect that fixes its box reaches over the stones on a full heap.
+  const top = Number(/<rect x="-4" y="(-?[\d.]+)"/.exec(full)![1]);
+  for (const m of full.matchAll(/class="cart-rough-in"[^>]*transform="translate\(([-\d.]+) ([-\d.]+)\)"/g)) expect(Number(m[2])).toBeGreaterThanOrEqual(top);
   expect(full.match(/class="cart-rough"/g)?.length).toBe(8);
   expect(full).not.toMatch(/<path|<polygon|<line/);
   expect(html(2, 0).match(/class="cart-ore-in"/g)?.length).toBe(2);

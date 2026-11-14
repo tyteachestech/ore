@@ -119,14 +119,16 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
 test("the fall off the cart has weight, and the bucket never turns through him: he lies along its tipped rim, is pressed short then pulled long, drops feet first, throws dirt, knocks the ring, and the cart hops as he leaves it", async () => {
   jest.useFakeTimers();
   const proto = w.Element.prototype as unknown as Record<string, unknown>, plain = proto.animate;
-  const seen: { cls: string; keys: Record<string, string>[]; o: { composite?: string } }[] = [];
-  proto.animate = function (this: Element, keys: Record<string, string>[], o: { composite?: string }) { seen.push({ cls: this.getAttribute("class") ?? this.tagName, keys, o }); return { cancel() {} }; };
+  const seen: { cls: string; keys: Record<string, string>[]; o: { composite?: string; duration?: number }; at: number }[] = [];
+  let now = 0;
+  proto.animate = function (this: Element, keys: Record<string, string>[], o: { composite?: string; duration?: number }) { seen.push({ cls: this.getAttribute("class") ?? this.tagName, keys, o, at: now }); return { cancel() {} }; };
   try {
     const s = await mount(end(["ai"]));
     const backed = s.q("#cart-solid") + s.q("#cart-solid-fine");
     let dived = false, dirt = 0;
     for (let t = 0; t < 6000 && s.q(".cart-tip"); t += 20) {
       await act(async () => void jest.advanceTimersByTime(20));
+      now = t + 20;
       if (s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood") === "dive") dived = true;
       dirt = Math.max(dirt, s.q(".cart-dirt"));
     }
@@ -141,10 +143,13 @@ test("the fall off the cart has weight, and the bucket never turns through him: 
     const slide = seen.filter((a) => a.cls === "cart-mole" && a.keys.length > 13 && a.keys[0]!.transform!.includes("scale(0.45)"))[0]!;
     for (const k of slide.keys) expect(k.transform).toContain("rotate(58deg)");
     expect(backed).toBe(2);
+    // His slide is over when the next move takes him, however short the pour: he never jumps the rest of the way.
+    const next = seen.filter((a) => a.cls === "cart-mole" && a.at > slide.at)[0]!;
+    expect(slide.at + slide.o.duration!).toBeLessThanOrEqual(next.at + 20);
     // The cart's hop is added to its roll, never in place of it.
     expect(seen.some((a) => a.cls === "cart" && a.o.composite === "add" && a.keys.some((k) => k.transform === "translateY(-4px)"))).toBe(true);
     // The load slides down the tipped bucket to its low lip before it falls, and the wheels lock before the cart has stopped.
-    expect(seen.some((a) => a.cls.startsWith("cart-ore-in") && a.keys.length === 2 && a.keys[0]!.transform === "translate(0, 0)")).toBe(true);
+    expect(seen.some((a) => a.cls.startsWith("cart-ore-in") && a.keys.length === 2 && a.keys[0]!.transform === "translate(0px, 0px)")).toBe(true);
     expect(seen.some((a) => a.cls === "cart-wheel" && a.keys.length === 3 && a.keys[1]!.transform === a.keys[2]!.transform)).toBe(true);
     await s.done();
   } finally { proto.animate = plain; jest.useRealTimers(); }
@@ -397,7 +402,7 @@ test("a rare line leads the mole's lines, in words alone: no icon in his speech 
   // He comes up through a mound of dirt, drawn in front of him and solid, so nothing of him shows between its dots.
   const mound = s.body.querySelector(".end-emblem .review-mole .mole + .mole-mound")!;
   expect(mound.querySelectorAll("circle").length).toBeGreaterThan(100);
-  expect(mound.querySelectorAll("rect.back").length).toBe(mound.querySelectorAll("circle").length);
+  expect(mound.querySelectorAll("circle.back").length).toBe(mound.querySelectorAll("circle:not(.back)").length);
   jest.useRealTimers();
   await s.done();
 });

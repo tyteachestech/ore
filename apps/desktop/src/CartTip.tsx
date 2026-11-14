@@ -64,8 +64,6 @@ const Z = [[0, 0], [1, 0], [2, 0], [3, 0], [2, 1], [1, 2], [0, 3], [1, 3], [2, 3
 const dots = (rows: readonly string[], x0: number, y0: number) =>
   rows.flatMap((row, y) => [...row].map((t, x) => (t === "." ? null : <circle key={`${x},${y}`} className={`cart-${t}`} cx={x0 + x + 0.5} cy={y0 + y + 0.5} r={RADIUS[t]} />)));
 
-/** How long a piece of the load takes to slide down the tipped bucket to its low lip, before it falls from there. */
-const SLIDE = 150;
 const GRAVITY = 2600, HOP = -90;
 /** A throw from rest under gravity: how long it flies to land `dy` px lower, after a small hop up out of the bucket. */
 export const flight = (dy: number) => (-HOP + Math.sqrt(HOP * HOP + 2 * GRAVITY * Math.max(0, dy))) / GRAVITY;
@@ -143,13 +141,13 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
       if (!frame) frame = requestAnimationFrame(tick);
     };
 
-    // In from the left, braking hard; the wheels turn as far as it rolls.
+    // The wheels turn as far as it rolls.
     const roll = (from: number, to: number, ms: number, easing: string) => {
       play(cart, [{ transform: `translateX(${from}px)` }, { transform: `translateX(${to}px)` }], { duration: ms, easing });
       for (const w of wheels) play(w, [{ transform: `rotate(${from / (WHEEL_R * CELL)}rad)` }, { transform: `rotate(${to / (WHEEL_R * CELL)}rad)` }], { duration: ms, easing });
     };
     play(rail, [{ opacity: 0 }, { opacity: 1 }], { duration: T2, easing: OUT });
-    roll(-(stop + W + 20), 0, MOMENT, OUT);
+    play(cart, [{ transform: `translateX(${-(stop + W + 20)}px)` }, { transform: "translateX(0px)" }], { duration: MOMENT, easing: OUT });
     // The brake: the wheels lock before it has stopped and it skids the last of the way.
     const far = -(stop + W + 20) / (WHEEL_R * CELL), locked = Math.round((far * 0.12) / (2 * Math.PI)) * 2 * Math.PI;
     for (const w of wheels) play(w, [{ transform: `rotate(${far}rad)`, easing: OUT }, { transform: `rotate(${locked}rad)`, offset: 0.4 }, { transform: `rotate(${locked}rad)` }], { duration: MOMENT });
@@ -160,19 +158,16 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
     const POUR = MOMENT + 180, poured = POUR + lit.length * gap, stoned = poured + stones.length * 130;
     let left = lit.length;
     // What is in the bucket slides down it to the low lip and falls from there, so the heap drains toward the lip.
-    const slide = (node: SVGElement | undefined, x: number, y: number, ms: number) => {
+    // `at`: where the piece is drawn, and `own`: the point its own transform starts from (a circle's centre).
+    const SLIDE = T2;
+    const slide = (node: SVGElement | null | undefined, at: readonly [number, number], own: readonly [number, number] = [0, 0]) => {
       if (!node) return;
-      play(node, [{ transform: `translate(${x}px, ${y}px)` }, { transform: `translate(${LIP[0] - 1}px, ${LIP[1] - 1.4}px)` }], { duration: SLIDE, easing: "ease-in" });
-      later(ms, () => node.setAttribute("visibility", "hidden"));
+      play(node, [{ transform: `translate(${at[0] - own[0]}px, ${at[1] - own[1]}px)` }, { transform: `translate(${LIP[0] - 1 - own[0]}px, ${LIP[1] - 1.4 - own[1]}px)` }], { duration: SLIDE, easing: "ease-in" });
+      later(SLIDE, () => node.setAttribute("visibility", "hidden"));
     };
-    const drained = new Set<number>();
     lit.forEach((_, k) => later(Math.max(0, POUR + k * gap - SLIDE), () => {
-      const h = Math.floor((k * heap.length) / lit.length), dot = heap[h];
-      if (!dot || drained.has(h)) return;
-      drained.add(h);
-      // A circle is placed by its centre, so its slide is measured from there.
-      play(dot, [{ transform: "translate(0, 0)" }, { transform: `translate(${LIP[0] - 1 - Number(dot.getAttribute("cx"))}px, ${LIP[1] - 1.4 - Number(dot.getAttribute("cy"))}px)` }], { duration: SLIDE, easing: "ease-in" });
-      later(SLIDE, () => dot.setAttribute("visibility", "hidden"));
+      const dot = heap[Math.floor((k * heap.length) / lit.length)], at = [Number(dot?.getAttribute("cx")), Number(dot?.getAttribute("cy"))] as const;
+      slide(dot, at, at);
     }));
     lit.forEach((n, k) => later(POUR + k * gap, () => {
       const c = circles[n];
@@ -192,7 +187,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
     if (!lit.length) later(POUR, () => calls.current.onPoured());
     stones.forEach((_, i) => later(Math.max(0, poured + i * 130 - SLIDE), () => {
       const [x = 0, y = 0] = (roughIn[i]?.getAttribute("transform") ?? "").match(/-?[\d.]+/g)?.map(Number) ?? [];
-      slide(roughIn[i], x, y, SLIDE);
+      slide(roughIn[i], [x, y]);
     }));
     stones.forEach((_, i) => later(poured + i * 130, () => {
       const slot = host.querySelectorAll(".review-cut > span")[i]?.querySelector(".gem");
@@ -249,7 +244,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
         end = [at2.x + off[0], at2.y + off[1] - 2, SLID];
         const N = 14;
         // Most of the way in the last third: he creeps, then goes.
-        play(rider, Array.from({ length: N + 1 }, (_, i) => { const t = (i / N) ** 3 * 0.8 + (i / N) * 0.2; return { transform: asleep(tipped[0] + (end[0] - tipped[0]) * t, tipped[1] + (end[1] - tipped[1]) * t, tipped[2] + (SLID - tipped[2]) * t) }; }), { duration: Math.max(T4, stoned + 160 - tip - T4), easing: "linear" });
+        play(rider, Array.from({ length: N + 1 }, (_, i) => { const t = (i / N) ** 3 * 0.8 + (i / N) * 0.2; return { transform: asleep(tipped[0] + (end[0] - tipped[0]) * t, tipped[1] + (end[1] - tipped[1]) * t, tipped[2] + (SLID - tipped[2]) * t) }; }), { duration: stoned + 160 - tip - T4, easing: "linear" });
       });
       // The bucket drops back, its lip flicking him up a little, and the cart backs out the way it came. He does
       // not: asleep on nothing, sagging; then awake with a start, up off nothing and bigger, limbs going; then down.
@@ -297,7 +292,7 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
         const [cx, cy] = [top[0], top[1] + THRASH[THRASH.length - 1]![2]], ty = to.bottom - o.top - GROUND;
         // From rest, under his own slower gravity so the drop can be read: his feet meet the dirt at `hit`, and
         // at T his helmet is under it.
-        const fallen = (px: number) => Math.sqrt((2 * Math.max(1, px)) / DIVE), hit = fallen(ty - cy - FEET * NEAR), T = fallen(ty - cy + CROWN), N = 16;
+        const fallen = (px: number) => Math.sqrt((2 * Math.max(1, px)) / DIVE), hit = fallen(ty - cy - FEET), T = fallen(ty - cy + CROWN), N = 16;
         play(rider, Array.from({ length: N + 1 }, (_, i) => {
           const t = (i / N) * T;
           return { transform: place(FALLER, cx, cy + 0.5 * DIVE * t * t, 0, NEAR + (1 - NEAR) * Math.min(1, t / hit)) };
@@ -382,8 +377,8 @@ export function CartTip({ host, lit, rich = 0, stones, mole = false, onFell, onS
         ))}
         {dots(FRAME, 0, FRAME_ROW)}
         {/* The rect fixes the group's box, so its foot is the same point whatever it carries. */}
-        <g className="cart-bucket" style={{ transformOrigin: `${HINGE[0] + 4}px ${HINGE[1] + HEAD + 2}px` }}>
-          <rect x={-4} y={-HEAD - 2} width={COLS + 8} height={HEAD + ROWS + 6} fill="none" />
+        <g className="cart-bucket" style={{ transformOrigin: `${HINGE[0] + 4}px ${HINGE[1] + HEAD + 8}px` }}>
+          <rect x={-4} y={-HEAD - 8} width={COLS + 8} height={HEAD + ROWS + 12} fill="none" />
           {stones.slice(0, 3).map((color, i) => (
             // At the back of the heap, on the highest row that reaches there.
             <g key={i} className="cart-rough-in" data-color={color} transform={`translate(${0.5 + i * 4.2} ${-6.4 - FULL.filter((n) => load >= n).length * 2.2 - (i === 1 ? 0.8 : 0)})`}>

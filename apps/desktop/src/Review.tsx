@@ -1618,7 +1618,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   // He comes up out of the ground first, with or without a cart before it, and after falling off the cart into his hole too (D255: `hole` while he is on it, `pop` once he has gone down) (under Reduce Motion he is just there, at rest: pleased, or plain after a session of misses).
   const [settled, setSettled] = useState(still);
   const [fell, setFell] = useState(false);
-  // The mole reacts to the day 560ms after it comes up (its rise), whatever the cart does after that; sooner after a fall, which needs no rise.
+  // The mole reacts to the day 560ms after it comes up (its rise), whatever the cart does after that; after a fall, once he has popped back up.
   const up = stage === "leaving" || stage === "done";
   // After a fall the wait starts when he has gone down his hole: an empty beat, then up he pops, and only then does he speak.
   const risen = nap ? fell : up;
