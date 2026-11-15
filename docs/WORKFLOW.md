@@ -5,8 +5,8 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 ## Merge as you go
 - Tyler has standing approval for a thread to merge its own PR once CI is green (typecheck, tests, build, e2e), without waiting for his review. Flag anything risky first, such as a change to the library's file format.
 - Before merging, run `/code-review` on the PR's diff and fix what it confirms. Self-merge has no other reviewer.
-- Before merging, also check master's last *completed* test run is green (Actions › Test, filter by master). A run cancelled by the next push shows no red, so a broken master can hide for several merges; that is how #174's break went unseen until #186.
-- Stacked PRs merge in order, each rebased onto master first.
+- Then merge with `bun run ship --reviewed` from the PR's worktree (`packages/core/scripts/ship.ts`). It brings master in, numbers new decisions and findings and fails on any placeholder left, pushes, refuses while master's last *completed* test run is red (a run cancelled by the next push shows no red, which is how #174's break went unseen until #186), waits for the PR's checks, starts again if master moved meanwhile, squash-merges and pulls `~/Developer/ore`. Merge by hand only when it can't run, and then do those same steps.
+- Stacked PRs merge in order, each with master brought in first.
 
 ## After a merge: pull, and the app reinstalls
 - On the Mac (Remote Control): `git -C ~/Developer/ore pull --ff-only`. With `core.hooksPath .githooks` set, the `post-merge` hook reinstalls /Applications/Ore.app in the background when the pulled commits touch `apps/desktop/`, `packages/` or the root package files, since the app carries an `ore` compiled from them (D30) (log: `~/Library/Caches/ore/app-install.log`). Check the log says `installed`. If Ore is open but not the frontmost app, it is then quit as ⌘Q does and reopened in the background on the new build (`relaunched`); if he is using it (frontmost), it is left alone and runs the old build until he quits it.
@@ -19,8 +19,8 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 
 ## Parallel threads
 - `~/Developer/ore` stays on `master`: the installed app carries a CLI compiled from it at install (D30), run against his real library. Build branches in a worktree (`git worktree add ../ore-<topic>`), never by checking one out there.
-- Rebase onto `origin/master` before pushing and again before merging; another thread may have landed.
-- New decisions and findings carry placeholders, `D-new-<slug>` in `docs/DECISIONS.md` and `F-new-<slug>` in `docs/reviews/findings.md`, mentioned by those names everywhere in the branch. After the last rebase, run `bun run ids` and commit: each placeholder becomes the next free number. Open PRs never claim the same number, and `.gitattributes` (`merge=union`) keeps both sides' new rows in a rebase; the decisions and findings tests catch a duplicate. A run on master fails on any placeholder left there (`bun packages/core/scripts/ids.ts --check`), since one breaks `bun run ids` for every other branch: whoever sees it red names it first.
+- Bring `origin/master` in before pushing; `bun run ship` does it again before merging, since another thread may have landed.
+- New decisions and findings carry placeholders, `D-new-<slug>` in `docs/DECISIONS.md` and `F-new-<slug>` in `docs/reviews/findings.md`, mentioned by those names everywhere in the branch. `bun run ship` runs `bun run ids` after master is in and commits: each placeholder becomes the next free number. Open PRs never claim the same number, and `.gitattributes` (`merge=union`) keeps both sides' new rows in a rebase; the decisions and findings tests catch a duplicate. A run on master fails on any placeholder left there (`bun packages/core/scripts/ids.ts --check`), since one breaks `bun run ids` for every other branch: whoever sees it red names it first.
 - Git housekeeping is the thread's job, never Tyler's: do resets, rebases, branch cleanup and reinstalls yourself on the Mac, and never ask him to run a git command. Never rewrite master's history; if it ever must be, the thread that does it also resets `~/Developer/ore`, rebases open PRs and deletes the old branches.
 - Name files in NFC Unicode (macOS shows NFD names as untracked).
 

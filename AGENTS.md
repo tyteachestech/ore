@@ -34,7 +34,7 @@ Ore's core promise is that whatever someone learns from imports as fully and rob
 - TypeScript strict. Bun runtime, one version everywhere: CI's `bun-version` in `.github/workflows/test.yml` is the Bun on Tyler's Mac (1.4.4, Tyler 2026-11-07, after a download that only broke on his older Bun); bump both together. React for UI. Tauri 2 for the shell. Tiny Swift CLI helpers only where macOS APIs are unavoidable, compiled with `swiftc`.
 - Names (D43, D181): what review brings back is an **exercise** (kinds Fact and Explain) in everything the app shows and in new docs, never a card or flashcard; a highlight marked with the gem (D229) is a Key point. Files, the CLI, key ids and code keep `card`. `apps/desktop/test/names.test.ts` checks the app's strings.
 - Commit task-related work with clear messages; keep unrelated edits out.
-- Shipping (`docs/WORKFLOW.md`): merge your own PR once CI is green and `/code-review` is clean, then pull `~/Developer/ore` on the Mac, which reinstalls the app. `~/Developer/ore` stays on `master`; branches live in worktrees. Git housekeeping is yours, never Tyler's.
+- Shipping (`docs/WORKFLOW.md`): once `/code-review` is clean, `bun run ship --reviewed` merges your PR when CI is green and pulls `~/Developer/ore` on the Mac, which reinstalls the app. `~/Developer/ore` stays on `master`; branches live in worktrees. Git housekeeping is yours, never Tyler's.
 
 ## UI quality bar (apps/desktop)
 - Match the best app that already does it (Notion, Raindrop, Linear, Raycast, ChatGPT). Before building a control, name the app you are copying and how it behaves there.
