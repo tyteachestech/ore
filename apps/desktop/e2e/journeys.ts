@@ -6072,7 +6072,7 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   if ((await moment.innerText()).includes("days")) throw new Error("a miss showed days added");
   const mole = moment.locator(".mole");
   if ((await mole.getAttribute("width")) !== "48") throw new Error("a rating's mole is not 48px");
-  if ((await mole.getAttribute("data-mood")) !== "set") throw new Error("a missed cut gem did not get the steady pose");
+  if ((await mole.getAttribute("data-mood")) !== "nod") throw new Error("a missed cut gem did not get the gentle nod (D278)");
   // ⌘Z: the rating and its moment are both taken back.
   await page.keyboard.press("Meta+z");
   await moment.waitFor({ state: "detached" });
