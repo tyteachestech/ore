@@ -19,7 +19,7 @@ import {
   enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
-  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
+  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
   type AnchoredAnnotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
@@ -88,6 +88,9 @@ export const itemCommands: Record<string, Command> = {
       // Transcribing audio takes minutes: it reports how far it has got (the app shows it on the add bar).
       const onProgress = (done: number, label?: string) => progress(Math.round(done * 100), 100, label ?? "Transcribing the audio", label ?? `Transcribing… ${Math.round(done * 100)}%`);
       if (f.html && !f.stdin) throw new Error("--html reads a paste on stdin: give --stdin too");
+      // Checked before anything is added, so a typo leaves no source behind.
+      checkSkills(lib, strs(f.skill));
+      if (f.for) questionFor(lib, str(f.for)!);
       const item: Awaited<ReturnType<typeof addSource>> = f.stdin
         ? await addText(lib, await readStdin(), { skills: strs(f.skill), html: !!f.html })
         : f.tab
@@ -110,10 +113,12 @@ export const itemCommands: Record<string, Command> = {
     async run(_, f) {
       const lib = openLibrary();
       if (f["add-file"] !== undefined) {
+        checkSkills(lib, strs(f.skill));
         const l = queueFile(lib, need(str(f["add-file"]), "<path>"), strs(f.skill), str(f.name));
         return { data: l, text: `Coming in: ${l.url}` };
       }
       if (f.add !== undefined) {
+        checkSkills(lib, strs(f.skill));
         const l = queueLink(lib, str(f.add) ?? "", strs(f.skill));
         return { data: l, text: `Coming in: ${l.url}` };
       }
@@ -131,7 +136,8 @@ export const itemCommands: Record<string, Command> = {
         // --owe (the iPhone): an episode is in at once, and the app fills it after, showing how far it is.
         const filled = f.owe ? [] : (await fillOwed(lib)).map((i) => ({ id: i.meta.id, title: i.meta.title }));
         for (const i of filled) startEnrich(lib, i.id);
-        return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n") };
+        // Every link failing is a failure (the links stay for a retry); some failing is reported, not fatal.
+        return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n"), exitCode: r.failed.length && !r.added.length && !filled.length ? 1 : 0 };
       }
       const all = queuedLinks(lib);
       return { data: all, text: all.length ? table(all.map((l) => [l.id, l.url, l.error ?? "waiting"])) : "Nothing waiting" };
@@ -484,6 +490,9 @@ export const itemCommands: Record<string, Command> = {
       const lib = openLibrary();
       const id = findItem(lib, need(ref, "<item>")).meta.id;
       if (f.title === undefined && f.author === undefined && f.skills === undefined) throw new Error("nothing to change (--title, --author or --skills)");
+      // Every field is checked before the first is written, so a refused edit changes nothing.
+      if (f.skills !== undefined) checkSkills(lib, strs(f.skills));
+      if (f.title !== undefined && !str(f.title)?.trim()) throw new Error("a source needs a title");
       let meta = f.title !== undefined ? await renameItem(lib, id, str(f.title) ?? "") : findItem(lib, id).meta;
       if (f.author !== undefined) meta = await setItemAuthor(lib, id, str(f.author) ?? "");
       if (f.skills !== undefined) meta = await setItemSkills(lib, id, strs(f.skills));

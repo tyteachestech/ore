@@ -35,5 +35,5 @@ ai: {vendor, model, prompt_version}   # leave as is
 - **Rubric asks only what the question asks.** Every bullet must be something a good answer to that exact question would contain. If a bullet needs content the question doesn't request, change the question or drop the bullet.
 - **2–4 rubric bullets** for prompts. Merge or cut to fit.
 - Keep Tyler's wording when he gives it; tighten, don't embellish.
-- Edit with the Edit tool so the frontmatter block stays byte-identical except the fields you meant to touch. Keep `---` delimiters intact.
-- After editing, `ore card show <id> --json` must succeed. If it fails, restore the original and report the error.
+- Write the fix with `ore card set <id> [--question …] [--answer …] [--point …]…`, never by editing the file: `ore` keeps the frontmatter, the lock and the review history right.
+- After it, `ore card show <id> --json` shows the fix. If `card set` exits non-zero, report the error and stop.

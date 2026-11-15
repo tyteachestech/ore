@@ -1,0 +1,11 @@
+Your name is `cli`. First read `codex-out/preamble.md` and follow it.
+
+Your ports: Mac app page http://localhost:1707/ with `window.__ORE_BRIDGE = 1708` (library `/Users/tylerpoelking/Developer/ore-wt/sweep3/codex-out/libs/cli`); iPhone app http://localhost:1709/ (its seed is a copy at `/Users/tylerpoelking/Developer/ore-wt/sweep3/codex-out/libs/cli-phone`; the page's writes stay in IndexedDB). WebKit server: `ws://[::1]:1719/`. The `ore` CLI: `ORE_LIBRARY=/Users/tylerpoelking/Developer/ore-wt/sweep3/codex-out/libs/cli bun packages/cli/src/ore.ts`.
+
+## Your focus: the `ore` CLI and the `/ore` skill, as an agent uses them
+Ore is AI-first: Claude Code and Codex work on the library through `ore` (every command takes `--json`), guided by `skills/ore/SKILL.md` and the `AGENTS.md` that `ore init` writes (`packages/core/src/templates/library-agents.md`). Read those, `ore --help` and each command's `--help`, and `docs/SPEC.md`'s CLI part.
+1. **Every command.** Run each command and subcommand with good input, with `--json`, and with bad input (a missing id, a prefix that matches two, an unknown skill, a wrong flag, an empty string, a rating of 0 or 9, a date in the wrong format). Is the JSON valid and the same shape each time, is the exit code non-zero on failure, does the error say what to do, and does nothing get half-written?
+2. **Docs match.** Every command, flag and example in `SKILL.md`, `library-agents.md`, `ore --help` and SPEC: does it exist and do what it says? List each one that is wrong or missing.
+3. **An agent's day.** Play an agent following `SKILL.md`: quiz him on a skill, record ratings, add a source, write exercises from his highlights, fix a bad exercise. Where does the skill lead it wrong, or let it break a rule (AI sets the rating, D21; writing the library other than through `ore`)?
+4. **Side by side.** Run CLI writes while the Mac app has the same thing open (a review, a note, a rename), and two CLI writes at once on the same file (`&`). Is anything lost, duplicated or left broken? Only report what earlier sweeps didn't (read `findings.md` rows from 2026-11-14 on outside edits first).
+5. **Round-trips.** `ore export`/`import` or whatever moves a library (if they exist), `ore doctor` on a library you broke in ten ways (each one alone): does it find each, and does its fix do what it says without losing anything?

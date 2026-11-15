@@ -425,11 +425,16 @@ export async function undoSuggestedSkill(lib: Library, ref: string, input: Sugge
 
 // File a source under exactly `ids`. Its cards follow (a skill taken off the source comes off its
 // cards, a new one goes on) and its topics gain the new ones; topics are shared, so none are dropped.
+/** Throws on the first id that isn't a skill (archived ones count), before anything is written. */
+export function checkSkills(lib: Library, ids: string[]): void {
+  const known = new Set(loadSkills(lib).skills.map((s) => s.id));
+  const unknown = ids.find((id) => !known.has(id));
+  if (unknown) throw new Error(`unknown skill "${unknown}"`);
+}
+
 export async function setItemSkills(lib: Library, ref: string, ids: string[]): Promise<ItemMeta> {
   return withLock(paths.lock(lib), () => {
-    const known = new Set(loadSkills(lib).skills.map((s) => s.id));
-    const unknown = ids.find((id) => !known.has(id));
-    if (unknown) throw new Error(`unknown skill "${unknown}"`);
+    checkSkills(lib, ids);
     const item = findItem(lib, ref);
     const next = [...new Set(ids)];
     const added = next.filter((id) => !item.meta.skills.includes(id));

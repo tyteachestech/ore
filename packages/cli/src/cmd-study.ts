@@ -76,8 +76,10 @@ export const studyCommands: Record<string, Command> = {
       if (sub === "edit") {
         const c = findCard(lib, id);
         const editor = process.env.VISUAL || process.env.EDITOR || "vi";
-        const proc = Bun.spawn(["sh", "-c", `${editor} "$1"`, "sh", c.path], { stdio: ["inherit", "inherit", "inherit"] });
-        await proc.exited;
+        // The editor talks to the terminal on stderr's side, so stdout keeps only Ore's answer (JSON with --json).
+        const proc = Bun.spawn(["sh", "-c", `${editor} "$1" >&2`, "sh", c.path], { stdio: ["inherit", "inherit", "inherit"] });
+        const code = await proc.exited;
+        if (code !== 0) throw new Error(`the editor (${editor}) exited with ${code}, so nothing was saved`);
         const after = readCardFile(c.path);
         return { data: cardJson(lib, after), text: `Saved ${after.meta.id}` };
       }
@@ -149,6 +151,8 @@ export const studyCommands: Record<string, Command> = {
       if (rating < 1 || rating > 4) throw new Error("--rating must be 1-4");
       if (confidence < 1 || confidence > 3) throw new Error("--confidence must be 1-3");
       if (aiRating !== undefined && (aiRating < 1 || aiRating > 4)) throw new Error("--ai-rating must be 1-4");
+      // A proposed rating is AI output, so it records who proposed it (D21): no stamp, no proposal.
+      if (aiRating !== undefined && !str(f["ai-by"])?.trim()) throw new Error('--ai-rating needs --ai-by "vendor model prompt@n", as `ore grade` prints them; leave both out when no AI proposed it');
       // The stamp `ore grade` printed with its rating: vendor, model and prompt version, in that order.
       // The model is whatever sits between the two (a name with a space, or none): a rating is never lost to its stamp.
       const by = str(f["ai-by"])?.trim().split(/\s+/);

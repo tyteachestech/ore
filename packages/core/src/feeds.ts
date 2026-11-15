@@ -242,7 +242,7 @@ export async function followFeed(lib: Library, url: string, opts: { skills?: str
 
 function feedOf(feeds: Feed[], ref: string): Feed {
   const f = feeds.find((x) => x.url === ref) ?? feeds.find((x) => x.title.toLowerCase() === ref.toLowerCase());
-  if (!f) throw new Error(`not following "${ref}" (ore feed --feeds lists them)`);
+  if (!f) throw new Error(`not following "${ref}" (\`ore feed\` lists them)`);
   return f;
 }
 
