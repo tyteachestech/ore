@@ -120,7 +120,7 @@ const steps: [string, (page: Page) => Promise<Result>][] = [
   }],
   ["filter sources", async (page) => measure(page, async () => {
     await page.keyboard.press("Meta+f");
-    await page.getByLabel("Filter sources").pressSequentially("Complete Book", { delay: 30 });
+    await page.getByLabel("Search sources").pressSequentially("Complete Book", { delay: 30 });
     await page.locator(".row").filter({ hasText: BOOK }).first().waitFor();
   })],
   ["reader: open 1.5 MB book", async (page) => measure(page, async () => {
@@ -133,7 +133,7 @@ const steps: [string, (page: Page) => Promise<Result>][] = [
   ["reader: open short source", async (page) => measure(page, async () => {
     await page.getByRole("button", { name: /^All sources/ }).click();
     await page.keyboard.press("Meta+f");
-    await page.getByLabel("Filter sources").fill("");
+    await page.getByLabel("Search sources").fill("");
     await page.locator(".row").nth(3).click();
     await page.locator(".doc-head").waitFor();
   })],
