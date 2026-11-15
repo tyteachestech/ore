@@ -393,7 +393,7 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   const pose = (o: Parameters<typeof endSays>[0]) => endMood(endSays(o)[0], o);
   expect(pose({ ...base, ups: [{ name: "AI", level: 3 }], session: session({}) })).toBe("cheer");
   expect(pose({ ...base, session: session({ rescued: 2 }) })).toBe("proud");
-  expect(pose({ ...base, session: session({ kept: 0 }) })).toBe("set");
+  expect(pose({ ...base, session: session({ kept: 0 }) })).toBe("nod");
   expect(pose({ ...base, session: session({ cut: ["ai"] }) })).toBe("happy");
   expect(pose({ ...base, closed: true, session: session({}) })).toBe("happy");
   expect(pose({ ...base, session: session({}) })).toBe("nod");

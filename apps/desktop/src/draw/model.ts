@@ -7,7 +7,7 @@ export type Pt = [number, number];
 export type Box = { x: number; y: number; w: number; h: number };
 /** `fixedPoint` pins the end to a spot on the shape (0–1 of its box), as Excalidraw's elbow arrows do;
  *  a tree's links use it to leave from the side the children grow on. */
-export type Binding = { elementId: string; focus: number; gap: number; fixedPoint?: [number, number] | null };
+type Binding = { elementId: string; focus: number; gap: number; fixedPoint?: [number, number] | null };
 export type Shape = "rectangle" | "ellipse" | "diamond";
 export type Linear = "arrow" | "line";
 export type Tool = "select" | "hand" | Shape | Linear | "freedraw" | "text" | "eraser";
@@ -470,7 +470,7 @@ export function route(a: El, map: Map<string, El>): El {
 }
 
 /** Where he dragged an elbow arrow's middle segment to (its x when the arrow runs across, y when down). */
-export const elbowMid = (a: El): number | undefined => {
+const elbowMid = (a: El): number | undefined => {
   const m = (a.customData?.oreElbow as { mid?: unknown } | undefined)?.mid;
   return typeof m === "number" ? m : undefined;
 };

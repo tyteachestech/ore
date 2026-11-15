@@ -35,7 +35,7 @@ function next(doc: PMNode): ((tr: Transaction) => void) | null {
 }
 
 /** Every image and diagram that shares a line with something moves to a line of its own; null when all do. */
-export function imagesAlone(state: EditorState): Transaction | null {
+function imagesAlone(state: EditorState): Transaction | null {
   const tr = state.tr;
   for (let fix = next(tr.doc), n = 0; fix && n < 1000; fix = next(tr.doc), n++) fix(tr);
   if (!tr.docChanged) return null;

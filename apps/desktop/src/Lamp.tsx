@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { still } from "./SideCursor";
 
 /* The lamp (D263): how a thing that is running right now says so. Its dots turn amber and breathe in place with a
    real signal; off, it is grey and still. The radio's button (Radio.tsx) follows the sound's level; a thing with no
@@ -6,7 +7,6 @@ import { useEffect, useRef } from "react";
    spoken, words arriving) and its dots follow `glow`, which fades between pulses. */
 
 export const AMBER = "255,178,36";
-const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const last = new Map<string, number>();
 /** Something just happened in the running thing `id`. */

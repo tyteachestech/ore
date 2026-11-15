@@ -18,8 +18,8 @@ export class RowSensor extends PointerSensor {
   ];
 }
 
-/** A resize drag from a handle's pointer-down (the video's edges, a side panel's divider, a note diagram's
- *  grips): `move` while the button is down, then `end` once, with the pointer-up, or with null when Esc or the
+/** A drag from a handle's pointer-down (the video's edges, a side panel's divider, a note diagram's grips, a
+ *  note block's or table row's handle): `move` while the button is down, then `end` once, with the pointer-up, or with null when Esc or the
  *  system cancels it (put the size back). Esc is taken here, so it never also closes the page under the drag.
  *  It listens on the window, so the drag ends cleanly even if its handle leaves the page first. */
 export function resizeDrag(e: { pointerId: number; currentTarget: Element }, on: { move: (ev: globalThis.PointerEvent) => void; end: (ev: globalThis.PointerEvent | null) => void }) {

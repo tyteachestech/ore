@@ -89,7 +89,7 @@ let turnSeq = 0;
 const turnId = () => `${Date.now().toString(36)}-${++turnSeq}`;
 
 /** A saved chat as `ore chat` lists it (D172). */
-export type ChatRow = { id: string; title: string; updated: string };
+type ChatRow = { id: string; title: string; updated: string };
 type SavedChat = { id: string; title: string; updated?: string; carry: Mention[]; turns: TutorTurn[] };
 /** A chat's name until its first reply names it: his first message, on one line. */
 const firstLine = (m: string) => { const s = m.replace(/\s+/g, " ").trim(); return s.length > 60 ? `${s.slice(0, 59).trimEnd()}…` : s; };

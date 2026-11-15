@@ -28,7 +28,7 @@ const tones = (c: string): Record<string, string> => ({ W: `color-mix(in oklab, 
 const SOLID = tones(C);
 const GOLD = tones("var(--seam)");
 /** How far a gem's dots have fused: 0 loose dots, 1 solid pixels. A missed gem's have come apart again. */
-export const FUSE: Record<GemKind, number> = { rough: 0, empty: 0, ready: 0.5, cut: 1, dull: 0.45 };
+const FUSE: Record<GemKind, number> = { rough: 0, empty: 0, ready: 0.5, cut: 1, dull: 0.45 };
 /** Fused cells overlap their neighbours a hair, so no seam of ground shows between them at a fractional scale. */
 const LAP = 0.03;
 

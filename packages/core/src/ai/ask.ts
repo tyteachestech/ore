@@ -130,6 +130,13 @@ export interface Citation { n: number; item: string; title: string; heading: str
 /** A web page the tutor's search found, cited like a passage: `quote` is words the search returned from it. */
 export interface WebCitation { n: number; url: string; title: string; site: string; quote: string; text: string }
 
+/** The citation of a quote the run's check found in passage `p`: its exact Markdown and where it sits in the source. */
+export function passageCitation(p: Passage, q: string, n: number): Citation {
+  const at = locate(p.text, q)!;
+  const quote = p.text.slice(at.start, at.end);
+  return { n, item: p.item, title: p.title, heading: p.heading, quote, text: plainText(quote), start: p.start + at.start, end: p.start + at.end };
+}
+
 /** Markdown as it reads: a link's text without its URL, no emphasis or code marks, no footnote marks. */
 export const plainText = (md: string) =>
   md.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[\^\d+\]/g, "").replace(/(\*\*|__|\*|`)/g, "").replace(/\s+/g, " ").trim();
@@ -164,12 +171,7 @@ export async function askLibrary(lib: Library, question: string, earlier: AskTur
     },
   });
   const citations: Citation[] = data.found
-    ? data.citations.map((c, i) => {
-        const p = byId.get(c.passage)!;
-        const at = locate(p.text, c.quote)!;
-        const quote = p.text.slice(at.start, at.end);
-        return { n: i + 1, item: p.item, title: p.title, heading: p.heading, quote, text: plainText(quote), start: p.start + at.start, end: p.start + at.end };
-      })
+    ? data.citations.map((c, i) => passageCitation(byId.get(c.passage)!, c.quote, i + 1))
     : [];
   return { question: q, found: data.found, answer: data.answer, citations, ai, usage };
 }

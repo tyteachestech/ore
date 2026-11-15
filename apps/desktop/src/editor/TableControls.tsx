@@ -1,5 +1,6 @@
 import type { EditorView } from "@milkdown/kit/prose/view";
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
+import { resizeDrag } from "../drag";
 import { Hint } from "../Hint";
 import { DotsSix, Plus } from "../icons";
 import { MoreButton, WithMenu, type MenuAction } from "../Menu";
@@ -116,9 +117,6 @@ export function TableControls({ view, host }: { view: () => EditorView | undefin
       }
     };
     const end = (drop: boolean) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("keydown", onKey, true);
       const was = dragging.current;
       dragging.current = false;
       setLine(null);
@@ -128,16 +126,7 @@ export function TableControls({ view, host }: { view: () => EditorView | undefin
       v.focus();
       setAt(null);
     };
-    const onUp = () => end(true);
-    const onKey = (k: KeyboardEvent) => {
-      if (k.key !== "Escape") return;
-      k.preventDefault();
-      k.stopPropagation();
-      end(false);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("keydown", onKey, true);
+    resizeDrag(e, { move: onMove, end: (up) => end(!!up) });
   };
   const grip = (kind: "row" | "col", p: { x: number; y: number }, list: () => MenuAction[]) => (
     <div className={`table-ctl table-grip-at ${kind}s`} style={{ left: p.x, top: p.y }}>

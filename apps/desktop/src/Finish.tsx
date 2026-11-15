@@ -64,15 +64,20 @@ const dropDraft = (id: string) => (drafts.delete(id), keptDrafts.delete(id));
 
 /** Sources whose cards failed to draft, each with its retry: one toast says them all (the latest reason),
  *  and its Try again drafts them all, so a second failure never hides the first one's way back. */
-const undrafted = new Map<string, { title: string; run: () => Promise<void> }>();
+const undrafted = new Map<string, { title: string; run: () => Promise<boolean> }>();
 function sayUndrafted(notify: Notify, why: string) {
   const left = [...undrafted.values()];
   if (!left.length) return;
   const what = left.length === 1 ? `Exercises for “${left[0]!.title}”` : `Exercises for ${left.length} sources`;
+  // He asked for this one, so it shows while it runs and says when it's done (rehearsal 2026-11-15); a
+  // failure takes the same slot with its own Try again.
   const again = () => {
     const runs = [...undrafted.values()];
     undrafted.clear();
-    for (const r of runs) void r.run();
+    notify(`Drafting ${what.replace(/^E/, "e")}…`, "progress", undefined, undefined, undefined, false, "drafting");
+    void Promise.all(runs.map((r) => r.run())).then((ok) => {
+      if (ok.every(Boolean)) notify(`${what} drafted.`, "info", undefined, undefined, undefined, false, "drafting");
+    });
   };
   notify(`${what} weren’t drafted: ${why}`, "error", undefined, undefined, again, true, "drafting");
 }
@@ -195,12 +200,13 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     // feedback so the prompts' rubrics include what he missed.
     // Run in the app, not detached, so a failure says why at once, wherever he has gone, with a retry.
     // Its Try again is the only way back to the cards, so the failure stays until he acts on it.
-    const run = (): Promise<void> =>
+    const run = (): Promise<boolean> =>
       ore("enrich", doc.id).then(
-        () => void undrafted.delete(doc.id),
+        () => undrafted.delete(doc.id) || true,
         (e) => {
           undrafted.set(doc.id, { title: doc.title, run });
           void back.then(() => sayUndrafted(notify, errorText(e)));
+          return false;
         },
       );
     if (PHONE) return; // Cards are drafted on the Mac (D78.3); said once in the panel, not as a failure.

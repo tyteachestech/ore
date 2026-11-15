@@ -1667,16 +1667,15 @@ export function App() {
     notify(message, "info", () => go(false, true), () => go(true, true));
   };
   const copySources = (list: Item[]) =>
-    void copyCited(citeSources(list)).then(() => notify(list.length > 1 ? `Copied ${sourcesN(list.length)} as Markdown` : "Copied as Markdown"), (e) => notify(errorText(e), "error"));
+    void copyCited(citeSources(list)).then(() => notify(list.length > 1 ? `Copied ${count(list.length, "source")} as Markdown` : "Copied as Markdown"), (e) => notify(errorText(e), "error"));
   /** One path per line, as Finder's Copy as Pathname does for several files. */
   const copyPaths = (list: Item[]) =>
     void navigator.clipboard.writeText(list.map(pathOf).join("\n")).then(() => notify(list.length > 1 ? `Copied ${list.length} paths` : "Path copied"), (e) => notify(errorText(e), "error"));
-  const sourcesN = (n: number) => `${n} source${n === 1 ? "" : "s"}`;
-  const archiveMany = (sel = many) => batch(`Archived ${sourcesN(sel.length)}`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null, undefined, sel);
-  const restoreMany = (sel = many) => batch(`Restored ${sourcesN(sel.length)}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])), undefined, undefined, sel);
+  const archiveMany = (sel = many) => batch(`Archived ${count(sel.length, "source")}`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null, undefined, sel);
+  const restoreMany = (sel = many) => batch(`Restored ${count(sel.length, "source")}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])), undefined, undefined, sel);
   const moveMany = (to: Item["status"], sel = many) =>
-    batch(`Moved ${sourcesN(sel.length)} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }), undefined, sel);
-  const fileMany = (k: Skill, on: boolean, sel = many) => fileItems(sel, sourcesN(sel.length), k, on);
+    batch(`Moved ${count(sel.length, "source")} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }), undefined, sel);
+  const fileMany = (k: Skill, on: boolean, sel = many) => fileItems(sel, count(sel.length, "source"), k, on);
   /** Puts `k` on each of these sources, or takes it off, each keeping its other skills. */
   const fileItems = (sel: Item[], what: string, k: Skill, on: boolean) => {
     const next = (i: Item) => (on ? [...new Set([...i.skills, k.id])] : i.skills.filter((s) => s !== k.id));
@@ -1690,7 +1689,7 @@ export function App() {
   };
   /** The picked sources' actions: the same as one row's that make sense for many, named for the count. */
   const manyActions = (sel = many): MenuAction[] => {
-    const what = sourcesN(sel.length);
+    const what = count(sel.length, "source");
     if (sel.every((i) => i.archived_at)) return [{ id: "restore", label: `Restore ${what}`, run: () => restoreMany(sel) }];
     return [
       sel.every((i) => i.status === "done")
@@ -2069,7 +2068,7 @@ export function App() {
         )}
         {details.includes("type") && <span className="col kind">{KIND[r.type] ?? r.type}</span>}
         {detailCols(r, [r.captured_at])}
-        <MoreButton label={pickN > 1 ? `Actions for ${sourcesN(pickN)}` : `Actions for ${r.title}`} actions={acts} hoverOnly />
+        <MoreButton label={pickN > 1 ? `Actions for ${count(pickN, "source")}` : `Actions for ${r.title}`} actions={acts} hoverOnly />
       </DragRow>
       </WithMenu>
     );
@@ -2211,7 +2210,7 @@ export function App() {
         {rowDrag && (
           // Follows the pointer, beside it, so the skill under it stays visible.
           <div className="row-ghost" style={{ left: rowDrag.at.x + 14, top: rowDrag.at.y + 10 }}>
-            {rowDrag.many ? sourcesN(rowDrag.many.length) : (rowDrag.course?.title ?? rowDrag.item.title)}
+            {rowDrag.many ? count(rowDrag.many.length, "source") : (rowDrag.course?.title ?? rowDrag.item.title)}
           </div>
         )}
       </DndContext>

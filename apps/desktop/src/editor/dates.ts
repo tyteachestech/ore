@@ -1,3 +1,4 @@
+import { localDay } from "../../../../packages/core/src/ids";
 // Notion's @ dates in a note: what he types after @ becomes a date, saved as plain `2026-11-12` text,
 // which sorts, greps and reads the same to him, GitHub and an AI.
 
@@ -7,8 +8,6 @@ export type DateRow = { label: string; iso: string };
 const DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 
-const pad = (n: number) => String(n).padStart(2, "0");
-const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const plus = (d: Date, days: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + days);
 /** A word he has typed the start of: two letters at least, so "m" alone is not May or Monday. */
 const prefix = (word: string, names: string[]) => (word.length >= 2 ? names.findIndex((n) => n.startsWith(word)) : -1);
@@ -22,7 +21,7 @@ function on(y: number, m: number, d: number): Date | null {
 export function dateRows(q: string, now = new Date()): DateRow[] {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const s = q.trim().toLowerCase().replace(/,/g, " ").replace(/\s+/g, " ");
-  const row = (d: Date, label = d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })): DateRow => ({ label, iso: isoOf(d) });
+  const row = (d: Date, label = d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric", year: "numeric" })): DateRow => ({ label, iso: localDay(d) });
   const named: [string, number][] = [["today", 0], ["tomorrow", 1], ["yesterday", -1]];
   const words = named.filter(([n]) => n.startsWith(s));
   if (words.length) return words.map(([n, k]) => row(plus(today, k), n[0]!.toUpperCase() + n.slice(1)));

@@ -187,6 +187,15 @@ export function summarize(runs: VendorRun[]): { mean: number; sd: number; flips:
   return { mean, sd, flips, missed };
 }
 
+/** The vendors an eval's `--vendor` flags name (each claude or codex), else `fallback`; `--model` needs exactly one. */
+export function vendorsFrom(args: string[], fallback: Vendor[]): Vendor[] {
+  const vendors = args.flatMap((a, i) => (args[i - 1] === "--vendor" ? [a] : [])) as Vendor[];
+  if (vendors.some((v) => v !== "claude" && v !== "codex")) throw new Error("--vendor must be claude or codex");
+  const pick = vendors.length ? vendors : fallback;
+  if (args.includes("--model") && pick.length > 1) throw new Error("--model needs one --vendor");
+  return pick;
+}
+
 export function columns(head: string[], rows: string[][]): string {
   const w = head.map((h, i) => Math.max(h.length, ...rows.map((r) => r[i]!.length)));
   return [head, ...rows].map((r) => r.map((c, i) => c.padEnd(w[i]!)).join("  ")).join("\n");
@@ -194,11 +203,8 @@ export function columns(head: string[], rows: string[][]): string {
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  const vendors = args.flatMap((a, i) => (args[i - 1] === "--vendor" ? [a] : [])) as Vendor[];
+  const pick = vendorsFrom(args, ["claude", "codex"]);
   const model = args[args.indexOf("--model") + 1];
-  if (vendors.some((v) => v !== "claude" && v !== "codex")) throw new Error("--vendor must be claude or codex");
-  const pick: Vendor[] = vendors.length ? vendors : ["claude", "codex"];
-  if (args.includes("--model") && pick.length > 1) throw new Error("--model needs one --vendor");
   const files = args.flatMap((a, i) => (args[i - 1] === "--cases" ? [a] : []));
   const times = args.includes("--runs") ? Number(args[args.indexOf("--runs") + 1]) : 1;
   if (!Number.isInteger(times) || times < 1) throw new Error("--runs needs a whole number");
