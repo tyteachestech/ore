@@ -1,24 +1,27 @@
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
 import { useRef, useState, type ReactElement } from "react";
-import { CaretRight, Check, X } from "./icons";
+import { CaretRight, Check, XSmall } from "./icons";
 import { Hint } from "./Hint";
 import { more } from "./more";
 import type { Item, Skill } from "./ore";
 import { SkillIcon } from "./IconPicker";
 import { FIELDS, kindLabel, options, settled, summary, toggle, type Field, type Filter } from "./filters";
 
-type Props = { items: Item[]; skills: Skill[]; filters: Filter[]; onChange: (f: Filter[]) => void };
+type Props = { items: Item[]; skills: Skill[]; filters: Filter[]; onChange: (f: Filter[]) => void; /** Where focus goes when a list closes: the search, so typing carries on. */ back?: () => void };
 
 const has = (label: string, q: string) => label.toLowerCase().includes(q.trim().toLowerCase());
 
 /** Linear's filter menu: pick a field, then any of its values; picking keeps it open, so several can be
  *  picked, and ⌫ in the empty search goes back to the fields. */
-function FilterPicker({ items, skills, filters, onChange, start, children }: Props & { start?: Field; children: ReactElement }) {
+function FilterPicker({ start, children, ...p }: Props & { start?: Field; children: ReactElement }) {
+  const { items, skills, filters, onChange } = p;
   const [open, setOpen] = useState(false);
   const [field, setField] = useState<Field | undefined>(start);
   const [query, setQuery] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  // A click elsewhere keeps the focus it gave (Radix's own rule); Esc or a pick hands it back to the search.
+  const outside = useRef(false);
   const skill = (id: string) => skills.find((k) => k.id === id);
   const picked = filters.find((f) => f.field === field)?.values ?? [];
   const opts = open && field ? options(items, field, (id) => skill(id)?.name ?? id).filter((o) => has(o.label, query)) : [];
@@ -36,7 +39,12 @@ function FilterPicker({ items, skills, filters, onChange, start, children }: Pro
     >
       <Popover.Trigger asChild>{children}</Popover.Trigger>
       <Popover.Portal>
-        <Popover.Content className="popover menu filter-menu" side="bottom" align="start" sideOffset={4} collisionPadding={8}>
+        <Popover.Content className="popover menu filter-menu" side="bottom" align="start" sideOffset={4} collisionPadding={8} onInteractOutside={() => (outside.current = true)}
+          onCloseAutoFocus={(e) => {
+            if (p.back && !outside.current) (e.preventDefault(), p.back());
+            outside.current = false;
+          }}
+        >
           <Command label="Filter" loop shouldFilter={false}>
             <Command.Input
               ref={input}
@@ -80,7 +88,7 @@ function FilterPicker({ items, skills, filters, onChange, start, children }: Pro
   );
 }
 
-/** The Filter button beside the list's search. */
+/** The faint Filter word at the search field's right end (Raycast, Linear's search). */
 export function FilterButton(p: Props) {
   return (
     <FilterPicker {...p}>
@@ -91,35 +99,25 @@ export function FilterButton(p: Props) {
   );
 }
 
-/** One chip per field filtered: its name and values open its list again, × lets it go (Linear). */
-export function FilterChips(p: Props) {
-  if (!p.filters.length) return null;
+/** One tag per field filtered, inside the search field: its values open its list again, × lets it go, and
+ *  ⌫ in the empty search takes the last one off (a token field, Raycast's). */
+export function FilterTags(p: Props) {
   const label = (field: Field) => (v: string) => (field === "skill" ? (v ? p.skills.find((k) => k.id === v)?.name ?? v : "No skill") : field === "kind" ? kindLabel(v) : v);
-  return (
-    <div className="filter-chips" role="group" aria-label="Filters">
-      {p.filters.map((f) => {
-        const name = FIELDS.find((x) => x.id === f.field)!.label;
-        return (
-          <span key={f.field} className="filter-chip">
-            <FilterPicker {...p} start={f.field}>
-              <button className="filter-chip-open">
-                <span className="filter-chip-field">{name}</span>
-                {summary(f, label(f.field))}
-              </button>
-            </FilterPicker>
-            <Hint text={`Remove the ${name.toLowerCase()} filter`}>
-              <button className="filter-chip-x" aria-label={`Remove the ${name.toLowerCase()} filter`} onClick={() => p.onChange(p.filters.filter((x) => x !== f))}>
-                <X size={10} aria-hidden="true" />
-              </button>
-            </Hint>
-          </span>
-        );
-      })}
-      {p.filters.length > 1 && (
-        <button className="filter-clear" onClick={() => p.onChange([])}>
-          Clear
-        </button>
-      )}
-    </div>
-  );
+  return p.filters.map((f) => {
+    const name = FIELDS.find((x) => x.id === f.field)!.label;
+    return (
+      <span key={f.field} className="filter-tag">
+        <FilterPicker {...p} start={f.field}>
+          <button className="filter-tag-open" aria-label={`${name}: ${summary(f, label(f.field))}`}>
+            {summary(f, label(f.field))}
+          </button>
+        </FilterPicker>
+        <Hint text={`Remove the ${name.toLowerCase()} filter`}>
+          <button className="filter-tag-x" aria-label={`Remove the ${name.toLowerCase()} filter`} onClick={() => (p.onChange(p.filters.filter((x) => x !== f)), p.back?.())}>
+            <XSmall aria-hidden="true" />
+          </button>
+        </Hint>
+      </span>
+    );
+  });
 }

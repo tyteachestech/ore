@@ -50,7 +50,7 @@ import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
 import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
-import { FilterButton, FilterChips } from "./FilterBar";
+import { FilterButton, FilterTags } from "./FilterBar";
 import { passes, type Filter } from "./filters";
 import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
@@ -2247,18 +2247,20 @@ export function App() {
       listRef.current?.focus({ preventScroll: true });
     } else if (e.key === "Enter" && rows[0]) openSource(rows[0].id);
   };
+  // A press in the field off its tags focuses the search; a press in a tag's list (a portal, whose events bubble here) does not.
+  const toSearch = () => filterRef.current?.focus();
   const sources = (
     <>
       <div className="list-bar">
         {view}
-        <FilterButton items={tabAll} skills={skills} filters={filters} onChange={setFilters} />
-        <Hint text="Filter by title, then text, highlights and notes" keys="filter">
-          <label className="filter">
-            <MagnifyingGlass size={13} aria-hidden="true" />
+        <div className={`filter${filters.length ? " filtered" : ""}`} onMouseDown={(e) => e.currentTarget.contains(e.target as Node) && !(e.target as Element).closest("button, input") && (e.preventDefault(), toSearch())}>
+          <MagnifyingGlass size={13} aria-hidden="true" />
+          <FilterTags items={tabAll} skills={skills} filters={filters} onChange={setFilters} back={toSearch} />
+          <Hint text="Filter by title, then text, highlights and notes" keys="filter">
             <input
               ref={filterRef}
               value={query}
-              placeholder="Filter by title or text"
+              placeholder={filters.length ? "" : "Filter by title or text"}
               spellCheck={false}
               aria-label="Filter sources"
               onChange={(e) => {
@@ -2270,14 +2272,17 @@ export function App() {
                   e.preventDefault();
                   if (query) setQuery("");
                   else listRef.current?.focus({ preventScroll: true });
+                } else if (e.key === "Backspace" && !e.repeat && !query && filters.length) {
+                  e.preventDefault();
+                  setFilters(filters.slice(0, -1));
                 } else searchKeys(e);
               }}
             />
-            {!query && <kbd>{label(keys.filter)}</kbd>}
-          </label>
-        </Hint>
+          </Hint>
+          {!query && !filters.length && <kbd>{label(keys.filter)}</kbd>}
+          <FilterButton items={tabAll} skills={skills} filters={filters} onChange={setFilters} back={toSearch} />
+        </div>
       </div>
-      <FilterChips items={tabAll} skills={skills} filters={filters} onChange={setFilters} />
       {list}
     </>
   );
