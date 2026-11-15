@@ -5,10 +5,7 @@ import * as HoverCard from "@radix-ui/react-hover-card";
 import { Children, createContext, Fragment, isValidElement, lazy, memo, Suspense, useContext, type CSSProperties, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type TouchEvent, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
+import { rehypeMath, remarkPlugins } from "./math-md";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
@@ -90,8 +87,7 @@ const PLACEHOLDER: Record<Intent, string> = {
 
 // Raw HTML never renders (skipHtml): documents come from the web and this webview can run `ore`.
 // That also drops the `<!-- page N -->` / `<!-- chapter N -->` markers. Links open in the browser.
-// Math is `$$…$$` only (intake writes inline TeX that way), so a price's `$` never reads as math.
-const remarkPlugins = [remarkGfm, [remarkMath, { singleDollarTextMath: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["remarkPlugins"]>;
+// Math is `$$…$$` only (intake writes inline TeX that way), so a price's `$` never reads as math (math-md.ts).
 /** Each block takes its direction from its own first letter (`dir="auto"`), as a browser does with a page that
  *  says its own: Arabic and Hebrew read right to left, list numbers on the right, beside English ones (Codex sweep 4). */
 const AUTO_DIR = new Set(["p", "li", "h1", "h2", "h3", "h4", "h5", "h6", "td", "th"]);
@@ -107,7 +103,7 @@ const rehypeAutoDir = () => (tree: HastNode) => {
   };
   walk(tree);
 };
-const rehypePlugins = [[rehypeKatex, { output: "htmlAndMathml", throwOnError: false }], rehypeAutoDir] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
+const rehypePlugins = [rehypeMath, rehypeAutoDir] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
 // A click on a link is handled by the reader (`followLink`). Footnotes (`footnotes` in text.ts) keep
 // their "^" in the text for the index, drawn as a small raised number.
 const caret = (children: ReactNode) => (typeof children === "string" && children.startsWith("^") ? <><span className="fn-caret">^</span>{children.slice(1)}</> : children);
@@ -642,7 +638,7 @@ type Props = {
   onPin: (item: Item) => void;
   onMove: (item: Item, to: Item["status"]) => void;
   /** A highlight to scroll to once the text is ready (a question on the skill page, D47), or
-   *  `q:start:end`, a quote a card points to (D99), or a ⌘K match: `find:<words>` in the text (the find
+   *  `q:start:end[:n]`, a quote a card or citation points to (D99; n a count, so a repeat click jumps again), or a ⌘K match: `find:<words>` in the text (the find
    *  bar opens on those words at their first place), `note:<words>` in the source note (the note opens,
    *  the find bar on its words), `ann:<id>` a highlight (scrolled to, its popup open). */
   jumpTo?: string;
@@ -864,7 +860,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const annsRef = useRef(anns);
   annsRef.current = anns;
   const frame = useRef(0);
-  const jumped = useRef(false);
+  // The jump last made, so a repaint doesn't scroll back to it, and a new one (a second citation into this
+  // source while it is open) still goes (F317).
+  const jumped = useRef<string | undefined>(undefined);
   const scrollTimer = useRef(0);
   const body = doc?.body;
   const src = useMemo(() => (body === undefined ? null : sourceSkeleton(body)), [body]);
@@ -1288,16 +1286,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     }
     const active = popup && map.get(popup.id);
     paint("hl-active", active ? [active] : []);
-    // `q:start:end` is a quote a card points to (D99), not a highlight.
-    const q = p.jumpTo?.match(/^q:(\d+):(\d+)$/);
-    const jump = jumped.current ? undefined : q ? rangeFor(index, src, body, { exact: body.slice(+q[1]!, +q[2]!), prefix: "", suffix: "", start: +q[1]! }) : p.jumpTo && map.get(p.jumpTo);
+    // `q:start:end` is a quote a card points to (D99), not a highlight; a citation adds `:n`, a count, so each
+    // click is a new jump. No jump (back or forward) forgets the last, so the same one can go again.
+    if (!p.jumpTo) jumped.current = undefined;
+    const q = p.jumpTo?.match(/^q:(\d+):(\d+)(?::\d+)?$/);
+    const jump = jumped.current === p.jumpTo ? undefined : q ? rangeFor(index, src, body, { exact: body.slice(+q[1]!, +q[2]!), prefix: "", suffix: "", start: +q[1]! }) : p.jumpTo && map.get(p.jumpTo);
     const el = scrollRef.current;
     if (jump && el) {
-      jumped.current = true;
+      jumped.current = p.jumpTo;
       toThird(jump);
       paint("hl-active", [jump]);
     }
-  }, [ready, anns, body, popup?.id, hidden, repaint]);
+  }, [ready, anns, body, popup?.id, hidden, repaint, p.jumpTo]);
   useEffect(() => () => unpaintAll(), []);
   // A ⌘K match in a highlight or its note: land on it with its popup open, once its range is painted.
   const landed = useRef<string | undefined>(undefined);

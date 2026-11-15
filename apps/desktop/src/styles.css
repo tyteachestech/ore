@@ -844,7 +844,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .doc th:hover .col-cover, .doc .col-cover:focus-visible, .doc .col-cover[aria-pressed="true"] { opacity: 1; }
 .doc .col-cover:hover { color: var(--text); background: var(--bg-hover); }
 @media (hover: none) { .doc .col-cover { opacity: 1; } }
-.doc .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+:is(.doc, .ask-text) .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
 
 /* Highlighted text is always full contrast: the intent layers sit above the video's spoken/unspoken dimming
    (priority 1, Reader.tsx), so they set their own colour. */
