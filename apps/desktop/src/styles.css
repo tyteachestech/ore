@@ -1458,6 +1458,11 @@ body.resizing iframe { pointer-events: none; }
 .note-menu-row.on { background: var(--bg-active); }
 .note-menu-row .sub { margin-left: auto; color: var(--faint); font-family: var(--mono); font-size: 11px; flex: none; }
 .note-menu-empty { padding: 6px 10px; color: var(--faint); }
+.note-menu-row > svg { flex: none; color: var(--muted); margin-right: -4px; }
+.note-menu-row.on > svg { color: var(--text); }
+/* A group's name over its blocks: the menus' own 12px mono label, as the sidebar's groups. */
+.note-menu-head { padding: 8px 10px 4px; font: 12px var(--mono); color: var(--faint); }
+.note-menu-head:first-child { padding-top: 4px; }
 
 /* Linked from (D39) */
 .linked-from { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--border); }

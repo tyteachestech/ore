@@ -13532,6 +13532,34 @@ journey("⌘K: Tab on a source steps into what can be done with it, typing narro
   await until("⌘Z puts it back in To read", async () => !((await ore("ls", "--status=done")) as { title: string }[]).some((i) => i.title === TESTING));
 });
 
+journey("note / menu: its blocks sit under Text, Toggles, Insert and Link with a picture each, it is never taller than ten rows, and a search lists matches flat (D-new-slash-menu)", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  const menu = page.locator(".note-menu");
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("/", { delay: 20 });
+  await menu.waitFor();
+  const heads = await menu.locator(".note-menu-head").allInnerTexts();
+  if (heads.join() !== "Text,Toggles,Insert,Link") throw new Error(`the groups are ${heads.join()}`);
+  const bare = await menu.locator(".note-menu-row").evaluateAll((rows) => rows.filter((r) => !r.querySelector("svg")).map((r) => r.textContent));
+  if (bare.length) throw new Error(`no picture on ${bare.join(", ")}`);
+  const size = await menu.evaluate((el) => ({ shown: el.getBoundingClientRect().height, all: el.scrollHeight }));
+  if (size.shown > 345 || size.all <= size.shown) throw new Error(`the menu is ${size.shown}px tall over ${size.all}px of rows: it should stop at 344 and scroll`);
+  // The arrows keep the highlighted block in sight as the list scrolls under it.
+  for (let i = 0; i < 15; i++) await page.keyboard.press("ArrowDown");
+  await until("the highlighted block is inside the menu", () => menu.evaluate((el) => {
+    const on = el.querySelector(".note-menu-row.on")?.getBoundingClientRect(), box = el.getBoundingClientRect();
+    return !!on && on.top >= box.top - 1 && on.bottom <= box.bottom + 1;
+  }));
+  await page.keyboard.type("div", { delay: 20 });
+  await until("a search lists its matches with no group names", async () => (await menu.locator(".note-menu-head").count()) === 0 && (await menu.locator(".note-menu-row").count()) === 1);
+  await page.keyboard.press("Escape");
+  for (let i = 0; i < 4; i++) await page.keyboard.press("Backspace");
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
