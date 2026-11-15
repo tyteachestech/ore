@@ -57,7 +57,7 @@ describe("review sounds", () => {
     expect(readFileSync(join(import.meta.dir, "../../../.gitignore"), "utf8")).toContain("apps/desktop/public/sounds/");
   });
 
-  // F302: fast ratings stacked up to four sounds, and the goal's chime rang over the rating's.
+  // F304: fast ratings stacked up to four sounds, and the goal's chime rang over the rating's.
   test("one review sound at a time: a new one cuts the one still playing, and the goal's chime waits for it to end", () => {
     const cuts: [string, number][] = [];
     const cut = (name: string) => (at: number) => void cuts.push([name, at]);
@@ -103,7 +103,7 @@ describe("review sounds", () => {
     expect(placed).toEqual(["tick", "rating", "next"]);
   });
 
-  // F303: a rating whose save came back after the window was hidden still played.
+  // F305: a rating whose save came back after the window was hidden still played.
   test("nothing plays while the page is hidden", () => {
     const g = globalThis as { document?: unknown };
     const was = g.document;

@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { dropWithin } from "../src/drag";
 
-// F306: a skill let go over the blank page still reordered, since closestCenter always finds
+// F308: a skill let go over the blank page still reordered, since closestCenter always finds
 // the nearest row. A drop with the pointer outside the list must find nothing, so the drag cancels.
 type Args = Parameters<CollisionDetection>[0];
 const box = { getBoundingClientRect: () => ({ left: 0, top: 0, right: 200, bottom: 600 }) } as unknown as Element;
