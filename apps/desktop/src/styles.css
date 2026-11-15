@@ -339,7 +339,10 @@ img.thumb { filter: brightness(0.86); }
 .row .snip mark { background: var(--keep); color: var(--text); border-radius: 2px; }
 .show-all { margin: 2px 0 0; padding: 4px 8px; border-radius: 6px; color: var(--muted); font-size: 13px; }
 .show-all:hover { color: var(--text); background: var(--bg-hover); }
-.list { flex: 1; overflow-y: auto; overscroll-behavior: none; padding: 6px 10px var(--mole-room); }
+/* On a wide window the rows stop at Home's 1120px and sit centred, as Things and Notion cap a list: a title at
+   the far left and its ⋯ 1700px away at the far right read as two things (F298). The scroller
+   still spans the pane, so its scrollbar stays at the window's edge. */
+.list { flex: 1; overflow-y: auto; overscroll-behavior: none; padding: 6px max(10px, calc((100% - 1144px) / 2)) var(--mole-room); }
 .row {
   display: flex; align-items: center; gap: 12px;
   height: var(--row); padding: 0 12px; border-radius: var(--radius);
@@ -403,6 +406,8 @@ img.thumb { filter: brightness(0.86); }
 /* The empty-state block is `.empty-state`, never bare `.empty`: `empty` is a modifier (`.home-plan.empty`, `.skill-goal.empty`), and a global `.empty` gave those its 18vh margin. */
 .empty-state { color: var(--muted); max-width: 46ch; margin: 18vh auto 0; text-align: center; line-height: 1.7; }
 .empty-state b { color: var(--text); font-weight: 600; }
+.empty-state .empty-out { color: var(--muted); }
+.empty-state.err .pill-btn { margin: 8px 0; }
 
 /* Overlays: palette, add panel */
 .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 20; display: flex; justify-content: center; align-items: flex-start; padding-top: 14vh; }
@@ -647,8 +652,8 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
   margin-left: max(0px, 50% - var(--measure) / 2 - var(--lead));
   margin-right: 0;
 }
-.doc-head h1 { font-size: 30px; line-height: 1.25; font-weight: 700; text-wrap: balance; margin: 8px 0 6px; letter-spacing: -0.01em; user-select: text; -webkit-user-select: text; }
-.doc-head .by { color: var(--text); font-size: 13px; margin-right: 4px; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-opening h1, .doc-head h1 { font-size: 30px; line-height: 1.25; font-weight: 700; text-wrap: balance; margin: 8px 0 6px; letter-spacing: -0.01em; user-select: text; -webkit-user-select: text; }
+.doc-head .by, .doc-opening .by { color: var(--text); font-size: 13px; margin-right: 4px; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-head button.by { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; cursor: text; }
 .doc-head button.by:hover { color: var(--text); }
 .doc-head .by-add { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; margin-right: 8px; color: var(--faint); cursor: text; }
@@ -657,8 +662,8 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .doc-thumb { display: block; height: 128px; max-width: 100%; width: auto; object-fit: cover; object-position: top; border-radius: 0; margin: 8px 0 14px; outline: 1px solid rgba(255, 255, 255, 0.08); outline-offset: -1px; }
 .doc-thumb.none { display: none; }
 /* The byline is its own line group, then the original link 18px on (or flush left when it wraps); 28px clears it from the text. */
-.doc-head .chips { margin-bottom: 28px; align-items: center; column-gap: 18px; }
-.doc-head .byline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.doc-head .chips, .doc-opening .chips { margin-bottom: 28px; align-items: center; column-gap: 18px; }
+.doc-head .byline, .doc-opening .byline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
 /* In the byline it takes the byline's size (Reeder's byline). */
 .doc-head .chips-button { flex-wrap: wrap; }
 .doc-head .chips-button .chip { font-size: 13px; }
@@ -1271,7 +1276,7 @@ body.resizing iframe { pointer-events: none; }
 /* Note editor (D38): the source note and skill notes. Compact type in the panel, reading type in a skill note. */
 .note-editor { --note-size: 14px; position: relative; font-size: var(--note-size); line-height: 1.6; color: var(--text-read); user-select: text; -webkit-user-select: text; cursor: text; }
 /* Notion's format bar over selected text (editor/SelectionBar.tsx). */
-.sel-bar { position: absolute; z-index: 6; display: flex; align-items: center; gap: 1px; padding: 3px; border-radius: 8px; background: var(--bg-raised); box-shadow: var(--float); font: 13px var(--font); color: var(--text); user-select: none; -webkit-user-select: none; white-space: nowrap; }
+.sel-bar { position: fixed; z-index: 6; display: flex; align-items: center; gap: 1px; padding: 3px; border-radius: 8px; background: var(--bg-raised); box-shadow: var(--float); font: 13px var(--font); color: var(--text); user-select: none; -webkit-user-select: none; white-space: nowrap; }
 .sel-bar button { height: 28px; min-width: 28px; padding: 0 7px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; border-radius: 5px; color: var(--text); }
 .sel-bar button:hover, .sel-bar button[data-state="open"] { background: var(--bg-hover); }
 .sel-bar button.on { color: var(--accent); }
@@ -2940,7 +2945,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .quiz-points li { position: relative; min-height: 44px; align-items: center; }
 .phone .quiz-points .quiz-mark::before { content: ""; position: absolute; inset: 0; }
 /* A long title stops at four lines, as Books does; a tap on it shows the rest (the Sources row cuts it too). */
-.phone .doc-head h1 { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; font-size: 26px; }
+.phone :is(.doc-head, .doc-opening) h1 { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; font-size: 26px; }
 .phone .doc-head h1.whole { -webkit-line-clamp: unset; }
 /* A tap leaves :hover on the element under the finger: on touch, hover looks like rest. */
 @media (hover: none) {

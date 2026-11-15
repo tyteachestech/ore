@@ -15,27 +15,38 @@ import { clampX } from "../popup-place";
 /** Where the selection is, relative to the note: the bar sits above its first line. */
 export type Sel = { from: number; to: number; x: number; y: number };
 
-/** Where the bar's left edge goes, in the note's coordinates: by the selection's first line, but kept
- *  inside the note (8px over its left edge at most) and inside the window, by the bar's real width (it
- *  is wider when Turn into names a long kind). Placed again when the window or the note's panel resizes. */
-function useBarLeft(bar: { current: HTMLDivElement | null }, x: number, docked?: boolean) {
+/** Where the bar goes, in the window: above the selection's first line, by its real width (it is wider
+ *  when Turn into names a long kind). It stays inside the note where it fits; in a panel narrower than
+ *  the bar it reaches out over the page beside it, as Notion's does, instead of being cut by the note's
+ *  scroller (F295), which is why it is placed in the window and not in the note. Placed
+ *  again when the window or the note's panel resizes and as the note scrolls; out of sight once its line
+ *  has scrolled out of the note. */
+function useBarPlace(bar: { current: HTMLDivElement | null }, sel: Sel, docked?: boolean) {
   useLayoutEffect(() => {
     const el = bar.current;
-    const host = el?.offsetParent;
+    const host = el?.closest(".note-editor");
     if (!el || !host || docked) return;
     const place = () => {
       const h = host.getBoundingClientRect();
       const w = el.offsetWidth;
-      const left = clampX(Math.max(h.left - 8, Math.min(h.left + x, h.right - w)), w, document.documentElement.clientWidth);
-      el.style.left = `${left - h.left}px`;
+      const inNote = Math.min(h.left + sel.x, h.right - w);
+      const left = clampX(w <= h.width + 8 ? Math.max(h.left - 8, inNote) : inNote, w, document.documentElement.clientWidth);
+      const top = h.top + sel.y;
+      let pane: DOMRect | undefined;
+      for (let up = host.parentElement; up && !pane; up = up.parentElement) if (/auto|scroll/.test(getComputedStyle(up).overflowY)) pane = up.getBoundingClientRect();
+      el.style.left = `${left}px`;
+      el.style.top = `${top}px`;
+      el.style.visibility = pane && (top < pane.top - el.offsetHeight || top > pane.bottom) ? "hidden" : "";
     };
     place();
     const watch = new ResizeObserver(place);
     watch.observe(host);
     addEventListener("resize", place);
+    addEventListener("scroll", place, true);
     return () => {
       watch.disconnect();
       removeEventListener("resize", place);
+      removeEventListener("scroll", place, true);
     };
   });
 }
@@ -46,7 +57,7 @@ const NAMES: Record<Color, string> = { gray: "Gray", red: "Red", orange: "Orange
  *  link to a source or skill note ([[ ]], D39), and colour. Each is one editor step (⌘Z). */
 export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0, linkNow = false }: { view: () => EditorView | undefined; sel: Sel; targets: LinkTarget[]; onDone: () => void; /** In the iPhone's keyboard bar, not over the text: iOS puts its Copy bar there. */ docked?: boolean; /** Goes up each time ⌘K asks for a web link on the selection (Notion). */ askLink?: number; /** ⌘K came with the selection itself, before the bar was up: the link field opens as the bar does. */ linkNow?: boolean }) {
   const bar = useRef<HTMLDivElement>(null);
-  useBarLeft(bar, sel.x, docked);
+  useBarPlace(bar, sel, docked);
   const v = view();
   if (!v) return null;
   const { schema, doc } = v.state;
@@ -70,7 +81,7 @@ export function SelectionBar({ view, sel, targets, onDone, docked, askLink = 0, 
   );
 
   return (
-    <div ref={bar} className={`sel-bar${docked ? " docked" : ""}`} style={docked ? undefined : { top: sel.y }} onMouseDown={keep} role="toolbar" aria-label="Format">
+    <div ref={bar} className={`sel-bar${docked ? " docked" : ""}`} onMouseDown={keep} role="toolbar" aria-label="Format">
       <MoreButton
         label="Turn into"
         hint="Turn into"
