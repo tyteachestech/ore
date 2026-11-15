@@ -3,7 +3,7 @@
 // phone twin; reading looks are set in the reader's Aa. Every change saves at once, with Undo.
 import * as Switch from "@radix-ui/react-switch";
 import { useEffect, useRef, useState } from "react";
-import { GOALS, Group, newOptions, PlanField, Row, Seg } from "../Settings";
+import { goalOptions, Group, newOptions, PlanField, Row, Seg } from "../Settings";
 import { ore, opt, pullFromMac } from "../ore";
 import { errorText, type Notify } from "../util";
 import { syncState } from "./fs";
@@ -27,19 +27,21 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
   now.current = review;
 
   /** At once, put back if the write fails; on the history so Undo takes it back. */
-  const set = async <K extends Key>(key: K, value: Review[K], record = true): Promise<void> => {
+  const set = async <K extends Key>(key: K, value: Review[K], record = true): Promise<boolean> => {
     const r = now.current;
-    if (!r) return;
+    if (!r) return false;
     const was = r[key];
     setReview({ ...r, [key]: value });
     try {
       await ore("goal", opt(FLAG[key], key === "reminder" ? String(value) || "off" : String(value)));
       void planReminders();
       if (record) notify(`Changed “${NAME[key]}”`, "quiet", () => set(key, was, false), () => set(key, value, false));
+      return true;
     } catch (e) {
       setReview((x) => x && { ...x, [key]: was });
       if (!record) throw e;
       notify(errorText(e), "error");
+      return false;
     }
   };
   /** On asks iOS first, from his tap; refused, the switch stays off and says where to allow it. */
@@ -56,7 +58,7 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
         <>
           <Group title="Daily goal">
             <Row title="Minutes a day" text="Review time that fills the ring on Today.">
-              <Seg label="Minutes a day" value={String(review.goal_minutes)} options={GOALS.map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("goal_minutes", Number(v))} />
+              <Seg label="Minutes a day" value={String(review.goal_minutes)} options={goalOptions(review.goal_minutes).map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("goal_minutes", Number(v))} />
             </Row>
             <Row title="New exercises a day" text="Exercises seen for the first time each day. Reviews are never capped.">
               <Seg label="New exercises a day" value={String(review.new_per_day)} options={newOptions(review.new_per_day).map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("new_per_day", Number(v))} />
@@ -69,7 +71,7 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
           </Group>
           <Group title="Daily plan">
             <Row title="When you review" text="Tie review to something you already do every day.">
-              <PlanField plan={review.plan} onSave={(v) => void set("plan", v)} />
+              <PlanField plan={review.plan} onSave={(v) => set("plan", v)} />
             </Row>
             <Row title="Reminder" text="A notification at this time, only on days the goal is still open." htmlFor="reminder">
               <Switch.Root id="reminder" className="switch" checked={!!review.reminder} onCheckedChange={(v) => void remind(v)}>

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
   CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
-  readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type Variant,
+  readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
 import type { Command } from "./types.ts";
@@ -257,7 +257,8 @@ export const studyCommands: Record<string, Command> = {
       if (typeof f.model === "string") await setAiModel(lib, vendor, f.model);
       const env = process.env.ORE_AI || null;
       const modelEnv = process.env.ORE_AI_MODEL || null;
-      const r = { library: lib.root, ai: loadSkills(lib).ai ?? "claude", ai_env: env, model: savedModel(lib, vendor), model_env: modelEnv, review: reviewSettings(lib) };
+      // `problems`: values in skills.yaml it had to leave out for their defaults, so Settings names them instead of showing the default as his.
+      const r = { library: lib.root, ai: loadSkills(lib).ai ?? "claude", ai_env: env, model: savedModel(lib, vendor), model_env: modelEnv, review: reviewSettings(lib), problems: skillsFileProblems(lib) };
       return { data: r, text: `Library ${r.library}\nAI ${r.ai}${env ? ` (ORE_AI=${env} overrides)` : ""}\nModel ${modelEnv ?? (r.model || "default")}${modelEnv ? " (ORE_AI_MODEL overrides)" : ""}` };
     },
   },

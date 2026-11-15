@@ -655,3 +655,12 @@ test("a review keeps who suggested its AI rating: vendor, model and prompt versi
   await recordReview(lib, card.meta.id, { rating: 3, confidence: 2, ai }); // no AI rating: nothing to stamp
   expect(readReviews(lib).map((r) => r.ai)).toEqual([ai, undefined]);
 });
+
+test("today counts the exercises he has, so a first day says how to get one, not that he is caught up (Codex sweep 4)", async () => {
+  const empty = await tempLibrary();
+  expect(today(empty).exercises).toBe(0);
+  const { lib, cards } = await library(2);
+  expect(today(lib).exercises).toBe(2);
+  writeCardMeta(cards[0]!, { ...cards[0]!.meta, state: "retired" });
+  expect(today(lib).exercises).toBe(1);
+});

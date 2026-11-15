@@ -110,6 +110,16 @@ const LENIENT = new Set(["color", "icon", "priority", "hook", "goal", "collectio
 /** Reads skills.yaml's data, dropping fields a hand edit got wrong (named in `dropped`); a file that still
  *  can't be read says which skill and field, with the fix, instead of zod's raw path. */
 export function parseSkillsFile(data: unknown): { file: SkillsFile; dropped: string[] } {
+  const r = parseFile(data);
+  // A name a hand edit left empty shows the skill's id, so it is never a blank row (Codex sweep 4).
+  for (const k of r.file.skills) if (!k.name.trim()) {
+    r.dropped.push(`skill "${k.id}" has no name, so its id is shown`);
+    k.name = k.id;
+  }
+  return r;
+}
+
+function parseFile(data: unknown): { file: SkillsFile; dropped: string[] } {
   if (data == null) throw new Error("skills.yaml in your library is empty. Restore it from the library's history, or run `ore init` in a new folder for a fresh one.");
   const first = SkillsFileSchema.safeParse(data);
   if (first.success) return { file: first.data, dropped: [] };
