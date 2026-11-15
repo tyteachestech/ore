@@ -141,9 +141,10 @@ export class LibraryIndex {
 
   /** Matches for `query`, best first. `bySource`: each source's best match only, every source that has
    *  one unless `limit` cuts them (a list's search, whose rows are sources: the first N matches across
-   *  the library leave out sources a tab or filter would show, organize sweep 6); past the best SNIPPETS
-   *  their snippet is empty. */
-  search(query: string, limit = 20, bySource = false): SearchHit[] {
+   *  the library leave out sources a tab or filter would show, organize sweep 6); past the first SNIPPETS
+   *  their snippet is empty. `within`: only these sources, in this order (the list's rows, as it shows
+   *  them), so the ones it shows first are the ones with a snippet. */
+  search(query: string, limit = 20, bySource = false, within?: string[]): SearchHit[] {
     // FTS5 drops "+" and "#" from words, so "c++" would find every word starting with c. A term that ends
     // in them ("c++", "c#", "f#") asks the index for the bare word and keeps only rows that spell it out.
     const terms = query.normalize("NFC").match(/[\p{L}\p{M}\p{N}_]+[+#]*/gu) ?? [];
@@ -161,24 +162,26 @@ export class LibraryIndex {
     // costs about a millisecond on a long source, so only the matches kept get one, and by source only the
     // best SNIPPETS: a list's search of a common word ("a", every source) took a second for 877 of them.
     const needBody = spelled.length > 0 || unspaced.length > 0;
-    const capped = !spelled.length && !bySource;
+    const capped = !spelled.length && !bySource && !within;
     // A hit in the title counts five times one in the body (bm25 weights by column). Archived sources,
     // and everything in them, stay out.
     const rows = this.db
-      .query<Omit<SearchHit, "snippet"> & { id: number; body?: string; annotation: string | null }, [string, number]>(
-        `select rowid as id, kind, ref, item, title${needBody ? ", body" : ""}, case when kind = 'card' then (select annotation from cards where cards.id = fts.ref) end as annotation from fts where fts match ? and (item is null or item not in (select id from items where archived = 1)) order by bm25(fts, 0, 0, 0, 5, 1, 1) limit ?`,
+      .query<Omit<SearchHit, "snippet"> & { id: number; body?: string; annotation: string | null }, (string | number)[]>(
+        `select rowid as id, kind, ref, item, title${needBody ? ", body" : ""}, case when kind = 'card' then (select annotation from cards where cards.id = fts.ref) end as annotation from fts where fts match ? and (item is null or item not in (select id from items where archived = 1))${within ? " and item in (select value from json_each(?))" : ""} order by bm25(fts, 0, 0, 0, 5, 1, 1) limit ?`,
       )
-      .all(match, capped ? limit : -1);
+      .all(match, ...(within ? [JSON.stringify(within)] : []), capped ? limit : -1);
     const seen = new Set<string>();
+    const order = within && new Map(within.map((id, i) => [id, i]));
     const kept = rows
       .filter((r) => spelled.every((re) => re.test(r.title) || re.test(r.body!)))
-      .filter((r) => !bySource || (r.item !== null && !seen.has(r.item) && !!seen.add(r.item)))
+      .filter((r) => !(bySource || within) || (r.item !== null && !seen.has(r.item) && !!seen.add(r.item)))
+      .sort(order ? (a, b) => order.get(a.item!)! - order.get(b.item!)! : () => 0)
       .slice(0, limit);
     if (!kept.length) return [];
     // A word found in `chars` gets the body's snippet, never the spaced letters (and its own, below, where the body holds it).
     const snips = new Map(
       this.db
-        .query<{ id: number; snippet: string }, [string]>(`select rowid as id, snippet(fts, ${unspaced.length ? 4 : -1}, '[', ']', '…', 12) as snippet from fts where fts match ? and rowid in (${kept.slice(0, bySource ? SNIPPETS : undefined).map((r) => r.id).join(",")})`)
+        .query<{ id: number; snippet: string }, [string]>(`select rowid as id, snippet(fts, ${unspaced.length ? 4 : -1}, '[', ']', '…', 12) as snippet from fts where fts match ? and rowid in (${kept.slice(0, bySource || within ? SNIPPETS : undefined).map((r) => r.id).join(",")})`)
         .all(match)
         .map((r) => [r.id, r.snippet]),
     );

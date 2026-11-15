@@ -6,7 +6,7 @@ import {
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
 import type { Command } from "./types.ts";
-import { int, need, oneOf, str, strs, table } from "./util.ts";
+import { int, need, oneOf, readStdin, str, strs, table } from "./util.ts";
 
 const cardJson = (lib: Library, c: Card, state = cardStates(lib)(c)) => ({ ...c.meta, state, question: c.question, answer: c.answer, rubric: c.rubric, path: relative(lib.root, c.path) });
 /** With a figure card (D166), where its image is, so review can show it. */
@@ -346,8 +346,8 @@ export const studyCommands: Record<string, Command> = {
   },
 
   search: {
-    usage: "<query> [--limit N] [--sources]   full-text search over docs, annotations, the source note, cards, topics; --sources: each source's best match, every source unless --limit",
-    options: { limit: { type: "string" }, sources: { type: "boolean" } },
+    usage: "<query> [--limit N] [--sources [--within]]   full-text search over docs, annotations, the source note, cards, topics; --sources: each source's best match, every source unless --limit, the first 60 with a snippet; --within: only the sources whose ids are on stdin, one per line, in that order (a list's rows as it shows them)",
+    options: { limit: { type: "string" }, sources: { type: "boolean" }, within: { type: "boolean" } },
     async run(positionals, f) {
       const lib = openLibrary();
       const query = need(positionals.join(" ").trim() || undefined, "<query>");
@@ -355,7 +355,8 @@ export const studyCommands: Record<string, Command> = {
       try {
         const limit = int(f.limit, "limit") ?? (f.sources ? Infinity : 20);
         if (limit < 1) throw new Error("--limit must be 1 or more");
-        const hits = index.search(query, limit, !!f.sources);
+        const within = f.within ? (await readStdin()).split("\n").map((l) => l.trim()).filter(Boolean) : undefined;
+        const hits = index.search(query, limit, !!f.sources, within);
         const text = hits.length ? hits.map((h) => `${h.kind.padEnd(10)} ${h.ref}  ${oneLine(h.title, 60)}\n    ${oneLine(h.snippet, 110)}`).join("\n") : "No matches.";
         return { data: hits, text };
       } finally {

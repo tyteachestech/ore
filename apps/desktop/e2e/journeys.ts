@@ -14310,6 +14310,32 @@ journey("list search: every source in the tab and its filters that holds the wor
   }
 });
 
+// F-new-list-search-snippets (review of #440): only the library's best 60 matches got their line, so a row past
+// them (here the oldest source, whose match ranks last) showed none.
+journey("list search: every row found in its text shows its line, past the first 60 too, as it scrolls into view", async (page) => {
+  const word = `quillwort${Date.now()}`;
+  const made: string[] = [];
+  try {
+    const last = (await ore("snippet", `--text=Practice note zero on durable recall, kept for the list. ${"A loop like this takes weeks to build. ".repeat(8)}Then ${word}.`, "--no-enrich")) as { id: string; title: string };
+    made.push(last.id);
+    for (let i = 0; i < 66; i += 11) {
+      const batch = await Promise.all(Array.from({ length: 11 }, (_, j) => ore("snippet", `--text=Practice note ${i + j + 1} on durable recall, kept for the list. Then ${word}.`, "--no-enrich") as Promise<{ id: string }>));
+      made.push(...batch.map((b) => b.id));
+    }
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await page.getByLabel("Search sources").fill(word);
+    const rows = page.locator(".row").filter({ hasText: "Practice note" });
+    await until("all 67 are listed by their text", async () => (await rows.count()) === 67, 8000);
+    await until("the first screen's rows show their lines", async () => (await rows.evaluateAll((rs) => rs.slice(0, 8).every((r) => r.querySelector(".snip")))), 5000);
+    const row = page.locator(`#row-${last.id}`);
+    await row.scrollIntoViewIfNeeded();
+    await until("the last row found in its text shows its line", async () => (await row.locator(".snip").count()) === 1 && (await row.locator(".snip").innerText()).includes(word), 5000);
+  } finally {
+    for (const id of made) await ore("archive", id).catch(() => {});
+  }
+});
+
 journey("list search: a match in a highlight's note opens that highlight; ↵ on one in the source note opens the note on it, as ⌘K does (F-new-list-search-lands)", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const search = page.getByLabel("Search sources");

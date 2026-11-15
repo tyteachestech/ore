@@ -16,7 +16,7 @@ import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, searchFieldsOf, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, oreWith, searchFieldsOf, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
@@ -33,7 +33,7 @@ import { Settings, useReminderAgent, type SettingsSection } from "./Settings";
 import { Shortcuts } from "./Shortcuts";
 import { SkillIcon } from "./IconPicker";
 import { Hint } from "./Hint";
-import { OnScreen } from "./Lite";
+import { OnScreen, useLite } from "./Lite";
 import { citeSources, copyCited } from "./cite";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Boundary } from "./Boundary";
@@ -1154,16 +1154,27 @@ export function App() {
    *  (as ⌘K's does). Every source that has one, so a tab or filter is never left with only those that made a
    *  cut across the whole library. `error`: why searching the text failed, so it never reads as "nothing matches". */
   const [hits, setHits] = useState<{ q: string; snip: Map<string, string>; at: Map<string, string | undefined>; error?: string }>({ q: "", snip: new Map(), at: new Map() });
+  const fieldsOf = useMemo(() => searchFieldsOf(tabRows, skills), [tabRows, skills]);
+  const byTitle = useMemo(() => (q ? ranked(tabRows, q, fieldsOf) : tabRows), [tabRows, q, fieldsOf]);
+  const titled = useMemo(() => new Set(byTitle), [byTitle]);
+  /** The rows a match in the text can add, in the list's order (one per line, `--within`): the first ones get their line. */
+  const rest = useMemo(() => (q ? tabRows.flatMap((r) => (titled.has(r) ? [] : [r.id])).join("\n") : ""), [q, tabRows, titled]);
+  /** Rows past those, shown without their line, ask for it as they near the screen. */
+  const asked = useRef(new Set<string>());
+  const wanted = useRef(new Set<string>());
+  const flushWanted = useRef(0);
   useEffect(() => {
     if (!q) return;
     let live = true;
     const t = setTimeout(() => {
-      ore<SearchHit[]>("search", q, "--sources").then(
+      oreWith<SearchHit[]>(rest, "search", q, "--sources", "--within").then(
         (r) => {
           const snip = new Map<string, string>();
           const at = new Map<string, string | undefined>();
           for (const h of r) if (h.item) (snip.set(h.item, h.snippet ?? ""), at.set(h.item, landing(h, q)));
-          if (live) setHits({ q, snip, at });
+          if (!live) return;
+          asked.current = new Set();
+          setHits({ q, snip, at });
         },
         (e) => live && setHits({ q, snip: new Map(), at: new Map(), error: errorText(e) }),
       );
@@ -1172,12 +1183,28 @@ export function App() {
       live = false;
       clearTimeout(t);
     };
-  }, [q]);
-  const fieldsOf = useMemo(() => searchFieldsOf(tabRows, skills), [tabRows, skills]);
-  const byTitle = useMemo(() => (q ? ranked(tabRows, q, fieldsOf) : tabRows), [tabRows, q, fieldsOf]);
+  }, [q, rest]);
+  const wantSnippet = useCallback(
+    (id: string) => {
+      if (asked.current.has(id)) return;
+      asked.current.add(id);
+      wanted.current.add(id);
+      clearTimeout(flushWanted.current);
+      flushWanted.current = window.setTimeout(() => {
+        const ids = [...wanted.current];
+        wanted.current = new Set();
+        const at = hits.q;
+        oreWith<SearchHit[]>(ids.join("\n"), "search", at, "--sources", "--within").then(
+          (r) => setHits((h) => (h.q !== at ? h : { ...h, snip: new Map([...h.snip, ...r.flatMap((x) => (x.item && x.snippet ? [[x.item, x.snippet] as const] : []))]) })),
+          () => {}, // the row keeps no line, as before it asked
+        );
+      }, 50);
+    },
+    [hits.q],
+  );
   const byText = useMemo(
-    () => (q && hits.q === q ? tabRows.filter((r) => hits.snip.has(r.id) && !byTitle.includes(r)) : []),
-    [tabRows, byTitle, hits, q],
+    () => (q && hits.q === q ? tabRows.filter((r) => hits.snip.has(r.id) && !titled.has(r)) : []),
+    [tabRows, titled, hits, q],
   );
   /** Opens a row of the list: one found by its text at the match, as ⌘K opens it. */
   const openRow = useCallback(
@@ -2050,7 +2077,7 @@ export function App() {
     );
   };
   const row = (r: Item, lesson = false) => {
-    const snip = q && !byTitle.includes(r) ? hits.snip.get(r.id) || undefined : undefined;
+    const snip = q && !titled.has(r) ? hits.snip.get(r.id) || undefined : undefined;
     const on = keyed && currentLine?.kind === "item" && currentLine.item === r;
     const sel = picked.includes(r.id);
     const dragged = rowDrag?.many ? rowDrag.many.some((i) => i.id === r.id) : rowDrag?.item.id === r.id && !rowDrag.course;
@@ -2058,6 +2085,7 @@ export function App() {
     // Off screen, a row's menus and hints wait until it scrolls in (Lite.tsx): a long list opens at once.
     return (
       <OnScreen key={r.id} id={`row-${r.id}`} full={on || renamingRow === r.id || pickFor === r.id}>
+        {q && hits.q === q && hits.snip.get(r.id) === "" && !titled.has(r) && <WantsLine id={r.id} want={wantSnippet} />}
         <Same
           deps={[r, lesson, snip, q, on, sel, pickN, dragged, renamingRow === r.id, pickFor === r.id, skills, skill, onSkillPage, details, mayAnswer.get(r.id)]}
           render={() => rowView(r, lesson, snip, on, sel, pickN, dragged)}
@@ -2824,4 +2852,13 @@ function DragRow({ id, dragged, children, ref, ...props }: { id: string; dragged
       <span role="gridcell" className="cell">{children}</span>
     </div>
   );
+}
+
+/** A row found in its text but shown without its line: asks for it once the row nears the screen. */
+function WantsLine({ id, want }: { id: string; want: (id: string) => void }) {
+  const lite = useLite();
+  useEffect(() => {
+    if (!lite) want(id);
+  }, [lite, id, want]);
+  return null;
 }
