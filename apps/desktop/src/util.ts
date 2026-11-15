@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type RefObject } from "react";
+import { localDay } from "../../../packages/core/src/ids";
 
 /** A toast; `undo` adds an Undo button and puts the step on the app's history (⌘Z), and `redo`,
  *  the step again, lets ⇧⌘Z repeat it after an undo (AGENTS.md: delete acts at once, then offers Undo).
@@ -351,7 +352,7 @@ export function wakeScreens() {
 /** Today's local date ("2026-11-14"): changes when midnight passes, checked every 30 s and when the window comes
  *  back, so a screen left open overnight (Home's Today) reads the new day instead of keeping yesterday's (F172). */
 export function useDay(): string {
-  const key = () => new Date().toLocaleDateString("sv");
+  const key = () => localDay(new Date());
   const [day, setDay] = useState(key);
   useEffect(() => {
     const check = () => setDay(key());

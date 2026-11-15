@@ -14,6 +14,7 @@ import { dueSkills, knowsDue, lastToday, rememberToday, ReviewPick } from "./Rev
 import { archivedOnly, SkillChips, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
 import { Thumb } from "./Thumb";
+import { localDay } from "../../../packages/core/src/ids";
 import { Roll } from "./Roll";
 import { count, errorText, load, typedLast, useKeptScroll, useDay, useLibraryChanges, type Notify } from "./util";
 import { focusQuietly } from "./focus-near";
@@ -23,7 +24,6 @@ import { TitleField } from "./TitleField";
 import { pickRun, typeSelect } from "./typeahead";
 import { keepFocusNear } from "./focus-near";
 
-const day = () => new Date().toLocaleDateString("sv-SE");
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -37,7 +37,7 @@ const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
  *  "favor recently added in home", one list, newest on top), each above the first row older than it; the
  *  older unread stays in To read, so Home never fills with the backlog. */
 const NEW_MS = 7 * 86_400_000;
-export const isNew = (i: Item, now = Date.now()) => i.status === "inbox" && !i.opened_at && !i.course && !i.archived_at && now - Date.parse(i.captured_at) < NEW_MS;
+const isNew = (i: Item, now = Date.now()) => i.status === "inbox" && !i.opened_at && !i.course && !i.archived_at && now - Date.parse(i.captured_at) < NEW_MS;
 export function continueReading(items: Item[], recent: string[], now = Date.now()): Item[] {
   const newest = (a: Item, b: Item) => (touched(b) > touched(a) ? 1 : touched(b) < touched(a) ? -1 : 0);
   const byTouch = items.filter((i) => i.status === "reading").sort(newest);
@@ -599,7 +599,7 @@ function subline(t: Today, empty?: boolean): string {
 /** New cards the daily limits held back (D65), so "caught up" never reads as "there's nothing left". */
 export function waiting(t: Today): string {
   const n = t.new_waiting;
-  const cards = `${n} new exercise${n === 1 ? "" : "s"}`;
+  const cards = count(n, "new exercise");
   if (!t.new_per_day) return `${cards} wait. New exercises are off in Settings.`;
   // New cards only take the goal time due cards leave (D65), so past a day's worth say that, not "up to 10 a day".
   return n <= t.new_per_day ? `${cards} start${n === 1 ? "s" : ""} tomorrow.` : `${cards} wait. A few start each day, as your goal leaves room.`;
@@ -609,7 +609,7 @@ export function waiting(t: Today): string {
  *  line; the hint says why (what `ore doctor` says) and a click shows the file in Finder to mend it. */
 function Unreadable({ list }: { list: Today["unreadable"] }) {
   if (!list.length) return null;
-  const text = `${list.length} source${list.length === 1 ? "" : "s"} couldn’t be read`;
+  const text = `${count(list.length, "source")} couldn’t be read`;
   const why = (
     <span className="hint-lines">
       {!PHONE && <span>Show it in Finder</span>}
@@ -629,7 +629,7 @@ function Unreadable({ list }: { list: Today["unreadable"] }) {
 }
 
 function Week({ week }: { week: Today["week"] }) {
-  const now = day();
+  const now = localDay(new Date());
   return (
     <div className="home-week" role="img" aria-label={`${week.filter((d) => d.status === "met").length} of ${count(week.filter((d) => d.status !== "off").length, "day")} met this week`}>
       {week.map((d, i) => (

@@ -13,7 +13,7 @@ import { inTextField, is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { ore, opt, type Skill } from "./ore";
 import { SkillChips, SkillPicker, unfile } from "./Skills";
-import { errorText, load, save, singleFlight, typedLast, useLibraryChanges, type Notify } from "./util";
+import { count, errorText, load, save, singleFlight, typedLast, useLibraryChanges, type Notify } from "./util";
 import { Working } from "./Working";
 import { citeSources, copyCited } from "./cite";
 import { focusQuietly } from "./focus-near";
@@ -41,7 +41,7 @@ const when = (iso?: string) => {
 /** What a feed has, so he can tell a link really is a feed before and after following it. */
 export type FoundFeed = { url: string; title: string; posts: number; newest?: string };
 export const feedProof = (f: FoundFeed) =>
-  !f.posts ? "no posts yet" : `${f.posts} post${f.posts === 1 ? "" : "s"}${f.newest ? `, newest ${when(f.newest).replace(/^(Today|Yesterday)$/, (d) => d.toLowerCase())}` : ""}`;
+  !f.posts ? "no posts yet" : `${count(f.posts, "post")}${f.newest ? `, newest ${when(f.newest).replace(/^(Today|Yesterday)$/, (d) => d.toLowerCase())}` : ""}`;
 
 /** A post's picture: the feed's image, else the icon of what it links to, as source rows have. */
 function PostThumb({ post }: { post: FeedPost }) {

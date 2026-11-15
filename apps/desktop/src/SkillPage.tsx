@@ -1,5 +1,6 @@
 import { Archive, CaretRight, Check, Collapse, Expand, Plus, Target, X } from "./icons";
 import { ranked } from "./match";
+import { localDay } from "../../../packages/core/src/ids";
 import { HeadSearch } from "./HeadSearch";
 import { ImportanceIcon, levelOf } from "./importance";
 import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
@@ -438,9 +439,6 @@ function lastGoalTry(text: string | null): string | null {
 }
 function shortDate(day: string): string {
   return new Date(`${day}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-function localDay(d = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 const EXPLAIN_SHOWN = 5;
@@ -1090,7 +1088,7 @@ function SkillRecall({ skill, goal, blocked, append, notify, onClose }: { skill:
     const t = text.trim();
     if (!t || saving) return;
     setSaving(true);
-    if (await append(t, goal ? `Goal try, ${localDay()}` : "Recall")) {
+    if (await append(t, goal ? `Goal try, ${localDay(new Date())}` : "Recall")) {
       recallDrafts.delete(key);
       if (goal) notify("Try saved in your note, under today’s date");
       onClose();

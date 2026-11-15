@@ -2,7 +2,7 @@ import { Callout, CaretRight, CheckSquare, Code, Heading1, Heading2, Heading3, L
 import type { Kind } from "./blockops";
 
 /** Each block type's icon in Turn into (Notion's menu draws one per type). A toggle heading draws its heading's. */
-export const KIND_ICON: Record<Kind, Icon> = {
+const KIND_ICON: Record<Kind, Icon> = {
   text: TextT,
   h1: Heading1,
   h2: Heading2,
