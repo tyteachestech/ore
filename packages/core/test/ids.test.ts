@@ -33,3 +33,24 @@ test("ids: a file not yet added to git is renumbered too (the #408 slip: a new t
   execFileSync("bun", [join(import.meta.dir, "../scripts/ids.ts")], { cwd: dir, stdio: "pipe" });
   expect(readFileSync(join(dir, "fresh.test.ts"), "utf8")).toBe("// F2, D2\n");
 });
+
+test("ids --check: any placeholder left on master fails and names its file, so no branch inherits one (#408, #410)", () => {
+  const { mkdtempSync, mkdirSync, writeFileSync } = require("node:fs") as typeof import("node:fs");
+  const { execFileSync, spawnSync } = require("node:child_process") as typeof import("node:child_process");
+  const { join } = require("node:path") as typeof import("node:path");
+  const dir = mkdtempSync(join(require("node:os").tmpdir(), "ore-ids-"));
+  mkdirSync(join(dir, "docs/reviews"), { recursive: true });
+  writeFileSync(join(dir, "docs/reviews/findings.md"), "| ID |\n|---|\n| F1 | a |\n");
+  writeFileSync(join(dir, "docs/DECISIONS.md"), "- D1. one\n");
+  writeFileSync(join(dir, "sfx.ts"), "// sounds (D1)\n");
+  execFileSync("git", ["init", "-q"], { cwd: dir });
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  const check = () => spawnSync("bun", [join(import.meta.dir, "../scripts/ids.ts"), "--check"], { cwd: dir, encoding: "utf8" });
+  expect(check().status).toBe(0);
+  writeFileSync(join(dir, "sfx.ts"), "// sounds (D-new-review-sounds)\n");
+  execFileSync("git", ["add", "-A"], { cwd: dir });
+  const r = check();
+  expect(r.status).toBe(1);
+  expect(r.stderr).toContain("sfx.ts");
+  expect(r.stderr).toContain("D-new-review-sounds");
+});

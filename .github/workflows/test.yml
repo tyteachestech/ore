@@ -19,6 +19,9 @@ jobs:
         with:
           bun-version: 1.4.4
       - run: bun install --frozen-lockfile
+      # Master only: a placeholder there means a PR merged without `bun run ids` (docs/WORKFLOW.md).
+      - if: github.event_name == 'push'
+        run: bun packages/core/scripts/ids.ts --check
       - run: bun run typecheck
       - run: bun test
       - run: bun run --cwd apps/desktop build
