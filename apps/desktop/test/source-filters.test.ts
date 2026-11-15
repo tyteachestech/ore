@@ -35,10 +35,10 @@ describe("All sources filters (D286)", () => {
     expect(summary({ field: "kind", values: ["epub"] }, kindLabel)).toBe("Book");
   });
 
-  test("All sources shows the button and the chips, and the empty list says so", () => {
+  test("All sources shows the Filter word and the tags in its search, and the empty list says so", () => {
     const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
     expect(app).toContain("<FilterButton items={tabAll}");
-    expect(app).toContain("<FilterChips items={tabAll}");
+    expect(app).toContain("<FilterTags items={tabAll}");
     expect(app).toContain("matches these filters");
   });
 });

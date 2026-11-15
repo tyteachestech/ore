@@ -11,6 +11,7 @@ const HANDLERS: Record<string, string> = {
   "Menu.tsx ContextMenu.Content popover menu-list": "`closed`: Radix's default, back to the row he right-clicked, unless keepFocus (the picked action moves focus itself); after a pick, `keepFocusNear` keeps it on the row, or on its neighbour once the row is gone",
   "Menu.tsx DropdownMenu.Content popover menu-list": "`closed`, as the right-click menu (`keepFocusNear` after a pick); a hover-only ⋯ (which can't hold focus) gives it to its row (`focusRow`)",
   "Skills.tsx Popover.Content popover menu skill-picker": "to `returnFocus` when the caller passes one (the field it was opened from), else Radix's default, its trigger",
+  "FilterBar.tsx Popover.Content popover menu filter-menu": "to the search field (`back`) after Esc or a pick, so typing and ⌫ carry on there; a click elsewhere keeps the focus it gave (Radix's default)",
   "Peek.tsx Popover.Content popover peek": "nowhere new: a hover preview that never takes focus (onOpenAutoFocus is cancelled too), so there is nothing to give back",
   "draw/Editor.tsx Popover.Content popover draw-colour": "to the diagram itself (onDone, tintDone), where its keys work, not to the swatch",
   "editor/SelectionBar.tsx useToNote": "Esc puts it back in the note, on the words (Notion); a pick puts it there itself; a press outside leaves it where it landed",

@@ -12698,6 +12698,28 @@ journey("settings: a failed older choice does not roll back the latest choice (F
   await until("the queue still accepts changes after failure", async () => (await ore("settings") as { review: { goal_minutes: number } }).review.goal_minutes === 10);
 });
 
+journey("all sources: a filter is a tag in the search; closing its list leaves the keys there, and ⌫ takes it off", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.getByRole("button", { name: "Filter by kind, skill or author" }).click();
+  await page.getByRole("option", { name: "Kind" }).click();
+  await page.locator(".filter-menu [cmdk-item]").first().click();
+  await page.keyboard.press("Escape");
+  const tag = page.locator(".filter .filter-tag");
+  await tag.waitFor();
+  const search = page.getByRole("textbox", { name: "Filter sources" });
+  await until("the search has the keys after the list closes", () => search.evaluate((el) => el === document.activeElement));
+  await page.keyboard.press("Backspace");
+  await until("⌫ in the empty search takes the tag off", async () => (await tag.count()) === 0);
+  // × takes a tag off and leaves the keys in the search, so ⌫ and typing still work.
+  await page.getByRole("button", { name: "Filter by kind, skill or author" }).click();
+  await page.getByRole("option", { name: "Kind" }).click();
+  await page.locator(".filter-menu [cmdk-item]").first().click();
+  await page.keyboard.press("Escape");
+  await page.locator(".filter-tag-x").click();
+  await until("× takes the tag off", async () => (await tag.count()) === 0);
+  await until("the search keeps the keys after ×", () => search.evaluate((el) => el === document.activeElement));
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
@@ -12744,3 +12766,4 @@ if (!only && shard === shards) {
 stop();
 if (errors.length) console.log(`page errors:\n  ${[...new Set(errors)].join("\n  ")}`);
 process.exit(failed || errors.length ? 1 : 0);
+
