@@ -1,3 +1,4 @@
+import { popUpShift } from "./pop-up";
 import { CaretUpDown, GearSix, Tick, Keyboard, Minus, Plus, Target, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { invoke } from "@tauri-apps/api/core";
@@ -582,22 +583,35 @@ function modelOptions(data: Data, list: Model[] | null): Model[] {
   return [saved, ...(list ?? [])];
 }
 
-/** A pop-up menu like macOS's and Calendar's time menu: the current pick ticked and in view; an
+/** A pop-up menu like macOS's and Calendar's time menu: the current pick ticked and over the button; an
  *  option's description shows on hover. */
 function SelectMenu({ label, value, options, disabled, onChange }: { label: string; value: string; options: readonly Model[]; disabled?: boolean; onChange: (v: string) => void }) {
   const list = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
+  /** When it opened: the pointer-up of the click that opened it lands on the row moved under the pointer,
+   *  and Radix picks a row on a pointer-up it never saw go down, so a quick click would pick the current choice. */
+  const opened = useRef(0);
   const open = (o: boolean) => {
     if (!o) return;
+    opened.current = performance.now();
     requestAnimationFrame(() => {
       const el = list.current?.querySelector<HTMLElement>('[data-state="checked"]');
       el?.scrollIntoView({ block: "center" });
       el?.focus();
+      const trigger = button.current?.getBoundingClientRect();
+      const box = list.current?.getBoundingClientRect();
+      const row = el?.getBoundingClientRect();
+      if (!trigger || !box || !row || !list.current) return;
+      // Measured while the list grows in (D280): its scale undone, so the row lands on the button.
+      const scale = box.height / list.current.offsetHeight || 1;
+      const rowTop = box.top + (row.top - box.top) / scale;
+      list.current.style.translate = `0 ${popUpShift({ triggerTop: trigger.top, triggerHeight: trigger.height, listTop: box.top, rowTop, rowHeight: row.height / scale, listHeight: list.current.offsetHeight, viewport: innerHeight })}px`;
     });
   };
   const current = options.find((o) => o.id === value)?.label ?? value;
   return (
     <DropdownMenu.Root onOpenChange={open}>
-      <DropdownMenu.Trigger className="settings-btn settings-select" aria-label={label} disabled={disabled}>
+      <DropdownMenu.Trigger ref={button} className="settings-btn settings-select" aria-label={label} disabled={disabled}>
         <span className="settings-select-label">{current}</span>
         <CaretUpDown size={12} aria-hidden="true" />
       </DropdownMenu.Trigger>
@@ -613,7 +627,7 @@ function SelectMenu({ label, value, options, disabled, onChange }: { label: stri
           <DropdownMenu.RadioGroup value={value} onValueChange={(v) => v !== value && onChange(v)}>
             {options.map((o) => {
               const item = (
-                <DropdownMenu.RadioItem key={o.id || "default"} value={o.id} className="menu-item check">
+                <DropdownMenu.RadioItem key={o.id || "default"} value={o.id} className="menu-item check" onPointerUp={(e) => performance.now() - opened.current < 300 && e.preventDefault()}>
                   <span className="menu-tick">
                     <DropdownMenu.ItemIndicator>
                       <Tick />

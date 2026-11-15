@@ -1,3 +1,4 @@
+import { more } from "./more";
 import { fold, WORDS } from "./match";
 import { GraduationCap, X } from "./icons";
 import { Command } from "cmdk";
@@ -347,7 +348,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
             </button>
           )}
         </div>
-        <Command.List>
+        <Command.List ref={more}>
           {!page && <Command.Empty>No matches</Command.Empty>}
           {groups.map((g) => (
             <Command.Group key={g.heading} heading={g.heading || undefined}>

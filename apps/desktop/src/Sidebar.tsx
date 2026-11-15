@@ -1,4 +1,5 @@
 import { CaretRight, House, Plus, Rss, Stack } from "./icons";
+import { watchMore } from "./more";
 import { keepKeysIn } from "./keys";
 import {
   closestCenter, defaultDropAnimationSideEffects, DndContext, DragOverlay, pointerWithin, useSensor, useSensors,
@@ -229,6 +230,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const nav = useRef<HTMLElement>(null);
   const cursor = useSideCursor(nav, home ? "home" : feed ? "feed" : skill ?? "all");
   const roving = useRoving(nav);
+  useEffect(() => (nav.current ? watchMore(nav.current) : undefined), []);
 
   return (
     <WithMenu actions={spaceMenu}>
