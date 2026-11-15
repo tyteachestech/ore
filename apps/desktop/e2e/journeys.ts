@@ -14142,6 +14142,9 @@ journey("opening a source: its title stands at once where it will stay, the pane
   await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().waitFor();
   const held = await page.evaluate(() => (window as unknown as { __ORE_HELD: string[] }).__ORE_HELD);
   if (!held.includes("skills")) throw new Error("the skills answered before the sidebar was checked");
+  // The hold off first: a second `skills` the page sends after the release would otherwise wait out the 60 s and
+  // still be in flight as the journey ends (CI, #442).
+  await page.evaluate(() => delete (window as Slow).__ORE_SLOW);
   await release(page, "skills");
 });
 
