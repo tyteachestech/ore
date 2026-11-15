@@ -599,7 +599,7 @@ type LookUp = { word: string; range: Range; ann: string | null; top: number; lef
 
 type Props = {
   id: string;
-  /** What the row he opened it from already knows, drawn at once while the text is read (D-new-no-blank-pages). */
+  /** What the row he opened it from already knows, drawn at once while the text is read (D299). */
   known?: { title: string; author?: string };
   /** A post open beside the Feed (D289): J and K open the next and previous post. */
   onStep?: (by: 1 | -1) => void;
@@ -1135,7 +1135,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const filling = useFilling(p.id);
   const opened = useRef<string | null>(null);
   const shownBodyOf = useRef<string | null>(null);
-  /** Goes up on "Try again" after a failed open: the read runs once more (F-new-reader-error-retry). */
+  /** Goes up on "Try again" after a failed open: the read runs once more (F299). */
   const [tries, setTries] = useState(0);
   useEffect(() => {
     let live = true;

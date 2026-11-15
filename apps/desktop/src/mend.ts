@@ -3,7 +3,7 @@ import remend from "remend";
 const RULE = /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/;
 const cells = (row: string) => row.trim().replace(/^\||\|$/g, "").split("|").length;
 
-/** The Markdown of a reply still being written, made whole enough to draw (D-new-mended-stream): open
+/** The Markdown of a reply still being written, made whole enough to draw (D298): open
  *  bold, italic, code and strike marks are closed and a half-written link shows as its words (remend,
  *  Apache-2.0), and a table waits until its header and rule are both in, since until then its pipes and
  *  dashes would show as text. */

@@ -180,8 +180,8 @@ export function App() {
   useReminderAgent();
   const [items, setItems] = useState<Item[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
-  // The skills as last seen stand in until this launch's answer comes (D-new-no-blank-pages): the sidebar opens
-  // whole, where it used to open as three bare words and jump when the icons arrived (F-new-sidebar-jump).
+  // The skills as last seen stand in until this launch's answer comes (D299): the sidebar opens
+  // whole, where it used to open as three bare words and jump when the icons arrived (F300).
   const [skills, setSkills] = useState<Skill[]>(lastSkills);
   const [status, setStatus] = useState<Tab>(() => lastView().status);
   /** Archived sources, for the Archived tab. */

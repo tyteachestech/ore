@@ -18,7 +18,7 @@ export type Sel = { from: number; to: number; x: number; y: number };
 /** Where the bar goes, in the window: above the selection's first line, by its real width (it is wider
  *  when Turn into names a long kind). It stays inside the note where it fits; in a panel narrower than
  *  the bar it reaches out over the page beside it, as Notion's does, instead of being cut by the note's
- *  scroller (F-new-format-bar-cut), which is why it is placed in the window and not in the note. Placed
+ *  scroller (F295), which is why it is placed in the window and not in the note. Placed
  *  again when the window or the note's panel resizes and as the note scrolls; out of sight once its line
  *  has scrolled out of the note. */
 function useBarPlace(bar: { current: HTMLDivElement | null }, sel: Sel, docked?: boolean) {

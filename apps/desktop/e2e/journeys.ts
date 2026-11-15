@@ -13341,7 +13341,7 @@ journey("feed: a post reads beside the list, J and K step through the posts, and
   }
 });
 
-journey("source note: the format bar shows whole in the side panel, reaching over the page when the panel is narrower than it (F-new-format-bar-cut)", async (page) => {
+journey("source note: the format bar shows whole in the side panel, reaching over the page when the panel is narrower than it (F295)", async (page) => {
   await openSource(page, TESTING);
   const pm = page.locator(".mynotes .note-editor .ProseMirror").first();
   await pm.click();
@@ -13359,7 +13359,7 @@ journey("source note: the format bar shows whole in the side panel, reaching ove
   await page.keyboard.press("Meta+z");
 });
 
-journey("Settings: each section opens at its top, however far the last one was scrolled (F-new-settings-scroll-kept)", async (page) => {
+journey("Settings: each section opens at its top, however far the last one was scrolled (F296)", async (page) => {
   await page.setViewportSize({ width: 1280, height: 600 });
   const settings = page.getByRole("dialog", { name: "Settings" });
   await page.keyboard.press("Meta+Comma");
@@ -13374,7 +13374,7 @@ journey("Settings: each section opens at its top, however far the last one was s
   await page.keyboard.press("Escape");
 });
 
-journey("all sources: a search that matches nothing offers Clear the search, and the rows stop at 1120px on a wide window (F-new-search-dead-end, F-new-list-full-bleed)", async (page) => {
+journey("all sources: a search that matches nothing offers Clear the search, and the rows stop at 1120px on a wide window (F297, F298)", async (page) => {
   await page.setViewportSize({ width: 1920, height: 900 });
   await page.getByRole("button", { name: /^All sources/ }).click();
   const row = page.locator("main .list .row").first();
@@ -13389,7 +13389,7 @@ journey("all sources: a search that matches nothing offers Clear the search, and
   await row.waitFor();
 });
 
-journey("opening a source: its title stands at once where it will stay, the panel's place held, while the text is read; a relaunch shows the sidebar whole (D-new-no-blank-pages, F-new-sidebar-jump)", async (page) => {
+journey("opening a source: its title stands at once where it will stay, the panel's place held, while the text is read; a relaunch shows the sidebar whole (D299, F300)", async (page) => {
   type Slow = { __ORE_SLOW?: Record<string, number> };
   await page.getByRole("button", { name: /^All sources/ }).click();
   const row = page.locator(".row").filter({ hasText: TESTING }).first();
@@ -13411,7 +13411,7 @@ journey("opening a source: its title stands at once where it will stay, the pane
   await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().waitFor({ timeout: 1000 });
 });
 
-journey("a source that fails to open says why and offers Try again, which opens it once the cause is gone (F-new-reader-error-retry)", async (page) => {
+journey("a source that fails to open says why and offers Try again, which opens it once the cause is gone (F299)", async (page) => {
   type Fail = { __ORE_FAIL?: Record<string, string> };
   await page.getByRole("button", { name: /^All sources/ }).click();
   const row = page.locator(".row").filter({ hasText: TESTING }).first();

@@ -126,7 +126,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
   }, [onClose]);
 
   /** Each section opens at its top, as System Settings and Linear do: one scroller holds them all, so
-   *  without this Review opened as far down as General had been scrolled (F-new-settings-scroll-kept). */
+   *  without this Review opened as far down as General had been scrolled (F296). */
   const main = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => void (main.current && (main.current.scrollTop = 0)), [section]);
   const pick = (s: string) => {

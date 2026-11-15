@@ -340,7 +340,7 @@ img.thumb { filter: brightness(0.86); }
 .show-all { margin: 2px 0 0; padding: 4px 8px; border-radius: 6px; color: var(--muted); font-size: 13px; }
 .show-all:hover { color: var(--text); background: var(--bg-hover); }
 /* On a wide window the rows stop at Home's 1120px and sit centred, as Things and Notion cap a list: a title at
-   the far left and its ⋯ 1700px away at the far right read as two things (F-new-list-full-bleed). The scroller
+   the far left and its ⋯ 1700px away at the far right read as two things (F298). The scroller
    still spans the pane, so its scrollbar stays at the window's edge. */
 .list { flex: 1; overflow-y: auto; overscroll-behavior: none; padding: 6px max(10px, calc((100% - 1144px) / 2)) var(--mole-room); }
 .row {
