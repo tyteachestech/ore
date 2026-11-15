@@ -52,7 +52,7 @@ Copy what Apple's own apps do (Books, Notes, Mail) and check against Apple's Hum
 - Nothing wider than the screen at 390 pt, popovers and menus included (they portal outside the phone screens: style them under `.phone`).
 - Safe areas: nothing under the status bar / Dynamic Island or the home indicator; fixed bars pad with `env(safe-area-inset-*)`.
 - Long text truncates or wraps; no element overlaps another (pills over body text, popups over bars).
-- Body text 17 pt-ish and readable; nothing under 11 pt.
+- Body text 17 pt-ish and readable, a source's own text 20 pt at about 35 letters a line (D-new-phone-reading-text); nothing under 11 pt.
 
 **Keyboard**
 - Fields are 16 px or larger, so iOS never zooms.

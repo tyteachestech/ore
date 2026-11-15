@@ -2868,7 +2868,15 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .phone-back { min-height: 44px; }
 .phone .reader-tools { top: -44px; right: 4px; }
 .phone .reader-tools button { min-width: 44px; min-height: 44px; }
-.phone .page, .phone .reader-scroll > .page { padding-left: 20px; padding-right: 20px; margin-left: 0; }
+/* Reading text on the iPhone (D-new-phone-reading-text): 20px Charter on 1.5 with 24px margins, about 35 characters a
+   line on a 390 to 402pt phone, as Books sets a page. It follows iOS's text size (--type, D250) at three quarters
+   of the change, so it never falls under iOS's own body size; as it grows the margins give way (to 16px) and the
+   lines sit closer, since short lines need less room between them. */
+.phone { --read-gutter: max(16px, calc(24px - (var(--type, 1) - 1) * 14px)); }
+.phone .page, .phone .reader-scroll > .page { padding-left: var(--read-gutter); padding-right: var(--read-gutter); margin-left: 0; }
+.phone .doc { font-size: calc(20px * (1 + (var(--type, 1) - 1) * 0.75)); line-height: calc(1.5 - (var(--type, 1) - 1) * 0.15); }
+/* Headings step down: at 20px the desktop's steps put a section head at the title's own size. */
+.phone .doc h1 { font-size: 1.3em; } .phone .doc h2 { font-size: 1.2em; } .phone .doc h3 { font-size: 1.08em; }
 /* A double tap highlights the paragraph (D224): never the zoom iOS gives it; a pinch still zooms. */
 .phone .page { touch-action: manipulation; }
 /* The type shows in the highlight colour; the margin icons would sit off the edge at phone margins. */
