@@ -1,10 +1,10 @@
 # Codex sweep 4 (2026-11-15)
 
-Five Codex testers, findings only, on master, each on ground no earlier sweep took (earlier: the daily path, edge cases, undo, personas, outside edits and a second device, time, intake, AI failures, phone edges and sizing, UX parity, diagrams, hostile content, numbers, the CLI, lifecycle, accessibility):
+Five Codex testers, findings only, on master, each on ground no earlier sweep took (port 1723 is blocked by WebKit, so firstrun's iPhone page is 1736; earlier: the daily path, edge cases, undo, personas, outside edits and a second device, time, intake, AI failures, phone edges and sizing, UX parity, diagrams, hostile content, numbers, the CLI, lifecycle, accessibility):
 
 | name | focus | Mac page | bridge | iPhone page |
 |---|---|---|---|---|
-| `firstrun` | the first week, from an empty library | 1721 | 1722 | 1723 |
+| `firstrun` | the first week, from an empty library | 1721 | 1722 | 1736 |
 | `scale` | a library ten times bigger than today's | 1724 | 1725 | 1726 |
 | `durability` | writes that are killed, refused or raced | 1727 | 1728 | 1729 |
 | `settings` | every setting, changed mid-use | 1730 | 1731 | 1732 |

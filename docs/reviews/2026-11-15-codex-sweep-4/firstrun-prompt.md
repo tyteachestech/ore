@@ -1,6 +1,6 @@
 Your name is `firstrun`. First read `codex-out/preamble.md` and follow it.
 
-Your ports: Mac app page http://localhost:1721/ with `window.__ORE_BRIDGE = 1722` (library `/Users/tylerpoelking/Developer/ore-wt/sweep4/codex-out/libs/firstrun`); iPhone app http://localhost:1723/ (its seed is a copy at `/Users/tylerpoelking/Developer/ore-wt/sweep4/codex-out/libs/firstrun-phone`; the page's writes stay in IndexedDB). WebKit server: `ws://[::1]:1739/`. The `ore` CLI: `ORE_LIBRARY=/Users/tylerpoelking/Developer/ore-wt/sweep4/codex-out/libs/firstrun bun packages/cli/src/ore.ts`.
+Your ports: Mac app page http://localhost:1721/ with `window.__ORE_BRIDGE = 1722` (library `/Users/tylerpoelking/Developer/ore-wt/sweep4/codex-out/libs/firstrun`); iPhone app http://localhost:1736/ (its seed is a copy at `/Users/tylerpoelking/Developer/ore-wt/sweep4/codex-out/libs/firstrun-phone`; the page's writes stay in IndexedDB). WebKit server: `ws://[::1]:1739/`. The `ore` CLI: `ORE_LIBRARY=/Users/tylerpoelking/Developer/ore-wt/sweep4/codex-out/libs/firstrun bun packages/cli/src/ore.ts`.
 Your library is empty: made with `ore init` and nothing else. Keep it that way until a step adds to it.
 
 ## Your focus: the first week, from an empty library
