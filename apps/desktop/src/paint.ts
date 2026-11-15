@@ -6,10 +6,12 @@
 // range that leaves are repainted here, by toggling a paint-only style for one frame.
 
 //
-// Highlights paint in two layers over the code's colours, never between them. WebKit's page crashes when a highlight
-// overlaps one under it and one over it at a priority strictly between theirs: a saved highlight over a code block
-// crashed as it opened, its underline (then 0) between the code's colours (-1) and the tint (1), and with the
-// underline put over the tint instead (2) a new highlight crashed as its tint came in under it (Codex sweep 6).
+// Highlights paint in three layers. WebKit's page crashes when a highlight is set that overlaps one under it and one
+// over it at a priority strictly between theirs (a plain page shows it: the same three set in another order paint
+// fine): a saved highlight over a code block crashed as it opened, its underline (then 0) between the code's colours
+// (-1) and the tint (1); with Find open on a word in the code, a highlight made over it came in between Find (2) and
+// the code (Codex sweep 6, review of #440). So a highlight is only ever set as the top layer: what lies over its layer
+// is taken off first and set again after it, lowest first.
 /** The code's colours, and what his highlights' colours win over: the spoken words, a quiz's evidence. */
 export const UNDER = -1;
 /** His highlights' tints and the underlines that go with them (the open one, a looked-up word, Listen's sentence),
@@ -25,7 +27,12 @@ export function paint(name: string, ranges: Range[], layer: Layer) {
   if (ranges.length) {
     const h = new Highlight(...ranges);
     h.priority = layer;
+    const others = [...CSS.highlights].filter(([n]) => n !== name);
+    // Only a layer with something both under and over it can crash; the code's colours (the lowest) never do.
+    const over = others.some(([, o]) => o.priority < layer) ? others.filter(([, o]) => o.priority > layer).sort(([, a], [, b]) => a.priority - b.priority) : [];
+    for (const [n] of over) CSS.highlights.delete(n);
     CSS.highlights.set(name, h);
+    for (const [n, o] of over) CSS.highlights.set(n, o);
   } else CSS.highlights.delete(name);
   if (!before) return;
   const now = new Set<AbstractRange>(ranges);

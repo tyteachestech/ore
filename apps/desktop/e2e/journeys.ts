@@ -3078,7 +3078,8 @@ async function selectPastTheEdge(page: Page, knob = false) {
 }
 // F-new-code-hl-crash: a saved highlight over a code block crashed WebKit's page as it opened (a click, or a drag carried
 // over it): the popup's underline lay between the code's colours and the highlight's tint, a priority WebKit can't paint.
-journey("highlight: a saved highlight over a code block opens in WebKit without taking the page down", async (page) => {
+// F-new-find-hl-crash: with Find open on a word in the code, a highlight made over it came in between Find and the code.
+journey("highlight: a saved highlight over a code block opens in WebKit without taking the page down, with Find open on it too", async (page) => {
   let crashed = false;
   page.on("crash", () => (crashed = true));
   const dir = mkdtempSync(join(tmpdir(), "ore-code-hl-"));
@@ -3102,6 +3103,10 @@ journey("highlight: a saved highlight over a code block opens in WebKit without 
       };
       return [at(ps.find((p) => p.textContent!.startsWith("First words"))!, false), at(ps.find((p) => p.textContent!.startsWith("Last words"))!, true)] as const;
     });
+    // Find open on a word in the code: its matches over the code's colours, then a highlight made between them.
+    await page.keyboard.press("Meta+f");
+    await page.getByLabel(/^Find in /).fill("message");
+    await until("Find marks the word in the code", async () => page.evaluate(() => [...(CSS.highlights.get("find") ?? []), ...(CSS.highlights.get("find-on") ?? [])].length > 0));
     await page.mouse.move(ends[0].x, ends[0].y);
     await page.mouse.down();
     await page.mouse.move(ends[1].x, ends[1].y, { steps: 8 });
