@@ -2979,6 +2979,67 @@ journey("highlight: an edge he dragged is his, so Esc keeps the highlight and �
   await until("⌘Z puts the edge back", async () => (await kept()).includes("That might mean not building"));
 });
 
+/** A long source of numbered passages, for the journeys that select past the screen's edge. */
+const longPassages = (title: string) =>
+  `# ${title}\n\n${Array.from({ length: 40 }, (_, i) => `Passage ${i + 1} goes on about recall and spacing, long enough to wrap across a couple of lines of the reading column.`).join("\n\n")}\n`;
+
+/** Drags from a passage low on the screen to its bottom edge and holds there (Books, Kindle): after a moment the
+ *  page turns and the highlight runs on into the next screen. */
+async function selectPastTheEdge(page: Page, knob = false) {
+  const dir = mkdtempSync(join(tmpdir(), "ore-edge-"));
+  const file = join(dir, "edge.md");
+  writeFileSync(file, longPassages("A passage across the page"));
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "A passage across the page");
+    await page.locator(".doc p", { hasText: "Passage 40 " }).waitFor();
+    await page.waitForTimeout(300);
+    const pane = page.locator(".reader-scroll");
+    const top = () => pane.evaluate((e) => e.scrollTop);
+    const at = await page.evaluate(() => {
+      const b = document.querySelector<HTMLElement>(".reader-scroll")!.getBoundingClientRect();
+      const ps = [...document.querySelectorAll<HTMLElement>(".doc p")];
+      const p = ps.find((p) => p.getBoundingClientRect().top > b.top + b.height / 2 && p.getBoundingClientRect().bottom < b.bottom - 80)!;
+      const last = ps.findLast((p) => p.getBoundingClientRect().top < b.bottom)!;
+      const r = p.getBoundingClientRect();
+      const n = (e: HTMLElement) => Number(e.textContent!.match(/Passage (\d+)/)![1]);
+      return { x: r.left + 1, y: r.top + 6, x2: r.left + r.width / 2, bottom: b.bottom, from: n(p), last: n(last) };
+    });
+    const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+    if (knob) {
+      // A highlight's end knob (D117) dragged there carries it on the same way.
+      await select(page, `Passage ${at.from} goes on`); // scrolls it to the middle
+      await until("the highlight is saved", async () => (await kept()).includes(`Passage ${at.from} goes on`));
+      at.last = await page.evaluate(() => {
+        const b = document.querySelector<HTMLElement>(".reader-scroll")!.getBoundingClientRect();
+        const last = [...document.querySelectorAll<HTMLElement>(".doc p")].findLast((p) => p.getBoundingClientRect().top < b.bottom)!;
+        return Number(last.textContent!.match(/Passage (\d+)/)![1]);
+      });
+      const k = (await page.locator(".grab-edge.end").boundingBox())!;
+      await page.mouse.move(k.x + k.width / 2, k.y + k.height / 2);
+    } else await page.mouse.move(at.x, at.y);
+    const was = await top();
+    await page.mouse.down();
+    // Above the last 20px, where the browser scrolls a drag by itself at once.
+    await page.mouse.move(at.x2, at.bottom - 28, { steps: 8 });
+    await page.waitForTimeout(300);
+    if ((await top()) !== was) throw new Error("the page turned the moment the drag reached the edge, before any pause");
+    await until("held at the bottom, the page turns", async () => (await top()) > was + 300, 3000);
+    await page.waitForTimeout(500); // the turn lands
+    await page.mouse.up();
+    const beyond = `Passage ${at.last + 2} `;
+    await until("the highlight runs from where the drag began into the next screen", async () => (await kept()).some((t) => t.startsWith(`Passage ${at.from} `) && t.includes(beyond)));
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+journey("highlight: a drag held at the bottom of the screen turns the page after a moment and the highlight runs on (Books)", (page) => selectPastTheEdge(page));
+journey("highlight: in WebKit too, a drag held at the bottom of the screen turns the page and the highlight runs on", (page) => selectPastTheEdge(page), "webkit");
+journey("highlight: a highlight's end knob held at the bottom of the screen turns the page and the highlight runs on", (page) => selectPastTheEdge(page, true));
+
 journey("highlight note: what he types is kept when he clicks away or presses Esc, and after a reload", async (page) => {
   await openSource(page, AGENTS);
   const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
@@ -12556,6 +12617,37 @@ journey("phone: a recording plays from a bar above the bottom bar, its timestamp
   await fits44(page, ".player.audio .ctl.play", "Play");
   const left = await page.locator(".doc .ts").first().evaluate((e) => e.getBoundingClientRect().left);
   if (left < 0) throw new Error(`a timestamp starts at x ${Math.round(left)}, off the screen`);
+}, "phone");
+
+journey("phone: a selection handle held at the bottom of the screen turns the page after a moment and the selection runs on (Books)", async (page) => {
+  const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
+  const md = longPassages("Passages on the phone");
+  await phoneWith(page, async () => (await createItem({ root: PHONE_LIB }, { type: "article", title: "Passages on the phone", body: md.slice(md.indexOf("Passage 1 ")) })).dir, async () => {
+    await phoneSource(page, "Passages on the phone");
+    await page.locator(".phone-reader .doc p", { hasText: "Passage 40 " }).waitFor();
+    await page.waitForTimeout(400);
+    const pane = page.locator(".phone-reader .reader-scroll");
+    const top = () => pane.evaluate((e) => e.scrollTop);
+    const was = await top();
+    // As iOS's handles move it: the selection's end dragged down to a word at the bottom of the screen.
+    const from = await page.evaluate(() => {
+      const b = document.querySelector<HTMLElement>(".phone-reader .reader-scroll")!.getBoundingClientRect();
+      const ps = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")];
+      const p = ps.find((p) => p.getBoundingClientRect().top > b.top + b.height / 2)!;
+      const t = p.firstChild as Text;
+      getSelection()!.setBaseAndExtent(t, 0, t, 7);
+      const end = ps.find((q) => q.getBoundingClientRect().bottom > b.bottom - 40)!;
+      const c = document.caretRangeFromPoint(end.getBoundingClientRect().left + 20, Math.min(end.getBoundingClientRect().bottom, b.bottom) - 30)!;
+      getSelection()!.setBaseAndExtent(t, 0, c.startContainer, c.startOffset);
+      return { n: Number(p.textContent!.match(/Passage (\d+)/)![1]), last: Number(end.textContent!.match(/Passage (\d+)/)![1]) };
+    });
+    await page.waitForTimeout(300);
+    if ((await top()) !== was) throw new Error("the page turned before any pause");
+    await until("held at the bottom, the page turns", async () => (await top()) > was + 300, 3000);
+    await page.waitForTimeout(500);
+    const sel = await page.evaluate(() => getSelection()!.toString());
+    if (!sel.startsWith(`Passage ${from.n} `) || !sel.includes(`Passage ${from.last + 2} `)) throw new Error(`the selection didn't run on with the page: “${sel.slice(0, 60)}…${sel.slice(-60)}”`);
+  });
 }, "phone");
 
 journey("phone: a video stays pinned under the top bar while its transcript scrolls", async (page) => {

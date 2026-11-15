@@ -56,6 +56,7 @@ import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
 import { paint, unpaint, unpaintAll } from "./paint";
 import { Working } from "./Working";
+import { edgeTurn, type EdgeTurn } from "./edge-turn";
 
 /** Background enrich gets this long after capture before the reader stops waiting for it. */
 const ENRICH_GIVE_UP_MS = 20 * 60_000;
@@ -2673,6 +2674,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       word.quiet();
     }
     pressedAt.current = { x: e.clientX, y: e.clientY };
+    if (e.button === 0 && !e.ctrlKey && !PHONE) turnWhileDragging();
     setFocus(null); // the mouse takes over from the keyboard focus
     if (popup && !popupRef.current?.contains(e.target as Node)) {
       keepNote();
@@ -2682,6 +2684,39 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     if (lookup && !lookupRef.current?.contains(e.target as Node) && !(e.target as Element).closest?.("[data-radix-popper-content-wrapper]")) closeLookUp();
     setTip(null);
   };
+
+  // A drag that selects past the bottom of the text, held there a moment, turns the page and selects on into
+  // the next screen of it (Books, Kindle); at the top, the one before (edge-turn.ts). Off the pane the Mac's
+  // own drag scrolling takes over.
+  const dragTurn = useRef<EdgeTurn | null>(null);
+  const turnWhileDragging = () => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    dragTurn.current?.stop();
+    const turn = edgeTurn({
+      scroller,
+      band,
+      extend: (x, y) => {
+        const sel = window.getSelection();
+        const el = docEl.current;
+        const c = document.caretRangeFromPoint?.(x, y);
+        if (!sel?.rangeCount || !el || !c || !sel.anchorNode || !el.contains(sel.anchorNode) || !el.contains(c.startContainer)) return;
+        sel.extend(c.startContainer, c.startOffset);
+      },
+    });
+    dragTurn.current = turn;
+    const move = (e: globalThis.MouseEvent) => (e.buttons & 1 ? turn.aim(e.clientX, e.clientY) : end());
+    const end = () => {
+      turn.stop();
+      if (dragTurn.current === turn) dragTurn.current = null;
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", end, true);
+    };
+    document.addEventListener("mousemove", move);
+    // Before the page's mouseup, so the highlight it keeps is the selection as it stands.
+    document.addEventListener("mouseup", end, true);
+  };
+  useEffect(() => () => dragTurn.current?.stop(), []);
 
   // One click opens a link (Safari, Readwise Reader): the web in his browser, a footnote or heading
   // in this page. A drag across one selects text instead: no link opens while text is selected.
@@ -2860,6 +2895,56 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       document.removeEventListener("scroll", settle, true);
     };
   }, []);
+  // iPhone: a selection handle held at the bottom of the text a moment turns the page and the selection runs on
+  // into the next screen, as in Books; its start held at the top turns back (edge-turn.ts). The handles fire no
+  // touch events, so the edge that moved is read from each change of the selection.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!PHONE || !scroller) return;
+    let was: Range | null = null;
+    let side: "start" | "end" = "end";
+    const turn = edgeTurn({
+      scroller,
+      edge: 72, // a finger's handle, and the home indicator below it
+      extend: (x, y) => {
+        const sel = window.getSelection();
+        const c = document.caretRangeFromPoint?.(x, y);
+        const el = docEl.current;
+        if (!sel?.rangeCount || !c || !el || !el.contains(c.startContainer)) return;
+        const r = sel.getRangeAt(0).cloneRange();
+        if (side === "end") r.setEnd(c.startContainer, c.startOffset);
+        else r.setStart(c.startContainer, c.startOffset);
+        if (r.collapsed) return;
+        sel.setBaseAndExtent(r.startContainer, r.startOffset, r.endContainer, r.endOffset);
+      },
+    });
+    const onChange = () => {
+      const sel = window.getSelection();
+      const el = docEl.current;
+      const r = sel?.rangeCount ? sel.getRangeAt(0) : null;
+      if (!r || r.collapsed || !el || !el.contains(r.startContainer) || !el.contains(r.endContainer)) {
+        was = null;
+        return turn.stop();
+      }
+      if (was) {
+        const sameStart = r.compareBoundaryPoints(Range.START_TO_START, was) === 0;
+        const sameEnd = r.compareBoundaryPoints(Range.END_TO_END, was) === 0;
+        if (!sameStart && sameEnd) side = "start";
+        else if (!sameEnd) side = "end";
+      }
+      was = r.cloneRange();
+      const rects = [...r.getClientRects()].filter((b) => b.width > 0 && b.height > 0);
+      const b = side === "end" ? rects.at(-1) : rects[0];
+      if (!b) return;
+      turn.aim(side === "end" ? b.right - 1 : b.left + 1, b.top + b.height / 2, side === "end" ? 1 : -1);
+    };
+    document.addEventListener("selectionchange", onChange);
+    return () => {
+      turn.stop();
+      document.removeEventListener("selectionchange", onChange);
+    };
+  }, [!!doc]); // the pane mounts with the source
+
   const highlightSelection = (intent: Intent) => {
     const r = touchRange.current;
     touchRange.current = null;
@@ -3542,6 +3627,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                   setRepaint((n) => n + 1);
                 }}
                 onDrop={(r, was) => void dropEdge(id, r, was)}
+                band={band}
               />
             );
           })()}
