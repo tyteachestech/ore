@@ -3121,6 +3121,7 @@ journey("highlight: a saved highlight over a code block opens in WebKit without 
     await page.waitForTimeout(500);
     if (crashed) throw new Error("the page crashed");
     await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Close find" }).click();
   } finally {
     await ore("archive", made.id).catch(() => {});
     rmSync(dir, { recursive: true, force: true });
