@@ -55,6 +55,8 @@ import { TablesLine } from "./Tables";
 import { MARKS, UNDER, paint, unpaint, unpaintAll } from "./paint";
 import { Working } from "./Working";
 import { ReadingLooks } from "./phone/ReadingLooks";
+import { sheetLayer, useSwipeDown } from "./phone/sheet";
+import { Trap } from "./Trap";
 import { edgeTurn } from "./edge-turn";
 
 /** Background enrich gets this long after capture before the reader stops waiting for it. */
@@ -3217,7 +3219,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   /** The open source's actions, Readwise Reader's document menu: ⋯ at the top right, right-click on
    *  the title, and ⌘K, each with its shortcut. */
   // D179: once he is reading, the prequestions fold away at the top; the toolbar keeps them in reach.
-  const readingFor = !PHONE && !!doc && !doc.preview && doc.status !== "done" && !!doc.prequestions?.length && (doc.status === "reading" || anns.length > 0);
+  const readingFor = !!doc && !doc.preview && doc.status !== "done" && !!doc.prequestions?.length && (doc.status === "reading" || anns.length > 0);
   const actions: MenuAction[] = !doc
     ? []
     : [
@@ -3470,7 +3472,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
             </Hint>
           )}
           {/* What he has collected sits in the toolbar (Reeder's article tools), never over the text he reads. */}
-          {readingFor && <ReadingFor qs={doc.prequestions!} onOpen={() => setPreqAsk((n) => n + 1)} />}
+          {readingFor && !PHONE && <ReadingFor qs={doc.prequestions!} onOpen={() => setPreqAsk((n) => n + 1)} />}
           {!PHONE && collected}
           {/* Not on the phone: its note is a page of its own, the source already out of sight. */}
           {!PHONE && (
@@ -3839,6 +3841,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           <button className={notes.text?.trim() ? "has" : ""} onClick={() => p.onShowSide("note")}>
             {notes.text?.trim() ? "Note" : "+ Note"}
           </button>
+          {readingFor && <PhoneReadingFor qs={doc.prequestions!} onOpen={() => setPreqAsk((n) => n + 1)} />}
           <button aria-label="Find in source" onClick={openFind}>
             <MagnifyingGlass size={16} aria-hidden="true" />
           </button>
@@ -4038,6 +4041,42 @@ function ReadingFor({ qs, onOpen }: { qs: NonNullable<Doc["prequestions"]>; onOp
         </HoverCard.Content>
       </HoverCard.Portal>
     </HoverCard.Root>
+  );
+}
+
+/** D179 on the iPhone: no hover there, so the chip is a ? in the source's bottom bar and a tap lists the questions
+ *  with his guesses in a bottom sheet, as the reading pill lists the sections. A question goes to the block at the
+ *  top, where he answers it. */
+function PhoneReadingFor({ qs, onOpen }: { qs: NonNullable<Doc["prequestions"]>; onOpen: () => void }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const close = () => setOpen(false);
+  useSwipeDown(box, close, open);
+  return (
+    <>
+      <button className="reading-for" aria-label={readingFor(qs.length)} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+        <PixelQuestion size={14} aria-hidden="true" />
+      </button>
+      {open && sheetLayer(
+        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+          <Trap>
+            <div ref={box} className="panel sheet reading-for-sheet" role="dialog" aria-modal="true" aria-label="What you’re reading for" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } }}>
+              <h2>Reading for</h2>
+              <div className="pick-list">
+                {qs.map((q, i) => (
+                  <button key={i} className="pick-row" onClick={() => { close(); onOpen(); }}>
+                    <span className="name">
+                      {q.q}
+                      {q.before && <span>{q.before}</span>}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Trap>
+        </div>,
+      )}
+    </>
   );
 }
 

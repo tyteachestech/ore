@@ -12,6 +12,7 @@ const BARE: Record<string, [number, string]> = {
   "Palette.tsx": [1, "a search field: nothing to save"],
   "ReviewPick.tsx": [1, "a list of skills to pick: no field"],
   "Outline.tsx": [1, "the sections sheet: a list, no field"],
+  "Reader.tsx": [1, "the phone's Reading for sheet: a list of questions, no field"],
   "Menu.tsx": [1, "an action sheet: rows, no field"],
   "Skills.tsx": [1, "Delete skill's Keep or Archive choice: buttons, no field"],
   "Shortcuts.tsx": [1, "the list of shortcuts: read only"],
