@@ -3492,8 +3492,11 @@ journey("note: /heading 2 and Enter makes a Heading 2, and /etc folder stays pro
   const pm = page.locator(".note-editor .ProseMirror").first();
   await openSource(page, AGENTS);
   await pm.click();
-  await page.keyboard.press("ControlOrMeta+End");
-  await page.keyboard.press("Enter");
+  // An empty note of its own: an earlier journey in the same run can leave the note ending in a formula or a heading.
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await until("the note is empty", async () => ((await pm.textContent()) ?? "").trim() === "");
   await page.keyboard.type("/heading 2", { delay: 20 });
   await page.locator(".note-menu-row.on", { hasText: "Heading 2" }).waitFor();
   await page.keyboard.press("Enter");
