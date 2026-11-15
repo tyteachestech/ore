@@ -3389,6 +3389,11 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .ask-edit-btn { position: absolute; right: 100%; top: 50%; translate: 0 -50%; margin-right: 2px; opacity: 0; }
 .ask-me:hover .ask-edit-btn, .ask-edit-btn:focus-visible { opacity: 1; }
 .ask-edit-btn:hover { color: var(--text); background: var(--bg-hover); }
+/* A message waiting for the reply being written (D-new-queued-message): his bubble at 0.6, and when it goes. */
+.ask-queued { align-self: flex-end; max-width: 80%; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.ask-queued .ask-me { max-width: 100%; opacity: 0.6; }
+.ask-queued .ask-me:hover, .ask-queued .ask-me:focus-within { opacity: 1; }
+.ask-queued-note { font-size: 12px; color: var(--faint); }
 .tutor .field.ask-edit { display: block; align-self: flex-end; width: 80%; border-radius: 14px 14px 4px 14px; }
 .tutor-stopped { margin: 0; color: var(--muted); }
 .tutor-stopped .link { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }

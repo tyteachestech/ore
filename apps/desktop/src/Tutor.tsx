@@ -79,7 +79,7 @@ type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: 
 /** What he has typed and not sent yet, with the @-mentions in it. */
 /** `cases`: what he has written under a tell-apart exercise's two cases, not yet sent, and the turn that asked. */
 /** `files`: what he has attached to the message he is writing (D189). */
-export type TutorDraft = { input: string; mentions: Mention[]; files?: ChatFile[]; cases?: { turn: TutorTurn["id"]; said: string[] } };
+export type TutorDraft = { input: string; mentions: Mention[]; files?: ChatFile[]; cases?: { turn: TutorTurn["id"]; said: string[] }; /** The message he sent while a reply was still being written (D-new-queued-message): it goes when that reply lands. */ queued?: { turn: Omit<TutorTurn, "id" | "pointed">; page: Mention[] } };
 export type TutorChat = ReturnType<typeof useTutorChat>;
 
 /** A file attached to a message (D189): its name, its path from the library's root, and what it is. */
@@ -110,6 +110,14 @@ export function useTutorChat(notify: Notify) {
   const [draft, setDraftState] = useState<TutorDraft>({ input: "", mentions: [] });
   const draftNow = useRef(draft);
   const setDraft = (f: (d: TutorDraft) => TutorDraft) => setDraftState((draftNow.current = f(draftNow.current)));
+  /** Holds a message typed while a reply is being written, to send when it lands (Claude's and ChatGPT's
+   *  queued message). A second one joins the first: one message waits, never a stack. */
+  const hold = (turn: Omit<TutorTurn, "id" | "pointed">, page: Mention[]) =>
+    setDraft((d) => ({ ...d, queued: d.queued ? { ...d.queued, turn: { ...d.queued.turn, message: `${d.queued.turn.message}\n\n${turn.message}`, mentions: [...(d.queued.turn.mentions ?? []), ...(turn.mentions ?? [])], files: [...(d.queued.turn.files ?? []), ...(turn.files ?? [])] } } : { turn, page } }));
+  /** Puts the waiting message back in the field, ahead of anything typed since: he edits it, or the reply
+   *  it waited for failed or was stopped, or he left for another chat. Nothing is sent that he did not see go. */
+  const unqueue = () =>
+    setDraft(({ queued: q, ...d }) => (q ? { ...d, input: d.input.trim() ? `${q.turn.message}\n${d.input}` : q.turn.message, mentions: [...(q.turn.mentions ?? []), ...d.mentions], ...(q.turn.files?.length || d.files?.length ? { files: [...(q.turn.files ?? []), ...(d.files ?? [])] } : {}) } : d));
   const now = useRef(turns);
   const update = (f: (t: TutorTurn[]) => TutorTurn[]) => setTurns((now.current = f(now.current)));
   // The chat on screen: its id (its first turn's) and name; null until he sends its first message.
@@ -189,11 +197,18 @@ export function useTutorChat(notify: Notify) {
       jobs.current.delete(t.id);
       flying.current.delete(t.id);
       patch(chat, t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, steps: r.steps ?? [], marks: r.marks ?? [], ai: r.ai, error: undefined, partial: undefined, searching: undefined }, first ? r.title?.trim() || undefined : undefined);
+      // The message that waited for this reply goes now, if he is still in this chat.
+      const q = draftNow.current.queued;
+      if (q && metaNow.current?.id === chat) {
+        setDraft(({ queued: _q, ...d }) => d);
+        ask(q.turn, q.page);
+      }
     } catch (e) {
       if (!mine()) return;
       jobs.current.delete(t.id);
       flying.current.delete(t.id);
       patch(chat, t.id, { error: errorText(e, "answer that"), partial: undefined, searching: undefined });
+      unqueue();
     } finally {
       stop();
     }
@@ -226,6 +241,7 @@ export function useTutorChat(notify: Notify) {
     const said = t.partial?.replace(CUT_MARKS, "").trim();
     const ai = answering.current.get(t.id);
     patch(chat, t.id, { ...(said ? { reply: said, citations: [], steps: [], marks: [], ...(ai ? { ai } : {}) } : { error: "Stopped." }), stopped: true, partial: undefined, searching: undefined });
+    unqueue();
   };
   /** Asks a turn again: Try again after a failure, Try another reply, or his message edited (`edited`). A
    *  reply it already had is kept as a version he can flip back to (D201); a failure is replaced. */
@@ -295,6 +311,7 @@ export function useTutorChat(notify: Notify) {
   };
   /** A new chat, even while one is thinking (its reply lands in its own saved chat). */
   const fresh = () => {
+    unqueue();
     update(() => []);
     setCarry([]);
     setMeta(null);
@@ -304,6 +321,7 @@ export function useTutorChat(notify: Notify) {
    *  way, was cut off by a quit: it says so and offers Try again. */
   const open = async (id: string) => {
     if (metaNow.current?.id === id) return;
+    unqueue();
     try {
       const c = await serial(() => ore<SavedChat & { root?: string }>("chat", id));
       if (c.root) libraryRoot = c.root;
@@ -354,7 +372,7 @@ export function useTutorChat(notify: Notify) {
   };
   /** A web page a reply cites, in his browser. */
   const openLink = (url: string) => void openUrl(url).catch((e) => notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
-  return { turns, draft, setDraft, carry, drop, ask, stop, retry, version, attach, attaching: attaching > 0, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
+  return { turns, draft, setDraft, carry, drop, ask, queue: hold, unqueue, stop, retry, version, attach, attaching: attaching > 0, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
 }
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
@@ -476,12 +494,17 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
   const send = (text: string, typed = false) => {
     const message = text.trim();
     // A file still being copied in goes with this message, so sending waits for it.
-    if (!message || busy || chat.attaching) return;
+    // While a reply is being written, what he types waits and goes when it lands; a starter or a chip does not queue.
+    if (!message || (busy && !typed) || chat.attaching) return;
     const pointed = mentions.filter((m, i) => message.includes(`@${m.name}`) && mentions.findIndex((x) => x.kind === m.kind && x.id === m.id) === i);
     force.current = true; // what he sends, and its reply, he wants to see
     // What he attached goes with the message he typed, not with a starter or a chip's canned one.
-    chat.ask({ message, ...(context ? { item: context.id, title: context.title, ...(readingAt() ? { at: readingAt() } : {}) } : {}), ...(pointed.length ? { mentions: pointed } : {}), ...(typed && files.length ? { files } : {}) }, scope ? [scope] : []);
-    if (typed) setDraft(() => ({ input: "", mentions: [] }));
+    const turn = { message, ...(context ? { item: context.id, title: context.title, ...(readingAt() ? { at: readingAt() } : {}) } : {}), ...(pointed.length ? { mentions: pointed } : {}), ...(typed && files.length ? { files } : {}) };
+    if (busy) {
+      chat.queue(turn, scope ? [scope] : []);
+      requestAnimationFrame(toEnd);
+    } else chat.ask(turn, scope ? [scope] : []);
+    if (typed) setDraft((d) => ({ input: "", mentions: [], ...(d.queued ? { queued: d.queued } : {}) }));
     setAt(null);
     field.current?.focus();
   };
@@ -805,6 +828,21 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
           </div>
           );
         })}
+        {chat.draft.queued && (
+          // What he sent while the reply above was being written (D-new-queued-message): his bubble, quieter,
+          // saying when it goes; the pencil puts it back in the field to change or drop.
+          <div className="ask-queued">
+            <p className="ask-me">
+              {chat.draft.queued.turn.message}
+              <Hint text="Edit" side="top">
+                <button className="icon-btn ask-edit-btn" aria-label="Edit the waiting message" onClick={() => { chat.unqueue(); field.current?.focus(); }}>
+                  <PencilSimple size={14} aria-hidden="true" />
+                </button>
+              </Hint>
+            </p>
+            <span className="ask-queued-note">Sends when this reply is done</span>
+          </div>
+        )}
         {picked && (() => {
           const t = turns.find((x) => x.id === picked.turn);
           const item = firstSource(t?.citations) ?? t?.item;

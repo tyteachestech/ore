@@ -13454,6 +13454,57 @@ journey("code in a source: its parts are coloured without rewrapping the text, C
   }
 });
 
+journey("tutor: a message sent while a reply is being written waits, goes when the reply lands, and comes back to the field if he edits it or stops the reply (D-new-queued-message)", async (page) => {
+  const held: (() => void)[] = [];
+  const asked: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    const args = JSON.parse(body).args as string[];
+    asked.push(args[1]!);
+    await new Promise<void>((ok) => held.push(ok));
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `Reply to ${args[1]}`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }) }).catch(() => {}); // a stopped reply's request is already gone
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    const waiting = tutor.locator(".ask-queued");
+    await field.fill("First question");
+    await page.keyboard.press("Enter");
+    await tutor.getByRole("button", { name: "Stop the reply" }).waitFor();
+    // Sent mid-reply: it waits in sight, the field is his again, and nothing has been asked yet.
+    await field.fill("Second question");
+    await page.keyboard.press("Enter");
+    await waiting.filter({ hasText: "Second question" }).waitFor();
+    if ((await field.inputValue()) !== "") throw new Error("the field kept the message that is waiting");
+    if (asked.length !== 1) throw new Error(`the waiting message was asked early: ${asked.join(", ")}`);
+    // The pencil puts it back in the field; sent again, it waits again.
+    await waiting.getByRole("button", { name: "Edit the waiting message" }).click();
+    await until("the waiting message is back in the field", async () => (await field.inputValue()) === "Second question" && (await waiting.count()) === 0);
+    await page.keyboard.press("Enter");
+    await waiting.waitFor();
+    // The reply lands: the waiting message goes as his next turn.
+    held.shift()!();
+    await tutor.getByText("Reply to First question").waitFor();
+    await until("the waiting message is asked once the reply lands", async () => asked.length === 2 && asked[1] === "Second question" && (await waiting.count()) === 0);
+    // A message waiting on a reply he stops comes back to the field instead of going.
+    await field.fill("Third question");
+    await page.keyboard.press("Enter");
+    await waiting.filter({ hasText: "Third question" }).waitFor();
+    await tutor.getByRole("button", { name: "Stop the reply" }).click();
+    await until("stopping gives the waiting message back", async () => (await field.inputValue()) === "Third question" && (await waiting.count()) === 0);
+    if (asked.length !== 2) throw new Error("a message waiting on a stopped reply was sent");
+    await field.fill("");
+  } finally {
+    held.forEach((ok) => ok());
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
