@@ -66,11 +66,37 @@ export function readChat(lib: Library, id: string): Chat {
   return parse(readFileSync(f, "utf8"), `chat ${id}`);
 }
 
-/** The saved turns with the new copy's: a turn in both is the new copy's, and one only the file has (another
- *  window's, sent after this copy was read) stays, after the turn it followed. The app never takes a turn out
- *  of a chat, so a missing turn is one this copy never saw, not one deleted (F-new-stale-chat-save). */
+type Turn = Chat["turns"][number];
+/** One message and its reply, as a turn shows it or keeps it among its other versions (D201, the app's chat-versions.ts). */
+type Version = Record<string, unknown>;
+const hasReply = (v: Version) => typeof v.reply === "string";
+const key = (v: Version) => JSON.stringify([v.message, v.reply]);
+const shown = ({ id: _i, alts: _a, alt: _n, ...v }: Turn): Version => v;
+const versionsOf = (t: Turn): Version[] => [...((t.alts as Version[] | undefined) ?? []), ...(hasReply(t) ? [shown(t)] : [])];
+const keptOf = (v: Version) => (typeof v.kept === "string" && v.kept !== "adding" ? v.kept : undefined);
+
+/** One turn as both copies have it. The new copy's, unless the file's has a reply the new one never saw (a
+ *  window that said "No reply came" while another's reply landed); either way every reply either holds stays a
+ *  version, and a card kept from one in either stays kept. */
+function mergeTurn(saved: Turn, next: Turn): Turn {
+  const nextVersions = versionsOf(next);
+  const useNext = hasReply(next) || !hasReply(saved) || nextVersions.some((v) => key(v) === key(saved));
+  const [base, other] = useNext ? [next, saved] : [saved, next];
+  const known = new Set(versionsOf(base).map(key));
+  const extra = versionsOf(other).filter((v) => !known.has(key(v)) && (known.add(key(v)), true));
+  const keptIn = new Map(versionsOf(other).flatMap((v) => (keptOf(v) ? [[key(v), keptOf(v)!] as const] : [])));
+  const withKept = <V extends Version>(v: V): V => (keptOf(v) || !hasReply(v) || !keptIn.has(key(v)) ? v : { ...v, kept: keptIn.get(key(v)) });
+  const alts = [...((base.alts as Version[] | undefined) ?? []), ...extra].map(withKept);
+  if (!alts.length) return withKept(base);
+  return { ...withKept(base), alts, alt: typeof base.alt === "number" ? base.alt : ((base.alts as Version[] | undefined)?.length ?? 0) };
+}
+
+/** The saved turns with the new copy's. A turn only the file has (another window's, sent after this copy was
+ *  read) stays, after the turn it followed: the app never takes a turn out of a chat, so a missing turn is one
+ *  this copy never saw, not one deleted. A turn in both is merged (F-new-stale-chat-save). */
 function merged(saved: Chat["turns"], next: Chat["turns"]): Chat["turns"] {
-  const out = [...next];
+  const was = new Map(saved.map((t) => [t.id, t]));
+  const out = next.map((t) => (was.has(t.id) ? mergeTurn(was.get(t.id)!, t) : t));
   const ids = new Set(next.map((t) => t.id));
   saved.forEach((t, i) => {
     if (ids.has(t.id)) return;
@@ -81,16 +107,17 @@ function merged(saved: Chat["turns"], next: Chat["turns"]): Chat["turns"] {
   return out;
 }
 
-/** Writes the chat (the app sends it after each message and reply), keeping turns saved since this copy was
- *  read. `created` is kept from the file once it exists; `updated` is now, unless `touch` is false (Undo of
- *  a delete puts it back as it was). */
-export async function saveChat(lib: Library, json: string, { touch = true } = {}): Promise<Chat> {
+/** Writes the chat. Given whole, it replaces the file (`ore chat --set`, which can take a turn out); with
+ *  `merge`, as the app saves after each message and reply, it keeps what another window saved since this copy
+ *  was read. `created` is kept from the file once it exists; `updated` is now, unless `touch` is false (Undo
+ *  of a delete puts it back as it was). */
+export async function saveChat(lib: Library, json: string, { touch = true, merge = false } = {}): Promise<Chat> {
   const c = parse(json, "the chat");
   const f = file(lib, c.id);
   return withLock(paths.lock(lib), () => {
     const was = existsSync(f) ? (() => { try { return parse(readFileSync(f, "utf8"), c.id); } catch { return null; } })() : null;
     const now = nowIso();
-    const out: Chat = { ...c, turns: was ? merged(was.turns, c.turns) : c.turns, created: was?.created ?? c.created ?? now, updated: touch || !c.updated ? now : c.updated };
+    const out: Chat = { ...c, turns: was && merge ? merged(was.turns, c.turns) : c.turns, created: was?.created ?? c.created ?? now, updated: touch || !c.updated ? now : c.updated };
     writeAtomic(f, JSON.stringify(out, null, 1) + "\n");
     return out;
   });

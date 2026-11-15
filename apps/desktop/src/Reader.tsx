@@ -636,7 +636,7 @@ type Props = {
   onPin: (item: Item) => void;
   onMove: (item: Item, to: Item["status"]) => void;
   /** A highlight to scroll to once the text is ready (a question on the skill page, D47), or
-   *  `q:start:end`, a quote a card points to (D99), or a ⌘K match: `find:<words>` in the text (the find
+   *  `q:start:end[:n]`, a quote a card or citation points to (D99; n a count, so a repeat click jumps again), or a ⌘K match: `find:<words>` in the text (the find
    *  bar opens on those words at their first place), `note:<words>` in the source note (the note opens,
    *  the find bar on its words), `ann:<id>` a highlight (scrolled to, its popup open). */
   jumpTo?: string;
@@ -1284,8 +1284,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     }
     const active = popup && map.get(popup.id);
     paint("hl-active", active ? [active] : []);
-    // `q:start:end` is a quote a card points to (D99), not a highlight.
-    const q = p.jumpTo?.match(/^q:(\d+):(\d+)$/);
+    // `q:start:end` is a quote a card points to (D99), not a highlight; a citation adds `:n`, a count, so each
+    // click is a new jump. No jump (back or forward) forgets the last, so the same one can go again.
+    if (!p.jumpTo) jumped.current = undefined;
+    const q = p.jumpTo?.match(/^q:(\d+):(\d+)(?::\d+)?$/);
     const jump = jumped.current === p.jumpTo ? undefined : q ? rangeFor(index, src, body, { exact: body.slice(+q[1]!, +q[2]!), prefix: "", suffix: "", start: +q[1]! }) : p.jumpTo && map.get(p.jumpTo);
     const el = scrollRef.current;
     if (jump && el) {

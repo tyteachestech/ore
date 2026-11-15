@@ -133,8 +133,8 @@ export const aiCommands: Record<string, Command> = {
   },
 
   chat: {
-    usage: "[<id> [--set [--keep-time] | --delete]] | --attach <file> | --attach - --name <name>   The tutor's saved chats (D172), chats/<id>.json: list them (last changed first), print one, replace one with the chat JSON on stdin ({id, title, carry, turns}; --keep-time keeps its `updated`, as Undo of a delete does), or delete one (prints it, so it can be set back). --attach copies a file for a message into chats/files/ (an image, a PDF or a text file, 20 MB at most; --attach -: its bytes in base64 on stdin, as pasted) and prints {name, path, kind} (D189)",
-    options: { set: { type: "boolean" }, "keep-time": { type: "boolean" }, delete: { type: "boolean" }, attach: { type: "string" }, name: { type: "string" } },
+    usage: "[<id> [--set [--merge] [--keep-time] | --delete]] | --attach <file> | --attach - --name <name>   The tutor's saved chats (D172), chats/<id>.json: list them (last changed first), print one, replace one with the chat JSON on stdin ({id, title, carry, turns}; --merge keeps turns and replies saved since that copy was read, as the app saves so two windows lose nothing; --keep-time keeps its `updated`, as Undo of a delete does), or delete one (prints it, so it can be set back). --attach copies a file for a message into chats/files/ (an image, a PDF or a text file, 20 MB at most; --attach -: its bytes in base64 on stdin, as pasted) and prints {name, path, kind} (D189)",
+    options: { set: { type: "boolean" }, merge: { type: "boolean" }, "keep-time": { type: "boolean" }, delete: { type: "boolean" }, attach: { type: "string" }, name: { type: "string" } },
     async run([id], f) {
       const lib = openLibrary();
       if (str(f.attach)) {
@@ -146,7 +146,7 @@ export const aiCommands: Record<string, Command> = {
         const json = await readStdin();
         const given = (() => { try { return (JSON.parse(json) as { id?: unknown }).id; } catch { return undefined; } })();
         if (id && given !== id) throw new Error(`the chat on stdin is ${String(given)}, not ${id}`);
-        const c = await saveChat(lib, json, { touch: !f["keep-time"] });
+        const c = await saveChat(lib, json, { touch: !f["keep-time"], merge: !!f.merge });
         return { data: c, text: `Saved chat ${c.id}` };
       }
       if (f.delete) {

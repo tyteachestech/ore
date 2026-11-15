@@ -47,21 +47,48 @@ describe("tutor chats", () => {
   });
 
   // F-new-stale-chat-save: a second window on the same chat saved its copy over the first's, deleting its turn.
-  test("a save from a window that never saw a turn keeps that turn, in its place", async () => {
+  const twoWindows = async () => {
     const lib = await tempLibrary();
-    const shared = { id: "c-1", message: "first", reply: "One." };
+    const save = (turns: object[]) => saveChat(lib, JSON.stringify({ id: "c-1", title: "Two windows", turns }), { merge: true });
+    const turn = (id: string) => readChat(lib, "c-1").turns.find((t) => t.id === id)!;
+    return { lib, save, turn };
+  };
+  const shared = { id: "c-1", message: "first", reply: "One." };
+
+  test("a save from a window that never saw a turn keeps that turn, in its place", async () => {
+    const { lib, save } = await twoWindows();
     const a = { id: "c-2", message: "from window A", reply: "A." };
     const b = { id: "c-3", message: "from window B", reply: "B." };
-    const save = (turns: object[]) => saveChat(lib, JSON.stringify({ id: "c-1", title: "Two windows", turns }));
     await save([shared]);
     await save([shared, a]); // window A
     await save([shared, b]); // window B, opened before A's turn
     expect(readChat(lib, "c-1").turns.map((t) => t.id)).toEqual(["c-1", "c-2", "c-3"]);
     await save([shared, a, { id: "c-4", message: "A again" }]); // A, still without B's
     expect(readChat(lib, "c-1").turns.map((t) => t.id)).toEqual(["c-1", "c-2", "c-3", "c-4"]);
-    // A turn both know is the saving window's: its new reply replaces the old.
-    await save([shared, { ...a, reply: "A, again." }]);
-    expect(readChat(lib, "c-1").turns.find((t) => t.id === "c-2")).toMatchObject({ reply: "A, again." });
+  });
+
+  test("a turn both windows have keeps its reply, every version and the kept card, whichever window saved last", async () => {
+    const { save, turn } = await twoWindows();
+    // B, opened while A's reply was on its way, said none came; A's reply had landed.
+    await save([shared, { id: "c-2", message: "why?", reply: "Because." }]);
+    await save([shared, { id: "c-2", message: "why?", error: "No reply came: Ore closed before it did." }]);
+    expect(turn("c-2")).toMatchObject({ reply: "Because." });
+    expect(turn("c-2").error).toBeUndefined();
+    // A tried another reply (D201) and kept a card from the first; B, still on the first, saves again.
+    await save([shared, { id: "c-2", message: "why?", reply: "Since.", alts: [{ message: "why?", reply: "Because.", kept: "card1" }], alt: 1 }]);
+    await save([shared, { id: "c-2", message: "why?", reply: "Because." }]);
+    const t = turn("c-2") as unknown as { reply: string; alts: { reply: string; kept?: string }[]; alt: number };
+    expect([t.reply, ...t.alts.map((v) => v.reply)].sort()).toEqual(["Because.", "Since."]);
+    expect([t, ...t.alts].find((v) => v.reply === "Because.")).toMatchObject({ kept: "card1" });
+    expect(t.alt).toBeLessThanOrEqual(t.alts.length);
+  });
+
+  test("a retry still being written is the saving window's: the reply it set aside stays a version, not back on top", async () => {
+    const { save, turn } = await twoWindows();
+    await save([shared, { id: "c-2", message: "why?", reply: "Because." }]);
+    await save([shared, { id: "c-2", message: "why?", alts: [{ message: "why?", reply: "Because." }], alt: 1 }]);
+    expect(turn("c-2")).toMatchObject({ alts: [{ reply: "Because." }], alt: 1 });
+    expect(turn("c-2").reply).toBeUndefined();
   });
 
   test("refuses what isn't a chat: no title, no message, a path for an id", async () => {
@@ -81,6 +108,18 @@ describe("tutor chats", () => {
     expect(p.exitCode).not.toBe(0);
     expect(p.stderr.toString()).toContain("the chat on stdin is b-1, not a-1");
     expect(listChats(lib)).toEqual([]);
+  });
+
+  test("`ore chat --set` replaces the chat, so a turn can be taken out; `--merge` keeps turns it never saw (the app's saves)", async () => {
+    const lib = await tempLibrary();
+    const cli = join(import.meta.dir, "../../cli/src/ore.ts");
+    const set = (turns: object[], ...flags: string[]) => Bun.spawnSync(["bun", cli, "chat", "c-1", "--set", ...flags], { env: { ...process.env, ORE_LIBRARY: lib.root }, stdin: Buffer.from(JSON.stringify({ id: "c-1", title: "T", turns })), stderr: "pipe" });
+    const b = { id: "c-2", message: "second", reply: "Two." };
+    expect(set([shared, b]).exitCode).toBe(0);
+    expect(set([shared], "--merge").exitCode).toBe(0);
+    expect(readChat(lib, "c-1").turns.map((t) => t.id)).toEqual(["c-1", "c-2"]);
+    expect(set([shared]).exitCode).toBe(0);
+    expect(readChat(lib, "c-1").turns.map((t) => t.id)).toEqual(["c-1"]);
   });
 
   test("the list skips a file that isn't a chat (Finder junk, a half-synced copy)", async () => {

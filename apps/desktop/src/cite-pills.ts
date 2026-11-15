@@ -1,3 +1,5 @@
+import { inProse, MARKER } from "../../../packages/core/src/markers";
+
 // How a tutor reply's citations read (ChatGPT's desktop app): each run of [n] markers becomes one small
 // pill named for its source, "britannica +1" for a run of two, with the passage or page on hover.
 
@@ -14,5 +16,7 @@ export function siteName(site: string): string {
 /** The reply's Markdown with each run of markers ("[1]", "[1][2]", "[1] [2]") as one link to
  *  `#cite-1,2`, which the reply renders as a pill; a [n] that starts a Markdown link is left alone. */
 export const citeRuns = (text: string) =>
-  // Code (fenced or inline) keeps its brackets: xs[1] there is an index, not a citation.
-  text.split(/(```[^]*?(?:```|$)|`[^`\n]*`)/).map((part, i) => (i % 2 ? part : part.replace(/(?:[ \t]?\[\d+\](?!\())+/g, (run) => ` [·](#cite-${[...new Set(run.match(/\d+/g)!)].join(",")})`))).join("");
+  // A marker as the tutor's check reads one (core's MARKER): code, a formula and an index right after a name
+  // (`arr[2]`) keep their brackets.
+  inProse(text, (prose) => prose.replace(RUN, (run) => ` [·](#cite-${[...new Set(run.match(/\d+/g)!)].join(",")})`));
+const RUN = new RegExp(`(?:[ \\t]?${MARKER.source.replace(/^ \?/, "")}(?!\\())+`, "gu");

@@ -1110,6 +1110,10 @@ journey("tutor citation: a numbered source in a reply opens that source at the q
     await tutor.getByRole("button", { name: `Source 2: ${TESTING}` }).click();
     await until("the second quoted passage is marked", async () => (await active()) === quote2);
     if ((await page.locator(".reader-scroll").evaluate((e) => e.scrollTop)) === top) throw new Error("the second citation left the page where the first put it");
+    // The same citation again, after he scrolled away, goes again.
+    await page.locator(".reader-scroll").evaluate((e) => (e.scrollTop = 0));
+    await tutor.getByRole("button", { name: `Source 2: ${TESTING}` }).click();
+    await until("the same citation clicked again goes back to its passage", async () => (await page.locator(".reader-scroll").evaluate((e) => e.scrollTop)) > 0);
   } finally {
     await page.unroute(/\/ore$/); // a failure here mustn't answer later journeys' tutor calls
   }

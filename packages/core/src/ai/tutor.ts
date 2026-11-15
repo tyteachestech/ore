@@ -2,6 +2,7 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { locate } from "../anchoring.ts";
+import { inProse, MARKER, markerNumbers } from "../markers.ts";
 import { findItem, listItems, type AiStamp } from "../items.ts";
 import { readAnnotations } from "../annotations.ts";
 import { blankProblem, cardTextProblem, ContentType, hideBlanks, listCards, writeNewCard, type Card } from "../cards.ts";
@@ -157,17 +158,11 @@ export function tutorPassages(lib: Library, query: string, focus: TutorFocus = {
 /** While a reply is written: its text so far ("" when a retry starts it over), or a web search starting or done. Codex sends its reply whole, so from it only the search shows. */
 export type TutorProgress = { reply: string } | { searching: boolean } | { ai: AiStamp };
 
-/** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. */
 /** What a quote from a web page is checked against: its title as the search gave it, then the results' text,
  *  which lists titles JSON-escaped (a title with "quotes" in it reads \"quotes\" there). */
-// A citation marker, [n], is in the reply's prose: `xs[1]` in code, an index right after a name, and [0]
-// are his reply's own words (F-new-code-index-marker).
-const MARKER = / ?(?<![\p{L}\p{N}_])\[(\d+)\]/gu;
-/** The text with `f` applied to what is outside its code spans and blocks. */
-const outsideCode = (text: string, f: (prose: string) => string) =>
-  text.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((part, at) => (at % 2 ? part : f(part))).join("");
 const pageWords = (page: { title: string; text: string }) => `${page.title}\n${page.text}`;
 
+/** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. */
 export async function tutor(lib: Library, message: string, { earlier = [], files = [], onProgress, ...focus }: { earlier?: TutorTurn[]; files?: { name: string; path: string }[]; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
   const m = withDiagrams(lib, focus.item, message.trim());
   if (!m) throw new Error("message is empty");
@@ -261,7 +256,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
       const keep = d.citations.map((c) => isWebUrl(c.passage) || mend(c, byId.get(c.passage)?.text));
       if (keep.includes(false)) {
         repaired.dropped += keep.filter((k) => !k).length;
-        const renumber = (text: string) => outsideCode(text, (part) => part.replace(MARKER, (all, n: string) => {
+        const renumber = (text: string) => inProse(text, (part) => part.replace(MARKER, (all, n: string) => {
           const i = +n - 1;
           if (i < 0 || i >= keep.length) return all;
           return keep[i] ? `${all.startsWith(" ") ? " " : ""}[${keep.slice(0, i + 1).filter(Boolean).length}]` : "";
@@ -271,7 +266,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
         d.citations = d.citations.filter((_, i) => keep[i]);
         d.general = true;
       }
-      const top = Math.max(0, ...[d.reply, ...d.steps].flatMap((text) => { const ns: number[] = []; outsideCode(text, (part) => (part.replace(MARKER, (all, n: string) => (ns.push(+n), all)))); return ns; }));
+      const top = Math.max(0, ...[d.reply, ...d.steps].flatMap(markerNumbers));
       if (d.steps.length === 1 || d.steps.length > 6) return "steps: give 2 to 6 steps, or [] when the reply isn't a worked answer";
       if (d.steps.length && (d.hint || d.exercise)) return "steps are a worked answer: not with a hint or an exercise";
       if (top > d.citations.length) return `marker [${top}] has no citation`;
