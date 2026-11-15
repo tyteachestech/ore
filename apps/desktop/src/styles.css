@@ -264,6 +264,22 @@ kbd {
 .filter input { flex: 1; min-width: 0; background: none; border: 0; outline: none; font: inherit; font-size: 13px; color: var(--text); }
 .filter input::placeholder { color: var(--faint); }
 .filter kbd { font-size: 11px; color: var(--faint); }
+/* Filters (D286), Linear's: a Filter button left of the search, then a chip per field. */
+.filter-add { margin-left: auto; height: 28px; padding: 0 10px; border-radius: 7px; color: var(--muted); font-size: 13px; }
+.filter-add:hover, .filter-add[data-state="open"] { background: var(--bg-hover); color: var(--text); }
+.filter-add + .filter, .filter-add + * > .filter { margin-left: 0; }
+.filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 6px 22px 2px; }
+.filter-chip { display: inline-flex; align-items: center; height: 24px; border-radius: 6px; border: 1px solid var(--border); font-size: 12px; color: var(--text); }
+.filter-chip-open { display: inline-flex; align-items: center; gap: 6px; height: 100%; padding: 0 4px 0 8px; border-radius: 5px 0 0 5px; max-width: 28ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.filter-chip-field { color: var(--muted); }
+.filter-chip-x { display: grid; place-items: center; width: 22px; height: 100%; border-radius: 0 5px 5px 0; color: var(--faint); }
+.filter-chip-open:hover, .filter-chip-open[data-state="open"], .filter-chip-x:hover { background: var(--bg-hover); color: var(--text); }
+.filter-clear { height: 24px; padding: 0 8px; border-radius: 6px; color: var(--muted); font-size: 12px; }
+.filter-clear:hover { background: var(--bg-hover); color: var(--text); }
+.filter-menu [cmdk-item] .menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.filter-menu [cmdk-item] .filter-n { margin-left: 8px; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.filter-menu [cmdk-item] .check { width: 12px; margin-left: 8px; }
+.filter-menu [cmdk-item] .sub-caret { margin-left: auto; color: var(--faint); }
 .list-group { padding: 12px 12px 4px; color: var(--faint); font-size: 12px; font-weight: 600; }
 .row .kind { flex: none; color: var(--faint); font-size: 12px; }
 /* Thumbnail left of the title (D77) in every list of sources: one fixed box so titles line up; kind
@@ -333,6 +349,9 @@ img.thumb { filter: brightness(0.86); }
 .row > .cell, .feed-head > .cell { display: contents; } /* the grid row's one cell; the row lays its parts out */
 .row:hover { background: var(--bg-hover); }
 .row.on, .row.sel { background: var(--bg-active); }
+/* Picked rows that touch read as one block (D283; Finder, Linear): only the run's outer corners are round. */
+.row.sel:has(+ .row.sel) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.row.sel + .row.sel { border-top-left-radius: 0; border-top-right-radius: 0; }
 .list:focus-visible { outline: none; }
 .list:focus-visible .row.on { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
 .row .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -453,6 +472,13 @@ img.thumb { filter: brightness(0.86); }
   z-index: 30; background: var(--bg-raised); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px;
   box-shadow: var(--float); overflow: hidden;
 }
+/* A popup or menu grows from what he pressed, or from the pointer on a right-click (D280; Radix gives
+   the origin on the side it landed), and leaves quicker than it came. From the keyboard it appears and goes
+   at once (input-mode.ts sets data-keys). A submenu opens at hover speed, so it does not move. */
+.popover[data-state] { transform-origin: var(--radix-popper-transform-origin); }
+:root:not([data-keys]) .popover[data-state="open"]:not(.menu-sub) { animation: pop-in var(--t-3) var(--ease-out); }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.96); } }
+@media (prefers-reduced-motion: reduce) { .popover[data-state] { animation: none !important; } }
 .popover.menu { width: 260px; border-radius: 10px; }
 .popover.menu [cmdk-list] { max-height: 240px; padding: 4px; }
 .popover.menu [cmdk-item] { height: 30px; }
@@ -531,6 +557,18 @@ img.thumb { filter: brightness(0.86); }
 }
 /* A long add (a course's lessons, a pasted list): the share done as a bar along the foot. Each step eases
    to its new width (Finder's copy bar); the label keeps one width as the count ticks. */
+/* The bar of a pick (PickBar.tsx, D283): the toast's surface at the window's foot; toasts stand above it while it is up. */
+.pick-bar { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 2px; padding: 5px 6px 5px 14px; background: var(--bg-raised); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 10px; box-shadow: var(--float); font-size: 13px; white-space: nowrap; animation: pick-in var(--t-3) var(--ease-out); }
+.pick-n { color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
+.pick-bar button { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 9px; border-radius: 6px; color: var(--text); }
+.pick-bar button svg { color: var(--muted); }
+.pick-bar button:hover, .pick-bar button[aria-expanded="true"] { background: var(--bg-hover); }
+.pick-bar button:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.pick-bar .pick-x { padding: 0; width: 28px; justify-content: center; }
+.pick-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
+body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
+@keyframes pick-in { from { opacity: 0; transform: translate(-50%, 4px) scale(0.97); } }
+@media (prefers-reduced-motion: reduce) { .pick-bar { animation: none; } }
 .toast:has(.toast-bar) { overflow: hidden; min-width: 300px; }
 /* A long title in a message is cut after two lines (Linear); an error keeps every word, to read and copy. */
 .toast:not([data-kind="error"]) .toast-msg { min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
@@ -937,6 +975,12 @@ body.resizing iframe { pointer-events: none; }
 .player.audio > .scrub { margin-top: 0; }
 .player.audio .video-error { position: static; padding: 8px 0; background: none; place-content: start; }
 .scrub-tick { position: absolute; top: 50%; width: 2px; height: 8px; margin-left: -1px; transform: translateY(-50%); background: var(--muted); pointer-events: none; }
+/* Sections on the bar: a gap of the page's colour where each starts, and the time and heading under the pointer. */
+.scrub-cut { position: absolute; top: 50%; width: 3px; height: 7px; margin-left: -1.5px; transform: translateY(-50%); background: var(--bg); pointer-events: none; }
+.scrub:hover .scrub-track { height: 5px; }
+.scrub-tip { position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); display: flex; gap: 8px; align-items: baseline; max-width: min(320px, 100%); padding: 4px 8px; border-radius: 4px; background: var(--bg-raised); box-shadow: var(--float); font-size: 12px; white-space: nowrap; pointer-events: none; z-index: 2; }
+.scrub-tip b { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--text); }
+.scrub-tip span { overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .popover.speed { width: 330px; padding: 14px 14px 12px; }
 .speed-head { font-weight: 600; color: var(--muted); margin-bottom: 12px; }
 .speed-head b { color: var(--text); font-variant-numeric: tabular-nums; }
@@ -1472,6 +1516,15 @@ body.resizing iframe { pointer-events: none; }
 button.skill-badge:hover { filter: brightness(1.2); }
 .skill-badge.tinted { background: color-mix(in srgb, var(--skill) 17%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--skill) 26%, transparent); }
 .skill-badge .initial { font-size: 20px; font-weight: 700; color: var(--skill); }
+/* The player's controls take a click 4px above and below what they draw (D282; Dice UI's hitbox): one row,
+   nothing above or below to steal from, and up and down only, so neighbours side by side never take each other's
+   clicks. Not every small button: stacked ones (a toast's ×, the tutor's lists) would. */
+:where(.controls .ctl) { position: relative; }
+:where(.controls .ctl)::after { content: ""; position: absolute; inset: -4px 0; }
+/* The full text of a title cut off by an ellipsis, laid over it (full-text.ts; Finder's expansion tooltip). */
+.full-text { position: fixed; z-index: 40; pointer-events: none; white-space: normal; overflow-wrap: anywhere; background: var(--bg-raised); border-radius: 4px; box-shadow: var(--float); }
+/* A control with its own hint shows the hint, never both: both wait the same 400ms, so either may come first. */
+body:has(.hint) .full-text { display: none; }
 .icon-btn { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; color: var(--faint); }
 .icon-btn:hover { background: var(--bg-hover); color: var(--text); }
 /* D132: one quiet line (Linear), no band: the question in muted, a small bordered Start whose hint carries the why. */
@@ -2464,6 +2517,21 @@ button.home-plan:hover { color: var(--text); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* A list that hides rows below its foot fades its last one (more.ts sets data-more; D281), and stops
+   fading at the end. A sticky strip the colour of the surface, so the rows fade and the surface does not. */
+.fade-more::after {
+  content: ""; display: block; position: sticky; bottom: calc(-1 * var(--fade-pad, 0px)); z-index: 1; height: 32px;
+  margin: -32px calc(-1 * var(--fade-pad, 0px)) 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(to bottom, transparent, var(--fade-to, var(--bg-raised))); transition: opacity var(--t-2) var(--ease-out);
+}
+.fade-more[data-more]::after { opacity: 1; }
+.sidebar.fade-more { --fade-to: var(--bg-side); --fade-pad: 8px; }
+/* Sticky edges sit inside the scroller's padding, so the sidebar's strip reaches past its foot room to the window's foot. */
+.sidebar.fade-more::after { bottom: calc(-1 * var(--mole-room)); height: 56px; margin: -56px -8px 0; }
+.menu-list.fade-more { --fade-pad: 4px; }
+[cmdk-list].fade-more { --fade-pad: 6px; }
+@media (prefers-reduced-motion: reduce) { .fade-more::after { transition: none; } }
 
 /* Object menus (Menu.tsx): right-click and the row's ⋯ show the same list, macOS-style. */
 /* No taller than the room Radix finds beside its trigger, scrolling past it, so a ⋯ menu in a short window never runs off the top. */

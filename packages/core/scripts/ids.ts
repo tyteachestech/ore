@@ -50,7 +50,9 @@ if (import.meta.main) {
   let files: string[] = [];
   try {
     // No `\b`: macOS's git grep -E takes it for a plain "b" and finds nothing, so no file was renumbered (F97).
-    files = execFileSync("git", ["grep", "-lE", "[FD]-new-[a-z0-9]"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
+    // --untracked: a test file written on the branch and not yet added still holds placeholders; skipped, it reached
+    // master with one and broke this script for every thread (#408).
+    files = execFileSync("git", ["grep", "--untracked", "-lE", "[FD]-new-[a-z0-9]"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
   } catch {} // git grep exits 1 when nothing matches
   files = files.filter((f) => !f.endsWith("scripts/ids.ts") && !f.endsWith("test/ids.test.ts"));
   const out = files.map((f) => [f, renumber(read(f), map)] as const); // all or nothing: a bad name writes no file

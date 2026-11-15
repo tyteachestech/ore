@@ -21,6 +21,9 @@ import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
 import { Radio } from "./Radio";
+import { PickBar } from "./PickBar";
+import { useGlide } from "./glide";
+import { FullText } from "./full-text";
 import { CHANNELS } from "./ambience-art";
 import { stop as stopAmbience, toggle as playAmbience, ambienceState } from "./ambience";
 import { Reader, type PracticeRef } from "./Reader";
@@ -47,6 +50,8 @@ import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
 import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
+import { FilterButton, FilterChips } from "./FilterBar";
+import { passes, type Filter } from "./filters";
 import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
@@ -1092,7 +1097,10 @@ export function App() {
 
   const inSkill = useMemo(() => (items ?? []).filter((i) => !skill || i.skills.includes(skill)), [items, skill]);
   const archivedInSkill = useMemo(() => archived.filter((i) => !skill || i.skills.includes(skill)), [archived, skill]);
-  const tabRows = useMemo(
+  /** All sources' filters (D286): by kind, skill or author, let go on leaving the list. */
+  const [filters, setFilters] = useState<Filter[]>([]);
+  useEffect(() => setFilters([]), [skill]);
+  const tabAll = useMemo(
     // Last touched (added or opened) first, D110. Archived: last archived first.
     () =>
       status === "archived"
@@ -1103,6 +1111,7 @@ export function App() {
             .sort((a, b) => Number(!a.pinned_at) - Number(!b.pinned_at) || (a.pinned_at ?? "").localeCompare(b.pinned_at ?? "") || touched(b).localeCompare(touched(a))),
     [inSkill, archivedInSkill, status],
   );
+  const tabRows = useMemo(() => (filters.length ? tabAll.filter((i) => passes(i, filters)) : tabAll), [tabAll, filters]);
   /** A list's search (⌘F on All sources, the magnifying glass on a skill page, D203): sources known by
    *  the words first, best match first (title, then course, author, site, skill, type; a typo still
    *  finds it), then sources whose text, highlights or note match (`ore search`), each with its line. */
@@ -1183,10 +1192,10 @@ export function App() {
       if ((status === "done") !== !next) continue;
       const open = openCourses.includes(c.id);
       const head: Line = { kind: "course", id: c.id, title: c.title, url: c.url, lessons, next, open };
-      out.push(open ? [head, ...lessons.map((l): Line => ({ kind: "item", item: l, lesson: true }))] : [head]);
+      out.push(open ? [head, ...lessons.filter((l) => passes(l, filters)).map((l): Line => ({ kind: "item", item: l, lesson: true }))] : [head]);
     }
     return out;
-  }, [tabRows, inSkill, status, openCourses]);
+  }, [tabRows, inSkill, status, openCourses, filters]);
   const lines = useMemo(
     (): Line[] => (q ? rows.map((item) => ({ kind: "item", item })) : (onSkillPage && !showAll ? groups.slice(0, SKILL_CAP) : groups).flat()),
     [q, rows, groups, onSkillPage, showAll],
@@ -1194,7 +1203,7 @@ export function App() {
   // When the selected row leaves the list in place (archived, moved to Done), the row after it takes the
   // selection, else the one before (Finder, Mail, Linear), never the first row: a second A then archives
   // the row he sees selected.
-  const listView = `${place}|${skill}|${status}|${q}`;
+  const listView = `${place}|${skill}|${status}|${q}|${JSON.stringify(filters)}`;
   const drawn = useRef<{ view: string; lines: Line[] }>({ view: listView, lines: [] });
   const found = lines.find((l) => lineKey(l) === cursor);
   const neighbour = !found && cursor && drawn.current.view === listView ? lineAfter(drawn.current.lines, lines, cursor) : undefined;
@@ -1204,6 +1213,8 @@ export function App() {
     // For good, so a list read that still has the gone row doesn't hand the selection back to it.
     if (neighbour) setCursor(lineKey(neighbour));
   }, [listView, lines, neighbour]);
+  // Text matches arrive after the title matches: a new view, so they appear without rising as an Undo would.
+  useGlide(listRef, lines, `${listView}|${openId}|${q ? byText.length : ""}`);
   const itemIds = useMemo(() => lines.flatMap((l) => (l.kind === "item" ? [l.item.id] : [])), [lines]);
   /** The picked sources still in view, in list order. */
   const many = useMemo(() => {
@@ -1236,7 +1247,7 @@ export function App() {
   useEffect(() => {
     boxDrag.current?.();
     unpick();
-  }, [status, skill, q, openId, place]);
+  }, [status, skill, q, openId, place, filters]);
   /** A drag from blank space beside the rows boxes the ones it crosses (D194, Finder; the note's D188):
    *  a pick like ⇧-click's, from the row it began by to the one it reached; ⇧ adds, ⌘ toggles. */
   const boxPick = (): RowPick => {
@@ -2161,7 +2172,11 @@ export function App() {
           </button>
         </div>
       )}
-      {!listError && items && !q && rows.length === 0 && <div className="empty-state">{empty(status, keys)}</div>}
+      {!listError && items && !q && rows.length === 0 && (filters.length ? (
+        <div className="empty-state">
+          Nothing in {TABS.find((s) => s.id === status)?.label ?? "Archived"} matches these filters. <button className="link" onClick={() => setFilters([])}>Clear them</button>
+        </div>
+      ) : <div className="empty-state">{empty(status, keys)}</div>)}
       {q && hits.q === q && hits.error && <div className="empty-state err" role="alert">Couldn’t search the text: {hits.error} Titles still filter.</div>}
       {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">Nothing in {TABS.find((s) => s.id === status)?.label ?? "Archived"} matches “{q}”.</div>}
       {/* A grid, not a listbox: a row holds its own controls (chips, ⋯), which an option may not (ARIA's layout grid). */}
@@ -2236,6 +2251,7 @@ export function App() {
     <>
       <div className="list-bar">
         {view}
+        <FilterButton items={tabAll} skills={skills} filters={filters} onChange={setFilters} />
         <Hint text="Filter by title, then text, highlights and notes" keys="filter">
           <label className="filter">
             <MagnifyingGlass size={13} aria-hidden="true" />
@@ -2261,6 +2277,7 @@ export function App() {
           </label>
         </Hint>
       </div>
+      <FilterChips items={tabAll} skills={skills} filters={filters} onChange={setFilters} />
       {list}
     </>
   );
@@ -2344,6 +2361,7 @@ export function App() {
         {tutorButton}
         {/* The ambience radio, the mole's twin at the bottom left (D254). */}
         {!PHONE && <Radio open={radioOpen} onOpenChange={setRadioOpen} />}
+        {!PHONE && <FullText />}
         <span className="sr-only" role="status">{unheard.said ? `The tutor answered: ${unheard.said}` : ""}</span>
         {/* A skill page is the same page wherever it was opened from: a place change under it (its folder tab,
             ⌘1, from Home) must not remount it and drop the tab that has focus (F55). */}
@@ -2597,6 +2615,7 @@ export function App() {
           notify={notify}
         />
       )}
+      {!PHONE && !openId && !overlay && many.length > 1 && <PickBar n={many.length} actions={manyActions()} onClear={unpick} />}
       {/* Hidden under a drop, but kept mounted: the toasts are a live region, read only if it was there first. */}
       <div style={{ display: "contents", visibility: dropping ? "hidden" : undefined }}>{toast}</div>
     </div>

@@ -3,6 +3,7 @@ import * as ContextMenu from "@radix-ui/react-context-menu";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { Hint } from "./Hint";
+import { more } from "./more";
 import { keepKeysIn } from "./keys";
 import { useLite } from "./Lite";
 import { nativeMenu } from "./native-menu";
@@ -134,7 +135,7 @@ export function WithMenu({ actions, children, keepFocus, hold, plain }: { action
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="popover menu-list" collisionPadding={8} onCloseAutoFocus={(e) => closed(e, keepFocus, row.current)} onKeyDown={keepKeysIn}>
+        <ContextMenu.Content ref={more} className="popover menu-list" collisionPadding={8} onCloseAutoFocus={(e) => closed(e, keepFocus, row.current)} onKeyDown={keepKeysIn}>
           <Later>{() => listOf(actions).map((a, i) => (
             <Fragment key={a.id}>
             {a.divider && i > 0 && <ContextMenu.Separator className="menu-sep" />}
@@ -146,7 +147,7 @@ export function WithMenu({ actions, children, keepFocus, hold, plain }: { action
                   <CaretRight className="menu-caret" size={11} weight="bold" aria-hidden="true" />
                 </ContextMenu.SubTrigger>
                 <ContextMenu.Portal>
-                  <ContextMenu.SubContent className="popover menu-list menu-sub" sideOffset={4} collisionPadding={8}>
+                  <ContextMenu.SubContent className="popover menu-list menu-sub" sideOffset={4} alignOffset={-5} collisionPadding={8}>
                     {a.sub.map((b) =>
                       b.checked === undefined ? (
                         <ContextMenu.Item key={b.id} className="menu-item" onSelect={later(b.run)}>
@@ -233,7 +234,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
         <DropdownMenu.Trigger asChild>{button}</DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (hoverOnly && !keepFocus && focusRow(e, self.current), closed(e, keepFocus, self.current?.closest<HTMLElement>("[data-menu-row]")))} onClick={(e) => e.stopPropagation()} onKeyDown={keepKeysIn}>
+        <DropdownMenu.Content ref={more} className="popover menu-list" align={align} sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => (hoverOnly && !keepFocus && focusRow(e, self.current), closed(e, keepFocus, self.current?.closest<HTMLElement>("[data-menu-row]")))} onClick={(e) => e.stopPropagation()} onKeyDown={keepKeysIn}>
           <Later>{() => listOf(actions).map((a, i) => (
             <Fragment key={a.id}>
             {a.divider && i > 0 && <DropdownMenu.Separator className="menu-sep" />}
@@ -245,7 +246,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
                   <CaretRight className="menu-caret" size={11} weight="bold" aria-hidden="true" />
                 </DropdownMenu.SubTrigger>
                 <DropdownMenu.Portal>
-                  <DropdownMenu.SubContent className="popover menu-list menu-sub" sideOffset={4} collisionPadding={8} onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenu.SubContent className="popover menu-list menu-sub" sideOffset={4} alignOffset={-5} collisionPadding={8} onClick={(e) => e.stopPropagation()}>
                     {a.sub.map((b) =>
                       b.checked === undefined ? (
                         <DropdownMenu.Item key={b.id} className="menu-item" onSelect={later(b.run)}>
