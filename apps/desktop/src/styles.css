@@ -652,8 +652,8 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
   margin-left: max(0px, 50% - var(--measure) / 2 - var(--lead));
   margin-right: 0;
 }
-.doc-head h1 { font-size: 30px; line-height: 1.25; font-weight: 700; text-wrap: balance; margin: 8px 0 6px; letter-spacing: -0.01em; user-select: text; -webkit-user-select: text; }
-.doc-head .by { color: var(--text); font-size: 13px; margin-right: 4px; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.doc-head h1, .doc-opening h1 { font-size: 30px; line-height: 1.25; font-weight: 700; text-wrap: balance; margin: 8px 0 6px; letter-spacing: -0.01em; user-select: text; -webkit-user-select: text; }
+.doc-head .by, .doc-opening .by { color: var(--text); font-size: 13px; margin-right: 4px; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-head button.by { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; cursor: text; }
 .doc-head button.by:hover { color: var(--text); }
 .doc-head .by-add { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; margin-right: 8px; color: var(--faint); cursor: text; }
@@ -662,8 +662,8 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .doc-thumb { display: block; height: 128px; max-width: 100%; width: auto; object-fit: cover; object-position: top; border-radius: 0; margin: 8px 0 14px; outline: 1px solid rgba(255, 255, 255, 0.08); outline-offset: -1px; }
 .doc-thumb.none { display: none; }
 /* The byline is its own line group, then the original link 18px on (or flush left when it wraps); 28px clears it from the text. */
-.doc-head .chips { margin-bottom: 28px; align-items: center; column-gap: 18px; }
-.doc-head .byline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.doc-head .chips, .doc-opening .chips { margin-bottom: 28px; align-items: center; column-gap: 18px; }
+.doc-head .byline, .doc-opening .byline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
 /* In the byline it takes the byline's size (Reeder's byline). */
 .doc-head .chips-button { flex-wrap: wrap; }
 .doc-head .chips-button .chip { font-size: 13px; }
@@ -2945,7 +2945,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .quiz-points li { position: relative; min-height: 44px; align-items: center; }
 .phone .quiz-points .quiz-mark::before { content: ""; position: absolute; inset: 0; }
 /* A long title stops at four lines, as Books does; a tap on it shows the rest (the Sources row cuts it too). */
-.phone .doc-head h1 { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; font-size: 26px; }
+.phone :is(.doc-head, .doc-opening) h1 { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; font-size: 26px; }
 .phone .doc-head h1.whole { -webkit-line-clamp: unset; }
 /* A tap leaves :hover on the element under the finger: on touch, hover looks like rest. */
 @media (hover: none) {

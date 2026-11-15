@@ -3190,12 +3190,13 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     return (
       <div className="reader">
         {/* Its title and author stand where they will be, from the row he clicked (Linear and Notion draw
-            the page's head before its body), so the open is never an empty pane. */}
+            the page's head before its body), so the open is never an empty pane.
+            Its own class: `.doc-head` means the source is read and its title can be worked. */}
         <div className="reader-pane">
         <div className="reader-scroll">
           <div className="page">
             {p.known && (
-              <header className="doc-head">
+              <header className="doc-opening">
                 <h1>{p.known.title}</h1>
                 {p.known.author && <div className="chips"><span className="byline"><span className="by">{p.known.author}</span></span></div>}
               </header>

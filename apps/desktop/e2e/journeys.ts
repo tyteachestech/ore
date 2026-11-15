@@ -13384,6 +13384,8 @@ journey("all sources: a search that matches nothing offers Clear the search, and
   const bar = (await page.locator("main .list-bar").boundingBox())!;
   if (Math.abs(bar.x - (box.x + 12)) > 1) throw new Error(`the head starts at ${bar.x}, the rows' text column at ${box.x + 12}`);
   await page.keyboard.press("Meta+f");
+  const search = page.getByRole("textbox", { name: "Search sources" });
+  await until("⌘F puts the keys in the search", () => search.evaluate((el) => el === document.activeElement));
   await page.keyboard.type("zzqqzz");
   await page.getByRole("button", { name: "Clear the search" }).click();
   await row.waitFor();
@@ -13396,7 +13398,7 @@ journey("opening a source: its title stands at once where it will stay, the pane
   await row.waitFor();
   await page.evaluate(() => ((window as Slow).__ORE_SLOW = { show: 1500 }));
   await row.click();
-  const early = page.locator(".reader .doc-head h1");
+  const early = page.locator(".reader .doc-opening h1");
   await early.waitFor({ timeout: 1000 });
   if ((await early.innerText()) !== TESTING) throw new Error("the title is not drawn while the source opens");
   const before = (await early.boundingBox())!;
