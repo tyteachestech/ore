@@ -5,6 +5,7 @@
 // Every word here was written for Ore (no copied text); studies are named where a fact rests on one.
 // On the Mac: ORE_LIBRARY=~/OreDemo open -n /Applications/Ore.app   (never seed over ~/Ore)
 import { addMess } from "./mess.ts";
+import { demoThumb } from "./demo-thumbs.ts";
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -34,7 +35,7 @@ const iso = (daysAgo: number) => at(daysAgo).toISOString().replace(/\.\d+Z$/, "Z
 
 // The skills a new library starts with that this person never used.
 for (const id of ["creativity", "self-regulation-motivation"]) await removeSkill(lib, id);
-for (const [id, look] of [
+const LOOKS: Record<string, { icon: string; color: string; collection: string }> = Object.fromEntries([
   ["ai", { icon: "mc:ai", color: "purple", collection: "Work" }],
   ["learning", { icon: "mc:brain", color: "pink", collection: "Work" }],
   ["teaching", { icon: "mc:black_board", color: "blue", collection: "Work" }],
@@ -42,7 +43,10 @@ for (const [id, look] of [
   ["creator-business", { icon: "mc:briefcase", color: "orange", collection: "Craft" }],
   ["habits", { icon: "mc:leaf", color: "green", collection: "Life" }],
   ["focus-attention", { icon: "mc:target", color: "red", collection: "Life" }],
-] as const) await setSkillLook(lib, id, look);
+]);
+for (const [id, look] of Object.entries(LOOKS)) await setSkillLook(lib, id, look);
+// The skills' colours as the app draws them (styles.css `--c-*`), for the sources' pictures.
+const COLOURS: Record<string, string> = { purple: "#b98af5", pink: "#f38bb8", blue: "#6aa8f7", yellow: "#e8c24a", orange: "#ffa657", green: "#5fcf8a", red: "#ff7b72" };
 
 /** One thing to remember from a source: a Fact (question, answer) or, with a rubric, an Explain. The answer is a
  *  sentence of the source's own text, so its exercise opens at the passage. `when`: where its memory stands
@@ -75,9 +79,9 @@ Stability is the number of days it takes for the chance of recall to fall to 90%
 
 Between reviews, retrievability falls along a curve that is steep at first and then flattens:
 
-$$R(t) = \\left(1 + \\frac{19}{81} \\cdot \\frac{t}{S}\\right)^{-0.5}$$
+$$R(t) = \\left(1 + \\frac{t}{9S}\\right)^{-1}$$
 
-Here $t$ is the days since the last review and $S$ is the stability. When $t = S$ the formula gives exactly 0.9.
+Here $$t$$ is the days since the last review and $$S$$ is the stability. When $$t = S$$ the formula gives exactly 0.9.
 
 ![Two forgetting curves: a new memory falls fast, a stable one slowly](assets/curves.svg)
 
@@ -89,7 +93,13 @@ A successful recall raises stability, and it raises it most when the memory was 
 
 You choose a desired retention, usually 90%. Raising desired retention shortens every interval, so you forget less but review far more. Going from 90% to 95% roughly doubles the daily work. For most learning, 85% to 90% is the best trade.
 `;
-const CURVES = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420"><rect width="960" height="420" fill="#f6f5f1"/><g font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#333"><line x1="80" y1="40" x2="80" y2="350" stroke="#333" stroke-width="2"/><line x1="80" y1="350" x2="900" y2="350" stroke="#333" stroke-width="2"/><text x="20" y="64">100%</text><text x="30" y="116">90%</text><line x1="80" y1="110" x2="900" y2="110" stroke="#999" stroke-dasharray="6 6"/><text x="440" y="396">Days since last review</text><path d="M80 50 C 120 130, 200 250, 420 320 S 800 345, 900 348" fill="none" stroke="#d6457a" stroke-width="4"/><path d="M80 50 C 300 80, 600 130, 900 190" fill="none" stroke="#2f8f6f" stroke-width="4"/><text x="250" y="300" fill="#d6457a">Stability 3 days</text><text x="620" y="120" fill="#2f8f6f">Stability 60 days</text></g></svg>`;
+// Plot 0–180 days, 100% at y=50 and 0% at the y=350 axis. Straight one-day
+// samples cannot overshoot or hook upward the way the hand-drawn Béziers did.
+const curve = (stability: number) => Array.from({ length: 181 }, (_, days) => {
+  const retention = 1 / (1 + days / (9 * stability));
+  return `${days ? "L" : "M"}${(80 + days / 180 * 820).toFixed(3)} ${(350 - retention * 300).toFixed(3)}`;
+}).join(" ");
+const CURVES = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420"><rect width="960" height="420" fill="#f6f5f1"/><g font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#333"><line x1="80" y1="40" x2="80" y2="350" stroke="#333" stroke-width="2"/><line x1="80" y1="350" x2="900" y2="350" stroke="#333" stroke-width="2"/><text x="20" y="64">100%</text><text x="30" y="86">90%</text><line x1="80" y1="80" x2="900" y2="80" stroke="#999" stroke-dasharray="6 6"/><text x="440" y="396">Days since last review</text><path d="${curve(3)}" fill="none" stroke="#d6457a" stroke-width="4"/><path d="${curve(60)}" fill="none" stroke="#2f8f6f" stroke-width="4"/><text x="250" y="300" fill="#d6457a">Stability 3 days</text><text x="620" y="150" fill="#2f8f6f">Stability 60 days</text></g></svg>`;
 
 const SOURCES: Src[] = [
   // Learning
@@ -300,6 +310,8 @@ for (const s of SOURCES) {
     type: s.type, title: s.title, body: text, skills: s.skills, author: s.author,
     assets: s.body ? [{ name: "curves.svg", data: new TextEncoder().encode(CURVES) }] : undefined,
   });
+  // Its picture (D77), as an import would have left it: a share card, a PDF's first page or a book's cover.
+  writeFileSync(join(item.dir, "thumbnail.svg"), demoThumb(s.title, s.type, COLOURS[LOOKS[s.skills[0]!]!.color]!));
   await updateItemMeta(lib, item.meta.id, (m) => ({
     ...m, captured_at: iso(s.age), status: s.status,
     finished_at: s.status === "done" ? iso(Math.max(0, s.age - 2 - Math.floor(rnd() * 4))) : undefined,

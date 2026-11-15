@@ -3,12 +3,12 @@ import { resizeDrag } from "./drag";
 import { clampSide } from "./split";
 import * as Tabs from "@radix-ui/react-tabs";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type RefObject } from "react";
 import { NoteEditor, type LinkTarget, type NoteEditorHandle } from "./editor/NoteEditor";
 import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
 import { ore, opt, oreWith, type Backlink, type Notes } from "./ore";
-import { errorText, load, save, type Notify } from "./util";
+import { errorText, LIBRARY_BACK, load, save, type Notify } from "./util";
 
 /** Which note: a source note (D31) or a skill note (D41). */
 type NoteRef = { item: string } | { skill: string };
@@ -37,6 +37,9 @@ type MyNotes = {
   attach: (from?: string | { ext: string; data: string }) => Promise<string | null>;
   /** Reads the open editor's text now; NoteEditor sets it. */
   pull: { current: (() => string | null) | null };
+  /** The editor closed (its pane, the view): what he typed in it since it opened goes on the app's
+   *  history as one step, since its own ⌘Z history closed with it (F157). */
+  close: () => void;
   /** The CLI arguments that name this note (`<item>` or `--skill=<s>`), for `ore diagram`. */
   args: string[];
   notify: Notify;
@@ -46,9 +49,26 @@ type MyNotes = {
  *  them here, and opening it again shows the draft and saves it, instead of the older text on disk. */
 const unsaved = new Map<string, { text: string; base: string }>();
 
+/** The queue belongs to the note, not its mounted editor. Reopening waits for the last
+ * editor's writes, and preview cleanup waits before deciding whether it is empty. */
+const writes = new Map<string, Promise<unknown>>();
+function queueNote<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const next = (writes.get(key) ?? Promise.resolve()).then(run, run);
+  const settled = next.catch(() => {});
+  writes.set(key, settled);
+  void settled.then(() => { if (writes.get(key) === settled) writes.delete(key); });
+  return next;
+}
+export async function settleNote(key: string): Promise<boolean> {
+  while (writes.has(key)) await writes.get(key);
+  return !unsaved.has(key);
+}
+
 /** One note: loaded with `ore notes`, autosaved with `--set` ~800ms after the last edit, on blur,
  *  and when the view closes. */
-export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
+export function useNotes(ref: NoteRef, notify: Notify, onKept?: () => void): MyNotes {
+  const kept = useRef(onKept);
+  kept.current = onKept;
   const key = args(ref).join(" ");
   const [text, setText] = useState<string | null>(null);
   const [dir, setDir] = useState<string | null>(null);
@@ -64,24 +84,36 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
    *  note's base on, so the save queued behind it is based on what it wrote. */
   const bases = useRef(new Map<string, string>());
   const timer = useRef(0);
-  const chain = useRef<Promise<unknown>>(Promise.resolve());
   /** The note the refs above belong to: a write or load for another note never touches them. */
   const owner = useRef(key);
   /** Reads the open editor's text (NoteEditor sets it). */
   const pull = useRef<(() => string | null) | null>(null);
+  /** By note: the file as it was when this run of his typing began, and as his last save left it. Leaving
+   *  makes the run one step on the app's history (`checkpoint`). */
+  const opened = useRef(new Map<string, string>());
+  const wrote = useRef(new Map<string, string>());
+  const checkpoint = useCallback((k: string, now?: string) => {
+    const from = opened.current.get(k);
+    const to = now ?? wrote.current.get(k);
+    wrote.current.delete(k);
+    if (from === undefined || to === undefined || from === to) return;
+    opened.current.set(k, to);
+    notify("Edited the note", "quiet", put(k, from, to), put(k, to, from));
+  }, [notify]);
 
   /** Runs CLI writes one at a time, in order. */
   const queue = useCallback(<T,>(run: () => Promise<T>): Promise<T> => {
-    const next = chain.current.then(run, run);
-    chain.current = next.catch(() => {});
-    return next;
-  }, []);
+    return queueNote(key, run);
+  }, [key]);
 
   const apply = useCallback((t: string) => {
     pull.current = null; // the editor showing the old text is about to be replaced
     draft.current = t;
     saved.current = t;
     bases.current.set(owner.current, t);
+    // Text from outside the editor starts a new run of typing.
+    opened.current.set(owner.current, t);
+    wrote.current.delete(owner.current);
     setText(t);
     setVersion((v) => v + 1);
   }, []);
@@ -93,7 +125,7 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     const now = owner.current === key ? pull.current?.() : null;
     if (now != null && (draft.current !== null || now !== saved.current)) draft.current = now;
     const t = draft.current;
-    if (t === null || t === saved.current) return chain.current.then(() => !unsaved.has(key));
+    if (t === null || t === saved.current) return settleNote(key);
     saved.current = t;
     // --base is read when the write runs, after the previous write's result has moved it on (else
     // two saves in flight merge his own first save back in as an outside change and duplicate
@@ -102,13 +134,22 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
     return queue(() => ore<Notes & { merged: boolean }>("notes", ...key.split(" "), opt("set", t), opt("base", at()))).then(
       (r) => {
         unsaved.delete(key);
+        wrote.current.set(key, r.text);
+        if (r.kept_from_feed) kept.current?.();
         // What the editor shows now, as above: a key pressed in its last 200 ms is not in the draft yet, and
         // showing the merged text over it would drop those words.
         const shown = owner.current === key ? pull.current?.() : null;
         if (shown != null && shown !== t) draft.current = shown;
         // An agent or a recall changed the file meanwhile and the CLI merged it in. With no newer
         // typing, show the merged text; otherwise keep his draft and merge again on the next save.
-        if (owner.current === key && r.merged && draft.current === t) return apply(r.text), true;
+        if (owner.current === key && r.merged && draft.current === t) {
+          // An outside change merged in doesn't start a new run: his typing before it stays one step.
+          const run = opened.current.get(key);
+          apply(r.text);
+          if (run !== undefined) opened.current.set(key, run);
+          wrote.current.set(key, r.text);
+          return true;
+        }
         bases.current.set(key, r.merged ? t : r.text);
         if (owner.current === key && r.merged) saved.current = null;
         return true;
@@ -121,6 +162,17 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
       },
     );
   }, [key, notify, queue]);
+
+  // Capture the editor before its passive cleanup clears pull and destroys it. This applies
+  // to every source and skill note; NoteEditor also flushes when just its pane closes.
+  // The step goes on the history as the editor closes, before the save lands, so it sits under anything he does next.
+  const close = useCallback(() => {
+    const k = key;
+    const now = (owner.current === k ? pull.current?.() : null) ?? draft.current ?? undefined;
+    void flush();
+    if (owner.current === k) checkpoint(k, now);
+  }, [key, flush, checkpoint]);
+  useLayoutEffect(() => close, [close]);
 
   const edit = useCallback(
     (t: string) => {
@@ -140,20 +192,20 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
         // The file as it is now (not what this editor last based a save on, which a merge can leave behind).
         const before = (await queue(() => ore<Notes>("notes", ...key.split(" "))).catch(() => undefined))?.text;
         const r = await queue(() => ore<Notes>("notes", ...key.split(" "), opt("append", t), opt("heading", heading)));
+        if (r.kept_from_feed) kept.current?.();
+        // His typing before it is a step of its own, under this one.
+        if (before !== undefined) checkpoint(key, before);
         if (owner.current === key) apply(r.text);
-        // On the history, as every change is. The step writes the file itself (--base keeps what he has typed
-        // since) and says so, so whichever copy of the note is open then reads it again.
-        const put = (text: string, base: string) => () =>
-          ore("notes", ...key.split(" "), opt("set", text), opt("base", base)).then(() => void window.dispatchEvent(new CustomEvent("ore:note-written", { detail: key })));
+        // On the history, as every change is. The step writes the file itself (--base keeps what he has typed since).
         // (Only when the text it was added to is known: an undo from a guess would take more than it added.)
-        if (before !== undefined) notify(`Added “${heading}” to the note`, "quiet", put(before, r.text), put(r.text, before));
+        if (before !== undefined) notify(`Added “${heading}” to the note`, "quiet", put(key, before, r.text), put(key, r.text, before));
         return true;
       } catch (e) {
         notify(errorText(e), "error");
         return false;
       }
     },
-    [apply, flush, key, notify, queue],
+    [apply, checkpoint, flush, key, notify, queue],
   );
 
   /** Copies an image beside the note: a file's path, a pasted one's bytes (base64), or one he picks. */
@@ -204,25 +256,34 @@ export function useNotes(ref: NoteRef, notify: Notify): MyNotes {
       void flush().then((ok) => ok && queue(() => ore<Notes>("notes", ...key.split(" "))).then((r) => live && draft.current === saved.current && apply(r.text), () => {}));
     };
     window.addEventListener("ore:note-written", written);
+    // Back after time away: the note as the file has it now (the phone, `/ore`), unless he has typed since his last save.
+    const outside = () =>
+      void queue(() => ore<Notes>("notes", ...key.split(" "))).then((r) => live && draft.current === saved.current && r.text !== saved.current && apply(r.text), () => {});
+    window.addEventListener(LIBRARY_BACK, outside);
     // Leaving (or quitting) writes what is pending; the CLI call outlives this view.
     const leave = () => void flush();
     window.addEventListener("beforeunload", leave);
     return () => {
       live = false;
       window.removeEventListener("ore:note-written", written);
+      window.removeEventListener(LIBRARY_BACK, outside);
       window.removeEventListener("beforeunload", leave);
-      leave();
     };
   }, [key, tries, apply, flush, notify, queue]);
 
   return useMemo(
-    () => ({ text, dir, error, retry, version, edit, flush, append, apply, attach, pull, args: key.split(" "), notify }),
-    [text, dir, error, retry, version, edit, flush, append, apply, attach, key, notify],
+    () => ({ text, dir, error, retry, version, edit, flush, append, apply, attach, pull, close, args: key.split(" "), notify }),
+    [text, dir, error, retry, version, edit, flush, append, apply, attach, close, key, notify],
   );
 }
 
 /** The source note (D31) for one source. */
-export const useSourceNote = (id: string, notify: Notify) => useNotes(useMemo(() => ({ item: id }), [id]), notify);
+export const useSourceNote = (id: string, notify: Notify, onKept?: () => void) => useNotes(useMemo(() => ({ item: id }), [id]), notify, onKept);
+
+/** Sets a note's file to `text`, keeping what changed since `base` (an agent, his own typing elsewhere), then
+ *  says so, so whichever copy of the note is open then reads it again: a step on the history. */
+const put = (key: string, text: string, base: string) => () =>
+  queueNote(key, () => ore("notes", ...key.split(" "), opt("set", text), opt("base", base))).then(() => void window.dispatchEvent(new CustomEvent("ore:note-written", { detail: key })));
 
 type EditorProps = {
   notes: MyNotes;
@@ -238,6 +299,10 @@ type EditorProps = {
 
 /** The block editor over a loaded note; reloads when text arrives from outside it. */
 export function NoteBody({ notes, editorRef, targets, onOpen, placeholder, label, place }: EditorProps) {
+  // Its pane closing (Collected, the side panel shut) closes the editor and its own ⌘Z history.
+  const close = useRef(notes.close);
+  close.current = notes.close;
+  useEffect(() => () => close.current(), []);
   if (notes.error)
     return (
       <div className="empty-state err" role="alert">

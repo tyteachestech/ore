@@ -1,0 +1,80 @@
+{
+ "eq": [
+  "\\mathrm{Attention}(Q,K,V)=\\mathrm{softmax}\\left(\\frac{QK^{T}}{\\sqrt{d_{k}}}\\right)V",
+  "\\mathrm{MH}(Q,K,V)=\\mathrm{Concat}(\\mathrm{head}_{1},\\dots,\\mathrm{head}_{h})W^{O}",
+  "\\mathrm{FFN}(x)=\\max(0,xW_{1}+b_{1})W_{2}+b_{2}",
+  "PE_{\\mathrm{pos},2i}=\\sin(\\mathrm{pos}/10000^{2i/d_{\\mathrm{model}}})",
+  "\\mathrm{lrate}=d_{\\mathrm{model}}^{-0.5}\\cdot\\min(\\mathrm{step}^{-0.5},\\mathrm{step}\\cdot\\mathrm{warmup}^{-1.5})",
+  "y=F(x,\\{W_{i}\\})+x",
+  "\\mathcal{L}=-D_{\\mathrm{KL}}(q(z|x)\\|p(z))+\\mathbb{E}_{q(z|x)}[\\log p(x|z)]",
+  "z=\\mu+\\sigma\\odot\\epsilon,\\quad\\epsilon\\sim\\mathcal{N}(0,I)"
+ ],
+ "tab": [
+  [
+   [
+    "Model",
+    "BLEU",
+    "Cost (FLOPs)"
+   ],
+   [
+    "EN-DE",
+    "EN-FR",
+    "EN-DE",
+    "EN-FR"
+   ],
+   [
+    "Recurrent",
+    "24.6",
+    "39.9",
+    "2.3\\cdot 10^{19}",
+    "1.4\\cdot 10^{20}"
+   ],
+   [
+    "Convolutional",
+    "25.2",
+    "40.5",
+    "9.6\\cdot 10^{18}",
+    "1.5\\cdot 10^{20}"
+   ],
+   [
+    "Attention only",
+    "28.4",
+    "41.8",
+    "3.3\\cdot 10^{18}",
+    "2.3\\cdot 10^{19}"
+   ]
+  ],
+  [
+   [
+    "Method",
+    "Depth",
+    "Top-1 error",
+    "Top-5 error"
+   ],
+   [
+    "Plain",
+    "18",
+    "27.94 ± 0.12",
+    "9.81"
+   ],
+   [
+    "Plain",
+    "34",
+    "28.54 ± 0.15",
+    "10.02"
+   ],
+   [
+    "Residual",
+    "18",
+    "27.88 ± 0.10",
+    "9.42"
+   ],
+   [
+    "Residual",
+    "34",
+    "25.03 ± 0.09",
+    "7.76"
+   ]
+  ]
+ ]
+}

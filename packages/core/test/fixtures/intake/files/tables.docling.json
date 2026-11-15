@@ -1,302 +1,687 @@
 {
- "schema_name": "DoclingDocument",
- "version": "1.11.0",
- "texts": [
-  {
-   "label": "formula",
-   "prov": [
+  "schema_name": "DoclingDocument",
+  "version": "1.11.0",
+  "name": "Document",
+  "furniture": {
+    "self_ref": "#/furniture",
+    "children": [],
+    "content_layer": "furniture",
+    "name": "_root_",
+    "label": "unspecified"
+  },
+  "body": {
+    "self_ref": "#/body",
+    "children": [
+      {
+        "$ref": "#/texts/0"
+      },
+      {
+        "$ref": "#/texts/1"
+      },
+      {
+        "$ref": "#/texts/2"
+      },
+      {
+        "$ref": "#/tables/0"
+      },
+      {
+        "$ref": "#/texts/3"
+      },
+      {
+        "$ref": "#/texts/4"
+      },
+      {
+        "$ref": "#/texts/5"
+      }
+    ],
+    "content_layer": "body",
+    "name": "_root_",
+    "label": "unspecified"
+  },
+  "groups": [],
+  "texts": [
     {
-     "page_no": 1,
-     "bbox": {
-      "l": 222.174,
-      "t": 491.3,
-      "r": 391.026,
-      "b": 467.1253147877013,
-      "coord_origin": "BOTTOMLEFT"
-     },
-     "charspan": [
-      0,
-      37
-     ]
-    }
-   ],
-   "text": "R ( t ) = e ^ { - t / S } , \\quad S _ { n + 1 } = S _ { n } \\cdot ( 1 + a )"
-  }
- ],
- "tables": [
-  {
-   "label": "table",
-   "prov": [
+      "self_ref": "#/texts/0",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "section_header",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 226.44,
+            "t": 80.78399999999999,
+            "r": 385.56,
+            "b": 99.792,
+            "coord_origin": "TOPLEFT"
+          },
+          "charspan": [
+            0,
+            18
+          ]
+        }
+      ],
+      "orig": "Spacing and recall",
+      "text": "Spacing and recall",
+      "level": 1
+    },
     {
-     "page_no": 1,
-     "bbox": {
-      "l": 139.8758544921875,
-      "t": 648.8443603515625,
-      "r": 471.87518310546875,
-      "b": 570.6477508544922,
-      "coord_origin": "BOTTOMLEFT"
-     },
-     "charspan": [
-      0,
-      0
-     ]
+      "self_ref": "#/texts/1",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 77.112,
+            "t": 107.712,
+            "r": 521.424,
+            "b": 133.056,
+            "coord_origin": "TOPLEFT"
+          },
+          "charspan": [
+            0,
+            171
+          ]
+        }
+      ],
+      "orig": "Learners who spread their reviews out remembered more a month later than learners who crammed, though both groups did about as well the next day. Table 1 lists each group.",
+      "text": "Learners who spread their reviews out remembered more a month later than learners who crammed, though both groups did about as well the next day. Table 1 lists each group."
+    },
+    {
+      "self_ref": "#/texts/2",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "caption",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 77.112,
+            "t": 234.432,
+            "r": 302.328,
+            "b": 247.104,
+            "coord_origin": "TOPLEFT"
+          },
+          "charspan": [
+            0,
+            52
+          ]
+        }
+      ],
+      "orig": "Table 1: Recall after one day and after thirty days.",
+      "text": "Table 1: Recall after one day and after thirty days."
+    },
+    {
+      "self_ref": "#/texts/3",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 77.112,
+            "t": 264.528,
+            "r": 534.888,
+            "b": 277.2,
+            "coord_origin": "TOPLEFT"
+          },
+          "charspan": [
+            0,
+            111
+          ]
+        }
+      ],
+      "orig": "The chance of recalling an item falls with the time t since it was last seen, at a rate set by its stability S:",
+      "text": "The chance of recalling an item falls with the time t since it was last seen, at a rate set by its stability S:"
+    },
+    {
+      "self_ref": "#/texts/4",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "formula",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 221.54399999999998,
+            "t": 302.544,
+            "r": 391.68,
+            "b": 324.71999999999997,
+            "coord_origin": "TOPLEFT"
+          },
+          "charspan": [
+            0,
+            80
+          ]
+        }
+      ],
+      "orig": "R ( t ) = e ^ { - t / S } , \\quad S _ { n + 1 } = S _ { n } \\cdot ( 1 + \\alpha )",
+      "text": "R ( t ) = e ^ { - t / S } , \\quad S _ { n + 1 } = S _ { n } \\cdot ( 1 + \\alpha )"
+    },
+    {
+      "self_ref": "#/texts/5",
+      "parent": {
+        "$ref": "#/body"
+      },
+      "children": [],
+      "content_layer": "body",
+      "label": "text",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 77.112,
+            "t": 351.648,
+            "r": 432.072,
+            "b": 364.32,
+            "coord_origin": "TOPLEFT"
+          },
+          "charspan": [
+            0,
+            81
+          ]
+        }
+      ],
+      "orig": "Each successful review raises S, so the next gap can be longer than the last one.",
+      "text": "Each successful review raises S, so the next gap can be longer than the last one."
     }
-   ],
-   "data": {
-    "num_rows": 4,
-    "num_cols": 4,
-    "table_cells": [
-     {
-      "bbox": {
-       "l": 147.0,
-       "t": 150.56399999999996,
-       "r": 189.174,
-       "b": 160.36253587115664,
-       "coord_origin": "TOPLEFT"
+  ],
+  "pictures": [],
+  "tables": [
+    {
+      "self_ref": "#/tables/0",
+      "parent": {
+        "$ref": "#/body"
       },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 0,
-      "start_col_offset_idx": 0,
-      "column_header": true,
-      "text": "Schedule"
-     },
-     {
-      "bbox": {
-       "l": 257.0,
-       "t": 150.56399999999996,
-       "r": 299.76800000000003,
-       "b": 160.36253587115664,
-       "coord_origin": "TOPLEFT"
+      "children": [],
+      "content_layer": "body",
+      "label": "table",
+      "prov": [
+        {
+          "page_no": 1,
+          "bbox": {
+            "l": 139.536,
+            "t": 140.976,
+            "r": 471.24,
+            "b": 220.17600000000002,
+            "coord_origin": "TOPLEFT"
+          },
+          "charspan": [
+            0,
+            0
+          ]
+        }
+      ],
+      "captions": [
+        {
+          "$ref": "#/texts/2"
+        }
+      ],
+      "references": [],
+      "footnotes": [],
+      "data": {
+        "table_cells": [
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 0,
+            "end_row_offset_idx": 1,
+            "start_col_offset_idx": 0,
+            "end_col_offset_idx": 1,
+            "text": "Schedule",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 0,
+            "end_row_offset_idx": 1,
+            "start_col_offset_idx": 1,
+            "end_col_offset_idx": 2,
+            "text": "Learners",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 0,
+            "end_row_offset_idx": 1,
+            "start_col_offset_idx": 2,
+            "end_col_offset_idx": 3,
+            "text": "Day 1",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 0,
+            "end_row_offset_idx": 1,
+            "start_col_offset_idx": 3,
+            "end_col_offset_idx": 4,
+            "text": "Day 30",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 1,
+            "end_row_offset_idx": 2,
+            "start_col_offset_idx": 0,
+            "end_col_offset_idx": 1,
+            "text": "Spaced",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 1,
+            "end_row_offset_idx": 2,
+            "start_col_offset_idx": 1,
+            "end_col_offset_idx": 2,
+            "text": "412",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 1,
+            "end_row_offset_idx": 2,
+            "start_col_offset_idx": 2,
+            "end_col_offset_idx": 3,
+            "text": "91%",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 1,
+            "end_row_offset_idx": 2,
+            "start_col_offset_idx": 3,
+            "end_col_offset_idx": 4,
+            "text": "74%",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 2,
+            "end_row_offset_idx": 3,
+            "start_col_offset_idx": 0,
+            "end_col_offset_idx": 1,
+            "text": "Massed",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 2,
+            "end_row_offset_idx": 3,
+            "start_col_offset_idx": 1,
+            "end_col_offset_idx": 2,
+            "text": "398",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 2,
+            "end_row_offset_idx": 3,
+            "start_col_offset_idx": 2,
+            "end_col_offset_idx": 3,
+            "text": "93%",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 2,
+            "end_row_offset_idx": 3,
+            "start_col_offset_idx": 3,
+            "end_col_offset_idx": 4,
+            "text": "41%",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 3,
+            "end_row_offset_idx": 4,
+            "start_col_offset_idx": 0,
+            "end_col_offset_idx": 1,
+            "text": "Control",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 3,
+            "end_row_offset_idx": 4,
+            "start_col_offset_idx": 1,
+            "end_col_offset_idx": 2,
+            "text": "120",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 3,
+            "end_row_offset_idx": 4,
+            "start_col_offset_idx": 2,
+            "end_col_offset_idx": 3,
+            "text": "88%",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          },
+          {
+            "row_span": 1,
+            "col_span": 1,
+            "start_row_offset_idx": 3,
+            "end_row_offset_idx": 4,
+            "start_col_offset_idx": 3,
+            "end_col_offset_idx": 4,
+            "text": "37%",
+            "column_header": false,
+            "row_header": false,
+            "row_section": false,
+            "fillable": false
+          }
+        ],
+        "num_rows": 4,
+        "num_cols": 4,
+        "orientation": "rot_0",
+        "grid": [
+          [
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 0,
+              "end_col_offset_idx": 1,
+              "text": "Schedule",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 1,
+              "end_col_offset_idx": 2,
+              "text": "Learners",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 2,
+              "end_col_offset_idx": 3,
+              "text": "Day 1",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 0,
+              "end_row_offset_idx": 1,
+              "start_col_offset_idx": 3,
+              "end_col_offset_idx": 4,
+              "text": "Day 30",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            }
+          ],
+          [
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 0,
+              "end_col_offset_idx": 1,
+              "text": "Spaced",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 1,
+              "end_col_offset_idx": 2,
+              "text": "412",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 2,
+              "end_col_offset_idx": 3,
+              "text": "91%",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 1,
+              "end_row_offset_idx": 2,
+              "start_col_offset_idx": 3,
+              "end_col_offset_idx": 4,
+              "text": "74%",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            }
+          ],
+          [
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 0,
+              "end_col_offset_idx": 1,
+              "text": "Massed",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 1,
+              "end_col_offset_idx": 2,
+              "text": "398",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 2,
+              "end_col_offset_idx": 3,
+              "text": "93%",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 2,
+              "end_row_offset_idx": 3,
+              "start_col_offset_idx": 3,
+              "end_col_offset_idx": 4,
+              "text": "41%",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            }
+          ],
+          [
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 3,
+              "end_row_offset_idx": 4,
+              "start_col_offset_idx": 0,
+              "end_col_offset_idx": 1,
+              "text": "Control",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 3,
+              "end_row_offset_idx": 4,
+              "start_col_offset_idx": 1,
+              "end_col_offset_idx": 2,
+              "text": "120",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 3,
+              "end_row_offset_idx": 4,
+              "start_col_offset_idx": 2,
+              "end_col_offset_idx": 3,
+              "text": "88%",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            },
+            {
+              "row_span": 1,
+              "col_span": 1,
+              "start_row_offset_idx": 3,
+              "end_row_offset_idx": 4,
+              "start_col_offset_idx": 3,
+              "end_col_offset_idx": 4,
+              "text": "37%",
+              "column_header": false,
+              "row_header": false,
+              "row_section": false,
+              "fillable": false
+            }
+          ]
+        ]
       },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 0,
-      "start_col_offset_idx": 1,
-      "column_header": true,
-      "text": "Learners"
-     },
-     {
-      "bbox": {
-       "l": 337.0,
-       "t": 150.56399999999996,
-       "r": 364.192,
-       "b": 160.36253587115664,
-       "coord_origin": "TOPLEFT"
+      "annotations": []
+    }
+  ],
+  "key_value_items": [],
+  "form_items": [],
+  "pages": {
+    "1": {
+      "size": {
+        "width": 612.0,
+        "height": 792.0
       },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 0,
-      "start_col_offset_idx": 2,
-      "column_header": true,
-      "text": "Day 1"
-     },
-     {
-      "bbox": {
-       "l": 407.0,
-       "t": 150.56399999999996,
-       "r": 439.692,
-       "b": 160.36253587115664,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 0,
-      "start_col_offset_idx": 3,
-      "column_header": true,
-      "text": "Day 30"
-     },
-     {
-      "bbox": {
-       "l": 147.0,
-       "t": 169.9179999999999,
-       "r": 178.768,
-       "b": 179.51360761346996,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 1,
-      "start_col_offset_idx": 0,
-      "column_header": false,
-      "text": "Spaced"
-     },
-     {
-      "bbox": {
-       "l": 257.0,
-       "t": 169.9179999999999,
-       "r": 273.5,
-       "b": 179.51360761346996,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 1,
-      "start_col_offset_idx": 1,
-      "column_header": false,
-      "text": "412"
-     },
-     {
-      "bbox": {
-       "l": 337.0,
-       "t": 169.9179999999999,
-       "r": 357.163,
-       "b": 179.51360761346996,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 1,
-      "start_col_offset_idx": 2,
-      "column_header": false,
-      "text": "91%"
-     },
-     {
-      "bbox": {
-       "l": 407.0,
-       "t": 169.9179999999999,
-       "r": 427.163,
-       "b": 179.51360761346996,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 1,
-      "start_col_offset_idx": 3,
-      "column_header": false,
-      "text": "74%"
-     },
-     {
-      "bbox": {
-       "l": 147.0,
-       "t": 189.11799999999994,
-       "r": 180.60500000000002,
-       "b": 198.7136076134699,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 2,
-      "start_col_offset_idx": 0,
-      "column_header": false,
-      "text": "Massed"
-     },
-     {
-      "bbox": {
-       "l": 257.0,
-       "t": 189.11799999999994,
-       "r": 273.5,
-       "b": 198.7136076134699,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 2,
-      "start_col_offset_idx": 1,
-      "column_header": false,
-      "text": "398"
-     },
-     {
-      "bbox": {
-       "l": 337.0,
-       "t": 189.11799999999994,
-       "r": 357.163,
-       "b": 198.7136076134699,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 2,
-      "start_col_offset_idx": 2,
-      "column_header": false,
-      "text": "93%"
-     },
-     {
-      "bbox": {
-       "l": 407.0,
-       "t": 189.11799999999994,
-       "r": 427.163,
-       "b": 198.7136076134699,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 2,
-      "start_col_offset_idx": 3,
-      "column_header": false,
-      "text": "41%"
-     },
-     {
-      "bbox": {
-       "l": 147.0,
-       "t": 208.31799999999998,
-       "r": 180.61599999999999,
-       "b": 217.91360761346994,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 3,
-      "start_col_offset_idx": 0,
-      "column_header": false,
-      "text": "Control"
-     },
-     {
-      "bbox": {
-       "l": 257.0,
-       "t": 208.31799999999998,
-       "r": 273.5,
-       "b": 217.91360761346994,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 3,
-      "start_col_offset_idx": 1,
-      "column_header": false,
-      "text": "120"
-     },
-     {
-      "bbox": {
-       "l": 337.0,
-       "t": 208.31799999999998,
-       "r": 357.163,
-       "b": 217.91360761346994,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 3,
-      "start_col_offset_idx": 2,
-      "column_header": false,
-      "text": "88%"
-     },
-     {
-      "bbox": {
-       "l": 407.0,
-       "t": 208.31799999999998,
-       "r": 427.163,
-       "b": 217.91360761346994,
-       "coord_origin": "TOPLEFT"
-      },
-      "row_span": 1,
-      "col_span": 1,
-      "start_row_offset_idx": 3,
-      "start_col_offset_idx": 3,
-      "column_header": false,
-      "text": "37%"
-     }
-    ]
-   }
+      "page_no": 1
+    }
   }
- ],
- "pages": {
-  "1": {
-   "size": {
-    "width": 612.0,
-    "height": 792.0
-   },
-   "page_no": 1
-  }
- }
 }

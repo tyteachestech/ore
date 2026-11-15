@@ -245,7 +245,9 @@ describe("tutor: the web", () => {
     const r = await tutor(lib, "When was Ebbinghaus born?", { onProgress: (p) => seen.push(p) });
     // The run starts the answer over, then the search starts; the reply's first words come at once and
     // later ones a few times a second (these all came within 50 ms, so only the first shows).
-    expect(seen).toEqual([{ reply: "" }, { searching: true }, { reply: "Your sources" }]);
+    expect(seen.filter((p) => !(p as object).hasOwnProperty("ai"))).toEqual([{ reply: "" }, { searching: true }, { reply: "Your sources" }]);
+    // Who is answering comes first, so a reply stopped part way still records it (F186).
+    expect(seen[0]).toMatchObject({ ai: { vendor: "claude", prompt_version: expect.stringMatching(/^tutor@\d+$/) } });
     expect(r.reply).toBe("Your sources don't say é.");
     expect(readFileSync(join(binDir, "argv.json"), "utf8")).toContain("--include-partial-messages");
   });
@@ -266,7 +268,7 @@ describe("tutor: the web", () => {
     const seen: unknown[] = [];
     await tutor(lib, "When was Ebbinghaus born?", { onProgress: (p) => seen.push(p) });
     const twice = [{ reply: "" }, { searching: true }, { searching: false }];
-    expect(seen).toEqual([...twice, { reply: "Born in 1850 [1]." }, ...twice, { reply: "Your sources don't say." }]);
+    expect(seen.slice(1)).toEqual([...twice, { reply: "Born in 1850 [1]." }, ...twice, { reply: "Your sources don't say." }]);
   });
 
   test("a web citation with no search at all is refused: the link would be made up", async () => {

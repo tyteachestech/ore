@@ -20,6 +20,7 @@ const g = globalThis as Record<string, unknown>;
 const leaked = { window: g.window, getComputedStyle: g.getComputedStyle };
 const realFetch = globalThis.fetch;
 const realPath = process.env.PATH;
+const realTranscribe = process.env.ORE_TRANSCRIBE;
 beforeAll(() => {
   delete g.window;
   delete g.getComputedStyle;
@@ -27,12 +28,18 @@ beforeAll(() => {
   const bin = mkdtempSync(join(tmpdir(), "ore-ytdlp-"));
   writeFileSync(join(bin, "yt-dlp"), `#!/bin/sh\ncat '${join(FIX, "video/talk.info.json")}'\n`);
   chmodSync(join(bin, "yt-dlp"), 0o755);
+  // A deterministic stand-in for the OS speech boundary; the saved WAV is silence, not speech.
+  writeFileSync(join(bin, "transcribe"), `#!/bin/sh\ncat '${join(FIX, "audio/sundial.vtt")}'\n`);
+  chmodSync(join(bin, "transcribe"), 0o755);
+  process.env.ORE_TRANSCRIBE = join(bin, "transcribe");
   process.env.PATH = `${bin}:${realPath}`;
 });
 afterAll(() => {
   for (const [k, v] of Object.entries(leaked)) if (v) g[k] = v;
   globalThis.fetch = realFetch;
   process.env.PATH = realPath;
+  if (realTranscribe === undefined) delete process.env.ORE_TRANSCRIBE;
+  else process.env.ORE_TRANSCRIBE = realTranscribe;
 });
 
 /** Serves saved files by URL; anything else (a page's images) is a 404. */
@@ -64,6 +71,9 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "csv", add: join(FIX, "files/verbs.csv") },
   { name: "notebook", add: join(FIX, "files/numpy.ipynb") },
   { name: "youtube-auto-captions", add: "https://www.youtube.com/watch?v=oreGolden01", serve: { "https://captions.test/talk.en.vtt": ["video/talk.en.vtt", "text/vtt"] } },
+  { name: "podcast-player-date", add: "https://overcast.fm/+Sundial", serve: { "https://overcast.fm/+Sundial": ["audio/player-date.html", HTML], "https://audio.test/sundial.wav": ["audio/sundial.wav", "audio/wav"] } },
+  { name: "podcast-publisher-language", add: "https://workshop.test/episodes/sundial", serve: { "https://workshop.test/episodes/sundial": ["audio/episode-language.html", HTML], "https://audio.test/sundial.wav": ["audio/sundial.wav", "audio/wav"] } },
+  { name: "podcast-player-language", add: "https://pca.st/episode/sundial", serve: { "https://pca.st/episode/sundial": ["audio/episode-language.html", HTML], "https://audio.test/sundial.wav": ["audio/sundial.wav", "audio/wav"] } },
   // Wikipedia (CC BY-SA 4.0) and the Python docs (PSF License) may be shared.
   { name: "web-wikipedia", add: "https://en.wikipedia.org/wiki/Spaced_repetition", serve: { "https://en.wikipedia.org/wiki/Spaced_repetition": ["web/wikipedia.html", HTML] } },
   { name: "web-hn-thread", add: "https://news.ycombinator.com/item?id=11408447", serve: { "https://news.ycombinator.com/item?id=11408447": ["web/hn-thread.html", HTML] }, rewritten: true },

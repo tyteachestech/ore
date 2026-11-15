@@ -360,6 +360,8 @@ export async function htmlToDoc(html: string, url: string, min = 200): Promise<W
   const { document } = parseHTML(html);
   // A forum's thread, rebuilt for the reader; a link partway into one is refused, not read as the page.
   const poster = hackerNews(document as unknown as Document, url) ?? (await discourse(document as unknown as Document, url));
+  // A byline only in the head's `<link rel="author" content="…">` (jaykmody.com), which the readers don't read (F162).
+  const linked = document.querySelector('link[rel~="author"][content]')?.getAttribute("content") ?? undefined;
   try {
     videoLinks(document as unknown as Document);
     flatTables(document as unknown as Document);
@@ -373,7 +375,7 @@ export async function htmlToDoc(html: string, url: string, min = 200): Promise<W
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
     const markdown = inlineMath(htmlTables(r.content.trim()));
     if (markdown.length > min) {
-      return { title: siteless(r.title, h1) || url, author: paper ?? poster ?? cleanAuthor(r.author), published: cleanDate(r.published), markdown: markdown + "\n" };
+      return { title: siteless(r.title, h1) || url, author: paper ?? poster ?? cleanAuthor(r.author) ?? cleanAuthor(linked), published: cleanDate(r.published), markdown: markdown + "\n" };
     }
   } catch {
     // fall through to Readability
@@ -384,5 +386,5 @@ export async function htmlToDoc(html: string, url: string, min = 200): Promise<W
     .split(/\n\s*\n/)
     .map((p) => p.replace(/\s+/g, " ").trim())
     .filter(Boolean);
-  return { title: r.title || url, author: cleanAuthor(r.byline ?? undefined), markdown: paragraphs.join("\n\n") + "\n" };
+  return { title: r.title || url, author: cleanAuthor(r.byline ?? undefined) ?? cleanAuthor(linked), markdown: paragraphs.join("\n\n") + "\n" };
 }

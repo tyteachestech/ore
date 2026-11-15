@@ -63,21 +63,24 @@ test("a session that filled the ring and cut a gem: the cart is there, the mole 
   expect(s.q(".dot-ring .on")).toBe(0);
   expect(s.q(".review-cut > span[data-wait]")).toBe(1);
   // A clock the test turns by hand, so the gap between the mole coming up and its reaction is exact on any runner.
-  let up = -1, react = -1;
+  let up = -1, react = -1, cut = 0;
   for (let t = 0; t < 6000 && !(react >= 0 && !s.q(".cart-tip")); t += 20) {
     await act(async () => void jest.advanceTimersByTime(20));
+    cut = Math.max(cut, s.q('.review-cut .gem[data-kind="cut"] rect'));
     if (up < 0 && s.q(".review-mole .mole")) up = t;
     if (up >= 0 && react < 0 && reacted(s.body)) react = t;
   }
-  jest.useRealTimers();
   expect(s.q(".cart-tip")).toBe(0);
   expect(s.q(".cart-ore")).toBe(0);
   expect(s.q(".dot-ring .on")).toBe(30);
-  expect(s.q(".review-cut > span[data-wait]")).toBe(0);
-  // The stone that landed is cut where it stands: it ends as a gem of solid pixels (D239).
-  for (const t0 = Date.now(); Date.now() - t0 < 3000 && s.q(".gem-cutting[data-cutting]"); ) await act(async () => void (await wait(40)));
-  expect(s.q(".gem-cutting[data-cutting]")).toBe(0);
-  expect(s.q('.review-cut .gem[data-kind="cut"] rect')).toBeGreaterThan(50);
+  // The stone that landed is cut where it stands: it ends as a gem of solid pixels (D239). Then it makes way
+  // for the day's minutes in the ring's centre (D274).
+  expect(cut).toBeGreaterThan(50);
+  for (let t = 0; t < 3000 && !s.q(".end-ring > .end-lap"); t += 20) await act(async () => void jest.advanceTimersByTime(20));
+  jest.useRealTimers();
+  expect(s.q(".end-ring > .end-lap")).toBe(1);
+  expect(s.q(".review-cut")).toBe(0);
+  expect(s.body.querySelector(".end-lap-n")!.getAttribute("aria-label")).toBe("10 minutes today");
   // The mole cheers once it is up (560ms), not when the cart has finished leaving.
   expect(react - up).toBeGreaterThanOrEqual(540);
   expect(react - up).toBeLessThanOrEqual(580);
@@ -91,15 +94,20 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
   expect(s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood")).toBe("doze");
   expect(s.q(".cart-zzz")).toBe(1);
   expect(s.q(".review-mole .mole")).toBe(0);
-  let awake = false;
+  let awake = false, grounded = false;
   for (let t = 0; t < 6000 && s.q(".cart-tip"); t += 20) {
     await act(async () => void jest.advanceTimersByTime(20));
-    // Awake in the air before he lands, and never two moles at once.
+    // Awake in the air before he lands, and never two moles at once: while he is on the cart or in the air, his hole is empty.
     if (s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood") === "fall") awake = true;
-    if (s.q(".cart-tip")) expect(s.q(".review-mole .mole")).toBe(0);
+    if (s.q(".cart-mole")) expect(s.body.querySelector(".review-mole .mole")?.getAttribute("data-mood") ?? "hole").toBe("hole");
+    // He falls into his hole: under the dirt line nothing of him is drawn, so the ring never crosses his belly (F94).
+    if (s.body.querySelector<HTMLElement>(".cart-ground")?.style.clipPath.startsWith("inset(")) grounded = true;
   }
   expect(awake).toBe(true);
-  expect(s.q(".review-mole .mole")).toBe(1);
+  expect(grounded).toBe(true);
+  // Down the hole, and up he pops: the same mole, and only then does he speak.
+  expect(s.body.querySelector(".review-mole .mole")?.getAttribute("data-mood")).toBe("pop");
+  expect(s.q(".end-says")).toBe(0);
   for (let i = 0; i < 200; i++) await act(async () => void jest.advanceTimersByTime(50));
   expect(s.body.querySelector(".end-says")!.textContent).toContain("Goal met. I supervised.");
   jest.useRealTimers();
@@ -109,6 +117,45 @@ test("the mole rides the cart in asleep, falls out onto the ring once it has gon
   expect(plain.q(".cart-tip .cart")).toBe(1);
   expect(plain.q(".cart-mole")).toBe(0);
   await plain.done();
+});
+
+test("the fall off the cart has weight, and the bucket never turns through him: he lies along its tipped rim, is pressed short then pulled long, drops feet first, throws dirt, knocks the ring, and the cart hops as he leaves it", async () => {
+  jest.useFakeTimers();
+  const proto = w.Element.prototype as unknown as Record<string, unknown>, plain = proto.animate;
+  const seen: { cls: string; keys: Record<string, string>[]; o: { composite?: string; duration?: number }; at: number }[] = [];
+  let now = 0;
+  proto.animate = function (this: Element, keys: Record<string, string>[], o: { composite?: string; duration?: number }) { seen.push({ cls: this.getAttribute("class") ?? this.tagName, keys, o, at: now }); return { cancel() {} }; };
+  try {
+    const s = await mount(end(["ai"]));
+    const backed = s.q("#cart-solid") + s.q("#cart-solid-fine");
+    let dived = false, dirt = 0;
+    for (let t = 0; t < 6000 && s.q(".cart-tip"); t += 20) {
+      await act(async () => void jest.advanceTimersByTime(20));
+      now = t + 20;
+      if (s.body.querySelector(".cart-mole .mole")?.getAttribute("data-mood") === "dive") dived = true;
+      dirt = Math.max(dirt, s.q(".cart-dirt"));
+    }
+    expect(dived).toBe(true);
+    expect(dirt).toBeGreaterThanOrEqual(8);
+    // Squash and stretch are on his body, inside the wrapper that places him: shorter than 1 along his length, then longer.
+    const pulls = seen.filter((a) => a.cls === "cart-mole-body").flatMap((a) => a.keys.map((k) => Number(/scale\(([\d.]+), ([\d.]+)\)/.exec(k.transform!)![2])));
+    expect(Math.min(...pulls)).toBeLessThan(0.9);
+    expect(Math.max(...pulls)).toBeGreaterThan(1.15);
+    // F155: tipped, he lies along the bucket's rim at the bucket's own angle (58°) and slides
+    // down it, so the bucket never turns through him; and his dots and the bucket's are backed, so neither shows through the other.
+    const slide = seen.filter((a) => a.cls === "cart-mole" && a.keys.length > 13 && a.keys[0]!.transform!.includes("scale(0.45)"))[0]!;
+    for (const k of slide.keys) expect(k.transform).toContain("rotate(58deg)");
+    expect(backed).toBe(2);
+    // His slide is over when the next move takes him, however short the pour: he never jumps the rest of the way.
+    const next = seen.filter((a) => a.cls === "cart-mole" && a.at > slide.at)[0]!;
+    expect(slide.at + slide.o.duration!).toBeLessThanOrEqual(next.at + 20);
+    // The cart's hop is added to its roll, never in place of it.
+    expect(seen.some((a) => a.cls === "cart" && a.o.composite === "add" && a.keys.some((k) => k.transform === "translateY(-4px)"))).toBe(true);
+    // The load slides down the tipped bucket to its low lip before it falls, and the wheels lock before the cart has stopped.
+    expect(seen.some((a) => a.cls.startsWith("cart-ore-in") && a.keys.length === 2 && a.keys[0]!.transform === "translate(0px, 0px)")).toBe(true);
+    expect(seen.some((a) => a.cls === "cart-wheel" && a.keys.length === 3 && a.keys[1]!.transform === a.keys[2]!.transform)).toBe(true);
+    await s.done();
+  } finally { proto.animate = plain; jest.useRealTimers(); }
 });
 
 test("a gem cut with the ring already full: the cart still comes, carrying only the stone", async () => {
@@ -153,28 +200,48 @@ test("an ore whose ring dot is missing still counts, so the ring is told it is f
 }, 10_000);
 
 test("gem grades on the end screen (D197): a won-back gem has a gold rim, a gem polished this session shows after the cut ones, and the session's depth is one line", async () => {
-  reduce = true;
   const e = end(["ai", "ai"]) as unknown as { session: Record<string, unknown> };
   Object.assign(e.session, { grades: ["mended", "cut"], polished: ["ai"], depth_days: 41 });
-  const s = await mount(e as never);
-  reduce = false;
-  const gems = [...s.body.querySelectorAll(".review-cut > span")];
-  expect(gems).toHaveLength(3);
-  const seams = gems.map((g) => g.querySelectorAll('rect[data-gold]').length);
+  // The gems are cut in the ring before they make way for the minutes (D274), so they are read there.
+  jest.useFakeTimers();
+  const c = await mount(e as never, 0.9);
+  let seams: number[] = [], n = 0, label: string | null = null;
+  for (let t = 0; t < 8000 && !c.q(".end-lap"); t += 20) {
+    await act(async () => void jest.advanceTimersByTime(20));
+    const gems = [...c.body.querySelectorAll(".review-cut > span")];
+    if (!gems.length) continue;
+    n = gems.length;
+    label = c.body.querySelector(".review-cut")!.getAttribute("aria-label");
+    const now = gems.map((g) => g.querySelectorAll('rect[data-gold]').length);
+    if (now.some(Boolean)) seams = now;
+  }
+  jest.useRealTimers();
+  await c.done();
+  expect(n).toBe(3);
   expect(seams[0]).toBeGreaterThan(0);
   expect(seams.slice(1)).toEqual([0, 0]);
-  expect(s.body.querySelector(".review-cut")!.getAttribute("aria-label")).toBe("2 became solid, 1 won back, 1 polished");
+  expect(label).toBe("2 became solid, 1 won back, 1 polished");
+  reduce = true;
+  const s = await mount(e as never);
+  reduce = false;
   // The mole speaks (D243); the depth is a number in the row of results.
   expect(s.q(".end-says .says-line")).toBe(1);
+  // The box is an outline with no tail (D266): nothing is drawn in it but the line.
+  expect(s.q(".end-says svg.says-tail")).toBe(0);
   expect(s.body.querySelector('.end-tally [data-key="depth"]')!.textContent).toBe("+41days of memory");
   await s.done();
   // More gems than fit: the count covers the polished ones left out too.
   const many = end(Array(8).fill("ai")) as unknown as { session: Record<string, unknown> };
   Object.assign(many.session, { polished: ["ai", "ai"] });
-  reduce = true;
-  const m = await mount(many as never);
-  reduce = false;
-  expect(m.body.querySelector(".review-cut > b")!.textContent).toBe("+2");
+  jest.useFakeTimers();
+  const m = await mount(many as never, 0.9);
+  let more: string | null = null;
+  for (let t = 0; t < 8000 && !m.q(".end-lap"); t += 20) {
+    await act(async () => void jest.advanceTimersByTime(20));
+    more = m.body.querySelector(".review-cut > b")?.textContent ?? more;
+  }
+  jest.useRealTimers();
+  expect(more).toBe("+2");
   await m.done();
   // Nothing gained, nothing said.
   reduce = true;
@@ -230,7 +297,15 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   Object.assign(two.session, { depth_days: 41, depth_extra_days: 12 });
   const s = await mount(two as never);
   expect(s.q(".end-emblem .end-ring > .ring")).toBe(1);
-  expect(s.q(".end-emblem .end-ring > .review-cut > span")).toBe(2);
+  // Settled, the ring holds the day's minutes; the gems were cut there first (D274).
+  expect(s.q(".end-emblem .end-ring > .end-lap")).toBe(1);
+  expect(s.q(".end-emblem .end-ring > .review-cut")).toBe(0);
+  reduce = false;
+  const first = await mount(two as never, 0.9);
+  expect(first.q(".end-emblem .end-ring > .review-cut > span")).toBe(2);
+  expect(first.q(".end-lap")).toBe(0);
+  await first.done();
+  reduce = true;
   // One row, three at most, in one order: kept, the days they added, then the rarest thing (here the gems cut).
   const row = [...s.body.querySelectorAll(".end-emblem + .end-tally > li")];
   expect(row.map((li) => li.getAttribute("data-key"))).toEqual(["kept", "depth", "cut"]);
@@ -250,9 +325,9 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   // The gem's own hint names its skill, so no icon repeats it under the gem.
   expect(s.q(".review-cut-skill")).toBe(0);
   await s.done();
-  // With no gem cut the ring holds nothing, and the row has what there is.
+  // With no gem cut the ring holds the minutes alone, and the row has what there is.
   const none = await mount(end([]));
-  expect(none.q(".end-ring > :not(.ring)")).toBe(0);
+  expect(none.q(".end-ring > :not(.ring):not(.end-lap)")).toBe(0);
   expect([...none.body.querySelectorAll(".end-tally > li")].map((li) => li.textContent)).toEqual(["5memories kept"]);
   await none.done();
   // The rarest thing takes the third place and wears its own colour: a new level its skill's, a memory pulled back the gold.
@@ -347,16 +422,21 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
   expect(endSays({ ...base, session: session({ longest_days: 3, rescued: 6 }) })).toHaveLength(1);
 });
 
-test("a rare line leads the mole's lines and wears its own mark (D247)", async () => {
+test("a rare line leads the mole's lines, in words alone: no icon in his speech box (D247 as amended)", async () => {
   jest.useFakeTimers();
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
-  Object.assign(e.session, { depth_days: 41, rescued: 2 });
+  // The row under the ring shows the two pulled back, so the rare thing left for him to say is the long gap (F138).
+  Object.assign(e.session, { depth_days: 41, rescued: 2, longest_days: 18 });
   const s = await mount(e as never);
   await act(async () => void jest.advanceTimersByTime(560));
   const line = s.body.querySelector(".end-says .says-line")!;
-  expect(line.textContent).toBe("2 pulled back just before you’d have lost them.");
-  // The gold-rimmed gem, the drawing a won-back memory already has.
-  expect(line.querySelectorAll(".says-mark .gem").length).toBe(1);
+  expect(line.textContent).toBe("18 days gone and you still had it.");
+  // Tyler, 2026-11-14: "remove the random ass icon in the text box".
+  expect(line.querySelectorAll("svg, .gem, .skill-icon").length).toBe(0);
+  // He comes up through a mound of dirt, drawn in front of him and solid, so nothing of him shows between its dots.
+  const mound = s.body.querySelector(".end-emblem .review-mole .mole + .mole-mound")!;
+  expect(mound.querySelectorAll("circle").length).toBeGreaterThan(100);
+  expect(mound.querySelectorAll("circle.back").length).toBe(mound.querySelectorAll("circle:not(.back)").length);
   jest.useRealTimers();
   await s.done();
 });
@@ -533,4 +613,40 @@ test("D258: then-and-now gets the curious pose on the mounted end screen, withou
   await act(async () => void jest.advanceTimersByTime(560));
   expect(s.body.querySelector(".review-mole .mole")?.getAttribute("data-mood")).toBe("curious");
   await s.done();
+});
+
+// F138
+test("on the full end screen the mole never says a number the row under the ring already shows", async () => {
+  const { endSays, endTiles } = await import("../src/end-says");
+  const base = { today: today(true, 600_000) as never, closed: false, short: false, ups: [], minutesLeft: null, row: true };
+  const session = (o: Record<string, unknown>) => ({ id: "s", reviews: 8, kept: 5, rescued: 0, ...o }) as never;
+  // A long gap is the row's third number, so he gives his verdict instead of saying it again.
+  const gap = { ...base, session: session({ depth_days: 30, longest_days: 18 }) };
+  expect(endTiles(gap).map((t) => t.key)).toEqual(["kept", "depth", "long"]);
+  expect(endSays(gap)[0]!.text).toBe("Gneiss work.");
+  // The same for a new level and for memories pulled back, and never the days of memory.
+  expect(endSays({ ...base, closed: true, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ depth_days: 30 }) })[0]!.text).toBe("Goal met. You rock.");
+  expect(endSays({ ...base, session: session({ rescued: 2 }) }).map((l) => l.text)).toEqual(["Gneiss work."]);
+  // A rare thing the row has no room for is still his to say: the row shows the level, he says the gap.
+  expect(endSays({ ...base, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ longest_days: 18 }) })[0]!.text).toBe("18 days gone and you still had it.");
+  // Then and now is never in the row.
+  expect(endSays({ ...base, session: session({ longest_days: 18, then_now: { then_ts: new Date(Date.now() - 28 * 864e5).toISOString() } }) })[0]!.rare?.kind).toBe("then");
+});
+
+// F134
+test("the memory line ends by saying in words when the next review falls for the rating in hand", async () => {
+  const { Timeline } = await import("../src/Timeline");
+  const at = (days: number) => new Date(Date.now() + days * 864e5 + 6e4).toISOString();
+  const history = { reviews: [{ ts: at(-9), rating: 3 }], next: { 1: at(0), 2: at(4), 3: at(21), 4: at(40) } } as never;
+  const body = document.createElement("div");
+  document.body.appendChild(body);
+  const root = createRoot(body);
+  const said = async (rating: 1 | 2 | 3 | 4) => {
+    await act(async () => root.render(<TooltipProvider><Timeline history={history} rating={rating} /></TooltipProvider>));
+    const el = body.querySelector(".timeline-next")!;
+    return [el.textContent, el.getAttribute("aria-hidden")];
+  };
+  expect(await said(3)).toEqual(["next in 21 days", "true"]);
+  expect(await said(4)).toEqual(["next in 1 month", "true"]);
+  await act(async () => (root.unmount(), body.remove()));
 });

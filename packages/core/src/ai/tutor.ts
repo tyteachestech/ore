@@ -8,7 +8,7 @@ import { withLock } from "../lock.ts";
 import { paths } from "../library.ts";
 import { loadSkills } from "../skills.ts";
 import type { Library } from "../library.ts";
-import { isWebUrl, runAgent, samePage, type Usage } from "./adapter.ts";
+import { aiStampFor, isWebUrl, runAgent, samePage, type Usage } from "./adapter.ts";
 import { PASSAGES, plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
 import { quoteIn } from "./grade.ts";
 
@@ -117,7 +117,7 @@ export function partialReply(json: string): string | null {
 }
 
 /** While a reply is written: its text so far ("" when a retry starts it over), or a web search starting or done (claude only). */
-export type TutorProgress = { reply: string } | { searching: boolean };
+export type TutorProgress = { reply: string } | { searching: boolean } | { ai: AiStamp };
 
 /** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. */
 /** What a quote from a web page is checked against: its title as the search gave it, then the results' text,
@@ -144,6 +144,8 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
   const pointed = [...(focus.sources ?? []).map((id) => findItem(lib, id).meta.title), ...(focus.skills ?? []).map((s) => `the skill ${skillNames.get(s)}`)];
   const passages = tutorPassages(lib, [...recent.slice(-2).map((t) => t.message), m].join(" "), focus);
   let last = 0;
+  // First, who is answering: a reply he stops part way is kept with it, as a whole one is.
+  onProgress?.({ ai: aiStampFor(lib, "tutor") });
   const byId = new Map(passages.map((p) => [p.id, p]));
   const { data, ai, usage, web } = await runAgent(lib, {
     prompt: "tutor",

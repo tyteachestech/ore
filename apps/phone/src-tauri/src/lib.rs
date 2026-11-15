@@ -300,8 +300,24 @@ async fn transcribe(request: tauri::ipc::Request<'_>) -> Result<String, String> 
     out.map_err(|e| e.to_string())?
 }
 
+/// What the iPhone's shake and three-finger swipe would undo and redo (apps/phone/ios/Undo.swift), named as the
+/// history's steps are, and whether focus is in a field (its own typing undo goes first there). F161.
+#[tauri::command]
+fn undo_state(undo: Option<String>, redo: Option<String>, field: bool) {
+    #[cfg(target_os = "ios")]
+    {
+        let c = |s: Option<String>| s.and_then(|s| std::ffi::CString::new(s.replace('\0', "")).ok());
+        let (u, r) = (c(undo), c(redo));
+        let ptr = |s: &Option<std::ffi::CString>| s.as_ref().map_or(std::ptr::null(), |s| s.as_ptr());
+        unsafe { ore_undo_state(ptr(&u), ptr(&r), field) };
+    }
+    #[cfg(not(target_os = "ios"))]
+    let _ = (undo, redo, field);
+}
+
 #[cfg(target_os = "ios")]
 extern "C" {
+    fn ore_undo_state(undo: *const std::ffi::c_char, redo: *const std::ffi::c_char, field: bool);
     fn ore_can_transcribe() -> bool;
     fn ore_transcribe(path: *const std::ffi::c_char, language: *const std::ffi::c_char, ok: *mut bool, progress: Option<extern "C" fn(f64, f64)>) -> *mut std::ffi::c_char;
     fn free(p: *mut std::ffi::c_void);
@@ -480,7 +496,7 @@ pub fn run() {
             hide_keyboard_accessory();
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, library_write, http_fetch, can_transcribe, transcribe, share_inbox, share_skills, share_open, player_port])
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, library_write, http_fetch, can_transcribe, transcribe, undo_state, share_inbox, share_skills, share_open, player_port])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }

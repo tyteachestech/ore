@@ -851,7 +851,7 @@ img.thumb { filter: brightness(0.86); }
 }
 .popup.wide { width: 440px; }
 .intents { grid-column: 1; margin: 0 0 8px; }
-.intent { flex: 1; height: 26px; border-radius: 6px; color: var(--muted); font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 5px; }
+.intent { flex: 1; height: 26px; border-radius: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .intent:hover { background: var(--bg-hover); }
 /* Each type keeps its colour on the icon; the chosen one fills with the same tint it paints in the text. */
 .intent.keep { --hue: var(--keep-solid); --tint: var(--keep); } .intent.card { --hue: var(--card-solid); --tint: var(--card); }
@@ -1535,9 +1535,34 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .dot-ring .soon { fill: var(--ring); opacity: 0.55; transform: scale(0.85); }
 @media (prefers-reduced-motion: reduce) { .dot-ring circle { transition: none; } }
 .ring .dot-ring { --ring: var(--c-green); }
+/* A lap past the full ring (the end screen's bonus minutes): the dots it lights again are a little bigger and
+   carry a white centre, so where the bonus stops is plain; past a second full lap, bigger again. Each lands white. */
+.dot-ring .over { transform: scale(1.2); animation: over-in var(--t-4) var(--ease-out); }
+.dot-ring .over2 { transform: scale(1.34); animation: over-in var(--t-4) var(--ease-out); }
+.dot-ring .core { fill: #fff; transform: none; transition: transform var(--t-3) var(--ease-out); animation: core-in var(--t-4) var(--ease-out) both; }
+.dot-ring .core.big { transform: scale(1.75); }
+@keyframes over-in { from { fill: #fff; transform: scale(1.6); } }
+@keyframes core-in { from { transform: scale(0); } }
+/* Crossing the goal as the minutes count: one ring of dots thrown outward, once (white and wider at twice the goal). */
+.ring-throw { position: absolute; inset: 0; pointer-events: none; }
+.ring-throw i { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--c-green); animation: ring-throw var(--t-moment) var(--ease-out) both; }
+.ring-throw[data-big] i { background: #fff; }
+@keyframes ring-throw { from { opacity: 1; transform: rotate(var(--a)) translateY(calc(-1 * var(--r))); } to { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--r) - var(--far))) scale(0.4); } }
+/* White sparkles over the bonus dots: a cross of five dots that opens and fades. */
+.ring-sparkle { position: absolute; width: 0; height: 0; pointer-events: none; animation: sparkle var(--t-moment) var(--ease-in-out) both; }
+.ring-sparkle[data-twice] { --reach: 5px; }
+.ring-sparkle i { position: absolute; width: 3px; height: 3px; margin: -1.5px; border-radius: 50%; background: #fff; }
+.ring-sparkle i:nth-child(1) { width: 4px; height: 4px; margin: -2px; }
+.ring-sparkle i:nth-child(2) { transform: translateX(var(--reach, 4px)); }
+.ring-sparkle i:nth-child(3) { transform: translateX(calc(-1 * var(--reach, 4px))); }
+.ring-sparkle i:nth-child(4) { transform: translateY(var(--reach, 4px)); }
+.ring-sparkle i:nth-child(5) { transform: translateY(calc(-1 * var(--reach, 4px))); }
+@keyframes sparkle { 0%, 100% { opacity: 0; transform: scale(0.3); } 50% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .dot-ring .over, .dot-ring .over2, .dot-ring .core, .ring-throw i, .ring-sparkle { animation: none; } .ring-throw, .ring-sparkle { display: none; } }
 [data-color="gray"] .gem-ring .dot-ring { --ring: var(--text); }
 .gem-ring-lv { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); padding: 0 6px; height: 16px; line-height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); font-family: var(--round); font-size: 10px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .strength-side { display: flex; flex-direction: column; gap: 4px; }
+.strength-line { display: none; }
 .near-goal { display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-family: var(--mono); font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .near-goal > span { display: inline-flex; align-items: center; gap: 5px; color: var(--faint); font-size: 12px; }
 .hero-strength:is(:hover, [aria-expanded="true"]) .near-goal > span:not(.near-glow) { color: var(--muted); }
@@ -1617,6 +1642,8 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .skill-col.side .question-quote .note { margin: 0; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-col.side .question-quote .from { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-col.side .question.done .question-quote .note { text-decoration: line-through; }
+/* On the phone a question gets two lines, as a title does (D256, F139): one line cut most of them mid-thought. */
+.phone .skill-col.side .question-quote .note { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; line-height: 1.3; }
 .q-lead { position: absolute; right: 8px; top: 9px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; }
 .q-lead::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--question-solid); }
 .q-lead:hover { background: var(--bg-hover); }
@@ -1708,7 +1735,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .quiz-answer { margin-top: 16px; width: 100%; min-height: 140px; max-height: 50vh; padding: 10px 12px; font-size: 15px; line-height: 1.5; border-radius: 10px; }
 .quiz-answer.tall { min-height: 240px; }
 .quiz-answer.short { min-height: 84px; margin-top: 6px; }
-.quiz-leave { margin-top: 10px; width: 100%; height: 36px; padding: 0 12px; font-size: 14px; border-radius: 10px; }
+.quiz-leave { margin-top: 10px; width: 100%; height: 36px; padding: 0 12px; font-size: 14px; border-radius: 10px; text-overflow: ellipsis; }
 .quiz-label { display: block; margin-top: 16px; color: var(--muted); font-size: 12px; }
 .quiz-faint { color: var(--faint); }
 .quiz-sure { margin-top: 8px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
@@ -1724,7 +1751,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .quiz-sure button:focus-visible { outline: none; box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--focus); }
 .quiz-grow { flex: 1; min-height: 16px; }
 .quiz-foot { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
-.quiz .pill-btn.quiz-go { height: 42px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; box-shadow: 0 3px 0 color-mix(in srgb, var(--skill) 55%, #000); }
+.quiz .pill-btn.quiz-go { height: 42px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; }
 .quiz .pill-btn.quiz-go.wide { flex: 1; justify-content: center; }
 .quiz-ghost { height: 42px; padding: 0 14px; white-space: nowrap; border-radius: 999px; color: var(--muted); font-weight: 600; }
 .quiz-ghost:hover:not(:disabled, [aria-disabled="true"]), .quiz-ghost:focus-visible { background: var(--bg-hover); color: var(--text); }
@@ -1959,8 +1986,8 @@ button.home-plan:hover { color: var(--text); }
 .pick-row[aria-checked="true"] .pick-box { border-color: transparent; background: var(--skill); color: #0f2a19; box-shadow: 0 2px 0 color-mix(in srgb, var(--skill) 55%, #000); }
 .pick-row:active .pick-box { transform: translateY(1px); box-shadow: 0 1px 0 color-mix(in srgb, var(--skill) 55%, #000); }
 .review-pick-foot { display: flex; justify-content: flex-end; padding: 14px 12px 0; }
-.review-pick .pill-btn.home-go { height: 40px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; box-shadow: 0 3px 0 color-mix(in srgb, var(--skill) 55%, #000); }
-.home .pill-btn.home-go { height: 40px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; box-shadow: 0 3px 0 color-mix(in srgb, var(--skill) 55%, #000); }
+.review-pick .pill-btn.home-go { height: 40px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; }
+.home .pill-btn.home-go { height: 40px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; }
 .home-h { margin: 26px 0 10px; color: var(--faint); font-size: 12px; font-weight: 500; }
 .home-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
 .home-skill { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); text-align: left; color: var(--text); min-width: 0;; box-shadow: var(--lift); }
@@ -2064,7 +2091,7 @@ button.home-plan:hover { color: var(--text); }
 @keyframes nudge { 0%, 100% { transform: none; } 30% { transform: translateX(-3px); } 70% { transform: translateX(3px); } }
 .review-foot { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 18px; }
 .review-foot.center { justify-content: center; }
-.review .pill-btn.quiz-go { height: 42px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; box-shadow: 0 3px 0 color-mix(in srgb, var(--skill) 55%, #000); }
+.review .pill-btn.quiz-go { height: 42px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; }
 .review-answer { margin: 0; font-size: 16px; line-height: 1.55; white-space: pre-wrap; user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
 .review-grading { margin: 12px 0 0; }
 .review-feedback { margin: 12px 0 0; color: var(--muted); line-height: 1.55; user-select: text; -webkit-user-select: text; }
@@ -2150,10 +2177,6 @@ button.home-plan:hover { color: var(--text); }
 .review-end { display: flex; flex-direction: column; align-items: center; text-align: center; margin: 4vh auto 0; max-width: 420px; animation: card-in var(--t-4) ease-out both; }
 /* The mole stands on the ring: its row of dirt just above the ring, clear of its fill (D169). */
 .review-mole { display: block; line-height: 0; margin-bottom: 2px; width: 96px; height: calc(96px * 18 / 22); }
-/* D255: he lands off the cart with a squash, then springs back to his height. */
-.review-mole.fell { transform-origin: 50% 100%; animation: mole-land var(--t-4) var(--ease-spring) both; }
-@keyframes mole-land { from { transform: scale(1.14, 0.8); } }
-@media (prefers-reduced-motion: reduce) { .review-mole.fell { animation: none; } }
 /* The cart's tip (D190): a layer as wide as the window over the end screen, so the cart crosses it on a rail just
    over the ring. Its ore is the ring's own dot, in size and colour; a rough stone is the gem it becomes. */
 .review-end.carted { position: relative; }
@@ -2173,7 +2196,13 @@ button.home-plan:hover { color: var(--text); }
 .rich-ore { display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%; background: var(--ore-rich); vertical-align: 1px; }
 .cart-rough { margin: -9px 0 0 -9px; line-height: 0; }
 /* The mole asleep on the load (D255). Its wrapper's own point is the middle of his body: the foot of the head's box. */
+/* The ground he falls into: a clip set as he falls, so his body goes under the dirt line. */
+.cart-ground { position: absolute; inset: 0; }
 .cart-mole { position: absolute; left: 0; top: 0; width: 96px; height: calc(96px * 18 / 22); margin: calc(-96px * 18 / 22) 0 0 -48px; transform-origin: 50% 100%; line-height: 0; will-change: transform; }
+.cart-mole-body { display: block; width: 100%; height: 100%; will-change: transform; filter: url(#cart-solid); }
+.cart-bucket { filter: url(#cart-solid-fine); }
+.cart-solid-fill { flood-color: var(--bg); }
+.cart-dirt { position: absolute; left: 0; top: 0; margin: -4px 0 0 -4px; border-radius: 50%; background: color-mix(in oklab, var(--text) 78%, var(--bg)); will-change: transform; }
 .cart-zzz { position: absolute; left: -30px; top: -110px; width: 110px; height: 86px; overflow: visible; fill: var(--muted); }
 .cart-zzz g { animation: cart-zzz 1400ms infinite both; }
 .cart-zzz g:nth-child(2) { animation-delay: 250ms; }
@@ -2190,6 +2219,23 @@ button.home-plan:hover { color: var(--text); }
 .end-emblem::before { content: ""; position: absolute; inset: -48px 0 -72px; z-index: -1; pointer-events: none; background-image: radial-gradient(circle, color-mix(in oklab, var(--text) 16%, transparent) 1.1px, transparent 1.6px); background-size: 9px 9px; background-position: center; -webkit-mask-image: radial-gradient(closest-side, #000, transparent); mask-image: radial-gradient(closest-side, #000, transparent); }
 .end-ring { position: relative; display: grid; place-items: center; }
 .end-ring > * { grid-area: 1 / 1; }
+/* What stands in the ring: the day's minutes in its dots, "min" and what came after the goal on a chip in the
+   ring's green, and one line for the skill the session fed most. */
+.end-lap { display: flex; flex-direction: column; align-items: center; font: 400 12px/1 var(--mono); color: var(--muted); animation: end-lap-in var(--t-4) var(--ease-out); }
+.end-lap-n { display: block; color: var(--text); }
+.end-lap-min { display: flex; align-items: center; justify-content: center; height: 20px; margin-top: 10px; }
+.end-lap-plus { display: grid; place-items: center; height: 20px; padding: 0 7px; margin-left: 7px; border-radius: 10px; background: var(--c-green); color: #0f2a19; animation: end-plus-in var(--t-4) var(--ease-out); }
+.end-lap .end-lap-plus .dot-number circle { fill: #0f2a19; }
+.end-lap-plus:focus-visible, .end-lap-reel:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
+.end-lap-reel { display: block; height: 24px; margin-top: 8px; overflow: hidden; border-radius: 6px; animation: end-lap-in var(--t-4) var(--ease-out); }
+.end-lap-rows { display: flex; flex-direction: column; transition: transform var(--t-4) var(--ease-out); }
+.end-lap-rows > span { display: flex; align-items: center; justify-content: center; gap: 6px; height: 24px; max-width: 150px; color: var(--text); white-space: nowrap; }
+.end-lap-rows > span > span:not(.skill-icon) { overflow: hidden; text-overflow: ellipsis; }
+.end-lap-rows .skill-icon.glyph { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; }
+.end-lap-rows b { font-weight: 500; color: var(--skill, var(--text)); }
+@keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes end-plus-in { from { opacity: 0; max-width: 0; padding: 0; margin-left: 0; } to { max-width: 48px; } }
+@media (prefers-reduced-motion: reduce) { .end-lap, .end-lap-reel, .end-lap-plus { animation: none; } .end-lap-rows { transition: none; } }
 /* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
    Each lands in hard steps, one after another, then is still. */
 .end-tally { list-style: none; display: flex; justify-content: center; gap: 16px; margin: 20px 0 0; padding: 0; }
@@ -2219,31 +2265,31 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-head { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .end-tally li, .end-tally .end-mark circle { animation: none !important; } }
 .end-ring > .review-cut { position: relative; flex-wrap: wrap; align-items: center; max-width: 160px; gap: 6px 8px; margin: 0; }
-/* The mole sits on the ring: its row of dirt rests on the ring's top dots. */
-.end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: -12px; }
+/* The mole comes up out of a mound of dirt that stands just clear of the ring: its bonus dots are bigger (Tyler, 2026-11-14, D274). */
+.end-emblem .review-mole { position: relative; z-index: 1; margin-bottom: 4px; }
+/* The mound, in front of him: it heaps up from its foot as he comes up, or as he lands in it off the cart. */
+.mole-mound { position: absolute; left: 0; bottom: 0; transform-origin: 50% 100%; animation: mound-in var(--t-moment) var(--ease-spring) both; }
+.mole-mound .back { fill: var(--bg); }
+.mole-mound .lit { fill: color-mix(in srgb, var(--text) 52%, var(--bg)); }
+.mole-mound .earth { fill: color-mix(in srgb, var(--text) 30%, var(--bg)); }
+.mole-mound .deep { fill: color-mix(in srgb, var(--text) 14%, var(--bg)); }
+@keyframes mound-in { from { transform: scale(0.7, 0); } }
+@media (prefers-reduced-motion: reduce) { .mole-mound { animation: none; } }
 /* Two groups: what the session won, then what comes next. */
 .end-emblem ~ .review-try { margin-top: 40px; }
 .end-emblem ~ .review-try ~ .review-foot { margin-top: 12px; }
 .end-emblem ~ .review-foot { margin-top: 40px; }
 /* The mole speaks (D243) from his speech box (D245), right of his head; it grows out of him once. */
-.says.end-says { position: absolute; left: calc(50% + 62px); top: 12px; z-index: 2; width: min(216px, calc(50vw - 78px)); min-height: 52px; transform-origin: 0 60%; animation: end-says var(--t-4) var(--ease-out); }
+.says.end-says { position: absolute; left: calc(50% + 62px); top: 12px; z-index: 2; width: max-content; max-width: min(248px, calc(50vw - 78px)); transform-origin: 0 50%; animation: end-says var(--t-4) var(--ease-out); }
 @keyframes end-says { from { opacity: 0; transform: translateX(-6px) scale(0.96); } }
 @media (prefers-reduced-motion: reduce) { .says.end-says { animation: none; } }
-/* The mole's speech box (D245, `MoleSays`): an old game's dialogue box in his own drawing. Flat, its corners cut
-   in the 3px steps of its stair tail (D159); the mono, typed out a letter at a time; his block (D186) rides the
-   last letter and blinks once the line is whole. The letters still to come hold their place unseen. */
-.says { position: relative; z-index: 0; box-sizing: border-box; padding: 9px 12px 10px; text-align: left; }
-.says::before { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--bg-active); clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px, 100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%, 6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px), 0 6px, 3px 6px, 3px 3px, 6px 3px); }
-.says-tail { position: absolute; top: 15px; fill: var(--bg-active); }
-.says[data-tail="left"] .says-tail { left: -9px; }
-.says[data-tail="right"] .says-tail { right: -9px; }
-.says-line { margin: 0; font: 400 12px/1.5 var(--mono); letter-spacing: 0.01em; color: var(--text); overflow-wrap: anywhere; }
+/* The mole's speech box (D245, `MoleSays`; its look D266, the Rive cart ending's box): a hairline
+   outline on the page's own ground, 6px corners, no fill and no tail, 10px more on the right for his block; the mono, typed out a letter at a time; his
+   block (D186) rides the last letter and blinks once the line is whole. The letters to come hold their place unseen. */
+.says { position: relative; box-sizing: border-box; padding: 6px 20px 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); text-align: left; }
+.says-line { margin: 0; font: 400 13px/1.5 var(--mono); letter-spacing: 0.01em; color: var(--text); overflow-wrap: anywhere; }
 .says-line:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 .says-rest { visibility: hidden; }
-/* A rare line's mark (D247): the thing's own drawing, 16px, on the words' midline. */
-.says-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; margin-right: 8px; vertical-align: middle; color: var(--muted); }
-.says-mark > * { grid-area: 1 / 1; }
-.says-mark > .skill-icon { width: 16px; height: 16px; }
 .says-block { position: relative; display: inline-block; width: 0; height: 1em; vertical-align: -0.12em; }
 .says-block::after { content: ""; position: absolute; left: 2px; top: 0; width: 0.55em; height: 100%; background: var(--text); }
 .says:not([data-typing]) .says-block::after { animation: block-blink 1s steps(1) infinite; }
@@ -2789,7 +2835,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .doc-head .source { position: relative; z-index: 1; min-width: 44px; padding-block: 14px; margin-block: -14px; }
 /* The reading pill: 28pt to the eye, 44pt to the finger. */
 .phone .read-pill::before { content: ""; position: absolute; inset: -9px -6px; }
-/* Rename, Add author, a key point, a guess before reading and Leave anything out?: fields 44pt tall to the finger. */
+/* Rename, Add author, a key point, a guess before reading and Skip a part of this source?: fields 44pt tall to the finger. */
 .phone .doc-head :is(.title-edit, .author-edit), .phone .cp-input, .phone .preq-input, .phone .quiz-leave { min-height: 44px; }
 /* Renaming from ⋯ keeps the title's own size (it is over 16px, so iOS doesn't zoom): the accent rule says it is being edited. */
 .phone .doc-head .title-edit { font-size: 26px !important; line-height: 1.25; outline: none; }
@@ -2801,7 +2847,15 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .kb-hide { flex: none; width: 44px; }
 .phone .quiz-close { min-width: 44px; min-height: 44px; }
 .phone .review-tools button { min-width: 44px; min-height: 44px; }
-.phone .review-moment { bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+/* Thumb reach (F137): what he taps on every exercise sits at the foot of the screen, over the home indicator, as
+   Apple puts an app's main actions: how sure he is on an exercise he answers in his head, and the ratings once the
+   answer is out. A typed answer keeps its buttons under the field, which the keyboard already lifts to the thumb. */
+.phone .review { --foot: max(32px, calc(env(safe-area-inset-bottom, 0px) + 16px)); }
+.phone .review-body { padding-bottom: var(--foot); }
+.phone .review-card { min-height: 100%; }
+.phone .review-card:not(:has(textarea)) > #review-sure, .phone .review-card > .review-memory, .phone .review-card > :not(.review-memory) + .review-rate { margin-top: auto; }
+.phone .review-card > .review-passage, .phone .review-card > .review-answer { margin-bottom: 24px; }
+/* What the last answer won shows over the next exercise, so it stands clear above the buttons at the foot (F137). */
 /* Menu rows at iOS's 44pt; the highlight popup's types and icons, and "What do you already know?", too. */
 .phone .menu-item { height: 44px; }
 /* A submenu (a source's Skills) has no room beside its menu at phone width: it rises as a sheet across the bottom.
@@ -2967,7 +3021,15 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-skill { padding: 8px 20px 40px; }
 .phone .phone-skill .skill-page { display: block; overflow: visible; }
 .phone .phone-skill .skill-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 12px; padding: 4px 0 20px; }
-.phone .phone-skill .skill-hero .hero-strength { grid-column: 2; margin: -4px 0 0 -12px; }
+/* The rocks in the order they grow, a dotted path between, ending in the level ring and the cut count (D272). */
+.phone .phone-skill .skill-hero .hero-strength { grid-column: 2; margin: -14px -12px -10px -12px; min-height: 44px; }
+.phone .phone-skill .hero-strength > :is(.gem-ring, .strength-side) { display: none; }
+.phone .phone-skill .strength-line { flex: 1; min-width: 0; display: flex; align-items: center; color: var(--muted); font-family: var(--mono); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.phone .phone-skill .strength-step { flex: 1; display: flex; align-items: center; gap: 5px; }
+.phone .phone-skill .strength-step::after { content: ""; flex: 1; min-width: 8px; height: 2px; margin: 0 8px; background: radial-gradient(circle, var(--faint) 1px, transparent 1.2px) 0 0 / 7px 2px repeat-x; opacity: 0.7; }
+.phone .phone-skill .strength-end { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 17px; font-weight: 600; }
+.phone .phone-skill .strength-lv { margin-left: 8px; font-size: 11px; }
+.phone .phone-skill .skill-name-row .skill-importance { margin-left: auto; }
 .phone .phone-skill .skill-goal span { white-space: normal; }
 .phone .phone-skill .skill-col { padding-inline: 0; margin-inline: 0; }
 .phone .phone-skill .skill-cols.one { display: flex; flex-direction: column; gap: 24px; padding: 0; }
@@ -3323,6 +3385,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* The exercise's gem beside its reviews (D237): one line, the gem on the timeline's midline. */
 .review-memory { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
 .review-memory .timeline { flex: 1; margin-top: 0; }
+/* Its width holds while the pointer crosses the ratings, so the line never changes length under the dots. */
+.timeline-next { flex: none; min-width: 17ch; text-align: right; color: var(--faint); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .review-memory + .review-rate { margin-top: 14px; }
 .review-gem { flex: none; display: inline-grid; border-radius: 4px; }
 .review-gem:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
@@ -3331,25 +3395,35 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .review-rate button[data-armed]:focus-visible { box-shadow: 0 3px 0 var(--border), 0 0 0 2px var(--rate), 0 0 0 4px var(--focus); }
 .review-guard { margin: 10px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
 /* The moment after a rating that changed the gem: it sits over the next card and never holds it back. */
-.review-moment { position: absolute; z-index: 5; left: 50%; bottom: 56px; display: flex; align-items: center; gap: 12px; width: max-content; max-width: min(520px, calc(100% - 32px)); padding: 10px 16px 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-raised, var(--bg)); translate: -50% 0; overflow: hidden; animation: moment-rise var(--t-4) var(--ease-out) both, moment-leave var(--t-3) var(--ease-out) 3.7s forwards; pointer-events: none; }
+/* D271: the reward after a rating is a chip in the head bar: the gem, then the days it added in
+   dots, then what became of it. It never sits over the question or a button. */
+.review-moment { position: absolute; z-index: 5; left: 50%; top: 6px; display: flex; align-items: center; gap: 10px; height: 40px; width: max-content; max-width: calc(100% - 32px); padding: 0 16px 0 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg-raised, var(--bg)); translate: -50% 0; overflow: hidden; animation: moment-drop var(--t-4) var(--ease-out) both, moment-leave var(--t-3) var(--ease-out) 3.7s forwards; pointer-events: none; }
 .review-moment[data-tone="miss"] { animation-delay: 0s, 5.7s; }
-/* D246: the goal's note stays until the next rating and carries his way out, so it takes the pointer. */
-/* The goal's note (D246): the mole and his speech box (D245), told once and kept until the next rating. */
+.moment-days { display: flex; align-items: center; gap: 6px; color: var(--muted); font: 500 12px/14px var(--mono); }
+.moment-days .dot-number { flex: none; }
+.moment-days .dot-number circle { fill: var(--text); }
+.moment-why { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; }
+.review-moment[data-days] .moment-why::before { content: "· "; }
+/* The quick quiz and the iPhone have no room beside the buttons for more than the gem and its days. */
+:is(.quick, .phone) .review-moment { position: static; flex: none; translate: none; }
+.quick .review-moment { height: 30px; }
+.quick .quick-ring { order: -1; }
+.phone .review-moment .moment-mole { display: none; }
+:is(.quick, .phone) .review-moment[data-days] .moment-why { display: none; }
 .review-goal { position: absolute; z-index: 5; left: 50%; bottom: 56px; display: flex; align-items: flex-end; gap: 12px; translate: -50% 0; animation: moment-rise var(--t-4) var(--ease-out) both; }
 .review-goal .says { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; white-space: nowrap; }
 .moment-done { flex: none; height: 24px; padding: 0 10px; border-radius: 999px; color: var(--muted); font-size: 13px; font-weight: 600; }
 .moment-done:hover, .moment-done:focus-visible { background: var(--bg-hover); color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .review-goal { animation: none; } }
-.moment-mole { flex: none; align-self: flex-end; display: inline-grid; margin: 0 0 -10px 4px; }
+.moment-mole { flex: none; align-self: flex-end; display: inline-grid; margin: 0 0 -14px 2px; }
 .moment-gem { flex: none; display: inline-grid; }
 .moment-gem > .gem { grid-area: 1 / 1; }
 .moment-gem > .gem:first-child { animation: moment-was var(--t-3) var(--ease-out) 350ms both; }
 .moment-gem > .gem:last-child { animation: moment-now var(--t-moment) var(--ease-spring) 350ms both; }
 .review-moment[data-tone="miss"] .moment-gem > .gem:last-child { animation-timing-function: var(--ease-out); animation-duration: var(--t-4); }
-.moment-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--muted); font-size: 13px; line-height: 18px; }
-.moment-text b { color: var(--text); font-family: var(--mono); font-weight: 500; font-variant-numeric: tabular-nums; }
 @keyframes moment-rise { from { opacity: 0; transform: translateY(8px); } }
-@keyframes moment-leave { to { opacity: 0; transform: translateY(4px); } }
+@keyframes moment-drop { from { opacity: 0; transform: translateY(-8px); } }
+@keyframes moment-leave { to { opacity: 0; transform: translateY(-4px); } }
 @keyframes moment-was { to { opacity: 0; transform: scale(0.9); } }
 @keyframes moment-now { from { opacity: 0; transform: scale(0.8); } }
 /* Still (the global rule stops every animation): only the gem it became shows. */

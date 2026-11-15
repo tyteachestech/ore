@@ -56,7 +56,7 @@ export function step(v: State, vel: State, to: State, dt: number) {
   for (const [k, lo, hi] of LIMITS) if (v[k] < lo || v[k] > hi) { v[k] = clamp(v[k], lo, hi); vel[k] = 0; }
 }
 
-export type Mood = "idle" | "peek" | "thinking" | "happy" | "surprised" | "cheer" | "nod" | "shake" | "wink" | "laugh" | "proud" | "curious" | "sad" | "sleepy" | "set" | "shy" | "wave" | "huff" | "lookdown" | "anxious" | "ecstatic" | "nap" | "doze" | "fall";
+export type Mood = "idle" | "peek" | "hole" | "pop" | "thinking" | "happy" | "surprised" | "cheer" | "nod" | "shake" | "wink" | "laugh" | "proud" | "curious" | "sad" | "sleepy" | "set" | "shy" | "wave" | "huff" | "lookdown" | "anxious" | "ecstatic" | "nap" | "doze" | "fall" | "dive";
 /** A mood: where each value should settle (`to`), where it starts (`from`), pushes that set it moving (`kick`), timed
  *  changes after (`at`), paws waving until `wave` ms, and when it rests (`end`) or starts over (`loop`).
  *  `still` is the one pose shown under reduced motion or in a hidden window. */
@@ -83,6 +83,11 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // A squat, then arc eyes, the moustache spread wide and a hop with both paws thrown up, and the dirt as he lands.
   happy: { to: { top: SQUAT }, end: 1700, still: HAPPY,
     at: [[110, { to: HAPPY, kick: { top: -HOP, pawL: THROW, pawR: THROW } }], [420, { kick: { kick: 7 } }]] },
+  // After his fall off the cart. `hole`: his hole with nobody up, only the dirt. `pop`: the dirt kicks as he goes in,
+  // a beat on the empty hole, then up with a start, helmet knocked askew, which he lets settle.
+  hole: { from: { y: 21 }, to: { y: 21 }, loop: 60_000, still: { y: 21 } },
+  pop: { from: { y: 21 }, to: { y: 21 }, kick: { kick: 12 }, end: 1900, still: { ...WIDE, bang: 1 },
+    at: [[150, { kick: { kick: 6 } }], [260, { to: { ...WIDE, y: 0, bang: 1, tilt: 0.35, hat: 0.8 }, kick: { pawL: THROW, pawR: THROW } }], [400, { kick: { kick: 8 } }], [780, { to: { tilt: 0, hat: 0 } }], [900, { to: { bang: 0 } }]] },
   // A jolt up with both paws, his helmet jumping off his brows, wide eyes, an O, and a "!" over him (the traced mole).
   surprised: { to: { ...WIDE, bang: 1 }, kick: { top: -JOLT, pawL: THROW, pawR: THROW, kick: 6 }, end: 1400, still: { ...WIDE, bang: 1 }, at: [[1000, { to: { bang: 0 } }]] },
   // Both paws waving, bobbing on each beat, then a squat, a last hop and it settles pleased.
@@ -141,8 +146,14 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
   // head, his belly and moustache rising on each snore, the foot in the air bobbing.
   doze: { from: DOZE, to: DOZE, loop: 3000, still: DOZE,
     at: [[0, { to: { breath: 1 } }], [1300, { to: { breath: 0 }, kick: { puff: 2 } }], [2000, { to: { legs: 1 } }], [2250, { to: { legs: 0 } }]] },
-  // Falling: eyes wide, mouth an O, arms flung out and his feet running on nothing.
-  fall: { from: { whole: 1 }, to: FALL, loop: 360, still: FALL, at: [[0, { to: { legs: 1, arms: 0.75 } }], [180, { to: { legs: -1, arms: 1 } }]] },
+  // Awake on nothing: a start (eyes wide, a "!", arms flung out, his helmet floating off his brows a beat late), a
+  // look down, his feet running on air while his arms go, then he stops and looks at us before he drops.
+  fall: { from: { whole: 1, side: 0, hat: -0.8 }, to: { ...FALL, hat: 0.9, bang: 1 }, loop: 3000, still: FALL,
+    at: [[330, { to: { ly: 1, bang: 0, hat: 0.3 } }],
+      ...[0, 1, 2, 3, 4].map((i): [number, Beat] => [450 + i * 108, { to: { legs: i % 2 ? -1 : 1, arms: i % 2 ? 0.8 : 1.5, tilt: i % 2 ? 0.2 : -0.2 }, kick: { legs: i % 2 ? -30 : 30 } }]),
+      [985, { to: { legs: 0, arms: 1, tilt: 0, ly: 0, hat: 0 } }]] },
+  // Dropping feet first: his arms go straight up over him and his helmet is left behind, feet together.
+  dive: { from: { whole: 1, side: 0 }, to: { ...FALL, hat: 1.4, arms: 2, legs: 0, tilt: 0 }, loop: 3000, still: { ...FALL, hat: 1.4, arms: 2, legs: 0 } },
 };
 
 /** The puppet's moving parts: its values, their speeds, where they are headed, and the move playing. */
@@ -301,6 +312,35 @@ export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false
       {FINE_ORDER.map((t) => (
         <path key={t} ref={(el) => { tones.current[t] = el; }} className={`mole-${t}`} />
       ))}
+    </svg>
+  );
+}
+
+/** The mound's clods on the fine grid, back to front: [column, rows above the dirt line, radius]. A big one at each
+ *  side of him, smaller ones along the front, low enough that his paws rest on them. */
+const CLODS: [number, number, number][] = [[-7.5, -0.4, 2.2], [40.5, -0.4, 2.2], [-2.5, 1.4, 4.3], [35.5, 1.6, 4.5], [4.5, -1.2, 3], [28.5, -1.1, 3.1], [10.5, -1.4, 2.4], [22, -1.3, 2.5], [16.5, -1.6, 2.3]];
+/** Its dots: [column, row, tone]. Each clod is lit along its top and dark at its foot, so it reads as a lump; all sit on one floor. */
+const MOUND: [number, number, "lit" | "earth" | "deep"][] = (() => {
+  const out: [number, number, "lit" | "earth" | "deep"][] = [];
+  for (let c = -10; c <= 43; c++) for (let r = -2; r <= 7; r++) {
+    const [x, y, R] = CLODS.findLast(([x, y, R]) => Math.hypot(c - x, r - y) <= R) ?? [0, 0, 0];
+    // The floor's two ends are rounded off.
+    if (!R || Math.abs(c - 16.5) > 25 + r * 1.5) continue;
+    const up = (r - y) / R, far = Math.hypot(c - x, r - y) / R;
+    out.push([c, r, r === -2 || (up < 0.1 && far > 0.72) ? "deep" : up > 0.25 && far > 0.55 ? "lit" : "earth"]);
+  }
+  return out;
+})();
+
+/** The mound of dirt the mole comes up through at a session's end, drawn in front of him in his own fine dots
+ *  (Tyler, 2026-11-14: "so it looks like he's popping out of a hole"). It lies over a `bare` mole of the same `size`. */
+export function Mound({ size = 96 }: { size?: number }) {
+  const u = COLS / 33;
+  return (
+    <svg className="mole-mound" width={size} height={(size * ROWS) / COLS} viewBox={`0 0 ${COLS} ${ROWS}`} overflow="visible" aria-hidden="true">
+      {/* Dots have gaps, so each sits on a wider round of the page: nothing of him shows through his mound. */}
+      {MOUND.map(([c, r]) => <circle key={`b${c},${r}`} className="back" cx={(c + 0.5) * u} cy={ROWS - 0.3 - r * u} r={0.72 * u} />)}
+      {MOUND.map(([c, r, tone]) => <circle key={`${c},${r}`} className={tone} cx={(c + 0.5) * u} cy={ROWS - 0.3 - r * u} r={0.42 * u} />)}
     </svg>
   );
 }

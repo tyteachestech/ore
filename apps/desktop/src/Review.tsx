@@ -1,3 +1,4 @@
+import { rememberToday } from "./ReviewPick";
 import { Archive, ArrowCounterClockwise, ArrowSquareOut, CaretLeft, CaretRight, ChatCircleDots, Check, Circle, Clock, PencilSimple, ThumbsDown, Trash, X } from "./icons";
 import { listen } from "@tauri-apps/api/event";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
@@ -7,7 +8,7 @@ import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Cutting, Gem } from "./Gem";
 import { EndMark } from "./EndMark";
 import { SkillIcon } from "./IconPicker";
-import { Mole } from "./Mole";
+import { Mole, Mound } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
 import { still } from "./SideCursor";
 import { Hint } from "./Hint";
@@ -17,11 +18,12 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
-import { endMood, endSays, endTiles, weeksAgo, type Said, type Tile } from "./end-says";
+import { endMood, endSays, endTiles, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
+import { LapCentre, lapPlan, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, kept, LIBRARY_BACK, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { MOMENT_MOOD, momentFor, type Moment } from "./moment";
@@ -209,9 +211,11 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const before = useRef<Today | null>(null);
   /** Today as the session started, for the quick quiz's ring. */
   const [start, setStart] = useState<Today | null>(null);
+  /** The local day `before` was read on. */
+  const beforeDay = useRef("");
   /** The ratings of this session, newest last, to take back with ⌘Z one after another (Anki's Undo): each
    *  review's ts and the session as it was before it. */
-  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget }[]>([]);
+  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget; day: string; ms: number }[]>([]);
   const last = undos.at(-1);
   /** Cards retired in this session: taking back a rating before one brings the queue back without it. */
   const retired = useRef(new Set<string>());
@@ -257,6 +261,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         }
         const t = ore<Today>("today").then((t) => {
           before.current = t;
+          beforeDay.current = new Date().toLocaleDateString("sv");
           setStart(t);
         }, () => {});
         // --start: a session opens on a likely recall (D176); the quick quiz asks the card that is next.
@@ -292,17 +297,25 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
   // comes up twice. Past the day's new-card limits, so a draft it didn't rate stays; the card on screen
   // goes only if he hasn't started on it.
+  // Back after time away does the same, since the CLI, `/ore` or the phone may have rated, changed or deleted one
+  // (F173); the next card loads again, and the one on screen too if he hasn't started on it.
   useEffect(() => {
-    if (quick || PHONE) return;
-    const un = listen("quiz-closed", () => {
+    const reconcile = (outside: boolean) =>
       ore<DueEntry[]>("due", "--all", ...pickArgs(pick, source)).then((fresh) => {
         const due = new Set(fresh.map((e) => e.id));
         const s = now.current;
         const started = s.phase !== "answer" || !!s.answer.trim();
+        if (outside) dropAhead();
+        if (outside && !started && s.card && due.has(s.card.id)) {
+          const id = s.card.id;
+          loadCard(id).then((c) => now.current.card?.id === id && now.current.phase === "answer" && !now.current.answer.trim() && setCard(c), () => {});
+        }
         setQueue((q) => q && (q.every((e) => due.has(e.id)) ? q : q.filter((e, i) => due.has(e.id) || (i === 0 && started))));
       }, () => {});
-    });
-    return () => void un.then((f) => f());
+    const back = () => void reconcile(true);
+    addEventListener(LIBRARY_BACK, back);
+    const un = quick || PHONE ? null : listen("quiz-closed", () => void reconcile(false));
+    return () => (removeEventListener(LIBRARY_BACK, back), void un?.then((f) => f()));
   }, [quick, pick, source]);
 
   /** A fresh start on a card: no answer, no marks, its clock not yet started. */
@@ -418,7 +431,11 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       }
       // The try line is a nicety: the end screen never waits on or fails for it.
       const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
-      setEnd({ session: receipt, today: await ore<Today>("today"), before: before.current, next: await next });
+      // Home draws the Today it last read until a fresh one lands (F125): hand it this one,
+      // so Done doesn't show the morning's progress and then push the list down when the goal line appears.
+      const today = await ore<Today>("today");
+      rememberToday(today);
+      setEnd({ session: receipt, today, before: before.current, next: await next });
     } catch (e) {
       notify(errorText(e), "error");
       onClose();
@@ -595,7 +612,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     setBusy(true);
     let goalClosed = false, saved = false;
     try {
-      const elapsed = Date.now() - shownAt.current;
+      // A wall clock set back since it showed (a time zone fix, a sync) never makes it negative (F183).
+      const elapsed = Math.max(0, Date.now() - shownAt.current);
       await sessionReady.current;
       const args = [
         card.id,
@@ -613,6 +631,21 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       // An everyday rating leaves a moment still showing to run its time.
       if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
+      // Past midnight the day's minutes start again: read the new day's Today, as if it was read just before this
+      // rating, so the goal and the ring count today's minutes, not yesterday's plus these (F184).
+      if (before.current && new Date().toLocaleDateString("sv") !== beforeDay.current) {
+        const t = await ore<Today>("today").catch(() => null);
+        if (t) {
+          const add = Math.min(elapsed, ACTIVE_CAP_MS, t.active_ms);
+          before.current = { ...t, active_ms: t.active_ms - add, met: t.active_ms - add >= t.goal_ms };
+          beforeDay.current = new Date().toLocaleDateString("sv");
+          setStart(before.current);
+          activeMs.current = add;
+          // Yesterday's goal note was yesterday's: today's goal is told when it closes.
+          goalTold.current = false;
+          setGoalSaid(false);
+        }
+      }
       // The day's goal closing (D65) is told by the mole; the session flows on (D246).
       const b = before.current;
       goalClosed = !!b && b.counts && !b.met && b.active_ms + activeMs.current >= b.goal_ms;
@@ -668,7 +701,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
           );
         },
       );
-    setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
+    setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget, day: beforeDay.current, ms: Math.min(elapsed, ACTIVE_CAP_MS) }]);
     // Every rating is a step, a miss too: a rating always moves "Exercise N of M" on, and a miss adds its retry
     // as one more step (D59).
     setDone((n) => n + 1);
@@ -693,7 +726,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         setEnd(null);
       }
       reviewed.current--;
-      activeMs.current = last.activeMs;
+      // A rating from before midnight's rollover: the count is the new day's now, so only its own time comes off.
+      activeMs.current = last.day === beforeDay.current ? last.activeMs : Math.max(0, activeMs.current - last.ms);
       putOffIds.current = new Set(last.off);
       // D177's one more goes with the rating that earned it.
       wonLast.current = last.won;
@@ -722,7 +756,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   /** What he has on screen, for ⌘Z after a Later. An Explain answer still being checked comes back to check
    *  again (that grade is dropped as it moves on), with what he typed and how sure he was. */
   const shownNow = (c: CardFull): Shown => {
-    const base = { card: c, answer, conf, elapsed: Date.now() - shownAt.current };
+    const base = { card: c, answer, conf, elapsed: Math.max(0, Date.now() - shownAt.current) };
     if (phase !== "checked" || (c.kind === "prompt" && !inHead && !marks && !gradeError))
       return { ...base, phase: "answer", inHead: false, grade: null, marks: null, remark: false, gradeError: null, passage: null, quoteAt: 0, passageGone: null, asking: false };
     // Ask open (D192): it comes back open, its chat kept as closing and opening it keeps it.
@@ -857,10 +891,17 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
 
   /** A card's new wording, and an Explain card's key points when given, on the history: undo puts the old
    *  ones back (and on screen, if it still is). */
-  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true) => {
+  /** Only what changed from `from` is written, so a field edited outside meanwhile keeps its edit (F174). */
+  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true, from: { question: string; answer: string; rubric?: string[] } = c) => {
     const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric };
+    const changed = [
+      ...(question !== from.question ? [opt("question", question)] : []),
+      ...(answer !== from.answer ? [opt("answer", answer)] : []),
+      ...(rubric && rubric.join("\n") !== (from.rubric ?? c.rubric).join("\n") ? rubric.map((p) => opt("point", p)) : []),
+    ];
+    if (!changed.length) return;
     dropAhead();
-    const saved = await ore<CardFull>("card", "set", c.id, opt("question", question), opt("answer", answer), ...(rubric ?? []).map((p) => opt("point", p)), ...variantOpt(c));
+    const saved = await ore<CardFull>("card", "set", c.id, ...changed, ...variantOpt(c));
     const s = now.current;
     setCard((cur) => (cur?.id === c.id ? saved : cur));
     // New key points: the AI's grade was for the old ones, so it goes (and one still on its way). A point
@@ -882,8 +923,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       setDraft(loaded.current);
     }
     if (undoable) {
-      const put = (w: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false);
-      notify("Exercise edit", "quiet", put(was), put({ question, answer, rubric }));
+      const put = (w: typeof was, f: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false, f);
+      notify("Exercise edit", "quiet", put(was, { question, answer, rubric }), put({ question, answer, rubric }, was));
     }
   };
 
@@ -1043,6 +1084,23 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     <Trap off={paused || under}>
     <div className="review" ref={root} tabIndex={-1} role="dialog" aria-modal={!paused} aria-label="Review" hidden={paused} data-gives-back="" data-done={done} data-steps={done + left}>
       <div className="review-head" data-tauri-drag-region>
+        {moment && !end && (
+          // D271: a chip in the head bar, clear of the question and of every button he presses.
+          <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} data-days={moment.days > 0 || undefined} role="status">
+            {!quick && <span className="moment-mole"><Mole bare size={48} mood={MOMENT_MOOD[moment.kind]} /></span>}
+            <span className="moment-gem" aria-hidden="true">
+              <Gem kind={moment.from.kind} size={24} seam={moment.from.seam} polished={moment.from.polished} />
+              <Gem kind={moment.to.kind} size={24} seam={moment.to.seam} polished={moment.to.polished} />
+            </span>
+            {moment.days > 0 && (
+              <b className="moment-days">
+                <DotNumber value={`+${moment.days}`} height={18} />
+                <span className="sr-only">+{moment.days}</span> {moment.days === 1 ? "day" : "days"}
+              </b>
+            )}
+            <span className="moment-why">{moment.line}</span>
+          </div>
+        )}
         {quick ? (
           // The quick quiz has no fixed length; what matters is that it counts toward today's goal (D60).
           start && !end && start.counts && (
@@ -1120,19 +1178,6 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                 <button className="moment-done" onClick={() => void finish()}>Done</button>
               </Hint>
             </MoleSays>
-          </div>
-        )}
-        {moment && !end && (
-          <div className="review-moment" key={moment.n} data-tone={moment.tone} data-color={moment.color} role="status">
-            {!quick && <span className="moment-mole"><Mole bare size={48} mood={MOMENT_MOOD[moment.kind]} /></span>}
-            <span className="moment-gem" aria-hidden="true">
-              <Gem kind={moment.from.kind} size={36} seam={moment.from.seam} polished={moment.from.polished} />
-              <Gem kind={moment.to.kind} size={36} seam={moment.to.seam} polished={moment.to.polished} />
-            </span>
-            <span className="moment-text">
-              {moment.days > 0 && <b>+{moment.days} {moment.days === 1 ? "day" : "days"}</b>}
-              <span>{moment.line}</span>
-            </span>
           </div>
         )}
         {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} />}
@@ -1406,7 +1451,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
           </div>
         )}
       </div>
-      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} />}
+      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} draft={entry.state === "draft"} />}
     </div>
     </Trap>
   );
@@ -1425,7 +1470,7 @@ function nothingDue(t: Today | null, pick: string[] | null, source?: string): st
 
 /** The review footer: the keys for this step, Raycast's action bar (DESIGN.md). `suggested`: the rating ↵ gives,
  *  named in the bar as its button is (Again, Hard, Good or Easy); none, no ↵. */
-function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; kind: CardFull["kind"]; suggested?: number; variant: boolean; inHead: boolean }) {
+function KeyFoot({ phase, kind, suggested, variant, inHead, draft }: { phase: Phase; kind: CardFull["kind"]; suggested?: number; variant: boolean; inHead: boolean; draft: boolean }) {
   const map = useKeymap();
   const k = (id: KeyId) => label(map[id]);
   const rows: [string, string][] =
@@ -1436,7 +1481,7 @@ function KeyFoot({ phase, kind, suggested, variant, inHead }: { phase: Phase; ki
           ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
             [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
           : [["1 2 3", "How sure, then show"], [k("later"), "Later"], ["Esc", "Leave"]]
-        : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], ["Esc", "Leave"]];
+        : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], [k("retire-card"), draft ? "Delete" : "Retire"], ["Esc", "Leave"]];
   return (
     <div className="review-keys" aria-hidden="true">
       {rows.map(([key, what]) => (
@@ -1616,16 +1661,18 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   // cart: rolling and pouring · poured: the ring is full · leaving: the cart starts off, and the mole comes up unless he is riding it (then when he has fallen) · done: the cart has gone.
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
-  // He comes up out of the ground first, with or without a cart before it, unless he fell off the cart (D255): then he is there, startled (under Reduce Motion he is just there, at rest: pleased, or plain after a session of misses).
+  // He comes up out of the ground first, with or without a cart before it, and after falling off the cart into his hole too (D255: `hole` while he is on it, `pop` once he has gone down) (under Reduce Motion he is just there, at rest: pleased, or plain after a session of misses).
   const [settled, setSettled] = useState(still);
   const [fell, setFell] = useState(false);
-  // The mole reacts to the day 560ms after it comes up (its rise), whatever the cart does after that; sooner after a fall, which needs no rise.
-  const up = nap ? fell : stage === "leaving" || stage === "done";
+  // The mole reacts to the day 560ms after it comes up (its rise), whatever the cart does after that; after a fall, once he has popped back up.
+  const up = stage === "leaving" || stage === "done";
+  // After a fall the wait starts when he has gone down his hole: an empty beat, then up he pops, and only then does he speak.
+  const risen = nap ? fell : up;
   useEffect(() => {
-    if (!up) return;
-    const id = setTimeout(() => setSettled(true), nap ? 400 : 560);
+    if (!risen) return;
+    const id = setTimeout(() => setSettled(true), nap ? 1000 : 560);
     return () => clearTimeout(id);
-  }, [up]);
+  }, [risen]);
   const full = stage !== "cart";
   // D197: a cut gem that was won back has a gold rim; a gem passed on a new case this session shows polished.
   const cutN = s.cut?.length ?? 0;
@@ -1663,18 +1710,42 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   const [tallied, setTallied] = useState(false);
   const [roll] = useState(Math.random);
   const skill = (id: string) => skills.find((x) => x.id === id);
-  // D247: a rare line wears its own mark, in the drawing that thing already has: the skill's icon in its colour,
-  // the clock for a long gap, the gold-rimmed gem for one pulled back.
-  const mark = (l: Said) => (!l.rare ? undefined : l.rare.kind === "level" ? <SkillIcon icon={skill(l.rare.skill)?.icon} color={skill(l.rare.skill)?.color} dot /> : l.rare.kind === "long" || l.rare.kind === "then" ? <Clock size={16} /> : <Gem kind="cut" size={16} seam />);
   const named = ups.map((k) => ({ skill: k.skill, name: skill(k.skill)?.name ?? k.skill, level: k.level }));
   const said = endSays({
-    session: s, today: t, closed, short, roll, ups: named, plain: quick, napped: nap,
+    session: s, today: t, closed, short, roll, ups: named, plain: quick, napped: nap, row: !quick,
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
-  }).map((l) => ({ ...l, mark: mark(l) }));
+  });
   const tiles = endTiles({ session: s, ups: named });
   // His pose is for the line he says (D258).
-  const mood = !settled ? (nap ? "surprised" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
-  const ring = <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={quick ? 72 : END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />;
+  const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
+  // D274: the full end screen's ring holds the day's minutes, and minutes past the goal go round again.
+  // Gems the session cut are cut in the ring first (D239), then make way for the minutes; they wait for the
+  // last stone, and a beat more so each cut is seen. Then the count has no room to run up to the goal, so it
+  // starts there.
+  const calm = still();
+  const [away, setAway] = useState(calm || !!quick || gems.length === 0);
+  useEffect(() => {
+    if (away || !full || landed < shown.length) return;
+    const id = setTimeout(() => setAway(true), pour ? 1100 : 1400 + gems.length * 90);
+    return () => clearTimeout(id);
+  }, [away, full, landed]);
+  const [plan] = useState(() => {
+    const p = lapPlan(b, t);
+    return away ? p : { ...p, from: Math.max(p.from, Math.min(p.to, p.goal || p.to)) };
+  });
+  const lap = useLap(plan, !quick && full && away);
+  const counted = lap.min === plan.to;
+  // The count crosses the goal on screen: then the dots it throws are the moment, and the burst stays out of it.
+  const crossing = !calm && plan.goal > 0 && plan.from < plan.goal && plan.to >= plan.goal;
+  const over = quick ? 0 : overDots(plan.goal ? lap.min - plan.goal : 0, plan.goal, ringDots(END_RING));
+  const ring = quick
+    ? <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={72} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
+    : (
+      // The ring follows the count, minute by minute; crossing the goal in the count is the moment (the dots it throws), so the burst is for a goal the count never crossed.
+      <Ring step={away && plan.goal > 0} value={!full ? part(b) : !away || !plan.goal ? part(t) : lap.min / plan.goal} from={part(b)} met={!full ? !!b?.met : !away || counted ? t.met : false} burst={closed && full && !crossing} over={over} hit={lap.hit} size={END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`}>
+        {counted && <Sparkles over={over} n={ringDots(END_RING)} />}
+      </Ring>
+    );
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
   return (
@@ -1693,14 +1764,14 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
         <>
           {/* D242: one emblem. The mole (D169) stands on the ring, and what the session won sits inside it. */}
           <div className="end-emblem" data-glint={(closed && full) || undefined}>
-            <span className={`review-mole${nap && fell ? " fell" : ""}`}>{up && <Mole bare size={96} mood={mood} />}</span>
+            <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}{up && <Mound />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
             {settled && (
               <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />
             )}
             <div className="end-ring">
               {ring}
-              {cluster}
+              {away ? <LapCentre min={lap.min} goal={plan.goal} kept={s.kept_skills ?? []} skills={skills} run={counted && full} /> : cluster}
             </div>
           </div>
           <Tally tiles={tiles} go={full} skills={skills} onDone={() => setTallied(true)} />

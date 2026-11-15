@@ -29,11 +29,11 @@ Mood names are the ones in `Mole.tsx`. "Today" moods are on master; the rest com
 |---|---|---|---|
 | A question is open, or being rated | not on screen | not on screen | none |
 | An ordinary pass, nothing changed | not on screen | not on screen (rule 3) | none |
-| A gem is cut | small mole, `happy`, beside the two gems | looks across at the gem as it cuts, then `proud`. Built: `proud` | today's line ("Cut: you'd still recall this three weeks from now.") |
-| A gem is won back (gold rim) | `happy` | `laugh`: the biggest mid-session pose, since it is the hardest thing to do. Built | "Won back. It keeps a gold rim." |
-| A gem is polished (passed on a new case) | `happy` | `wink`. Built | "Polished: you recalled it on a new case." |
+| A gem is cut | small mole, `happy`, beside the two gems | looks across at the gem as it cuts, then `proud`. Built: `proud` | "Cut · last seen 18 days ago" |
+| A gem is won back (gold rim) | `happy` | `laugh`: the biggest mid-session pose, since it is the hardest thing to do. Built | "Won back" |
+| A gem is polished (passed on a new case) | `happy` | `wink`. Built | "Polished" |
 | Recalled across a long gap | `happy` | `surprised`, settling into `nod`. Built: `surprised` | today's line (how long it had been) |
-| A miss on a cut gem | `peek` (he only looks up) | `set`: chin up, steady. Never `sad` or `shake`. Built | today's lines ("Loose, not lost…") |
+| A miss on a cut gem | `peek` (he only looks up) | `set`: chin up, steady. Never `sad` or `shake`. Built | "Came loose" |
 | Today's goal is met | 48px, `happy`, "Goal met. The rest is extra." | rises, one `wave`, then rests while the line is up. Built | same line |
 | Past the goal, still going | not on screen | not on screen: the bonus is in the end screen's numbers | none |
 

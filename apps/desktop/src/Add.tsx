@@ -10,7 +10,7 @@ import { ore, type Skill } from "./ore";
 import { copiedFiles, pastesFiles, takeCopied } from "./copied";
 import { copiedWhat, entries, entryName, entryText, fileKind, isCourseLink, pastedHtml, withHtml, words, type Entry, type FileKind, type Pasted } from "./paste";
 import { SkillChip, SkillPicker } from "./Skills";
-import { useFocusWhileMounted, type Notify } from "./util";
+import { count, useFocusWhileMounted, type Notify } from "./util";
 import { Working } from "./Working";
 
 /** A course link says what ↵ will add (D79): the course and how many lessons, read from the link. */
@@ -62,14 +62,14 @@ function Detected({ list }: { list: Entry[] }) {
     return (
       <span className="add-kind">
         <GraduationCap size={14} aria-hidden="true" />
-        {course === "reading" ? "Course · reading its lessons…" : course === "unreadable" ? "Course · couldn’t read its lessons; ↵ tries again" : `Course · ${course.lessons.length} lessons · ${course.title}`}
+        {course === "reading" ? "Course · reading its lessons…" : course === "unreadable" ? "Course · couldn’t read its lessons; ↵ tries again" : `Course · ${count(course.lessons.length, "lesson")} · ${course.title}`}
       </span>
     );
   const e = list[0]!;
   const Icon = e.kind === "link" ? LinkSimple : e.kind === "file" ? FileText : TextAlignLeft;
   const what =
     list.length > 1 ? `${list.length} ${e.kind === "file" || list.some((x) => x.kind === "file") ? "sources" : "links"}`
-    : e.kind === "text" ? `Text · ${words(e.text).toLocaleString()} words`
+    : e.kind === "text" ? `Text · ${count(words(e.text), "word")}`
     : `${e.kind === "link" ? "Link" : "File"} · ${entryName(e)}`;
   return (
     <span className="add-kind">
@@ -177,7 +177,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
           value={value}
           readOnly={busy}
           rows={1}
-          placeholder="Paste a link, a file, or any text…"
+          placeholder="Paste a link, a file or any text…"
           spellCheck={false}
           autoComplete="off"
           autoCorrect="off"

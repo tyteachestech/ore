@@ -1,0 +1,84 @@
+{
+ "eq": [
+  "|x|=\\begin{cases}x&\\text{if }x\\geq 0\\\\-x&\\text{otherwise}\\end{cases}",
+  "\\sum_{i=1}^{n}i=\\frac{n(n+1)}{2}",
+  "\\int_{0}^{\\infty}e^{-x^{2}}\\,dx=\\frac{\\sqrt{\\pi}}{2}",
+  "A=\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix},\\quad\\det A=ad-bc",
+  "p(y|x)=\\frac{\\exp(w_{y}^{T}x)}{\\sum_{k}\\exp(w_{k}^{T}x)}",
+  "\\nabla_{\\theta}J(\\theta)=\\mathbb{E}_{\\tau\\sim\\pi_{\\theta}}\\left[\\sum_{t}\\nabla_{\\theta}\\log\\pi_{\\theta}(a_{t}|s_{t})R(\\tau)\\right]"
+ ],
+ "tab": [
+  [
+   [
+    "Size",
+    "Baseline",
+    "Dropout",
+    "Weight decay",
+    "Both",
+    "Time (h)"
+   ],
+   [
+    "Small",
+    "71.2",
+    "73.5",
+    "72.0",
+    "74.1",
+    "0.8"
+   ],
+   [
+    "Medium",
+    "74.9",
+    "76.8",
+    "75.6",
+    "77.3",
+    "2.1"
+   ],
+   [
+    "Large",
+    "76.0",
+    "78.2",
+    "77.1",
+    "78.9",
+    "6.4"
+   ],
+   [
+    "Huge",
+    "76.3",
+    "78.6",
+    "—",
+    "79.4",
+    "19.0"
+   ]
+  ],
+  [
+   [
+    "Task",
+    "Metric",
+    "Before",
+    "After"
+   ],
+   [
+    "Reading",
+    "Exact match",
+    "61.0",
+    "68.4"
+   ],
+   [
+    "F1",
+    "70.2",
+    "76.9"
+   ],
+   [
+    "Inference",
+    "Accuracy",
+    "80.5",
+    "84.6"
+   ],
+   [
+    "Macro F1",
+    "79.8",
+    "83.9"
+   ]
+  ]
+ ]
+}

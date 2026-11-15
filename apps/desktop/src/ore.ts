@@ -93,6 +93,8 @@ export type Item = {
   /** Absolute paths: the item's folder and the original kept at capture (source.pdf, …), if any. */
   dir: string;
   source_file?: string;
+  /** `ore show`: Reimport has an original to read again, a link or a file's kept copy (D93). */
+  reimport?: boolean;
   /** Absolute path of thumbnail.* beside doc.md (D77), if the source has one. */
   thumbnail?: string;
   captured_at: string;
@@ -237,7 +239,7 @@ export type Skill = { id: string; name: string; priority?: Priority; archived?: 
 export type SearchHit = { kind: string; ref: string; item?: string; title: string; snippet?: string; annotation?: string };
 
 /** `ore notes`: a source note or a skill note (notes.md) as it now is; `dir` is its folder, absolute. */
-export type Notes = { item?: string; skill?: string; text: string; path: string; dir: string };
+export type Notes = { kept_from_feed?: boolean; item?: string; skill?: string; text: string; path: string; dir: string };
 
 /** `ore backlinks`: a line in another note that links here (D39). */
 export type Backlink = { from: { kind: "item" | "skill"; id: string; title: string }; heading: string | null; line: string };
@@ -396,6 +398,8 @@ export type SessionEnd = {
   polished?: string[];
   /** How much longer the exercises he passed now last, in days added up (D197). */
   depth_days?: number;
+  /** Memories kept this session by skill, most first; absent when none was kept. */
+  kept_skills?: { skill: string; n: number }[];
   /** The part of `depth_days` earned after the day's goal closed (D246). */
   depth_extra_days?: number;
   /** Then and now (D248), at most once in four weeks: an exercise he missed or guessed weeks ago and passed now, with both answers. */

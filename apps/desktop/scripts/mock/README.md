@@ -23,7 +23,8 @@ skills, 90 exercises with real questions and answers (all written for Ore), a ye
 FSRS, and today set up to film: nine of the day's ten minutes done, about a dozen exercises due, six gems one Good
 from being cut, and AI two gems short of level 2. It refuses a folder that isn't empty. On the Mac:
 `ORE_LIBRARY=~/OreDemo open -n /Applications/Ore.app`. Seed it on the day of filming (dates count back from now),
-and again for another take. `apps/desktop/test/seed-demo.test.ts` holds that state.
+and again for another take. `apps/desktop/test/seed-demo.test.ts` holds that state. Every source has a picture (`demo-thumbs.ts`, written as
+`thumbnail.svg`): an article's share card, a PDF's first page, a book's cover, each drawn from its own title.
 
 ### Zoomed crops
 
