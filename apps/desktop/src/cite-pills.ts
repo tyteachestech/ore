@@ -1,4 +1,4 @@
-import { inProse, MARKER } from "../../../packages/core/src/markers";
+import { eachMarker } from "../../../packages/core/src/markers";
 
 // How a tutor reply's citations read (ChatGPT's desktop app): each run of [n] markers becomes one small
 // pill named for its source, "britannica +1" for a run of two, with the passage or page on hover.
@@ -13,10 +13,12 @@ export function siteName(site: string): string {
   return parts.length > 1 ? parts.at(-2)! : (parts[0] ?? site);
 }
 
-/** The reply's Markdown with each run of markers ("[1]", "[1][2]", "[1] [2]") as one link to
- *  `#cite-1,2`, which the reply renders as a pill; a [n] that starts a Markdown link is left alone. */
-export const citeRuns = (text: string) =>
-  // A marker as the tutor's check reads one (core's MARKER): code, a formula and an index right after a name
-  // (`arr[2]`) keep their brackets.
-  inProse(text, (prose) => prose.replace(RUN, (run) => ` [·](#cite-${[...new Set(run.match(/\d+/g)!)].join(",")})`));
-const RUN = new RegExp(`(?:[ \\t]?${MARKER.source.replace(/^ \?/, "")}(?!\\())+`, "gu");
+/** The reply's Markdown with each run of markers ("[1]", "[1][2]", "[1] [2]") as one link to `#cite-1,2`, which
+ *  the reply renders as a pill. A marker is as the tutor's check reads one (core's `eachMarker`): never in code
+ *  or a formula, nor a [n] that starts a Markdown link, and glued to a word ("again[1]") only when the reply has
+ *  citation n (`has`), so `arr[2]` with no citation 2 keeps its brackets. */
+export const citeRuns = (text: string, has: (n: number) => boolean = () => false) =>
+  eachMarker(text, has, (all, n) => `${all.startsWith(" ") ? " " : ""}\u0000${n}\u0001`).replace(
+    /(?:[ \t]?\u0000\d+\u0001)+/g,
+    (run) => ` [·](#cite-${[...new Set(run.match(/\d+/g)!)].join(",")})`,
+  );

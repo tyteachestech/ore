@@ -182,6 +182,20 @@ describe("tutor: replies", () => {
     expect(readFileSync(join(binDir, "count"), "utf8")).toBe("1");
   });
 
+  // Models often glue a marker to its word ("claim[1]"): one with its citation is a marker (repaired like any),
+  // one with none (`arr[2]`) is the reply's own words and never fails the check.
+  test("a marker glued to its word is renumbered with the rest; a glued [n] with no citation is left as written", async () => {
+    const { lib, a } = await library();
+    fakeClaude([{
+      reply: "It goes to box one[1], every time[2]. Use arr[5] for the fifth.",
+      citations: [{ passage: "P2", quote: "Leitner invented this in a Hamburg cellar." }, { passage: "P2", quote: "goes back to the first box" }],
+      general: false, hint: false, steps: [], exercise: null, card: null,
+    }]);
+    const r = await tutor(lib, "missed card", { item: a.meta.id });
+    expect(r.reply).toBe("It goes to box one, every time[1]. Use arr[5] for the fifth.");
+    expect(readFileSync(join(binDir, "count"), "utf8")).toBe("1");
+  });
+
   test("a made-up quote or passage loses its marker and the rest keep their order; the reply stays, marked as not from his sources", async () => {
     const { lib, a } = await library();
     fakeClaude([{

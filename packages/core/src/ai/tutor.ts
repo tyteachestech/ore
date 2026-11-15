@@ -2,7 +2,7 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { locate } from "../anchoring.ts";
-import { inProse, MARKER, markerNumbers } from "../markers.ts";
+import { eachMarker, markerNumbers } from "../markers.ts";
 import { findItem, listItems, type AiStamp } from "../items.ts";
 import { readAnnotations } from "../annotations.ts";
 import { blankProblem, cardTextProblem, ContentType, hideBlanks, listCards, writeNewCard, type Card } from "../cards.ts";
@@ -256,17 +256,19 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
       const keep = d.citations.map((c) => isWebUrl(c.passage) || mend(c, byId.get(c.passage)?.text));
       if (keep.includes(false)) {
         repaired.dropped += keep.filter((k) => !k).length;
-        const renumber = (text: string) => inProse(text, (part) => part.replace(MARKER, (all, n: string) => {
-          const i = +n - 1;
+        const cited = (n: number) => n >= 1 && n <= keep.length;
+        const renumber = (text: string) => eachMarker(text, cited, (all, n) => {
+          const i = n - 1;
           if (i < 0 || i >= keep.length) return all;
           return keep[i] ? `${all.startsWith(" ") ? " " : ""}[${keep.slice(0, i + 1).filter(Boolean).length}]` : "";
-        }));
+        });
         d.reply = renumber(d.reply);
         d.steps = d.steps.map(renumber);
         d.citations = d.citations.filter((_, i) => keep[i]);
         d.general = true;
       }
-      const top = Math.max(0, ...[d.reply, ...d.steps].flatMap(markerNumbers));
+      // A glued [n] counts only when citation n exists, so it never fails this (markers.ts).
+      const top = Math.max(0, ...[d.reply, ...d.steps].flatMap((t) => markerNumbers(t, (n) => n >= 1 && n <= d.citations.length)));
       if (d.steps.length === 1 || d.steps.length > 6) return "steps: give 2 to 6 steps, or [] when the reply isn't a worked answer";
       if (d.steps.length && (d.hint || d.exercise)) return "steps are a worked answer: not with a hint or an exercise";
       if (top > d.citations.length) return `marker [${top}] has no citation`;

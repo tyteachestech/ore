@@ -1010,6 +1010,7 @@ function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }
   const [listed, setListed] = useState(false);
   const opener = useRef({ onOpen, onLink });
   opener.current = { onOpen, onLink };
+  const cited = (n: number) => citations.some((c) => c.n === n);
   // A count on the end makes each click a new jump, so the same citation clicked again goes again.
   const open = (c: AnyCitation) => ("url" in c ? opener.current.onLink(c.url) : opener.current.onOpen(c.item, `q:${c.start}:${c.end}:${++turnSeq}`));
   // Made once per set of citations, so a re-render (a keystroke, a streaming reply) doesn't remount the pills and close an open card.
@@ -1026,13 +1027,13 @@ function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }
   return (
     <>
       <ReactMarkdown {...math} components={components}>
-        {citeRuns(aiMath(text))}
+        {citeRuns(aiMath(text), cited)}
       </ReactMarkdown>
       {!!steps?.length && id && (
         <Steps id={id} steps={steps} onDone={onSteps}>
           {(s) => (
             <ReactMarkdown {...math} components={components}>
-              {citeRuns(aiMath(s))}
+              {citeRuns(aiMath(s), cited)}
             </ReactMarkdown>
           )}
         </Steps>
