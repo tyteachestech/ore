@@ -34,7 +34,7 @@ test("merges after numbering, the placeholder check, the push and green checks, 
 });
 
 test("a placeholder left after numbering stops it before the push", async () => {
-  const f = fake((c) => (c.endsWith("ids.ts --check") ? { code: 1, out: "findings.md: F-new-plan-fail" } : undefined));
+  const f = fake((c) => (c.endsWith("ids.ts --check") ? { code: 1, out: "findings.md: an unnumbered finding" } : undefined));
   await expect(go(f.sh)).rejects.toThrow("placeholder");
   expect(f.calls.some((c) => c.startsWith("git push") || c.startsWith("gh pr merge"))).toBe(false);
 });
