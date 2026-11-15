@@ -24,6 +24,11 @@ const variantJson = (lib: Library, c: Card, v: Variant) => ({
   ...cardJson(lib, c), kind: "prompt" as const, question: v.question, answer: v.answer, rubric: v.rubric,
   variant: v.id, original: { question: c.question, answer: c.answer, rubric: c.rubric },
 });
+/** A card, or one of its variants, as review shows it: every `card show` and `card set` answers in this one
+ *  shape, so an edit or a bad version keeps what review draws. history: its reviews and where each rating puts
+ *  the next (D149); in_head_ok: review may offer "In my head" on this Explain card (D68; never on a variant). */
+const shownJson = (lib: Library, c: Card, v?: Variant | null) =>
+  v ? { ...variantJson(lib, c, v), history: cardHistory(lib, c.meta.id) } : { ...cardJson(lib, c), ...figureJson(lib, c), in_head_ok: inHeadOk(lib, c), history: cardHistory(lib, c.meta.id) };
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const oneLine = (s: string, n = 90) => {
   const t = s.replace(/\s+/g, " ").trim();
@@ -68,10 +73,8 @@ export const studyCommands: Record<string, Command> = {
       if (sub === "show") {
         const c = findCard(lib, id);
         const v = f.review ? reviewVersion(lib, c) : f.variant ? findVariant(lib, c.meta.id, str(f.variant)!) : null;
-        if (v) return { data: { ...variantJson(lib, c, v), ...(f.review ? { history: cardHistory(lib, c.meta.id) } : {}) }, text: `${relative(lib.root, c.path)} · variant ${v.id} (${v.type})\n\n${v.question}\n---\n${v.answer}\n${v.rubric.map((p) => `- ${p}`).join("\n")}` };
-        // in_head_ok: review may offer "In my head" on this Explain card (D68); history: its reviews and
-        // where each rating puts the next (D149).
-        return { data: { ...cardJson(lib, c), ...figureJson(lib, c), ...(f.review ? { in_head_ok: inHeadOk(lib, c), history: cardHistory(lib, c.meta.id) } : {}) }, text: `${relative(lib.root, c.path)}\n\n${readFileSync(c.path, "utf8")}` };
+        if (v) return { data: shownJson(lib, c, v), text: `${relative(lib.root, c.path)} · variant ${v.id} (${v.type})\n\n${v.question}\n---\n${v.answer}\n${v.rubric.map((p) => `- ${p}`).join("\n")}` };
+        return { data: shownJson(lib, c), text: `${relative(lib.root, c.path)}\n\n${readFileSync(c.path, "utf8")}` };
       }
       if (sub === "edit") {
         const c = findCard(lib, id);
@@ -88,10 +91,10 @@ export const studyCommands: Record<string, Command> = {
         if (!question?.trim() && !answer?.trim() && !rubric) throw new Error("give --question, --answer or --point");
         if (f.variant) {
           const v = await setVariant(lib, id, str(f.variant)!, { question, answer, rubric });
-          return { data: variantJson(lib, findCard(lib, id), v), text: `Saved variant ${v.id}` };
+          return { data: shownJson(lib, findCard(lib, id), v), text: `Saved variant ${v.id}` };
         }
         const c = await withLock(paths.lock(lib), () => writeCardContent(findCard(lib, id), { question, answer, rubric }));
-        return { data: { ...cardJson(lib, c), ...figureJson(lib, c) }, text: `Saved ${c.meta.id}` };
+        return { data: shownJson(lib, c), text: `Saved ${c.meta.id}` };
       }
       if (sub === "retire" || sub === "restore") {
         const state = sub === "retire" ? "retired" : need(oneOf(f.state, ["draft", "live"] as const, "state"), "--state draft|live");
