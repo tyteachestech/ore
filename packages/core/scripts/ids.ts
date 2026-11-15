@@ -55,6 +55,17 @@ if (import.meta.main) {
     files = execFileSync("git", ["grep", "--untracked", "-lE", "[FD]-new-[a-z0-9]"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
   } catch {} // git grep exits 1 when nothing matches
   files = files.filter((f) => !f.endsWith("scripts/ids.ts") && !f.endsWith("test/ids.test.ts"));
+  // --check (CI on master): a placeholder on master means a branch merged without `bun run ids`, and every other
+  // branch's run then fails on it. Name each one so the next thread fixes it before anything else lands.
+  if (process.argv.includes("--check")) {
+    const left = files.flatMap((f) => [...new Set(read(f).match(PLACEHOLDER) ?? [])].map((n) => `${f}: ${n}`));
+    if (left.length) {
+      console.error(`placeholders left on master; run \`bun run ids\` and commit:\n${left.join("\n")}`);
+      process.exit(1);
+    }
+    console.log("no placeholders left");
+    process.exit(0);
+  }
   const out = files.map((f) => [f, renumber(read(f), map)] as const); // all or nothing: a bad name writes no file
   for (const [f, text] of out) writeFileSync(join(root, f), text);
   writeFileSync(join(root, FINDINGS), ordered(read(FINDINGS)));
