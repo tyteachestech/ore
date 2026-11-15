@@ -399,7 +399,8 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ow
   const [scrub, setScrub] = useState<number | null>(null);
   /** Where the pointer is over the bar, as a share of it; null when it is elsewhere. */
   const [over, setOver] = useState<{ at: number; width: number } | null>(null);
-  const tip = useRef<HTMLDivElement>(null);
+  /** The tip's width once drawn, so it is kept inside the bar from its first frame on a heading. */
+  const [tipW, setTipW] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const size = useVideoWidth(box);
   const shown = scrub ?? player.elapsed;
@@ -472,7 +473,9 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ow
           const head = sectionAt(sections, t);
           const at = scrub !== null ? (scrub / total) * over.width : over.at * over.width;
           return (
-            <div className="scrub-tip" ref={tip} style={{ left: tipX(at, over.width, tip.current?.offsetWidth ?? 0) }} aria-hidden="true">
+            <div className="scrub-tip" ref={(el) => {
+              if (el && el.offsetWidth !== tipW) setTipW(el.offsetWidth);
+            }} style={{ left: tipX(at, over.width, tipW), visibility: tipW ? undefined : "hidden" }} aria-hidden="true">
               <b>{clock(t)}</b>
               {head && <span>{head}</span>}
             </div>

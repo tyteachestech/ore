@@ -47,3 +47,9 @@ test("picked rows that touch join into one block", () => {
   expect(css).toContain(".row.sel:has(+ .row.sel) { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }");
   expect(css).toContain(".row.sel + .row.sel { border-top-left-radius: 0; border-top-right-radius: 0; }");
 });
+
+test("the pick bar hides under the palette, Settings, Add, a dialog and Review", () => {
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  expect(app).toContain("!openId && !overlay && many.length > 1 && <PickBar");
+});

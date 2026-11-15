@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { kindLabel, NO_SKILL, options, passes, summary, toggle, type Filter } from "../src/filters";
+import { kindLabel, NO_SKILL, options, passes, settled, summary, toggle, type Filter } from "../src/filters";
 import type { Item } from "../src/ore";
 
 const item = (id: string, type: string, skills: string[], author?: string) => ({ id, type, skills, author, title: id, dir: "", captured_at: "", status: "inbox" }) as unknown as Item;
@@ -40,5 +40,26 @@ describe("All sources filters (D286)", () => {
     expect(app).toContain("<FilterButton items={tabAll}");
     expect(app).toContain("<FilterChips items={tabAll}");
     expect(app).toContain("matches these filters");
+  });
+});
+
+describe("filters after review (D-new-source-filters)", () => {
+  const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+  test("unticking a chip's last value keeps its list open until it closes", () => {
+    const f = toggle([{ field: "author", values: ["Ana"] }], "author", "Ana", true);
+    expect(f).toEqual([{ field: "author", values: [] }]);
+    expect(summary(f[0]!, String)).toBe("any");
+    expect(items.every((i) => passes(i, f))).toBe(true);
+    expect(settled(f)).toEqual([]);
+    expect(src("FilterBar.tsx")).toContain("onChange(toggle(filters, field!, o.value, true))");
+  });
+  test("an open course lists only its lessons the filters keep", () => {
+    expect(src("App.tsx")).toContain("lessons.filter((l) => passes(l, filters))");
+  });
+  test("a filter that hides picked sources lets go of the pick", () => {
+    expect(src("App.tsx")).toContain("}, [status, skill, q, openId, place, filters]);");
+  });
+  test("a closed chip builds no option list", () => {
+    expect(src("FilterBar.tsx")).toContain("const opts = open && field ? options(");
   });
 });

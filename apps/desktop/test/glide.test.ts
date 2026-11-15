@@ -18,3 +18,12 @@ test("a refilter (rows both leave and arrive), a big change or no change slides 
   const many = m(Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`r${i}`, i * 72])));
   expect(glidePlan(many, m({ r0: 0 }))).toBeNull();
 });
+
+test("the glide's speeds and curve come from the motion tokens, and search results never rise", () => {
+  const { readFileSync } = require("node:fs") as typeof import("node:fs");
+  const glide = readFileSync(new URL("../src/glide.ts", import.meta.url), "utf8");
+  expect(glide).toContain('token("--t-4", 300)');
+  expect(glide).not.toMatch(/cubic-bezier\(/);
+  const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
+  expect(app).toContain("useGlide(listRef, lines, `${listView}|${openId}|${q ? byText.length : \"\"}`)");
+});

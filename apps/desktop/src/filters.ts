@@ -35,17 +35,22 @@ export function options(items: Item[], field: Field, skillName: (id: string) => 
   return [...n].map(([value, k]) => ({ value, label: label(value), n: k })).sort((a, b) => b.n - a.n || a.label.localeCompare(b.label));
 }
 
-/** `filters` with `value` picked or let go in `field`; a field left with nothing picked goes. */
-export function toggle(filters: Filter[], field: Field, value: string): Filter[] {
+/** `filters` with `value` picked or let go in `field`; a field left with nothing picked goes, unless `keep`
+ *  (its list is open: the chip it opened from stays until the list closes, as Linear's does). */
+export function toggle(filters: Filter[], field: Field, value: string, keep = false): Filter[] {
   const at = filters.findIndex((f) => f.field === field);
   if (at < 0) return [...filters, { field, values: [value] }];
   const was = filters[at]!.values;
   const values = was.includes(value) ? was.filter((v) => v !== value) : [...was, value];
-  return values.length ? filters.map((f, i) => (i === at ? { field, values } : f)) : filters.filter((_, i) => i !== at);
+  return values.length || keep ? filters.map((f, i) => (i === at ? { field, values } : f)) : filters.filter((_, i) => i !== at);
 }
+
+/** Filters with the fields left empty while a list was open taken out. */
+export const settled = (filters: Filter[]) => (filters.some((f) => !f.values.length) ? filters.filter((f) => f.values.length) : filters);
 
 /** What a chip says it holds: the one value, or how many. */
 export function summary(f: Filter, label: (v: string) => string): string {
+  if (!f.values.length) return "any";
   if (f.values.length === 1) return label(f.values[0]!);
   return `${f.values.length} ${FIELDS.find((x) => x.id === f.field)!.plural}`;
 }

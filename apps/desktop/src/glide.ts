@@ -20,6 +20,10 @@ export function glidePlan(before: Map<string, number>, after: Map<string, number
  *  Keyframery's list-cut, Things): the rows below glide to their new places over --t-4, an arriving row rises
  *  8px into view. Only rows in view move; not from the keyboard (data-keys), nor under Reduce Motion, nor
  *  when the view changed (`view`: the tab, skill and filter). */
+/** A motion token in ms, and the curve every everyday move uses (DESIGN.md "Motion"). */
+const token = (name: string, fallback: number) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
+const ease = () => getComputedStyle(document.documentElement).getPropertyValue("--ease-out").trim() || "ease-out";
+
 export function useGlide(list: RefObject<HTMLElement | null>, lines: unknown, view: string) {
   const last = useRef<{ view: string; at: Map<string, number> } | null>(null);
   useLayoutEffect(() => {
@@ -42,7 +46,7 @@ export function useGlide(list: RefObject<HTMLElement | null>, lines: unknown, vi
     };
     for (const [id, dy] of plan.moved) {
       if (!seen(id)) continue;
-      document.getElementById(id)?.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 300, delay: plan.removed ? 60 : 0, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "backwards" });
+      document.getElementById(id)?.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: token("--t-4", 300), delay: plan.removed ? 60 : 0, easing: ease(), fill: "backwards" });
     }
     const arriving = plan.added.filter(seen);
     if (!arriving.length) return;
@@ -51,7 +55,7 @@ export function useGlide(list: RefObject<HTMLElement | null>, lines: unknown, vi
     const start = performance.now();
     const rise = (r: Element | null) => {
       if (!r) return;
-      const a = r.animate([{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: 200, easing: "cubic-bezier(0.23, 1, 0.32, 1)" });
+      const a = r.animate([{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "none" }], { duration: token("--t-3", 200), easing: ease() });
       a.currentTime = performance.now() - start;
     };
     arriving.forEach((id) => rise(document.getElementById(id)));

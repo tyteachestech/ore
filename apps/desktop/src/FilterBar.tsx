@@ -6,7 +6,7 @@ import { Hint } from "./Hint";
 import { more } from "./more";
 import type { Item, Skill } from "./ore";
 import { SkillIcon } from "./IconPicker";
-import { FIELDS, kindLabel, options, summary, toggle, type Field, type Filter } from "./filters";
+import { FIELDS, kindLabel, options, settled, summary, toggle, type Field, type Filter } from "./filters";
 
 type Props = { items: Item[]; skills: Skill[]; filters: Filter[]; onChange: (f: Filter[]) => void };
 
@@ -21,7 +21,7 @@ function FilterPicker({ items, skills, filters, onChange, start, children }: Pro
   const input = useRef<HTMLInputElement>(null);
   const skill = (id: string) => skills.find((k) => k.id === id);
   const picked = filters.find((f) => f.field === field)?.values ?? [];
-  const opts = field ? options(items, field, (id) => skill(id)?.name ?? id).filter((o) => has(o.label, query)) : [];
+  const opts = open && field ? options(items, field, (id) => skill(id)?.name ?? id).filter((o) => has(o.label, query)) : [];
   const meta = FIELDS.find((f) => f.id === field);
   return (
     <Popover.Root
@@ -31,7 +31,7 @@ function FilterPicker({ items, skills, filters, onChange, start, children }: Pro
         if (o) {
           setField(start);
           setQuery("");
-        }
+        } else if (settled(filters) !== filters) onChange(settled(filters));
       }}
     >
       <Popover.Trigger asChild>{children}</Popover.Trigger>
@@ -63,7 +63,7 @@ function FilterPicker({ items, skills, filters, onChange, start, children }: Pro
               {opts.map((o) => {
                 const k = field === "skill" ? skill(o.value) : undefined;
                 return (
-                  <Command.Item key={o.value} value={`v:${o.value}`} onSelect={() => (onChange(toggle(filters, field!, o.value)), input.current?.focus())}>
+                  <Command.Item key={o.value} value={`v:${o.value}`} onSelect={() => (onChange(toggle(filters, field!, o.value, true)), input.current?.focus())}>
                     {k && <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />}
                     <span className="menu-label">{o.label}</span>
                     <span className="filter-n">{o.n}</span>

@@ -1192,10 +1192,10 @@ export function App() {
       if ((status === "done") !== !next) continue;
       const open = openCourses.includes(c.id);
       const head: Line = { kind: "course", id: c.id, title: c.title, url: c.url, lessons, next, open };
-      out.push(open ? [head, ...lessons.map((l): Line => ({ kind: "item", item: l, lesson: true }))] : [head]);
+      out.push(open ? [head, ...lessons.filter((l) => passes(l, filters)).map((l): Line => ({ kind: "item", item: l, lesson: true }))] : [head]);
     }
     return out;
-  }, [tabRows, inSkill, status, openCourses]);
+  }, [tabRows, inSkill, status, openCourses, filters]);
   const lines = useMemo(
     (): Line[] => (q ? rows.map((item) => ({ kind: "item", item })) : (onSkillPage && !showAll ? groups.slice(0, SKILL_CAP) : groups).flat()),
     [q, rows, groups, onSkillPage, showAll],
@@ -1213,7 +1213,8 @@ export function App() {
     // For good, so a list read that still has the gone row doesn't hand the selection back to it.
     if (neighbour) setCursor(lineKey(neighbour));
   }, [listView, lines, neighbour]);
-  useGlide(listRef, lines, `${listView}|${openId}`);
+  // Text matches arrive after the title matches: a new view, so they appear without rising as an Undo would.
+  useGlide(listRef, lines, `${listView}|${openId}|${q ? byText.length : ""}`);
   const itemIds = useMemo(() => lines.flatMap((l) => (l.kind === "item" ? [l.item.id] : [])), [lines]);
   /** The picked sources still in view, in list order. */
   const many = useMemo(() => {
@@ -1246,7 +1247,7 @@ export function App() {
   useEffect(() => {
     boxDrag.current?.();
     unpick();
-  }, [status, skill, q, openId, place]);
+  }, [status, skill, q, openId, place, filters]);
   /** A drag from blank space beside the rows boxes the ones it crosses (D194, Finder; the note's D188):
    *  a pick like ⇧-click's, from the row it began by to the one it reached; ⇧ adds, ⌘ toggles. */
   const boxPick = (): RowPick => {
@@ -2614,7 +2615,7 @@ export function App() {
           notify={notify}
         />
       )}
-      {!PHONE && !openId && many.length > 1 && <PickBar n={many.length} actions={manyActions()} onClear={unpick} />}
+      {!PHONE && !openId && !overlay && many.length > 1 && <PickBar n={many.length} actions={manyActions()} onClear={unpick} />}
       {/* Hidden under a drop, but kept mounted: the toasts are a live region, read only if it was there first. */}
       <div style={{ display: "contents", visibility: dropping ? "hidden" : undefined }}>{toast}</div>
     </div>

@@ -912,7 +912,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       const at = skeletonOffset(index, h, 0);
       const i = wordAtOffset(words, at);
       // A heading of a page's own text above its video (D92) is not a part of the talk: its next spoken word is far off.
-      return i >= 0 && words.pos[i]! - at < 300 ? [{ level: Number(h.tagName[1]), t: words.time[i]!, title: (h.textContent ?? "").trim() }] : [];
+      return i >= 0 && words.pos[i]! >= at && words.pos[i]! - at < 300 ? [{ level: Number(h.tagName[1]), t: words.time[i]!, title: (h.textContent ?? "").trim() }] : [];
     });
     const level = topLevel(heads.map((h) => h.level));
     return byTime(heads.filter((h) => h.level === level));

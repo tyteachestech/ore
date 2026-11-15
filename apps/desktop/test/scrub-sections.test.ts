@@ -42,3 +42,11 @@ describe("scrubber sections (D285)", () => {
     expect(reader.match(/sections=\{talkParts\}/g)?.length).toBe(2);
   });
 });
+
+test("a heading after the last spoken word never cuts the bar", () => {
+  // wordAtOffset falls back to the last word, so a heading below the transcript would time itself there.
+  const reader = readFileSync(new URL("../src/Reader.tsx", import.meta.url), "utf8");
+  expect(reader).toContain("words.pos[i]! >= at && words.pos[i]! - at < 300");
+  const video = readFileSync(new URL("../src/Video.tsx", import.meta.url), "utf8");
+  expect(video).toContain('visibility: tipW ? undefined : "hidden"');
+});
