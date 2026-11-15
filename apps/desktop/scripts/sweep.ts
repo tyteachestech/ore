@@ -66,15 +66,16 @@ async function main() {
   const root = resolve(import.meta.dir, "../../..");
   if (root === join(homedir(), "Developer/ore")) throw new Error("Run sweeps from a worktree, never ~/Developer/ore.");
   const folder = resolve(dir);
-  const only = args.includes("--only") ? args[args.indexOf("--only") + 1].split(",") : undefined;
+  const only = args.includes("--only") ? (args[args.indexOf("--only") + 1] ?? "").split(",") : undefined;
   const testers: Tester[] = JSON.parse(readFileSync(join(folder, "sweep.json"), "utf8")).testers
     .filter((t: Tester) => !only || only.includes(t.name));
   const preamble = existsSync(join(folder, "preamble.md")) ? readFileSync(join(folder, "preamble.md"), "utf8") + "\n\n" : "";
   const out = join(root, "codex-out"), libs = join(out, "libs"), logs = join(out, "logs");
 
   const ports = pickPorts(1 + testers.length * 3, 1760, portFree);
-  const webkit = ports[0];
-  const plan = new Map<string, Ports>(testers.map((t, i) => [t.name, { mac: ports[1 + i * 3], bridge: ports[2 + i * 3], phone: ports[3 + i * 3] }]));
+  const port = (i: number) => ports[i]!;
+  const webkit = port(0);
+  const plan = new Map<string, Ports>(testers.map((t, i) => [t.name, { mac: port(1 + i * 3), bridge: port(2 + i * 3), phone: port(3 + i * 3) }]));
   const prompts = new Map(testers.map((t) => {
     const p = plan.get(t.name)!;
     const vars = { ...p, webkit: `ws://[::1]:${webkit}/`, library: join(libs, t.name), phoneLibrary: join(libs, `${t.name}-phone`), out: join(out, t.name) };
