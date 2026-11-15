@@ -43,7 +43,7 @@ describe("All sources filters (D286)", () => {
   });
 });
 
-describe("filters after review (D-new-source-filters)", () => {
+describe("filters after review (D286)", () => {
   const src = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
   test("unticking a chip's last value keeps its list open until it closes", () => {
     const f = toggle([{ field: "author", values: ["Ana"] }], "author", "Ana", true);
