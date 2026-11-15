@@ -13382,6 +13382,7 @@ journey("add: the footer's ↵ Add is a button, so a pointer adds typed text; �
   const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Pointer ${stamp}</title><link>http://localhost/</link><item><title>Pointer post ${stamp}</title><link>http://localhost/p</link><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
   const url = `http://localhost:${server.port}/feed.xml`;
   try {
+    await page.getByRole("button", { name: "Home", exact: true }).click();
     await page.getByRole("button", { name: "+ Add" }).click();
     await box.getByLabel("Link, file path or text").fill(url);
     await box.getByRole("button", { name: /^↵\s*Follow$/ }).click();
@@ -13397,8 +13398,7 @@ journey("Edit skill: a click outside saves the typed name, as Enter does (D211, 
   await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit skill…" }).click();
   const dialog = page.getByRole("dialog", { name: "Edit skill Creativity" });
-  await dialog.getByRole("button", { name: "Creativity" }).click();
-  await dialog.getByLabel("Rename Creativity").fill("Creative pointer");
+  await dialog.getByLabel("Rename Creativity").fill("Creative pointer"); // the name opens in edit
   await page.mouse.click(1200, 760); // the dimmed page around the editor
   await dialog.waitFor({ state: "detached" });
   await until("the sidebar shows the new name", async () => (await page.locator(".sidebar .side-item", { hasText: "Creative pointer" }).count()) === 1);
@@ -13428,6 +13428,7 @@ journey("Settings: a click outside the sheet saves the review plan he typed (D21
 
 journey("sidebar: a skill dropped on the page outside the sidebar stays where it was (sweep 5, F-new-sidebar-drop-outside)", async (page) => {
   const order = () => page.locator(".sidebar [role=group] .side-item").allInnerTexts();
+  await until("the skills are in the sidebar", async () => (await order()).includes("Creativity"));
   const before = await order();
   const from = (await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().boundingBox())!;
   await page.mouse.move(from.x + 40, from.y + from.height / 2);
