@@ -3829,6 +3829,8 @@ journey("Undo of taking a source off a skill puts each exercise's own skills bac
   await page.locator(".skill-picker [cmdk-item]", { hasText: name }).click();
   await page.keyboard.press("Escape");
   await until("it is off the skill", async () => !((await ore("show", item.id)) as { skills: string[] }).skills.includes(skill));
+  // The file changes before the app hears back and puts the step in its history: ⌘Z waits for the toast, as he would.
+  await page.locator(".toast", { hasText: `Removed from ${name}` }).waitFor();
   await page.keyboard.press("Meta+KeyZ");
   await until("Undo files it back", async () => ((await ore("show", item.id)) as { skills: string[] }).skills.includes(skill));
   await until("each exercise has its own skills again", async () => JSON.stringify(await cards()) === JSON.stringify(before));
