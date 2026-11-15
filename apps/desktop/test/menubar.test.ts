@@ -102,8 +102,9 @@ describe("menu bar", () => {
     window.addEventListener("keydown", on as unknown as EventListener);
     runMenu("listen", keymap, 20000);
     expect(seen).toEqual(["listen"]);
-    // Listen moved to the player's K: the menu still runs Listen.
-    rebind("listen", "KeyK");
+    // Listen moved to the player's K (Previous post, which a silent source shares, moved off it first): the menu still runs Listen.
+    expect(rebind("prev-post", "Shift+KeyK")).toBeNull();
+    expect(rebind("listen", "KeyK")).toBeNull();
     seen.length = 0;
     runMenu("listen", { ...keymap, listen: "KeyK" }, 21000);
     expect(seen).toEqual(["listen"]);

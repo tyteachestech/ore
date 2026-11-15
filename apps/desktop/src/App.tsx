@@ -758,6 +758,9 @@ export function App() {
   }, [notify, goFeed]);
   /** Feed posts open as previews; leaving one keeps it if he highlighted or wrote in it, else drops it. */
   const previews = useRef(new Map<string, string>());
+  /** The post last opened from the Feed, which reads beside the list while it is open (D289). */
+  const [feedPost, setFeedPost] = useState<{ url: string; id: string } | null>(null);
+  const feedStep = useRef<((by: 1 | -1) => void) | null>(null);
   const [feedTick, setFeedTick] = useState(0);
   const opening = useRef<{ url: string; from: unknown } | null>(null);
   const openPost = useCallback(async (post: FeedPost) => {
@@ -774,6 +777,7 @@ export function App() {
       // (Unless he has asked for this same post again: that ask opens this preview.)
       if (viewRef.current !== from || !mine) return void (r.preview && opening.current?.url !== post.url && ore("feed", "close", r.id).catch(() => {}));
       if (r.preview) previews.current.set(r.id, r.title);
+      setFeedPost({ url: post.url, id: r.id });
       openSource(r.id);
     } catch (e) {
       if (opening.current === ask) opening.current = null;
@@ -914,7 +918,9 @@ export function App() {
   const narrow = useNarrow(1100);
   // One panel at the right: the docked tutor takes the side panel's place, which comes back when it closes.
   const sideShown = notesOpen && !tutorDocked;
-  const autoHide = !!openId && (sideShown || tutorDocked) && narrow;
+  // A post read beside the Feed folds the sidebar away, so the list and the post share the window (D289).
+  const feedSplit = !PHONE && !!openId && place === "feed" && feedPost?.id === openId;
+  const autoHide = feedSplit || (!!openId && (sideShown || tutorDocked) && narrow);
   const [showAnyway, setShowAnyway] = useState(false);
   useEffect(() => setShowAnyway(false), [autoHide]);
   const collapsed = hideSidebar || (autoHide && !showAnyway);
@@ -2367,11 +2373,27 @@ export function App() {
         <span className="sr-only" role="status">{unheard.said ? `The tutor answered: ${unheard.said}` : ""}</span>
         {/* A skill page is the same page wherever it was opened from: a place change under it (its folder tab,
             ⌘1, from Home) must not remount it and drop the tab that has focus (F55). */}
+        {/* The Feed keeps its place in the tree whether a post is open beside it or not, so its view, scroll and
+            the posts read meanwhile stay (D289). */}
+        <Box on={onFeed || feedSplit} className={feedSplit ? "feed-split" : "contents"}>
+        {(onFeed || feedSplit) && (
+          <div className={feedSplit ? "feed-col" : "contents"}>
+            <Boundary onBack={goHome}>
+              <Feed skills={skills} tick={feedTick} blocked={overlay} onOpen={openPost} onFollow={() => setAdding(true)} onCreateSkill={createSkill} notify={notify} reading={feedSplit ? feedPost!.url : null} stepOut={feedStep} />
+            </Boundary>
+          </div>
+        )}
+        <Box on={feedSplit} className="feed-read">
         <Boundary key={`${openId}-${skill}-${skill ? "" : place}`} onBack={goHome}>
         {openId ? (
           <Reader
             key={openId}
             id={openId}
+            onStep={feedSplit ? (by) => {
+              // The list holds the keys while the next post loads; the post takes them when it shows.
+              document.querySelector<HTMLElement>(".feed-col .feed-list")?.focus({ preventScroll: true });
+              feedStep.current?.(by);
+            } : undefined}
             pickSkill={pickFor === openId}
             onPicked={() => setPickFor(null)}
             skills={skills}
@@ -2482,12 +2504,12 @@ export function App() {
             onRetry={reload}
             notify={notify}
           />
-        ) : onFeed ? (
-          <Feed skills={skills} tick={feedTick} blocked={overlay} onOpen={openPost} onFollow={() => setAdding(true)} onCreateSkill={createSkill} notify={notify} />
-        ) : (
+        ) : onFeed ? null : (
           sources
         )}
         </Boundary>
+        </Box>
+        </Box>
         <DropOverlay drop={dropping && ({ kinds: dropping.kinds, skill: dropping.skill ? skillOf(dropping.skill) : null } satisfies Dropping)} />
       </main>
       {tutorOpen && <Tutor chat={tutor} docked={tutorDock} onFit={() => setTutorDock((d) => (save("ore.tutor.fit", d ? "float" : "dock"), !d))} sources={(items ?? []).map((i) => ({ id: i.id, title: i.title }))} skills={skills.map((k) => ({ id: k.id, name: k.name, icon: k.icon, color: k.color }))} reading={openItem ? { id: openItem.id, title: openItem.title, skills: openItem.skills ?? [] } : null} skillPage={pageSkill} onQuiz={(pick) => startReview(pick.length ? pick : null)} onWrite={(ex, source) => {
@@ -2626,6 +2648,8 @@ export function App() {
 
 type Place = "home" | "sources" | "feed";
 type View = { openId: string | null; skill: string | null; status: Tab; place: Place };
+/** A wrapper only where it lays something out: elsewhere the screen stays a child of <main>, which focus-near.ts reads. */
+const Box = ({ on, className, children }: { on: boolean; className: string; children: ReactNode }) => (on ? <div className={className}>{children}</div> : <>{children}</>);
 const sameView = (a: View, b: View) => a.openId === b.openId && a.skill === b.skill && a.status === b.status && a.place === b.place;
 
 /** Back and forward through the views he opened (a source, a skill page, a sources tab), like a

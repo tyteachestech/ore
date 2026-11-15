@@ -582,6 +582,8 @@ type LookUp = { word: string; range: Range; ann: string | null; top: number; lef
 
 type Props = {
   id: string;
+  /** A post open beside the Feed (D289): J and K open the next and previous post. */
+  onStep?: (by: 1 | -1) => void;
   /** Just added with no skill (D109): the skill picker opens with the source. */
   pickSkill?: boolean;
   onPicked?: () => void;
@@ -2359,6 +2361,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       if (p.blocked || closedBook) return;
       const t = e.target as HTMLElement;
       if (t.closest?.(".popover")) return; // the speed popover handles its own keys and Esc
+      // The Feed beside a post (D289) keeps its own keys, but Esc there with nothing picked closes the post, as from the post.
+      const col = t.closest?.(".feed-col");
+      if (col && !(e.key === "Escape" && !col.querySelector(".row.sel"))) return;
       const inNote = t === noteRef.current;
       const inField = !inNote && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
       const inSide = !!t.closest?.(".margin, .mynotes");
@@ -2396,6 +2401,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         return;
       }
       const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
+      if (p.onStep && !video && !inField && !inNote && !popup && (is(e, "next-post") || is(e, "prev-post"))) {
+        e.preventDefault();
+        p.onStep(is(e, "next-post") ? 1 : -1);
+        return;
+      }
       if (video && player.ready && !inField && !inNote && !ownsMediaKey(t, e.key)) {
         // Space ← →, and YouTube's K J L beside them (D195).
         const act = is(e, "play") || is(e, "play-alt")

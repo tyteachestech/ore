@@ -5,7 +5,7 @@ import { TitleField } from "./TitleField";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { pickRun, typeSelect } from "./typeahead";
 import { Article, CaretDown, Plus, Tick, YoutubeLogo } from "./icons";
 import { Hint } from "./Hint";
@@ -59,7 +59,7 @@ function PostThumb({ post }: { post: FeedPost }) {
  *  follows. Nothing here is in the library: opening a post reads it, and a highlight or a note line
  *  keeps it as a source. Two views (Recent, By feed) and one Unread / All switch for both, in the
  *  list title's view menu, as the sources list has. */
-export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, notify }: {
+export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, notify, reading = null, stepOut }: {
   skills: Skill[];
   /** Bumped when a post he read was closed, so read marks and kept posts show. */
   tick: number;
@@ -69,6 +69,10 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   onFollow: () => void;
   onCreateSkill: (name: string) => Promise<Skill | undefined>;
   notify: Notify;
+  /** The post open beside the list (D289): its row is marked, and posts read while it is open stay. */
+  reading?: string | null;
+  /** Set to the step J and K take from the post beside the list: the next or previous post opens. */
+  stepOut?: MutableRefObject<((by: 1 | -1) => void) | null>;
 }) {
   const keys = useKeymap();
   // A post is fetched before it opens: its row says so until the reader shows it.
@@ -122,14 +126,34 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
       if (d?.feeds.some((f) => !f.checked_at || Date.now() - Date.parse(f.checked_at) > STALE_MS)) void check();
     });
   }, [read, check, tick, changes]);
-  useEffect(() => listRef.current?.focus({ preventScroll: true }), []);
+  // Not when it mounts beside a post already open (back with ⌘[): the post keeps the keys.
+  useEffect(() => void (!reading && listRef.current?.focus({ preventScroll: true })), []);
 
   const feeds = data?.feeds ?? [];
-  const shown = useMemo(() => (data?.posts ?? []).filter((p) => show === "all" || !p.read), [data, show]);
+  // Posts opened beside the list stay in Unread while he is on the Feed, so J and K, and the list after Esc, keep their place.
+  const [kept, setKept] = useState<ReadonlySet<string>>(new Set());
+  const wasReading = useRef<string | null>(null);
+  useEffect(() => {
+    if (reading) setKept((k) => (k.has(reading) ? k : new Set(k).add(reading)));
+    if (reading) document.getElementById(`post-${reading}`)?.scrollIntoView({ block: "nearest" });
+    else if (wasReading.current) {
+      // Back from the post: the list takes the keys again, on the post just read (Mail).
+      setCursor(wasReading.current);
+      setKeyed(true);
+      listRef.current?.focus({ preventScroll: true });
+    }
+    wasReading.current = reading;
+  }, [reading]);
+  const shown = useMemo(() => (data?.posts ?? []).filter((p) => show === "all" || !p.read || kept.has(p.url) || p.url === reading), [data, show, kept, reading]);
   const groups = useMemo(() => feeds.map((f) => ({ feed: f, posts: shown.filter((p) => p.feed === f.url).slice(0, PER_GROUP) })), [feeds, shown]);
   /** The posts in screen order, for the arrow keys. */
   const order = view === "recent" ? shown : groups.flatMap((g) => g.posts);
   const current = keyed ? order.find((p) => p.url === cursor) : undefined;
+  const step = (by: 1 | -1) => {
+    const at = order.findIndex((p) => p.url === reading);
+    if (at >= 0 && order[at + by]) open(order[at + by]!);
+  };
+  if (stepOut) stepOut.current = reading ? step : null;
 
   /** Marks one post, or a pick of them at once with one Undo (F9). */
   const setRead = (post: FeedPost | FeedPost[], on: boolean, toast = true): Promise<void> => {
@@ -276,6 +300,12 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   const typed = useMemo(typeSelect, []);
   const onKey = (e: React.KeyboardEvent) => {
     if (blocked || renaming) return;
+    const by = reading && (is(e.nativeEvent, "next-post") ? 1 : is(e.nativeEvent, "prev-post") ? -1 : 0);
+    if (by) {
+      e.preventDefault();
+      step(by);
+      return;
+    }
     const at = order.findIndex((p) => p.url === cursor);
     const jump = inTextField(e.nativeEvent) ? null : typed(e, order.map((x) => x.title), keyed ? at : -1);
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -339,12 +369,13 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
         id={`post-${p.url}`}
         role="row"
         aria-selected={picked.length ? picked.includes(p.url) : current === p}
-        className={`row post${current === p ? " on" : ""}${picked.includes(p.url) ? " sel" : ""}${p.read ? " read" : ""}`}
+        aria-current={p.url === reading || undefined}
+        className={`row post${current === p ? " on" : ""}${p.url === reading ? " open" : ""}${picked.includes(p.url) ? " sel" : ""}${p.read ? " read" : ""}`}
         onClick={(e) => !(e.target as Element).closest("button") && clickRow(e, p)}
       >
         <span role="gridcell" className="cell">
           <PostThumb post={p} />
-          <span className="title">{p.title}</span>
+          <span className="title post-title">{p.title}</span>
           {withFeed && <span className="kind">{p.feed_title}</span>}
           {opening === p.url ? <span className="when"><Working label="Opening…" /></span> : <span className="when">{when(p.published)}</span>}
           <MoreButton label={`Actions for ${p.title}`} actions={() => postActions(p)} />
