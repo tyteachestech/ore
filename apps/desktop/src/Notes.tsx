@@ -8,7 +8,7 @@ import { NoteEditor, type LinkTarget, type NoteEditorHandle } from "./editor/Not
 import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
 import { ore, opt, oreWith, type Backlink, type Notes } from "./ore";
-import { errorText, LIBRARY_BACK, load, save, type Notify } from "./util";
+import { errorText, LIBRARY_BACK, load, save, useLibraryChanges, type Notify } from "./util";
 
 /** Which note: a source note (D31) or a skill note (D41). */
 type NoteRef = { item: string } | { skill: string };
@@ -339,6 +339,8 @@ export function LinkedFrom({ target, onOpen }: { target: NoteRef; onOpen: (t: Om
   const [links, setLinks] = useState<Backlink[]>([]);
   const peek = usePeek(onOpen);
   const key = args(target).join(" ");
+  // Read again when the library changes too: a linking skill renamed or deleted from the sidebar (Codex sweep 5).
+  const changes = useLibraryChanges();
   useEffect(() => {
     let live = true;
     ore<Backlink[]>("backlinks", ...key.split(" ")).then(
@@ -348,7 +350,7 @@ export function LinkedFrom({ target, onOpen }: { target: NoteRef; onOpen: (t: Om
     return () => {
       live = false;
     };
-  }, [key]);
+  }, [key, changes]);
   if (!links.length) return null;
   return (
     <section className="linked-from" aria-label="Linked from">

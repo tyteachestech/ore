@@ -1006,6 +1006,8 @@ body.resizing iframe { pointer-events: none; }
 .player.audio { width: 100%; }
 .player.audio > .scrub { margin-top: 0; }
 .player.audio .video-error { position: static; padding: 8px 0; background: none; place-content: start; }
+.player.audio .video-error { text-align: start; }
+.player.audio .video-error button { justify-self: start; }
 .scrub-tick { position: absolute; top: 50%; width: 2px; height: 8px; margin-left: -1px; transform: translateY(-50%); background: var(--muted); pointer-events: none; }
 /* Sections on the bar: a gap of the page's colour where each starts, and the time and heading under the pointer. */
 .scrub-cut { position: absolute; top: 50%; width: 3px; height: 7px; margin-left: -1.5px; transform: translateY(-50%); background: var(--bg); pointer-events: none; }
