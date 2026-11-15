@@ -24,6 +24,12 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 - Git housekeeping is the thread's job, never Tyler's: do resets, rebases, branch cleanup and reinstalls yourself on the Mac, and never ask him to run a git command. Never rewrite master's history; if it ever must be, the thread that does it also resets `~/Developer/ore`, rebases open PRs and deletes the old branches.
 - Name files in NFC Unicode (macOS shows NFD names as untracked).
 
+## Mac load
+Five Codex testers at once, each with its own WebKit pages, servers and bridges, froze Tyler's Mac until it restarted (2026-11-15). Every thread that runs Codex testers, Playwright or a test instance of Ore on the Mac:
+- Runs `apps/desktop/scripts/mac-load.sh check` before each start. It fails below 25% free memory, or when two Codex testers already run across all threads. Then wait, don't start.
+- Runs at most two Codex testers at once, and a big-library run (`ORE_SEED_SCALE` above 1) alone.
+- Runs `mac-load.sh clean <worktree>` when a run ends or fails. That stops every process started from that worktree, and never Tyler's own Ore or `~/Developer/ore`.
+
 ## Component catalogs (shadcn MCP)
 - `.mcp.json` starts the shadcn MCP server (`bunx --bun shadcn@latest mcp`, no key) in Claude Code sessions on this repo. Approve it once when Claude Code asks; check with `/mcp`.
 - It searches the registries in the root `components.json`: shadcn/ui (always on), Cult UI (`@cult-ui`, MIT) and Rare UI (`@rare-ui`). Ask by registry, e.g. "show me `@cult-ui/…`"; a bare name searches only shadcn.
