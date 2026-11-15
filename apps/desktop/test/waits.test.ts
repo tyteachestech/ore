@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
-// The wait rule (AGENTS.md, Interaction checklist): every wait on the AI or the network shows that
+// The wait rule (apps/desktop/AGENTS.md, Interaction checklist): every wait on the AI or the network shows that
 // it is working at once, through <Working label=…> (or the Matrix it draws), never a blank or a
 // still line. Each slow `ore` call is listed here as the label its screen shows while it runs, or as
 // "background: <why>" when nothing waits on it ("Other.tsx: <label>" when another file draws it). A new slow call fails this test until it is listed.
