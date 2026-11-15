@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // Runs a Codex sweep on the Mac: `bun run sweep <sweep folder> [--only a,b] [--dry-run]`, from a worktree.
-// The folder holds sweep.json ({ "testers": [{ "name": "firstrun", "seed": "init" | "seed" | "big", "scale"?: 5 }] }),
+// The folder holds sweep.json ({ "testers": [{ "name": "firstrun", "seed": "init" | "seed" | "big", "scale"?: 5, "from"?: "<library folder>" }] }),
 // an optional preamble.md and a <name>-prompt.md per tester. In those, {{mac}} {{bridge}} {{phone}} {{webkit}}
 // {{library}} {{phoneLibrary}} {{out}} become this run's ports and folders. For each tester it seeds a scratch
 // library and a phone copy, serves the release build under its CSP with a bridge, serves the phone build, and starts
@@ -13,7 +13,8 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { check, clean, killTree, MAX_TESTERS } from "./mac-load";
 
-export type Tester = { name: string; seed: "init" | "seed" | "big"; scale?: number };
+/** `from` (a library folder) is copied as the tester's library in place of a seed: an older Ore's library, a real one's copy. */
+export type Tester = { name: string; seed: "init" | "seed" | "big"; scale?: number; from?: string };
 export type Ports = { mac: number; bridge: number; phone: number };
 
 // Ports WebKit refuses to load (the Fetch standard's "bad ports"; 1723 cost sweep 4 a restart of its setup).
@@ -84,7 +85,7 @@ async function main() {
   }));
   for (const t of testers) {
     const p = plan.get(t.name)!;
-    console.log(`${t.name}: Mac ${p.mac}, bridge ${p.bridge}, iPhone ${p.phone}, seed ${t.seed}${t.scale ? ` ×${t.scale}` : ""}${alone(t) ? ", alone" : ""}`);
+    console.log(`${t.name}: Mac ${p.mac}, bridge ${p.bridge}, iPhone ${p.phone}, ${t.from ? `from ${t.from}` : `seed ${t.seed}`}${t.scale ? ` ×${t.scale}` : ""}${alone(t) ? ", alone" : ""}`);
   }
   console.log(`WebKit server: ws://[::1]:${webkit}/`);
   if (args.includes("--dry-run")) return;
@@ -120,7 +121,9 @@ async function main() {
     const p = plan.get(t.name)!, lib = join(libs, t.name), mock = "apps/desktop/scripts/mock";
     mkdirSync(join(out, t.name), { recursive: true });
     // Awaited, not spawnSync: a big seed takes minutes, and the other tester's Mac page is served from this process.
-    const seed = t.seed === "init"
+    const seed = t.from
+      ? start(["cp", "-R", resolve(folder, t.from), lib], `seed-${t.name}.log`)
+      : t.seed === "init"
       ? start(["bun", "packages/cli/src/ore.ts", "init"], `seed-${t.name}.log`, { env: { ORE_LIBRARY: lib } })
       : start(["bun", `${mock}/${t.seed === "big" ? "seed-big" : "seed"}.ts`, lib], `seed-${t.name}.log`, { env: t.scale ? { ORE_SEED_SCALE: String(t.scale) } : {} });
     if ((await seed.exited) !== 0) throw new Error(`seeding failed: see codex-out/logs/seed-${t.name}.log`);
