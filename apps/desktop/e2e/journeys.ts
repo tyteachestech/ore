@@ -13411,6 +13411,19 @@ journey("opening a source: its title stands at once where it will stay, the pane
   await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().waitFor({ timeout: 1000 });
 });
 
+journey("a source that fails to open says why and offers Try again, which opens it once the cause is gone (F-new-reader-error-retry)", async (page) => {
+  type Fail = { __ORE_FAIL?: Record<string, string> };
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row").filter({ hasText: TESTING }).first();
+  await row.waitFor();
+  await page.evaluate(() => ((window as Fail).__ORE_FAIL = { show: "The library is busy." }));
+  await row.click();
+  await page.locator(".reader [role=alert]").filter({ hasText: "The library is busy." }).waitFor();
+  await page.evaluate(() => ((window as Fail).__ORE_FAIL = {}));
+  await page.locator(".reader").getByRole("button", { name: "Try again" }).click();
+  await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
