@@ -70,9 +70,9 @@
 :root { --font-serif: Charter, "Bitstream Charter", "New York", ui-serif, Georgia, serif; }
 .doc { font-family: var(--font-serif); line-height: 1.6; }
 /* The title is the source's own words, so it takes the same face as the text under it. */
-.doc-head h1, .doc-head .title-edit { font-family: var(--font-serif); letter-spacing: 0; }
+.doc-head h1, .doc-opening h1, .doc-head .title-edit { font-family: var(--font-serif); letter-spacing: 0; }
 /* Settings › Reading font (D151): Geist for the text and title instead of the serif. */
-:root[data-font="geist"] .doc, :root[data-font="geist"] .doc-head h1, :root[data-font="geist"] .doc-head .title-edit { font-family: "Geist", var(--font); }
+:root[data-font="geist"] .doc, :root[data-font="geist"] .doc-head h1, :root[data-font="geist"] .doc-opening h1, :root[data-font="geist"] .doc-head .title-edit { font-family: "Geist", var(--font); }
 .sidebar { border-right: 1px solid var(--border); }
 /* The open row's 8-bit menu arrow in the left gutter (SideCursor.tsx); quieter inside a source, as the row is. */
 .sidebar:not(.peek) { position: relative; }
@@ -134,7 +134,7 @@
 [data-tone="done"] .card-icon { color: var(--c-green); }
 [data-tone="archived"] .card-icon { color: var(--muted); }
 .head-tab-after .view-menu { width: 22px; height: 22px; margin: 0; padding: 0; justify-content: center; }
-.list-bar { margin: 0 22px 6px; padding: 6px 0 0; border-bottom: 1px solid var(--border); }
+.list-bar { margin: 0 max(22px, calc((100% - 1120px) / 2)) 6px; padding: 6px 0 0; border-bottom: 1px solid var(--border); }
 .list-bar > :not(.head-tabs) { margin-bottom: 4px; }
 /* The grow is for a click (the tab list carries data-grow from a pointer press); keys switch at once. */
 @media (prefers-reduced-motion: no-preference) {

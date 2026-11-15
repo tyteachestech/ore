@@ -428,6 +428,13 @@ export function useSideWidth(key: string, initial: number, min = 280, { left = f
  *  double-click resets it, and the width is remembered. His writing only (D34.2). */
 export type SideTab = "note" | "questions" | "original";
 
+/** The panel's empty frame at its remembered width, while the source it belongs to is still being read:
+ *  the title beside it then stands where it will stay, instead of sliding left when the panel arrives. */
+export function SidePanelFrame() {
+  const { width } = useSideWidth("ore.notewidth", NOTE_WIDTH);
+  return <aside className="mynotes" aria-hidden="true" style={{ width }} />;
+}
+
 /** The reader's right panel: one panel, two tabs (D75), like Notion's side peek. N opens the source
  *  note, C what he collected (Q too, at his questions); the same key again closes the panel. The toggle at the
  *  window's top right (⌥⌘S) shows or hides it. Resizable, width remembered. */
