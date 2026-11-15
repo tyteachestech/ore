@@ -11382,7 +11382,7 @@ journey("phone: Aa sets the text size, line spacing, margins, font and page, eac
   await tap(page, sheet.getByRole("radio", { name: "Light" }));
   const want = (l: Awaited<ReturnType<typeof looks>>) => l.size === 22 && Math.abs(l.leading - 1.7) < 0.01 && l.gutter === 16 && !/^Charter/.test(l.face) && l.page === "light";
   await until("each tap shows in the text at once", async () => want(await looks()));
-  // The sheet turns light with the page, as Books' does, not a dark panel over a white page (F317).
+  // The sheet turns light with the page, as Books' does, not a dark panel over a white page (F326).
   const light = (sel: string) => page.locator(sel).first().evaluate((e) => { const [r, g, b] = getComputedStyle(e).backgroundColor.match(/\d+/g)!.map(Number); return r! + g! + b! > 600; });
   await until("the sheet turns light with the page", () => light(".looks-sheet"));
   // Every tap a target of 44pt or more, and the sheet as wide as the screen.
@@ -11414,7 +11414,7 @@ journey("phone: every screen's text follows the iPhone's text size, and Start re
   const body = await size(".phone-reader .doc p");
   await type(1.353);
   const larger = await size(".phone-reader .doc p");
-  // A source reads at 20px and takes three quarters of the change (F316): 25.3px, above iOS's 23pt body.
+  // A source reads at 20px and takes three quarters of the change (F325): 25.3px, above iOS's 23pt body.
   if (Math.abs(body - 20) > 0.1 || Math.abs(larger - 20 * (1 + 0.353 * 0.75)) > 0.2) throw new Error(`the reader's text went from ${body}px to ${larger}px at 1.353`);
 }, "phone");
 
