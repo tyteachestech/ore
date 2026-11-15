@@ -6,7 +6,7 @@ import * as Switch from "@radix-ui/react-switch";
 import * as Tabs from "@radix-ui/react-tabs";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { openPath } from "@tauri-apps/plugin-opener";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { escTaken, Hint } from "./Hint";
 import { Trap } from "./Trap";
 import { comboOf, label, rebind, useKeymap } from "./keys";
@@ -125,6 +125,10 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  /** Each section opens at its top, as System Settings and Linear do: one scroller holds them all, so
+   *  without this Review opened as far down as General had been scrolled (F-new-settings-scroll-kept). */
+  const main = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => void (main.current && (main.current.scrollTop = 0)), [section]);
   const pick = (s: string) => {
     setSection(s as Section);
     save(LAST, s);
@@ -248,7 +252,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
           </Tabs.List>
         </nav>
 
-        <div className="settings-main">
+        <div className="settings-main" ref={main}>
           <div className="settings-page">
             <div className="settings-title">
               <h1>{title}</h1>

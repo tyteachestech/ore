@@ -339,7 +339,10 @@ img.thumb { filter: brightness(0.86); }
 .row .snip mark { background: var(--keep); color: var(--text); border-radius: 2px; }
 .show-all { margin: 2px 0 0; padding: 4px 8px; border-radius: 6px; color: var(--muted); font-size: 13px; }
 .show-all:hover { color: var(--text); background: var(--bg-hover); }
-.list { flex: 1; overflow-y: auto; overscroll-behavior: none; padding: 6px 10px var(--mole-room); }
+/* On a wide window the rows stop at Home's 1120px and sit centred, as Things and Notion cap a list: a title at
+   the far left and its ⋯ 1700px away at the far right read as two things (F-new-list-full-bleed). The scroller
+   still spans the pane, so its scrollbar stays at the window's edge. */
+.list { flex: 1; overflow-y: auto; overscroll-behavior: none; padding: 6px max(10px, calc((100% - 1144px) / 2)) var(--mole-room); }
 .row {
   display: flex; align-items: center; gap: 12px;
   height: var(--row); padding: 0 12px; border-radius: var(--radius);
@@ -403,6 +406,8 @@ img.thumb { filter: brightness(0.86); }
 /* The empty-state block is `.empty-state`, never bare `.empty`: `empty` is a modifier (`.home-plan.empty`, `.skill-goal.empty`), and a global `.empty` gave those its 18vh margin. */
 .empty-state { color: var(--muted); max-width: 46ch; margin: 18vh auto 0; text-align: center; line-height: 1.7; }
 .empty-state b { color: var(--text); font-weight: 600; }
+.empty-state .empty-out { color: var(--muted); }
+.empty-state.err .pill-btn { margin: 8px 0; }
 
 /* Overlays: palette, add panel */
 .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 20; display: flex; justify-content: center; align-items: flex-start; padding-top: 14vh; }
@@ -1271,7 +1276,7 @@ body.resizing iframe { pointer-events: none; }
 /* Note editor (D38): the source note and skill notes. Compact type in the panel, reading type in a skill note. */
 .note-editor { --note-size: 14px; position: relative; font-size: var(--note-size); line-height: 1.6; color: var(--text-read); user-select: text; -webkit-user-select: text; cursor: text; }
 /* Notion's format bar over selected text (editor/SelectionBar.tsx). */
-.sel-bar { position: absolute; z-index: 6; display: flex; align-items: center; gap: 1px; padding: 3px; border-radius: 8px; background: var(--bg-raised); box-shadow: var(--float); font: 13px var(--font); color: var(--text); user-select: none; -webkit-user-select: none; white-space: nowrap; }
+.sel-bar { position: fixed; z-index: 6; display: flex; align-items: center; gap: 1px; padding: 3px; border-radius: 8px; background: var(--bg-raised); box-shadow: var(--float); font: 13px var(--font); color: var(--text); user-select: none; -webkit-user-select: none; white-space: nowrap; }
 .sel-bar button { height: 28px; min-width: 28px; padding: 0 7px; display: inline-flex; align-items: center; justify-content: center; gap: 4px; border-radius: 5px; color: var(--text); }
 .sel-bar button:hover, .sel-bar button[data-state="open"] { background: var(--bg-hover); }
 .sel-bar button.on { color: var(--accent); }

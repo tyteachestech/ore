@@ -2187,7 +2187,7 @@ export function App() {
         </div>
       ) : <div className="empty-state">{empty(status, keys)}</div>)}
       {q && hits.q === q && hits.error && <div className="empty-state err" role="alert">Couldn’t search the text: {hits.error} Titles still filter.</div>}
-      {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">Nothing in {TABS.find((s) => s.id === status)?.label ?? "Archived"} matches “{q}”.</div>}
+      {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">Nothing in {TABS.find((s) => s.id === status)?.label ?? "Archived"} matches “{q}”. <button className="link" onClick={() => setQuery("")}>Clear the search</button></div>}
       {/* A grid, not a listbox: a row holds its own controls (chips, ⋯), which an option may not (ARIA's layout grid). */}
       {rows.length > 0 && <div role="grid" aria-multiselectable="true" aria-label="Sources">
       <DndContext

@@ -1133,6 +1133,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const filling = useFilling(p.id);
   const opened = useRef<string | null>(null);
   const shownBodyOf = useRef<string | null>(null);
+  /** Goes up on "Try again" after a failed open: the read runs once more (F-new-reader-error-retry). */
+  const [tries, setTries] = useState(0);
   useEffect(() => {
     let live = true;
     ore<Doc>("show", p.id, "--annotations").then(
@@ -1157,7 +1159,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     return () => {
       live = false;
     };
-  }, [p.id, changes]);
+  }, [p.id, changes, tries]);
 
   // Enrichment runs in the background after `ore add`; poll for prequestions for up to ~3 minutes
   // (`ore ls` carries the frontmatter without the body, which can be megabytes for a book).
@@ -3170,10 +3172,15 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   if (error)
     return (
       <div className="reader">
-        <div className="empty-state">
-          {error}
-          <br />
-          <kbd>Esc</kbd> back to sources
+        {/* The same block as Home's and the list's failure: what went wrong, Try again, and the way out. */}
+        <div className="empty-state err" role="alert">
+          <p>{error}</p>
+          {!/no longer in your library/.test(error) && (
+            <button className="pill-btn" onClick={() => (setError(null), setTries((n) => n + 1))}>
+              Try again
+            </button>
+          )}
+          <p className="empty-out"><kbd>Esc</kbd> back to sources</p>
         </div>
       </div>
     );

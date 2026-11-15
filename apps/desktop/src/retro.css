@@ -134,7 +134,7 @@
 [data-tone="done"] .card-icon { color: var(--c-green); }
 [data-tone="archived"] .card-icon { color: var(--muted); }
 .head-tab-after .view-menu { width: 22px; height: 22px; margin: 0; padding: 0; justify-content: center; }
-.list-bar { margin: 0 22px 6px; padding: 6px 0 0; border-bottom: 1px solid var(--border); }
+.list-bar { margin: 0 max(22px, calc((100% - 1120px) / 2)) 6px; padding: 6px 0 0; border-bottom: 1px solid var(--border); }
 .list-bar > :not(.head-tabs) { margin-bottom: 4px; }
 /* The grow is for a click (the tab list carries data-grow from a pointer press); keys switch at once. */
 @media (prefers-reduced-motion: no-preference) {
