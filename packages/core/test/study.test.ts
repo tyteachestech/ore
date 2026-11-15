@@ -313,6 +313,43 @@ describe("review loop", () => {
     idx2.close();
   });
 
+  test("search by source: every source that holds the words, each once with its best match, past the first 20 matches (F335)", async () => {
+    const lib = await tempLibrary();
+    // Each snippet is a source and its highlight: 50 matches from 25 sources.
+    const ids: string[] = [];
+    for (let i = 0; i < 25; i++) ids.push((await addSnippet(lib, { text: `Durability usually wins, says note ${i}.` })).item.meta.id);
+    const idx = openIndex(lib);
+    try {
+      expect(idx.search("durability usually wins")).toHaveLength(20);
+      const hits = idx.search("durability usually wins", 1000, true);
+      expect(hits.map((h) => h.item).sort()).toEqual([...ids].sort());
+      expect(hits.every((h) => h.snippet.includes("[Durability]"))).toBe(true);
+      expect(idx.search("durability usually wins", 3, true).map((h) => h.item)).toEqual(hits.slice(0, 3).map((h) => h.item));
+    } finally {
+      idx.close();
+    }
+  });
+
+  // F344 (review of #440): by source only the best 60 library-wide got a snippet, so a
+  // filtered list, or one in its own order, showed matches with no line under them.
+  test("search by source within the sources a list shows: only those, in its order, the first ones with their line", async () => {
+    const lib = await tempLibrary();
+    const ids: string[] = [];
+    for (let i = 0; i < 70; i++) ids.push((await addSnippet(lib, { text: `Durability usually wins, says note ${i}.` })).item.meta.id);
+    const idx = openIndex(lib);
+    try {
+      const best = idx.search("durability usually wins", Infinity, true).map((h) => h.item!);
+      const shown = [...best].reverse(); // the list's own order: the library's worst matches first
+      const hits = idx.search("durability usually wins", Infinity, true, shown);
+      expect(hits.map((h) => h.item)).toEqual(shown);
+      expect(hits.slice(0, 60).every((h) => h.snippet.includes("[Durability]"))).toBe(true);
+      const some = [ids[3]!, ids[40]!];
+      expect(idx.search("durability usually wins", Infinity, true, some).map((h) => [h.item, h.snippet.includes("[Durability]")])).toEqual(some.map((id) => [id, true]));
+    } finally {
+      idx.close();
+    }
+  });
+
   test("a first build of the index drops no rows; a changed file is still indexed once (F84)", async () => {
     // Each drop scans the whole search table, so on a fresh index (every launch on the phone) 2,800 files
     // spent 1.35 s of a 1.75 s first Today deleting rows that were not there.

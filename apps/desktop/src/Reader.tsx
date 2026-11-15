@@ -6,7 +6,7 @@ import { Children, createContext, Fragment, isValidElement, lazy, memo, Suspense
 import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { rehypeMath, remarkPlugins } from "./math-md";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { withImages } from "./md-images";
 import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
@@ -52,7 +52,7 @@ import { mergeAnns } from "./anns";
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
-import { paint, unpaint, unpaintAll } from "./paint";
+import { MARKS, UNDER, paint, unpaint, unpaintAll } from "./paint";
 import { Working } from "./Working";
 import { ReadingLooks } from "./phone/ReadingLooks";
 import { edgeTurn } from "./edge-turn";
@@ -171,14 +171,6 @@ const stamped: Components = {
   },
 };
 
-/** Images saved with the source (`assets/…`, D96) load from its folder; web images as they are. */
-const withImages = (base: Components, dir: string): Components => ({
-  ...base,
-  img: ({ src, alt }) => {
-    const s = typeof src === "string" ? src : "";
-    return <img src={/^(https?:|data:)/i.test(s) ? s : convertFileSrc(`${dir}/${decodeURI(s)}`)} data-src={s} alt={alt ?? ""} loading="lazy" draggable={false} />;
-  },
-});
 
 /** A figure open to fill the window (D143): its image in the text, and where it sat. */
 type Zoomed = { img: HTMLImageElement; from: DOMRect };
@@ -996,7 +988,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         // A new range each time: WebKit repaints only the new extent when one is moved in place,
         // so text behind a rewind stayed lit until something else repainted it.
         spoken.current = skeletonRange(index, words.pos[0]!, words.end[i]!);
-        paint("hl-spoken", [spoken.current]);
+        paint("hl-spoken", [spoken.current], UNDER);
       }
     }
     // A folded transcript keeps its place; the card's box scrolls, not the page.
@@ -1092,7 +1084,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     speaker.current = new Speaker(list, rate, {
       sentence: (i) => {
         sentence.current = list[i]!;
-        paint("hl-listen", [list[i]!]);
+        paint("hl-listen", [list[i]!], MARKS);
         showSentence();
       },
       word: () => pulse("listen"),
@@ -1282,10 +1274,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // Hidden behind the quiz, highlight colors would show where the answers are (D52).
     for (const i of INTENTS) {
       // Above hl-spoken, so a highlight in a playing transcript keeps its own text colour.
-      paint(`hl-${i}`, hidden ? [] : by[i], 1);
+      paint(`hl-${i}`, hidden ? [] : by[i], MARKS);
     }
     const active = popup && map.get(popup.id);
-    paint("hl-active", active ? [active] : []);
+    paint("hl-active", active ? [active] : [], MARKS);
     // `q:start:end` is a quote a card points to (D99), not a highlight; a citation adds `:n`, a count, so each
     // click is a new jump. No jump (back or forward) forgets the last, so the same one can go again.
     if (!p.jumpTo) jumped.current = undefined;
@@ -1295,7 +1287,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     if (jump && el) {
       jumped.current = p.jumpTo;
       toThird(jump);
-      paint("hl-active", [jump]);
+      paint("hl-active", [jump], MARKS);
     }
   }, [ready, anns, body, popup?.id, hidden, repaint, p.jumpTo]);
   useEffect(() => () => unpaintAll(), []);
@@ -1344,9 +1336,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const rs = reveal.quotes.map((q) => rangeFor(index, src, body, q));
     setEvidence(rs);
     const cur = rs[reveal.at];
-    paint("hl-evidence", rs.filter((r, i): r is Range => !!r && i !== reveal.at));
+    paint("hl-evidence", rs.filter((r, i): r is Range => !!r && i !== reveal.at), UNDER);
     if (cur) {
-      paint("hl-evidence-on", [cur]);
+      paint("hl-evidence-on", [cur], UNDER);
       toThird(cur, "smooth");
     }
   }, [reveal, ready, body]);
@@ -1763,7 +1755,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const r = rangeFor(index, src, body, { exact: m.quote, prefix: "", suffix: "", start: m.start ?? 0 });
     if (!r) return p.notify("Couldn’t find that passage in the text any more.", "error");
     toThird(r, "smooth");
-    paint("hl-evidence-on", [r]);
+    paint("hl-evidence-on", [r], UNDER);
     window.setTimeout(() => unpaint("hl-evidence-on"), 2400);
   }
 
@@ -2302,7 +2294,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // Where it sits in the body: the AI reads its paragraph, and the rest of the source is searched for it.
     const q = src && doc && idx.current ? sourceQuote(src, doc.body, idx.current, range) : null;
     const again = q && doc ? againIn(doc.body, q.start + q.exact.length, word) : { sections: [], later: false };
-    paint("hl-lookup", [range]);
+    paint("hl-lookup", [range], MARKS);
     setLookup({ word, range, ann, ...at, start: q?.start, again });
     void define(word).then((text) => setLookup((cur) => (cur?.range === range ? { ...cur, text } : cur)));
   }

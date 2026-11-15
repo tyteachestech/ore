@@ -917,7 +917,10 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
     const { kind, query, typed } = t;
     const from = $from.pos - typed;
     if (from === live.current.dismissed.at) return show(null);
-    show({ kind, query, from, to: $from.pos });
+    const m: Menu = { kind, query, from, to: $from.pos };
+    // A / whose words reach a space with no block answering them is prose (Notion): "/etc folder".
+    if (kind === "slash" && query.includes(" ") && !live.current.rowsFor(m).length) return show(null);
+    show(m);
   };
   return $prose(
     () =>

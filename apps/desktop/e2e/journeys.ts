@@ -3076,6 +3076,58 @@ async function selectPastTheEdge(page: Page, knob = false) {
     rmSync(dir, { recursive: true, force: true });
   }
 }
+// F331: a saved highlight over a code block crashed WebKit's page as it opened (a click, or a drag carried
+// over it): the popup's underline lay between the code's colours and the highlight's tint, a priority WebKit can't paint.
+// F339: with Find open on a word in the code, a highlight made over it came in between Find and the code.
+journey("highlight: a saved highlight over a code block opens in WebKit without taking the page down, with Find open on it too", async (page) => {
+  let crashed = false;
+  page.on("crash", () => (crashed = true));
+  const dir = mkdtempSync(join(tmpdir(), "ore-code-hl-"));
+  const file = join(dir, "code.md");
+  const prose = "Retrieval strengthens a memory when the learner reconstructs the idea before seeing the answer.";
+  writeFileSync(file, `# Code under a highlight\n\nFirst words here. ${prose}\n\n\`\`\`javascript\n// A comment\nconst message = "remember the exact words";\nconsole.log(message);\n\`\`\`\n\nLast words there. ${prose}\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Code under a highlight");
+    await until("the code is coloured", async () => page.evaluate(() => CSS.highlights.has("code-keyword")));
+    const ends = await page.evaluate(() => {
+      const ps = [...document.querySelectorAll(".doc p")];
+      const at = (p: Element, end: boolean) => {
+        const t = p.firstChild as Text;
+        const r = document.createRange();
+        r.setStart(t, end ? t.length - 1 : 0);
+        r.setEnd(t, end ? t.length : 1);
+        const b = r.getBoundingClientRect();
+        return { x: end ? b.right - 1 : b.left + 1, y: b.top + b.height / 2 };
+      };
+      return [at(ps.find((p) => p.textContent!.startsWith("First words"))!, false), at(ps.find((p) => p.textContent!.startsWith("Last words"))!, true)] as const;
+    });
+    // Find open on a word in the code: its matches over the code's colours, then a highlight made between them.
+    await page.keyboard.press("Meta+f");
+    await page.getByLabel(/^Find in /).fill("message");
+    await until("Find marks the word in the code", async () => page.evaluate(() => [...(CSS.highlights.get("find") ?? []), ...(CSS.highlights.get("find-on") ?? [])].length > 0));
+    await page.mouse.move(ends[0].x, ends[0].y);
+    await page.mouse.down();
+    await page.mouse.move(ends[1].x, ends[1].y, { steps: 8 });
+    await page.mouse.up();
+    const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+    await until("the highlight over the code is saved", async () => (await kept()).some((t) => t.includes("const message") && t.startsWith("First words")));
+    await page.mouse.click(5, 400); // away from it: the popup closes, the highlight stays
+    await page.locator(".popup").waitFor({ state: "detached" });
+    // Clicked again, it opens: its underline over the tint and the code's colours.
+    await page.mouse.click(ends[0].x + 30, ends[0].y);
+    await page.locator(".popup").waitFor();
+    await page.waitForTimeout(500);
+    if (crashed) throw new Error("the page crashed");
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Close find" }).click();
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, "webkit");
+
 journey("highlight: a drag held at the bottom of the screen turns the page after a moment and the highlight runs on (Books)", (page) => selectPastTheEdge(page));
 journey("highlight: in WebKit too, a drag held at the bottom of the screen turns the page and the highlight runs on", (page) => selectPastTheEdge(page), "webkit");
 journey("highlight: a highlight's end knob held at the bottom of the screen turns the page and the highlight runs on", (page) => selectPastTheEdge(page, true));
@@ -3433,6 +3485,28 @@ journey("note equations: /equation opens a TeX field that draws as he types; ↵
   await page.reload();
   await openSource(page, AGENTS);
   await until("still drawn after a reload", async () => (await pm.locator(".note-math .katex annotation").last().textContent().catch(() => "")) === "\\pi r^2");
+});
+
+// F328: the / menu closed at the space in "/heading 2", and Enter left the words as prose.
+journey("note: /heading 2 and Enter makes a Heading 2, and /etc folder stays prose", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  await openSource(page, AGENTS);
+  await pm.click();
+  // An empty note of its own: an earlier journey in the same run can leave the note ending in a formula or a heading.
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await until("the note is empty", async () => ((await pm.textContent()) ?? "").trim() === "");
+  await page.keyboard.type("/heading 2", { delay: 20 });
+  await page.locator(".note-menu-row.on", { hasText: "Heading 2" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Plans");
+  await until("a Heading 2 with no slash left", async () => (await pm.locator("h2", { hasText: "Plans" }).count()) === 1 && !/\/heading/.test((await pm.textContent()) ?? ""));
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("See /etc folder", { delay: 20 });
+  await until("no menu once nothing answers", async () => (await page.locator(".note-menu").count()) === 0);
+  await page.keyboard.press("Enter");
+  await until("the words stay as he typed them", async () => (await pm.locator("p", { hasText: "See /etc folder" }).count()) === 1);
 });
 
 journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words (Esc goes back to them, a press outside doesn't), ⌘↵ closes a toggle", async (page) => {
@@ -4650,6 +4724,46 @@ journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette 
   await settings.getByRole("alert").filter({ hasText: "Command palette" }).waitFor();
   if (await page.getByRole("dialog", { name: "Command palette" }).count()) throw new Error("⌘K while recording opened the palette");
   await page.keyboard.press("Escape");
+});
+
+// F334: at 150% in an 800×600 window (533×400 CSS px) ⌘K ran below the window: its last
+// rows and its footer couldn't be reached, and End picked a row out of sight.
+journey("a small window: ⌘K, the Add box and the shortcuts sheet fit in it, and End shows the palette's last row", async (page) => {
+  await page.setViewportSize({ width: 533, height: 400 });
+  const inWindow = async (what: string, l: Locator) => {
+    const b = (await l.boundingBox())!;
+    if (b.y < 0 || b.y + b.height > 400 + 0.5) throw new Error(`${what} runs from y=${Math.round(b.y)} to ${Math.round(b.y + b.height)} in a 400px window`);
+  };
+  try {
+    const palette = page.getByRole("dialog", { name: "Command palette" });
+    await page.keyboard.press("Meta+k");
+    await palette.waitFor();
+    await inWindow("the palette", palette.locator(".panel"));
+    await inWindow("the palette's footer", palette.locator(".panel-foot"));
+    await page.keyboard.press("End");
+    const last = palette.locator("[cmdk-item]").last();
+    await until("End selects the last row", async () => (await last.getAttribute("aria-selected")) === "true");
+    await until("the last row is in the window", async () => inWindow("the palette's last row", last).then(() => true, () => false));
+    // …at the list's end, so it isn't faded as if more waited below it.
+    await until("the list is at its end", async () => (await palette.locator("[cmdk-list]").getAttribute("data-more")) === null);
+    await page.keyboard.press("Escape");
+    await palette.waitFor({ state: "detached" });
+    await page.keyboard.press("Meta+Slash");
+    const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+    await sheet.waitFor();
+    await inWindow("the shortcuts sheet", sheet);
+    await page.keyboard.press("Escape");
+    await sheet.waitFor({ state: "detached" });
+    await page.getByRole("button", { name: "+ Add" }).click();
+    const add = page.getByRole("dialog", { name: "Add a source" });
+    await add.getByLabel("Link, file path or text").fill(Array.from({ length: 40 }, (_, i) => `Line ${i + 1}`).join("\n"));
+    await inWindow("the Add box", add);
+    await inWindow("the Add box's footer", add.locator(".panel-foot"));
+    await page.keyboard.press("Escape");
+    await add.waitFor({ state: "detached" });
+  } finally {
+    await page.setViewportSize({ width: 1280, height: 800 });
+  }
 });
 
 journey("Review: ⌘K and ⌘/ open over it, Esc goes back to the card, and a palette action leaves Review as Esc does (controls-08)", async (page) => {
@@ -13940,6 +14054,58 @@ journey("tutor: a message sent while a reply is being written waits, goes when t
   await page.keyboard.press("Escape");
 });
 
+// F329: a reply that came back empty left "Reading your sources…" up for good, the waiting message stuck
+// under it, and Stop did nothing.
+journey("tutor: a reply that comes back empty says so with Try again and gives the waiting message back", async (page) => {
+  const held: (() => void)[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    await new Promise<void>((ok) => held.push(ok));
+    await route.fulfill({ contentType: "application/json", body: "null" }).catch(() => {});
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    await field.fill("Explain this part");
+    await page.keyboard.press("Enter");
+    await tutor.getByRole("button", { name: "Stop the reply" }).waitFor();
+    await field.fill("Keep my follow up");
+    await page.keyboard.press("Enter");
+    await tutor.locator(".ask-queued").filter({ hasText: "Keep my follow up" }).waitFor();
+    await until("the request went", async () => held.length === 1);
+    held.shift()!();
+    await tutor.getByRole("button", { name: "Try again" }).waitFor();
+    await until("the wait ends and the waiting message is back in the field", async () => (await field.inputValue()) === "Keep my follow up" && (await tutor.locator(".ask-queued").count()) === 0 && (await tutor.getByRole("button", { name: "Stop the reply" }).count()) === 0);
+    await field.fill("");
+  } finally {
+    held.forEach((ok) => ok());
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+});
+
+// F330: Ask about this with an empty answer replaced Review with "This view hit a snag".
+journey("Ask about this: an answer that comes back empty says so with Try again, and Review stays", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { ask: null }));
+  try {
+    await startReview(page, null);
+    await reveal(page);
+    const question = await page.locator(".review-q").textContent();
+    await page.getByRole("button", { name: "Ask about this" }).click();
+    const ask = page.getByRole("region", { name: "Ask about this" });
+    await ask.getByRole("button", { name: "Make this exercise clearer" }).click();
+    await ask.getByRole("button", { name: "Try again" }).waitFor();
+    if (await page.getByText("This view hit a snag").count()) throw new Error("the view crashed");
+    if ((await page.locator(".review-q").textContent()) !== question) throw new Error("the exercise left the screen");
+  } finally {
+    await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = {}));
+  }
+});
+
 journey("⌘K: Tab on a source steps into what can be done with it, typing narrows the actions, ↵ runs one, and Esc steps back out (D302)", async (page) => {
   await page.keyboard.press("Meta+k");
   const input = page.getByPlaceholder("Search sources or run a command…");
@@ -14118,6 +14284,114 @@ journey("original: a PowerPoint deck's Original tab shows the slide itself, foll
       open ? localStorage.setItem("ore.mynotes", open) : localStorage.removeItem("ore.mynotes");
     }, before);
   }
+});
+
+// —— Codex sweep 6, round C: finding things (docs/reviews/2026-11-15-codex-sweep-6/organize-report.md) ——
+
+journey("list search: every source in the tab and its filters that holds the words is found, however many others hold them too (F335)", async (page) => {
+  const word = `zircon${Date.now()}`;
+  // 36 sources and their highlights hold the word, 72 matches; the one under Habits holds it once, deep in a longer text, so it ranks last.
+  const made: string[] = [];
+  try {
+    for (let i = 0; i < 36; i += 9) {
+      const batch = await Promise.all(Array.from({ length: 9 }, (_, j) => ore("snippet", `--text=${word} note ${i + j} on durable practice.`, "--no-enrich") as Promise<{ id: string }>));
+      made.push(...batch.map((b) => b.id));
+    }
+    const habit = (await ore("snippet", `--text=Habits form slowly when a cue predicts a reward, and the routine runs on its own long after. ${"A loop like this takes weeks to build. ".repeat(8)}Then ${word}.`, "--skill=habits", "--no-enrich")) as { id: string; title: string };
+    made.push(habit.id);
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await page.getByRole("button", { name: "Filter by kind, skill or author" }).click();
+    await page.getByRole("option", { name: "Skill" }).click();
+    await page.locator(".filter-menu [cmdk-item]").filter({ hasText: "Habits" }).first().click();
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Skill: Habits" }).waitFor();
+    await page.getByLabel("Search sources").fill(word);
+    await until("the Habits source that holds the word is listed", async () => (await page.locator(".row.hit").count()) === 1, 8000);
+    if (await page.locator(".empty-state").count()) throw new Error(`the list says ${await page.locator(".empty-state").innerText()}`);
+  } finally {
+    for (const id of made) await ore("archive", id).catch(() => {});
+  }
+});
+
+// F344 (review of #440): only the library's best 60 matches got their line, so a row past
+// them (here the oldest source, whose match ranks last) showed none.
+journey("list search: every row found in its text shows its line, past the first 60 too, as it scrolls into view", async (page) => {
+  const word = `quillwort${Date.now()}`;
+  const made: string[] = [];
+  try {
+    const last = (await ore("snippet", `--text=Practice note zero on durable recall, kept for the list. ${"A loop like this takes weeks to build. ".repeat(8)}Then ${word}.`, "--no-enrich")) as { id: string; title: string };
+    made.push(last.id);
+    for (let i = 0; i < 66; i += 11) {
+      const batch = await Promise.all(Array.from({ length: 11 }, (_, j) => ore("snippet", `--text=Practice note ${i + j + 1} on durable recall, kept for the list. Then ${word}.`, "--no-enrich") as Promise<{ id: string }>));
+      made.push(...batch.map((b) => b.id));
+    }
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await page.getByLabel("Search sources").fill(word);
+    const rows = page.locator(".row").filter({ hasText: "Practice note" });
+    await until("all 67 are listed by their text", async () => (await rows.count()) === 67, 8000);
+    await until("the first screen's rows show their lines", async () => (await rows.evaluateAll((rs) => rs.slice(0, 8).every((r) => r.querySelector(".snip")))), 5000);
+    const row = page.locator(`#row-${last.id}`);
+    await row.scrollIntoViewIfNeeded();
+    await until("the last row found in its text shows its line", async () => (await row.locator(".snip").count()) === 1 && (await row.locator(".snip").innerText()).includes(word), 5000);
+  } finally {
+    for (const id of made) await ore("archive", id).catch(() => {});
+  }
+});
+
+journey("list search: a match in a highlight's note opens that highlight; ↵ on one in the source note opens the note on it, as ⌘K does (F336)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const search = page.getByLabel("Search sources");
+  await search.fill("hold for kids");
+  await page.locator(".row.hit").filter({ hasText: TESTING }).click();
+  const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
+  await until("the highlight's popup is open on its note", async () => (await note.isVisible()) && (await note.inputValue()) === "Does this hold for kids?");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await search.fill("just a measurement");
+  await page.locator(".row.hit").filter({ hasText: TESTING }).waitFor();
+  await search.press("Enter");
+  await foundOnScreen(page, "just a measurement", ".mynotes-text");
+  await page.keyboard.press("Escape");
+});
+
+journey("⌘K: a source is found by its author, as the list's search finds it (F337)", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.locator("[cmdk-input]").fill("Barry Zhang");
+  await page.locator("[cmdk-item]").filter({ hasText: AGENTS }).first().click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+});
+
+journey("phone: Search finds a source by its author (F337)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Search" }));
+  await page.locator("[cmdk-input]").fill("Barry Zhang");
+  await page.locator("[cmdk-item]").filter({ hasText: AGENTS }).first().waitFor();
+}, "phone");
+
+journey("list search: Back to the list brings its search and filters back (F338)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.getByRole("button", { name: "Filter by kind, skill or author" }).click();
+  await page.getByRole("option", { name: "Skill" }).click();
+  await page.locator(".filter-menu [cmdk-item]").filter({ hasText: "AI" }).first().click();
+  await page.keyboard.press("Escape");
+  const search = page.getByRole("textbox", { name: "Search sources" });
+  await search.fill("Effective Agents");
+  await page.locator(".row").filter({ hasText: AGENTS }).first().click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+  await page.locator(".side-item").filter({ hasText: "Learning" }).first().click();
+  await page.locator(".skill-page").waitFor();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await until("the search is back", async () => (await search.count()) === 1 && (await search.inputValue()) === "Effective Agents");
+  await page.getByRole("button", { name: "Skill: AI" }).waitFor();
+  await page.getByRole("button", { name: "Forward", exact: true }).click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+  await page.getByRole("button", { name: "Forward", exact: true }).click();
+  await page.locator(".skill-page").waitFor();
+  const field = page.getByRole("textbox", { name: "Search sources" });
+  await until("the skill page's search is its own, empty", async () => (await field.count()) === 0 || (await field.inputValue()) === "");
 });
 
 /** What the mole and the ambience radio cover once every scroller on screen is at its end: text, a control or a picture

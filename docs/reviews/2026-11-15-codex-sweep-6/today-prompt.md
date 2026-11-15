@@ -1,0 +1,13 @@
+Your name is `today`.
+
+Your ports: Mac app page http://localhost:{{mac}}/ with `window.__ORE_BRIDGE = {{bridge}}` (library `{{library}}`); iPhone app http://localhost:{{phone}}/ (its seed is a copy at `{{phoneLibrary}}`; the page's writes stay in IndexedDB). WebKit server: `{{webkit}}`. The `ore` CLI: `ORE_LIBRARY={{library}} bun packages/cli/src/ore.ts`. Write everything to `{{out}}/` and the report to `{{out}}/report.md`.
+Your library is seeded with `seed.ts`.
+
+Earlier sweeps covered: the daily path, edge cases, undo, personas, outside edits and a second device, time, intake, AI failures, phone edges and sizing, UX parity, diagrams, hostile content, numbers, the CLI, lifecycle, accessibility and keyboard-only, first run, scale and speed, durability, settings, languages, mouse-only, notes, media and the tutor chat. Don't redo them; go where yours points.
+
+## Your focus: what merged today (2026-11-15), used as a learner would
+Read `git log --since=2026-11-15 --oneline` and the decisions it names (D300–D311), then use each change many times in a row and mixed with the rest of the loop.
+1. **iPhone reading (#428, D310, D311).** Open sources of every kind on the phone: the text size and margins, then the Aa sheet: size, line spacing, margins, font, page colour. Change each, highlight, open the next source, go back, reload the page: does every choice stay, apply at once, and never move his place or a highlight? Light page with the sheet open, a dark page, a page with images, tables and code. Does anything clip or overflow at the biggest size?
+2. **Carrying a highlight past the edge (#433, D308).** On the Mac, drag a highlight down to the bottom edge and hold: the page turns after a moment. Carry it across one and several pages, back up again, let go mid-turn, outside the window, over a table or image; in a short window; Esc during the carry; then undo. Is the highlight's text exactly what he swept, and saved that way on disk (`sources/*/highlights*`)?
+3. **shadcn round 6 (#431, #435, D300–D307).** Code blocks (copy, long lines, wrapping), the waiting tutor message, ⌘K's new actions (run each, then undo it), the / menu in notes (every item, Esc, typing to filter, at the bottom of the window), folding panels (fold, reload, fold while something loads), frozen table heads in long tables (scroll, highlight under the frozen head), the gliding pill (switch fast, resize the window), a deck's own slides (open, page through, highlight, reopen).
+4. **Sweep 5's fixes (#434, #436, #437) under pressure.** For each F303–F324 row in `docs/reviews/findings.md`, try a close neighbour of the case it fixed (a different screen, a second time, with a slow write). Report only what broke.

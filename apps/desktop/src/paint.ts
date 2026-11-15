@@ -5,13 +5,34 @@
 // and clicking it cleared it in chunks (an undone highlight, 2026-11-11). So the blocks under every
 // range that leaves are repainted here, by toggling a paint-only style for one frame.
 
-/** Sets highlight `name` to `ranges` (none deletes it), repainting where a range left. */
-export function paint(name: string, ranges: Range[], priority = 0) {
+//
+// Highlights paint in three layers. WebKit's page crashes when a highlight is set that overlaps one under it and one
+// over it at a priority strictly between theirs (a plain page shows it: the same three set in another order paint
+// fine): a saved highlight over a code block crashed as it opened, its underline (then 0) between the code's colours
+// (-1) and the tint (1); with Find open on a word in the code, a highlight made over it came in between Find (2) and
+// the code (Codex sweep 6, review of #440). So a highlight is only ever set as the top layer: what lies over its layer
+// is taken off first and set again after it, lowest first.
+/** The code's colours, and what his highlights' colours win over: the spoken words, a quiz's evidence. */
+export const UNDER = -1;
+/** His highlights' tints and the underlines that go with them (the open one, a looked-up word, Listen's sentence),
+ *  which set no colour of their own, so the order among them is never seen. */
+export const MARKS = 1;
+/** Find's matches, over everything, as Safari's are. */
+export const OVER = 2;
+export type Layer = typeof UNDER | typeof MARKS | typeof OVER;
+
+/** Sets highlight `name` to `ranges` (none deletes it) in `layer`, repainting where a range left. */
+export function paint(name: string, ranges: Range[], layer: Layer) {
   const before = CSS.highlights.get(name);
   if (ranges.length) {
     const h = new Highlight(...ranges);
-    h.priority = priority;
+    h.priority = layer;
+    const others = [...CSS.highlights].filter(([n]) => n !== name);
+    // Only a layer with something both under and over it can crash; the code's colours (the lowest) never do.
+    const over = others.some(([, o]) => o.priority < layer) ? others.filter(([, o]) => o.priority > layer).sort(([, a], [, b]) => a.priority - b.priority) : [];
+    for (const [n] of over) CSS.highlights.delete(n);
     CSS.highlights.set(name, h);
+    for (const [n, o] of over) CSS.highlights.set(n, o);
   } else CSS.highlights.delete(name);
   if (!before) return;
   const now = new Set<AbstractRange>(ranges);
@@ -19,7 +40,7 @@ export function paint(name: string, ranges: Range[], priority = 0) {
 }
 
 /** Removes highlight `name` and repaints what it covered. */
-export const unpaint = (name: string) => paint(name, []);
+export const unpaint = (name: string) => paint(name, [], UNDER);
 
 /** Removes every highlight, repainting each (the reader closing). */
 export function unpaintAll() {

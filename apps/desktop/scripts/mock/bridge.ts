@@ -1,6 +1,7 @@
 // Stand-in for the Tauri `ore` command when the UI runs in a plain browser (screenshots, Playwright).
 // POST /ore {args, stdin, job} -> runs the real ore CLI against $ORE_LIBRARY, returns its JSON (or 500 with the error line).
 // POST /cancel {job} stops that run with SIGTERM, as the app's ore_cancel does.
+import { callsAi } from "../../src/ai-commands";
 const CLI = `${import.meta.dir}/../../../../packages/cli/src/ore.ts`;
 // ORE_BRIDGE_BIN=<compiled ore>: run that instead of the source (bench.ts --compiled, as a release app does).
 const RUN = process.env.ORE_BRIDGE_BIN ? [process.env.ORE_BRIDGE_BIN] : ["bun", CLI];
@@ -23,8 +24,9 @@ Bun.serve({
       return new Response("null", { headers: h });
     }
     const { args, stdin, job } = await req.json();
-    // `recall --text` only stores what he wrote; `recall --feedback` is the AI call.
-    const ai = ["enrich", "ask", "ask-library", "tutor", "grade", "key-points", "check", "research", "explain"].includes(args[0]) || (args[0] === "recall" && args.includes("--feedback"));
+    // `recall --text` only stores what he wrote: it runs. `check --covered` calls no AI either, but marks a check
+    // the canned AI never wrote down, so it is answered as the check was.
+    const ai = callsAi(args) || args[0] === "check";
     // ORE_MOCK_REAL_AI=1: AI commands run for real (a rehearsal on a copy of a real library; spends usage).
     if (ai && !process.env.ORE_MOCK_REAL_AI) {
       // ORE_MOCK_AI=<dir>: <dir>/<command>.json answers that AI command (after a moment, as the AI would).

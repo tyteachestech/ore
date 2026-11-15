@@ -194,6 +194,8 @@ export function useTutorChat(notify: Notify) {
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
       const r = await oreJob<Reply & { title?: string }>(job, null, "tutor", t.message, ...(t.item ? [opt("item", t.item), ...(t.at ? [opt("at", t.at)] : [])] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), ...(t.files?.length ? [opt("files", JSON.stringify(t.files))] : []), opt("stream", t.id));
       if (!mine()) return;
+      // An empty or malformed reply is a failure, said as one with Try again, never a wait that doesn't end.
+      if (typeof r?.reply !== "string" || !r.reply.trim()) throw new TypeError("The tutor gave no reply");
       jobs.current.delete(t.id);
       flying.current.delete(t.id);
       patch(chat, t.id, { reply: r.reply, citations: r.citations, general: r.general, hint: r.hint, exercise: r.exercise, card: r.card, steps: r.steps ?? [], marks: r.marks ?? [], ai: r.ai, error: undefined, partial: undefined, searching: undefined }, first ? r.title?.trim() || undefined : undefined);
@@ -233,11 +235,12 @@ export function useTutorChat(notify: Notify) {
   const stop = () => {
     const chat = metaNow.current?.id;
     const t = now.current.find((x) => x.reply === undefined && !x.error);
-    const job = t && jobs.current.get(t.id);
-    if (!chat || !t || !job) return;
+    if (!chat || !t) return;
+    // A waiting turn always settles, even one whose run has already ended without settling it.
+    const job = jobs.current.get(t.id);
     jobs.current.delete(t.id);
     flying.current.delete(t.id);
-    void cancelOre(job);
+    if (job) void cancelOre(job);
     const said = t.partial?.replace(CUT_MARKS, "").trim();
     const ai = answering.current.get(t.id);
     patch(chat, t.id, { ...(said ? { reply: said, citations: [], steps: [], marks: [], ...(ai ? { ai } : {}) } : { error: "Stopped." }), stopped: true, partial: undefined, searching: undefined });

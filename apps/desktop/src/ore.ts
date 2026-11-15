@@ -1,5 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { passageText } from "./text";
+import { answersWithAi } from "./ai-commands";
+import { siteOf } from "./details";
 import { wakeOpenScreens } from "./util";
 
 /** The iPhone build (`ORE_PHONE=1 vite build`, apps/phone). */
@@ -49,8 +51,24 @@ export function wakesScreens(args: string[]): boolean {
 }
 
 
+/** Whether a command's answer is one the app reads (an AI reply, a grade, a check), which the CLI always prints as
+ *  an object. Empty output, from a run that ended without printing (or the mock's AI-off null), comes back as
+ *  null: for these it is a failure, so the caller's error path says so with Try again, instead of a property
+ *  read on null throwing where no catch sees it, inside a React state updater (Codex sweep 6). */
+export const mustAnswer = answersWithAi;
+
+/** A run's result, or a TypeError (so errorText says "got an unexpected reply") when a command that must answer didn't. */
+export function answered<T>(args: string[], r: T): T {
+  if (r == null && mustAnswer(args)) throw new TypeError(`ore ${args[0]} gave no answer`);
+  return r;
+}
+
 /** `ore` run under the name `job`, which `cancelOre(job)` stops (Cancel on an add). */
 export async function oreJob<T>(job: string | null, stdin: string | null, ...args: string[]): Promise<T> {
+  return answered(args, await oreRun<T>(job, stdin, args));
+}
+
+async function oreRun<T>(job: string | null, stdin: string | null, args: string[]): Promise<T> {
   // On iPhone the same commands run inside the app (src/phone/core.ts).
   if (PHONE) return (await import("./phone/core")).run<T>(args, stdin);
   const call = async () => {
@@ -190,6 +208,14 @@ export function pinBetween(before?: string, after?: string): string {
 
 /** What a list's search knows a source by (`ranked`): its title first, then its course, author, site, skills and type. */
 export const searchFields = (i: Item, site?: string, skills: string[] = []): (string | undefined)[] => [i.title, i.course?.title, i.author, siteName(site), ...skills, i.type];
+/** Each source's `searchFields` with its site and its skills by name, worked out once per list and not on every
+ *  key: a site is a parsed URL, which on a big library was most of a key's time (bench "filter sources"). */
+export function searchFieldsOf(items: Item[], skills: Pick<Skill, "id" | "name">[]): (i: Item) => (string | undefined)[] {
+  const names = new Map(skills.map((s) => [s.id, s.name]));
+  const of = (i: Item) => searchFields(i, siteOf(i.url), i.skills.map((id) => names.get(id) ?? id));
+  const by = new Map(items.map((i) => [i, of(i)]));
+  return (i) => by.get(i) ?? of(i);
+}
 /** A site as searched: its name without the ending ("nytimes" for nytimes.com, "bbc.co" for bbc.co.uk), or
  *  "com" would find nearly every web page as one types "Complete" (bench "filter sources"). */
 const siteName = (site?: string) => site?.replace(/\.[^.]+$/, "");
@@ -267,6 +293,11 @@ export type Priority = "P1" | "P2" | "P3";
 export type Skill = { id: string; name: string; priority?: Priority; archived?: boolean; hook?: string; goal?: string; icon?: string; color?: SkillColor; collection?: string };
 
 export type SearchHit = { kind: string; ref: string; item?: string; title: string; snippet?: string; annotation?: string };
+
+/** Where a search match lands in its source (Reader's `jumpTo`), for ⌘K and a list's search alike: the words in
+ *  its text, a highlight's popup, the words in its source note; an exercise at the highlight it was made from. */
+export const landing = (h: SearchHit, query: string): string | undefined =>
+  h.kind === "item" ? `find:${query}` : h.kind === "notes" ? `note:${query}` : h.kind === "annotation" ? `ann:${h.ref}` : h.annotation && `ann:${h.annotation}`;
 
 /** `ore notes`: a source note or a skill note (notes.md) as it now is; `dir` is its folder, absolute. */
 export type Notes = { kept_from_feed?: boolean; item?: string; skill?: string; text: string; path: string; dir: string };
@@ -363,7 +394,9 @@ export type CardFull = {
    *  fractions of its size; `figure_file` is where the image is (show only). */
   figure?: { src: string; box: [number, number, number, number] };
   figure_file?: string;
-  /** Its reviews and where each rating puts the next one (D149); with --review only. */
+  /** The folder of its source, where the images its text names are (show and set; absent when the source is gone). */
+  source_dir?: string;
+  /** Its reviews and where each rating puts the next one (D149): every `card show` and `card set`. */
   history?: CardHistory;
 };
 /** A card's gem (D236); `seam`: missed and won back, `polished`: passed on a new case. */

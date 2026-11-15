@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
-  CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
+  CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, findItemDir, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
   readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
 import type { Command } from "./types.ts";
-import { int, need, oneOf, str, strs, table } from "./util.ts";
+import { int, need, oneOf, readStdin, str, strs, table } from "./util.ts";
 
 const cardJson = (lib: Library, c: Card, state = cardStates(lib)(c)) => ({ ...c.meta, state, question: c.question, answer: c.answer, rubric: c.rubric, path: relative(lib.root, c.path) });
 /** With a figure card (D166), where its image is, so review can show it. */
@@ -24,6 +24,23 @@ const variantJson = (lib: Library, c: Card, v: Variant) => ({
   ...cardJson(lib, c), kind: "prompt" as const, question: v.question, answer: v.answer, rubric: v.rubric,
   variant: v.id, original: { question: c.question, answer: c.answer, rubric: c.rubric },
 });
+/** A card, or one of its variants, as review shows it: every `card show` and `card set` answers in this one
+ *  shape, so an edit or a bad version keeps what review draws. history: its reviews and where each rating puts
+ *  the next (D149); in_head_ok: review may offer "In my head" on this Explain card (D68; never on a variant);
+ *  source_dir (below). */
+const shownJson = (lib: Library, c: Card, v?: Variant | null) => ({
+  ...(v ? variantJson(lib, c, v) : { ...cardJson(lib, c), ...figureJson(lib, c), in_head_ok: inHeadOk(lib, c) }),
+  history: cardHistory(lib, c.meta.id),
+  ...sourceDir(lib, c),
+});
+/** source_dir: the source's folder, where the images its question and answer name are, as the reader finds them. */
+const sourceDir = (lib: Library, c: Card) => {
+  try {
+    return { source_dir: findItemDir(lib, c.meta.item) };
+  } catch {
+    return {}; // its source is gone: the text stands alone
+  }
+};
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const oneLine = (s: string, n = 90) => {
   const t = s.replace(/\s+/g, " ").trim();
@@ -68,10 +85,8 @@ export const studyCommands: Record<string, Command> = {
       if (sub === "show") {
         const c = findCard(lib, id);
         const v = f.review ? reviewVersion(lib, c) : f.variant ? findVariant(lib, c.meta.id, str(f.variant)!) : null;
-        if (v) return { data: { ...variantJson(lib, c, v), ...(f.review ? { history: cardHistory(lib, c.meta.id) } : {}) }, text: `${relative(lib.root, c.path)} · variant ${v.id} (${v.type})\n\n${v.question}\n---\n${v.answer}\n${v.rubric.map((p) => `- ${p}`).join("\n")}` };
-        // in_head_ok: review may offer "In my head" on this Explain card (D68); history: its reviews and
-        // where each rating puts the next (D149).
-        return { data: { ...cardJson(lib, c), ...figureJson(lib, c), ...(f.review ? { in_head_ok: inHeadOk(lib, c), history: cardHistory(lib, c.meta.id) } : {}) }, text: `${relative(lib.root, c.path)}\n\n${readFileSync(c.path, "utf8")}` };
+        if (v) return { data: shownJson(lib, c, v), text: `${relative(lib.root, c.path)} · variant ${v.id} (${v.type})\n\n${v.question}\n---\n${v.answer}\n${v.rubric.map((p) => `- ${p}`).join("\n")}` };
+        return { data: shownJson(lib, c), text: `${relative(lib.root, c.path)}\n\n${readFileSync(c.path, "utf8")}` };
       }
       if (sub === "edit") {
         const c = findCard(lib, id);
@@ -88,10 +103,10 @@ export const studyCommands: Record<string, Command> = {
         if (!question?.trim() && !answer?.trim() && !rubric) throw new Error("give --question, --answer or --point");
         if (f.variant) {
           const v = await setVariant(lib, id, str(f.variant)!, { question, answer, rubric });
-          return { data: variantJson(lib, findCard(lib, id), v), text: `Saved variant ${v.id}` };
+          return { data: shownJson(lib, findCard(lib, id), v), text: `Saved variant ${v.id}` };
         }
         const c = await withLock(paths.lock(lib), () => writeCardContent(findCard(lib, id), { question, answer, rubric }));
-        return { data: { ...cardJson(lib, c), ...figureJson(lib, c) }, text: `Saved ${c.meta.id}` };
+        return { data: shownJson(lib, c), text: `Saved ${c.meta.id}` };
       }
       if (sub === "retire" || sub === "restore") {
         const state = sub === "retire" ? "retired" : need(oneOf(f.state, ["draft", "live"] as const, "state"), "--state draft|live");
@@ -331,16 +346,17 @@ export const studyCommands: Record<string, Command> = {
   },
 
   search: {
-    usage: "<query> [--limit N]           full-text search over docs, annotations, the source note, cards, topics",
-    options: { limit: { type: "string" } },
+    usage: "<query> [--limit N] [--sources [--within]]   full-text search over docs, annotations, the source note, cards, topics; --sources: each source's best match, every source unless --limit, the first 60 with a snippet; --within: only the sources whose ids are on stdin, one per line, in that order (a list's rows as it shows them)",
+    options: { limit: { type: "string" }, sources: { type: "boolean" }, within: { type: "boolean" } },
     async run(positionals, f) {
       const lib = openLibrary();
       const query = need(positionals.join(" ").trim() || undefined, "<query>");
       const index = openIndex(lib);
       try {
-        const limit = int(f.limit, "limit") ?? 20;
+        const limit = int(f.limit, "limit") ?? (f.sources ? Infinity : 20);
         if (limit < 1) throw new Error("--limit must be 1 or more");
-        const hits = index.search(query, limit);
+        const within = f.within ? (await readStdin()).split("\n").map((l) => l.trim()).filter(Boolean) : undefined;
+        const hits = index.search(query, limit, !!f.sources, within);
         const text = hits.length ? hits.map((h) => `${h.kind.padEnd(10)} ${h.ref}  ${oneLine(h.title, 60)}\n    ${oneLine(h.snippet, 110)}`).join("\n") : "No matches.";
         return { data: hits, text };
       } finally {

@@ -23,6 +23,7 @@ import { RowSensor } from "./drag";
 import { TitleField } from "./TitleField";
 import { pickRun, typeSelect } from "./typeahead";
 import { keepFocusNear } from "./focus-near";
+import { ExerciseText } from "./ExerciseText";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -576,7 +577,7 @@ function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }:
         <HoverCard.Content className="skill-fan" side="bottom" align="start" sideOffset={6} collisionPadding={8} aria-label={`Next due in ${s.name}`}>
           {(fan ?? []).map((c, i) => (
             <button key={c.id} className="skill-fan-q" style={{ "--i": i } as CSSProperties} onClick={onStart}>
-              {c.question}
+              <ExerciseText text={c.question} inline />
             </button>
           ))}
         </HoverCard.Content>

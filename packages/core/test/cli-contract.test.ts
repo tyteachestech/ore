@@ -95,6 +95,45 @@ describe("the CLI as an agent drives it", () => {
     expect(hint.length).toBeGreaterThan(0);
     expect((await ore(lib.root, [...hint, "--json"])).code).toBe(0);
   });
+
+  // F332: Review shows what `card set` answers, so it carries what `card show --review`
+  // does, or an edit drops the history dots and "next in …" until the exercise is reopened.
+  test("an exercise edited in review keeps its history: card set and card show answer as card show --review does", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, "# Spacing\n\nSpaced practice beats massed practice.");
+    const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "Q?", answer: "A", rubric: [] });
+    expect((await ore(lib.root, ["review", card.meta.id, "--rating", "3", "--confidence", "3", "--json"])).code).toBe(0);
+    const shown = JSON.parse((await ore(lib.root, ["card", "show", card.meta.id, "--review", "--json"])).out);
+    expect(shown.history.reviews).toHaveLength(1);
+    const saved = JSON.parse((await ore(lib.root, ["card", "set", card.meta.id, "--question", "New Q?", "--json"])).out);
+    expect(saved.question).toBe("New Q?");
+    // `next` is counted from now, so it moves a few milliseconds between the two runs.
+    const past = (h: { reviews: unknown; gem: unknown; next: object }) => ({ reviews: h.reviews, gem: h.gem, next: Object.keys(h.next) });
+    expect(past(saved.history)).toEqual(past(shown.history));
+    expect(saved.in_head_ok).toBe(shown.in_head_ok);
+    // F333: and the source's folder, where the images its text names are.
+    expect(saved.source_dir).toBe(findItem(lib, item.meta.id).dir);
+    expect(shown.source_dir).toBe(findItem(lib, item.meta.id).dir);
+    // Bad version shows the original by a plain `card show`: the same shape.
+    const original = JSON.parse((await ore(lib.root, ["card", "show", card.meta.id, "--json"])).out);
+    expect(past(original.history)).toEqual(past(shown.history));
+    expect(original.in_head_ok).toBe(shown.in_head_ok);
+  });
+
+  // F345 (review of #440): every card show and card set read the source's whole doc.md (a book
+  // runs to megabytes) only to learn its folder.
+  test("card show names the source's folder without reading its doc.md", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, "# Spacing\n\nSpaced practice beats massed practice.");
+    const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "Q?", answer: "A", rubric: [] });
+    chmodSync(item.docPath, 0o000);
+    try {
+      const shown = JSON.parse((await ore(lib.root, ["card", "show", card.meta.id, "--json"])).out);
+      expect(shown.source_dir).toBe(item.dir);
+    } finally {
+      chmodSync(item.docPath, 0o644);
+    }
+  });
 });
 
 describe("doctor", () => {

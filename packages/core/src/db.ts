@@ -139,7 +139,12 @@ export class LibraryIndex {
       .filter((p) => !indexed.has(relative(this.lib.root, p)));
   }
 
-  search(query: string, limit = 20): SearchHit[] {
+  /** Matches for `query`, best first. `bySource`: each source's best match only, every source that has
+   *  one unless `limit` cuts them (a list's search, whose rows are sources: the first N matches across
+   *  the library leave out sources a tab or filter would show, organize sweep 6); past the first SNIPPETS
+   *  their snippet is empty. `within`: only these sources, in this order (the list's rows, as it shows
+   *  them), so the ones it shows first are the ones with a snippet. */
+  search(query: string, limit = 20, bySource = false, within?: string[]): SearchHit[] {
     // FTS5 drops "+" and "#" from words, so "c++" would find every word starting with c. A term that ends
     // in them ("c++", "c#", "f#") asks the index for the bare word and keeps only rows that spell it out.
     const terms = query.normalize("NFC").match(/[\p{L}\p{M}\p{N}_]+[+#]*/gu) ?? [];
@@ -153,20 +158,38 @@ export class LibraryIndex {
     };
     const match = terms.map((t) => (spacedOut(t) ? ask(t) : /[+#]$/.test(t) ? `"${t.replace(/[+#]+$/, "")}"` : `"${t}"*`)).join(" ");
     const spelled = literal.map((t) => new RegExp(`(?<![\\p{L}\\p{N}_])${t.replace(/\+/g, "\\+")}(?![+#])`, "iu"));
+    // The body is read only to check a spelled-out term or cut a snippet around an unspaced word. A snippet
+    // costs about a millisecond on a long source, so only the matches kept get one, and by source only the
+    // best SNIPPETS: a list's search of a common word ("a", every source) took a second for 877 of them.
+    const needBody = spelled.length > 0 || unspaced.length > 0;
+    const capped = !spelled.length && !bySource && !within;
     // A hit in the title counts five times one in the body (bm25 weights by column). Archived sources,
     // and everything in them, stay out.
     const rows = this.db
-      .query<SearchHit & { body: string; annotation: string | null }, [string, number]>(
-        "select kind, ref, item, title, body, snippet(fts, -1, '[', ']', '…', 12) as snippet, case when kind = 'card' then (select annotation from cards where cards.id = fts.ref) end as annotation from fts where fts match ? and (item is null or item not in (select id from items where archived = 1)) order by bm25(fts, 0, 0, 0, 5, 1, 1) limit ?"
-          // A word found in `chars` gets the body's snippet, never the spaced letters (and its own, below, where the body holds it).
-          .replace("snippet(fts, -1,", unspaced.length ? "snippet(fts, 4," : "snippet(fts, -1,"),
+      .query<Omit<SearchHit, "snippet"> & { id: number; body?: string; annotation: string | null }, [string, number]>(
+        `select rowid as id, kind, ref, item, title${needBody ? ", body" : ""}, case when kind = 'card' then (select annotation from cards where cards.id = fts.ref) end as annotation from fts where fts match ? and (item is null or item not in (select id from items where archived = 1)) order by bm25(fts, 0, 0, 0, 5, 1, 1) limit ?`,
       )
-      .all(match, spelled.length ? -1 : limit);
-    return rows
-      .filter((r) => spelled.every((re) => re.test(r.title) || re.test(r.body)))
-      .map((r) => (unspaced.length ? { ...r, snippet: around(r.body, unspaced[0]!) ?? r.snippet } : r))
-      .slice(0, limit)
-      .map(({ body: _, annotation, ...hit }) => (annotation ? { ...hit, annotation } : hit));
+      .all(match, capped ? limit : -1);
+    const seen = new Set<string>();
+    const order = within && new Map(within.map((id, i) => [id, i]));
+    const kept = rows
+      .filter((r) => !order || order.has(r.item!))
+      .filter((r) => spelled.every((re) => re.test(r.title) || re.test(r.body!)))
+      .filter((r) => !(bySource || within) || (r.item !== null && !seen.has(r.item) && !!seen.add(r.item)))
+      .sort(order ? (a, b) => order.get(a.item!)! - order.get(b.item!)! : () => 0)
+      .slice(0, limit);
+    if (!kept.length) return [];
+    // A word found in `chars` gets the body's snippet, never the spaced letters (and its own, below, where the body holds it).
+    const snips = new Map(
+      this.db
+        .query<{ id: number; snippet: string }, [string]>(`select rowid as id, snippet(fts, ${unspaced.length ? 4 : -1}, '[', ']', '…', 12) as snippet from fts where fts match ? and rowid in (${kept.slice(0, bySource || within ? SNIPPETS : undefined).map((r) => r.id).join(",")})`)
+        .all(match)
+        .map((r) => [r.id, r.snippet]),
+    );
+    return kept.map(({ id, body, annotation, ...hit }) => {
+      const snippet = (unspaced.length ? around(body!, unspaced[0]!) : undefined) ?? snips.get(id) ?? "";
+      return annotation ? { ...hit, snippet, annotation } : { ...hit, snippet };
+    });
   }
 
   /** Sources (not archived) whose title or text holds any of these word stems, best first (Ask your library). */
@@ -227,6 +250,9 @@ function openDb(lib: Library): Database {
   }
   return db;
 }
+
+/** How many of a search by source get a snippet, best first: as many lines as the list's search had before it found every source. */
+const SNIPPETS = 60;
 
 /** Letters of scripts written without spaces between words (Chinese, Japanese, Thai and its neighbours),
  *  with the marks on them. The index reads a run of them as one word, so a word inside one was never found. */

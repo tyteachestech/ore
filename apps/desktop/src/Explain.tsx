@@ -78,8 +78,8 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
   useEffect(() => {
     let live = true;
     setGloss(undefined);
-    ore<(Gloss & { ai: unknown }) | null>("explain", p.item, opt("exact", p.word), ...(p.start === undefined ? [] : [opt("start", String(p.start))])).then(
-      (r) => live && setGloss(r ? { here: r.here, general: r.general } : { error: "Explaining needs AI." }),
+    ore<Gloss & { ai: unknown }>("explain", p.item, opt("exact", p.word), ...(p.start === undefined ? [] : [opt("start", String(p.start))])).then(
+      (r) => live && setGloss({ here: r.here, general: r.general }),
       (e) => live && setGloss({ error: errorText(e) }),
     );
     return () => {
@@ -92,10 +92,9 @@ export const Explain = forwardRef<HTMLDivElement, ExplainProps>(function Explain
     if (!learn?.id) return;
     let live = true;
     setFound(undefined);
-    ore<Research | null>("research", learn.id).then(
+    ore<Research>("research", learn.id).then(
       (r) => {
         if (!live) return;
-        if (!r) return setFound({ error: "Finding sources needs AI." });
         setFound(r.sources);
         setPicked(r.sources.slice(0, 1).map((s) => s.url));
       },

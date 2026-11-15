@@ -2,7 +2,7 @@ import { Children, isValidElement, useEffect, useRef, useState, type ReactNode }
 import { KINDS, languageOf, tokens, type Kind } from "./code-tokens";
 import { Hint } from "./Hint";
 import { Check, Copy } from "./icons";
-import { paint } from "./paint";
+import { paint, UNDER } from "./paint";
 
 /** The coloured ranges of every code block on screen: one CSS Custom Highlight per kind holds them all. */
 const blocks = new Map<HTMLElement, Map<Kind, Range[]>>();
@@ -12,8 +12,8 @@ function repaint() {
   queued = true;
   queueMicrotask(() => {
     queued = false;
-    // Under his own highlights and Find's (priority 0 and up), so their colours win where they meet.
-    for (const k of KINDS) paint(`code-${k}`, [...blocks.values()].flatMap((m) => m.get(k) ?? []), -1);
+    // Under his own highlights and Find's, so their colours win where they meet.
+    for (const k of KINDS) paint(`code-${k}`, [...blocks.values()].flatMap((m) => m.get(k) ?? []), UNDER);
   });
 }
 

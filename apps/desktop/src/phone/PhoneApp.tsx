@@ -26,7 +26,7 @@ import { Palette } from "../Palette";
 import { SkillEditor, skillGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
-import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, shareOpen, shareSkills, type CardSkills, type Item, type Skill, touched } from "../ore";
+import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, shareOpen, shareSkills, type CardSkills, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -1092,7 +1092,7 @@ export function PhoneApp() {
                 const mine = (items ?? []).filter((i) => i.skills.includes(skill));
                 const q = skillQuery.trim();
                 // Searched, the sources that match, best first, lessons on their own (the Mac's filter, D203).
-                const lines: Line[] = q ? ranked(mine, q, (i) => [i.title, i.course?.title ?? ""]).map((item) => ({ kind: "item", item })) : linesOf(skillTab === "toread" ? [...mine].sort(toReadOrder) : mine, skillTab);
+                const lines: Line[] = q ? ranked(mine, q, searchFieldsOf(mine, skills)).map((item) => ({ kind: "item", item })) : linesOf(skillTab === "toread" ? [...mine].sort(toReadOrder) : mine, skillTab);
                 const shown = q || skillAll ? lines : lines.slice(0, SKILL_CAP);
                 const coming = q || skillTab !== "toread" ? [] : waiting.filter((l) => l.skills.includes(skill));
                 return (

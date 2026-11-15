@@ -25,6 +25,7 @@ import { Roll } from "./Roll";
 import { errorText, focusQuietly, load, save, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { Trap } from "./Trap";
 import { passageText } from "./text";
+import { ExerciseText } from "./ExerciseText";
 
 type Props = {
   skill: Skill;
@@ -517,7 +518,7 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
                 <h3>You can now explain</h3>
                 <ul>
                   {shown.map((e) => (
-                    <li key={e.id}>{e.question}</li>
+                    <li key={e.id}><ExerciseText text={e.question} inline /></li>
                   ))}
                 </ul>
                 {k.explain.length > EXPLAIN_SHOWN && (

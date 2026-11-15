@@ -23,8 +23,15 @@ beforeAll(async () => {
   db.run("insert into fts (kind, ref, item, title, body, chars) values (?, ?, ?, ?, ?, ?)", ["item", "j", "j", "日本語", "毎朝勉強する。", "日 本 語 毎 朝 勉 強 す る"]);
 });
 
-const search = (q: string) =>
-  db.query<{ kind: string; ref: string; snippet: string }>(statement(/select kind, ref, item, title, body, snippet\(fts[^"]*/)).all(`"${q}"*`, 10);
+/** The two statements of `search`: the matches, then the snippets of those it keeps. */
+const MATCHES = statement(/select rowid as id, kind, ref, item, title[^`]*/).replace('${needBody ? ", body" : ""}', ", body");
+const SNIPPETS = statement(/select rowid as id, snippet\(fts[^`]*/).replace("${unspaced.length ? 4 : -1}", "-1");
+const search = (q: string) => {
+  const hits = db.query<{ id: number; kind: string; ref: string }>(MATCHES).all(q.startsWith('"') ? q : `"${q}"*`, 10);
+  if (!hits.length) return [];
+  const snips = db.query<{ id: number; snippet: string }>(SNIPPETS.replace(/\(\$\{kept.*\}\)/, `(${hits.map((h) => h.id).join(",")})`)).all(q.startsWith('"') ? q : `"${q}"*`);
+  return hits.map(({ id: _, ...h }) => ({ ...h, snippet: snips.find((s) => s.id === _)?.snippet ?? "" }));
+};
 
 test("finds a word in a source's text, marked in its snippet", () => {
   const hits = search("cramming");
@@ -41,7 +48,6 @@ test("the kind, ref and item columns aren't searched", () => {
 });
 
 test("a word inside Japanese is found from its letters side by side, as on the Mac (Codex sweep 4)", () => {
-  const q = statement(/select kind, ref, item, title, body, snippet\(fts[^"]*/);
-  expect(db.query<{ ref: string }>(q).all('"勉 強"', 10).map((h) => h.ref)).toEqual(["j"]);
-  expect(db.query<{ ref: string }>(q).all('"勉 朝"', 10)).toEqual([]);
+  expect(search('"勉 強"').map((h) => h.ref)).toEqual(["j"]);
+  expect(search('"勉 朝"')).toEqual([]);
 });
