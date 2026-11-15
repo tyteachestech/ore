@@ -65,7 +65,7 @@ When a sweep's triage is done, add a row per tester here.
 | 11-15 | [sweep 6](2026-11-15-codex-sweep-6/) exercises | Codex | Making, fixing and keeping exercises and their history | both | 3 | #440 |
 | 11-15 | [sweep 6](2026-11-15-codex-sweep-6/) looks | Codex | Light and dark, window sizes, zoom, reduced motion, contrast | both | 1 | #440 |
 | 11-15 | [sweep 6](2026-11-15-codex-sweep-6/) organize | Codex | Finding and organizing a big library (238 sources, not 950) | both | 4 (+9 from #440's review, F339–F347) | #440 |
-| 11-15 | [sweep 7](2026-11-15-codex-sweep-7/) highlights | Codex | Highlighting at its limits: overlaps, formulas, code, tables, every source type | both | 4 (+3 of the same kinds the fix found) | sweep 7's PR |
+| 11-15 | [sweep 7](2026-11-15-codex-sweep-7/) highlights | Codex | Highlighting at its limits: overlaps, formulas, code, tables, every source type | both | 4 (+3 of the same kinds the fix found) | #442 |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
