@@ -334,7 +334,7 @@ async function select(page: Page, phrase: string) {
  *  pressed, while its write may still wait behind the archive's. A journey that ended there closed its
  *  page first, the queued Undo was never sent, and the next journeys lost those sources (“The Testing
  *  Effect” from To read, failing the hang and a11y journeys on CI). The app's own writes answer first
- *  (`settled`): a fixed wait for the library timed out on CI while a runner stalled (F156). */
+ *  (`settled`): a fixed wait for the library timed out on CI while a runner stalled (F190). */
 async function inLibrary(page: Page, titles: string[]) {
   await settled(page);
   await until("the library has them all back", async () => {
@@ -9699,7 +9699,7 @@ journey("prequestions: a source added with --no-enrich offers to write them, nev
 });
 
 journey("stacked Undo: each ⌘Z's toast comes to the front and names the source it put back", async (page) => {
-  // A ⌘Z whose write runs late, as one did on a stalled CI runner (F156): the library has
+  // A ⌘Z whose write runs late, as one did on a stalled CI runner (F190): the library has
   // all three back only once the app's writes have answered, past any fixed wait.
   await page.getByRole("button", { name: /^All sources/ }).click();
   const titles = () => page.locator(".list .row .title").allInnerTexts();
@@ -12397,7 +12397,7 @@ journey("skill rename: pending Undo preserves the preceding source (F146)", asyn
   }
 });
 
-journey("source rename: pending Undo takes back the rename, not the source added before it (F156)", async (page) => {
+journey("source rename: pending Undo takes back the rename, not the source added before it (F190)", async (page) => {
   const title = `Source to rename ${Date.now()}`;
   await page.reload();
   await page.keyboard.press("Meta+n");
