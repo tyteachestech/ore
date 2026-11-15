@@ -66,10 +66,10 @@ When a sweep's triage is done, add a row per tester here.
 | 11-15 | [sweep 6](2026-11-15-codex-sweep-6/) looks | Codex | Light and dark, window sizes, zoom, reduced motion, contrast | both | 1 | #440 |
 | 11-15 | [sweep 6](2026-11-15-codex-sweep-6/) organize | Codex | Finding and organizing a big library (238 sources, not 950) | both | 4 (+9 from #440's review, F339–F347) | #440 |
 | 11-15 | [sweep 7](2026-11-15-codex-sweep-7/) highlights | Codex | Highlighting at its limits: overlaps, formulas, code, tables, every source type | both | 4 (+3 of the same kinds the fix found) | #442 |
-| 11-15 | [sweep 8](2026-11-15-codex-sweep-8/) reimport | Codex | Reimport a source that has highlights, notes, questions and exercises; the kept original changed | Mac | 3 | sweeps 8–11's PR |
+| 11-15 | [sweep 8](2026-11-15-codex-sweep-8/) reimport | Codex | Reimport a source that has highlights, notes, questions and exercises; the kept original changed | Mac | 3 | #443 |
 | 11-15 | [sweep 9](2026-11-15-codex-sweep-8/) upgrade | Codex | A library written by Ore as of 11-06 (`aa6bc6f`), opened and used by today's | both | 0 (small seed: no media, PDF or chats) | — |
-| 11-15 | [sweep 10](2026-11-15-codex-sweep-10/) months | Codex | 60–90 simulated days of sessions with `page.clock` | both | 1 | sweeps 8–11's PR |
-| 11-15 | [sweep 11](2026-11-15-codex-sweep-10/) offline | Codex | The Feed over weeks; the Mac offline or on a bad network | both | 2 | sweeps 8–11's PR |
+| 11-15 | [sweep 10](2026-11-15-codex-sweep-10/) months | Codex | 60–90 simulated days of sessions with `page.clock` | both | 1 | #443 |
+| 11-15 | [sweep 11](2026-11-15-codex-sweep-10/) offline | Codex | The Feed over weeks; the Mac offline or on a bad network | both | 2 | #443 |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
