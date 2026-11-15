@@ -13,7 +13,8 @@ export const FIELDS: { id: Field; label: string; plural: string }[] = [
   { id: "author", label: "Author", plural: "authors" },
 ];
 
-const KINDS: Record<string, string> = { article: "Article", youtube: "Video", pdf: "PDF", epub: "Book", markdown: "Document", text: "Text", snippet: "Snippet" };
+/** Source kinds as he would say them, on the rows, in Add and in the filter alike. */
+const KINDS: Record<string, string> = { article: "Article", youtube: "Video", pdf: "PDF", epub: "Book", markdown: "Text", snippet: "Snippet" };
 export const kindLabel = (type: string) => KINDS[type] ?? type.charAt(0).toUpperCase() + type.slice(1);
 
 /** No skill is a value of its own, so the unfiled can be found. */

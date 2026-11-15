@@ -32,7 +32,7 @@ test("the bar counts the pick and offers Done, Skills and Archive", () => {
   expect(out).toContain(">Done<");
   expect(out).toContain("Skills");
   expect(out).toContain(">Archive<");
-  expect(out).toContain('aria-label="Let go of the pick"');
+  expect(out).toContain('aria-label="Clear the pick"');
 });
 
 test("a pick already done offers To read; an archived one only Restore", () => {

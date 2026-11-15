@@ -24,7 +24,7 @@ import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { LapCentre, lapPlan, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, kept, LIBRARY_BACK, useFocusWhileMounted, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { MOMENT_MOOD, momentFor, type Moment } from "./moment";
@@ -1385,7 +1385,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                 </div>
                 {guard !== undefined && (
                   <p className="review-guard" role="status">
-                    {marks?.some((m) => !m) ? `${marks.filter((m) => !m).length} of ${marks.length} key points are marked missed.` : "This one is down as a miss."} Press {RATINGS[guard - 1]} again to keep it.
+                    {marks?.some((m) => m === false) ? missedOf(marks) : "This one is down as a miss."} Press {RATINGS[guard - 1]} again to keep it.
                   </p>
                 )}
                 {!PHONE && <div className="review-tools">

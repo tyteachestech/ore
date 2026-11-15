@@ -26,6 +26,12 @@ function FilterPicker({ start, children, ...p }: Props & { start?: Field; childr
   const picked = filters.find((f) => f.field === field)?.values ?? [];
   const opts = open && field ? options(items, field, (id) => skill(id)?.name ?? id).filter((o) => has(o.label, query)) : [];
   const meta = FIELDS.find((f) => f.id === field);
+  // The row the keys are on. When it leaves the list (a field was opened, a search narrowed it), the first row
+  // takes over, as in Linear: cmdk would keep pointing at the gone row, and Enter would pick nothing.
+  const [sel, setSel] = useState("");
+  const fields = field ? [] : FIELDS.filter((f) => has(f.label, query));
+  const rows = field ? opts.map((o) => `v:${o.value}`) : fields.map((f) => f.id);
+  const on = rows.includes(sel) ? sel : rows[0] ?? "";
   return (
     <Popover.Root
       open={open}
@@ -34,6 +40,7 @@ function FilterPicker({ start, children, ...p }: Props & { start?: Field; childr
         if (o) {
           setField(start);
           setQuery("");
+          setSel("");
         } else if (settled(filters) !== filters) onChange(settled(filters));
       }}
     >
@@ -45,7 +52,7 @@ function FilterPicker({ start, children, ...p }: Props & { start?: Field; childr
             outside.current = false;
           }}
         >
-          <Command label="Filter" loop shouldFilter={false}>
+          <Command label="Filter" loop shouldFilter={false} value={on} onValueChange={setSel}>
             <Command.Input
               ref={input}
               className="menu-input"
@@ -61,13 +68,12 @@ function FilterPicker({ start, children, ...p }: Props & { start?: Field; childr
               autoFocus
             />
             <Command.List ref={more}>
-              {!field &&
-                FIELDS.filter((f) => has(f.label, query)).map((f) => (
-                  <Command.Item key={f.id} value={f.id} onSelect={() => (setField(f.id), setQuery(""), input.current?.focus())}>
-                    <span className="menu-label">{f.label}</span>
-                    <CaretRight size={11} className="sub-caret" aria-hidden="true" />
-                  </Command.Item>
-                ))}
+              {fields.map((f) => (
+                <Command.Item key={f.id} value={f.id} onSelect={() => (setField(f.id), setQuery(""), input.current?.focus())}>
+                  <span className="menu-label">{f.label}</span>
+                  <CaretRight size={11} className="sub-caret" aria-hidden="true" />
+                </Command.Item>
+              ))}
               {opts.map((o) => {
                 const k = field === "skill" ? skill(o.value) : undefined;
                 return (
@@ -80,6 +86,7 @@ function FilterPicker({ start, children, ...p }: Props & { start?: Field; childr
                 );
               })}
               {field && !opts.length && <Command.Empty>No {meta!.plural} match</Command.Empty>}
+              {!field && !fields.length && <Command.Empty>No filters match</Command.Empty>}
             </Command.List>
           </Command>
         </Popover.Content>

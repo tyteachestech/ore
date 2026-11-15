@@ -371,7 +371,7 @@ img.thumb { filter: brightness(0.86); }
 .row.lesson.finished .title { color: var(--faint); }
 .row.pinned:not(:hover, .on, .sel) { background: rgba(255, 255, 255, 0.035); }
 /* On hover and selected rows, metadata steps up to muted (faint on selected is under 4.5:1). */
-.row:is(:hover, .on) :is(.kind, .sub, .snip, .col, .by, .course-next, .part), .note-menu-row.on .sub { color: var(--muted); }
+.row:is(:hover, .on, .sel) :is(.kind, .sub, .snip, .col, .by, .course-next, .part), .note-menu-row.on .sub { color: var(--muted); }
 .chips { display: flex; gap: 4px; flex-wrap: wrap; }
 /* A skill on a source, one build everywhere (Tyler's pick C, 2026-11-10): its icon in its colour and its name
    in `muted`, no fill and no edge, so a row holds no box. Flex-centred so the icon sits on the text's midline. */
@@ -647,7 +647,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
   margin-left: max(0px, 50% - var(--measure) / 2 - var(--lead));
   margin-right: 0;
 }
-.doc-head h1 { font-size: 30px; line-height: 1.25; font-weight: 700; margin: 8px 0 6px; letter-spacing: -0.01em; user-select: text; -webkit-user-select: text; }
+.doc-head h1 { font-size: 30px; line-height: 1.25; font-weight: 700; text-wrap: balance; margin: 8px 0 6px; letter-spacing: -0.01em; user-select: text; -webkit-user-select: text; }
 .doc-head .by { color: var(--text); font-size: 13px; margin-right: 4px; max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .doc-head button.by { background: none; border: 0; padding: 0; font: inherit; font-size: 13px; cursor: text; }
 .doc-head button.by:hover { color: var(--text); }
@@ -2529,6 +2529,8 @@ button.home-plan:hover { color: var(--text); }
 .sidebar.fade-more::after { bottom: calc(-1 * var(--mole-room)); height: 56px; margin: -56px -8px 0; }
 .menu-list.fade-more { --fade-pad: 4px; }
 [cmdk-list].fade-more { --fade-pad: 6px; }
+/* A menu's list has 4px of padding, so its fade reaches only that far (a 6px one scrolled it sideways). */
+.popover.menu [cmdk-list].fade-more { --fade-pad: 4px; }
 @media (prefers-reduced-motion: reduce) { .fade-more::after { transition: none; } }
 
 /* Object menus (Menu.tsx): right-click and the row's ⋯ show the same list, macOS-style. */

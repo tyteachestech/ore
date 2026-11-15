@@ -381,5 +381,12 @@ export const stepLabel = (segments: string[]) => `Step ${Math.min(segments.filte
 /** A number with its thing, singular for one: "1 lesson", "1,200 words". */
 export const count = (n: number, one: string) => `${n.toLocaleString()} ${one}${n === 1 ? "" : "s"}`;
 
+/** Review's guard line on an Explain marked down: the points he marked missed (a point not marked yet isn't one),
+ *  of all its points, a count of one in the singular. */
+export const missedOf = (marks: (boolean | undefined)[]) => {
+  const n = marks.filter((m) => m === false).length;
+  return `${n} of ${count(marks.length, "key point")} ${n === 1 ? "is" : "are"} marked missed.`;
+};
+
 /** The reader's Reading for chip: what the number counts, so it reads without a hover (D276). */
 export const readingFor = (n: number) => `Reading for ${count(n, "question")}`;
