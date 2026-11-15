@@ -8,7 +8,7 @@ import type { JSX, SVGProps } from "react";
    and up), so its ink stands about one and a half times a label's capitals (D171, after 24px read too big). The dot is
    0.38 of a cell (D170), small enough that the gaps stay even at 20px, and each drawing is centred by its ink
    (dots.ts). There is no fill weight: a selected icon shows by its row, never a second drawing. */
-export type IconProps = Omit<SVGProps<SVGSVGElement>, "ref" | "children"> & { size?: number; weight?: string };
+type IconProps = Omit<SVGProps<SVGSVGElement>, "ref" | "children"> & { size?: number; weight?: string };
 export type Icon = (props: IconProps) => JSX.Element;
 
 import { dots } from "./dots";

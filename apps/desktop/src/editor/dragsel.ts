@@ -26,7 +26,7 @@ function spans(view: EditorView): Span[] {
 }
 
 /** The blocks between two heights, selected from the one at `y0` to the one at `y1`; null when none are. */
-export function between(state: EditorState, all: Span[], y0: number, y1: number): BlockSelection | null {
+function between(state: EditorState, all: Span[], y0: number, y1: number): BlockSelection | null {
   const hit = crossing(all, y0, y1);
   if (!hit.length) return null;
   const [a, h] = y0 <= y1 ? [hit[0]!, hit.at(-1)!] : [hit.at(-1)!, hit[0]!];

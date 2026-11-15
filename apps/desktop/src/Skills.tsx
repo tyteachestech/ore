@@ -9,7 +9,7 @@ import { useLite } from "./Lite";
 import { Trap } from "./Trap";
 import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
 import { ore, opt, type Skill, type SkillColor } from "./ore";
-import { errorText, load, save, settleFocus, usable, useFocusWhileMounted, type Notify } from "./util";
+import { count, errorText, load, save, settleFocus, usable, useFocusWhileMounted, type Notify } from "./util";
 
 /** How skill tags show in lists (Settings → General): icon and name, or the icon alone for a small
  *  screen or less to read; the name is then said on hover and to VoiceOver. */
@@ -505,7 +505,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
   const panelRef = useRef<HTMLDivElement>(null);
   const choice = sources.all > 0 && sources.only > 0;
   useFocusWhileMounted(keepRef);
-  const n = (k: number) => `${k} source${k === 1 ? "" : "s"}`;
+  const n = (k: number) => count(k, "source");
   const alsoArchived = sources.archived ? ` (and ${sources.archived} archived)` : "";
 
   const remove = async () => {

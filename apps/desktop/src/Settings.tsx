@@ -33,7 +33,7 @@ const SECTIONS = [
 type Section = (typeof SECTIONS)[number]["id"];
 
 export const GOALS = [5, 10, 15, 20, 30];
-export const NEW = [0, 5, 10, 20];
+const NEW = [0, 5, 10, 20];
 /** The choices for New exercises a day: the list, plus the library's own value when `ore goal` or a hand edit set one off it, so one is always shown picked. */
 export const newOptions = (now: number) => [...new Set([...NEW, now])].sort((a, b) => a - b);
 const VENDORS: { id: Vendor; label: string }[] = [
