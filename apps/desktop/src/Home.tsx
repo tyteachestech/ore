@@ -24,7 +24,6 @@ import { TitleField } from "./TitleField";
 import { pickRun, typeSelect } from "./typeahead";
 import { keepFocusNear } from "./focus-near";
 
-
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
 /** Home (D58): today's goal and what is due, the sources he is reading, and each skill's
