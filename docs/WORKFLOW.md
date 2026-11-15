@@ -26,6 +26,7 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 
 ## Mac load
 Five Codex testers at once, each with its own WebKit pages, servers and bridges, froze Tyler's Mac until it restarted (2026-11-15). So:
+- Before writing a sweep's prompts, read `docs/reviews/sweeps.md` (every tester so far, its angle and how many real bugs it found, and the ground not yet covered) and pick angles from there; when its triage is done, add a row per tester and strike the ground it took.
 - Run a Codex sweep with `bun run sweep <folder>` from a worktree. The folder holds `sweep.json` (each tester's name and seed), an optional `preamble.md` and a `<name>-prompt.md` per tester, written with `{{mac}}`, `{{bridge}}`, `{{phone}}`, `{{webkit}}`, `{{library}}`, `{{phoneLibrary}}` and `{{out}}` for this run's ports and folders (the header of `apps/desktop/scripts/sweep.ts`; `--dry-run` prints the plan). It runs at most two testers, a library bigger than the big seed alone, starts each only when the load check passes, never uses a port WebKit refuses, and stops everything it started when it ends or is stopped.
 - Anything else that loads the Mac (Playwright, a test instance of Ore, a hand-run tester) runs `bun apps/desktop/scripts/mac-load.ts check` before each start and waits while it fails (below 25% free memory, or two Codex testers already running across all threads), and `mac-load.ts clean <worktree>` when it ends or fails. Clean never stops Tyler's own Ore, `~/Developer/ore` or a Claude session.
 
