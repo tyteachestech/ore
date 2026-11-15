@@ -7,6 +7,7 @@ import { Hint } from "./Hint";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { load, save } from "./util";
 import { clampRate, MAX_RATE, MIN_RATE, PRESETS, snapRate } from "./rate";
+import { sectionAt, tipX, type Section } from "./sections";
 
 // The YouTube player for a video source (D48, D50), driven over the embed's postMessage protocol
 // (what YouTube's iframe_api script does, without loading a remote script into this webview).
@@ -394,8 +395,12 @@ function useVideoWidth(box: RefObject<HTMLDivElement | null>) {
 /** The pinned video and its control row (D48). Copies Eleven Reader's player: a full-width scrubber,
  *  then −15, play and +30 as plain text and a dot triangle in the middle (D209), time on the left and speed on
  *  the right. YouTube's own controls are off. Every control shows its shortcut on hover (Hint). */
-export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, owed = false, ticks = [] }: { player: Player; title: string; onFinish: () => void; onOpen: () => void; audio?: boolean; owed?: boolean; ticks?: number[] }) {
+export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, owed = false, ticks = [], sections = [] }: { player: Player; title: string; onFinish: () => void; onOpen: () => void; audio?: boolean; owed?: boolean; ticks?: number[]; sections?: Section[] }) {
   const [scrub, setScrub] = useState<number | null>(null);
+  /** Where the pointer is over the bar, as a share of it; null when it is elsewhere. */
+  const [over, setOver] = useState<{ at: number; width: number } | null>(null);
+  /** The tip's width once drawn, so it is kept inside the bar from its first frame on a heading. */
+  const [tipW, setTipW] = useState(0);
   const box = useRef<HTMLDivElement>(null);
   const size = useVideoWidth(box);
   const shown = scrub ?? player.elapsed;
@@ -449,13 +454,33 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ow
           player.seek(v ?? 0);
         }}
         aria-label="Position"
+        onPointerMove={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setOver({ at: Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)), width: r.width });
+        }}
+        onPointerLeave={() => setOver(null)}
       >
         <Slider.Track className="scrub-track">
           <Slider.Range className="scrub-range" />
         </Slider.Track>
+        {/* A cut where each section starts, so the bar reads as the talk's parts; his ticks draw over them. */}
+        {total > 0 && sections.filter((s) => s.t > 0 && s.t < total).map((s) => <span key={s.t} className="scrub-cut" style={{ left: `${(s.t / total) * 100}%` }} aria-hidden="true" />)}
         {/* His highlights where they are spoken (D167), so he can go back to the moments he marked. */}
         {total > 0 && ticks.filter((t) => t <= total).map((t, i) => <span key={i} className="scrub-tick" style={{ left: `${(t / total) * 100}%` }} aria-hidden="true" />)}
         <Slider.Thumb className="scrub-thumb" aria-valuetext={`${clock(shown)} of ${clock(total)}`} />
+        {over && total > 0 && !off && (() => {
+          const t = scrub ?? over.at * total;
+          const head = sectionAt(sections, t);
+          const at = scrub !== null ? (scrub / total) * over.width : over.at * over.width;
+          return (
+            <div className="scrub-tip" ref={(el) => {
+              if (el && el.offsetWidth !== tipW) setTipW(el.offsetWidth);
+            }} style={{ left: tipX(at, over.width, tipW), visibility: tipW ? undefined : "hidden" }} aria-hidden="true">
+              <b>{clock(t)}</b>
+              {head && <span>{head}</span>}
+            </div>
+          );
+        })()}
       </Slider.Root>
       <div className="controls">
         <span className="time">

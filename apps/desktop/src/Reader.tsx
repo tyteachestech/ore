@@ -43,6 +43,7 @@ import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { chunks, pageChunks, pageOf, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
+import { byTime, topLevel } from "./sections";
 import { glow, LampRing, pulse } from "./Lamp";
 import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from "./listen";
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer, type Player } from "./Video";
@@ -901,6 +902,21 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       return i >= 0 ? [words.time[i]!] : [];
     });
   }, [words, painted]);
+
+  /** The outline's top headings at the time each is first spoken: cuts and hover titles on the scrubber. */
+  const talkParts = useMemo(() => {
+    const index = idx.current;
+    const el = docEl.current;
+    if (!words || !index || !el) return [];
+    const heads = Array.from(el.querySelectorAll<HTMLElement>("h1, h2, h3, h4")).flatMap((h) => {
+      const at = skeletonOffset(index, h, 0);
+      const i = wordAtOffset(words, at);
+      // A heading of a page's own text above its video (D92) is not a part of the talk: its next spoken word is far off.
+      return i >= 0 && words.pos[i]! >= at && words.pos[i]! - at < 300 ? [{ level: Number(h.tagName[1]), t: words.time[i]!, title: (h.textContent ?? "").trim() }] : [];
+    });
+    const level = topLevel(heads.map((h) => h.level));
+    return byTime(heads.filter((h) => h.level === level));
+  }, [words]);
 
   /** The part of the scroll pane not covered by the pinned player. */
   const band = () => {
@@ -3212,6 +3228,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
             <VideoPlayer
               player={player}
               ticks={ticks}
+              sections={talkParts}
               title={doc.title}
               onFinish={() => p.setFinishing(true)}
               onOpen={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}
@@ -3420,6 +3437,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                 audio={!!audio}
                 owed={!!doc.owed?.length}
                 ticks={ticks}
+                sections={talkParts}
                 title={doc.title}
                 onFinish={() => p.setFinishing(true)}
                 onOpen={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}
