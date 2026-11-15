@@ -327,6 +327,64 @@ export const pasteLink = $prose(
     }),
 );
 
+/** A line that starts a Markdown block (a list item, heading, quote, fence or table row): text holding one is
+ *  Markdown, pasted as Markdown, whatever tabs it has (an Obsidian list is indented with them). */
+const BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |>|```|~~~|\|)/;
+/** A cell that starts a code comment: tab-aligned comments are code, not columns. */
+const COMMENT = /^(?:\/\/|\/\*|# |-- )/;
+const linesOf = (text: string) => text.replace(/\r\n?/g, "\n").replace(/\n+$/, "").split("\n");
+
+/** Rows of tab-separated cells, as a spreadsheet's plain text gives them: two or more lines, each with
+ *  the same number of tabs, none of them Markdown or code. Null for any other text. */
+export function tsvRows(text: string): string[][] | null {
+  const lines = linesOf(text);
+  const tabs = (l: string) => l.split("\t").length - 1;
+  if (lines.length < 2 || !tabs(lines[0]!) || lines.some((l) => tabs(l) !== tabs(lines[0]!) || BLOCK.test(l))) return null;
+  // Every line starting with a tab is indentation (code, an outline), not a first column.
+  if (lines.every((l) => l.startsWith("\t"))) return null;
+  const rows = lines.map((l) => l.split("\t").map((c) => c.trim()));
+  return rows.some((r) => r.some((c) => COMMENT.test(c))) ? null : rows;
+}
+
+/** Plain text the Markdown paste would garble (Codex sweep 5): tab-separated rows paste as a table (Notion,
+ *  Google Docs); other lines indented with tabs, and no Markdown, paste as a code block, which keeps their
+ *  lines and plain tabs in the file. In a table cell either goes in on the cell's one line. Markdown, text
+ *  with HTML or VS Code's data beside it, and a paste into code keep their own paste. */
+export const pastePlain = $prose(
+  () =>
+    new Plugin({
+      props: {
+        handlePaste: (view, e) => {
+          const text = e.clipboardData?.getData("text/plain") ?? "";
+          const { schema, selection } = view.state;
+          if (!text.includes("\t") || e.clipboardData?.getData("text/html") || e.clipboardData?.getData("vscode-editor-data") || selection.$from.parent.type.spec.code) return false;
+          const lines = linesOf(text);
+          if (inTable(selection.$from)) {
+            view.dispatch(view.state.tr.insertText(lines.map((l) => l.trim()).filter(Boolean).join(" ")).scrollIntoView());
+            return true;
+          }
+          const n = schema.nodes;
+          const rows = tsvRows(text);
+          if (rows && n.table) {
+            const para = (t: string) => n.paragraph!.create(null, t ? schema.text(t) : null);
+            const row = (cells: string[], head: boolean) =>
+              (head ? n.table_header_row : n.table_row)!.create(null, cells.map((c) => (head ? n.table_header : n.table_cell)!.create({ alignment: null }, para(c))));
+            view.dispatch(view.state.tr.replaceSelectionWith(n.table.create(null, rows.map((r, i) => row(r, i === 0)))).scrollIntoView());
+            return true;
+          }
+          if (!lines.some((l) => l.startsWith("\t")) || lines.some((l) => BLOCK.test(l)) || !n.code_block) return false;
+          view.dispatch(view.state.tr.replaceSelectionWith(n.code_block.create(null, schema.text(lines.join("\n")))).scrollIntoView());
+          return true;
+        },
+      },
+    }),
+);
+
+const inTable = ($p: ResolvedPos) => {
+  for (let d = $p.depth; d > 0; d--) if ($p.node(d).type.name === "table") return true;
+  return false;
+};
+
 /** What an empty block says while the caret is on it, as in Notion: the empty line that / turns, and
  *  the kind of an empty heading, list item, to-do, quote or toggle title. Shown only while the note
  *  has focus (CSS), never saved. */

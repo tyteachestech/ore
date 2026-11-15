@@ -3,7 +3,7 @@ import type { MilkdownPlugin } from "@milkdown/kit/ctx";
 import { history } from "@milkdown/kit/plugin/history";
 import { clipboard } from "@milkdown/kit/plugin/clipboard";
 import { listener, listenerCtx } from "@milkdown/kit/plugin/listener";
-import { bulletListSchema, commonmark, linkAttr, remarkPreserveEmptyLinePlugin } from "@milkdown/kit/preset/commonmark";
+import { bulletListSchema, commonmark, linkAttr, linkSchema, remarkPreserveEmptyLinePlugin } from "@milkdown/kit/preset/commonmark";
 import { gfm } from "@milkdown/kit/preset/gfm";
 import { InputRule } from "@milkdown/kit/prose/inputrules";
 import { findWrapping } from "@milkdown/kit/prose/transform";
@@ -15,7 +15,7 @@ import { blockSelPlugin } from "./blocksel";
 import { dragSelPlugin } from "./dragsel";
 import { tablePlugin, tableView } from "./tables";
 import { mathBlockSchema, mathInlineSchema, mathRule, remarkNoteMath } from "./math";
-import { emptyHints, foldPlugin, notionKeys, notionRules, pasteLink, trapTab } from "./notion";
+import { emptyHints, foldPlugin, notionKeys, notionRules, pasteLink, pastePlain, trapTab } from "./notion";
 
 /** A Milkdown editor over one note. `onChange` gets the editor's own Markdown after each edit. */
 export async function createEditor(root: HTMLElement, markdown: string, onChange: (md: string) => void, plugins: MilkdownPlugin[] = []): Promise<Editor> {
@@ -25,7 +25,14 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
       ctx.set(defaultValueCtx, markdown);
       // The style of his existing notes and of the CLI's appends.
       ctx.update(remarkStringifyOptionsCtx, (o) => ({ ...o, bullet: "-" as const, rule: "-" as const, handlers: { ...o.handlers, oreColor: stringifyColor as never } }));
-      ctx.set(linkAttr.key, (mark) => (String(mark.attrs.href).startsWith("ore:") ? { class: "ore-link" } : {}));
+      // Milkdown empties an `ore:` href in the DOM (an unknown scheme), and copy and Markdown paste both
+      // go through that DOM, so the link keeps its destination in `data-ore-href` and is read back from it.
+      ctx.set(linkAttr.key, (mark) => (isOre(mark.attrs.href) ? { class: "ore-link", "data-ore-href": mark.attrs.href } : {}));
+      ctx.update(linkSchema.key, (prev) => (c) => {
+        const spec = prev(c);
+        const ore = { tag: "a[data-ore-href]", getAttrs: (dom: HTMLElement) => { const href = dom.getAttribute("data-ore-href"); return isOre(href) ? { href, title: dom.getAttribute("title") } : false; } };
+        return { ...spec, parseDOM: [ore, ...(spec.parseDOM ?? [])] };
+      });
       ctx.get(listenerCtx).updated((c) => onChange(c.get(serializerCtx)(c.get(editorViewCtx).state.doc)));
     })
     .use(remarkBlocks)
@@ -39,6 +46,8 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     .use(notionKeys)
     // Before the presets' own rules, which would take a shortcut first and do it otherwise.
     .use(notionRules)
+    // Before the tables' own paste, which spreads lines pasted in a cell over the cells after it.
+    .use(pastePlain)
     // Without it an empty paragraph saves as nothing, not as a `<br />` line.
     .use(commonmark.filter((p) => !remarkPreserveEmptyLinePlugin.includes(p)))
     .use(gfm)
@@ -56,6 +65,8 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     .create()
     .then((e) => (trapTab(root), e));
 }
+
+const isOre = (href: unknown): href is string => typeof href === "string" && href.startsWith("ore:");
 
 /** Notion's to-do shortcut: `[]`, `[ ]` or `[x]` then a space at the start of a line makes a
  *  checkbox item, also outside a list (GFM's own rule only works inside one). Saves as `- [ ]`. */
