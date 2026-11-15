@@ -38,7 +38,7 @@ describe("the iPhone's text size", () => {
     expect(typeScale(53)).toBe(Math.round(MAX_TYPE * 1000) / 1000);
     expect(typeScale(undefined)).toBe(1);
   });
-  // F303: the phone read a source in the Mac's 17px, about 43 letters a line, smaller and longer than Books.
+  // F310: the phone read a source in the Mac's 17px, about 43 letters a line, smaller and longer than Books.
   test("a source on the iPhone reads at 20px on 24px margins, and at every iOS text size no smaller than iOS's own body", () => {
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
     const [, base, share] = css.match(/\.phone \.doc \{ font-size: calc\(var\(--read-size, (\d+)px\) \* \(1 \+ \(var\(--type, 1\) - 1\) \* ([\d.]+)\)\)/) ?? [];
