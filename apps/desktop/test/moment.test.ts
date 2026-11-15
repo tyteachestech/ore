@@ -39,5 +39,5 @@ test("the moment after a rating (D237): only a gem that is cut, comes loose, is 
   // A hard recall on a gem already cut: three weeks or more of memory is the biggest reward there is.
   expect(momentFor(h({ kind: "cut" }, { 3: { kind: "cut", days: 61 } }), 3, { now: NOW })).toMatchObject({ tone: "deep", kind: "deep", days: 61, line: "Last seen 38 days ago" });
   // The mole's pose per kind: the laugh is for a gem won back alone, and a miss never gets a sad one (D62).
-  expect(MOMENT_MOOD).toEqual({ cut: "proud", won: "laugh", polished: "wink", deep: "surprised", miss: "set" });
+  expect(MOMENT_MOOD).toEqual({ cut: "proud", won: "laugh", polished: "wink", deep: "surprised", miss: "nod" });
 });

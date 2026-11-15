@@ -56,7 +56,7 @@ export function endMood(first: Said | undefined, o: { session: SessionEnd; close
   if (o.still) return o.session.kept === 0 ? "idle" : "happy";
   const rare = first?.rare?.kind;
   if (rare) return rare === "level" ? "cheer" : rare === "then" ? "curious" : rare === "long" ? (o.napped ? "nod" : "surprised") : "proud";
-  if (o.session.kept === 0) return "set";
+  if (o.session.kept === 0) return "nod";
   return o.session.cut?.length || o.closed ? "happy" : "nod";
 }
 
