@@ -32,7 +32,7 @@ const DEFAULTS = [
   { id: "prev-post", label: "Previous post", group: "Feed", combo: "KeyK", scope: "silent" },
   { id: "tutor", label: "Tutor chat", group: "General", combo: "Meta+KeyJ", global: true },
   { id: "ambience", label: "Ambience", group: "General", combo: "Alt+Meta+KeyA", global: true },
-  { id: "tutor-stop", label: "Stop the tutor's reply", group: "General", combo: "Meta+Period", global: true },
+  { id: "tutor-stop", label: "Stop a reply being written", group: "General", combo: "Meta+Period", global: true },
   { id: "review", label: "Start review", group: "General", combo: "Meta+KeyR", global: true },
   { id: "quick-quiz", label: "Quick quiz, from any app", group: "General", combo: "Ctrl+Alt+KeyQ", global: true, system: true },
   { id: "undo", label: "Undo", group: "General", combo: "Meta+KeyZ" },

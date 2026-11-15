@@ -17,7 +17,7 @@ export const ChatOutput = z.strictObject({
  *  rating is suggested (D21). */
 // On a variant (D66) the chat sees the variant he answered and the original, so "why is this the
 // same idea?" has an answer.
-export async function askAboutCard(lib: Library, cardRef: string, a: { message: string; answer?: string; session?: string; variant?: string }) {
+export async function askAboutCard(lib: Library, cardRef: string, a: { message: string; answer?: string; session?: string; variant?: string; onProgress?: (p: { reply: string }) => void }) {
   if (!a.message.trim()) throw new Error("message is empty");
   const card = findCard(lib, cardRef);
   const prompt = loadPrompt("chat");
@@ -38,7 +38,7 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
     const context = { ...shown, his_answer: a.answer?.trim() || "(no idea)", passage, ...original };
     message = `Exercise (JSON):\n${JSON.stringify(context, null, 2)}\n\nHis message:\n${message}`;
   }
-  const r = await runChatTurn(lib, { system: prompt.text, message, schema: vendorSchema(ChatOutput), session: a.session, cwd: lib.root });
+  const r = await runChatTurn(lib, { system: prompt.text, message, schema: vendorSchema(ChatOutput), session: a.session, cwd: lib.root, onProgress: a.onProgress });
   const out = ChatOutput.parse(parseOutput(r.output));
   return { card: card.meta.id, reply: out.reply, proposal: out.card, session: r.session, ai: { vendor: r.vendor, model: r.model, prompt_version: prompt.version } };
 }

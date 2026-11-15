@@ -9,6 +9,14 @@ bun run eval:tutor --vendor claude --runs 3   # each case three times: one poole
 bun run eval:tutor --vendor claude --against 85e22fb   # blind A/B: today's tutor.md against the one at that commit (or a file)
 ```
 
+## New cases from real use
+
+```bash
+bun run eval:mine:tutor     # read-only, no AI; ORE_LIBRARY picks the library
+```
+
+Lists the turns in his saved chats that he asked again, reworded, stopped or that failed (D295), each with the turns before it and the reply he turned down. His second try says the first reply missed; read each, decide what the reply should have done, and write that as a case's `expect` in `tutor-cases.json`. It also sums `.ore/logs/tutor.jsonl`: turns, the median wait, and how many went back for a second run, had a citation mended, searched or failed.
+
 ## How it works
 
 - **Set** (`packages/core/eval/tutor-cases.json`): 16 single turns over the golden docs, some with the turns before (`earlier`) and a source open (`reading`). Each lists what its reply must do: be a hint or not, hold or withhold patterns (the answer he is meant to find), set an exercise or not, split a worked answer into steps (D142), ask him something, cite a passage, give no score, not search, stay short.

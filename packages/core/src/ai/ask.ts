@@ -140,6 +140,23 @@ export function passageCitation(p: Passage, q: string, n: number): Citation {
 /** Markdown as it reads: a link's text without its URL, no emphasis or code marks, no footnote marks. */
 export const plainText = (md: string) =>
   md.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[\^\d+\]/g, "").replace(/(\*\*|__|\*|`)/g, "").replace(/\s+/g, " ").trim();
+/** A quote that isn't in `text` word for word, moved to the sentence there that says it (D291): the one
+ *  holding the most of the quote's words, at least three of them and 60%. Null when no sentence does (a made-up
+ *  quote, or one stitched from two places). */
+export function nearestSentence(text: string, quote: string): string | null {
+  const words = (s: string) => new Set(plainText(s).toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+  const want = words(quote);
+  let best: string | null = null;
+  let top = 0;
+  for (const m of text.matchAll(/[^\n.!?]+(?:[.!?]+(?=\s|$)|[.!?]*$|(?=\n))/gm)) {
+    const sentence = m[0].trim();
+    const has = words(sentence);
+    const shared = [...want].filter((w) => has.has(w)).length;
+    if (shared >= 3 && shared / want.size >= 0.6 && shared > top) (best = sentence), (top = shared);
+  }
+  return best;
+}
+
 export interface AskTurn { question: string; answer: string }
 
 export const NOT_FOUND = "Nothing in your library mentions that.";

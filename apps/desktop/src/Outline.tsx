@@ -27,6 +27,11 @@ function outlineHeadings(doc: HTMLElement): Heading[] {
  *  that is its top heading, else nothing: never a top heading from further down (F66). */
 export const sectionName = (headings: { level: number; title: string }[], current: number) => headings[current]?.title ?? (headings[0]?.level === 1 ? headings[0].title : "");
 
+// The section on his screen in the source he has open ("" above the first heading, or with no source's text
+// on screen): the tutor is told it with his message, so "this part" means that part (D294).
+let at = "";
+export const readingAt = () => at;
+
 type Place = { scroll: RefObject<HTMLDivElement | null>; doc: HTMLElement | null; ready: boolean; onJump?: () => void };
 
 /** How far down the source he is and which heading he is in, kept up as he scrolls. */
@@ -43,12 +48,13 @@ function useReadingPlace({ scroll, doc, ready }: Place) {
       const max = el.scrollHeight - el.clientHeight;
       setProgress(max > 0 ? Math.min(1, el.scrollTop / max) : 1);
       const edge = el.getBoundingClientRect().top + READ_LINE;
-      let at = -1;
+      let now = -1;
       for (const [i, h] of headings.entries()) {
         if (h.el.getBoundingClientRect().top > edge) break;
-        at = i;
+        now = i;
       }
-      setCurrent(at);
+      setCurrent(now);
+      at = sectionName(headings, now);
     };
     const onScroll = () => {
       if (!frame) frame = requestAnimationFrame(update);
@@ -57,6 +63,7 @@ function useReadingPlace({ scroll, doc, ready }: Place) {
     el.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     return () => {
+      at = "";
       cancelAnimationFrame(frame);
       el.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);

@@ -1,23 +1,27 @@
-import { ArrowUp, Sparkle } from "./icons";
+import { ArrowUp, Sparkle, Stop } from "./icons";
 import { Fragment, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Grow } from "./Grow";
 import { Hint } from "./Hint";
-import { ore, opt, type CardFull } from "./ore";
+import { listen } from "@tauri-apps/api/event";
+import { cancelOre, oreJob, opt, type CardFull } from "./ore";
+import { is } from "./keys";
 import { errorText } from "./util";
 import { wordDiff } from "./worddiff";
 
 type Proposal = { question: string; answer: string };
 /** `was`: the card as it stood when the proposal came, so the change it shows survives Use this card (D161). */
-type Turn = { role: "me" | "ai"; text: string; proposal?: Proposal | null; was?: Proposal };
+/** `stopped`: he stopped this reply part way; what was written by then is the reply. */
+type Turn = { role: "me" | "ai"; text: string; proposal?: Proposal | null; was?: Proposal; stopped?: boolean };
 type Reply = { reply: string; proposal: Proposal | null; session: string };
 
 const STARTERS = ["Why is this the answer?", "Give me an example", "Make this exercise clearer"];
 
 /** One card's chat: what he has typed, the thread, and the AI session. Review keeps it by card id,
  *  so closing Ask (or a reply landing while it is closed) loses nothing. */
-export type AskChat = { turns: Turn[]; input: string; busy: boolean; error: string | null; session?: string; failed?: string };
+/** `partial`: the reply so far while it is written (D296); `job`: the run writing it, which Stop ends. */
+export type AskChat = { turns: Turn[]; input: string; busy: boolean; error: string | null; session?: string; failed?: string; partial?: string; job?: string };
 export const NO_ASK: AskChat = { turns: [], input: "", busy: false, error: null };
 
 /** Ask about this (D61): a chat about the card he just answered, like ChatGPT's thread under a
@@ -46,22 +50,41 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
     const message = text.trim();
     if (!message || busy || sending.current) return;
     sending.current = true;
-    setChat((c) => (again ? { ...c, error: null, busy: true } : { ...c, turns: [...c.turns, { role: "me", text: message }], input: "", error: null, busy: true }));
+    // The reply lands on this run alone: Stop ends it, and whatever it still sends or returns is dropped.
+    const job = `ask-${crypto.randomUUID()}`;
+    const mine = (c: AskChat) => c.job === job;
+    setChat((c) => (again ? { ...c, error: null, busy: true, partial: undefined, job } : { ...c, turns: [...c.turns, { role: "me", text: message }], input: "", error: null, busy: true, partial: undefined, job }));
+    // The reply as it is written (ChatGPT's streaming), as the tutor's comes: the first words in place of the dots.
+    const off = await listen<{ stream?: string; reply?: string }>("ore-progress", ({ payload: p }) => {
+      if (p.stream === job && p.reply !== undefined) setChat((c) => (mine(c) ? { ...c, partial: p.reply } : c));
+    }).catch(() => () => {});
     try {
-      const r = await ore<Reply>(
-        "ask",
-        card.id,
-        opt("message", message),
-        ...(chat.session ? [opt("session", chat.session)] : [opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : [])]),
-      );
-      setChat((c) => ({ ...c, session: r.session, busy: false, failed: undefined, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal, was: { question: card.question, answer: card.answer } }] }));
+      const r = await oreJob<Reply>(job, null, "ask", card.id, opt("message", message), opt("stream", job), ...(chat.session ? [opt("session", chat.session)] : [opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : [])]));
+      setChat((c) => (mine(c) ? { ...c, session: r.session, busy: false, failed: undefined, partial: undefined, job: undefined, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal, was: { question: card.question, answer: card.answer } }] } : c));
     } catch (e) {
-      setChat((c) => ({ ...c, busy: false, error: errorText(e, "answer that"), failed: message }));
+      setChat((c) => (mine(c) ? { ...c, busy: false, partial: undefined, job: undefined, error: errorText(e, "answer that"), failed: message } : c));
     } finally {
+      off();
       sending.current = false;
       field.current?.focus();
     }
   };
+  /** Stops the reply being written (the tutor's Stop, ChatGPT's): the words so far stay as its reply; with none
+   *  it says Stopped and offers Try again. */
+  const stop = () => {
+    if (!chat.job) return;
+    void cancelOre(chat.job);
+    const asked = turns.findLast((t) => t.role === "me")?.text;
+    setChat((c) => (c.job !== chat.job ? c : { ...c, busy: false, job: undefined, partial: undefined, ...(c.partial ? { turns: [...c.turns, { role: "ai", text: c.partial, stopped: true }] } : { error: "Stopped.", failed: asked }) }));
+    field.current?.focus();
+  };
+  // ⌘. stops it, as it stops the tutor's reply (the Mac's own cancel key).
+  useEffect(() => {
+    if (!busy) return;
+    const key = (e: KeyboardEvent) => { if (is(e, "tutor-stop")) { e.preventDefault(); stop(); } };
+    document.addEventListener("keydown", key, true);
+    return () => document.removeEventListener("keydown", key, true);
+  });
 
   return (
     <section className="ask" aria-label="Ask about this">
@@ -85,6 +108,7 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
               <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />
               <div className="ask-text">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{t.text}</ReactMarkdown>
+                {t.stopped && <p className="tutor-general">Stopped</p>}
                 {t.proposal && (
                   <div className="ask-card">
                     <div className="quiz-kicker">Suggested exercise</div>
@@ -102,15 +126,21 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
         {busy && (
           <div className="ask-ai">
             <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />
-            <span className="ask-dots" aria-label="Thinking">
-              <i />
-              <i />
-              <i />
-            </span>
+            {chat.partial ? (
+              <div className="ask-text">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{chat.partial}</ReactMarkdown>
+              </div>
+            ) : (
+              <span className="ask-dots" aria-label="Thinking">
+                <i />
+                <i />
+                <i />
+              </span>
+            )}
           </div>
         )}
         {error && (
-          <p className="err">
+          <p className={error === "Stopped." ? "tutor-stopped" : "err"}>
             {error}
             {chat.failed && (
               <>
@@ -143,11 +173,20 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
             }
           }}
         />
-        <Hint text={<>Send <kbd>↵</kbd></>} side="top">
-          <button className="ask-send" aria-label="Send" disabled={!input.trim() || busy} onClick={() => void send(input)}>
-            <ArrowUp size={14} weight="bold" aria-hidden="true" />
-          </button>
-        </Hint>
+        {busy ? (
+          // While a reply is written the send button is Stop, as in the tutor (ChatGPT, Claude, Notion AI).
+          <Hint text="Stop" keys="tutor-stop" side="top">
+            <button className="ask-send stop" aria-label="Stop the reply" onClick={stop}>
+              <Stop size={14} aria-hidden="true" />
+            </button>
+          </Hint>
+        ) : (
+          <Hint text={<>Send <kbd>↵</kbd></>} side="top">
+            <button className="ask-send" aria-label="Send" disabled={!input.trim()} onClick={() => void send(input)}>
+              <ArrowUp size={14} weight="bold" aria-hidden="true" />
+            </button>
+          </Hint>
+        )}
       </div>
     </section>
   );
