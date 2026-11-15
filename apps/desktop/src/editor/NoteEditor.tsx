@@ -13,8 +13,9 @@ import { Decoration, DecorationSet, type EditorView, type ViewMutationRecord } f
 import { $prose, $view, callCommand } from "@milkdown/kit/utils";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { forwardRef, lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { forwardRef, Fragment, lazy, Suspense, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { Scene } from "../Diagram";
+import { CalendarBlank, Callout, CaretRight, CheckSquare, Code, Heading1, Heading2, Heading3, Image, LinkSimple, ListBullets, ListNumbers, Minus, Quotes, Sigma, Table, TextT, TreeStructure, type Icon } from "../icons";
 import { ore, PHONE, type Diagram } from "../ore";
 import { usePeek } from "../Peek";
 import { errorText, type Notify } from "../util";
@@ -136,7 +137,8 @@ const SAVED = "ore:diagram-saved";
 
 type Menu = { kind: "slash" | "link" | "date"; query: string; from: number; to: number };
 /** `names`: what Notion also takes after `/` for it (`/h1`, `/#`, `/hr`). */
-type Row = { label: string; sub?: string; names?: string[]; run: () => void };
+/** `icon` and `group` are the / menu's: each block draws its icon, and with nothing typed the rows sit under their group's name. */
+type Row = { label: string; sub?: string; names?: string[]; icon?: Icon; group?: string; run: () => void };
 
 const LINK_URL = /^ore:(item|skill)\/(.+)$/;
 
@@ -408,14 +410,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       else there();
     };
     const all: Row[] = [
-      { label: "Text", names: ["plain"], run: turn("text", call(turnIntoTextCommand.key)) },
-      { label: "Heading 1", sub: "#", names: ["h1", "#"], run: turn("h1", call(wrapInHeadingCommand.key, 1)) },
-      { label: "Heading 2", sub: "##", names: ["h2", "##"], run: turn("h2", call(wrapInHeadingCommand.key, 2)) },
-      { label: "Heading 3", sub: "###", names: ["h3", "###"], run: turn("h3", call(wrapInHeadingCommand.key, 3)) },
-      { label: "Bulleted list", sub: "-", names: ["ul"], run: turn("bullet", call(wrapInBulletListCommand.key)) },
-      { label: "Numbered list", sub: "1.", names: ["ol"], run: turn("number", call(wrapInOrderedListCommand.key)) },
+      { label: "Text", icon: TextT, group: "Text", names: ["plain"], run: turn("text", call(turnIntoTextCommand.key)) },
+      { label: "Heading 1", icon: Heading1, group: "Text", sub: "#", names: ["h1", "#"], run: turn("h1", call(wrapInHeadingCommand.key, 1)) },
+      { label: "Heading 2", icon: Heading2, group: "Text", sub: "##", names: ["h2", "##"], run: turn("h2", call(wrapInHeadingCommand.key, 2)) },
+      { label: "Heading 3", icon: Heading3, group: "Text", sub: "###", names: ["h3", "###"], run: turn("h3", call(wrapInHeadingCommand.key, 3)) },
+      { label: "Bulleted list", icon: ListBullets, group: "Text", sub: "-", names: ["ul"], run: turn("bullet", call(wrapInBulletListCommand.key)) },
+      { label: "Numbered list", icon: ListNumbers, group: "Text", sub: "1.", names: ["ol"], run: turn("number", call(wrapInOrderedListCommand.key)) },
       {
         label: "To-do list",
+        icon: CheckSquare,
+        group: "Text",
         sub: "[ ]",
         names: ["check", "checkbox", "task"],
         run: turn("todo", () => {
@@ -427,9 +431,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
             if ($from.node(d).type.name === "list_item") return v.dispatch(v.state.tr.setNodeAttribute($from.before(d), "checked", false));
         }),
       },
-      { label: "Quote", sub: '"', run: turn("quote", call(wrapInBlockquoteCommand.key)) },
+      { label: "Quote", icon: Quotes, group: "Text", sub: '"', run: turn("quote", call(wrapInBlockquoteCommand.key)) },
       {
         label: "Callout",
+        icon: Callout,
+        group: "Text",
         sub: "> [!note]",
         run: turn("callout", () => {
           const v = view();
@@ -438,6 +444,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       },
       ...[0, 1, 2, 3].map((level) => ({
         label: level ? `Toggle heading ${level}` : "Toggle",
+        icon: [CaretRight, Heading1, Heading2, Heading3][level]!,
+        group: "Toggles",
         sub: level ? undefined : ">",
         run: turn(level ? (`th${level}` as Kind) : "toggle", () => {
           const v = view();
@@ -451,10 +459,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           v.dispatch(tr.setSelection(TextSelection.create(tr.doc, at + 2)));
         }),
       })),
-      { label: "Table", sub: "| |", run: cmd(insertTableCommand.key, { row: 3, col: 3 }) },
-      { label: "Code", sub: "```", run: turn("code", call(createCodeBlockCommand.key)) },
+      { label: "Table", icon: Table, group: "Insert", sub: "| |", run: cmd(insertTableCommand.key, { row: 3, col: 3 }) },
+      { label: "Code", icon: Code, group: "Insert", sub: "```", run: turn("code", call(createCodeBlockCommand.key)) },
       {
         label: "Inline equation",
+        icon: Sigma,
+        group: "Insert",
         sub: "$$",
         names: ["equation", "tex"],
         run: () => {
@@ -467,6 +477,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       },
       {
         label: "Block equation",
+        icon: Sigma,
+        group: "Insert",
         names: ["math", "latex", "equation"],
         run: () => {
           const v = clear(menu);
@@ -480,9 +492,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           live.current.editMath(at);
         },
       },
-      { label: "Divider", sub: "---", names: ["hr", "line"], run: cmd(insertHrCommand.key) },
+      { label: "Divider", icon: Minus, group: "Insert", sub: "---", names: ["hr", "line"], run: cmd(insertHrCommand.key) },
       {
         label: "Image",
+        icon: Image,
+        group: "Insert",
         names: ["img", "picture", "photo"],
         run: () => {
           clear(menu);
@@ -494,6 +508,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
         ? []
         : [{
             label: "Diagram",
+        icon: TreeStructure,
+        group: "Insert",
             sub: "Map, sketch, matrix",
             run: () => {
               const at = clear(menu)?.state.selection.from;
@@ -505,6 +521,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
           }]),
       {
         label: "Link",
+        icon: LinkSimple,
+        group: "Link",
         sub: "[[",
         run: () => {
           const v = clear(menu);
@@ -513,6 +531,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       },
       {
         label: "Date",
+        icon: CalendarBlank,
+        group: "Link",
         sub: "@",
         run: () => {
           const v = clear(menu);
@@ -724,12 +744,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       {menu && (menu.kind !== "date" || rows.length > 0) && (
         <div ref={menuBox} className="note-menu" role="listbox" onMouseDown={(e) => e.preventDefault()}>
           {rows.length ? (
-            rows.map((r, i) => (
-              <div key={r.label + i} role="option" aria-selected={i === index} className={`note-menu-row${i === index ? " on" : ""}`} onMouseMove={() => hover(i)} onClick={r.run}>
-                <span className="label">{r.label}</span>
-                {r.sub && <span className="sub">{r.sub}</span>}
-              </div>
-            ))
+            rows.map((r, i) => {
+              const Glyph = r.icon;
+              return (
+                <Fragment key={r.label + i}>
+                  {/* With nothing typed the blocks sit under their group's name (Notion's / menu); a search lists its matches flat. */}
+                  {r.group && !menu.query.trim() && r.group !== rows[i - 1]?.group && <div className="note-menu-head" role="presentation">{r.group}</div>}
+                  <div role="option" aria-selected={i === index} className={`note-menu-row${i === index ? " on" : ""}`} onMouseMove={() => hover(i)} onClick={r.run}>
+                    {Glyph && <Glyph size={16} aria-hidden="true" />}
+                    <span className="label">{r.label}</span>
+                    {r.sub && <span className="sub">{r.sub}</span>}
+                  </div>
+                </Fragment>
+              );
+            })
           ) : (
             <div className="note-menu-empty">{menu.kind === "link" ? "No source or skill by that name" : "No block by that name"}</div>
           )}
@@ -1270,6 +1298,8 @@ const toggleView = $view(toggleSchema.node, () => (node) => {
  *  as typing narrows the list, again when the window resizes and (once a frame) when the page scrolls, with
  *  the highlighted row scrolled into view in a list capped to the room there is. Hidden while its line
  *  is scrolled out of view (lineShown); the keys still drive it. On the phone CSS docks it instead. */
+/** The tallest a /, [[ or @ menu grows before it scrolls: about ten rows, as Notion's. */
+const MENU_MAX = 344;
 function useMenuPlace(box: { current: HTMLDivElement | null }, view: () => EditorView | undefined, menu: Menu | null, count: number, index: number) {
   const side = useRef<Side | undefined>(undefined);
   const size = useRef({ width: 0, height: 0 });
@@ -1286,7 +1316,8 @@ function useMenuPlace(box: { current: HTMLDivElement | null }, view: () => Edito
     const v = view();
     if (!opened || !el || !v || PHONE) return;
     Object.assign(el.style, { left: "0px", top: "0px", maxHeight: "none" });
-    size.current = { width: el.offsetWidth, height: el.offsetHeight };
+    // Never taller than MENU_MAX (D303): 22 blocks ran to the window's bottom edge; now it scrolls.
+    size.current = { width: el.offsetWidth, height: Math.min(el.offsetHeight, MENU_MAX) };
     place.current = () => {
       const m = latest.current;
       if (!m) return;
@@ -1296,7 +1327,7 @@ function useMenuPlace(box: { current: HTMLDivElement | null }, view: () => Edito
       if (!shown) return;
       const at = menuPlace(c, size.current, { width: innerWidth, height: innerHeight }, side.current);
       side.current = at.side;
-      Object.assign(el.style, { left: `${at.left}px`, top: `${at.top}px`, maxHeight: `${at.maxHeight}px` });
+      Object.assign(el.style, { left: `${at.left}px`, top: `${at.top}px`, maxHeight: `${Math.min(at.maxHeight, MENU_MAX)}px` });
       rowInView(el);
     };
     place.current();

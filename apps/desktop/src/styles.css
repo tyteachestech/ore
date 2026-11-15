@@ -773,6 +773,21 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .doc code { font-family: var(--mono); font-size: 0.86em; background: var(--bg-raised); border-radius: 4px; padding: 1px 4px; }
 .doc pre { background: var(--bg-raised); padding: 12px 14px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
 .doc pre code { background: none; padding: 0; }
+/* A code block (D300, Code.tsx; GitHub's and Linear's): the code scrolls sideways inside the
+   block, so Copy and the language's name stay at its top right; both show on hover or when Copy has focus.
+   Its parts take five quiet tones through CSS Custom Highlights, the text itself left unwrapped. */
+.code-block { position: relative; }
+:is(.doc, .ask-text) pre.code-block { overflow: visible; }
+:is(.doc, .ask-text) pre.code-block > code { display: block; overflow-x: auto; }
+.code-copy { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border-radius: 6px; color: var(--muted); background: var(--bg-raised); opacity: 0; transition: opacity var(--t-1) ease-out; }
+.code-block[data-lang]::after { content: attr(data-lang); position: absolute; top: 6px; right: 38px; height: 26px; padding: 0 4px; display: flex; align-items: center; font: 11px var(--mono); color: var(--faint); background: var(--bg-raised); opacity: 0; transition: opacity var(--t-1) ease-out; pointer-events: none; }
+.code-block:hover .code-copy, .code-copy:focus-visible, .code-block:hover::after, .code-block:focus-within::after { opacity: 1; }
+.code-copy:hover { color: var(--text); background: var(--bg-hover); }
+::highlight(code-comment) { color: var(--faint); }
+::highlight(code-keyword) { color: var(--c-pink); }
+::highlight(code-string) { color: var(--c-teal); }
+::highlight(code-number) { color: var(--c-orange); }
+::highlight(code-name) { color: var(--c-blue); }
 /* A notebook cell's output, folded until he has guessed it (D199): a row the shape of the block it opens into. */
 .doc .output-fold { display: flex; align-items: center; gap: 6px; width: 100%; margin: 0 0 1.05em; padding: 6px 10px; border-radius: 8px; background: var(--bg-raised); color: var(--faint); font: 500 12px var(--font); text-align: left; }
 .doc .output-fold:hover { color: var(--text); background: var(--bg-hover); }
@@ -801,8 +816,17 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .figure-label .field { width: 220px; }
 .figure-tip { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); color: var(--faint); font-family: var(--mono); font-size: 11px; pointer-events: none; }
 .doc hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
-.doc table { border-collapse: collapse; font-size: 0.92em; display: block; overflow-x: auto; }
-.doc th, .doc td { border: 1px solid var(--border); padding: 4px 8px; }
+/* A long table scrolls in its own box, no taller than most of the window, so its header row and first column stay
+   in view while he reads down or across it (D305; Notion's and Airtable's frozen header and first column).
+   Sticky cells are drawn opaque, and their rules as shadows, since a collapsed border scrolls away under them. */
+.doc table { border-collapse: separate; border-spacing: 0; font-size: 0.92em; display: block; overflow: auto; max-height: 70vh; overscroll-behavior: auto; }
+.doc th, .doc td { border: 0; box-shadow: inset -1px -1px 0 var(--border); padding: 4px 8px; background: var(--bg); }
+.doc tr > :first-child { box-shadow: inset 1px 0 0 var(--border), inset -1px -1px 0 var(--border); }
+.doc table tr:first-child > * { box-shadow: inset 0 1px 0 var(--border), inset -1px -1px 0 var(--border); }
+.doc table tr:first-child > :first-child { box-shadow: inset 1px 1px 0 var(--border), inset -1px -1px 0 var(--border); }
+.doc thead th, .doc thead th:has(.col-cover) { position: sticky; top: 0; z-index: 2; }
+.doc tr > :first-child { position: sticky; left: 0; z-index: 1; }
+.doc thead tr > :first-child { z-index: 3; }
 /* A covered column (D200): each cell a block he clicks to check himself. The text stays under it, unpainted. */
 .doc td.covered { position: relative; color: transparent; cursor: pointer; user-select: none; -webkit-user-select: none; }
 .doc td.covered > * { visibility: hidden; }
@@ -1178,6 +1202,8 @@ body.resizing iframe { pointer-events: none; }
 .mynotes .divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent; transition: background var(--t-1) ease-out; }
 .mynotes .divider:hover::after, .mynotes.dragging .divider::after { background: var(--accent); }
 .mynotes.dragging { user-select: none; -webkit-user-select: none; cursor: col-resize; }
+/* Dragged past its narrowest: what letting go will hide shows dimmed (D304, VS Code and Linear). */
+.app.folding .sidebar > *, .mynotes.folding > :not(.divider) { opacity: 0.35; transition: opacity var(--t-1) var(--ease-out); }
 .mynotes-head { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px; flex: none; }
 .mynotes-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .mynotes-text {
@@ -1443,6 +1469,11 @@ body.resizing iframe { pointer-events: none; }
 .note-menu-row.on { background: var(--bg-active); }
 .note-menu-row .sub { margin-left: auto; color: var(--faint); font-family: var(--mono); font-size: 11px; flex: none; }
 .note-menu-empty { padding: 6px 10px; color: var(--faint); }
+.note-menu-row > svg { flex: none; color: var(--muted); margin-right: -4px; }
+.note-menu-row.on > svg { color: var(--text); }
+/* A group's name over its blocks: the menus' own 12px mono label, as the sidebar's groups. */
+.note-menu-head { padding: 8px 10px 4px; font: 12px var(--mono); color: var(--faint); }
+.note-menu-head:first-child { padding-top: 4px; }
 
 /* Linked from (D39) */
 .linked-from { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--border); }
@@ -2104,6 +2135,11 @@ button.home-plan:hover { color: var(--text); }
 .seg-item[data-state="on"], .side-tabs button[aria-selected="true"], .intents .intent.on { background: var(--bg-hover); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), var(--lift); }
 .intents .intent:not(.on):hover { background: none; }
 .seg-item:focus-visible, .side-tabs button:focus-visible { outline: none; color: var(--text); box-shadow: inset 0 0 0 2px var(--focus); }
+/* The pill gliding to a clicked choice (D306, pill-glide.ts): a ghost under the labels; the real pill shows once it lands. */
+.seg, .side-tabs { position: relative; }
+.seg-item, .side-tabs button { position: relative; z-index: 1; }
+.seg-ghost { position: absolute; z-index: 0; pointer-events: none; }
+:is(.seg-item, .side-tabs button).seg-landing { background: none; box-shadow: none; }
 .switch { position: relative; width: 32px; height: 18px; flex: none; border-radius: 999px; background: var(--bg-active); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4); transition: background-color var(--t-2); }
 .switch[data-state="checked"] { background: var(--c-green); }
 .switch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
@@ -2400,6 +2436,8 @@ button.home-plan:hover { color: var(--text); }
 .ask-text p { margin: 0 0 8px; }
 .ask-text p:last-child { margin-bottom: 0; }
 .ask-text ul, .ask-text ol { margin: 0 0 8px; padding-left: 20px; }
+.ask-text pre { margin: 8px 0; padding: 10px 12px; border-radius: 8px; background: var(--bg-raised); line-height: 1.5; }
+.ask-text pre code { background: none; padding: 0; }
 .ask-text code { font-family: var(--mono); font-size: 0.92em; padding: 1px 4px; border-radius: 4px; background: var(--bg-raised); }
 .ask-card { margin-top: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 6%, transparent); }
 .ask-card .quiz-kicker { margin: 0 0 6px; }
@@ -3372,6 +3410,11 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .ask-edit-btn { position: absolute; right: 100%; top: 50%; translate: 0 -50%; margin-right: 2px; opacity: 0; }
 .ask-me:hover .ask-edit-btn, .ask-edit-btn:focus-visible { opacity: 1; }
 .ask-edit-btn:hover { color: var(--text); background: var(--bg-hover); }
+/* A message waiting for the reply being written (D301): his bubble at 0.6, and when it goes. */
+.ask-queued { align-self: flex-end; max-width: 80%; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.ask-queued .ask-me { max-width: 100%; opacity: 0.6; }
+.ask-queued .ask-me:hover, .ask-queued .ask-me:focus-within { opacity: 1; }
+.ask-queued-note { font-size: 12px; color: var(--faint); }
 .tutor .field.ask-edit { display: block; align-self: flex-end; width: 80%; border-radius: 14px 14px 4px 14px; }
 .tutor-stopped { margin: 0; color: var(--muted); }
 .tutor-stopped .link { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
@@ -3607,6 +3650,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* The Original tab (D202): the PDF's page at the panel's width, its pager above it. */
 .mynotes-text:has(> .original) { padding: 12px 16px var(--mole-room); }
 .original canvas { display: block; width: 100%; height: auto; border-radius: 6px; background: #fff; }
+.original-slide { display: block; width: 100%; height: auto; border-radius: 6px; overflow: hidden; background: #fff; }
 .original-pager { display: flex; align-items: center; justify-content: center; gap: 2px; height: 24px; margin-bottom: 8px; color: var(--faint); font: 500 12px var(--mono); font-variant-numeric: tabular-nums; }
 .original-pager span { min-width: 52px; text-align: center; }
 .original-pager .icon-btn:disabled { opacity: 0.35; }

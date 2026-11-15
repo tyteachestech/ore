@@ -12,13 +12,14 @@ runs on the Mac (D78.3).
 ## Run it on an iPhone (Mac, Xcode, the paid Apple team)
 
 ```bash
-rustup target add aarch64-apple-ios aarch64-apple-ios-sim
-cd apps/phone
-bun run ios:init                                   # once, and again after the bundle id changes (D104: delete gen/apple first): writes the Xcode project and its iCloud entitlements
-bun run tauri ios build --debug
-xcrun devicectl list devices                       # the iPhone's identifier
-xcrun devicectl device install app --device <id> src-tauri/gen/apple/build/arm64/Ore.ipa
+rustup target add aarch64-apple-ios aarch64-apple-ios-sim   # once
+bun run phone:install            # from the repo root: rewrites the Xcode project if what shapes it changed, builds, installs over Wi-Fi
+bun run phone:install --status   # which build the phone runs, and how many commits behind this checkout
 ```
+The build number is the checkout's commit count (`git rev-list --count HEAD`), so the installed build names its
+commit. By hand: `bun run ios:init` (writes `src-tauri/gen/apple` and its iCloud entitlements; after a bundle id
+change, D104, move gen/apple away first), `bun run tauri ios build --debug`, then
+`xcrun devicectl device install app --device <id> src-tauri/gen/apple/build/arm64/Ore.ipa`.
 The app icon: every build copies `src-tauri/icons/ios/` into the Xcode project's icon set, so a fresh worktree's
 build carries it too (`apps/desktop/scripts/app-icon.ts` draws those files). If the phone keeps showing an old
 icon after an install, restart it: iOS caches home screen icons.

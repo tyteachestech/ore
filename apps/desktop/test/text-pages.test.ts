@@ -18,3 +18,8 @@ test("a page longer than a slice is cut again, and only its first slice starts t
 test("a body with no page marks is sliced as any other", () => {
   expect(pageChunks("# A\n\nText.").map(pageOf)).toEqual([null]);
 });
+
+test("a deck's body is sliced where its slides start, so the Original tab follows the slide being read", () => {
+  const md = "<!-- slide 1 -->\n\n## Encoding\n\nOne.\n\n<!-- slide 2 -->\n\n## Storage\n\nTwo.";
+  expect(pageChunks(md).map(pageOf)).toEqual([1, 2]);
+});
