@@ -4,7 +4,7 @@ Tested checkout `cc6e604` on 2026-11-15, using the supplied release build at `17
 
 ## 1. Findings
 
-### F-new-feed-return-scroll — Esc loses the Feed's reading position
+### F301 — Esc loses the Feed's reading position
 
 **S2 · Mac · reproduced 4/4** (two initial runs, then two after a page reload; Unread and All).
 
@@ -21,7 +21,7 @@ Tested checkout `cc6e604` on 2026-11-15, using the supplied release build at `17
 
 **Suspected location:** `apps/desktop/src/Feed.tsx:136–145` restores cursor/focus on closing, but only scrolls a row into view when opening. The layout switches between `.feed-col` and `.contents` in `apps/desktop/src/App.tsx:2384–2388` / `apps/desktop/src/styles.css:3054–3058`; retaining the same DOM node did not retain its scroll position. The exact reason Enter loses its target needs a separate trace; `Feed.tsx:501` also clears the keyed state on pointer movement.
 
-### F-new-review-sounds-overlap — Fast reveals and ratings stack up to four sounds
+### F302 — Fast reveals and ratings stack up to four sounds
 
 **S2 · Mac · reproduced across multiple consecutive ratings and again in the later Good/goal session.**
 
@@ -39,7 +39,7 @@ Example from the first run, using the audio engine's clock: tick at 72.8468s, mi
 
 **Suspected location:** `apps/desktop/src/sfx.ts:60–75`: every play constructs and starts a source without retaining or stopping the previous one. `apps/desktop/src/Review.tsx:693` delays the goal by a fixed half second without accounting for the rating sound's duration.
 
-### F-new-review-sounds-hidden — A rating saved after hiding the page still starts audio
+### F303 — A rating saved after hiding the page still starts audio
 
 **S2 · Mac · reproduced 2/2**, once for Good and once for Again.
 

@@ -13343,7 +13343,7 @@ journey("feed: a post reads beside the list, J and K step through the posts, and
 
 // —— Codex sweep 5 (docs/reviews/2026-11-15-codex-sweep-5) ——
 
-journey("feed: Esc back from a post low in a long list keeps that post in view (sweep 5, F-new-feed-return-scroll)", async (page) => {
+journey("feed: Esc back from a post low in a long list keeps that post in view (sweep 5, F301)", async (page) => {
   const stamp = Date.now();
   const titles = Array.from({ length: 30 }, (_, i) => `Long feed ${i + 1} ${stamp}`);
   const server: ReturnType<typeof Bun.serve> = Bun.serve({ port: 0, fetch: (r: Request): Response => {
@@ -13372,7 +13372,7 @@ journey("feed: Esc back from a post low in a long list keeps that post in view (
   }
 });
 
-journey("add: the footer's ↵ Add is a button, so a pointer adds typed text; ↵ Follow follows a feed's own link (sweep 5, F-new-add-submit-click)", async (page) => {
+journey("add: the footer's ↵ Add is a button, so a pointer adds typed text; ↵ Follow follows a feed's own link (sweep 5, F304)", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
   const box = page.getByRole("dialog", { name: "Add a source" });
   await box.getByLabel("Link, file path or text").fill("# Added by pointer\n\nA pointer user adds what he typed with one click on the footer's Add.");
@@ -13394,7 +13394,7 @@ journey("add: the footer's ↵ Add is a button, so a pointer adds typed text; �
   }
 });
 
-journey("Edit skill: a click outside saves the typed name, as Enter does (D211, sweep 5, F-new-skill-edit-click-away)", async (page) => {
+journey("Edit skill: a click outside saves the typed name, as Enter does (D211, sweep 5, F305)", async (page) => {
   await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Edit skill…" }).click();
   const dialog = page.getByRole("dialog", { name: "Edit skill Creativity" });
@@ -13426,7 +13426,7 @@ journey("Settings: a click outside the sheet saves the review plan he typed (D21
   await page.keyboard.press("Escape");
 });
 
-journey("sidebar: a skill dropped on the page outside the sidebar stays where it was (sweep 5, F-new-sidebar-drop-outside)", async (page) => {
+journey("sidebar: a skill dropped on the page outside the sidebar stays where it was (sweep 5, F306)", async (page) => {
   const order = () => page.locator(".sidebar [role=group] .side-item").allInnerTexts();
   await until("the skills are in the sidebar", async () => (await order()).includes("Creativity"));
   const before = await order();
@@ -13442,7 +13442,7 @@ journey("sidebar: a skill dropped on the page outside the sidebar stays where it
   if (JSON.stringify(after) !== JSON.stringify(before)) throw new Error(`the skills moved: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
 });
 
-journey("highlight: a drag from the text let go in the margin beside it still makes the highlight (sweep 5, F-new-select-release-margin)", async (page) => {
+journey("highlight: a drag from the text let go in the margin beside it still makes the highlight (sweep 5, F307)", async (page) => {
   await openSource(page, TESTING);
   const keeps = page.locator(".collected-chip.keep");
   const before = Number(await keeps.innerText());
