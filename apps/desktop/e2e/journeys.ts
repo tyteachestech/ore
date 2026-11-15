@@ -11216,6 +11216,9 @@ journey("phone: Aa sets the text size, line spacing, margins, font and page, eac
   await tap(page, sheet.getByRole("radio", { name: "Light" }));
   const want = (l: Awaited<ReturnType<typeof looks>>) => l.size === 22 && Math.abs(l.leading - 1.7) < 0.01 && l.gutter === 16 && !/^Charter/.test(l.face) && l.page === "light";
   await until("each tap shows in the text at once", async () => want(await looks()));
+  // The sheet turns light with the page, as Books' does, not a dark panel over a white page (F-new-phone-light-sheet).
+  const light = (sel: string) => page.locator(sel).first().evaluate((e) => { const [r, g, b] = getComputedStyle(e).backgroundColor.match(/\d+/g)!.map(Number); return r! + g! + b! > 600; });
+  await until("the sheet turns light with the page", () => light(".looks-sheet"));
   // Every tap a target of 44pt or more, and the sheet as wide as the screen.
   for (const b of await sheet.locator("button").all()) {
     const r = (await b.boundingBox())!;

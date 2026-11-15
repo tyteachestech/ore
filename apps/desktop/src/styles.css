@@ -833,7 +833,8 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
    the type icons, ≥4.5:1 for --faint). Highlight pseudo-elements get literal colours: WebKit doesn't
    resolve custom properties set below :root inside ::highlight. */
 :root[data-page="light"] .reader-pane,
-:root[data-page="light"].phone .phone-source:not(:has(.reader.noting)) > .phone-bar {
+:root[data-page="light"].phone .phone-source:not(:has(.reader.noting)) > .phone-bar,
+:root[data-page="light"].phone .looks-sheet {
   color-scheme: light;
   --bg: #fbfbfa;
   --bg-card: #f4f4f2;
@@ -2913,6 +2914,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .looks-tile[data-page="auto"] svg { color: var(--muted); }
 .looks-tile[data-page="light"] { background: #f7f6f2; color: #555; }
 .looks-tile[data-page="light"] b { color: #1a1a1a; }
+/* On the light sheet the Dark tile still shows a dark page, as Books' theme tiles show their own page. */
+.looks-tile[data-page="dark"] { background: #232325; color: #a8a8a8; }
+.looks-tile[data-page="dark"] b { color: #ececec; }
 .looks-pair > button:focus-visible > .looks-tile, .looks-seg button:focus-visible, .looks-size button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus); }
 .phone .phone-source .reader-tools .looks-btn { width: 44px; height: 44px; padding: 0; border-radius: 999px; background: var(--bg-hover); color: var(--text); display: grid; place-items: center; font: 600 17px/1 var(--font-serif); }
 .phone .doc h1 { font-size: 1.3em; } .phone .doc h2 { font-size: 1.2em; } .phone .doc h3 { font-size: 1.08em; }
