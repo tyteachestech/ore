@@ -140,9 +140,12 @@ export function placeOf(scroll: HTMLElement, doc: HTMLElement): () => void {
   };
 }
 
+/** The reading looks now, outside React. */
+export const readingNow = (): State => state;
+
 export function useReading(): State {
   return useSyncExternalStore(
     (l) => (listeners.add(l), () => listeners.delete(l)),
-    () => state,
+    readingNow,
   );
 }

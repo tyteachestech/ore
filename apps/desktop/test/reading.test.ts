@@ -3,7 +3,7 @@ import { Window } from "happy-dom";
 
 const w = new Window();
 for (const k of ["document", "HTMLElement", "Node", "localStorage"] as const) (globalThis as Record<string, unknown>)[k] = (w as unknown as Record<string, unknown>)[k];
-const { DEFAULT_SIZE, placeOf, setSpacing, SIZES, stepSize } = await import("../src/reading");
+const { DEFAULT_SIZE, placeOf, readingNow, setSpacing, SIZES, stepSize } = await import("../src/reading");
 
 describe("reading page", () => {
   test("text size steps and holds at the ends", () => {
@@ -15,11 +15,11 @@ describe("reading page", () => {
     expect(stepSize(19, 1)).toBe(DEFAULT_SIZE); // a stored value that is no longer a step
   });
 
-  test("line spacing is a step on the page, kept for next time", () => {
-    expect(document.documentElement.dataset.spacing).toBe("normal");
+  // Another test file may have loaded reading.ts on its own document first, so this reads the module's state.
+  test("line spacing starts Normal and steps", () => {
+    expect(readingNow().spacing).toBe("normal");
     setSpacing("loose");
-    expect(document.documentElement.dataset.spacing).toBe("loose");
-    expect(localStorage.getItem("ore.spacing")).toContain("loose");
+    expect(readingNow().spacing).toBe("loose");
     setSpacing("normal");
   });
 
