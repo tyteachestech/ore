@@ -27,6 +27,7 @@ import { SkillChip } from "./Skills";
 import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useFocusWhileMounted, useLibraryChanges, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
+import { ExerciseText } from "./ExerciseText";
 import { MOMENT_MOOD, momentFor, type Moment } from "./moment";
 import { Trap } from "./Trap";
 import { waiting } from "./Home";
@@ -1225,7 +1226,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
             {phase === "edit" ? (
               <EditCard draft={draft} setDraft={setDraft} points={card.kind === "prompt"} ok={draftOk} busy={busy} onSave={() => void saveEdit()} onCancel={() => setPhase("checked")} />
             ) : (
-              <h1 className="review-q">{card.question}</h1>
+              <div className="review-q" role="heading" aria-level={1}><ExerciseText text={card.question} dir={card.source_dir} /></div>
             )}
             {card.figure && card.figure_file && phase !== "edit" && <Occluded file={card.figure_file} box={card.figure.box} shown={phase === "checked"} />}
 
@@ -1288,7 +1289,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                   </>
                 )}
                 <div className="quiz-kicker">Answer</div>
-                <p className="review-answer">{card.answer}</p>
+                <div className="review-answer"><ExerciseText text={card.answer} dir={card.source_dir} /></div>
                 {card.kind === "prompt" && card.rubric.length > 0 && (
                   <>
                     <div className="quiz-kicker">{inHead || gradeError ? "Key points · which did you get?" : "Key points"}</div>
@@ -1339,8 +1340,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
                 )}
                 {card.original && (
                   <details className="review-original">
-                    <summary>Same idea as: {card.original.question}</summary>
-                    <p className="review-answer">{card.original.answer}</p>
+                    <summary>Same idea as: <ExerciseText text={card.original.question} dir={card.source_dir} inline /></summary>
+                    <div className="review-answer"><ExerciseText text={card.original.answer} dir={card.source_dir} /></div>
                   </details>
                 )}
                 {sureMiss && <p className="quiz-sure-miss">You were sure about this one. Worth a careful look.</p>}

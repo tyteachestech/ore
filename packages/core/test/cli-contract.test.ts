@@ -111,6 +111,9 @@ describe("the CLI as an agent drives it", () => {
     const past = (h: { reviews: unknown; gem: unknown; next: object }) => ({ reviews: h.reviews, gem: h.gem, next: Object.keys(h.next) });
     expect(past(saved.history)).toEqual(past(shown.history));
     expect(saved.in_head_ok).toBe(shown.in_head_ok);
+    // F-new-exercise-markdown: and the source's folder, where the images its text names are.
+    expect(saved.source_dir).toBe(findItem(lib, item.meta.id).dir);
+    expect(shown.source_dir).toBe(findItem(lib, item.meta.id).dir);
     // Bad version shows the original by a plain `card show`: the same shape.
     const original = JSON.parse((await ore(lib.root, ["card", "show", card.meta.id, "--json"])).out);
     expect(past(original.history)).toEqual(past(shown.history));

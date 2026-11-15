@@ -26,9 +26,21 @@ const variantJson = (lib: Library, c: Card, v: Variant) => ({
 });
 /** A card, or one of its variants, as review shows it: every `card show` and `card set` answers in this one
  *  shape, so an edit or a bad version keeps what review draws. history: its reviews and where each rating puts
- *  the next (D149); in_head_ok: review may offer "In my head" on this Explain card (D68; never on a variant). */
-const shownJson = (lib: Library, c: Card, v?: Variant | null) =>
-  v ? { ...variantJson(lib, c, v), history: cardHistory(lib, c.meta.id) } : { ...cardJson(lib, c), ...figureJson(lib, c), in_head_ok: inHeadOk(lib, c), history: cardHistory(lib, c.meta.id) };
+ *  the next (D149); in_head_ok: review may offer "In my head" on this Explain card (D68; never on a variant);
+ *  source_dir (below). */
+const shownJson = (lib: Library, c: Card, v?: Variant | null) => ({
+  ...(v ? variantJson(lib, c, v) : { ...cardJson(lib, c), ...figureJson(lib, c), in_head_ok: inHeadOk(lib, c) }),
+  history: cardHistory(lib, c.meta.id),
+  ...sourceDir(lib, c),
+});
+/** source_dir: the source's folder, where the images its question and answer name are, as the reader finds them. */
+const sourceDir = (lib: Library, c: Card) => {
+  try {
+    return { source_dir: findItem(lib, c.meta.item).dir };
+  } catch {
+    return {}; // its source is gone: the text stands alone
+  }
+};
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const oneLine = (s: string, n = 90) => {
   const t = s.replace(/\s+/g, " ").trim();
