@@ -6,7 +6,7 @@ import { Children, createContext, Fragment, isValidElement, lazy, memo, Suspense
 import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { rehypeMath, remarkPlugins } from "./math-md";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { withImages } from "./md-images";
 import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
@@ -171,14 +171,6 @@ const stamped: Components = {
   },
 };
 
-/** Images saved with the source (`assets/…`, D96) load from its folder; web images as they are. */
-const withImages = (base: Components, dir: string): Components => ({
-  ...base,
-  img: ({ src, alt }) => {
-    const s = typeof src === "string" ? src : "";
-    return <img src={/^(https?:|data:)/i.test(s) ? s : convertFileSrc(`${dir}/${decodeURI(s)}`)} data-src={s} alt={alt ?? ""} loading="lazy" draggable={false} />;
-  },
-});
 
 /** A figure open to fill the window (D143): its image in the text, and where it sat. */
 type Zoomed = { img: HTMLImageElement; from: DOMRect };

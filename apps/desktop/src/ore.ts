@@ -381,7 +381,9 @@ export type CardFull = {
    *  fractions of its size; `figure_file` is where the image is (show only). */
   figure?: { src: string; box: [number, number, number, number] };
   figure_file?: string;
-  /** Its reviews and where each rating puts the next one (D149); with --review only. */
+  /** The folder of its source, where the images its text names are (show and set; absent when the source is gone). */
+  source_dir?: string;
+  /** Its reviews and where each rating puts the next one (D149): every `card show` and `card set`. */
   history?: CardHistory;
 };
 /** A card's gem (D236); `seam`: missed and won back, `polished`: passed on a new case. */
