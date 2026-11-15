@@ -7,7 +7,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 // convertFileSrc, as the app's asset protocol answers it.
 (globalThis as Record<string, unknown>).window = { __TAURI_INTERNALS__: { convertFileSrc: (p: string) => `asset://${p}` } };
 const { ExerciseText } = await import("../src/ExerciseText");
-const html = (text: string, inline = false) => renderToStaticMarkup(createElement(ExerciseText, { text, dir: "/lib/items/agents", inline }));
+const html = (text: string, inline = false, dir: string | null = "/lib/items/agents") => renderToStaticMarkup(createElement(ExerciseText, { text, dir: dir ?? undefined, inline }));
 
 // F-new-exercise-markdown: an exercise's question and answer were drawn as plain text, so its formulas,
 // code and images showed raw.
@@ -32,4 +32,29 @@ test("every place an exercise's question or answer is shown draws it with Exerci
     const src = readFileSync(join(import.meta.dir, "../src", f), "utf8");
     expect({ f, raw: src.match(/\{[\w.?]+\.(question|answer)\}\s*</g) }).toEqual({ f, raw: null });
   }
+});
+
+// F-new-exercise-tag-text (review of #440): text that looks like a tag was dropped, so "List<T>" read "List".
+test("text in an exercise that looks like a tag shows as typed", () => {
+  expect(html("What does List<T> return?")).toBe("<p>What does List&lt;T&gt; return?</p>");
+  expect(html("Use <br> or <kbd>K</kbd>")).toBe("<p>Use &lt;br&gt; or &lt;kbd&gt;K&lt;/kbd&gt;</p>");
+  expect(html("<div>a block</div>")).toContain("&lt;div&gt;a block&lt;/div&gt;");
+});
+
+// F-new-exercise-one-line (review of #440): in a one-line spot its paragraphs ran together ("First part.Second
+// part.") and a code block or a formula on its own line was drawn as a block inside the line.
+test("in a one-line spot an exercise is one line: blocks joined by a space, code and formulas inline", () => {
+  expect(html("First part.\n\nSecond part.", true)).toBe("First part. Second part.");
+  const line = html("Run this:\n\n```js\nconst a = 1;\n```\n\n$$x^2$$\n\nThen ![a chart](assets/c.png)", true);
+  expect(line).not.toMatch(/<pre|katex-display|<p>|<img/);
+  expect(line).toContain("<code>const a = 1;</code>");
+  expect(line).toContain("katex");
+  expect(line).toContain("a chart");
+  expect(html("- one\n- two", true)).toBe("one two");
+});
+
+// F-new-exercise-image-nodir (review of #440): with no source folder an image got its relative path as src, a broken picture.
+test("an image with no source folder to load from shows its alt text", () => {
+  expect(html("See ![Workflow patterns](assets/patterns.svg)", false, null)).toBe("<p>See Workflow patterns</p>");
+  expect(html("![A web one](https://example.com/a.png)", false, null)).toContain('src="https://example.com/a.png"');
 });
