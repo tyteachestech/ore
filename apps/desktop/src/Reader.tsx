@@ -77,6 +77,7 @@ const CHAPTER_PROMPTS = ["The claim this chapter makes", "One example or piece o
 // thought he has while reading. A key point asks why it holds (self-explanation), a question asks for
 // a guess first (prediction): those two are tested later, so their prompts pay off.
 const Original = lazy(() => import("./OriginalPage"));
+const Slides = lazy(() => import("./OriginalSlides"));
 
 const PLACEHOLDER: Record<Intent, string> = {
   keep: "Note…",
@@ -1376,7 +1377,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   // Opening the source note puts the caret in it; closing writes what is pending.
   /** A PDF's own file, for the Original tab (D202); any other source has only the two tabs. */
   const pdf = doc?.source_file && /\.pdf$/i.test(doc.source_file) ? doc.source_file : null;
-  const sideTab: SideTab = p.sideTab === "original" && !pdf ? "note" : p.sideTab;
+  /** A PowerPoint deck's own file: its Original tab shows the slide (D-new-deck-original). */
+  const deck = doc?.source_file && /\.pptx$/i.test(doc.source_file) ? doc.source_file : null;
+  const sideTab: SideTab = p.sideTab === "original" && !pdf && !deck ? "note" : p.sideTab;
   const notesShown = p.notesOpen && !closedBook && sideTab === "note";
   const questionsShown = p.notesOpen && !closedBook && sideTab === "questions";
   const originalShown = p.notesOpen && !closedBook && sideTab === "original";
@@ -1397,6 +1400,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         if ((marks[mid]!.nextElementSibling?.getBoundingClientRect().top ?? Infinity) <= line) lo = mid + 1;
         else hi = mid;
       }
+      // A deck scrolled to its end is on its last slide, though that short slide's mark never reaches the line.
+      // (A PDF's page is long, so its end shows the page above too, and the line decides.)
+      if (deck && marks.length && el.scrollTop > 0 && el.scrollTop + el.clientHeight >= el.scrollHeight - 2) lo = marks.length;
       setPage(lo ? Number(marks[lo - 1]!.dataset.page) : 1);
     };
     const onScroll = () => (frame ||= requestAnimationFrame(read));
@@ -1406,7 +1412,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       el.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(frame);
     };
-  }, [originalShown, ready, shownBody]);
+  }, [originalShown, ready, shownBody, deck]);
 
   /** The chapter block (D115): the sign opens the source note with the chapter's title and three
    *  prompts, the source hidden (D34.4) until he ends it with ⌘↵ (recorded, then feedback) or Esc
@@ -3158,7 +3164,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         { id: "side-panel", label: panelShown ? "Hide side panel" : "Show side panel", hint: label(keys["side-panel"]), paletteOnly: true, run: p.onToggleSide },
         { id: "notes", label: notesShown ? "Close source note" : "Open source note", hint: label(keys.notes), paletteOnly: true, run: () => p.onShowSide("note") },
         // On the phone the PDF's own page is a page of its own, beside the source as the note is (Back returns).
-        ...(pdf ? [{ id: "original-page", label: PHONE ? "Original page" : originalShown ? "Close original page" : "Original page beside the text", paletteOnly: !PHONE, run: () => p.onShowSide("original") }] : []),
+        ...(pdf || deck ? [{ id: "original-page", label: PHONE ? (deck ? "Original slide" : "Original page") : originalShown ? (deck ? "Close original slide" : "Close original page") : deck ? "Original slide beside the text" : "Original page beside the text", paletteOnly: !PHONE, run: () => p.onShowSide("original") }] : []),
         ...(readingFor ? [{ id: "reading-for", label: "Show prequestions", paletteOnly: true, run: () => setPreqAsk((n) => n + 1) }] : []),
         { id: "archive", label: doc.archived_at ? "Restore" : "Archive", hint: label(keys.archive), danger: !doc.archived_at, divider: true, run: () => p.onArchive(doc) },
       ];
@@ -3536,7 +3542,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
             </div>
           )}
           <TableCtx.Provider value={tables}>
-            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} pages={!!pdf} onReady={onReady} card={cardMode ? videoCard : undefined} />
+            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} pages={!!pdf || !!deck} onReady={onReady} card={cardMode ? videoCard : undefined} />
           </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
@@ -3735,7 +3741,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           tab={sideTab}
           onTab={(t) => p.onShowSide(t, true)}
           onFold={PHONE ? undefined : p.onCloseSide}
-          original={!!pdf}
+          original={!!pdf || !!deck}
           tool={questionsShown && !PHONE && <SearchButton label="Filter collected" button={sideFilterButton} pressed={sideFilterShown} onClick={() => (sideFilterShown ? (setSideFilter(""), setSideFiltering(false)) : setSideFiltering(true))} />}
           bar={
             questionsShown && !PHONE && sideFilterShown && (
@@ -3759,6 +3765,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           {originalShown && pdf ? (
             <Suspense fallback={null}>
               <Original file={pdf} page={page} />
+            </Suspense>
+          ) : originalShown && deck ? (
+            <Suspense fallback={null}>
+              <Slides file={deck} slide={page} />
             </Suspense>
           ) : notesShown || (PHONE && !questionsShown) ? (
             <SourceNoteBody

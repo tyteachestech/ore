@@ -430,7 +430,8 @@ export function pageChunks(md: string): string[] {
   flush();
   return out;
 }
-const PAGE = /^<!-- page (\d+) -->$/;
+/** A PDF's page mark, or a deck's slide mark (core's `office.ts`): each is where the original's next page starts. */
+const PAGE = /^<!-- (?:page|slide) (\d+) -->$/;
 /** The page a slice of `pageChunks` starts, if it starts one. */
 export const pageOf = (chunk: string): number | null => Number(PAGE.exec(chunk.slice(0, chunk.indexOf("\n") >>> 0))?.[1]) || null;
 

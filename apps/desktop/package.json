@@ -10,6 +10,7 @@
     "app:install": "bun run tauri build --config src-tauri/tauri.release.json --bundles app && { [ ! -e /Applications/Ore.app ] || trash /Applications/Ore.app; } && ditto \"${CARGO_TARGET_DIR:-$HOME/Library/Caches/ore/target}/release/bundle/macos/Ore.app\" /Applications/Ore.app"
   },
   "dependencies": {
+    "@diceui/pptx": "0.5.0",
     "@dnd-kit/core": "6.3.1",
     "@dnd-kit/sortable": "10.0.0",
     "@dnd-kit/utilities": "3.2.2",

@@ -13647,6 +13647,44 @@ journey("side panel tabs: a click glides the pill to the new tab, a key moves it
   if (await page.locator(".seg-ghost").count()) throw new Error("a key glided the pill: keys land at once");
 });
 
+journey("original: a PowerPoint deck's Original tab shows the slide itself, follows the slide being read, and ‹ › turn to another (D-new-deck-original)", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "deck.pptx"), "--no-enrich")) as { id: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+    await page.reload();
+    await openSource(page, "How memory works");
+    const show = page.getByRole("button", { name: "Show side panel" });
+    if (await show.count()) await show.click();
+    await page.getByRole("tab", { name: "Original" }).click();
+    const slide = page.locator(".original-slide");
+    const pager = page.locator(".original-pager span");
+    const total = async () => Number((await pager.innerText()).split("/")[1]);
+    const shown = (n: number) => until(`slide ${n} of the original is shown`, async () => (await slide.getAttribute("data-slide")) === String(n) && (await pager.innerText()).startsWith(`${n} /`), 15000);
+    await shown(1);
+    // The slide is drawn: its title's words are on it, laid out as PowerPoint does.
+    await until("the slide shows its own text", async () => (await slide.innerText()).includes("Encoding"));
+    const box = (await slide.boundingBox())!;
+    const panel = (await page.locator(".mynotes").boundingBox())!;
+    if (box.width > panel.width) throw new Error(`the slide is ${box.width}px in a ${panel.width}px panel`);
+    // Reading on to Retrieval, the last slide, brings it up beside it: the page's end is as far as he can scroll.
+    await page.locator(".doc h2", { hasText: "Retrieval" }).evaluate((h) => h.scrollIntoView({ block: "start" }));
+    await shown(3);
+    await until("its words are on the slide", async () => (await slide.innerText()).includes("Every recall changes the memory"));
+    if ((await total()) !== 3) throw new Error(`the pager counts ${await total()} slides, not 3`);
+    if (!(await page.getByRole("button", { name: "Next slide" }).isDisabled())) throw new Error("Next slide is offered past the last slide");
+    await page.getByRole("button", { name: "Previous slide" }).click();
+    await shown(2);
+    await page.locator(".doc h2").first().evaluate((h) => h.scrollIntoView({ block: "center" }));
+    await shown(1);
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.evaluate(([tab, open]) => {
+      tab ? localStorage.setItem("ore.sidetab", tab) : localStorage.removeItem("ore.sidetab");
+      open ? localStorage.setItem("ore.mynotes", open) : localStorage.removeItem("ore.mynotes");
+    }, before);
+  }
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);

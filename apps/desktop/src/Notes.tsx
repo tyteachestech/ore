@@ -480,7 +480,7 @@ export function SidePanel({ away, tab, onTab, onFold, original, tool, bar, bodyR
               <Tabs.Trigger value="questions" data-tone="read"><PixelStack className="card-icon" size={12} aria-hidden="true" />Collected</Tabs.Trigger>
             </Hint>
             {original && (
-              <Hint text="The PDF’s own page, beside the text you are reading">
+              <Hint text="The original’s own page or slide, beside the text you are reading">
                 <Tabs.Trigger value="original"><PixelPage className="card-icon" size={12} aria-hidden="true" />Original</Tabs.Trigger>
               </Hint>
             )}
