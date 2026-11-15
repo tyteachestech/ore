@@ -331,16 +331,16 @@ export const studyCommands: Record<string, Command> = {
   },
 
   search: {
-    usage: "<query> [--limit N]           full-text search over docs, annotations, the source note, cards, topics",
-    options: { limit: { type: "string" } },
+    usage: "<query> [--limit N] [--sources]   full-text search over docs, annotations, the source note, cards, topics; --sources: each source's best match, every source unless --limit",
+    options: { limit: { type: "string" }, sources: { type: "boolean" } },
     async run(positionals, f) {
       const lib = openLibrary();
       const query = need(positionals.join(" ").trim() || undefined, "<query>");
       const index = openIndex(lib);
       try {
-        const limit = int(f.limit, "limit") ?? 20;
+        const limit = int(f.limit, "limit") ?? (f.sources ? Infinity : 20);
         if (limit < 1) throw new Error("--limit must be 1 or more");
-        const hits = index.search(query, limit);
+        const hits = index.search(query, limit, !!f.sources);
         const text = hits.length ? hits.map((h) => `${h.kind.padEnd(10)} ${h.ref}  ${oneLine(h.title, 60)}\n    ${oneLine(h.snippet, 110)}`).join("\n") : "No matches.";
         return { data: hits, text };
       } finally {
