@@ -86,3 +86,38 @@ test("the last two square marks are round dots: a question's may-answer lead and
     expect(rule, sel).toContain("border-radius: 50%");
   }
 });
+
+test("the small marks are round dots too: the sidebar arrow, the tick and cross, the waiting matrix (D183)", async () => {
+  const { Arrow } = await import("../src/SideCursor");
+  const { CHECK, CROSS, Matrix, Sprite } = await import("../src/Working");
+  const marks = [<Arrow ref={{ current: null }} className="side-cursor" />, <Sprite rows={CHECK} />, <Sprite rows={CROSS} />, <Matrix />];
+  for (const mark of marks) {
+    const html = renderToStaticMarkup(mark);
+    expect(html).toContain("<circle");
+    expect(html).not.toContain("<rect");
+    expect(html).not.toContain("crispEdges");
+  }
+});
+
+test("nothing glows but the lamp: no blurred shadow in a colour, and no halo behind a gem", async () => {
+  const css = (await Bun.file(new URL("../src/styles.css", import.meta.url)).text()) + (await Bun.file(new URL("../src/retro.css", import.meta.url)).text());
+  const glows = css.split("\n").filter((l) => /drop-shadow\(|box-shadow:[^;]*(?<!0 )\b0 0 [1-9]\d*px (var\(--c-|var\(--skill|color-mix)/.test(l) && !l.includes("--lamp"));
+  expect(glows.map((l) => l.slice(0, 40))).toEqual([]);
+  expect(/\.gem\[data-polished\][^{]*\{[^}]*gradient/.test(css)).toBe(false);
+  expect(/\.quiz-done-badge \{[^}]*box-shadow/.test(css)).toBe(false);
+});
+
+test("a source's type is written in sentence case, like every other label", async () => {
+  const css = await Bun.file(new URL("../src/styles.css", import.meta.url)).text();
+  expect(/\.kind-line \{[^}]*uppercase/.test(css)).toBe(false);
+  const app = await Bun.file(new URL("../src/App.tsx", import.meta.url)).text();
+  const kinds = app.match(/const KIND[^\n]*/)![0].match(/: "([^"]+)"/g)!.map((k) => k.slice(3, -1));
+  for (const k of kinds) expect(k[0]).toBe(k[0]!.toUpperCase());
+});
+
+test("a failed feed has one main button: Try again; Unfollow is quiet", async () => {
+  const feed = await Bun.file(new URL("../src/Feed.tsx", import.meta.url)).text();
+  const line = feed.slice(feed.indexOf('className="feed-error"'), feed.indexOf("</div>", feed.indexOf('className="feed-error"')));
+  expect(line.match(/className="pill-btn"/g)?.length).toBe(1);
+  expect(line).toContain('className="settings-btn" onClick={() => unfollow(f)}');
+});
