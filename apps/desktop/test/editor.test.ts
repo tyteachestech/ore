@@ -162,7 +162,7 @@ describe("note editor (D38)", () => {
     expect(ed.menuTrigger("at 10:30")).toBeNull();
   });
 
-  test("F-new-slash-space: / takes a block's name with its spaces (/heading 2), as Notion does; / then a space, or two spaces, is prose", async () => {
+  test("F328: / takes a block's name with its spaces (/heading 2), as Notion does; / then a space, or two spaces, is prose", async () => {
     expect(ed.menuTrigger("/heading 2")).toEqual({ kind: "slash", query: "heading 2", typed: 10 });
     expect(ed.menuTrigger("Text /toggle heading 2")).toEqual({ kind: "slash", query: "toggle heading 2", typed: 17 });
     expect(ed.menuTrigger("/heading ")).toEqual({ kind: "slash", query: "heading ", typed: 9 });

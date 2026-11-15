@@ -53,7 +53,7 @@ describe("Ask your library in ⌘K", () => {
   });
 });
 
-// F-new-palette-weak-drops-hit (review of #440): a source found in ⌘K by its author, skill or type was listed in
+// F343 (review of #440): a source found in ⌘K by its author, skill or type was listed in
 // Sources, and its match in the text was dropped with it, losing the snippet and the place it lands.
 test("only a source listed by its title loses its row in “In the text”", () => {
   const listed = [{ id: "a", title: "Retrieval practice" }, { id: "b", title: "Make it stick" }];

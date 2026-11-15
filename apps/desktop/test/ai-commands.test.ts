@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mustAnswer } from "../src/ore";
 
-// F-new-ai-lists-disagree (review of #440): which `ore` commands call the AI was written three times (the app's
+// F346 (review of #440): which `ore` commands call the AI was written three times (the app's
 // "must answer", the phone's "needs AI", the mock bridge's), and they disagreed: `check --covered`, a plain write
 // of his own marks (Finish's flip), was one that must answer, so a run that printed nothing read as a failure.
 test("only a command that answers with what the AI said must answer: not his own marks stored by check --covered", () => {

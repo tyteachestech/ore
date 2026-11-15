@@ -96,7 +96,7 @@ describe("the CLI as an agent drives it", () => {
     expect((await ore(lib.root, [...hint, "--json"])).code).toBe(0);
   });
 
-  // F-new-edit-drops-history: Review shows what `card set` answers, so it carries what `card show --review`
+  // F332: Review shows what `card set` answers, so it carries what `card show --review`
   // does, or an edit drops the history dots and "next in …" until the exercise is reopened.
   test("an exercise edited in review keeps its history: card set and card show answer as card show --review does", async () => {
     const lib = await tempLibrary();
@@ -111,7 +111,7 @@ describe("the CLI as an agent drives it", () => {
     const past = (h: { reviews: unknown; gem: unknown; next: object }) => ({ reviews: h.reviews, gem: h.gem, next: Object.keys(h.next) });
     expect(past(saved.history)).toEqual(past(shown.history));
     expect(saved.in_head_ok).toBe(shown.in_head_ok);
-    // F-new-exercise-markdown: and the source's folder, where the images its text names are.
+    // F333: and the source's folder, where the images its text names are.
     expect(saved.source_dir).toBe(findItem(lib, item.meta.id).dir);
     expect(shown.source_dir).toBe(findItem(lib, item.meta.id).dir);
     // Bad version shows the original by a plain `card show`: the same shape.
@@ -120,7 +120,7 @@ describe("the CLI as an agent drives it", () => {
     expect(original.in_head_ok).toBe(shown.in_head_ok);
   });
 
-  // F-new-card-show-reads-doc (review of #440): every card show and card set read the source's whole doc.md (a book
+  // F345 (review of #440): every card show and card set read the source's whole doc.md (a book
   // runs to megabytes) only to learn its folder.
   test("card show names the source's folder without reading its doc.md", async () => {
     const lib = await tempLibrary();

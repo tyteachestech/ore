@@ -3076,9 +3076,9 @@ async function selectPastTheEdge(page: Page, knob = false) {
     rmSync(dir, { recursive: true, force: true });
   }
 }
-// F-new-code-hl-crash: a saved highlight over a code block crashed WebKit's page as it opened (a click, or a drag carried
+// F331: a saved highlight over a code block crashed WebKit's page as it opened (a click, or a drag carried
 // over it): the popup's underline lay between the code's colours and the highlight's tint, a priority WebKit can't paint.
-// F-new-find-hl-crash: with Find open on a word in the code, a highlight made over it came in between Find and the code.
+// F339: with Find open on a word in the code, a highlight made over it came in between Find and the code.
 journey("highlight: a saved highlight over a code block opens in WebKit without taking the page down, with Find open on it too", async (page) => {
   let crashed = false;
   page.on("crash", () => (crashed = true));
@@ -3487,7 +3487,7 @@ journey("note equations: /equation opens a TeX field that draws as he types; ↵
   await until("still drawn after a reload", async () => (await pm.locator(".note-math .katex annotation").last().textContent().catch(() => "")) === "\\pi r^2");
 });
 
-// F-new-slash-space: the / menu closed at the space in "/heading 2", and Enter left the words as prose.
+// F328: the / menu closed at the space in "/heading 2", and Enter left the words as prose.
 journey("note: /heading 2 and Enter makes a Heading 2, and /etc folder stays prose", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   await openSource(page, AGENTS);
@@ -4723,7 +4723,7 @@ journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette 
   await page.keyboard.press("Escape");
 });
 
-// F-new-panel-past-window: at 150% in an 800×600 window (533×400 CSS px) ⌘K ran below the window: its last
+// F334: at 150% in an 800×600 window (533×400 CSS px) ⌘K ran below the window: its last
 // rows and its footer couldn't be reached, and End picked a row out of sight.
 journey("a small window: ⌘K, the Add box and the shortcuts sheet fit in it, and End shows the palette's last row", async (page) => {
   await page.setViewportSize({ width: 533, height: 400 });
@@ -14051,7 +14051,7 @@ journey("tutor: a message sent while a reply is being written waits, goes when t
   await page.keyboard.press("Escape");
 });
 
-// F-new-tutor-null: a reply that came back empty left "Reading your sources…" up for good, the waiting message stuck
+// F329: a reply that came back empty left "Reading your sources…" up for good, the waiting message stuck
 // under it, and Stop did nothing.
 journey("tutor: a reply that comes back empty says so with Try again and gives the waiting message back", async (page) => {
   const held: (() => void)[] = [];
@@ -14085,7 +14085,7 @@ journey("tutor: a reply that comes back empty says so with Try again and gives t
   await page.keyboard.press("Escape");
 });
 
-// F-new-ask-null: Ask about this with an empty answer replaced Review with "This view hit a snag".
+// F330: Ask about this with an empty answer replaced Review with "This view hit a snag".
 journey("Ask about this: an answer that comes back empty says so with Try again, and Review stays", async (page) => {
   await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { ask: null }));
   try {
@@ -14285,7 +14285,7 @@ journey("original: a PowerPoint deck's Original tab shows the slide itself, foll
 
 // —— Codex sweep 6, round C: finding things (docs/reviews/2026-11-15-codex-sweep-6/organize-report.md) ——
 
-journey("list search: every source in the tab and its filters that holds the words is found, however many others hold them too (F-new-list-search-cap)", async (page) => {
+journey("list search: every source in the tab and its filters that holds the words is found, however many others hold them too (F335)", async (page) => {
   const word = `zircon${Date.now()}`;
   // 36 sources and their highlights hold the word, 72 matches; the one under Habits holds it once, deep in a longer text, so it ranks last.
   const made: string[] = [];
@@ -14311,7 +14311,7 @@ journey("list search: every source in the tab and its filters that holds the wor
   }
 });
 
-// F-new-list-search-snippets (review of #440): only the library's best 60 matches got their line, so a row past
+// F344 (review of #440): only the library's best 60 matches got their line, so a row past
 // them (here the oldest source, whose match ranks last) showed none.
 journey("list search: every row found in its text shows its line, past the first 60 too, as it scrolls into view", async (page) => {
   const word = `quillwort${Date.now()}`;
@@ -14337,7 +14337,7 @@ journey("list search: every row found in its text shows its line, past the first
   }
 });
 
-journey("list search: a match in a highlight's note opens that highlight; ↵ on one in the source note opens the note on it, as ⌘K does (F-new-list-search-lands)", async (page) => {
+journey("list search: a match in a highlight's note opens that highlight; ↵ on one in the source note opens the note on it, as ⌘K does (F336)", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const search = page.getByLabel("Search sources");
   await search.fill("hold for kids");
@@ -14353,20 +14353,20 @@ journey("list search: a match in a highlight's note opens that highlight; ↵ on
   await page.keyboard.press("Escape");
 });
 
-journey("⌘K: a source is found by its author, as the list's search finds it (F-new-palette-author)", async (page) => {
+journey("⌘K: a source is found by its author, as the list's search finds it (F337)", async (page) => {
   await page.keyboard.press("Meta+k");
   await page.locator("[cmdk-input]").fill("Barry Zhang");
   await page.locator("[cmdk-item]").filter({ hasText: AGENTS }).first().click();
   await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
 });
 
-journey("phone: Search finds a source by its author (F-new-palette-author)", async (page) => {
+journey("phone: Search finds a source by its author (F337)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Search" }));
   await page.locator("[cmdk-input]").fill("Barry Zhang");
   await page.locator("[cmdk-item]").filter({ hasText: AGENTS }).first().waitFor();
 }, "phone");
 
-journey("list search: Back to the list brings its search and filters back (F-new-back-keeps-search)", async (page) => {
+journey("list search: Back to the list brings its search and filters back (F338)", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   await page.getByRole("button", { name: "Filter by kind, skill or author" }).click();
   await page.getByRole("option", { name: "Skill" }).click();

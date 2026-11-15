@@ -313,7 +313,7 @@ describe("review loop", () => {
     idx2.close();
   });
 
-  test("search by source: every source that holds the words, each once with its best match, past the first 20 matches (F-new-list-search-cap)", async () => {
+  test("search by source: every source that holds the words, each once with its best match, past the first 20 matches (F335)", async () => {
     const lib = await tempLibrary();
     // Each snippet is a source and its highlight: 50 matches from 25 sources.
     const ids: string[] = [];
@@ -330,7 +330,7 @@ describe("review loop", () => {
     }
   });
 
-  // F-new-list-search-snippets (review of #440): by source only the best 60 library-wide got a snippet, so a
+  // F344 (review of #440): by source only the best 60 library-wide got a snippet, so a
   // filtered list, or one in its own order, showed matches with no line under them.
   test("search by source within the sources a list shows: only those, in its order, the first ones with their line", async () => {
     const lib = await tempLibrary();
