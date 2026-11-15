@@ -3110,6 +3110,11 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-tools > button.has { color: var(--accent); }
 .phone-tools .collected { position: static; transform: none; padding: 0; background: none; border: 0; box-shadow: none; animation: none; }
 .phone-tools .collected-chip { height: 44px; }
+/* D179's prequestions in reach on the phone: their sheet's rows wrap, a question is often two lines, his guess under it. */
+.reading-for-sheet .pick-list { max-height: 60vh; overflow-y: auto; }
+.reading-for-sheet .pick-row { padding-top: 10px; padding-bottom: 10px; }
+.sheet.reading-for-sheet .pick-row .name { white-space: normal; overflow-wrap: anywhere; line-height: 1.4; color: var(--text); }
+.reading-for-sheet .pick-row .name span { display: -webkit-box; margin-top: 2px; font-size: 13px; font-weight: 400; color: var(--muted); -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 /* A source's bottom bar (D156) lifts what sits over it by --tools-lift: its 44pt and the 8pt gap above it. The pill
    rides that far up while the bar shows; a toast sits over the pill, and over the bar while it shows (Mail's Undo
    banner sits above its toolbar), so neither loses its taps; on the note page, with neither there, it is at the foot. */

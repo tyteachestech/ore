@@ -59,6 +59,7 @@ describe("shortcut hints", () => {
 const ICON_ONLY_OK: Record<string, string> = {
   "Palette.tsx Close": "phone only (PHONE): a touch screen has no hover",
   "Reader.tsx Find in source": "phone only (PHONE): a touch screen has no hover",
+  "Reader.tsx readingFor(qs.length)": "phone only (PHONE): a touch screen has no hover",
   "IconPicker.tsx label(icon)": "one of hundreds of cells in the icon grid; the filter field names them, and a tooltip each would cost the grid its speed",
   "phone/PhoneApp.tsx Open menu": "the phone app: a touch screen has no hover",
   "phone/PhoneApp.tsx Search": "the phone app: a touch screen has no hover",
