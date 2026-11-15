@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ReactMarkdown from "react-markdown";
 import { aiMath, reply } from "../src/math-md";
 
-// F-new-raw-latex: an AI writes its formulas as $x$, \(x\) or \[x\]; a reply draws them as the reader does ($$x$$).
+// F320: an AI writes its formulas as $x$, \(x\) or \[x\]; a reply draws them as the reader does ($$x$$).
 test("an AI's $x$, \\(x\\) and \\[x\\] become $$x$$; prices, $$x$$ and code stay as written", () => {
   expect(aiMath("Inline $E=mc^2$ here.")).toBe("Inline $$E=mc^2$$ here.");
   expect(aiMath("So \\(a^2+b^2\\) and")).toBe("So $$a^2+b^2$$ and");

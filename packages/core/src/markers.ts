@@ -17,7 +17,7 @@ const WORD = /[\p{L}\p{N}_]/u;
 /** Each citation marker in a reply's prose, given to `f` (the marker as written, its number), which returns what
  *  stands in its place. A [n] glued right after a letter, digit or _ is a marker only when the reply has citation
  *  n (`has`): models often write "claim[1]", while `arr[2]` with no citation 2 is an index, the reply's own words
- *  (F-new-code-index-marker, F-new-pill-on-index). [0] is passed on; callers drop it. */
+ *  (F318, F323). [0] is passed on; callers drop it. */
 export const eachMarker = (text: string, has: (n: number) => boolean, f: (marker: string, n: number) => string) =>
   inProse(text, (prose) =>
     prose.replace(ANY, (all: string, n: string, at: number) => {

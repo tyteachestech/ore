@@ -1039,7 +1039,7 @@ journey("tutor: a message from a source says which section is on his screen, so 
   await page.getByRole("textbox", { name: "Message the tutor" }).fill("Explain this part");
   await page.keyboard.press("Enter");
   await sent;
-  // F-new-retry-drops-section: Try another reply asks the same part again, not the source at large.
+  // F319: Try another reply asks the same part again, not the source at large.
   const tutor = page.getByRole("complementary", { name: "Tutor" });
   const again = page.waitForRequest((r) => (r.postData() ?? "").includes(`"tutor","Explain this part","--item=`));
   await tutor.getByRole("button", { name: "Try another reply" }).click();
@@ -1105,7 +1105,7 @@ journey("tutor citation: a numbered source in a reply opens that source at the q
     await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
     const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
     await until("the quoted passage is marked", async () => (await active()) === quote);
-    // F-new-second-citation: another citation into the source already open goes to its own passage.
+    // F317: another citation into the source already open goes to its own passage.
     const top = await page.locator(".reader-scroll").evaluate((e) => e.scrollTop);
     await tutor.getByRole("button", { name: `Source 2: ${TESTING}` }).click();
     await until("the second quoted passage is marked", async () => (await active()) === quote2);
@@ -9898,7 +9898,7 @@ journey("review Ask: a failed question offers Try again, which asks it again and
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-// F-new-raw-latex: a reply's formula showed as its TeX, dollars, backslashes and braces.
+// F320: a reply's formula showed as its TeX, dollars, backslashes and braces.
 journey("math in a reply: the tutor and Review's Ask draw an AI's formulas, on their own line and inline, and a price stays a price", async (page) => {
   const reply = "The logistic curve:\n\n$$\\frac{1}{1+e^{-x}}$$\n\nInline, $E=mc^2$ for $5 a copy.";
   await page.route(/\/ore$/, async (route) => {

@@ -93,7 +93,7 @@ function mergeTurn(saved: Turn, next: Turn): Turn {
 
 /** The saved turns with the new copy's. A turn only the file has (another window's, sent after this copy was
  *  read) stays, after the turn it followed: the app never takes a turn out of a chat, so a missing turn is one
- *  this copy never saw, not one deleted. A turn in both is merged (F-new-stale-chat-save). */
+ *  this copy never saw, not one deleted. A turn in both is merged (F316). */
 function merged(saved: Chat["turns"], next: Chat["turns"]): Chat["turns"] {
   const was = new Map(saved.map((t) => [t.id, t]));
   const out = next.map((t) => (was.has(t.id) ? mergeTurn(was.get(t.id)!, t) : t));

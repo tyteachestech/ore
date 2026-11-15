@@ -27,7 +27,7 @@ const loneDisplay = () => (tree: MdNode) => {
 };
 const replyRemark = [...remarkPlugins, loneDisplay] as NonNullable<Props["remarkPlugins"]>;
 export const rehypeMath = [rehypeKatex, { output: "htmlAndMathml", throwOnError: false }] as NonNullable<Props["rehypePlugins"]>[number];
-/** What a tutor or Ask reply is drawn with: its formulas too (F-new-raw-latex). */
+/** What a tutor or Ask reply is drawn with: its formulas too (F320). */
 export const reply = { remarkPlugins: replyRemark, rehypePlugins: [rehypeMath] as NonNullable<Props["rehypePlugins"]> };
 
 // A single-dollar formula, read as Pandoc reads one (no space inside either `$`, no digit right after the

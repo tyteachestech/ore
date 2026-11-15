@@ -860,7 +860,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   annsRef.current = anns;
   const frame = useRef(0);
   // The jump last made, so a repaint doesn't scroll back to it, and a new one (a second citation into this
-  // source while it is open) still goes (F-new-second-citation).
+  // source while it is open) still goes (F317).
   const jumped = useRef<string | undefined>(undefined);
   const scrollTimer = useRef(0);
   const body = doc?.body;

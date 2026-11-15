@@ -44,7 +44,7 @@ test("a card still being added is not kept as added, and a reply being written i
   expect(t.alts).toEqual([{ message: "Why?", reply: "Because." }]);
 });
 
-// F-new-retry-drops-section and the review of #437: a turn asked again goes with what it first went with,
+// F319 and the review of #437: a turn asked again goes with what it first went with,
 // less an @ he took out of the message by editing it.
 test("asking a turn again keeps its source, section, @s and files; an @ edited out no longer points it", () => {
   const memory = { kind: "skill" as const, id: "memory", name: "Memory" };

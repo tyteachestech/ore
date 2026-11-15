@@ -251,7 +251,7 @@ describe("tutor: replies", () => {
     expect(r.citations[0]!.quote).toBe("goes back to the first box");
   });
 
-  // F-new-code-index-marker: `xs[1]` in code was taken for a citation marker, so a plain reply went back to fix.
+  // F318: `xs[1]` in code was taken for a citation marker, so a plain reply went back to fix.
   test("an index in code or after a name is no citation marker: the reply is taken as it came", async () => {
     const { lib, a } = await library();
     const reply = "Use `xs[1]` for the second element, as in\n\n```py\nys[2] = xs[1]\n```\n\nand arr[3] the fourth.";

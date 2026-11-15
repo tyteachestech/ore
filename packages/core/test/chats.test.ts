@@ -46,7 +46,7 @@ describe("tutor chats", () => {
     expect(listChats(lib).map((r) => r.id)).toEqual(["b-1", "a-1"]);
   });
 
-  // F-new-stale-chat-save: a second window on the same chat saved its copy over the first's, deleting its turn.
+  // F316: a second window on the same chat saved its copy over the first's, deleting its turn.
   const twoWindows = async () => {
     const lib = await tempLibrary();
     const save = (turns: object[]) => saveChat(lib, JSON.stringify({ id: "c-1", title: "Two windows", turns }), { merge: true });
