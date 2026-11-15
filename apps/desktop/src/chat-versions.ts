@@ -34,3 +34,17 @@ export function flip(t: TutorTurn, i: number): TutorTurn {
   if (!v || i === versionShown(t)) return t;
   return { id: t.id, ...v, alts: list.filter((_, j) => j !== i), alt: i };
 }
+
+const same = (a: { kind: string; id: string }, b: { kind: string; id: string }) => a.kind === b.kind && a.id === b.id;
+
+/** The turn asked again: Try again, Try another reply, or his message edited (`edited`). It goes with all it first
+ *  went with (its source, the section on screen, D294, its @s and files), less an @ he took out of the message,
+ *  which then no longer points it; the reply it had is set aside as a version (D201). */
+export function askAgain(old: TutorTurn, edited?: string): TutorTurn {
+  const { id, item, at, title, files } = old;
+  const message = edited ?? old.message;
+  const mentions = old.mentions?.filter((m) => message.includes(`@${m.name}`));
+  const gone = (old.mentions ?? []).filter((m) => !mentions?.some((k) => same(k, m)));
+  const pointed = old.pointed?.filter((p) => !gone.some((m) => same(m, p)));
+  return { id, message, item, ...(at ? { at } : {}), title, ...(mentions?.length ? { mentions } : {}), ...(pointed ? { pointed } : {}), ...(files?.length ? { files } : {}), ...shelve(old) };
+}

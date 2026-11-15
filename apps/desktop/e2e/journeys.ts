@@ -1034,10 +1034,17 @@ journey("tutor: a message from a source says which section is on his screen, so 
     return h.textContent!.trim();
   });
   await page.keyboard.press("Meta+j");
-  const sent = page.waitForRequest((r) => (r.postData() ?? "").includes(`"tutor","Explain this part","--item=`) && (r.postData() ?? "").includes(JSON.stringify(`--at=${heading}`).slice(1, -1)));
+  const at = (r: { postData(): string | null }) => (r.postData() ?? "").includes(`"tutor","Explain this part","--item=`) && (r.postData() ?? "").includes(JSON.stringify(`--at=${heading}`).slice(1, -1));
+  const sent = page.waitForRequest(at);
   await page.getByRole("textbox", { name: "Message the tutor" }).fill("Explain this part");
   await page.keyboard.press("Enter");
   await sent;
+  // F319: Try another reply asks the same part again, not the source at large.
+  const tutor = page.getByRole("complementary", { name: "Tutor" });
+  const again = page.waitForRequest((r) => (r.postData() ?? "").includes(`"tutor","Explain this part","--item=`));
+  await tutor.getByRole("button", { name: "Try another reply" }).click();
+  if (!at(await again)) throw new Error("Try another reply dropped the section on his screen");
+  await tutor.locator(".ask-versions").last().getByText("2 / 2").waitFor();
 });
 
 journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {
@@ -1071,18 +1078,21 @@ journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources
   await page.keyboard.press("Escape");
 });
 
-journey("tutor citation: a numbered source in a reply opens that source at the quoted passage, marked", async (page) => {
+journey("tutor citation: a numbered source in a reply opens that source at the quoted passage, marked; another into the open source goes to its own", async (page) => {
   // The reply cites a real passage of the seeded source, placed in its doc.md as the tutor places it.
   const bridge = (args: string[]) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args }) }).then((r) => r.json());
   const item = ((await bridge(["ls"])) as { id: string; title: string }[]).find((i) => i.title === TESTING)!;
   const body = ((await bridge(["show", item.id])) as { body: string }).body;
   const quote = "Each successful retrieval changes the memory itself.";
   const start = body.indexOf(quote);
-  if (start < 0) throw new Error("the seeded source no longer holds the quote");
+  const quote2 = "Confidence matters as much as accuracy.";
+  const start2 = body.indexOf(quote2);
+  if (start < 0 || start2 < 0) throw new Error("the seeded source no longer holds the quotes");
   await page.route(/\/ore$/, async (route) => {
     if (!(route.request().postData() ?? "").includes('"tutor",')) return route.fallback();
     const cite = { n: 1, item: item.id, title: TESTING, heading: "", quote, text: quote, start, end: start + quote.length };
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Retrieval changes the memory [1].", citations: [cite], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } }) });
+    const cite2 = { n: 2, item: item.id, title: TESTING, heading: "Using it well", quote: quote2, text: quote2, start: start2, end: start2 + quote2.length };
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Retrieval changes the memory [1]. Confidence counts too [2].", citations: [cite, cite2], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } }) });
   });
   try {
     await page.keyboard.press("Meta+j");
@@ -1095,6 +1105,15 @@ journey("tutor citation: a numbered source in a reply opens that source at the q
     await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
     const active = () => page.evaluate(() => [...(CSS.highlights.get("hl-active") ?? [])].map((r) => r.toString()).join("|"));
     await until("the quoted passage is marked", async () => (await active()) === quote);
+    // F317: another citation into the source already open goes to its own passage.
+    const top = await page.locator(".reader-scroll").evaluate((e) => e.scrollTop);
+    await tutor.getByRole("button", { name: `Source 2: ${TESTING}` }).click();
+    await until("the second quoted passage is marked", async () => (await active()) === quote2);
+    if ((await page.locator(".reader-scroll").evaluate((e) => e.scrollTop)) === top) throw new Error("the second citation left the page where the first put it");
+    // The same citation again, after he scrolled away, goes again.
+    await page.locator(".reader-scroll").evaluate((e) => (e.scrollTop = 0));
+    await tutor.getByRole("button", { name: `Source 2: ${TESTING}` }).click();
+    await until("the same citation clicked again goes back to its passage", async () => (await page.locator(".reader-scroll").evaluate((e) => e.scrollTop)) > 0);
   } finally {
     await page.unroute(/\/ore$/); // a failure here mustn't answer later journeys' tutor calls
   }
@@ -9874,6 +9893,44 @@ journey("review Ask: a failed question offers Try again, which asks it again and
   if ((await page.locator(".ask-me").count()) !== 1) throw new Error("Try again put the question in the thread twice");
   await page.waitForTimeout(300);
   if (asked.length !== 2) throw new Error(`a double click on Try again asked ${asked.length - 1} times`);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+// F320: a reply's formula showed as its TeX, dollars, backslashes and braces.
+journey("math in a reply: the tutor and Review's Ask draw an AI's formulas, on their own line and inline, and a price stays a price", async (page) => {
+  const reply = "The logistic curve:\n\n$$\\frac{1}{1+e^{-x}}$$\n\nInline, $E=mc^2$ for $5 a copy.";
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !(body.includes('"tutor",') || body.includes('"ask",'))) return route.fallback();
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(body.includes('"ask",') ? { reply, proposal: null, session: "s1" } : { reply, citations: [], general: true, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@16" } }) });
+  });
+  const drawn = async (where: string, root: ReturnType<typeof page.locator>) => {
+    await root.locator(".katex-display .katex").first().waitFor();
+    const text = (await root.innerText()).replace(/\s+/g, " ");
+    if (/\$\$|\\frac|\^\{/.test(text)) throw new Error(`${where} shows the TeX: ${text}`);
+    if (!(await root.locator(".katex").filter({ hasText: "mc" }).count())) throw new Error(`${where} left inline math as text`);
+    if (!text.includes("for $5 a copy")) throw new Error(`${where} took a price for math`);
+  };
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    await page.getByRole("textbox", { name: "Message the tutor" }).fill("What is the logistic curve?");
+    await page.keyboard.press("Enter");
+    await drawn("the tutor", tutor.locator(".ask-ai").last());
+    await page.keyboard.press("Escape");
+    await startReview(page, null);
+    await reveal(page);
+    await page.getByRole("button", { name: "Ask about this" }).click();
+    await page.getByRole("textbox", { name: "Ask about this exercise" }).fill("Show me the formula");
+    await page.keyboard.press("Enter");
+    await drawn("Review's Ask", page.locator(".ask"));
+  } finally {
+    await page.unroute(/\/ore$/);
+  }
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });

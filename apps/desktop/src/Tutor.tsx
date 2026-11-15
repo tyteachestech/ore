@@ -3,7 +3,7 @@ import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
 import { ArrowClockwise, CaretLeft, CaretRight, ArrowDown, ArrowUp, BookOpen, CaretDown, Check, Circle, Copy, FilePdf, FileText, Image, Paperclip, PencilSimple, Plus, Quotes, SidebarRight, Square, Stack, Stop, TextAlignLeft, Trash, X, type Icon } from "./icons";
 import { chatGroups } from "./chat-groups";
-import { flip, shelve, versionCount, versionShown, type Version } from "./chat-versions";
+import { askAgain, flip, versionCount, versionShown, type Version } from "./chat-versions";
 import { WithMenu } from "./Menu";
 import { citeRuns, siteName } from "./cite-pills";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -15,7 +15,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import { mend } from "./mend";
 import { CodeBlock } from "./Code";
-import remarkGfm from "remark-gfm";
+import { aiMath, reply as math } from "./math-md";
 import { Evidence } from "./Evidence";
 import { SkillIcon } from "./IconPicker";
 import { Grow } from "./Grow";
@@ -139,7 +139,7 @@ export function useTutorChat(notify: Notify) {
     const m = metaNow.current;
     if (!m || !now.current.length) return;
     const chat = { ...m, carry: carryNow.current, turns: now.current.map(settled) };
-    void write(() => oreWith(JSON.stringify(chat), "chat", "--set"));
+    void write(() => oreWith(JSON.stringify(chat), "chat", "--set", "--merge"));
   };
   /** A turn's change, in the chat on screen or, once he has moved on, in its own saved chat. */
   const patch = (chat: string, id: string, p: Partial<TutorTurn>, title?: string) => {
@@ -155,7 +155,7 @@ export function useTutorChat(notify: Notify) {
       const read = await ore<SavedChat & { root?: string }>("chat", chat).catch(() => null);
       if (!read) return;
       const { root: _root, ...c } = read; // where the library is, not part of the chat
-      await oreWith(JSON.stringify({ ...c, ...(title ? { title } : {}), turns: c.turns.map((t) => (t.id === id ? settled({ ...t, ...p }) : t)) }), "chat", "--set");
+      await oreWith(JSON.stringify({ ...c, ...(title ? { title } : {}), turns: c.turns.map((t) => (t.id === id ? settled({ ...t, ...p }) : t)) }), "chat", "--set", "--merge");
     });
   };
   // The @ context in effect (D128.3): the last message's own @s carry to later ones until he @s
@@ -248,13 +248,8 @@ export function useTutorChat(notify: Notify) {
   const retry = (id: string, edited?: string) => {
     const i = now.current.findIndex((t) => t.id === id);
     if (i < 0) return;
-    const old = now.current[i]!;
-    const { item, title, pointed, files } = old;
-    const message = edited ?? old.message;
-    // An @ he took out of the message no longer points it.
-    const mentions = old.mentions?.filter((m) => message.includes(`@${m.name}`));
     stepsShown.delete(id); // a new reply starts its steps from the first
-    const t: TutorTurn = { id, message, item, title, ...(mentions?.length ? { mentions } : {}), pointed, ...(files?.length ? { files } : {}), ...shelve(old) };
+    const t = askAgain(now.current[i]!, edited);
     update((ts) => ts.map((x) => (x.id === id ? t : x)));
     save();
     void run(t, now.current.slice(0, i));
@@ -1015,7 +1010,9 @@ function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }
   const [listed, setListed] = useState(false);
   const opener = useRef({ onOpen, onLink });
   opener.current = { onOpen, onLink };
-  const open = (c: AnyCitation) => ("url" in c ? opener.current.onLink(c.url) : opener.current.onOpen(c.item, `q:${c.start}:${c.end}`));
+  const cited = (n: number) => citations.some((c) => c.n === n);
+  // A count on the end makes each click a new jump, so the same citation clicked again goes again.
+  const open = (c: AnyCitation) => ("url" in c ? opener.current.onLink(c.url) : opener.current.onOpen(c.item, `q:${c.start}:${c.end}:${++turnSeq}`));
   // Made once per set of citations, so a re-render (a keystroke, a streaming reply) doesn't remount the pills and close an open card.
   const components = useMemo(() => ({
     pre: ({ children }: { children?: ReactNode }) => <CodeBlock>{children}</CodeBlock>,
@@ -1029,14 +1026,14 @@ function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }
   }), [citations]);
   return (
     <>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {citeRuns(text)}
+      <ReactMarkdown {...math} components={components}>
+        {citeRuns(aiMath(text), cited)}
       </ReactMarkdown>
       {!!steps?.length && id && (
         <Steps id={id} steps={steps} onDone={onSteps}>
           {(s) => (
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-              {citeRuns(s)}
+            <ReactMarkdown {...math} components={components}>
+              {citeRuns(aiMath(s), cited)}
             </ReactMarkdown>
           )}
         </Steps>

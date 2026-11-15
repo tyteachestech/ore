@@ -182,6 +182,20 @@ describe("tutor: replies", () => {
     expect(readFileSync(join(binDir, "count"), "utf8")).toBe("1");
   });
 
+  // Models often glue a marker to its word ("claim[1]"): one with its citation is a marker (repaired like any),
+  // one with none (`arr[2]`) is the reply's own words and never fails the check.
+  test("a marker glued to its word is renumbered with the rest; a glued [n] with no citation is left as written", async () => {
+    const { lib, a } = await library();
+    fakeClaude([{
+      reply: "It goes to box one[1], every time[2]. Use arr[5] for the fifth.",
+      citations: [{ passage: "P2", quote: "Leitner invented this in a Hamburg cellar." }, { passage: "P2", quote: "goes back to the first box" }],
+      general: false, hint: false, steps: [], exercise: null, card: null,
+    }]);
+    const r = await tutor(lib, "missed card", { item: a.meta.id });
+    expect(r.reply).toBe("It goes to box one, every time[1]. Use arr[5] for the fifth.");
+    expect(readFileSync(join(binDir, "count"), "utf8")).toBe("1");
+  });
+
   test("a made-up quote or passage loses its marker and the rest keep their order; the reply stays, marked as not from his sources", async () => {
     const { lib, a } = await library();
     fakeClaude([{
@@ -235,6 +249,16 @@ describe("tutor: replies", () => {
     const r = await tutor(lib, "missed card", { item: a.meta.id });
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("marker [2] has no citation");
     expect(r.citations[0]!.quote).toBe("goes back to the first box");
+  });
+
+  // F318: `xs[1]` in code was taken for a citation marker, so a plain reply went back to fix.
+  test("an index in code or after a name is no citation marker: the reply is taken as it came", async () => {
+    const { lib, a } = await library();
+    const reply = "Use `xs[1]` for the second element, as in\n\n```py\nys[2] = xs[1]\n```\n\nand arr[3] the fourth.";
+    fakeClaude([{ ...OK, reply, general: true }, { ...OK, reply: "Rewritten.", general: true }]);
+    const r = await tutor(lib, "how do I index a list?", { item: a.meta.id });
+    expect(r.reply).toBe(reply);
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).not.toContain("has no citation");
   });
 
   // F264: only the last six turns reached the tutor, so a long chat lost what he had said he was after.
