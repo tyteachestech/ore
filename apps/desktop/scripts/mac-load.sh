@@ -21,7 +21,7 @@ clean)
   me=$(ps -o pgid= -p $$ | tr -d ' '); up=" "; p=$$
   while [ "$p" -gt 1 ]; do up="$up$p "; p=$(ps -o ppid= -p "$p" | tr -d ' '); done
   pids=$(for p in $pids; do
-    case "$up" in *" $p "*) continue ;; esac
+    case "$up" in (*" $p "*) continue ;; esac
     [ "$(ps -o pgid= -p "$p" 2>/dev/null | tr -d ' ')" = "$me" ] && continue
     kill -0 "$p" 2>/dev/null || continue
     ps -o command= -p "$p" | grep -qi claude || echo "$p"
