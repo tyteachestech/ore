@@ -2196,21 +2196,16 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }
 
   /** Takes a saved highlight away as one step of the history, put on it at once, as the highlight goes: a ⌘Z
-   *  while the write is out takes back this step, not the one before it (a note, which it then cleared). Its
-   *  Undo shows the highlight at once and writes it back once the removal has landed, so it never lands first. */
+   *  while the write is out takes back this step, not the one before it (a note, which it then cleared). The
+   *  history holds its Undo and Redo until the removal has landed (history.ts `hold`), so they never land first. */
   async function removeStep(rid: string, undoable = true) {
     const s = annStep(rid);
     s.drop();
     const write = annotate(rid, "--status", "deleted");
-    const bring = () => {
-      s.restore();
-      return write.then(s.bring, () => {}); // a removal that failed has put it back already
-    };
-    const forget = undoable ? p.notify("Highlight removed", "info", bring, s.remove) : undefined;
+    if (undoable) p.notify("Highlight removed", "info", s.bring, s.remove).hold(write);
     try {
       await write;
     } catch (e) {
-      forget?.();
       p.notify(errorText(e), "error");
       s.restore();
     }

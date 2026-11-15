@@ -15,8 +15,10 @@ import { localDay } from "../../../packages/core/src/ids";
 /** `slot`: one toast at a time for it; a new one takes the place of the one showing (a retry that failed again). */
 export type Notify = (message: string, kind?: "info" | "error" | "progress" | "quiet", undo?: () => Promise<unknown>, redo?: () => Promise<unknown>, show?: () => void, stay?: boolean, slot?: string) => Forget;
 /** What `notify` returns: call it to take the step off the history; `undo()` takes the step back as ⌘Z would
- *  (a screen's own Undo button), so it can be redone and a failure is reported the same way. */
-export type Forget = (() => void) & { undo: () => void };
+ *  (a screen's own Undo button), so it can be redone and a failure is reported the same way. `hold(write)`: the
+ *  step went on the history before its own write landed (so a ⌘Z meanwhile takes back this step, not the one before
+ *  it); its undo and redo wait for that write, and one that fails takes the step off (history.ts `hold`). */
+export type Forget = (() => void) & { undo: () => void; hold: (write: Promise<unknown>) => void };
 
 /** What went wrong, in words he can act on. A JS fault (usually an empty or malformed AI reply) never
  *  reaches the UI as "Cannot read properties of null". */

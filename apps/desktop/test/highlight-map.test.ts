@@ -349,3 +349,46 @@ describe("the innermost of overlapping highlights opens, in any order (F-new-inn
     expect(holderOf(ranges, over(root, "delta echo"))?.[0]).toBe("outer");
   });
 });
+
+// Review of #442 (F-new-indented-code-symbols): the page keeps `*_[]|~` in any <code>, but the source's code map knew
+// only fences and backtick spans, so an indented code block read "consta=items0;" in the source and
+// "consta=items[0];" on the page, and nothing in it could be highlighted.
+describe("indented code keeps its symbols too, as CommonMark reads it (F-new-indented-code-symbols)", () => {
+  const INDENTED = [
+    "Some prose with a [link](https://example.com) and *emphasis*.",
+    "",
+    "    const a = items[0];",
+    "    const b = a_b | c;",
+    "",
+    "- a list item",
+    "",
+    "    its continuation, not code: [not](a) *code*",
+    "",
+    "A paragraph",
+    "    whose lazy line is not code: *x*",
+    "",
+    "\tconst t = tab[1];",
+    "",
+  ].join("\n");
+  test("the skeletons agree", () => {
+    expect(sourceSkeleton(INDENTED).chars).toBe(indexText(render(INDENTED)).chars);
+  });
+  test("a selection in it saves and paints with its brackets", () => {
+    const root = render(INDENTED);
+    const { q, painted } = saveAndPaint(INDENTED, root, over(root, "items[0]"));
+    expect(q).toEqual({ exact: "items[0]", start: INDENTED.indexOf("items[0]") });
+    expect(painted?.toString()).toBe("items[0]");
+  });
+});
+
+// Review of #442 (F-new-moved-code-highlight): a quote no longer at its offset (text added above it) was read as prose,
+// its brackets dropped, so a highlight in code never painted again once the text before it changed.
+test("a code highlight paints again after the text before it changes (F-new-moved-code-highlight)", () => {
+  const md = LAB;
+  const fence = md.indexOf("```js");
+  const at = md.indexOf("values[0]", fence);
+  const moved = `A new opening paragraph.\n\n${md}`;
+  const root = render(moved);
+  const r = rangeFor(indexText(root), sourceSkeleton(moved), moved, { exact: "values[0]", prefix: md.slice(at - 12, at), suffix: md.slice(at + 9, at + 21), start: at });
+  expect(r?.toString()).toBe("values[0]");
+});

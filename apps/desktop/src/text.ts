@@ -34,14 +34,37 @@ const FOOTNOTE_REF = /\[\^[^\]\s]+\]/g;
 const WORD = /[\p{L}\p{N}]/u;
 const SPACE = /\s/;
 
-/** Which characters are code (a fenced block's lines, a code span's text), where Markdown syntax does
- *  not apply: the reader shows each one as written. 1 marks code, 2 a fence line (never shown). */
+/** A line's indent in columns (a tab to the next multiple of 4) and where its text starts. */
+function indentOf(line: string): { cols: number; lead: number } {
+  let cols = 0;
+  let lead = 0;
+  for (; line[lead] === " " || line[lead] === "\t"; lead++) cols = line[lead] === "\t" ? cols + 4 - (cols % 4) : cols + 1;
+  return { cols, lead };
+}
+const LIST_ITEM = /^( {0,3}(?:[-+*]|\d{1,9}[.)]))([ \t]+|$)/;
+
+/** Which characters are code (a fenced block's lines, an indented block's, a code span's text), where Markdown
+ *  syntax does not apply: the reader shows each one as written. 1 marks code, 2 a fence line (never shown).
+ *  An indented block is CommonMark's: 4 columns in, not a paragraph's lazy line, and in a list 4 past the item's text. */
 function codeOf(md: string): Uint8Array {
   const code = new Uint8Array(md.length);
   let open: { ch: string; len: number; quotes: number } | null = null;
   let at = 0;
+  /** The line before was a paragraph's (an indented line then continues it), and the open list's text column. */
+  let para = false;
+  let list = -1;
   for (const line of md.split("\n")) {
     const end = at + line.length;
+    const { cols, lead } = indentOf(line);
+    const blank = lead === line.length;
+    if (!open && !blank) {
+      if (list >= 0 && cols < list && !LIST_ITEM.test(line) && !para) list = -1; // a line left of the item's text ends the list
+      if (!para && cols >= (list >= 0 ? list : 0) + 4) {
+        code.fill(1, at + lead, end);
+        at = end + 1;
+        continue;
+      }
+    }
     if (open) {
       const close = line.match(/^[ \t>]*(`{3,}|~{3,})[ \t]*$/);
       if (close && close[1]![0] === open.ch && close[1]!.length >= open.len) {
@@ -66,6 +89,14 @@ function codeOf(md: string): Uint8Array {
         code.fill(2, at + m[1]!.length, end);
       }
     }
+    if (!open && !blank) {
+      const item = line.match(LIST_ITEM);
+      // Its text starts past the marker and 1 to 4 spaces (more, and the text is 1 past the marker: code).
+      const w = item && indentOf(item[2]!).cols;
+      if (item) list = item[1]!.length + (w! >= 1 && w! <= 4 ? w! : 1);
+    }
+    // A paragraph goes on until a blank line; a heading, a fence or a rule is a line of its own.
+    para = !blank && !open && !code[at + lead] && !/^ {0,3}(#{1,6}([ \t]|$)|(\*[ \t]*){3,}$|(-[ \t]*){3,}$|(_[ \t]*){3,}$)/.test(line);
     at = end + 1;
   }
   // Code spans: a run of backticks up to the next run of the same length in the same paragraph.
@@ -386,15 +417,31 @@ type Quote = { exact: string; prefix: string; suffix: string; start: number };
 /** A DOM range for a stored annotation, located by its quote (context first, then position). A quote
  *  still at its offset is cut from the body's own skeleton, since a piece of code read alone (a
  *  `# comment` line out of its fence) would read as Markdown. */
+/** Where a quote that is no longer at its offset now is in the body: the place whose context matches best,
+ *  then the nearest. -1 when its words are gone. */
+function movedTo(body: string, q: Quote): number {
+  let best = -1;
+  let score = -1;
+  for (let i = body.indexOf(q.exact); i >= 0; i = body.indexOf(q.exact, i + 1)) {
+    const s = (q.prefix && body.endsWith(q.prefix, i) ? 2 : 0) + (q.suffix && body.startsWith(q.suffix, i + q.exact.length) ? 2 : 0);
+    if (s > score || (s === score && Math.abs(i - q.start) < Math.abs(best - q.start))) [best, score] = [i, s];
+  }
+  return best;
+}
+
 export function rangeFor(idx: TextIndex, src: Skeleton, body: string, q: Quote): Range | null {
   let needle: string;
   let pre: string;
   let suf: string;
-  if (q.exact && body.startsWith(q.exact, q.start)) {
-    let a = sourceIndex(src, q.start);
+  // A quote that moved (text changed before it) is mapped where it now is, as one still in place: code stays code.
+  let start = !q.exact ? -1 : body.startsWith(q.exact, q.start) ? q.start : movedTo(body, q);
+  // Words found again only where nothing shows (a link's address) are looked for as they read instead.
+  if (start >= 0 && start !== q.start && sourceIndex(src, start) === sourceIndex(src, start + q.exact.length)) start = -1;
+  if (start >= 0) {
+    let a = sourceIndex(src, start);
     // A quote starting inside a formula's TeX (saved before formulas were whole) is on that formula.
-    if (a > 0 && src.chars[a - 1] === MATH && src.map[a - 1]! + src.refs.get(src.map[a - 1]!)! > q.start) a--;
-    const b = sourceIndex(src, q.start + q.exact.length);
+    if (a > 0 && src.chars[a - 1] === MATH && src.map[a - 1]! + src.refs.get(src.map[a - 1]!)! > start) a--;
+    const b = sourceIndex(src, start + q.exact.length);
     needle = src.chars.slice(a, b);
     pre = src.chars.slice(Math.max(0, a - 24), a);
     suf = src.chars.slice(b, b + 24);
@@ -404,7 +451,7 @@ export function rangeFor(idx: TextIndex, src: Skeleton, body: string, q: Quote):
     suf = sourceSkeleton(q.suffix).chars;
   }
   if (!needle) return null;
-  const hint = (q.start / Math.max(1, body.length)) * idx.chars.length;
+  const hint = ((start >= 0 ? start : q.start) / Math.max(1, body.length)) * idx.chars.length;
   const h = find(idx.chars, pre, needle, suf, hint);
   if (h === null) return null;
   const last = h + needle.length - 1;

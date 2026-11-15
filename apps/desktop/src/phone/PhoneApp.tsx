@@ -925,16 +925,15 @@ export function PhoneApp() {
     // Off the list at once: the remove waits its turn behind a link being read, which can take a while.
     removing.current.add(l.id);
     setWaiting((all) => all.filter((w) => w.id !== l.id));
-    // On the history at once too, so an undo meanwhile takes back this step, not the one before it; its Undo
-    // writes once the remove has landed (one that failed has put the link back already).
+    // On the history at once too, so an undo meanwhile takes back this step, not the one before it; the history
+    // holds its Undo until the remove has landed (history.ts `hold`).
     const write = ore("inbox", "--remove", l.id);
-    const forget = notify("Removed the link", "info", () => write.then(() => ore("inbox", "--add", l.url, ...l.skills.flatMap((s) => ["--skill", s])).then(refresh), () => {}));
+    notify("Removed the link", "info", () => ore("inbox", "--add", l.url, ...l.skills.flatMap((s) => ["--skill", s])).then(refresh)).hold(write);
     try {
       await write;
       removing.current.delete(l.id);
       void refresh();
     } catch (e) {
-      forget();
       removing.current.delete(l.id);
       void refresh();
       notify(errorText(e), "error");

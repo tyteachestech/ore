@@ -7,7 +7,7 @@
 // Codex once the Mac load check passes (mac-load.ts: at most two testers, a big library alone). It stops each
 // tester's servers when that tester ends, and everything it started when the run ends or is stopped.
 // Output: codex-out/<name>/ (Codex writes report.md there), codex-out/<name>.log, codex-out/logs/, codex-out/done.txt.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { cp } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
@@ -16,6 +16,16 @@ import { check, clean, killTree, MAX_TESTERS } from "./mac-load";
 /** `from` (a library folder) is copied as the tester's library in place of a seed: an older Ore's library, a real one's copy. */
 export type Tester = { name: string; seed: "init" | "seed" | "big"; scale?: number; from?: string };
 export type Ports = { mac: number; bridge: number; phone: number };
+
+/** A tester's library copied from `from`, in place of whatever an earlier run left at `lib` (`cp -R` into a folder
+ *  that is there copies into a folder inside it). */
+export async function copyLibrary(from: string, lib: string) {
+  rmSync(lib, { recursive: true, force: true });
+  await cp(from, lib, { recursive: true });
+}
+
+/** How a tester's library is made, as the plan says it: a folder it is copied from, or its seed. */
+export const seedLabel = (t: Tester) => (t.from ? `from ${t.from}` : `seed ${t.seed}${t.scale ? ` ×${t.scale}` : ""}`);
 
 // Ports WebKit refuses to load (the Fetch standard's "bad ports"; 1723 cost sweep 4 a restart of its setup).
 const BAD = new Set([1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102, 103,
@@ -85,7 +95,7 @@ async function main() {
   }));
   for (const t of testers) {
     const p = plan.get(t.name)!;
-    console.log(`${t.name}: Mac ${p.mac}, bridge ${p.bridge}, iPhone ${p.phone}, ${t.from ? `from ${t.from}` : `seed ${t.seed}`}${t.scale ? ` ×${t.scale}` : ""}${alone(t) ? ", alone" : ""}`);
+    console.log(`${t.name}: Mac ${p.mac}, bridge ${p.bridge}, iPhone ${p.phone}, ${seedLabel(t)}${alone(t) ? ", alone" : ""}`);
   }
   console.log(`WebKit server: ws://[::1]:${webkit}/`);
   if (args.includes("--dry-run")) return;
@@ -121,12 +131,13 @@ async function main() {
     const p = plan.get(t.name)!, lib = join(libs, t.name), mock = "apps/desktop/scripts/mock";
     mkdirSync(join(out, t.name), { recursive: true });
     // Awaited, not spawnSync: a big seed takes minutes, and the other tester's Mac page is served from this process.
-    const seed = t.from
-      ? start(["cp", "-R", resolve(folder, t.from), lib], `seed-${t.name}.log`)
-      : t.seed === "init"
-      ? start(["bun", "packages/cli/src/ore.ts", "init"], `seed-${t.name}.log`, { env: { ORE_LIBRARY: lib } })
-      : start(["bun", `${mock}/${t.seed === "big" ? "seed-big" : "seed"}.ts`, lib], `seed-${t.name}.log`, { env: t.scale ? { ORE_SEED_SCALE: String(t.scale) } : {} });
-    if ((await seed.exited) !== 0) throw new Error(`seeding failed: see codex-out/logs/seed-${t.name}.log`);
+    if (t.from) await copyLibrary(resolve(folder, t.from), lib);
+    else {
+      const seed = t.seed === "init"
+        ? start(["bun", "packages/cli/src/ore.ts", "init"], `seed-${t.name}.log`, { env: { ORE_LIBRARY: lib } })
+        : start(["bun", `${mock}/${t.seed === "big" ? "seed-big" : "seed"}.ts`, lib], `seed-${t.name}.log`, { env: t.scale ? { ORE_SEED_SCALE: String(t.scale) } : {} });
+      if ((await seed.exited) !== 0) throw new Error(`seeding failed: see codex-out/logs/seed-${t.name}.log`);
+    }
     await cp(lib, `${lib}-phone`, { recursive: true });
     const csp = cspFor(p.bridge), dist = join(root, "apps/desktop/dist");
     const mac = Bun.serve({ port: p.mac, async fetch(req) {
