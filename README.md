@@ -96,7 +96,7 @@ Start with **DECISIONS** (what was decided and why) and **SPEC** (how it's built
 | [`docs/SPEC.md`](docs/SPEC.md) | Data model, library layout, CLI, scheduling, AI adapter |
 | [`GLOSSARY.md`](GLOSSARY.md) | Glossary: source, highlight, intent, prequestion, finish, skill… |
 | [`PRODUCT.md`](PRODUCT.md) · [`DESIGN.md`](DESIGN.md) | Product brief and design system (tokens, components, states) |
-| [`AGENTS.md`](AGENTS.md) | Working agreement for AI coding agents: rules, UI quality bar, interaction checklist |
+| [`AGENTS.md`](AGENTS.md) | Working agreement for AI coding agents: rules, commands, where things are; the UI quality bar and interaction checklist are in [`apps/desktop/AGENTS.md`](apps/desktop/AGENTS.md) |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Reporting a broken import, setting up, and what a pull request needs |
 | [`docs/WORKFLOW.md`](docs/WORKFLOW.md) | How the maintainer's threads merge and reinstall the app |
 

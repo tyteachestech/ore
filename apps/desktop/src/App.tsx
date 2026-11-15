@@ -63,6 +63,17 @@ import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setSpaci
 /** wry on macOS reports file-drop positions in CSS points (see dropPoint). */
 const MAC = navigator.userAgent.includes("Mac");
 
+const LAST_SKILLS = "ore.skills.last";
+/** The skills the sidebar showed last time, or none: only a stand-in until `ore skills` answers. */
+function lastSkills(): Skill[] {
+  try {
+    const all: unknown = JSON.parse(load(LAST_SKILLS) ?? "[]");
+    return Array.isArray(all) && all.every((s) => s && typeof s.id === "string" && typeof s.name === "string") ? (all as Skill[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 const TABS: { id: Tab; label: string; key: KeyId }[] = [
   { id: "toread", label: "To read", key: "go-toread" },
   { id: "done", label: "Done", key: "go-done" },
@@ -169,7 +180,9 @@ export function App() {
   useReminderAgent();
   const [items, setItems] = useState<Item[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
-  const [skills, setSkills] = useState<Skill[]>([]);
+  // The skills as last seen stand in until this launch's answer comes (D299): the sidebar opens
+  // whole, where it used to open as three bare words and jump when the icons arrived (F300).
+  const [skills, setSkills] = useState<Skill[]>(lastSkills);
   const [status, setStatus] = useState<Tab>(() => lastView().status);
   /** Archived sources, for the Archived tab. */
   const [archived, setArchived] = useState<Item[]>([]);
@@ -284,7 +297,9 @@ export function App() {
   const [hideSidebar, setHideSidebar] = useState(() => load("ore.sidebar") === "collapsed");
   // Its edge drags it from 180 (the title bar's buttons and a short skill name still fit) to 360, or 40% of a
   // narrow window so the content keeps its room (D44, D193). Everything sized off the sidebar reads --sidebar.
-  const sideWidth = useSideWidth("ore.sidebarwidth", 216, 180, { left: true, share: 0.4, cap: 360 });
+  /** Set once toggleSidebar exists below: the sidebar's edge dragged past its narrowest hides it (D304). */
+  const foldSidebar = useRef<() => void>(undefined);
+  const sideWidth = useSideWidth("ore.sidebarwidth", 216, 180, { left: true, share: 0.4, cap: 360, fold: () => foldSidebar.current?.() });
   useLayoutEffect(() => document.documentElement.style.setProperty("--sidebar", `${sideWidth.width}px`), [sideWidth.width]);
   const [notesOpen, setNotesOpen] = useState(() => load("ore.mynotes") !== "closed");
   const [sideTab, setSideTab] = useState<SideTab>(() => {
@@ -347,6 +362,7 @@ export function App() {
     loadSkills().then(
       (all) => {
         setSkills(all);
+        save(LAST_SKILLS, JSON.stringify(all));
         setSkill((k) => (k && !all.some((s) => s.id === k) ? null : k));
       },
       // Try again while `ore` is still down says so again in the same toast.
@@ -937,6 +953,7 @@ export function App() {
       return !v;
     });
   }, [autoHide, hideSidebar, collapsed, leaveSidebar]);
+  foldSidebar.current = toggleSidebar;
 
   /** Back from Settings; Home re-reads the goal it may have changed. */
   const closeSettings = useCallback(() => {
@@ -1892,6 +1909,16 @@ export function App() {
     ...(r.archived_at ? [] : [{ id: "archive", label: "Archive", hint: label(keys.archive), danger: true, divider: true, run: () => void archiveSource(r) }]),
   ];
 
+  /** What ⌘K offers on a source row of its own (Tab on the row): its ⋯ menu's actions, each skill a row of
+   *  its own. Not Rename, which edits a list row in place, nor the list's own Show menu and pin moves. */
+  const paletteSourceActions = (id: string): Action[] => {
+    const r = (items ?? []).find((i) => i.id === id);
+    if (!r) return [];
+    return rowActions(r)
+      .filter((a) => !["rename", "pin-up", "pin-down"].includes(a.id) && a !== showMenu)
+      .flatMap((a): Action[] => (a.sub ? a.sub.map((b) => ({ id: `${a.id}:${b.id}`, label: b.checked ? `Remove from ${b.label}` : `File under ${b.label}`, keywords: ["skill", "move"], run: b.run })) : [{ id: a.id, label: a.label, hint: a.hint, run: a.run }]));
+  };
+
   /** ⌘K follows what is open (a source, a skill page), never what is selected in a list (D178): a row's
    *  actions are on its ⋯ and its right-click. */
   const actions: Action[] = [
@@ -2188,7 +2215,7 @@ export function App() {
         </div>
       ) : <div className="empty-state">{empty(status, keys)}</div>)}
       {q && hits.q === q && hits.error && <div className="empty-state err" role="alert">Couldn’t search the text: {hits.error} Titles still filter.</div>}
-      {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">Nothing in {TABS.find((s) => s.id === status)?.label ?? "Archived"} matches “{q}”.</div>}
+      {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">Nothing in {TABS.find((s) => s.id === status)?.label ?? "Archived"} matches “{q}”. <button className="link" onClick={() => setQuery("")}>Clear the search</button></div>}
       {/* A grid, not a listbox: a row holds its own controls (chips, ⋯), which an option may not (ARIA's layout grid). */}
       {rows.length > 0 && <div role="grid" aria-multiselectable="true" aria-label="Sources">
       <DndContext
@@ -2299,7 +2326,7 @@ export function App() {
 
   const tutorButton = !tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} said={unheard.said} failed={unheard.failed} thinking={unheard.thinking} onHush={unheard.hush} />;
   return (
-    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}${sideWidth.dragging ? " sizing" : ""}`}>
+    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}${sideWidth.dragging ? " sizing" : ""}${sideWidth.folding ? " folding" : ""}`}>
       <div className="titlebar" data-tauri-drag-region />
       <Hint text={collapsed ? "Show sidebar" : "Hide sidebar"} keys="sidebar">
       <button
@@ -2327,7 +2354,7 @@ export function App() {
       </div>
       {collapsed && <div className="side-edge" aria-hidden="true" onMouseEnter={peekIn} onMouseLeave={() => !peek && clearTimeout(peekTimer.current)} />}
       {!collapsed && (
-        <Hint text="Drag to resize · double-click to reset" side="right">
+        <Hint text="Drag to resize or hide · double-click to reset" side="right">
           <div className={`divider side-divider${sideWidth.dragging ? " dragging" : ""}`} role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" {...sideWidth.divider} />
         </Hint>
       )}
@@ -2396,6 +2423,7 @@ export function App() {
           <Reader
             key={openId}
             id={openId}
+            known={items?.find((i) => i.id === openId)}
             onStep={feedSplit ? (by) => {
               // The list holds the keys while the next post loads; the post takes them when it shows.
               document.querySelector<HTMLElement>(".feed-col .feed-list")?.focus({ preventScroll: true });
@@ -2587,6 +2615,7 @@ export function App() {
           }}
           onOpen={openSource}
           onAsk={(q) => openTutor(q)}
+          sourceActions={paletteSourceActions}
           onCreated={(s) => {
             reloadSkills();
             madeSkill(s);

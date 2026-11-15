@@ -9,6 +9,7 @@ import { PHONE } from "./ore";
 import { PhoneApp } from "./phone/PhoneApp";
 import { HintProvider } from "./Hint";
 import { trackInput } from "./input-mode";
+import { installGlide } from "./pill-glide";
 import { suppressPageMenu } from "./native-menu";
 import { QuickQuiz } from "./QuickQuiz";
 import "./styles.css";
@@ -17,6 +18,7 @@ import "./tailwind.css";
 
 suppressPageMenu(document);
 trackInput(document);
+installGlide();
 
 /** A click on a control that stops its own event still closes an open popover: Radix counts one that doesn't reach the document as
  *  taken, so it stays open, unless the click lands on a surface registered here (the whole page). */

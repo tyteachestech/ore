@@ -35,7 +35,8 @@ import { citeQuote, citeSources, copyCited, type Cited } from "./cite";
 import { group, MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { findChapterEnds, Margin, type ChapterEnd, type MarginHandle } from "./Margin";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
-import { clickBelow, SidePanel, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
+import { CodeBlock } from "./Code";
+import { clickBelow, SidePanel, SidePanelFrame, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
@@ -77,6 +78,7 @@ const CHAPTER_PROMPTS = ["The claim this chapter makes", "One example or piece o
 // thought he has while reading. A key point asks why it holds (self-explanation), a question asks for
 // a guess first (prediction): those two are tested later, so their prompts pay off.
 const Original = lazy(() => import("./OriginalPage"));
+const Slides = lazy(() => import("./OriginalSlides"));
 
 const PLACEHOLDER: Record<Intent, string> = {
   keep: "Note…",
@@ -135,6 +137,7 @@ const placeError = (e: unknown) => {
 };
 
 const components: Components = {
+  pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   a: ({ href, children }) => {
     const fn = href?.match(/^#fn(ref)?-(.+)$/);
     if (fn) return (
@@ -516,7 +519,7 @@ const notebook: Components = {
   pre: ({ children }) => {
     const code = Children.toArray(children)[0];
     const out = isValidElement<{ className?: string }>(code) && /\blanguage-text\b/.test(code.props.className ?? "");
-    return out ? <Output>{children}</Output> : <pre>{children}</pre>;
+    return out ? <Output>{children}</Output> : <CodeBlock>{children}</CodeBlock>;
   },
 };
 
@@ -600,6 +603,8 @@ type LookUp = { word: string; range: Range; ann: string | null; top: number; lef
 
 type Props = {
   id: string;
+  /** What the row he opened it from already knows, drawn at once while the text is read (D299). */
+  known?: { title: string; author?: string };
   /** A post open beside the Feed (D289): J and K open the next and previous post. */
   onStep?: (by: 1 | -1) => void;
   /** Just added with no skill (D109): the skill picker opens with the source. */
@@ -1134,6 +1139,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const filling = useFilling(p.id);
   const opened = useRef<string | null>(null);
   const shownBodyOf = useRef<string | null>(null);
+  /** Goes up on "Try again" after a failed open: the read runs once more (F299). */
+  const [tries, setTries] = useState(0);
   useEffect(() => {
     let live = true;
     ore<Doc>("show", p.id, "--annotations").then(
@@ -1158,7 +1165,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     return () => {
       live = false;
     };
-  }, [p.id, changes]);
+  }, [p.id, changes, tries]);
 
   // Enrichment runs in the background after `ore add`; poll for prequestions for up to ~3 minutes
   // (`ore ls` carries the frontmatter without the body, which can be megabytes for a book).
@@ -1371,7 +1378,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   // Opening the source note puts the caret in it; closing writes what is pending.
   /** A PDF's own file, for the Original tab (D202); any other source has only the two tabs. */
   const pdf = doc?.source_file && /\.pdf$/i.test(doc.source_file) ? doc.source_file : null;
-  const sideTab: SideTab = p.sideTab === "original" && !pdf ? "note" : p.sideTab;
+  /** A PowerPoint deck's own file: its Original tab shows the slide (D307). */
+  const deck = doc?.source_file && /\.pptx$/i.test(doc.source_file) ? doc.source_file : null;
+  const sideTab: SideTab = p.sideTab === "original" && !pdf && !deck ? "note" : p.sideTab;
   const notesShown = p.notesOpen && !closedBook && sideTab === "note";
   const questionsShown = p.notesOpen && !closedBook && sideTab === "questions";
   const originalShown = p.notesOpen && !closedBook && sideTab === "original";
@@ -1392,6 +1401,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         if ((marks[mid]!.nextElementSibling?.getBoundingClientRect().top ?? Infinity) <= line) lo = mid + 1;
         else hi = mid;
       }
+      // A deck scrolled to its end is on its last slide, though that short slide's mark never reaches the line.
+      // (A PDF's page is long, so its end shows the page above too, and the line decides.)
+      if (deck && marks.length && el.scrollTop > 0 && el.scrollTop + el.clientHeight >= el.scrollHeight - 2) lo = marks.length;
       setPage(lo ? Number(marks[lo - 1]!.dataset.page) : 1);
     };
     const onScroll = () => (frame ||= requestAnimationFrame(read));
@@ -1401,7 +1413,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       el.removeEventListener("scroll", onScroll);
       cancelAnimationFrame(frame);
     };
-  }, [originalShown, ready, shownBody]);
+  }, [originalShown, ready, shownBody, deck]);
 
   /** The chapter block (D115): the sign opens the source note with the chapter's title and three
    *  prompts, the source hidden (D34.4) until he ends it with ⌘↵ (recorded, then feedback) or Esc
@@ -3153,7 +3165,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         { id: "side-panel", label: panelShown ? "Hide side panel" : "Show side panel", hint: label(keys["side-panel"]), paletteOnly: true, run: p.onToggleSide },
         { id: "notes", label: notesShown ? "Close source note" : "Open source note", hint: label(keys.notes), paletteOnly: true, run: () => p.onShowSide("note") },
         // On the phone the PDF's own page is a page of its own, beside the source as the note is (Back returns).
-        ...(pdf ? [{ id: "original-page", label: PHONE ? "Original page" : originalShown ? "Close original page" : "Original page beside the text", paletteOnly: !PHONE, run: () => p.onShowSide("original") }] : []),
+        ...(pdf || deck ? [{ id: "original-page", label: PHONE ? (deck ? "Original slide" : "Original page") : originalShown ? (deck ? "Close original slide" : "Close original page") : deck ? "Original slide beside the text" : "Original page beside the text", paletteOnly: !PHONE, run: () => p.onShowSide("original") }] : []),
         ...(readingFor ? [{ id: "reading-for", label: "Show prequestions", paletteOnly: true, run: () => setPreqAsk((n) => n + 1) }] : []),
         { id: "archive", label: doc.archived_at ? "Restore" : "Archive", hint: label(keys.archive), danger: !doc.archived_at, divider: true, run: () => p.onArchive(doc) },
       ];
@@ -3171,18 +3183,39 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   if (error)
     return (
       <div className="reader">
-        <div className="empty-state">
-          {error}
-          <br />
-          <kbd>Esc</kbd> back to sources
+        {/* The same block as Home's and the list's failure: what went wrong, Try again, and the way out. */}
+        <div className="empty-state err" role="alert">
+          <p>{error}</p>
+          {!/no longer in your library/.test(error) && (
+            <button className="pill-btn" onClick={() => (setError(null), setTries((n) => n + 1))}>
+              Try again
+            </button>
+          )}
+          <p className="empty-out"><kbd>Esc</kbd> back to sources</p>
         </div>
       </div>
     );
   if (!doc)
     return (
       <div className="reader">
-        {/* Shows only if opening takes a beat, so a quick open doesn't flash it. */}
-        <p className="loading reader-loading"><Working label="Opening…" /></p>
+        {/* Its title and author stand where they will be, from the row he clicked (Linear and Notion draw
+            the page's head before its body), so the open is never an empty pane.
+            Its own class: `.doc-head` means the source is read and its title can be worked. */}
+        <div className="reader-pane">
+        <div className="reader-scroll">
+          <div className="page">
+            {p.known && (
+              <header className="doc-opening">
+                <h1>{p.known.title}</h1>
+                {p.known.author && <div className="chips"><span className="byline"><span className="by">{p.known.author}</span></span></div>}
+              </header>
+            )}
+            {/* Shows only if opening takes a beat, so a quick open doesn't flash it. */}
+            <p className="loading reader-loading"><Working label="Opening…" /></p>
+          </div>
+        </div>
+        </div>
+        {p.notesOpen && !PHONE && <SidePanelFrame />}
       </div>
     );
 
@@ -3511,7 +3544,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
             </div>
           )}
           <TableCtx.Provider value={tables}>
-            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} pages={!!pdf} onReady={onReady} card={cardMode ? videoCard : undefined} />
+            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} pages={!!pdf || !!deck} onReady={onReady} card={cardMode ? videoCard : undefined} />
           </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
@@ -3709,7 +3742,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           away={PHONE && !panelShown}
           tab={sideTab}
           onTab={(t) => p.onShowSide(t, true)}
-          original={!!pdf}
+          onFold={PHONE ? undefined : p.onCloseSide}
+          original={!!pdf || !!deck}
           tool={questionsShown && !PHONE && <SearchButton label="Filter collected" button={sideFilterButton} pressed={sideFilterShown} onClick={() => (sideFilterShown ? (setSideFilter(""), setSideFiltering(false)) : setSideFiltering(true))} />}
           bar={
             questionsShown && !PHONE && sideFilterShown && (
@@ -3733,6 +3767,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           {originalShown && pdf ? (
             <Suspense fallback={null}>
               <Original file={pdf} page={page} />
+            </Suspense>
+          ) : originalShown && deck ? (
+            <Suspense fallback={null}>
+              <Slides file={deck} slide={page} />
             </Suspense>
           ) : notesShown || (PHONE && !questionsShown) ? (
             <SourceNoteBody

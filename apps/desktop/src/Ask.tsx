@@ -1,6 +1,7 @@
 import { ArrowUp, Sparkle, Stop } from "./icons";
 import { Fragment, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import { mend } from "./mend";
 import remarkGfm from "remark-gfm";
 import { Grow } from "./Grow";
 import { Hint } from "./Hint";
@@ -135,7 +136,7 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
             <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />
             {chat.partial ? (
               <div className="ask-text">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{chat.partial}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{mend(chat.partial)}</ReactMarkdown>
               </div>
             ) : (
               <span className="ask-dots" aria-label="Thinking">
