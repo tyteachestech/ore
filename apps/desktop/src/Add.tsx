@@ -165,6 +165,9 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
     setError(failed.length < what.length ? `Added ${what.length - failed.length} of ${what.length}. ${failure}` : failure);
   };
 
+  /** ↵, or a click on the foot's Add: follows a feed's own link, else adds what is in the box (or the copied one). */
+  const go = () => void (isFeed && !offer ? follow() : submit(offer ? [offer] : list));
+
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Trap>
@@ -202,8 +205,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              if (isFeed && !offer) void follow();
-              else void submit(offer ? [offer] : list);
+              go();
             } else if (e.key === "Tab" && !e.shiftKey) {
               // Tab goes to the skills and opens them (the field and its skills are the box's two choices).
               e.preventDefault();
@@ -269,9 +271,10 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
                 File
               </button>
             </Hint>
-            <span>
+            {/* A pointer adds too, not only ↵ (Codex sweep 5). */}
+            <button className="add-file" onClick={() => (go(), ref.current?.focus())} disabled={busy || (!list.length && !offer)}>
               <kbd>↵</kbd> {isFeed ? "Follow" : "Add"}
-            </span>
+            </button>
           </span>
         </div>
       </div>

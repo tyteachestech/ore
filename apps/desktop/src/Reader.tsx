@@ -2677,6 +2677,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   });
 
   const pressedAt = useRef({ x: 0, y: 0 });
+  /** Lets go of the window's ear for a press's release outside the page (below). */
+  const disarm = useRef(() => {});
+  useEffect(() => () => disarm.current(), []);
   const onMouseDown = (e: MouseEvent) => {
     // A click that is not the third of a triple: the double click's sentence is kept now, quietly (no popup,
     // and the selection this click starts is left alone).
@@ -2686,6 +2689,27 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       word.quiet();
     }
     pressedAt.current = { x: e.clientX, y: e.clientY };
+    // A drag begun in the text and let go past the page (the margin beside it, Codex sweep 5): the page never hears
+    // that release, so the window hands it on, and a selection wholly in the source is highlighted all the same.
+    // Only this press's own release: a press that ends some other way (a native drag of the words, a cancelled
+    // pointer, the window losing focus) or the next press lets go of it, as does leaving the source.
+    disarm.current();
+    if (e.button === 0) {
+      const page = e.currentTarget;
+      const up = (ev: globalThis.MouseEvent) => {
+        off();
+        if (!page.contains(ev.target as Node) && !window.getSelection()?.isCollapsed) mouseUp.current(ev);
+      };
+      const ends = ["dragend", "pointercancel", "pointerdown", "blur"] as const;
+      const off = () => {
+        window.removeEventListener("mouseup", up, true);
+        for (const t of ends) window.removeEventListener(t, off, true);
+        disarm.current = () => {};
+      };
+      window.addEventListener("mouseup", up, true);
+      for (const t of ends) window.addEventListener(t, off, true);
+      disarm.current = off;
+    }
     if (e.button === 0 && !e.ctrlKey && !PHONE && docEl.current?.contains(e.target as Node) && !popupRef.current?.contains(e.target as Node)) turnWhileDragging(e.clientY);
     setFocus(null); // the mouse takes over from the keyboard focus
     if (popup && !popupRef.current?.contains(e.target as Node)) {
@@ -2810,8 +2834,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   useEffect(() => dropWord, []);
   // A drag over the text before a long source has finished mounting (its offsets aren't known yet) is
   // kept and highlighted once it has, if the words are still selected, never dropped (Codex sweep 4).
-  const early = useRef<MouseEvent | null>(null);
-  const onMouseUp = (e: MouseEvent) => {
+  const early = useRef<MouseEvent | globalThis.MouseEvent | null>(null);
+  const onMouseUp = (e: MouseEvent | globalThis.MouseEvent) => {
     const el = docEl.current;
     if (!ready && e.button === 0 && !e.ctrlKey && !popupRef.current?.contains(e.target as Node) && !lookupRef.current?.contains(e.target as Node)) early.current = e;
     if (!ready || !el || closedBook || popupRef.current?.contains(e.target as Node) || lookupRef.current?.contains(e.target as Node)) return;
@@ -2871,6 +2895,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       openPopup(id, range, annOf(id)?.note ?? "", { x: e.clientX, y: e.clientY });
     }
   };
+  const mouseUp = useRef(onMouseUp);
+  mouseUp.current = onMouseUp;
   useEffect(() => {
     const e = early.current;
     early.current = null;

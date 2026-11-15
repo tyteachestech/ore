@@ -13446,6 +13446,141 @@ journey("feed: a post reads beside the list, J and K step through the posts, and
   }
 });
 
+// —— Codex sweep 5 (docs/reviews/2026-11-15-codex-sweep-5) ——
+
+journey("feed: Esc back from a post low in a long list keeps that post in view (sweep 5, F303)", async (page) => {
+  const stamp = Date.now();
+  const titles = Array.from({ length: 30 }, (_, i) => `Long feed ${i + 1} ${stamp}`);
+  const server: ReturnType<typeof Bun.serve> = Bun.serve({ port: 0, fetch: (r: Request): Response => {
+    const path = new URL(r.url).pathname;
+    if (path === "/feed.xml") return new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Long ${stamp}</title><link>http://localhost/</link>${titles.map((t, i) => `<item><title>${t}</title><link>http://localhost:${server.port}/p${i}.html</link><pubDate>${new Date(Date.now() - i * 3600_000).toUTCString()}</pubDate></item>`).join("")}</channel></rss>`, { headers: { "content-type": "application/rss+xml" } });
+    const t = titles[Number(path.match(/p(\d+)/)?.[1] ?? 0)]!;
+    return new Response(`<html><head><title>${t}</title></head><body><article><h1>${t}</h1>${"<p>Space the practice out, then test yourself before you look back at the page.</p>".repeat(6)}</article></body></html>`, { headers: { "content-type": "text/html" } });
+  } });
+  const url = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", url);
+    await page.getByRole("button", { name: "Feed", exact: true }).click();
+    const row = page.locator(".row.post").filter({ hasText: titles[24] });
+    await row.scrollIntoViewIfNeeded();
+    await row.click();
+    await until("the post opens beside the list", async () => (await page.locator(".feed-col .row.post.open").innerText().catch(() => "")).includes(titles[24]!));
+    await page.locator(".feed-read p").filter({ hasText: "Space the practice" }).first().waitFor();
+    await page.keyboard.press("Escape");
+    await until("the whole list is back", async () => (await page.locator(".feed-split").count()) === 0);
+    await page.waitForTimeout(200);
+    const box = await row.boundingBox();
+    if (!box || box.y < 0 || box.y + box.height > 800) throw new Error(`the post just read is out of view after Esc (top ${box?.y})`);
+  } finally {
+    await ore("feed", "unfollow", url);
+    server.stop();
+  }
+});
+
+journey("add: the footer's ↵ Add is a button, so a pointer adds typed text; ↵ Follow follows a feed's own link (sweep 5, F306)", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByRole("dialog", { name: "Add a source" });
+  await box.getByLabel("Link, file path or text").fill("# Added by pointer\n\nA pointer user adds what he typed with one click on the footer's Add.");
+  await box.getByRole("button", { name: /^↵\s*Add$/ }).click();
+  await page.locator(".doc").getByText("A pointer user adds what he typed").waitFor();
+  const stamp = Date.now();
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Pointer ${stamp}</title><link>http://localhost/</link><item><title>Pointer post ${stamp}</title><link>http://localhost/p</link><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const url = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await box.getByLabel("Link, file path or text").fill(url);
+    await box.getByRole("button", { name: /^↵\s*Follow$/ }).click();
+    await box.waitFor({ state: "detached" });
+    await until("the feed is followed", async () => ((await ore("feed")) as { feeds: { url: string }[] }).feeds.some((f) => f.url === url));
+  } finally {
+    await ore("feed", "unfollow", url).catch(() => {});
+    server.stop();
+  }
+});
+
+journey("Edit skill: a click outside saves the typed name, as Enter does (D211, sweep 5, F307)", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit skill Creativity" });
+  await dialog.getByLabel("Rename Creativity").fill("Creative pointer"); // the name opens in edit
+  await page.mouse.click(1200, 760); // the dimmed page around the editor
+  await dialog.waitFor({ state: "detached" });
+  await until("the sidebar shows the new name", async () => (await page.locator(".sidebar .side-item", { hasText: "Creative pointer" }).count()) === 1);
+  await settled(page);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the old name back", async () => (await page.locator(".sidebar .side-item", { hasText: "Creativity" }).count()) === 1);
+});
+
+journey("Settings: a click outside the sheet saves the review plan he typed (D211, sweep 5)", async (page) => {
+  await page.keyboard.press("Meta+Comma");
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await settings.getByRole("tab", { name: "Review" }).click();
+  const plan = settings.getByLabel("After what do you review?");
+  const was = await plan.inputValue();
+  await plan.click();
+  await plan.fill("my pointer coffee");
+  await page.mouse.click(8, 400); // the app's margin around the sheet
+  await settings.waitFor({ state: "detached" });
+  await page.keyboard.press("Meta+Comma");
+  await settings.getByRole("tab", { name: "Review" }).click();
+  await until("the plan was saved", async () => (await plan.inputValue()) === "my pointer coffee");
+  await plan.fill(was);
+  await page.keyboard.press("Enter");
+  await settled(page);
+  await page.keyboard.press("Escape");
+});
+
+journey("sidebar: a skill dropped on the page outside the sidebar stays where it was (sweep 5, F308)", async (page) => {
+  const order = () => page.locator(".sidebar [role=group] .side-item").allInnerTexts();
+  await until("the skills are in the sidebar", async () => (await order()).includes("Creativity"));
+  const before = await order();
+  const from = (await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().boundingBox())!;
+  await page.mouse.move(from.x + 40, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 40, from.y + from.height / 2 + 10, { steps: 4 });
+  await page.mouse.move(900, 720, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  await settled(page);
+  const after = await order();
+  if (JSON.stringify(after) !== JSON.stringify(before)) throw new Error(`the skills moved: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+});
+
+journey("highlight: a drag from the text let go in the margin beside it still makes the highlight (sweep 5, F309)", async (page) => {
+  await openSource(page, TESTING);
+  const keeps = page.locator(".collected-chip.keep");
+  const before = Number(await keeps.innerText());
+  const at = await page.evaluate(() => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf("Multiple-choice works too");
+      if (i < 0) continue;
+      n.parentElement!.scrollIntoView({ block: "center" });
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + 1);
+      const a = r.getBoundingClientRect();
+      return { x: a.left + 1, y: a.top + a.height / 2 };
+    }
+    return null;
+  });
+  if (!at) throw new Error("the phrase is not in the reader");
+  const box = (await page.locator(".reader-scroll").boundingBox())!;
+  const col = (await page.locator(".page").boundingBox())!;
+  const right = box.x + box.width - (col.x + col.width);
+  if (right < 20) throw new Error("no margin right of the page to let go in");
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down();
+  await page.mouse.move(col.x + col.width + right / 2, at.y, { steps: 8 });
+  await page.mouse.up();
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await until("the Keep count goes up", async () => Number(await keeps.innerText()) === before + 1);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => Number(await keeps.innerText()) === before);
+});
+
 journey("source note: the format bar shows whole in the side panel, reaching over the page when the panel is narrower than it (F295)", async (page) => {
   await openSource(page, TESTING);
   const pm = page.locator(".mynotes .note-editor .ProseMirror").first();
@@ -13533,6 +13668,58 @@ journey("a source that fails to open says why and offers Try again, which opens 
   await page.evaluate(() => ((window as Fail).__ORE_FAIL = {}));
   await page.locator(".reader").getByRole("button", { name: "Try again" }).click();
   await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+});
+
+journey("Edit skill: a click outside with a name already taken stays open and says why (sweep 5 review)", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit skill Creativity" });
+  const name = dialog.getByLabel("Rename Creativity");
+  await name.fill("Habits");
+  await page.mouse.click(1200, 760);
+  await page.locator(".toast[data-kind=error]").filter({ hasText: "already exists" }).waitFor();
+  await page.waitForTimeout(300);
+  if (!(await dialog.isVisible())) throw new Error("the editor closed on a name that failed to save");
+  if ((await name.inputValue()) !== "Habits") throw new Error("the draft was lost");
+  await page.keyboard.press("Escape"); // drops the draft
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "detached" });
+  await settled(page);
+});
+
+journey("highlight: a drag that turns into a native text drag arms nothing for a later click (sweep 5 review)", async (page) => {
+  await openSource(page, TESTING);
+  const keeps = page.locator(".collected-chip.keep");
+  const before = Number(await keeps.innerText());
+  // A press on the text whose release never comes (a native drag took it over and ended in dragend).
+  const at = (await page.locator(".page p").filter({ hasText: "Space the tests out" }).first().boundingBox())!;
+  await page.locator(".page p").filter({ hasText: "Space the tests out" }).first().dispatchEvent("mousedown", { button: 0, clientX: at.x + 5, clientY: at.y + 5, bubbles: true });
+  await page.evaluate(() => document.dispatchEvent(new DragEvent("dragend", { bubbles: true })));
+  // Later: words selected some other way, and a click let go outside the page.
+  await page.evaluate(() => {
+    const p = [...document.querySelectorAll(".page p")].find((e) => e.textContent!.includes("Space the tests out"))!;
+    const r = document.createRange();
+    r.selectNodeContents(p.firstChild!);
+    getSelection()!.removeAllRanges();
+    getSelection()!.addRange(r);
+    document.querySelector(".reader-scroll")!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0, clientX: 5, clientY: 400 }));
+  });
+  await page.waitForTimeout(600);
+  if (Number(await keeps.innerText()) !== before) throw new Error("an unrelated mouseup made a highlight");
+  if (await page.getByRole("dialog", { name: "Highlight" }).isVisible()) throw new Error("a highlight popup opened");
+});
+
+journey("add: after a click on ↵ Add that fails, the caret is back in the box (sweep 5 review)", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL?: Record<string, string> }).__ORE_FAIL = { add: "The disk is full" }));
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByRole("dialog", { name: "Add a source" });
+  const field = box.getByLabel("Link, file path or text");
+  await field.fill("# Will fail\n\nThis text fails to add.");
+  await box.getByRole("button", { name: /^↵\s*Add$/ }).click();
+  await box.getByRole("alert").waitFor();
+  await until("focus is back in the box", () => field.evaluate((f) => document.activeElement === f));
+  await page.evaluate(() => delete (window as unknown as { __ORE_FAIL?: unknown }).__ORE_FAIL);
+  await page.keyboard.press("Escape");
 });
 
 journey("code in a source: its parts are coloured without rewrapping the text, Copy puts the code on the clipboard, and a highlight across it still lands (D300)", async (page) => {

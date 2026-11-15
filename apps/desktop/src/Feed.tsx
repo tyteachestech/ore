@@ -1,6 +1,6 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { closestCenter, DndContext, KeyboardSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
-import { RowSensor } from "./drag";
+import { RowSensor, dropWithin } from "./drag";
 import { TitleField } from "./TitleField";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -137,10 +137,13 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     if (reading) setKept((k) => (k.has(reading) ? k : new Set(k).add(reading)));
     if (reading) document.getElementById(`post-${reading}`)?.scrollIntoView({ block: "nearest" });
     else if (wasReading.current) {
-      // Back from the post: the list takes the keys again, on the post just read (Mail).
+      // Back from the post: the list takes the keys again, on the post just read (Mail), in view: the whole list
+      // lays out afresh and starts at its top (Codex sweep 5). Only as far as it must, once laid out.
       setCursor(wasReading.current);
       setKeyed(true);
       listRef.current?.focus({ preventScroll: true });
+      const id = `post-${wasReading.current}`;
+      requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "nearest" }));
     }
     wasReading.current = reading;
   }, [reading]);
@@ -400,6 +403,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   );
 
   const sensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
+  const feedDrop = dropWithin(() => listRef.current, closestCenter);
   const onDragEnd = (e: DragEndEvent) => {
     const from = feeds.findIndex((f) => f.url === e.active.id);
     const to = feeds.findIndex((f) => f.url === e.over?.id);
@@ -447,7 +451,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   else
     body = grid(
       // dnd-kit's live region goes to <body>: a grid's children are rows and row groups only.
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd} accessibility={{ container: document.body }}>
+      <DndContext sensors={sensors} collisionDetection={feedDrop} onDragEnd={onDragEnd} accessibility={{ container: document.body }}>
         <SortableContext items={feeds.map((f) => f.url)} strategy={verticalListSortingStrategy}>
           {groups.map((g) => (
             <FeedGroup
