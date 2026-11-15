@@ -166,13 +166,14 @@ export class LibraryIndex {
     // A hit in the title counts five times one in the body (bm25 weights by column). Archived sources,
     // and everything in them, stay out.
     const rows = this.db
-      .query<Omit<SearchHit, "snippet"> & { id: number; body?: string; annotation: string | null }, (string | number)[]>(
-        `select rowid as id, kind, ref, item, title${needBody ? ", body" : ""}, case when kind = 'card' then (select annotation from cards where cards.id = fts.ref) end as annotation from fts where fts match ? and (item is null or item not in (select id from items where archived = 1))${within ? " and item in (select value from json_each(?))" : ""} order by bm25(fts, 0, 0, 0, 5, 1, 1) limit ?`,
+      .query<Omit<SearchHit, "snippet"> & { id: number; body?: string; annotation: string | null }, [string, number]>(
+        `select rowid as id, kind, ref, item, title${needBody ? ", body" : ""}, case when kind = 'card' then (select annotation from cards where cards.id = fts.ref) end as annotation from fts where fts match ? and (item is null or item not in (select id from items where archived = 1)) order by bm25(fts, 0, 0, 0, 5, 1, 1) limit ?`,
       )
-      .all(match, ...(within ? [JSON.stringify(within)] : []), capped ? limit : -1);
+      .all(match, capped ? limit : -1);
     const seen = new Set<string>();
     const order = within && new Map(within.map((id, i) => [id, i]));
     const kept = rows
+      .filter((r) => !order || order.has(r.item!))
       .filter((r) => spelled.every((re) => re.test(r.title) || re.test(r.body!)))
       .filter((r) => !(bySource || within) || (r.item !== null && !seen.has(r.item) && !!seen.add(r.item)))
       .sort(order ? (a, b) => order.get(a.item!)! - order.get(b.item!)! : () => 0)
