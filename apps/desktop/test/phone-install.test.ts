@@ -27,8 +27,8 @@ test("installs to the paired iPhone, not a watch or a simulator", () => {
 });
 
 test("says which build the phone runs and how far behind it is", () => {
-  expect(say("2500", 2510)).toContain("10 commits behind");
-  expect(say("2510", 2510)).toContain("this checkout's");
+  expect(say("0.1.0.2500", 2510)).toContain("10 commits behind");
+  expect(say("0.1.0.2510", 2510)).toContain("this checkout's");
   expect(say("0.1.0", 2510)).toContain("assume it's old");
   expect(say(undefined, 2510)).toContain("isn't on the phone");
 });

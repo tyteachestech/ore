@@ -34,8 +34,10 @@ export function pickIphone(json: { result: { devices: Device[] } }): { udid: str
 
 export function describe(installed: string | undefined, here: number): string {
   if (!installed) return "Ore isn't on the phone.";
-  const n = Number(installed);
-  if (!Number.isInteger(n) || installed.includes(".")) return `The phone runs build ${installed}, from before builds were numbered by commit: assume it's old.`;
+  // Tauri writes the build number after the version: 0.1.0.614. A plain 0.1.0 predates numbered builds.
+  const m = installed.match(/^\d+\.\d+\.\d+\.(\d+)$/);
+  const n = Number(m?.[1]);
+  if (!m) return `The phone runs build ${installed}, from before builds were numbered by commit: assume it's old.`;
   return n === here ? `The phone runs build ${n}, this checkout's.` : n < here ? `The phone runs build ${n}, ${here - n} commits behind this checkout (${here}).` : `The phone runs build ${n}, ahead of this checkout (${here}).`;
 }
 
