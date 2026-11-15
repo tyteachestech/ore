@@ -6692,6 +6692,46 @@ journey("review: ⌘Z on the end screen takes the last rating back and returns t
   await page.keyboard.press("Escape");
 });
 
+journey("review sounds: showing the answer ticks and a rating shines, ⌘Z is silent, and Settings turns them off (D277)", async (page) => {
+  const heard = () => page.evaluate(() => (window as { __ORE_SFX?: string[] }).__ORE_SFX!.join(" "));
+  const q = page.locator(".review-q");
+  const sounds = async (on: boolean) => {
+    await page.keyboard.press("Meta+Comma");
+    await page.getByRole("tab", { name: "Review" }).click();
+    const sw = page.getByRole("switch", { name: "Sound effects" });
+    if (((await sw.getAttribute("aria-checked")) === "true") !== on) await sw.click();
+    await until(`Sound effects is ${on ? "on" : "off"}`, async () => ((await sw.getAttribute("aria-checked")) === "true") === on);
+    await page.keyboard.press("Escape");
+    await page.getByRole("dialog", { name: "Settings" }).waitFor({ state: "detached" });
+  };
+  await page.evaluate(() => ((window as { __ORE_SFX?: string[] }).__ORE_SFX = []));
+  await startReview(page, null);
+  const first = await q.first().innerText();
+  await reveal(page);
+  if ((await heard()) !== "tap") throw new Error(`showing the answer played “${await heard()}”, not the tick`);
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await until("the rating plays the shine", async () => (await heard()) === "tap right");
+  await until("the card moves on", async () => (await q.count()) === 0 || (await q.first().innerText().catch(() => first)) !== first);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z brings the card back", async () => (await q.first().innerText().catch(() => "")) === first);
+  await page.waitForTimeout(300);
+  if ((await heard()) !== "tap right") throw new Error(`⌘Z played a sound: “${await heard()}”`);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+  // Off in Settings: the same moments are silent.
+  await sounds(false);
+  try {
+    await startReview(page, null);
+    await reveal(page);
+    await page.waitForTimeout(200);
+    if ((await heard()) !== "tap right") throw new Error(`with Sound effects off, showing the answer played: “${await heard()}”`);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  } finally {
+    await sounds(true);
+  }
+});
+
 journey("review: at a session's end the cart tips its ore into the ring and leaves, the mole comes up after, and Reduce Motion skips it (D190)", async (page) => {
   const doneButton = page.locator(".review-foot").getByRole("button", { name: "Done" });
   const q = page.locator(".review-q");
@@ -6724,6 +6764,8 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
     await page.keyboard.press("Escape");
     await page.locator(".review").waitFor({ state: "detached" });
   };
+  await page.evaluate(() => ((window as { __ORE_SFX?: string[] }).__ORE_SFX = []));
+  const endSounds = () => page.evaluate(() => (window as { __ORE_SFX?: string[] }).__ORE_SFX!.filter((x) => ["cart", "done", "pop"].includes(x)).join(" "));
   await finish();
   // The cart plays only with something to tip (a ring dot this session lit, or a gem it cut).
   // Whether this library has that depends on the journeys before it, so that the cart mounts at all is
@@ -6738,6 +6780,8 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   }
   const after = await page.evaluate(() => ({ mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length, waiting: document.querySelectorAll(".review-cut > span[data-wait]").length, ore: document.querySelectorAll(".cart-ore").length }));
   if (!after.mole || after.waiting || after.ore || after.on < first.on) throw new Error(`the end screen didn't settle: ${JSON.stringify({ first, after })}`);
+  // Its sounds (D277): the cart's roll if it came, the jingle as the ring fills, the mole's pop as he comes up.
+  await until("the end screen's sounds played in order", async () => (await endSounds()) === (first.cart ? "cart done pop" : "done pop"));
   await back();
   // Reduce Motion: the same screen, at once, with no cart.
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -6748,6 +6792,8 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   })().finally(() => page.emulateMedia({ reducedMotion: null }));
   // A second session only adds minutes, so the ring is at least as full.
   if (still.cart || !still.mole || still.on < after.on) throw new Error(`Reduce Motion: ${JSON.stringify({ still, after })}`);
+  // He is just there, so nothing pops: only the jingle.
+  if (!(await endSounds()).endsWith("pop done")) throw new Error(`Reduce Motion's end screen played: ${await endSounds()}`);
   await back();
 });
 

@@ -126,7 +126,8 @@ const textImports: Plugin = {
 // point it at their own tones). Served as /sounds/<id>.mp3 in dev and written into the build when they are there;
 // a channel with no file says so in the app.
 const SOUNDS = process.env.ORE_SOUNDS ?? join(homedir(), "Library/Application Support/Ore/sounds");
-const SOUND_IDS = ["cave", "rain", "lamp", "deep", "focus"];
+// The `fx-` ones are Review's sounds (src/sfx.ts).
+const SOUND_IDS = ["cave", "rain", "lamp", "deep", "focus", ...["tap", "right", "missed", "goal", "cart", "pop", "done"].map((id) => `fx-${id}`)];
 const soundFile = (id: string) => join(SOUNDS, `${id}.mp3`);
 const ambienceSounds: Plugin = {
   name: "ambience-sounds",
