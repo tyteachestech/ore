@@ -1,13 +1,12 @@
 import { more } from "./more";
 import { fold, rankScore, WORDS } from "./match";
-import { siteOf } from "./details";
 import { GraduationCap, X } from "./icons";
 import { Command } from "cmdk";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SkillIcon } from "./IconPicker";
 import { isOther } from "../../../packages/core/src/collection-name";
 import { LABEL } from "./Collected";
-import { courseThumb, landing, lessonsOf, nextLesson, ore, opt, PHONE, searchFields, touched, type Intent, type Item, type SearchHit, type Skill } from "./ore";
+import { courseThumb, landing, lessonsOf, nextLesson, ore, opt, PHONE, searchFieldsOf, touched, type Intent, type Item, type SearchHit, type Skill } from "./ore";
 import { Thumb } from "./Thumb";
 import { useSwipeDown } from "./phone/sheet";
 import { errorText, useFocusWhileMounted } from "./util";
@@ -60,6 +59,13 @@ const sourceOf = (value: string, hits: Hit[]) => (value.startsWith("source ") ? 
 
 const TITLES = 8;
 
+/** The matches "In the text" lists: a source listed above for its title goes, as its row there opens it;
+ *  one listed only for its author, skill or type keeps its match, with its snippet and where it lands. */
+export const textHits = <H extends Pick<Hit, "item">>(hits: H[], listed: Pick<Item, "id" | "title">[], query: string) => {
+  const titled = new Set(listed.filter((i) => titleScore(i.title, query) > 0).map((i) => i.id));
+  return hits.filter((h) => !h.item || !titled.has(h.item));
+};
+
 /** ⌘K: recent sources, actions, skills, sources and courses by title, then sources whose text matches
  *  (`ore search`, SQLite FTS5) in their own group below. */
 export function Palette({ actions, recent, items, skills, skill, onSkill, onSkillNote, onOpen, onAsk, sourceActions, onCreated, onClose, leave }: Props) {
@@ -68,13 +74,10 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
   const byRecent = useMemo(() => [...items].sort((a, b) => touched(b).localeCompare(touched(a))), [items]);
   const touchedAt = useMemo(() => new Map(items.map((i) => [i.id, touched(i)])), [items]);
   /** What else a source is known by, as in a list's search (`searchFields`): its course, author, site, skills and type. */
-  const fieldsOf = useMemo(() => {
-    const names = new Map(skills.map((s) => [s.id, s.name]));
-    return new Map(items.map((i) => [i.id, searchFields(i, siteOf(i.url), i.skills.map((id) => names.get(id) ?? id))]));
-  }, [items, skills]);
+  const fieldsOf = useMemo(() => searchFieldsOf(items, skills), [items, skills]);
   /** A source's score: its title's, else a quarter of how the rest matches, so a source found by its author
    *  (or a typo) comes below every title that holds the words. */
-  const sourceScore = (i: Item, query: string) => titleScore(i.title, query) || rankScore(fieldsOf.get(i.id)!, query) / 4;
+  const sourceScore = (i: Item, query: string) => titleScore(i.title, query) || rankScore(fieldsOf(i), query) / 4;
   const [hits, setHits] = useState<Hit[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -188,7 +191,6 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
         ]
       : [];
   } else {
-    const titled = new Set<string>();
     // A course (D79) is one row, matched by its own title, that opens the lesson to read next, as its
     // row in the source list does; its lessons match by their own titles like any source.
     const courses = query ? [...new Map(items.flatMap((i) => (i.course ? [[i.course.id, i.course] as const] : []))).values()] : [];
@@ -226,7 +228,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
       undefined,
       TITLES,
     );
-    for (const r of byTitle.rows) if (r.value.startsWith("source ")) titled.add(r.value.slice(7));
+    const listed = byTitle.rows.flatMap((r) => (r.value.startsWith("source ") ? items.filter((i) => i.id === r.value.slice(7)) : []));
     groups = [
       group("Recent", query ? [] : recent.map((r) => ({ value: `source ${r.id}`, label: sourceLabel(r), run: () => onOpen(r.id) })), 2),
       byTitle,
@@ -260,8 +262,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
       group(
         "In the text",
         // The phone's SQLite has no bm25 (phone/sqlite.ts), so its hits come last touched first.
-        (PHONE ? [...hits].sort((a, b) => (touchedAt.get(b.item ?? "") ?? "").localeCompare(touchedAt.get(a.item ?? "") ?? "")) : hits)
-          .filter((h) => !h.item || !titled.has(h.item))
+        textHits(PHONE ? [...hits].sort((a, b) => (touchedAt.get(b.item ?? "") ?? "").localeCompare(touchedAt.get(a.item ?? "") ?? "")) : hits, listed, query)
           .map((h) => ({
             value: h.key,
             label: (

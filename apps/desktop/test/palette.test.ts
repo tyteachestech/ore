@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { titleScore, asksQuestion } from "../src/Palette";
+import { titleScore, asksQuestion, textHits } from "../src/Palette";
 
 test("a title matches only when every query word is in it", () => {
   expect(titleScore("Notes on spaced repetition scheduling (FSRS)", "section")).toBe(0);
@@ -51,4 +51,12 @@ describe("Ask your library in ⌘K", () => {
     for (const q of ["Why does spacing work?", "what is the testing effect", "How do Leitner boxes work", "leitner?"]) expect(asksQuestion(q)).toBe(true);
     for (const q of ["leitner", "testing effect", "what if", "Spaced repetition"]) expect(asksQuestion(q)).toBe(false);
   });
+});
+
+// F-new-palette-weak-drops-hit (review of #440): a source found in ⌘K by its author, skill or type was listed in
+// Sources, and its match in the text was dropped with it, losing the snippet and the place it lands.
+test("only a source listed by its title loses its row in “In the text”", () => {
+  const listed = [{ id: "a", title: "Retrieval practice" }, { id: "b", title: "Make it stick" }];
+  const hits = [{ key: "text item a", item: "a", title: "Retrieval practice" }, { key: "text item b", item: "b", title: "Make it stick", at: "find:retrieval" }, { key: "skill notes s", skill: "s", title: "Memory" }];
+  expect(textHits(hits, listed, "retrieval").map((h) => h.key)).toEqual(["text item b", "skill notes s"]);
 });
