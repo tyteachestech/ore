@@ -160,6 +160,12 @@ export type TutorProgress = { reply: string } | { searching: boolean } | { ai: A
 /** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. */
 /** What a quote from a web page is checked against: its title as the search gave it, then the results' text,
  *  which lists titles JSON-escaped (a title with "quotes" in it reads \"quotes\" there). */
+// A citation marker, [n], is in the reply's prose: `xs[1]` in code, an index right after a name, and [0]
+// are his reply's own words (F-new-code-index-marker).
+const MARKER = / ?(?<![\p{L}\p{N}_])\[(\d+)\]/gu;
+/** The text with `f` applied to what is outside its code spans and blocks. */
+const outsideCode = (text: string, f: (prose: string) => string) =>
+  text.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((part, at) => (at % 2 ? part : f(part))).join("");
 const pageWords = (page: { title: string; text: string }) => `${page.title}\n${page.text}`;
 
 export async function tutor(lib: Library, message: string, { earlier = [], files = [], onProgress, ...focus }: { earlier?: TutorTurn[]; files?: { name: string; path: string }[]; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
@@ -255,18 +261,17 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
       const keep = d.citations.map((c) => isWebUrl(c.passage) || mend(c, byId.get(c.passage)?.text));
       if (keep.includes(false)) {
         repaired.dropped += keep.filter((k) => !k).length;
-        // Markers only: `xs[1]` in code, an index right after a name, and [0] are his reply's own words.
-        const renumber = (text: string) => text.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((part, at) => at % 2 ? part : part.replace(/ ?(?<![\p{L}\p{N}_])\[(\d+)\]/gu, (all, n: string) => {
+        const renumber = (text: string) => outsideCode(text, (part) => part.replace(MARKER, (all, n: string) => {
           const i = +n - 1;
           if (i < 0 || i >= keep.length) return all;
           return keep[i] ? `${all.startsWith(" ") ? " " : ""}[${keep.slice(0, i + 1).filter(Boolean).length}]` : "";
-        })).join("");
+        }));
         d.reply = renumber(d.reply);
         d.steps = d.steps.map(renumber);
         d.citations = d.citations.filter((_, i) => keep[i]);
         d.general = true;
       }
-      const top = Math.max(0, ...[...[d.reply, ...d.steps].join("\n").matchAll(/\[(\d+)\]/g)].map((x) => +x[1]!));
+      const top = Math.max(0, ...[d.reply, ...d.steps].flatMap((text) => { const ns: number[] = []; outsideCode(text, (part) => (part.replace(MARKER, (all, n: string) => (ns.push(+n), all)))); return ns; }));
       if (d.steps.length === 1 || d.steps.length > 6) return "steps: give 2 to 6 steps, or [] when the reply isn't a worked answer";
       if (d.steps.length && (d.hint || d.exercise)) return "steps are a worked answer: not with a hint or an exercise";
       if (top > d.citations.length) return `marker [${top}] has no citation`;

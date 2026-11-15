@@ -46,6 +46,24 @@ describe("tutor chats", () => {
     expect(listChats(lib).map((r) => r.id)).toEqual(["b-1", "a-1"]);
   });
 
+  // F-new-stale-chat-save: a second window on the same chat saved its copy over the first's, deleting its turn.
+  test("a save from a window that never saw a turn keeps that turn, in its place", async () => {
+    const lib = await tempLibrary();
+    const shared = { id: "c-1", message: "first", reply: "One." };
+    const a = { id: "c-2", message: "from window A", reply: "A." };
+    const b = { id: "c-3", message: "from window B", reply: "B." };
+    const save = (turns: object[]) => saveChat(lib, JSON.stringify({ id: "c-1", title: "Two windows", turns }));
+    await save([shared]);
+    await save([shared, a]); // window A
+    await save([shared, b]); // window B, opened before A's turn
+    expect(readChat(lib, "c-1").turns.map((t) => t.id)).toEqual(["c-1", "c-2", "c-3"]);
+    await save([shared, a, { id: "c-4", message: "A again" }]); // A, still without B's
+    expect(readChat(lib, "c-1").turns.map((t) => t.id)).toEqual(["c-1", "c-2", "c-3", "c-4"]);
+    // A turn both know is the saving window's: its new reply replaces the old.
+    await save([shared, { ...a, reply: "A, again." }]);
+    expect(readChat(lib, "c-1").turns.find((t) => t.id === "c-2")).toMatchObject({ reply: "A, again." });
+  });
+
   test("refuses what isn't a chat: no title, no message, a path for an id", async () => {
     const lib = await tempLibrary();
     await expect(saveChat(lib, chat("a-1", "  "))).rejects.toThrow("title");

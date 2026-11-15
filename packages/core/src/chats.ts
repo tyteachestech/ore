@@ -66,15 +66,31 @@ export function readChat(lib: Library, id: string): Chat {
   return parse(readFileSync(f, "utf8"), `chat ${id}`);
 }
 
-/** Writes the whole chat (the app sends it after each message and reply). `created` is kept from the
- *  file once it exists; `updated` is now, unless `touch` is false (Undo of a delete puts it back as it was). */
+/** The saved turns with the new copy's: a turn in both is the new copy's, and one only the file has (another
+ *  window's, sent after this copy was read) stays, after the turn it followed. The app never takes a turn out
+ *  of a chat, so a missing turn is one this copy never saw, not one deleted (F-new-stale-chat-save). */
+function merged(saved: Chat["turns"], next: Chat["turns"]): Chat["turns"] {
+  const out = [...next];
+  const ids = new Set(next.map((t) => t.id));
+  saved.forEach((t, i) => {
+    if (ids.has(t.id)) return;
+    const after = i ? out.findIndex((x) => x.id === saved[i - 1]!.id) : -1;
+    out.splice(after + 1, 0, t);
+    ids.add(t.id);
+  });
+  return out;
+}
+
+/** Writes the chat (the app sends it after each message and reply), keeping turns saved since this copy was
+ *  read. `created` is kept from the file once it exists; `updated` is now, unless `touch` is false (Undo of
+ *  a delete puts it back as it was). */
 export async function saveChat(lib: Library, json: string, { touch = true } = {}): Promise<Chat> {
   const c = parse(json, "the chat");
   const f = file(lib, c.id);
   return withLock(paths.lock(lib), () => {
     const was = existsSync(f) ? (() => { try { return parse(readFileSync(f, "utf8"), c.id); } catch { return null; } })() : null;
     const now = nowIso();
-    const out: Chat = { ...c, created: was?.created ?? c.created ?? now, updated: touch || !c.updated ? now : c.updated };
+    const out: Chat = { ...c, turns: was ? merged(was.turns, c.turns) : c.turns, created: was?.created ?? c.created ?? now, updated: touch || !c.updated ? now : c.updated };
     writeAtomic(f, JSON.stringify(out, null, 1) + "\n");
     return out;
   });

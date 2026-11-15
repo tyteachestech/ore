@@ -237,6 +237,16 @@ describe("tutor: replies", () => {
     expect(r.citations[0]!.quote).toBe("goes back to the first box");
   });
 
+  // F-new-code-index-marker: `xs[1]` in code was taken for a citation marker, so a plain reply went back to fix.
+  test("an index in code or after a name is no citation marker: the reply is taken as it came", async () => {
+    const { lib, a } = await library();
+    const reply = "Use `xs[1]` for the second element, as in\n\n```py\nys[2] = xs[1]\n```\n\nand arr[3] the fourth.";
+    fakeClaude([{ ...OK, reply, general: true }, { ...OK, reply: "Rewritten.", general: true }]);
+    const r = await tutor(lib, "how do I index a list?", { item: a.meta.id });
+    expect(r.reply).toBe(reply);
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).not.toContain("has no citation");
+  });
+
   // F264: only the last six turns reached the tutor, so a long chat lost what he had said he was after.
   test("a long chat keeps its start: earlier turns go by size, never fewer than six, and what he asked before those in a line each (D293)", async () => {
     const { lib } = await library();
