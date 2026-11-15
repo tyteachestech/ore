@@ -12428,6 +12428,52 @@ journey("phone: a session across midnight counts only the new day's minutes towa
   if (await page.getByText("Goal met").count()) throw new Error("the goal was said met with 6 of today's 10 minutes");
 }, "phone");
 
+journey("phone: a review left after midnight with no rating since shows the new day's minutes in its end ring (F-new-midnight-end-ring)", async (page) => {
+  // A session before midnight, then a second rated before it and left after it: the ring's centre kept the minutes
+  // from before the second session, yesterday's, though the new day had none (Codex sweep 10, MONTHS-1).
+  const late = new Date();
+  late.setHours(23, 40, 0, 0);
+  await page.clock.install({ time: late });
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  const rate = async (wait: string) => {
+    await sure.waitFor();
+    await page.clock.fastForward(wait);
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+  };
+  const start = async () => {
+    await tap(page, page.getByRole("button", { name: "Start review" }).first());
+    await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  };
+  await start();
+  await rate("03:00");
+  await rate("03:00");
+  await sure.waitFor();
+  await tap(page, page.getByRole("button", { name: "Leave review" }));
+  await page.locator(".review-end").waitFor();
+  await tap(page, page.locator(".review-foot").getByRole("button", { name: "Done" }));
+  await until("Review is closed", async () => !(await page.locator(".phone-full .review").count()));
+  await start();
+  await rate("02:00");
+  await sure.waitFor();
+  // The next exercise stays open past midnight, and nothing is rated on the new day.
+  await page.clock.fastForward("12:00");
+  await tap(page, page.getByRole("button", { name: "Leave review" }));
+  const centre = page.locator(".review-end .end-lap-n");
+  await centre.waitFor({ timeout: 8000 });
+  const ring = await page.locator(".review-end [aria-label$='minutes today']").first().getAttribute("aria-label");
+  const today = Number(/^(\d+) of/.exec(ring ?? "")?.[1]);
+  await page.waitForTimeout(2500);
+  const shown = Number(/^(\d+)/.exec((await centre.getAttribute("aria-label")) ?? "")?.[1]);
+  if (shown !== today) throw new Error(`the end ring shows ${shown} min, but today has ${today} (the ring's own label: “${ring}”)`);
+}, "phone");
+
 journey("phone: a source added on the phone and a new skill each take ⌘Z (F160)", async (page) => {
   const words = "Spacing out practice sessions makes what is learned last longer than cramming it into one sitting. ".repeat(12);
   const article = `<html><head><title>Spacing on the phone</title></head><body><article><h1>Spacing on the phone</h1>${`<p>${words}</p>`.repeat(3)}</article></body></html>`;
