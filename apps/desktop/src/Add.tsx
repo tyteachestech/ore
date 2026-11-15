@@ -272,7 +272,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
               </button>
             </Hint>
             {/* A pointer adds too, not only ↵ (Codex sweep 5). */}
-            <button className="add-file" onClick={go} disabled={busy || (!list.length && !offer)}>
+            <button className="add-file" onClick={() => (go(), ref.current?.focus())} disabled={busy || (!list.length && !offer)}>
               <kbd>↵</kbd> {isFeed ? "Follow" : "Add"}
             </button>
           </span>

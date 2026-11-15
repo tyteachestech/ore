@@ -138,11 +138,12 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     if (reading) document.getElementById(`post-${reading}`)?.scrollIntoView({ block: "nearest" });
     else if (wasReading.current) {
       // Back from the post: the list takes the keys again, on the post just read (Mail), in view: the whole list
-      // lays out afresh and starts at its top (Codex sweep 5).
+      // lays out afresh and starts at its top (Codex sweep 5). Only as far as it must, once laid out.
       setCursor(wasReading.current);
       setKeyed(true);
       listRef.current?.focus({ preventScroll: true });
-      document.getElementById(`post-${wasReading.current}`)?.scrollIntoView({ block: "center" });
+      const id = `post-${wasReading.current}`;
+      requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "nearest" }));
     }
     wasReading.current = reading;
   }, [reading]);

@@ -149,12 +149,12 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     // Let go over nothing (off the sidebar): nothing moves, not even a group it crossed on the way.
     if (!over) return onDragCancel();
     let next = draft ?? groups;
-    if (over && isGroup(a.id)) {
+    if (isGroup(a.id)) {
       const from = groupOf(next, a.id);
       const to = groupOf(next, over.id);
       // The ungrouped skills always come last.
       if (from >= 0 && to >= 0 && next[to]!.collection) next = arrayMove(next, from, to);
-    } else if (over && !isGroup(over.id)) {
+    } else if (!isGroup(over.id)) {
       const g = groupOf(next, a.id);
       if (g >= 0 && g === groupOf(next, over.id)) {
         const list = next[g]!.skills;

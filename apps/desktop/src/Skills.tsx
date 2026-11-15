@@ -1,7 +1,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import { Command } from "cmdk";
 import { CaretDown, Check as CheckIcon, Plus } from "./icons";
-import { useEffect, useRef, useState, type ElementType, type ReactNode, type RefObject, type SyntheticEvent } from "react";
+import { useEffect, useRef, useState, type ElementType, type MutableRefObject, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 import { Hint } from "./Hint";
 import { keepKeysIn } from "./keys";
 import { isOther } from "../../../packages/core/src/collection-name";
@@ -206,12 +206,14 @@ export const layoutOf = (groups: ReturnType<typeof skillGroups>): SkillLayout =>
 
 /** A skill's name, renamed in place like a Notion page title: click it (or open with `editing`),
  *  Enter saves through `ore skills set --name`, Esc or clicking away keeps the old name. */
-export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, onRenamed, onEnter, notify }: {
+export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, commitRef, onRenamed, onEnter, notify }: {
   skill: Skill;
   as?: ElementType;
   /** Starts in edit; the caller focuses `inputRef` (so it can hand focus back on close). */
   editing?: boolean;
   inputRef?: RefObject<HTMLInputElement | null>;
+  /** Set to save the name being typed, for a dialog closing around it: true once saved (or nothing to save). */
+  commitRef?: MutableRefObject<(() => Promise<boolean>) | null>;
   onRenamed: () => void;
   /** Enter saved the name: a dialog around it closes, as a Mac dialog's default button does. */
   onEnter?: () => void;
@@ -261,6 +263,13 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, on
       setSaving((busy.current = false));
     }
   };
+  if (commitRef)
+    commitRef.current = async () => {
+      if (draft === null || busy.current) return !busy.current;
+      // An empty name keeps the old, as a click away does.
+      if (!draft.trim()) return (setDraft(null), true);
+      return save(false);
+    };
   if (draft === null)
     return (
       <Tag className="skill-name">
@@ -332,6 +341,7 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
   const [picking, setPicking] = useState(false);
   const iconRef = useRef<HTMLButtonElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
+  const commitName = useRef<(() => Promise<boolean>) | null>(null);
   useFocusWhileMounted(rename ? nameRef : iconRef);
 
   const set = async <K extends keyof Look>(key: K, value: Look[K], undoable = true) => {
@@ -367,7 +377,7 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
   }, [onClose]);
 
   return (
-    <div className="overlay" onMouseDown={onBackdrop(onClose)}>
+    <div className="overlay" onMouseDown={onBackdrop(onClose, () => commitName.current?.() ?? true)}>
       <Trap>
       <div ref={panelRef} className="panel skill-edit" role="dialog" aria-modal="true" aria-label={`Edit skill ${skill.name}`}>
         <div className="skill-edit-head">
@@ -397,7 +407,7 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
               </Popover.Content>
             </Popover.Portal>
           </Popover.Root>
-          <SkillName skill={skill} as="h2" editing={rename} inputRef={nameRef} onRenamed={onSaved} onEnter={onClose} notify={notify} />
+          <SkillName skill={skill} as="h2" editing={rename} inputRef={nameRef} commitRef={commitName} onRenamed={onSaved} onEnter={onClose} notify={notify} />
         </div>
         <div className="look-row">
           <span>Color</span>

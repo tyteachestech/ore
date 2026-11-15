@@ -13561,6 +13561,58 @@ journey("a source that fails to open says why and offers Try again, which opens 
   await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
 });
 
+journey("Edit skill: a click outside with a name already taken stays open and says why (sweep 5 review)", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit skill Creativity" });
+  const name = dialog.getByLabel("Rename Creativity");
+  await name.fill("Habits");
+  await page.mouse.click(1200, 760);
+  await page.locator(".toast[data-kind=error]").filter({ hasText: "already exists" }).waitFor();
+  await page.waitForTimeout(300);
+  if (!(await dialog.isVisible())) throw new Error("the editor closed on a name that failed to save");
+  if ((await name.inputValue()) !== "Habits") throw new Error("the draft was lost");
+  await page.keyboard.press("Escape"); // drops the draft
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "detached" });
+  await settled(page);
+});
+
+journey("highlight: a drag that turns into a native text drag arms nothing for a later click (sweep 5 review)", async (page) => {
+  await openSource(page, TESTING);
+  const keeps = page.locator(".collected-chip.keep");
+  const before = Number(await keeps.innerText());
+  // A press on the text whose release never comes (a native drag took it over and ended in dragend).
+  const at = (await page.locator(".page p").filter({ hasText: "Space the tests out" }).first().boundingBox())!;
+  await page.locator(".page p").filter({ hasText: "Space the tests out" }).first().dispatchEvent("mousedown", { button: 0, clientX: at.x + 5, clientY: at.y + 5, bubbles: true });
+  await page.evaluate(() => document.dispatchEvent(new DragEvent("dragend", { bubbles: true })));
+  // Later: words selected some other way, and a click let go outside the page.
+  await page.evaluate(() => {
+    const p = [...document.querySelectorAll(".page p")].find((e) => e.textContent!.includes("Space the tests out"))!;
+    const r = document.createRange();
+    r.selectNodeContents(p.firstChild!);
+    getSelection()!.removeAllRanges();
+    getSelection()!.addRange(r);
+    document.querySelector(".reader-scroll")!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0, clientX: 5, clientY: 400 }));
+  });
+  await page.waitForTimeout(600);
+  if (Number(await keeps.innerText()) !== before) throw new Error("an unrelated mouseup made a highlight");
+  if (await page.getByRole("dialog", { name: "Highlight" }).isVisible()) throw new Error("a highlight popup opened");
+});
+
+journey("add: after a click on ↵ Add that fails, the caret is back in the box (sweep 5 review)", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL?: Record<string, string> }).__ORE_FAIL = { add: "The disk is full" }));
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByRole("dialog", { name: "Add a source" });
+  const field = box.getByLabel("Link, file path or text");
+  await field.fill("# Will fail\n\nThis text fails to add.");
+  await box.getByRole("button", { name: /^↵\s*Add$/ }).click();
+  await box.getByRole("alert").waitFor();
+  await until("focus is back in the box", () => field.evaluate((f) => document.activeElement === f));
+  await page.evaluate(() => delete (window as unknown as { __ORE_FAIL?: unknown }).__ORE_FAIL);
+  await page.keyboard.press("Escape");
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);

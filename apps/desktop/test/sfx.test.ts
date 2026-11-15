@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { newSession, rated, setPlayer, setSounds, sfx, SFX, take } from "../src/sfx";
+import { inOrder, newSession, rated, setPlayer, setSounds, sfx, SFX, take } from "../src/sfx";
 
 // Review's sounds (D277): which moment plays what, read off the player in place of the speakers.
 let heard: [string, number][] = [];
@@ -72,6 +72,35 @@ describe("review sounds", () => {
     take(200, 0.5, false, cut("tap"));
     take(201, 0.5, false, cut("missed"));
     expect(cuts).toEqual([["tap", 100.08]]);
+  });
+
+  test("rate again during the goal's wait: the rating cuts the sound still playing, never the chime waiting its turn", () => {
+    const cuts: [string, number][] = [];
+    const cut = (name: string) => (at: number) => void cuts.push([name, at]);
+    take(300, 0.85, false, cut("right"));
+    expect(take(300.5, 1, true, cut("goal"))).toBeCloseTo(300.85); // waits for the shine
+    // The next answer's tick lands before the chime has started: the shine stops there, the chime still comes.
+    take(300.6, 0.55, false, cut("tap"));
+    expect(cuts).toEqual([["right", 300.6]]);
+    // Once the chime is sounding, the next sound cuts it as any other.
+    take(301, 0.85, false, cut("missed"));
+    expect(cuts).toEqual([["right", 300.6], ["tap", 301], ["goal", 301]]);
+  });
+
+  test("a slow first file still takes its turn first: sounds are placed in the order they were asked for", async () => {
+    const placed: string[] = [];
+    let load!: (v: string) => void;
+    const slow = new Promise<string>((r) => (load = r));
+    const a = inOrder(slow, (v) => void placed.push(v));
+    const b = inOrder(Promise.resolve("rating"), (v) => void placed.push(v));
+    await Promise.resolve();
+    expect(placed).toEqual([]);
+    load("tick");
+    await Promise.all([a, b]);
+    expect(placed).toEqual(["tick", "rating"]);
+    // One that fails to load never holds up the ones after it.
+    await Promise.all([inOrder(Promise.reject(new Error("404")), () => void placed.push("lost")), inOrder(Promise.resolve("next"), (v) => void placed.push(v))]);
+    expect(placed).toEqual(["tick", "rating", "next"]);
   });
 
   // F-new-review-sounds-hidden: a rating whose save came back after the window was hidden still played.

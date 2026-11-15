@@ -20,13 +20,19 @@ export function Trap({ children, off = false }: { children: ReactElement; off?: 
   );
 }
 
-/** A sheet's backdrop: a press on it closes the sheet, but first the field he was typing in lets go, so its own
- *  click-away save runs (D211) as it would for a click anywhere else. Closed at once, the field was gone before it
- *  lost focus and his typing went with it (Edit skill's name, Codex sweep 5). */
-export const onBackdrop = (close: () => void) => (e: MouseEvent) => {
+/** A sheet's backdrop: a press on it closes the sheet, but first the field he was typing in saves, as a click
+ *  anywhere else would (D211). Closed at once, the field was gone before it lost focus and his typing went with it
+ *  (Edit skill's name, Codex sweep 5). `commit` saves the field itself and says whether it took: one that fails
+ *  validation keeps the sheet open, the caret still in it, with the reason it gave. Without one, the field is
+ *  blurred so its own click-away save runs. */
+export const onBackdrop = (close: () => void, commit?: () => Promise<boolean> | boolean) => (e: MouseEvent) => {
   if (e.target !== e.currentTarget) return;
-  (document.activeElement as HTMLElement | null)?.blur?.();
-  close();
+  if (!commit) {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    return close();
+  }
+  e.preventDefault(); // focus stays in the field while it saves
+  void Promise.resolve(commit()).then((ok) => ok && close());
 };
 
 const CONTROLS = "a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1']), [contenteditable=true]";
