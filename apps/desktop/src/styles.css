@@ -2894,7 +2894,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* No dimming: the text above the sheet is what he judges each tap by. */
 .phone .overlay.looks-overlay { background: transparent; }
 .looks-size { display: grid; grid-template-columns: 1fr 1fr; height: 52px; border-radius: 12px; background: var(--bg-hover); overflow: hidden; }
-.looks-size button { display: grid; place-items: center; color: var(--text); font-family: Charter, "Bitstream Charter", "New York", serif; }
+.looks-size button { display: grid; place-items: center; color: var(--text); font-family: var(--font-serif); }
 .looks-size button:first-child { font-size: 15px; }
 .looks-size button:last-child { font-size: 24px; border-left: 1px solid var(--border); }
 .looks-size button:disabled { color: var(--faint); }
@@ -2914,7 +2914,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .looks-tile[data-page="light"] { background: #f7f6f2; color: #555; }
 .looks-tile[data-page="light"] b { color: #1a1a1a; }
 .looks-pair > button:focus-visible > .looks-tile, .looks-seg button:focus-visible, .looks-size button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus); }
-.phone .phone-source .reader-tools .looks-btn { width: 44px; height: 44px; padding: 0; border-radius: 999px; background: var(--bg-hover); color: var(--text); display: grid; place-items: center; font: 600 17px/1 Charter, "Bitstream Charter", "New York", serif; }
+.phone .phone-source .reader-tools .looks-btn { width: 44px; height: 44px; padding: 0; border-radius: 999px; background: var(--bg-hover); color: var(--text); display: grid; place-items: center; font: 600 17px/1 var(--font-serif); }
 .phone .doc h1 { font-size: 1.3em; } .phone .doc h2 { font-size: 1.2em; } .phone .doc h3 { font-size: 1.08em; }
 /* A double tap highlights the paragraph (D224): never the zoom iOS gives it; a pinch still zooms. */
 .phone .page { touch-action: manipulation; }

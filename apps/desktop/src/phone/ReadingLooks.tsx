@@ -68,7 +68,7 @@ export function ReadingLooks() {
                 {/* Margins: Narrow width is wide margins. */}
                 <Choice className="looks-seg" label="Margins" value={width} options={[...WIDTHS].reverse().map((w, i) => ({ id: w.id, label: ["Narrow margins", "Medium margins", "Wide margins"][i]! }))} onPick={setWidth} render={(_, i) => <Lines gap={4} width={[22, 17, 12][i]!} />} />
               </div>
-              <Choice className="looks-pair" label="Font" value={font} options={FONTS} onPick={setFont} render={(id) => <span className="looks-tile" data-font={id}><b style={{ fontFamily: id === "charter" ? 'Charter, "Bitstream Charter", "New York", serif' : "var(--font)" }}>Aa</b>{FONTS.find((f) => f.id === id)!.label}</span>} />
+              <Choice className="looks-pair" label="Font" value={font} options={FONTS} onPick={setFont} render={(id) => <span className="looks-tile" data-font={id}><b style={{ fontFamily: id === "charter" ? "var(--font-serif)" : '"Geist", var(--font)' }}>Aa</b>{FONTS.find((f) => f.id === id)!.label}</span>} />
               <Choice className="looks-pair looks-pages" label="Page" value={page} options={PAGES} onPick={setPage} render={(id) => <span className="looks-tile" data-page={id}>{id === "auto" && <CircleHalf size={16} aria-hidden="true" />}<b>{PAGES.find((p) => p.id === id)!.label}</b></span>} />
             </div>
           </Trap>
