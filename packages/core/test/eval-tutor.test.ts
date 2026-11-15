@@ -92,3 +92,28 @@ describe("tutor pedagogy eval", () => {
     expect(loadPrompt("tutor").version).toBe(today);
   });
 });
+
+describe("mining real chats for cases (D295)", () => {
+  test("turns he asked again, reworded, stopped or that failed come out as candidates, with the reply he turned down; a plain turn doesn't", async () => {
+    const { tempLibrary } = await import("./helpers.ts");
+    const { saveChat } = await import("../src/chats.ts");
+    const { candidates, waits } = await import("../eval/mine-tutor.ts");
+    const { appendFileSync, mkdirSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const lib = await tempLibrary();
+    await saveChat(lib, JSON.stringify({ id: "c1", title: "Boxes", carry: [], turns: [
+      { id: "t1", message: "what is box one?", reply: "The first box." },
+      { id: "t2", message: "why?", reply: "Because it is reviewed most.", alts: [{ message: "why?", reply: "It just is." }], alt: 1 },
+      { id: "t3", message: "why does a miss go back?", reply: "A miss shows a weak memory.", alts: [{ message: "why back", reply: "Back where?" }], alt: 1 },
+      { id: "t4", message: "explain everything", reply: "Spaced repetition is", stopped: true },
+      { id: "t5", message: "and FSRS?", error: "claude returned invalid tutor output twice: x" },
+    ] }));
+    const found = candidates(lib);
+    expect(found.map((c) => [c.id, c.signal])).toEqual([["c1-t2", "asked again"], ["c1-t3", "reworded"], ["c1-t4", "stopped"], ["c1-t5", "failed"]]);
+    expect(found[0]).toMatchObject({ message: "why?", earlier: [{ message: "what is box one?", reply: "The first box." }], turned_down: ["It just is."], kept: "Because it is reviewed most." });
+    expect(found[1]).toMatchObject({ message: "why back", turned_down: ["Back where?"] });
+    mkdirSync(join(lib.root, ".ore/logs"), { recursive: true });
+    for (const l of [{ ms: 4000, runs: 1, moved: 0, dropped: 0, searched: false }, { ms: 6000, runs: 2, moved: 1, dropped: 0, searched: true }, { ms: 20000, runs: 2, error: "x" }, "not json"]) appendFileSync(join(lib.root, ".ore/logs/tutor.jsonl"), `${typeof l === "string" ? l : JSON.stringify(l)}\n`);
+    expect(waits(lib)).toEqual({ turns: 3, median_s: 6, went_back: 2, mended: 1, searched: 1, failed: 1 });
+  });
+});

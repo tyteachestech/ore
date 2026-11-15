@@ -1,6 +1,6 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { z } from "zod";
 import type { AiStamp } from "../items.ts";
 import type { Library } from "../library.ts";
@@ -32,14 +32,16 @@ export interface AgentResult<T> {
   data: T;
   ai: AiStamp;
   usage: Usage; // summed over retries
-  /** What its web searches and fetches returned, when the vendor reports it (claude does, codex doesn't). */
+  /** How many runs it took: 2 when the first one's output was invalid and it went back to fix. */
+  runs: number;
+  /** What its web searches and fetches returned (claude: the pages' text; codex: each result's snippet). */
   web?: WebSeen;
 }
 
 /** The pages a run's web searches and fetches returned, each with the text it came back in, so a web
  *  citation can be checked as a library one is: its page must be one the search found, its quote words
  *  returned with that page. */
-export interface WebSeen { searched: boolean; pages: { url: string; title: string; text: string }[] }
+export interface WebSeen { searched: boolean; pages: { url: string; title: string; text: string }[]; /** codex: each result's snippet, not the page's text, so a quote can't be checked against it. */ snippets?: true }
 
 interface RawRun {
   output: unknown; // parsed JSON (or a string to parse)
@@ -167,6 +169,18 @@ export function streamProgress(line: string, state: { block?: number; json: stri
   return null;
 }
 
+/** The reply so far in a structured answer's half-written JSON (its `reply` string, unescaped), or null. */
+export function partialReply(json: string): string | null {
+  const m = json.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
+  if (!m) return null;
+  try {
+    // A \u escape cut off mid-way waits for the next chunk (an escaped backslash before a u is no escape).
+    return JSON.parse(`"${m[1]!.replace(/((?:^|[^\\])(?:\\\\)*)\\u[0-9a-fA-F]{0,3}$/, "$1")}"`) as string;
+  } catch {
+    return null;
+  }
+}
+
 /** `claude -p` otherwise loads his own MCP servers, skills, settings and hooks into every call: on
  *  Tyler's Mac 21 MCP servers added ~360k input tokens (~$1.45) to each grade. Ore's tasks need none. */
 const CLAUDE_BARE = ["--strict-mcp-config", "--disable-slash-commands", "--setting-sources", ""];
@@ -212,13 +226,26 @@ function claudeResult(r: Exec, events?: StreamEvent[]) {
   return out;
 }
 
+/** The tools a claude task gets, and what each may touch (D292). File tools only for a task that names
+ *  files: each tool's definition is input on every call, and a task given everything in its input (grading) has
+ *  nothing to read. What it may read is those files and no others: a task reads text Ore didn't write (an imported
+ *  page, a web result, an attached file), and `Read` allowed bare opens any file on the Mac to whatever that text asks
+ *  for. A task that can also reach the web reads its files alone, with no search tools; one that can't may look
+ *  through each file's folder (a source's doc.md sits beside its images). The rule names the real path, since
+ *  claude refuses one through a symlink (/tmp on a Mac). Files in the task's `cwd` are readable with no rule. */
+export function claudeTools(task: Pick<AgentTask<unknown>, "files" | "web">): { tools: string[]; allowed: string[] } {
+  const real = (f: string) => { try { return realpathSync(f); } catch { return f; } };
+  const files = [...new Set((task.files ?? []).map(real))];
+  const read = task.web ? files.map((f) => `Read(/${f})`) : [...new Set(files.map((f) => `Read(/${dirname(f)}/**)`))];
+  const web = task.web ? ["WebSearch", "WebFetch"] : [];
+  return { tools: [...(files.length ? (task.web ? ["Read"] : ["Read", "Grep", "Glob"]) : []), ...web], allowed: [...read, ...web] };
+}
+
 // claude -p with a system prompt, structured output and only the tools the task needs.
 async function runClaude(system: string, message: string, schema: object, task: AgentTask<unknown>, { model }: RunOpts): Promise<RawRun> {
   const bin = Bun.which("claude", { PATH: process.env.PATH ?? "" });
   if (!bin) throw new Error("Claude Code isn’t installed (no `claude` on PATH). Install it, or pick Codex in Settings → AI.");
-  // File tools only for a task that names files: each tool's definition is input on every call, and a
-  // task given everything in its input (the tutor, grading) has nothing to read.
-  const tools = [...(task.files?.length ? ["Read", "Grep", "Glob"] : []), ...(task.web ? ["WebSearch", "WebFetch"] : [])];
+  const { tools, allowed } = claudeTools(task);
   // A web task streams its events, so the pages its searches returned can be checked against its citations.
   const cmd = [
     bin, "-p", message,
@@ -226,7 +253,7 @@ async function runClaude(system: string, message: string, schema: object, task: 
     "--json-schema", JSON.stringify(schema),
     "--system-prompt", system,
     "--tools", tools.join(","),
-    "--allowedTools", tools.join(","),
+    ...(allowed.length ? ["--allowedTools", ...allowed] : []),
     "--permission-mode", "dontAsk",
     ...CLAUDE_BARE,
     "--no-session-persistence",
@@ -311,6 +338,35 @@ export function samePage(a: string, b: string): boolean {
   return key(a) === key(b);
 }
 
+type CodexItem = { type?: string; item?: { type?: string; results?: { url?: unknown; title?: unknown; snippet?: unknown }[] } };
+const codexSearch = (line: string): CodexItem | null => {
+  if (!line.includes('"web_search"')) return null;
+  try {
+    const e = JSON.parse(line) as CodexItem;
+    return e.item?.type === "web_search" ? e : null;
+  } catch { return null; }
+};
+
+/** A codex `--json` line as progress: a web search starting or done. codex sends its reply whole, so there is no text to show early. */
+export function codexProgress(line: string): StreamProgress | null {
+  const e = codexSearch(line);
+  return e?.type === "item.started" ? { searching: true } : e?.type === "item.completed" ? { searching: false } : null;
+}
+
+/** The searches a codex `--json` run made, and the results each returned (D297). */
+export function codexWebSeen(stdout: string): WebSeen {
+  const seen: WebSeen = { searched: false, pages: [], snippets: true };
+  for (const line of stdout.split("\n")) {
+    const e = codexSearch(line);
+    if (!e) continue;
+    seen.searched = true;
+    for (const r of Array.isArray(e.item!.results) ? e.item!.results : [])
+      if (isWebUrl(r.url) && !seen.pages.some((p) => samePage(p.url, r.url as string)))
+        seen.pages.push({ url: r.url.trim(), title: typeof r.title === "string" ? r.title : "", text: typeof r.snippet === "string" ? r.snippet : "" });
+  }
+  return seen;
+}
+
 function codexConfiguredModel(): string | undefined {
   const p = join(process.env.CODEX_HOME ?? join(homedir(), ".codex"), "config.toml");
   if (!existsSync(p)) return undefined;
@@ -335,9 +391,9 @@ async function runCodex(system: string, message: string, schema: object, task: A
   ];
   // The schema and last message are scratch files: one folder per run, removed when it ends.
   try {
-    const r = await exec(cmd, task.cwd);
+    const r = await exec(cmd, task.cwd, task.web && task.onProgress ? (l) => { const p = codexProgress(l); if (p) task.onProgress!(p); } : undefined);
     if (r.code !== 0 || !existsSync(outPath)) throw vendorFailure("codex", r);
-    return { output: readFileSync(outPath, "utf8"), model: model ?? codexConfiguredModel() ?? "codex-default", usage: codexUsage(r.stdout) };
+    return { output: readFileSync(outPath, "utf8"), model: model ?? codexConfiguredModel() ?? "codex-default", usage: codexUsage(r.stdout), ...(task.web ? { web: codexWebSeen(r.stdout) } : {}) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -373,13 +429,13 @@ export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<Age
   for (let attempt = 1; attempt <= 2; attempt++) {
     const raw = await run(prompt.text, message, schema, task as AgentTask<unknown>, opts);
     usage = addUsage(usage, raw.usage);
-    if (raw.web) web = web ? { searched: web.searched || raw.web.searched, pages: [...web.pages, ...raw.web.pages.filter((p) => !web!.pages.some((q) => samePage(q.url, p.url)))] } : raw.web;
+    if (raw.web) web = web ? { ...raw.web, searched: web.searched || raw.web.searched, pages: [...web.pages, ...raw.web.pages.filter((p) => !web!.pages.some((q) => samePage(q.url, p.url)))] } : raw.web;
     try {
       const parsed = task.schema.safeParse(parseOutput(raw.output));
       if (!parsed.success) throw new Error(parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "));
       const problem = task.check?.(parsed.data, web);
       if (problem) throw new Error(problem);
-      return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage, ...(web ? { web } : {}) };
+      return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage, runs: attempt, ...(web ? { web } : {}) };
     } catch (e) {
       lastError = (e as Error).message;
       message = `${userMessage(task.input, task.files ?? [])}\n\nYour previous output was invalid: ${lastError}\nReturn only JSON that matches the schema.`;
@@ -398,7 +454,9 @@ export interface ChatRun {
 // One turn of a chat (D61), through the vendor's own program on his plan: `claude -p` keeps the
 // conversation under a session id it is given; `codex exec` under the thread id it reports, picked
 // up again with `exec resume`. No tools: everything the chat needs is in the first message.
-export async function runChatTurn(lib: Library, a: { system: string; message: string; schema: object; session?: string; cwd: string }): Promise<ChatRun & { vendor: Vendor }> {
+/** `onProgress` (claude only): the reply so far as it is written, a few times a second, with the session it is
+ *  written in, which a run stopped part way never returns (D296). */
+export async function runChatTurn(lib: Library, a: { system: string; message: string; schema: object; session?: string; cwd: string; onProgress?: (p: { reply: string; session: string }) => void }): Promise<ChatRun & { vendor: Vendor }> {
   const vendor = chooseVendor(lib);
   const model = aiModel(lib, vendor);
   if (vendor === "claude") {
@@ -407,7 +465,7 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
     const session = a.session ?? crypto.randomUUID();
     const cmd = [
       bin, "-p", a.message,
-      "--output-format", "json",
+      ...(a.onProgress ? ["--output-format", "stream-json", "--verbose", "--include-partial-messages"] : ["--output-format", "json"]),
       "--json-schema", JSON.stringify(a.schema),
       "--system-prompt", a.system,
       "--tools", "",
@@ -416,7 +474,15 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
       ...(a.session ? ["--resume", session] : ["--session-id", session]),
       ...(model ? ["--model", model] : []),
     ];
-    const out = claudeResult(await exec(cmd, a.cwd));
+    const state = { json: "" };
+    let last = 0;
+    const r = await exec(cmd, a.cwd, a.onProgress && ((line) => {
+      const p = streamProgress(line, state);
+      if (!p || !("partial" in p) || Date.now() - last < 50) return;
+      const reply = partialReply(p.partial);
+      if (reply) (last = Date.now()), a.onProgress!({ reply, session });
+    }));
+    const out = claudeResult(r, a.onProgress ? streamEvents(r.stdout) : undefined);
     const usage = Object.entries(out.modelUsage ?? {}).sort((x, y) => (y[1].outputTokens ?? 0) - (x[1].outputTokens ?? 0));
     return { vendor, output: out.structured_output ?? out.result, model: usage[0]?.[0] ?? model ?? "claude-default", session };
   }

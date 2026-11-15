@@ -81,11 +81,14 @@ export const aiCommands: Record<string, Command> = {
   },
 
   ask: {
-    usage: '<card> --message "<text>" [--answer "<his answer>"] [--session id] [--variant v]   Ask about this (D61): a chat turn about a card he has answered; may propose a better card (apply with card set)',
-    options: { message: { type: "string" }, answer: { type: "string" }, session: { type: "string" }, variant: { type: "string" } },
+    usage: '<card> --message "<text>" [--answer "<his answer>"] [--session id] [--variant v] [--stream <id>]   Ask about this (D61): a chat turn about a card he has answered; may propose a better card (apply with card set)',
+    options: { message: { type: "string" }, answer: { type: "string" }, session: { type: "string" }, variant: { type: "string" }, stream: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();
-      const r = await askAboutCard(lib, need(ref, "<card>"), { message: need(str(f.message), "--message"), answer: str(f.answer), session: str(f.session), variant: str(f.variant) });
+      // --stream <id>: the reply as it is written, as `{"progress": {stream, reply}}` lines on stderr, as `ore tutor` sends them (claude only).
+      const stream = str(f.stream);
+      const onProgress = stream ? (p: { reply: string; session: string }) => void process.stderr.write(JSON.stringify({ progress: { stream, ...p } }) + "\n") : undefined;
+      const r = await askAboutCard(lib, need(ref, "<card>"), { message: need(str(f.message), "--message"), answer: str(f.answer), session: str(f.session), variant: str(f.variant), onProgress });
       const text = [r.reply, ...(r.proposal ? ["", "Proposed card:", `Q: ${r.proposal.question}`, `A: ${r.proposal.answer}`] : []), "", `(session ${r.session})`].join("\n");
       return { data: r, text };
     },
@@ -107,8 +110,8 @@ export const aiCommands: Record<string, Command> = {
   },
 
   tutor: {
-    usage: '"<message>" [--item <source>] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--files <json>] [--stream <id>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), else from the web (cited by URL) or general knowledge, hints instead of answers on practice; --item is the source being read, --source and --skill what he @-mentioned, --earlier is [{message, reply, exercise?, files?}] (a turn that set an exercise carries it, so feedback judges against its card), --files is what he attached to this message, [{name, path}] as `ore chat --attach` returned them (D189), --stream <id> writes the reply as it comes as {"progress": {stream, reply}} lines on stderr (and {stream, searching} when a web search starts or ends)',
-    options: { item: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" }, files: { type: "string" }, stream: { type: "string" } },
+    usage: '"<message>" [--item <source> [--at <heading>]] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--files <json>] [--stream <id>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), else from the web (cited by URL) or general knowledge, hints instead of answers on practice; --item is the source being read (--at the heading of the section on screen), --source and --skill what he @-mentioned, --earlier is [{message, reply, exercise?, files?}] (a turn that set an exercise carries it, so feedback judges against its card), --files is what he attached to this message, [{name, path}] as `ore chat --attach` returned them (D189), --stream <id> writes the reply as it comes as {"progress": {stream, reply}} lines on stderr (and {stream, searching} when a web search starts or ends)',
+    options: { item: { type: "string" }, at: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" }, files: { type: "string" }, stream: { type: "string" } },
     async run(words, f) {
       const lib = openLibrary();
       let earlier: TutorTurn[] = [];
@@ -116,14 +119,14 @@ export const aiCommands: Record<string, Command> = {
         try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{message, reply, exercise?}]"); }
       }
       // --stream <id>: the reply as it is written, and a web search starting, as `{"progress": {stream, …}}`
-      // lines on stderr, which the app shows on the turn with that id (claude only).
+      // lines on stderr, which the app shows on the turn with that id (Codex: the search alone).
       const stream = str(f.stream);
       const onProgress = stream ? (p: TutorProgress) => void process.stderr.write(JSON.stringify({ progress: { stream, ...p } }) + "\n") : undefined;
       let files: { name: string; path: string }[] = [];
       if (str(f.files)) {
         try { files = JSON.parse(str(f.files)!); } catch { throw new Error("--files must be JSON: [{name, path}]"); }
       }
-      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, files, item: str(f.item), sources: strs(f.source), skills: strs(f.skill), onProgress });
+      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, files, item: str(f.item), at: str(f.at), sources: strs(f.source), skills: strs(f.skill), onProgress });
       const text = [withSteps(r), ...(r.exercise?.cases ?? []).map((c, i) => `  ${"AB"[i]}: ${c}`), ...r.marks.map((m) => `  ${m.covered ? "got" : "missed"}: ${m.point}${m.quote ? ` (“${m.quote}”)` : ""}`), ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => ("url" in c ? `  [${c.n}] ${c.title || c.site}: "${c.text}" ${c.url}` : `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`))].join("\n");
       return { data: r, text };
     },

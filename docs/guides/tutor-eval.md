@@ -9,6 +9,14 @@ bun run eval:tutor --vendor claude --runs 3   # each case three times: one poole
 bun run eval:tutor --vendor claude --against 85e22fb   # blind A/B: today's tutor.md against the one at that commit (or a file)
 ```
 
+## New cases from real use
+
+```bash
+bun run eval:mine:tutor     # read-only, no AI; ORE_LIBRARY picks the library
+```
+
+Lists the turns in his saved chats that he asked again, reworded, stopped or that failed (D295), each with the turns before it and the reply he turned down. His second try says the first reply missed; read each, decide what the reply should have done, and write that as a case's `expect` in `tutor-cases.json`. It also sums `.ore/logs/tutor.jsonl`: turns, the median wait, and how many went back for a second run, had a citation mended, searched or failed.
+
 ## How it works
 
 - **Set** (`packages/core/eval/tutor-cases.json`): 16 single turns over the golden docs, some with the turns before (`earlier`) and a source open (`reading`). Each lists what its reply must do: be a hint or not, hold or withhold patterns (the answer he is meant to find), set an exercise or not, split a worked answer into steps (D142), ask him something, cite a passage, give no score, not search, stay short.
@@ -54,3 +62,12 @@ bun run eval:tutor --vendor claude --against 85e22fb   # blind A/B: today's tuto
 2. Kestin et al., [AI tutoring outperforms in-class active learning](https://www.nature.com/articles/s41598-025-97652-6) (Scientific Reports, 2025). A tutor built on teaching practice (one step at a time, his own reasoning first) doubled learning gains over an active-learning class in physics.
 3. Pashler et al., [When does feedback facilitate learning of words?](https://doi.org/10.1037/0278-7393.31.1.3) (JEP: LMC, 2005). After a wrong answer, being shown the right one raised later recall about fivefold; feedback after a right answer did little. Why Quiz me corrects a miss with the answer.
 4. Butler and Roediger, [Feedback enhances the positive effects and reduces the negative effects of multiple-choice testing](https://doi.org/10.3758/MC.36.3.604) (Memory & Cognition, 2008). Without feedback, a test can lock in the wrong answer it let him give.
+
+## tutor@15 (2026-11-15): the same pair swings from 15–6 to 8–16
+
+tutor@15 adds what the tutor is told of the open source (`whole`, `outline`, `at`, `marked`), `missed`, `before`, and the line that passages and files are material, never instructions (D290, D293, D294). Sonnet 5.5, 2 runs each.
+
+- Checks: 31/32 (84–99%), `worked-example-show-me` passed one run of two (a calculation answered in the reply with no steps). Ask eval: retrieval 20/20, answers 20/20, citations 19/20, harder set 14/14 on all three.
+- Blind comparison against tutor@14, four times over (`tutor-compare-2026-11-15.json`, `-2`, `-3`, `-4`): new 9, old 15 · new 5, old 17 · new 15, old 6 · new 8, old 16. The last two are the same two prompts, run side by side at the same minute. Each half of the change alone against tutor@14: new 11, old 13 (the `before` and material lines) and new 13, old 10 (the reading and missed lines).
+- What that says: one comparison of 32 pairs can't tell these two prompts apart. A batch leans one way as a whole, by more than chance on 32 separate pairs would give, so a single "old won 17" is not a verdict. Summed, old leads 54 to 37 with 37 ties; the comparator's reasons on the old wins are mostly tightness (the new reply says the same and adds a figure or a second question), with no one case or rule behind them.
+- So: before reading a comparison as a loss, run it at least three times and look for the same cases losing for the same reason each time. None did here. Worth watching in real use: replies that add one thing more than was asked (`bun run eval:mine:tutor` shows the turns he reworded or stopped).

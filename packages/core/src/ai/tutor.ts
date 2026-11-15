@@ -1,15 +1,20 @@
+import { appendFileSync, mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { z } from "zod";
 import { locate } from "../anchoring.ts";
 import { findItem, listItems, type AiStamp } from "../items.ts";
-import { blankProblem, cardTextProblem, ContentType, hideBlanks, writeNewCard, type Card } from "../cards.ts";
+import { readAnnotations } from "../annotations.ts";
+import { blankProblem, cardTextProblem, ContentType, hideBlanks, listCards, writeNewCard, type Card } from "../cards.ts";
+import { readReviews } from "../reviews.ts";
 import { chatFilePath } from "../chats.ts";
 import { getDiagram, sceneOutline } from "../diagrams.ts";
 import { withLock } from "../lock.ts";
 import { paths } from "../library.ts";
 import { loadSkills } from "../skills.ts";
 import type { Library } from "../library.ts";
-import { aiStampFor, isWebUrl, runAgent, samePage, type Usage } from "./adapter.ts";
-import { PASSAGES, passageCitation, plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
+import { aiStampFor, isWebUrl, partialReply, runAgent, samePage, type Usage } from "./adapter.ts";
+export { partialReply };
+import { nearestSentence, PASSAGES, passageCitation, plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
 import { quoteIn } from "./grade.ts";
 
 // The tutor (D128): the chat docked at the window's right, grown out of Ask your library. It answers
@@ -82,41 +87,74 @@ export function withDiagrams(lib: Library, item: string | undefined, text: strin
 }
 
 /** What the tutor is pointed at: the source he is reading, and the sources and skills he @-mentioned. */
-export interface TutorFocus { item?: string; sources?: string[]; skills?: string[] }
+/** `at`: the heading of the section on his screen in the source he is reading (D294). */
+export interface TutorFocus { item?: string; sources?: string[]; skills?: string[]; at?: string }
 
-/** The passages the tutor sees: the focused sources' best (or their opening, when the message names no
- *  words in them, as "what's this about?" doesn't), then the rest of the library's, or only of the
- *  @-mentioned skills' sources when he named a skill. */
+/** The source he has open goes to the tutor whole up to this many words (about 20k tokens a turn, D290):
+ *  "Summarize this", "What's this about?" and Practice share no words with it, and got its opening alone. */
+export const WHOLE_WORDS = 15_000;
+/** How much of the chat so far goes with each message, in words (about 4k tokens). */
+const EARLIER_WORDS = 3_000;
+const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
+
+/** What the tutor is told of the open source: whether its passages hold all of it (its headings when they
+ *  don't), the section on his screen, and what he highlighted in it (D294), Key points marked,
+ *  each with his note: the parts he chose to keep, in the order they come. */
+export function readingOf(lib: Library, item: string, at?: string) {
+  const it = findItem(lib, item);
+  const marked = readAnnotations(it).filter((a) => (a.intent === "keep" || a.intent === "card") && !a.point).slice(0, 40)
+    .map((a) => ({ text: cut(plainText(a.exact), 300), ...(a.intent === "card" ? { key: true } : {}), ...(a.note?.trim() ? { note: cut(a.note.trim(), 200) } : {}) }));
+  const whole = wordCount(it.body) <= WHOLE_WORDS;
+  // Headings only: a `# comment` inside a code block is not one.
+  const outline = whole ? undefined : [...it.body.replace(/^(```|~~~)[\s\S]*?^\1.*$/gm, "").matchAll(/^#{1,6}[ \t]+(.+)$/gm)].map((m) => m[1]!.replace(/\\/g, "").trim()).slice(0, 80);
+  return { title: it.meta.title, whole, ...(outline ? { outline } : {}), ...(at?.trim() ? { at: at.trim() } : {}), ...(marked.length ? { marked } : {}) };
+}
+const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n).trimEnd()}…` : s);
+
+/** The exercises he got wrong the last time review brought them (D294), newest miss first, question
+ *  only: from the source he is reading and the ones he @-mentioned, and from the skills he named. */
+export function missedIn(lib: Library, focus: TutorFocus): string[] {
+  if (!focus.item && !focus.sources?.length && !focus.skills?.length) return [];
+  const items = new Set([...(focus.item ? [focus.item] : []), ...(focus.sources ?? [])].map((id) => findItem(lib, id).meta.id));
+  const cards = listCards(lib).filter((c) => c.meta.state !== "retired" && (items.has(c.meta.item) || c.meta.skills.some((s) => focus.skills?.includes(s))));
+  if (!cards.length) return [];
+  const last = new Map<string, { ts: string; rating: number }>();
+  for (const r of readReviews(lib)) if (!last.has(r.card) || last.get(r.card)!.ts <= r.ts) last.set(r.card, r);
+  return cards.filter((c) => last.get(c.meta.id)?.rating === 1).sort((a, b) => last.get(b.meta.id)!.ts.localeCompare(last.get(a.meta.id)!.ts)).slice(0, 5).map((c) => cut(c.question, 240));
+}
+
+/** The passages the tutor sees: the source he is reading whole (past WHOLE_WORDS, its best, or ones from across
+ *  it when the message names no words in it), the @-mentioned sources' best, then the rest of the library's, or
+ *  only of the @-mentioned skills' sources when he named a skill. */
 export function tutorPassages(lib: Library, query: string, focus: TutorFocus = {}): Passage[] {
   const focused = [...new Set([...(focus.item ? [focus.item] : []), ...(focus.sources ?? [])])];
   const each = focused.length ? Math.max(2, Math.floor(8 / focused.length)) : 0;
   const here: Passage[] = [];
+  let whole = false;
   for (const id of focused) {
+    const it = findItem(lib, id);
+    const all = () => splitPassages(it.body).map((p) => ({ ...p, id: "", item: it.meta.id, title: it.meta.title }));
+    if (id === focus.item && wordCount(it.body) <= WHOLE_WORDS) {
+      whole = true;
+      here.push(...all());
+      continue;
+    }
     let ps = retrieve(lib, query, each, id);
     if (!ps.length) {
-      const it = findItem(lib, id);
-      ps = splitPassages(it.body).slice(0, each).map((p) => ({ ...p, id: "", item: it.meta.id, title: it.meta.title }));
+      const every = all();
+      const n = Math.min(each, every.length);
+      ps = Array.from({ length: n }, (_, i) => every[Math.floor((i * every.length) / n)]!);
     }
     here.push(...ps);
   }
   const inSkills = focus.skills?.length ? listItems(lib).filter((i) => i.meta.skills.some((s) => focus.skills!.includes(s))).map((i) => i.meta.id) : undefined;
   const rest = (inSkills ? (inSkills.length ? retrieve(lib, query, PASSAGES, inSkills) : []) : retrieve(lib, query, PASSAGES)).filter((p) => !focused.includes(p.item));
-  return [...here, ...rest].slice(0, Math.max(PASSAGES, here.length)).map((p, i) => ({ ...p, id: `P${i + 1}` }));
+  // A whole source can fill the count alone: a few of the library's still come, so "how does this connect to…" has them.
+  const room = Math.max(PASSAGES - here.length, whole ? 6 : 0);
+  return [...here, ...rest.slice(0, room)].map((p, i) => ({ ...p, id: `P${i + 1}` }));
 }
 
-/** The reply so far in a structured answer's half-written JSON (its `reply` string, unescaped), or null. */
-export function partialReply(json: string): string | null {
-  const m = json.match(/"reply"\s*:\s*"((?:[^"\\]|\\.)*)/);
-  if (!m) return null;
-  try {
-    // A \u escape cut off mid-way waits for the next chunk (an escaped backslash before a u is no escape).
-    return JSON.parse(`"${m[1]!.replace(/((?:^|[^\\])(?:\\\\)*)\\u[0-9a-fA-F]{0,3}$/, "$1")}"`) as string;
-  } catch {
-    return null;
-  }
-}
-
-/** While a reply is written: its text so far ("" when a retry starts it over), or a web search starting or done (claude only). */
+/** While a reply is written: its text so far ("" when a retry starts it over), or a web search starting or done. Codex sends its reply whole, so from it only the search shows. */
 export type TutorProgress = { reply: string } | { searching: boolean } | { ai: AiStamp };
 
 /** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. */
@@ -134,11 +172,23 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
     try { return [{ name: String(f.name), file: chatFilePath(lib, String(f.path)) }]; } catch (e) { if (strict) throw e; return []; }
   });
   const attached = filesOf(files, true);
-  const recent = earlier.slice(-6).map(({ message, reply, files }) => { const a = filesOf(files); return { message, reply, ...(a.length ? { attached: a } : {}) }; });
+  // Earlier turns go by size, newest first (D293): a chat of short turns goes whole, long replies push
+  // the oldest out, and never fewer than six go. Of the turns left out, what he asked stays, a line each, so a long
+  // chat still knows what it set out to do. Only the last six turns' files are read again.
+  // Turns come as JSON from the app or an agent: one with no reply (or no message) is an empty one.
+  earlier = earlier.map((t) => ({ ...t, message: String(t.message ?? ""), reply: String(t.reply ?? "") }));
+  let from = earlier.length;
+  for (let words = 0; from > 0; from--) {
+    words += wordCount(earlier[from - 1]!.message) + wordCount(earlier[from - 1]!.reply);
+    if (words > EARLIER_WORDS && earlier.length - from >= 6) break;
+  }
+  const before = earlier.slice(0, from).slice(-30).map((t) => cut(t.message, 120));
+  const recent = earlier.slice(from).map(({ message, reply, files }, i, all) => { const a = i >= all.length - 6 ? filesOf(files) : []; return { message, reply, ...(a.length ? { attached: a } : {}) }; });
   const toRead = [...new Set([...recent.flatMap((t) => t.attached ?? []), ...attached].map((f) => f.file))];
   // The exercise he is answering: the last one set, however long ago, with the card committed then.
   const open = earlier.flatMap((t) => { const e = Exercise.safeParse(t.exercise); return e.success ? [e.data] : []; }).at(-1);
-  const reading = focus.item ? findItem(lib, focus.item).meta.title : undefined;
+  const reading = focus.item ? readingOf(lib, focus.item, focus.at) : undefined;
+  const missedBefore = missedIn(lib, focus);
   const skillNames = new Map(loadSkills(lib).skills.map((s) => [s.id, s.name]));
   for (const s of focus.skills ?? []) if (!skillNames.has(s)) throw new Error(`no skill "${s}"`);
   const pointed = [...(focus.sources ?? []).map((id) => findItem(lib, id).meta.title), ...(focus.skills ?? []).map((s) => `the skill ${skillNames.get(s)}`)];
@@ -147,9 +197,22 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
   // First, who is answering: a reply he stops part way is kept with it, as a whole one is.
   onProgress?.({ ai: aiStampFor(lib, "tutor") });
   const byId = new Map(passages.map((p) => [p.id, p]));
-  const { data, ai, usage, web } = await runAgent(lib, {
+  // What the check mended in the reply that was kept (a retry starts the count over).
+  let repaired = { moved: 0, dropped: 0 };
+  // Each turn leaves a line in the library's logs (D295): how long he waited, for the first words and
+  // for the whole reply, whether it went back, what was mended, or why it failed. Never what was said.
+  const started = Date.now();
+  let firstWords: number | undefined;
+  const log = (line: object) => {
+    try {
+      mkdirSync(paths.logs(lib), { recursive: true });
+      appendFileSync(join(paths.logs(lib), "tutor.jsonl"), `${JSON.stringify({ ts: new Date(started).toISOString(), ms: Date.now() - started, ...(firstWords !== undefined ? { first_ms: firstWords } : {}), ...line })}\n`);
+    } catch { /* a log is a nicety: the reply still goes */ }
+  };
+  const { data, ai, usage, web, runs } = await runAgent(lib, {
     prompt: "tutor",
-    cwd: lib.root,
+    // With a file to read it starts in chats/files, not the library: what sits in its folder it may read (D292).
+    cwd: toRead.length ? dirname(toRead[0]!) : lib.root,
     web: true,
     ...(toRead.length ? { files: toRead } : {}),
     onProgress: onProgress && ((p) => {
@@ -158,26 +221,50 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
       // A few updates a second read as smooth; reading the whole JSON again on every token would not be.
       if (Date.now() - last < 50) return;
       const reply = partialReply(p.partial);
-      if (reply) (last = Date.now()), onProgress({ reply });
+      if (reply) (last = Date.now()), (firstWords ??= last - started), onProgress({ reply });
     }),
     schema: TutorOutput,
-    input: { message: m, ...(attached.length ? { attached } : {}), earlier: recent, ...(open ? { exercise: { heading: open.heading, card: open.card } } : {}), ...(reading ? { reading: { title: reading } } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
+    input: { message: m, ...(attached.length ? { attached } : {}), ...(before.length ? { before } : {}), earlier: recent, ...(open ? { exercise: { heading: open.heading, card: open.card } } : {}), ...(reading ? { reading } : {}), ...(missedBefore.length ? { missed: missedBefore } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
     check: (d, seen) => {
+      repaired = { moved: 0, dropped: 0 };
+      // A citation that fails is mended here, never a reason to write the reply again (D291): a quote a
+      // few words off moves to the sentence that says it; one with no such sentence, or naming a passage that
+      // wasn't given, goes with its marker, and the reply is then marked as not all from his sources.
+      const mend = (c: (typeof d.citations)[number], text: string | undefined) => {
+        if (text === undefined) return false;
+        if (locate(text, c.quote)) return true;
+        const near = nearestSentence(text, c.quote);
+        if (!near || !locate(text, near)) return false;
+        c.quote = near;
+        repaired.moved++;
+        return true;
+      };
+      // A web page is held to more: a link the search never returned is a made-up source, so it goes back to fix.
       for (const c of d.citations) {
-        if (isWebUrl(c.passage)) {
-          if (!URL.canParse(c.passage.trim())) return `${c.passage} is not a link`;
-          // Claude reports what its searches returned, so a web citation is checked as a passage is; codex doesn't.
-          if (!seen) continue;
-          const page = seen.pages.find((p) => samePage(p.url, c.passage));
-          // The retry is a fresh run that can't see this one's results, so the reason lists them.
-          const returned = seen.pages.slice(0, 8).map((p) => p.url).join(", ") || "none: search first";
-          if (!page) return `${c.passage} is not a page your web search returned (it returned ${returned}): cite one of those, or a passage`;
-          if (!locate(pageWords(page), c.quote)) return `the quote "${c.quote}" is not in what the web search returned for ${page.url}: copy its exact words`;
-          continue;
-        }
-        const p = byId.get(c.passage);
-        if (!p) return `no passage ${c.passage}; cite one of ${passages.map((x) => x.id).join(", ") || "none (there are no passages)"}, or a page your web search returned`;
-        if (!locate(p.text, c.quote)) return `the quote "${c.quote}" is not in ${c.passage}: copy its exact words`;
+        if (!isWebUrl(c.passage)) continue;
+        if (!URL.canParse(c.passage.trim())) return `${c.passage} is not a link`;
+        // Claude reports the text its searches returned, so a web citation is checked as a passage is; codex
+        // reports each result's snippet alone, which a quote from the page itself would fail.
+        if (!seen || seen.snippets) continue;
+        const page = seen.pages.find((p) => samePage(p.url, c.passage));
+        // The retry is a fresh run that can't see this one's results, so the reason lists them.
+        const returned = seen.pages.slice(0, 8).map((p) => p.url).join(", ") || "none: search first";
+        if (!page) return `${c.passage} is not a page your web search returned (it returned ${returned}): cite one of those, or a passage`;
+        if (!mend(c, pageWords(page))) return `the quote "${c.quote}" is not in what the web search returned for ${page.url}: copy its exact words`;
+      }
+      const keep = d.citations.map((c) => isWebUrl(c.passage) || mend(c, byId.get(c.passage)?.text));
+      if (keep.includes(false)) {
+        repaired.dropped += keep.filter((k) => !k).length;
+        // Markers only: `xs[1]` in code, an index right after a name, and [0] are his reply's own words.
+        const renumber = (text: string) => text.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((part, at) => at % 2 ? part : part.replace(/ ?(?<![\p{L}\p{N}_])\[(\d+)\]/gu, (all, n: string) => {
+          const i = +n - 1;
+          if (i < 0 || i >= keep.length) return all;
+          return keep[i] ? `${all.startsWith(" ") ? " " : ""}[${keep.slice(0, i + 1).filter(Boolean).length}]` : "";
+        })).join("");
+        d.reply = renumber(d.reply);
+        d.steps = d.steps.map(renumber);
+        d.citations = d.citations.filter((_, i) => keep[i]);
+        d.general = true;
       }
       const top = Math.max(0, ...[...[d.reply, ...d.steps].join("\n").matchAll(/\[(\d+)\]/g)].map((x) => +x[1]!));
       if (d.steps.length === 1 || d.steps.length > 6) return "steps: give 2 to 6 steps, or [] when the reply isn't a worked answer";
@@ -201,7 +288,8 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
       d.card.question = hideBlanks(d.card.question); // what the + Exercise chip shows, before it is kept
       return cardTextProblem(d.card) ?? blankProblem(d.card);
     },
-  });
+  }).catch((e: unknown) => { log({ error: String((e as Error)?.message ?? e).slice(0, 300) }); throw e; });
+  log({ runs, searched: web?.searched ?? false, ...repaired, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, model: ai.model, prompt: ai.prompt_version });
   const citations: (Citation | WebCitation)[] = data.citations.map((c, i) => {
     if (isWebUrl(c.passage)) {
       const page = web?.pages.find((p) => samePage(p.url, c.passage));
@@ -219,7 +307,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
   // Each point of the committed card with its mark and the words of his that earned it (D162), as Review's
   // check shows them (D141): a quote is kept only for a covered point and only when it is in what he wrote.
   const marks = open && data.covered.length ? open.card.rubric.map((point, i) => ({ point, covered: data.covered[i]!, quote: data.covered[i] ? quoteIn(message.trim(), data.evidence[i] ?? "") : "" })) : [];
-  return { message: m, title: earlier.length ? "" : data.title.trim().slice(0, 80), reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card, marks, ai, usage: usage as Usage };
+  return { message: m, title: earlier.length ? "" : data.title.trim().slice(0, 80), reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card, marks, repaired, ai, usage: usage as Usage };
 }
 
 /** Keeps a card the tutor proposed (D128, D9: it goes into review like any draft). It belongs to the

@@ -72,6 +72,7 @@ bun run typecheck           # tsc strict, whole workspace
 bun run golden:update       # rewrite test/golden/*.md (whole doc.md per sample source) after an import change you mean; read the diff
 bun run eval:grade          # grading eval: Ore's grader on labeled exercises, Claude vs Codex (docs/guides/grading-eval.md)
 bun run eval:mine           # prints real reviews where Tyler's rating and the grader's fell on different sides, as candidate golden cases (read-only, no AI)
+bun run eval:mine:tutor     # prints the tutor turns in his saved chats that he asked again, reworded, stopped or that failed, as candidate tutor cases, and sums the waits in .ore/logs/tutor.jsonl (read-only, no AI)
 bun run eval:ask            # Ask-your-library eval: the tutor's retrieval, answers and citations (docs/guides/ask-library.md)
 bun run eval:tutor          # tutor pedagogy eval: hints before answers, feedback, A/B of prompts (docs/guides/tutor-eval.md)
 bun run eval:questions      # question-quality eval: the AI's exercises scored by code and a judge (docs/guides/question-eval.md)

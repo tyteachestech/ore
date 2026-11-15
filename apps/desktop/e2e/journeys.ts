@@ -1024,6 +1024,22 @@ journey("ambience radio over Review: its button stays at the bottom left and one
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("tutor: a message from a source says which section is on his screen, so \"this part\" means that part (D294)", async (page) => {
+  await openSource(page, AGENTS);
+  const heading = await page.evaluate(() => {
+    const hs = [...document.querySelectorAll<HTMLElement>(".doc h2, .doc h3")];
+    const h = hs[Math.min(2, hs.length - 1)]!;
+    const pane = document.querySelector<HTMLElement>(".reader-scroll")!;
+    pane.scrollTop += h.getBoundingClientRect().top - pane.getBoundingClientRect().top - 40;
+    return h.textContent!.trim();
+  });
+  await page.keyboard.press("Meta+j");
+  const sent = page.waitForRequest((r) => (r.postData() ?? "").includes(`"tutor","Explain this part","--item=`) && (r.postData() ?? "").includes(JSON.stringify(`--at=${heading}`).slice(1, -1)));
+  await page.getByRole("textbox", { name: "Message the tutor" }).fill("Explain this part");
+  await page.keyboard.press("Enter");
+  await sent;
+});
+
 journey("tutor: ⌘J opens it over the source it sees, a reply shows its sources, Esc closes it and the thread stays; docked it takes the side panel's place", async (page) => {
   await openSource(page, TESTING);
   await page.keyboard.press("Meta+j");
@@ -6467,6 +6483,71 @@ journey("review: Enter activates the focused button (Again, Edit exercise, Open 
   if (ratings[before + 1] !== "3") throw new Error(`Enter on the card recorded ${ratings[before + 1]}`);
   await undo.waitFor(); // the rating is sent; Undo shows once it is in
   for (let n = 0; n < 8 && (await undo.isVisible()); n++) await undo.click(), await page.waitForTimeout(250);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+});
+
+// F265: Review's chat showed three dots until the whole reply was there, and nothing stopped it.
+journey("review Ask: the reply shows as it is written, Stop keeps the words so far, and with none it says Stopped with Try again (D296)", async (page) => {
+  let release = () => {};
+  let streams: string[] = [];
+  const bodies: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"ask",')) return route.fallback();
+    streams.push(/--stream=(ask-[\w-]+)/.exec(body)![1]!);
+    bodies.push(body);
+    await new Promise<void>((done) => (release = done)); // the reply is still being written
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Because recalling it is the practice.", proposal: null, session: "s1" }) }).catch(() => {});
+  });
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const q = page.locator(".review-q");
+  await pick.or(q).first().waitFor();
+  if (await pick.isVisible()) await page.keyboard.press("Enter");
+  await q.waitFor();
+  const noIdea = page.getByRole("button", { name: "No idea" });
+  await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+  await page.getByRole("button", { name: "Ask about this" }).click();
+  const ask = page.getByRole("region", { name: "Ask about this" });
+  const field = page.getByRole("textbox", { name: "Ask about this exercise" });
+  const emit = (p: object) => page.evaluate(([p]) => (window as any).__emit("ore-progress", p), [p] as const);
+  // Stopped before a word: it says so and offers the message again.
+  await field.fill("Why is this the answer?");
+  await page.keyboard.press("Enter");
+  await ask.getByLabel("Thinking").waitFor();
+  await until("the request went", async () => streams.length === 1);
+  await ask.getByRole("button", { name: "Stop the reply" }).click();
+  await ask.getByText("Stopped.").waitFor();
+  await ask.getByRole("button", { name: "Send" }).waitFor();
+  // Asked again at once, while the stopped run is still winding down: the words come in place of the dots,
+  // another run's words don't, and ⌘. keeps what was written.
+  const first = release;
+  await ask.getByRole("button", { name: "Try again" }).click();
+  await until("the second request went", async () => streams.length === 2);
+  first();
+  await emit({ stream: streams[0], reply: "Words of the run he stopped", session: "s-old" });
+  await emit({ stream: streams[1], reply: "Because recalling", session: "s-live" });
+  await ask.getByText("Because recalling").waitFor();
+  if (await ask.getByText("Words of the run he stopped").count()) throw new Error("a stopped run's words landed on the next one");
+  if (await ask.getByLabel("Thinking").count()) throw new Error("the dots stayed beside the words");
+  await page.keyboard.press("Meta+.");
+  await ask.getByText("Stopped", { exact: true }).waitFor();
+  await ask.getByText("Because recalling").waitFor();
+  release();
+  await page.waitForTimeout(150);
+  if (await ask.getByText("Because recalling it is the practice.").count()) throw new Error("the stopped run's reply landed after Stop");
+  // A reply left to finish lands whole.
+  await field.fill("And after a week?");
+  await page.keyboard.press("Enter");
+  await until("the third request went", async () => streams.length === 3);
+  // It follows the reply he stopped, in that reply's conversation, not a new one that never saw it.
+  if (!bodies[2]!.includes("--session=s-live")) throw new Error(`the message after a stopped reply started a new conversation: ${bodies[2]}`);
+  release();
+  await ask.getByText("Because recalling it is the practice.").waitFor();
+  await page.keyboard.press("Escape");
+  await until("Ask closes", async () => (await ask.count()) === 0);
+  await page.unroute(/\/ore$/);
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
 });

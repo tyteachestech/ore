@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Citation } from "../src/ai/ask.ts";
 import { addTutorCard, partialReply, tutor, tutorPassages, type TutorCard } from "../src/ai/tutor.ts";
 import { attachToChat } from "../src/chats.ts";
 import { sceneOutline, setDiagram } from "../src/diagrams.ts";
-import { findCard } from "../src/cards.ts";
+import { findCard, writeCardMeta, writeNewCard } from "../src/cards.ts";
+import { addHighlight } from "../src/annotations.ts";
+import { recordReview } from "../src/study.ts";
 import { createItem, findItem } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -23,6 +25,7 @@ const n = Number(fs.readFileSync(dir + "/count", "utf8"));
 fs.writeFileSync(dir + "/count", String(n + 1));
 fs.appendFileSync(dir + "/msgs.jsonl", JSON.stringify(process.argv[process.argv.indexOf("-p") + 1]) + "\\n");
 fs.writeFileSync(dir + "/argv.json", JSON.stringify(process.argv));
+fs.writeFileSync(dir + "/cwd", process.cwd());
 // An entry { web: [events…], out } first prints those stream-json events (what its web search returned).
 const q = JSON.parse(fs.readFileSync(dir + "/queue.json", "utf8"))[n];
 for (const e of q?.web ?? []) console.log(JSON.stringify(e));
@@ -30,7 +33,7 @@ console.log(JSON.stringify({ type: "result", is_error: false, structured_output:
 `);
   chmodSync(join(binDir, "claude"), 0o755);
 }
-type Sent = { message: string; reading?: { title: string }; earlier: unknown[]; passages: { id: string; source: string; heading: string; text: string }[] };
+type Sent = { message: string; reading?: { title: string; whole?: boolean; outline?: string[] }; earlier: unknown[]; passages: { id: string; source: string; heading: string; text: string }[] };
 const sent = (): Sent[] =>
   readFileSync(join(binDir, "msgs.jsonl"), "utf8").trim().split("\n").map((l) => { const m = JSON.parse(l) as string; return JSON.parse(m.slice(m.indexOf("{"), m.lastIndexOf("}") + 1)); });
 
@@ -60,6 +63,8 @@ async function library() {
   return { lib, a, b, c };
 }
 
+const OK = { reply: "Yes.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "A chat" };
+
 describe("tutor: what it sees", () => {
   test("the open source's passages come first, then the library's; unrelated sources stay out", async () => {
     const { lib, a, b } = await library();
@@ -85,7 +90,12 @@ describe("tutor: what it sees", () => {
     expect(input.attached).toEqual([{ name: "chart.png", file: abs(png) }]);
     expect(input.earlier[0]!.attached).toEqual([{ name: "notes.txt", file: abs(txt) }]);
     const argv = JSON.parse(readFileSync(join(binDir, "argv.json"), "utf8")) as string[];
-    expect(argv[argv.indexOf("--tools") + 1]).toContain("Read");
+    // F263: with a file attached the run could read any file on the Mac, and fetch web addresses too.
+    // It reads the attached files and nothing else (D292): no search-the-disk tools, and it starts in chats/files.
+    expect(argv[argv.indexOf("--tools") + 1]).toBe("Read,WebSearch,WebFetch");
+    const real = (f: { path: string }) => realpathSync(abs(f));
+    expect(argv.slice(argv.indexOf("--allowedTools") + 1, argv.indexOf("--permission-mode"))).toEqual([`Read(/${real(txt)})`, `Read(/${real(png)})`, "WebSearch", "WebFetch"]);
+    expect(readFileSync(join(binDir, "cwd"), "utf8")).toBe(realpathSync(join(lib.root, "chats/files")));
     await expect(tutor(lib, "and this?", { files: [{ name: "x", path: "../secrets.txt" }] })).rejects.toThrow('no attached file "../secrets.txt"');
     // An earlier turn's file that is gone is left out, and the follow-up still goes.
     fakeClaude([out]);
@@ -101,16 +111,51 @@ describe("tutor: what it sees", () => {
 });
 
 describe("tutor: replies", () => {
+  // F261: "Summarize this", "What's this about?" and Practice got the open source's first 8 passages (16% of a 4,000-word article).
+  test("the source he has open goes whole, in order, whatever his words: a summary or an exercise can draw on its end (D290)", async () => {
+    const lib = await tempLibrary();
+    const body = Array.from({ length: 30 }, (_, i) => `## Part ${i + 1}\n\n${`Section ${i + 1} explains idea number ${i + 1} in enough words to stand as a passage of its own, well past the forty that would join it to the one before, so every part is kept apart from its neighbours here. `.repeat(2)}`).join("\n\n");
+    const a = await createItem(lib, { type: "article", title: "Thirty parts", body });
+    await createItem(lib, { type: "article", title: "Elsewhere", body: "Summarize a text by naming its claim first." });
+    for (const q of ["summarize this", "Practice", "idea number 3"]) {
+      const ps = tutorPassages(lib, q, { item: a.meta.id });
+      const own = ps.filter((p) => p.item === a.meta.id);
+      expect(own.map((p) => p.heading)).toEqual(Array.from({ length: 30 }, (_, i) => `Part ${i + 1}`));
+      expect(ps.slice(0, 30)).toEqual(own); // his source first, the library's after
+    }
+    expect(tutorPassages(lib, "summarize this", { item: a.meta.id }).some((p) => p.title === "Elsewhere")).toBe(true); // other sources still reach it
+    fakeClaude([{ reply: "It covers thirty ideas.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "Thirty parts" }]);
+    await tutor(lib, "summarize this", { item: a.meta.id });
+    expect(sent()[0]!.reading).toEqual({ title: "Thirty parts", whole: true });
+  });
+
+  test("a source too long to send whole says so: its headings as an outline, and passages from across it when his words match none", async () => {
+    const lib = await tempLibrary();
+    const part = (i: number) => `## Chapter ${i + 1}\n\n${`Chapter ${i + 1} sentence about topic${i + 1}. `.repeat(60)}`;
+    const a = await createItem(lib, { type: "epub", title: "A long book", body: Array.from({ length: 60 }, (_, i) => part(i)).join("\n\n") });
+    const ps = tutorPassages(lib, "summarize this", { item: a.meta.id });
+    expect(ps.length).toBeLessThan(20);
+    expect(ps[0]!.heading).toBe("Chapter 1");
+    expect(ps.some((p) => +p.heading.slice(8) > 45)).toBe(true); // not only its opening
+    expect(tutorPassages(lib, "topic37", { item: a.meta.id })[0]!.heading).toBe("Chapter 37"); // his words still pick the part
+    fakeClaude([{ reply: "From the parts I can see, it runs to sixty chapters.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "A long book" }]);
+    await tutor(lib, "summarize this", { item: a.meta.id });
+    const r = sent()[0]!.reading as { title: string; whole: boolean; outline: string[] };
+    expect(r.whole).toBe(false);
+    expect(r.outline.slice(0, 2)).toEqual(["Chapter 1", "Chapter 2"]);
+    expect(r.outline).toHaveLength(60);
+  });
+
   test("cites the open source, placed in its doc.md, and sends the title he is reading", async () => {
     const { lib, a } = await library();
-    fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P1", quote: "A card you miss goes back to the first box." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
+    fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P2", quote: "A card you miss goes back to the first box." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@14" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@15" });
     expect(r.general).toBe(false);
     const c = r.citations[0] as Citation;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
     expect(findItem(lib, a.meta.id).body.slice(c.start, c.end)).toBe("A card you miss goes back to the first box.");
-    expect(sent()[0]!.reading).toEqual({ title: "Flashcard boxes" });
+    expect(sent()[0]!.reading).toEqual({ title: "Flashcard boxes", whole: true });
   });
 
   test("the first reply names the chat (D172); later ones don't rename it", async () => {
@@ -127,17 +172,130 @@ describe("tutor: replies", () => {
     expect((await tutor(lib, "boxes?", { item: a.meta.id })).title).toBe("x".repeat(80));
   });
 
-  test("a made-up quote or a marker with no citation goes back once to fix", async () => {
+  // F262: one quote a word off reran the whole turn (the reply on screen started over), and a second miss lost the answer to an error.
+  test("a quote a few words off is moved to the sentence that says it, with no second run (D291)", async () => {
+    const { lib, a } = await library();
+    fakeClaude([{ reply: "Box one [1].", citations: [{ passage: "P2", quote: "A card you miss goes back to box one." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
+    const r = await tutor(lib, "missed card", { item: a.meta.id });
+    expect(r.citations[0]!.quote).toBe("A card you miss goes back to the first box.");
+    expect(r).toMatchObject({ reply: "Box one [1].", general: false, repaired: { moved: 1, dropped: 0 } });
+    expect(readFileSync(join(binDir, "count"), "utf8")).toBe("1");
+  });
+
+  test("a made-up quote or passage loses its marker and the rest keep their order; the reply stays, marked as not from his sources", async () => {
+    const { lib, a } = await library();
+    fakeClaude([{
+      reply: "It goes to box one [1], every time [2]. Reviewed again it gets easier [3].",
+      citations: [{ passage: "P2", quote: "Leitner invented this in a Hamburg cellar." }, { passage: "P9", quote: "every time" }, { passage: "P2", quote: "goes back to the first box" }],
+      general: false, hint: false, steps: ["Miss it [3].", "Box one [1]."], exercise: null, card: null,
+    }]);
+    const r = await tutor(lib, "missed card", { item: a.meta.id });
+    expect(r.reply).toBe("It goes to box one, every time. Reviewed again it gets easier [1].");
+    expect(r.steps).toEqual(["Miss it [1].", "Box one."]);
+    expect(r.citations.map((c) => [c.n, c.quote])).toEqual([[1, "goes back to the first box"]]);
+    expect(r).toMatchObject({ general: true, repaired: { moved: 0, dropped: 2 } });
+    expect(readFileSync(join(binDir, "count"), "utf8")).toBe("1");
+  });
+
+  // Found by the review of #426, before it merged.
+  test("a mended quote is a whole sentence across a decimal, and small words alone never make a quote real", async () => {
+    const { nearestSentence } = await import("../src/ai/ask.ts");
+    const text = "Version 2.5 of the scheduler improves recall by a wide margin over fixed intervals. It is the gap that matters, and that is the point.";
+    expect(nearestSentence(text, "Version 2.5 of the scheduler improved recall by a wide margin")).toBe("Version 2.5 of the scheduler improves recall by a wide margin over fixed intervals.");
+    expect(nearestSentence(text, "it is the tide that matters")).toBeNull();
+  });
+
+  test("dropping a citation leaves code and [0] in the reply alone", async () => {
+    const { lib, a } = await library();
+    fakeClaude([{ ...OK, reply: "Use `box[1]` or xs[0] for the first box [1], never the last [2].", citations: [{ passage: "P9", quote: "nothing like this is anywhere" }, { passage: "P2", quote: "A card you miss goes back to the first box." }] }]);
+    const r = await tutor(lib, "Which box?", { item: a.meta.id });
+    expect(r.reply).toBe("Use `box[1]` or xs[0] for the first box, never the last [1].");
+  });
+
+  test("an earlier turn with no reply, as an agent may send it, is read as an empty one", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK]);
+    await tutor(lib, "And then?", { item: a.meta.id, earlier: [{ message: "hi" } as never] });
+    expect(sent()[0]!.earlier).toEqual([{ message: "hi", reply: "" }]);
+  });
+
+  test("a long source's outline is its headings, never a # comment inside its code", async () => {
+    const { lib } = await library();
+    const { readingOf } = await import("../src/ai/tutor.ts");
+    const long = await createItem(lib, { type: "article", title: "Shell", body: `# Shell\n\n\`\`\`sh\n# install deps\nmake\n\`\`\`\n\n## Pipes\n\n${"word ".repeat(15_100)}` });
+    expect(readingOf(lib, long.meta.id).outline).toEqual(["Shell", "Pipes"]);
+  });
+
+  test("a marker with no citation still goes back once to fix", async () => {
     const { lib, a } = await library();
     fakeClaude([
-      { reply: "Box one [1] [2].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, steps: [], exercise: null, card: null },
-      { reply: "Box one [1].", citations: [{ passage: "P1", quote: "Missed cards return to box one." }], general: false, hint: false, steps: [], exercise: null, card: null },
-      { reply: "Box one [1].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, steps: [], exercise: null, card: null },
+      { reply: "Box one [1] [2].", citations: [{ passage: "P2", quote: "goes back to the first box" }], general: false, hint: false, steps: [], exercise: null, card: null },
+      { reply: "Box one [1].", citations: [{ passage: "P2", quote: "goes back to the first box" }], general: false, hint: false, steps: [], exercise: null, card: null },
     ]);
-    await expect(tutor(lib, "missed card", { item: a.meta.id })).rejects.toThrow("is not in P1: copy its exact words");
-    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("marker [2] has no citation");
     const r = await tutor(lib, "missed card", { item: a.meta.id });
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("marker [2] has no citation");
     expect(r.citations[0]!.quote).toBe("goes back to the first box");
+  });
+
+  // F264: only the last six turns reached the tutor, so a long chat lost what he had said he was after.
+  test("a long chat keeps its start: earlier turns go by size, never fewer than six, and what he asked before those in a line each (D293)", async () => {
+    const { lib } = await library();
+    const out = { reply: "On it.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null };
+    const short = Array.from({ length: 20 }, (_, i) => ({ message: `question ${i + 1}`, reply: `answer ${i + 1}` }));
+    fakeClaude([out, out]);
+    await tutor(lib, "and now?", { earlier: short });
+    const first = sent()[0] as unknown as { earlier: unknown[]; before?: string[] };
+    expect(first.earlier).toEqual(short); // twenty short turns all fit
+    expect(first.before).toBeUndefined();
+    const long = Array.from({ length: 20 }, (_, i) => ({ message: i ? `question ${i + 1}` : `I'm learning this for my exam on Friday. ${"So ".repeat(80)}`, reply: `answer ${i + 1} ${"word ".repeat(600)}` }));
+    await tutor(lib, "and now?", { earlier: long });
+    const second = sent()[1] as unknown as { earlier: { message: string }[]; before: string[] };
+    expect(second.earlier.map((t) => t.message)).toEqual(long.slice(-6).map((t) => t.message));
+    expect(second.before).toHaveLength(14);
+    expect(second.before[0]).toBe(`${long[0]!.message.slice(0, 120).trimEnd()}…`);
+    expect(second.before[13]).toBe("question 14");
+  });
+
+  test("it is told where he is, what he marked and what he last missed, so \"this part\" and Practice aim there (D294)", async () => {
+    const { lib, a, c } = await library();
+    addHighlight(findItem(lib, a.meta.id), { exact: "A card you miss goes back to the first box.", intent: "card", note: "why the first?" });
+    addHighlight(findItem(lib, a.meta.id), { exact: "Spaced repetition is a way to remember.", intent: "keep" });
+    addHighlight(findItem(lib, c.meta.id), { exact: "Knead the dough", intent: "keep" }); // another source's: not sent
+    const card = (item: string, question: string) => writeNewCard(lib, { kind: "card", item, skills: [], topics: [], content_type: "fact", question, answer: "x", rubric: [] });
+    const missed = card(a.meta.id, "Where does a missed card go?");
+    const got = card(a.meta.id, "What moves a card up a box?");
+    const mended = card(a.meta.id, "How often is box one reviewed?");
+    const other = card(c.meta.id, "How long do you knead?");
+    for (const x of [missed, got, mended, other]) writeCardMeta(findCard(lib, x.meta.id), { ...x.meta, state: "live" });
+    await recordReview(lib, missed.meta.id, { rating: 1, confidence: 2 });
+    await recordReview(lib, got.meta.id, { rating: 3, confidence: 2 });
+    await recordReview(lib, mended.meta.id, { rating: 1, confidence: 2 });
+    await Bun.sleep(3); // two reviews of one card in the same millisecond read as one
+    await recordReview(lib, mended.meta.id, { rating: 3, confidence: 2 }); // missed, then got: no longer a miss
+    await recordReview(lib, other.meta.id, { rating: 1, confidence: 2 });
+    fakeClaude([{ reply: "Here.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null }]);
+    await tutor(lib, "Practice", { item: a.meta.id, at: "The Leitner system" });
+    const input = sent()[0] as unknown as { reading: unknown; missed: unknown };
+    expect(input.reading).toEqual({
+      title: "Flashcard boxes", whole: true, at: "The Leitner system",
+      marked: [{ text: "Spaced repetition is a way to remember." }, { text: "A card you miss goes back to the first box.", key: true, note: "why the first?" }],
+    });
+    expect(input.missed).toEqual(["Where does a missed card go?"]);
+  });
+
+  test("each turn leaves a line in the library's logs: how long it took, whether it went back, what was mended, or why it failed (D295)", async () => {
+    const { lib, a } = await library();
+    const ok = { reply: "Box one [1].", citations: [{ passage: "P2", quote: "A card you miss goes back to box one." }], general: false, hint: false, steps: [], exercise: null, card: null };
+    fakeClaude([{ ...ok, reply: "Box one [1] [2]." }, ok, { nope: true }, { nope: true }]);
+    await tutor(lib, "missed card", { item: a.meta.id });
+    await expect(tutor(lib, "and then?", { item: a.meta.id })).rejects.toThrow("invalid tutor output twice");
+    const lines = readFileSync(join(lib.root, ".ore/logs/tutor.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toMatchObject({ runs: 2, searched: false, moved: 1, dropped: 0, model: "claude-fake-1", prompt: "tutor@15" });
+    expect(lines[0].ms).toBeGreaterThanOrEqual(0);
+    expect(Date.parse(lines[0].ts)).not.toBeNaN();
+    expect(lines[1].error).toContain("invalid tutor output twice");
+    expect(JSON.stringify(lines)).not.toContain("missed card"); // what he wrote stays in the chat's own file
   });
 
   test("with nothing in the library it still talks, marking general knowledge as such", async () => {
@@ -178,7 +336,7 @@ describe("tutor: the web", () => {
     const { lib } = await library();
     const web = searched([BRIT], "Hermann Ebbinghaus was born on January 24, 1850, in Barmen.");
     const reply = (passage: string, quote: string) => ({ web, out: { reply: "Born in 1850 [1].", citations: [{ passage, quote }], general: false, hint: false, steps: [], exercise: null, card: null } });
-    fakeClaude([reply("https://en.wikipedia.org/wiki/Hermann_Ebbinghaus", "born on January 24, 1850"), reply(BRIT.url, "born on 24 January 1850 in Bonn"), reply(BRIT.url, "born on January 24, 1850")]);
+    fakeClaude([reply("https://en.wikipedia.org/wiki/Hermann_Ebbinghaus", "born on January 24, 1850"), reply(BRIT.url, "he died at Halle in 1909"), reply(BRIT.url, "born on January 24, 1850")]);
     await expect(tutor(lib, "When was Ebbinghaus born?")).rejects.toThrow("is not in what the web search returned");
     expect(sent()).toHaveLength(2);
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("is not a page your web search returned");
@@ -317,8 +475,8 @@ describe("tutor: hints and cards", () => {
     const card: TutorCard = { kind: "prompt", content_type: "concept", question: "In the Leitner system, why does a missed card go back to box one?", answer: "So it comes back often until it sticks.", rubric: ["it is reviewed more often"] };
     fakeClaude([
       { reply: "Look at what happens to a card you miss.", citations: [], general: false, hint: true, steps: [], exercise: null, card: null },
-      { reply: "It goes back to box one [1].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, steps: [], exercise: null, card: { ...card, rubric: [] } },
-      { reply: "It goes back to box one [1].", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, steps: [], exercise: null, card },
+      { reply: "It goes back to box one [1].", citations: [{ passage: "P2", quote: "goes back to the first box" }], general: false, hint: false, steps: [], exercise: null, card: { ...card, rubric: [] } },
+      { reply: "It goes back to box one [1].", citations: [{ passage: "P2", quote: "goes back to the first box" }], general: false, hint: false, steps: [], exercise: null, card },
     ]);
     expect(await tutor(lib, "what's the answer to my card about missed cards?", { item: a.meta.id })).toMatchObject({ hint: true, steps: [], exercise: null, card: null });
     const r = await tutor(lib, "show me the missed card answer", { item: a.meta.id });
@@ -331,9 +489,9 @@ describe("tutor: hints and cards", () => {
     const steps = ["A card you miss is one you don't know yet [1].", "So it goes back where cards come up most often: box one."];
     fakeClaude([
       { reply: "Here's the working.", citations: [], general: false, hint: false, steps: [steps[0]!], exercise: null, card: null },
-      { reply: "Here's the working.", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: true, steps, exercise: null, card: null },
+      { reply: "Here's the working.", citations: [{ passage: "P2", quote: "goes back to the first box" }], general: false, hint: true, steps, exercise: null, card: null },
       { reply: "Here's the working.", citations: [], general: false, hint: false, steps, exercise: null, card: null },
-      { reply: "Here's the working.", citations: [{ passage: "P1", quote: "goes back to the first box" }], general: false, hint: false, steps, exercise: null, card: null },
+      { reply: "Here's the working.", citations: [{ passage: "P2", quote: "goes back to the first box" }], general: false, hint: false, steps, exercise: null, card: null },
       { reply: "Here's the working.", citations: [], general: false, hint: false, steps: Array(7).fill(steps[1]), exercise: null, card: null },
       { reply: "Here's the working.", citations: [], general: false, hint: false, steps: [steps[1]!, steps[1]!], exercise: null, card: null },
     ]);
@@ -385,7 +543,7 @@ describe("tutor: practice", () => {
     const earlier = [{ message: "Practice", reply: "Explain why a missed card goes back to box one.", exercise }, { message: "wait, what's box one?", reply: "The box reviewed most often." }];
     const late: TutorCard = { kind: "card", content_type: "fact", question: "Where does a missed card go?", answer: "Box one.", rubric: [] };
     fakeClaude([
-      out({ reply: "Right that it comes back sooner [1]. Missing: why box one. What does a miss say about the memory?", citations: [{ passage: "P1", quote: "goes back to the first box" }], covered: [false, true], evidence: ["", "you see it again soon"], card: late }),
+      out({ reply: "Right that it comes back sooner [1]. Missing: why box one. What does a miss say about the memory?", citations: [{ passage: "P2", quote: "goes back to the first box" }], covered: [false, true], evidence: ["", "you see it again soon"], card: late }),
       out({ reply: "Both points, nicely put. What about a card you get right?", covered: [true, true], evidence: ["memory is weak", "comes round most often"] }),
       out({ reply: "Both points.", covered: [true], evidence: ["Both"] }),
       out({ reply: "Both points.", covered: [true, true], evidence: ["", ""] }),
@@ -457,5 +615,55 @@ describe("tutor: practice", () => {
     const m = sent()[0]!.message;
     expect(m).toContain("[Diagram he drew:\n- Missed card\n- Box one\n- Missed card → Box one (goes back)\n]");
     expect(m).toContain("![Diagram](diagrams/nothing.excalidraw)");
+  });
+});
+
+describe("tutor on Codex (D297)", () => {
+  // The lines `codex exec --json` printed on Tyler's Mac (0.167.0, 2026-11-15): a search starts with no query, ends
+  // with each result's title and snippet, and the reply comes whole in the last-message file, never in pieces.
+  test("a web search shows while it runs, counts as searched, and its result names the page cited", async () => {
+    const { lib } = await library();
+    const url = "https://example.org/ebbinghaus";
+    const events = [
+      { type: "thread.started", thread_id: "t" },
+      { type: "item.started", item: { id: "s1", type: "web_search", query: "", action: { type: "other" } } },
+      { type: "item.completed", item: { id: "s1", type: "web_search", query: "ebbinghaus", results: [{ type: "text_result", domain: "example.org", snippet: "He ran the tests on himself.", title: "Hermann Ebbinghaus", url }] } },
+      { type: "turn.completed", usage: { input_tokens: 9, output_tokens: 3 } },
+    ];
+    // The quote is from the page itself, not the snippet: codex never reports the page's text, so it is not held to it.
+    const out = { title: "Ebbinghaus", reply: "He published it in 1885 [1].", citations: [{ passage: url, quote: "published in 1885" }], general: false, hint: false, exercise: null, card: null, steps: [] };
+    writeFileSync(join(binDir, "codex"), `#!/usr/bin/env bun
+const fs = require("fs");
+for (const e of ${JSON.stringify(events)}) console.log(JSON.stringify(e));
+fs.writeFileSync(process.argv[process.argv.indexOf("-o") + 1], ${JSON.stringify(JSON.stringify(out))});
+`);
+    chmodSync(join(binDir, "codex"), 0o755);
+    process.env.ORE_AI = "codex";
+    const seen: unknown[] = [];
+    const r = await tutor(lib, "When did Ebbinghaus publish?", { onProgress: (p) => seen.push(p) });
+    expect(seen.filter((p) => "searching" in (p as object))).toEqual([{ searching: true }, { searching: false }]);
+    expect(r.searched).toBe(true);
+    expect(r.citations[0]).toMatchObject({ title: "Hermann Ebbinghaus" });
+  });
+
+  test("a retry on Codex still holds a web quote to nothing more than its link", async () => {
+    const { lib } = await library();
+    const url = "https://example.org/ebbinghaus";
+    const search = { type: "item.completed", item: { id: "s1", type: "web_search", query: "e", results: [{ snippet: "He ran the tests on himself.", title: "Hermann Ebbinghaus", url }] } };
+    const out = { title: "E", reply: "He published it in 1885 [1].", citations: [{ passage: url, quote: "published in 1885" }], general: false, hint: false, exercise: null, card: null, steps: [] };
+    // The first run's reply has one step, which goes back; the second is right.
+    writeFileSync(join(binDir, "n"), "0");
+    writeFileSync(join(binDir, "codex"), `#!/usr/bin/env bun
+const fs = require("fs");
+const n = Number(fs.readFileSync(${JSON.stringify(join(binDir, "n"))}, "utf8"));
+fs.writeFileSync(${JSON.stringify(join(binDir, "n"))}, String(n + 1));
+console.log(${JSON.stringify(JSON.stringify(search))});
+const out = ${JSON.stringify(out)};
+fs.writeFileSync(process.argv[process.argv.indexOf("-o") + 1], JSON.stringify(n ? out : { ...out, steps: ["one"] }));
+`);
+    chmodSync(join(binDir, "codex"), 0o755);
+    process.env.ORE_AI = "codex";
+    const r = await tutor(lib, "When did Ebbinghaus publish?");
+    expect(r.reply).toBe("He published it in 1885 [1].");
   });
 });

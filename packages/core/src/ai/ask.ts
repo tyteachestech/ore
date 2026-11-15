@@ -140,6 +140,25 @@ export function passageCitation(p: Passage, q: string, n: number): Citation {
 /** Markdown as it reads: a link's text without its URL, no emphasis or code marks, no footnote marks. */
 export const plainText = (md: string) =>
   md.replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1").replace(/\[\^\d+\]/g, "").replace(/(\*\*|__|\*|`)/g, "").replace(/\s+/g, " ").trim();
+/** A quote that isn't in `text` word for word, moved to the sentence there that says it (D291): the one
+ *  holding the most of the quote's words, at least three of them and 60%, counting only words of four letters or
+ *  more (and numbers): "it is the … that" is in every sentence. Null when no sentence does (a made-up quote, or
+ *  one stitched from two places). */
+export function nearestSentence(text: string, quote: string): string | null {
+  const words = (s: string) => new Set((plainText(s).toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => w.length > 3 || /\d/.test(w)));
+  const want = words(quote);
+  let best: string | null = null;
+  let top = 0;
+  // A sentence ends at . ! ? before a space, or at a line's end: "2.5" and "ore.app" are inside one.
+  for (const part of text.split(/(?<=[.!?])\s+|\n+/)) {
+    const sentence = part.trim();
+    const has = words(sentence);
+    const shared = [...want].filter((w) => has.has(w)).length;
+    if (shared >= 3 && shared / want.size >= 0.6 && shared > top) (best = sentence), (top = shared);
+  }
+  return best;
+}
+
 export interface AskTurn { question: string; answer: string }
 
 export const NOT_FOUND = "Nothing in your library mentions that.";

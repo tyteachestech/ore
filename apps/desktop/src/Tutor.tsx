@@ -22,6 +22,7 @@ import { useSideWidth } from "./Notes";
 import { cancelOre, ore, oreJob, oreWith, opt, type SkillColor } from "./ore";
 import { is } from "./keys";
 import { errorText, type Notify } from "./util";
+import { readingAt } from "./Outline";
 import { Working } from "./Working";
 import { mentionMatches, pointedAt, type Mention } from "./mentions";
 import { glow, pulse } from "./Lamp";
@@ -49,6 +50,8 @@ export type TutorTurn = {
   /** Unique across chats: a reply lands only on the turn that asked for it. */
   id: string;
   message: string; item?: string; title?: string; mentions?: Mention[];
+  /** The heading of the section on his screen when he asked (D294): "this part" is that part. */
+  at?: string;
   /** The @ context the request carried: his own @s, else the ones still in effect from before (D128.3), then
    *  the skill whose page he asked from (D191). Try again sends it as it was. */
   pointed?: Mention[];
@@ -179,7 +182,7 @@ export function useTutorChat(notify: Notify) {
     try {
       if (!mine()) return; // stopped before the run began
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
-      const r = await oreJob<Reply & { title?: string }>(job, null, "tutor", t.message, ...(t.item ? [opt("item", t.item)] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), ...(t.files?.length ? [opt("files", JSON.stringify(t.files))] : []), opt("stream", t.id));
+      const r = await oreJob<Reply & { title?: string }>(job, null, "tutor", t.message, ...(t.item ? [opt("item", t.item), ...(t.at ? [opt("at", t.at)] : [])] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), ...(t.files?.length ? [opt("files", JSON.stringify(t.files))] : []), opt("stream", t.id));
       if (!mine()) return;
       jobs.current.delete(t.id);
       flying.current.delete(t.id);
@@ -475,7 +478,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
     const pointed = mentions.filter((m, i) => message.includes(`@${m.name}`) && mentions.findIndex((x) => x.kind === m.kind && x.id === m.id) === i);
     force.current = true; // what he sends, and its reply, he wants to see
     // What he attached goes with the message he typed, not with a starter or a chip's canned one.
-    chat.ask({ message, ...(context ? { item: context.id, title: context.title } : {}), ...(pointed.length ? { mentions: pointed } : {}), ...(typed && files.length ? { files } : {}) }, scope ? [scope] : []);
+    chat.ask({ message, ...(context ? { item: context.id, title: context.title, ...(readingAt() ? { at: readingAt() } : {}) } : {}), ...(pointed.length ? { mentions: pointed } : {}), ...(typed && files.length ? { files } : {}) }, scope ? [scope] : []);
     if (typed) setDraft(() => ({ input: "", mentions: [] }));
     setAt(null);
     field.current?.focus();

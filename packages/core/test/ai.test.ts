@@ -57,6 +57,31 @@ afterEach(() => {
 const Schema = z.strictObject({ rating: z.number().int().min(1).max(4) });
 
 describe("Ask about this (D61)", () => {
+  // F265: Review's chat showed three dots until the whole reply was there, and it couldn't be stopped.
+  test("its reply comes as it is written, when the caller listens (D296)", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Retrieval practice changes what is stored." });
+    const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "What does retrieval change?", answer: "What is stored.", rubric: [] });
+    const events = [
+      { type: "stream_event", event: { type: "message_start" } },
+      { type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", name: "StructuredOutput" } } },
+      { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"reply": "Because effort' } } },
+    ];
+    writeFileSync(join(binDir, "while.js"), `for (const e of ${JSON.stringify(events)}) console.log(JSON.stringify(e));`);
+    fakeClaude([{ reply: "Because effort strengthens it.", card: null }, { reply: "Yes.", card: null }]);
+    const seen: unknown[] = [];
+    const r = await askAboutCard(lib, card.meta.id, { message: "Why?", answer: "x", onProgress: (p) => seen.push(p) });
+    // Each carries the session, so a reply he stops part way can still be followed up in it.
+    expect(seen).toEqual([{ reply: "Because effort", session: r.session }]);
+    expect(r.reply).toBe("Because effort strengthens it.");
+    rmSync(join(binDir, "while.js"));
+    await askAboutCard(lib, card.meta.id, { message: "Sure?", session: r.session }); // nobody listening: one JSON answer, as before
+    const [streamed, plain] = readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
+    expect(streamed![streamed!.indexOf("--output-format") + 1]).toBe("stream-json");
+    expect(streamed).toContain("--include-partial-messages");
+    expect(plain![plain!.indexOf("--output-format") + 1]).toBe("json");
+  });
+
   test("the first turn sends the card, his answer and the passage under a new session; a follow-up resumes it", async () => {
     const lib = await tempLibrary();
     const { item, annotation } = await addSnippet(lib, { text: "Retrieval practice changes what is stored." });
@@ -914,5 +939,25 @@ describe("a partway finish (D100)", () => {
     expect(r.leave_out).toEqual({ text: "the coding part", ai: { vendor: "claude", model: "claude-fake-1", prompt_version: "leave-out@2" } });
     const [args] = readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
     expect(args!.join(" ")).not.toContain("How do you start a Flask app?"); // already out: not sent
+  });
+});
+
+// F263: `--allowedTools Read` let a run open any file on the Mac, at the word of text Ore didn't write.
+describe("what a claude task may read (D292)", () => {
+  test("a task with files reads their folders and nothing else; with the web too, the files alone and no search tools; with neither, no tools", async () => {
+    const { claudeTools } = await import("../src/ai/adapter.ts");
+    const { mkdtempSync, realpathSync, symlinkSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "ore scope (1) ")));
+    writeFileSync(join(dir, "doc.md"), "x");
+    writeFileSync(join(dir, "b.png"), "x");
+    expect(claudeTools({ files: [join(dir, "doc.md"), join(dir, "b.png")] })).toEqual({ tools: ["Read", "Grep", "Glob"], allowed: [`Read(/${dir}/**)`] });
+    expect(claudeTools({ files: [join(dir, "doc.md")], web: true })).toEqual({ tools: ["Read", "WebSearch", "WebFetch"], allowed: [`Read(/${dir}/doc.md)`, "WebSearch", "WebFetch"] });
+    expect(claudeTools({ web: true })).toEqual({ tools: ["WebSearch", "WebFetch"], allowed: ["WebSearch", "WebFetch"] });
+    expect(claudeTools({})).toEqual({ tools: [], allowed: [] });
+    // The rule names the real path: claude refuses a read through a symlink's name (a Mac's /tmp).
+    symlinkSync(dir, `${dir}-link`);
+    expect(claudeTools({ files: [join(`${dir}-link`, "doc.md")], web: true }).allowed[0]).toBe(`Read(/${dir}/doc.md)`);
   });
 });
