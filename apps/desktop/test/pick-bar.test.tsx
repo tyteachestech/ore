@@ -29,7 +29,7 @@ const html = (actions: { id: string; label: string; sub?: unknown[] }[]) => {
 test("the bar counts the pick and offers Done, Skills and Archive", () => {
   const out = html([{ id: "done", label: "Move 3 sources to Done" }, { id: "skills", label: "Skills", sub: [{ id: "ai", label: "AI", run }] }, { id: "archive", label: "Archive 3 sources" }]);
   expect(out).toContain("3 picked");
-  expect(out).toContain(">Done<");
+  expect(out).toContain(">Mark done<");
   expect(out).toContain("Skills");
   expect(out).toContain(">Archive<");
   expect(out).toContain('aria-label="Clear the pick"');

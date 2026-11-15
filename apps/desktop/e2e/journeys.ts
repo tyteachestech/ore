@@ -4923,7 +4923,7 @@ journey("search: when searching the text fails, ⌘K and the sources filter say 
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: /^All sources/ }).click();
   await page.keyboard.press("Meta+f");
-  await page.getByLabel("Filter sources").fill("plausible");
+  await page.getByLabel("Search sources").fill("plausible");
   await page.getByRole("alert").filter({ hasText: "Couldn’t search the text: The index is busy." }).waitFor();
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
 });
@@ -5098,14 +5098,14 @@ journey("list drag to select: a drag from beside the rows boxes the ones it cros
   await page.mouse.click(x, (await at(1)).y + 10);
   await until("a click on blank space clears the selection", async () => !(await pickedRows(page)).length);
   // Below the last row: up over it. A filter leaves one row, so there is room below it whatever the library holds.
-  await page.getByLabel("Filter sources").fill("Retrieval Beats Rereading");
+  await page.getByLabel("Search sources").fill("Retrieval Beats Rereading");
   await until("the filter leaves one row", async () => (await rows.count()) === 1);
   const only = await at(0);
   const room = list.y + list.height - (only.y + only.height);
   if (room < 60) throw new Error(`no room below the last row (${Math.round(room)}px)`);
   await boxDrag(page, x + 300, only.y + only.height + 30, x + 320, await mid(0));
   await until("a drag from below the last row selects it", async () => (await pickedRows(page)).join() === (await rowTitles(page, 0)).join());
-  await page.getByLabel("Filter sources").fill("");
+  await page.getByLabel("Search sources").fill("");
   await rows.nth(3).waitFor();
   // A key that leaves the view mid-drag ends it: no box over the next view, and nothing picked carried back.
   await boxDrag(page, x, (await at(0)).y + 10, x + 240, await mid(1), false);
@@ -12724,7 +12724,7 @@ journey("all sources: a filter is a tag in the search; closing its list leaves t
   await page.keyboard.press("Escape");
   const tag = page.locator(".filter .filter-tag");
   await tag.waitFor();
-  const search = page.getByRole("textbox", { name: "Filter sources" });
+  const search = page.getByRole("textbox", { name: "Search sources" });
   await until("the search has the keys after the list closes", () => search.evaluate((el) => el === document.activeElement));
   await page.keyboard.press("Backspace");
   await until("⌫ in the empty search takes the tag off", async () => (await tag.count()) === 0);

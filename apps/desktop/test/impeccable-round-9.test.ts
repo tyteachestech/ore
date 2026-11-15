@@ -57,3 +57,11 @@ test("counts of one in the singular: a course's lessons on the iPhone, a missed 
   // A point not marked yet is not a miss (code review on #422).
   expect(missedOf([false, undefined, undefined])).toBe("1 of 3 key points is marked missed.");
 });
+
+test("Tyler's round 9 picks: All sources' field is Search, the pick bar's move is Mark done (F227, F228)", () => {
+  const app = src("App.tsx");
+  expect(app).toContain('placeholder={filters.length ? "" : "Search"}');
+  expect(app).toContain('aria-label="Search sources"');
+  expect(app).not.toContain("Filter sources");
+  expect(src("PickBar.tsx")).toContain('"Mark done"');
+});

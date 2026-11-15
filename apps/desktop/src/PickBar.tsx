@@ -17,7 +17,7 @@ export function PickBar({ n, actions, onClear }: { n: number; actions: MenuActio
         <Hint text={move.label}>
           <button onClick={move.run}>
             {move.id === "done" ? <Check size={16} aria-hidden="true" /> : <ArrowCounterClockwise size={16} aria-hidden="true" />}
-            {move.id === "done" ? "Done" : move.id === "toread" ? "To read" : "Restore"}
+            {move.id === "done" ? "Mark done" : move.id === "toread" ? "To read" : "Restore"}
           </button>
         </Hint>
       )}

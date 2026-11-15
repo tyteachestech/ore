@@ -1901,7 +1901,7 @@ export function App() {
     { id: "review", label: "Start review", hint: label(keys.review), run: askReview },
     ...(openId ? [{ id: "back", label: skill ? `Back to ${skillOf(skill).name}` : "Back to sources", hint: "Esc", run: () => setOpenId(null) }] : []),
     ...(skill || onHome ? [{ id: "all", label: "All sources", run: () => openSkill(null) }] : []),
-    ...(!openId && !onSkillPage ? [{ id: "filter", label: "Filter sources", hint: label(keys.filter), keywords: ["search", "find"], run: () => {
+    ...(!openId && !onSkillPage ? [{ id: "filter", label: "Search sources", hint: label(keys.filter), keywords: ["search", "find"], run: () => {
       setPlace("sources");
       requestAnimationFrame(() => filterRef.current?.focus());
     } }] : []),
@@ -2263,9 +2263,9 @@ export function App() {
             <input
               ref={filterRef}
               value={query}
-              placeholder={filters.length ? "" : "Filter by title or text"}
+              placeholder={filters.length ? "" : "Search"}
               spellCheck={false}
-              aria-label="Filter sources"
+              aria-label="Search sources"
               onChange={(e) => {
                 setQuery(e.target.value);
                 setCursor(null);
