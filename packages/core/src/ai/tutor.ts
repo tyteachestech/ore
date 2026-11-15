@@ -9,7 +9,7 @@ import { paths } from "../library.ts";
 import { loadSkills } from "../skills.ts";
 import type { Library } from "../library.ts";
 import { aiStampFor, isWebUrl, runAgent, samePage, type Usage } from "./adapter.ts";
-import { PASSAGES, plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
+import { PASSAGES, passageCitation, plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
 import { quoteIn } from "./grade.ts";
 
 // The tutor (D128): the chat docked at the window's right, grown out of Ask your library. It answers
@@ -211,10 +211,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
       // A fetched page has no title of its own here: "" (the app shows its site alone).
       return { n: i + 1, url, title: page?.title ?? "", site: new URL(url).hostname.replace(/^www\./, ""), quote, text: plainText(quote) };
     }
-    const p = byId.get(c.passage)!;
-    const at = locate(p.text, c.quote)!;
-    const quote = p.text.slice(at.start, at.end);
-    return { n: i + 1, item: p.item, title: p.title, heading: p.heading, quote, text: plainText(quote), start: p.start + at.start, end: p.start + at.end };
+    return passageCitation(byId.get(c.passage)!, c.quote, i + 1);
   });
   // Feedback that found a point missing offers the exercise's own card (D158), never one the model wrote after his answer.
   const missed = !!open && data.covered.length > 0 && data.covered.some((c) => !c);

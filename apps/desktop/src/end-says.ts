@@ -8,7 +8,7 @@ export type Tile = { key: "kept" | "depth" | "level" | "rescued" | "long" | "cut
 export type Said = { text: string; hint?: string; verdict?: true; rare?: { kind: "level"; skill: string } | { kind: "then" } | { kind: "long" } | { kind: "rescued" } };
 
 /** How many lines a session's end may say (Tyler: "keep it to 2, maybe 3 max"). */
-export const SAID_MAX = 3;
+const SAID_MAX = 3;
 
 /** What the mole says at a session's end (D243), three lines at most (D247). The full end screen has him say
  *  only the first, and never a number that stands in the row under the ring (`endTiles`, `row`); the quick quiz lists them all. The rare things

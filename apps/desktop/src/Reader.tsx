@@ -193,8 +193,8 @@ const plainSrc = (s: string) => {
  *  D166: a drag over part of it draws a box, and the box with what's under it becomes a Fact card that hides
  *  that part in review (image occlusion, after Mischief's redaction, MIT); the figure's cards show as boxes. */
 function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string; notify: Notify; onClose: () => void }) {
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const [open, setOpen] = useState(still);
+  const reduced = still();
+  const [open, setOpen] = useState(reduced);
   const leaving = useRef(false);
   const close = useRef(onClose);
   close.current = onClose;
@@ -212,7 +212,7 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
     if (leaving.current) return;
     leaving.current = true;
     setDraft(null);
-    if (still || !open) close.current(); // not grown yet: nothing to animate back
+    if (reduced || !open) close.current(); // not grown yet: nothing to animate back
     else setOpen(false);
   };
   const backRef = useRef(back);
@@ -1526,7 +1526,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const ann = annOf(id);
     const page = pageRef.current;
     if (!ann || !page || (ann.intent === "keep" && !note.trim())) return;
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (still()) return;
     const pop = popupRef.current;
     if (pop) {
       const ghost = pop.cloneNode(true) as HTMLElement;

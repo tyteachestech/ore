@@ -14,7 +14,7 @@ const TONE = { cut: "cut", won: "cut", polished: "cut", deep: "deep", miss: "mis
 const moment = (kind: Moment["kind"], m: Omit<Moment, "kind" | "tone">): Moment => ({ ...m, kind, tone: TONE[kind] });
 
 /** A recall that adds this many days of memory is a moment even on a gem already cut: three weeks, a cut gem's worth. */
-export const DEEP_DAYS = 21;
+const DEEP_DAYS = 21;
 const DAY = 86_400_000;
 
 const ago = (ts: string | undefined, now: number): string => {

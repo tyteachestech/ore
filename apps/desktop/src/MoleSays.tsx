@@ -3,7 +3,8 @@ import { Hint } from "./Hint";
 import { still } from "./SideCursor";
 
 /** One letter of the mole's speech, and how long a full line holds before the next. */
-export const TYPE_MS = 28, HOLD_MS = 2600;
+const TYPE_MS = 28;
+export const HOLD_MS = 2600;
 
 /** The mole's speech box (D245): a hairline outlined box (D266). His lines, one at a time, typed out letter by
  *  letter in the mono with his block cursor (D186) at the words' end; a full line holds, then the next is typed.

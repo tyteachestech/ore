@@ -20,7 +20,7 @@ import type { Library } from "../src/library.ts";
 import { sharedRun } from "../src/remix.ts";
 import { addSkill, loadSkills, setItemSkills, setSkillLook } from "../src/skills.ts";
 import { GOLDEN } from "./ask.ts";
-import { columns, costText, pct, pool, range, resultPath, setId, wilson, withVendor } from "./grade.ts";
+import { columns, costText, pct, pool, range, resultPath, setId, vendorsFrom, wilson, withVendor } from "./grade.ts";
 
 const Highlight = z.strictObject({
   exact: z.string().min(1), intent: z.enum(["keep", "card", "apply"]), note: z.string().optional(), reflection: z.string().optional(),
@@ -239,10 +239,7 @@ export function runQuestionEval(vendor: Vendor, model: string | undefined, judge
 if (import.meta.main) {
   const args = process.argv.slice(2);
   const flag = (f: string) => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined);
-  const vendors = args.flatMap((a, i) => (args[i - 1] === "--vendor" ? [a] : [])) as Vendor[];
-  if (vendors.some((v) => v !== "claude" && v !== "codex")) throw new Error("--vendor must be claude or codex");
-  const pick: Vendor[] = vendors.length ? vendors : ["claude"];
-  if (args.includes("--model") && pick.length > 1) throw new Error("--model needs one --vendor");
+  const pick = vendorsFrom(args, ["claude"]);
   const only = args.flatMap((a, i) => (args[i - 1] === "--case" ? [a] : []));
   const judgeModel = flag("--judge") ?? "opus";
   const runs = [];

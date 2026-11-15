@@ -4,11 +4,12 @@
 // on the phone a drag on the picture is the finger's, so that stays on the Mac.
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { still } from "../SideCursor";
 import { TransformComponent, TransformWrapper, type ReactZoomPanPinchRef } from "react-zoom-pan-pinch";
 
 export function FigureView({ img, from, onClose }: { img: HTMLImageElement; from: DOMRect; onClose: () => void }) {
-  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const [open, setOpen] = useState(still);
+  const reduced = still();
+  const [open, setOpen] = useState(reduced);
   const [drag, setDrag] = useState(0);
   const [zoomed, setZoomed] = useState(false);
   const leaving = useRef(false);
@@ -27,7 +28,7 @@ export function FigureView({ img, from, onClose }: { img: HTMLImageElement; from
     if (leaving.current) return;
     leaving.current = true;
     setDrag(0);
-    if (still || zoomed) close.current(); // zoomed in, it would shrink from the wrong place: it goes at once
+    if (reduced || zoomed) close.current(); // zoomed in, it would shrink from the wrong place: it goes at once
     else setOpen(false);
   };
   now.current = { zoomed, back };

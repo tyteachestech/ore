@@ -526,15 +526,24 @@ function useRoving(nav: RefObject<HTMLElement | null>) {
   return { onFocus, onKeyDown };
 }
 
-function SkillFace({ s, marked }: { s: Skill; marked: boolean }) {
+/** A skill's icon (when the sidebar shows them) and name, as its row and its lifted drag picture draw them. */
+function SkillLabel({ s, marked }: { s: Skill; marked: boolean }) {
   return (
-    <span className="side-main">
+    <>
       {marked && (
         <span className="mark" aria-hidden="true">
           <SkillIcon icon={s.icon} color={s.color} dot />
         </span>
       )}
       <span className="label">{s.name}</span>
+    </>
+  );
+}
+
+function SkillFace({ s, marked }: { s: Skill; marked: boolean }) {
+  return (
+    <span className="side-main">
+      <SkillLabel s={s} marked={marked} />
     </span>
   );
 }
@@ -559,12 +568,7 @@ function SkillRow({ s, on, drop, marked, onOpen, menu }: {
         style={{ transform: CSS.Translate.toString(transform), transition }}
       >
         <button className="side-main" aria-pressed={on} {...listeners} onClick={() => onOpen(s.id)}>
-          {marked && (
-            <span className="mark" aria-hidden="true">
-              <SkillIcon icon={s.icon} color={s.color} dot />
-            </span>
-          )}
-          <span className="label">{s.name}</span>
+          <SkillLabel s={s} marked={marked} />
         </button>
         <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} hoverOnly />
       </div>
@@ -579,12 +583,7 @@ function ArchivedRow({ s, on, drop, marked, onOpen, menu }: { s: Skill; on: bool
     <WithMenu actions={menu}>
       <div className={`side-item${on ? " on" : ""}${drop ? " drop-on" : ""}`} data-drop-skill={s.id} data-color={s.color}>
         <button className="side-main" aria-pressed={on} onClick={() => onOpen(s.id)}>
-          {marked && (
-            <span className="mark" aria-hidden="true">
-              <SkillIcon icon={s.icon} color={s.color} dot />
-            </span>
-          )}
-          <span className="label">{s.name}</span>
+          <SkillLabel s={s} marked={marked} />
         </button>
         <MoreButton className="side-more" label={`Actions for ${s.name}`} actions={menu} hoverOnly />
       </div>

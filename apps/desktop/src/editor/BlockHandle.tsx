@@ -1,6 +1,7 @@
 import type { EditorView } from "@milkdown/kit/prose/view";
 import type { Transaction } from "@milkdown/kit/prose/state";
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { resizeDrag } from "../drag";
 import { DotsSix } from "../icons";
 import { label, useKeymap } from "../keys";
 import { MoreButton, WithMenu, type MenuAction } from "../Menu";
@@ -77,9 +78,6 @@ export function BlockHandle({ view, host }: { view: () => EditorView | undefined
       setLine(to ? { x: to.left - h.left, y: to.y - h.top - 1, w: to.right - to.left } : null);
     };
     const end = (drop: boolean) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("keydown", onKey, true);
       const was = dragging.current;
       dragging.current = false;
       setLine(null);
@@ -90,16 +88,7 @@ export function BlockHandle({ view, host }: { view: () => EditorView | undefined
       }
       setAt(null);
     };
-    const onUp = () => end(true);
-    const onKey = (k: KeyboardEvent) => {
-      if (k.key !== "Escape") return;
-      k.preventDefault();
-      k.stopPropagation();
-      end(false);
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("keydown", onKey, true);
+    resizeDrag(e, { move: onMove, end: (up) => end(!!up) });
   };
 
   const actions = (): MenuAction[] => {

@@ -1,5 +1,6 @@
 import { Hint } from "./Hint";
 import type { CardHistory } from "./ore";
+import { count } from "./util";
 
 const RATINGS = ["Again", "Hard", "Good", "Easy"] as const;
 const DAY = 86_400_000;
@@ -17,7 +18,6 @@ export function layout(reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[], next: s
 }
 
 const day = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-const count = (n: number, unit: string) => `${n} ${unit}${n === 1 ? "" : "s"}`;
 /** Midnight that starts the local day of `t`. */
 const dayStart = (t: number) => new Date(t).setHours(0, 0, 0, 0);
 /** "in 12 days", "tomorrow", "later today": by the days on his calendar, not 24-hour spans, so 09:00 tomorrow
@@ -34,7 +34,7 @@ export function Timeline({ history, rating }: { history: CardHistory; rating: 1 
   const { dots, nextX } = layout(history.reviews, history.next[rating], history.next[4]);
   return (
     <>
-    <div className="timeline" role="img" aria-label={`${dots.length} review${dots.length === 1 ? "" : "s"}; next ${inWords(history.next[rating])} if ${RATINGS[rating - 1]}`}>
+    <div className="timeline" role="img" aria-label={`${count(dots.length, "review")}; next ${inWords(history.next[rating])} if ${RATINGS[rating - 1]}`}>
       {dots.map((d, i) => (
         <Hint key={i} text={`${RATINGS[d.rating - 1]} · ${day(d.ts)}`} side="top">
           <i className={`rate-${d.rating}`} style={{ left: `${d.x}%` }} />
