@@ -315,8 +315,29 @@ fn undo_state(undo: Option<String>, redo: Option<String>, field: bool) {
     let _ = (undo, redo, field);
 }
 
+/// Whether the iPhone is in Dark mode, for the reading page's Auto (apps/phone/ios/Appearance.swift); the web view
+/// can't tell, as the window is held dark.
+#[tauri::command]
+fn system_dark() -> bool {
+    #[cfg(target_os = "ios")]
+    return unsafe { ore_system_dark() };
+    #[cfg(not(target_os = "ios"))]
+    true
+}
+
+/// A light reading page is showing: the status bar's text turns dark over it (Appearance.swift).
+#[tauri::command]
+fn light_bars(light: bool) {
+    #[cfg(target_os = "ios")]
+    unsafe { ore_light_bars(light) };
+    #[cfg(not(target_os = "ios"))]
+    let _ = light;
+}
+
 #[cfg(target_os = "ios")]
 extern "C" {
+    fn ore_system_dark() -> bool;
+    fn ore_light_bars(light: bool);
     fn ore_undo_state(undo: *const std::ffi::c_char, redo: *const std::ffi::c_char, field: bool);
     fn ore_can_transcribe() -> bool;
     fn ore_transcribe(path: *const std::ffi::c_char, language: *const std::ffi::c_char, ok: *mut bool, progress: Option<extern "C" fn(f64, f64)>) -> *mut std::ffi::c_char;
@@ -496,7 +517,7 @@ pub fn run() {
             hide_keyboard_accessory();
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, library_write, http_fetch, can_transcribe, transcribe, undo_state, share_inbox, share_skills, share_open, player_port])
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, library_write, http_fetch, can_transcribe, transcribe, undo_state, system_dark, light_bars, share_inbox, share_skills, share_open, player_port])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }

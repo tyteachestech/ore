@@ -54,6 +54,7 @@ import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
 import { paint, unpaint, unpaintAll } from "./paint";
 import { Working } from "./Working";
+import { ReadingLooks } from "./phone/ReadingLooks";
 import { edgeTurn } from "./edge-turn";
 
 /** Background enrich gets this long after capture before the reader stops waiting for it. */
@@ -3494,6 +3495,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
               </button>
             </Hint>
           )}
+          {PHONE && <ReadingLooks />}
           <MoreButton className="width-toggle" label="Source actions" actions={shownActions} />
         </div>
       )}

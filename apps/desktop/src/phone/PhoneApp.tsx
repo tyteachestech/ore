@@ -15,6 +15,7 @@ import { ranked } from "../match";
 import { SkillPage } from "../SkillPage";
 import { PhoneSettings } from "./Settings";
 import { planReminders } from "./reminder";
+import { followAppearance } from "./appearance";
 import { useNativeUndo } from "./native-undo";
 import { SkillIcon } from "../IconPicker";
 import { NoteBody, useNotes, type SideTab } from "../Notes";
@@ -32,6 +33,9 @@ import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
 import { Working } from "../Working";
 import { count, errorText, inOrder, stepLanded, usable, useKeptScroll, wakeScreens, type Notify } from "../util";
+
+// The reading page's Auto follows the iPhone's Light or Dark mode (D311).
+followAppearance();
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   const now = useRef(drag);

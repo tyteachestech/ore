@@ -11362,6 +11362,41 @@ journey("phone: Today in a library with nothing to read says to add a first sour
   if (await page.getByText("Read something new").count()) throw new Error("Today says to read something new in a library with nothing to read");
 }, "phone");
 
+journey("phone: Aa sets the text size, line spacing, margins, font and page, each at once and still there after a relaunch (D311)", async (page) => {
+  // The phone had no way to change how a source reads; the five every good reader offers sit behind Aa (Books, Kindle, Readwise).
+  await phoneSource(page, "The Story Spine");
+  const looks = () => page.locator(".phone-reader .doc").first().evaluate((d) => {
+    const s = getComputedStyle(d);
+    return { size: parseFloat(s.fontSize), leading: parseFloat(s.lineHeight) / parseFloat(s.fontSize), gutter: parseFloat(getComputedStyle(d.closest(".page")!).paddingLeft), face: s.fontFamily, page: document.documentElement.dataset.page };
+  });
+  const was = await looks();
+  if (was.size !== 20 || Math.abs(was.leading - 1.5) > 0.01 || was.gutter !== 24) throw new Error(`a source opened at ${JSON.stringify(was)}, not 20px on 1.5 with 24px margins`);
+  await tap(page, page.getByRole("button", { name: "Text and page" }));
+  const sheet = page.getByRole("dialog", { name: "Text and page" });
+  // The page starts on Auto, the iPhone's own mode (dark here, where no iPhone says otherwise).
+  if ((await sheet.getByRole("radio", { name: "Auto" }).getAttribute("aria-checked")) !== "true" || was.page !== "dark") throw new Error(`the page started at ${was.page}, not Auto`);
+  await tap(page, sheet.getByRole("button", { name: "Larger text" }));
+  await tap(page, sheet.getByRole("radio", { name: "Loose" }));
+  await tap(page, sheet.getByRole("radio", { name: "Narrow margins" }));
+  await tap(page, sheet.getByRole("radio", { name: "Geist" }));
+  await tap(page, sheet.getByRole("radio", { name: "Light" }));
+  const want = (l: Awaited<ReturnType<typeof looks>>) => l.size === 22 && Math.abs(l.leading - 1.7) < 0.01 && l.gutter === 16 && !/^Charter/.test(l.face) && l.page === "light";
+  await until("each tap shows in the text at once", async () => want(await looks()));
+  // The sheet turns light with the page, as Books' does, not a dark panel over a white page (F326).
+  const light = (sel: string) => page.locator(sel).first().evaluate((e) => { const [r, g, b] = getComputedStyle(e).backgroundColor.match(/\d+/g)!.map(Number); return r! + g! + b! > 600; });
+  await until("the sheet turns light with the page", () => light(".looks-sheet"));
+  // Every tap a target of 44pt or more, and the sheet as wide as the screen.
+  for (const b of await sheet.locator("button").all()) {
+    const r = (await b.boundingBox())!;
+    if (r.height < 44 || r.width < 44) throw new Error(`a control in Aa is ${r.width}×${r.height}`);
+  }
+  await page.reload();
+  // The phone reopens on the source it was reading.
+  await page.locator(".phone-reader .doc").first().waitFor();
+  const after = await looks();
+  if (!want(after)) throw new Error(`after a relaunch the source read at ${JSON.stringify(after)}`);
+}, "phone");
+
 journey("phone: every screen's text follows the iPhone's text size, and Start review still holds its label at the largest (F70)", async (page) => {
   // Ore drew every size in fixed pixels, so a phone set to larger text read Ore at the default size.
   const size = (sel: string) => page.locator(sel).first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
@@ -11379,7 +11414,8 @@ journey("phone: every screen's text follows the iPhone's text size, and Start re
   const body = await size(".phone-reader .doc p");
   await type(1.353);
   const larger = await size(".phone-reader .doc p");
-  if (Math.abs(larger / body - 1.353) > 0.02) throw new Error(`the reader's text went from ${body}px to ${larger}px at 1.353`);
+  // A source reads at 20px and takes three quarters of the change (F325): 25.3px, above iOS's 23pt body.
+  if (Math.abs(body - 20) > 0.1 || Math.abs(larger - 20 * (1 + 0.353 * 0.75)) > 0.2) throw new Error(`the reader's text went from ${body}px to ${larger}px at 1.353`);
 }, "phone");
 
 journey("phone: a long title on Today and in Sources shows on two lines, with the reading dots on the picture's foot, at every text size (F87)", async (page) => {
