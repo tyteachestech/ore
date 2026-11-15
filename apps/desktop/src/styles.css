@@ -1193,6 +1193,8 @@ body.resizing iframe { pointer-events: none; }
 .mynotes .divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent; transition: background var(--t-1) ease-out; }
 .mynotes .divider:hover::after, .mynotes.dragging .divider::after { background: var(--accent); }
 .mynotes.dragging { user-select: none; -webkit-user-select: none; cursor: col-resize; }
+/* Dragged past its narrowest: what letting go will hide shows dimmed (D-new-drag-fold, VS Code and Linear). */
+.app.folding .sidebar > *, .mynotes.folding > :not(.divider) { opacity: 0.35; transition: opacity var(--t-1) var(--ease-out); }
 .mynotes-head { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px; flex: none; }
 .mynotes-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
 .mynotes-text {

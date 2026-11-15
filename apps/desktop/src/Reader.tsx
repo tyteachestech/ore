@@ -3734,6 +3734,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           away={PHONE && !panelShown}
           tab={sideTab}
           onTab={(t) => p.onShowSide(t, true)}
+          onFold={PHONE ? undefined : p.onCloseSide}
           original={!!pdf}
           tool={questionsShown && !PHONE && <SearchButton label="Filter collected" button={sideFilterButton} pressed={sideFilterShown} onClick={() => (sideFilterShown ? (setSideFilter(""), setSideFiltering(false)) : setSideFiltering(true))} />}
           bar={

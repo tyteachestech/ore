@@ -10738,8 +10738,8 @@ journey("sidebar: its edge drags to resize between a min and a max, Esc puts it 
   await settle("dragged wider, the sidebar and the content follow", 300);
   await drag(1000);
   await settle("it stops at its max (360 in a 1280 window)", 360);
-  await drag(40);
-  await settle("it stops at its min (180)", 180);
+  await drag(120);
+  await settle("it stops at its min (180), short of where it folds (D-new-drag-fold)", 180);
   const sideways = await side.evaluate((n) => n.scrollWidth - n.clientWidth);
   if (sideways > 0) throw new Error(`at its min the sidebar scrolls ${sideways}px sideways`);
   await drag(300);
@@ -13558,6 +13558,40 @@ journey("note / menu: its blocks sit under Text, Toggles, Insert and Link with a
   await until("a search lists its matches with no group names", async () => (await menu.locator(".note-menu-head").count()) === 0 && (await menu.locator(".note-menu-row").count()) === 1);
   await page.keyboard.press("Escape");
   for (let i = 0; i < 4; i++) await page.keyboard.press("Backspace");
+});
+
+journey("sidebar and side panel: an edge dragged past half its narrowest dims what it will hide, and letting go hides it; it comes back at the width it had (D-new-drag-fold)", async (page) => {
+  const side = page.locator("nav.sidebar");
+  /** Presses `edge`, drags it to `x`, checks the dimmed look there, then lets go (or presses Esc first). */
+  const drag = async (edge: Locator, x: number, dim: string, esc = false) => {
+    const d = (await edge.boundingBox())!;
+    await page.mouse.move(d.x + d.width / 2, d.y + 300);
+    await page.mouse.down();
+    await page.mouse.move(x, d.y + 300, { steps: 6 });
+    await until("what will hide shows dimmed", () => page.evaluate((sel) => !!document.querySelector(sel), dim));
+    if (esc) await page.keyboard.press("Escape");
+    await page.mouse.up();
+  };
+  const sideEdge = page.getByRole("separator", { name: "Resize the sidebar" });
+  const before = Math.round((await side.boundingBox())!.width);
+  await drag(sideEdge, 60, ".app.folding", true);
+  if (!(await side.isVisible())) throw new Error("Esc mid-fold hid the sidebar");
+  if (await page.locator(".app.folding").count()) throw new Error("Esc left the sidebar dimmed");
+  await drag(sideEdge, 60, ".app.folding");
+  await side.waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Show sidebar" }).click();
+  await until("shown again, the sidebar has its old width", async () => Math.abs((await side.boundingBox())!.width - before) <= 2);
+  // The side panel folds from its own edge, toward the right.
+  await openSource(page, AGENTS);
+  await page.getByRole("tab", { name: "Source note" }).click().catch(() => {});
+  const panel = page.locator(".mynotes");
+  await panel.waitFor();
+  const wide = Math.round((await panel.boundingBox())!.width);
+  const right = page.viewportSize()!.width;
+  await drag(page.getByRole("separator", { name: "Resize the side panel" }), right - 100, ".mynotes.folding");
+  await panel.waitFor({ state: "hidden" });
+  await page.keyboard.press("n");
+  await until("opened again, the panel has its old width", async () => (await panel.count()) > 0 && Math.abs((await panel.boundingBox())!.width - wide) <= 2);
 });
 
 let failed = 0;
