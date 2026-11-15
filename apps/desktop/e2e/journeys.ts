@@ -10738,8 +10738,8 @@ journey("sidebar: its edge drags to resize between a min and a max, Esc puts it 
   await settle("dragged wider, the sidebar and the content follow", 300);
   await drag(1000);
   await settle("it stops at its max (360 in a 1280 window)", 360);
-  await drag(40);
-  await settle("it stops at its min (180)", 180);
+  await drag(120);
+  await settle("it stops at its min (180), short of where it folds (D304)", 180);
   const sideways = await side.evaluate((n) => n.scrollWidth - n.clientWidth);
   if (sideways > 0) throw new Error(`at its min the sidebar scrolls ${sideways}px sideways`);
   await drag(300);
@@ -13424,6 +13424,265 @@ journey("a source that fails to open says why and offers Try again, which opens 
   await page.evaluate(() => ((window as Fail).__ORE_FAIL = {}));
   await page.locator(".reader").getByRole("button", { name: "Try again" }).click();
   await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+});
+
+journey("code in a source: its parts are coloured without rewrapping the text, Copy puts the code on the clipboard, and a highlight across it still lands (D300)", async (page) => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-code-"));
+  const file = join(dir, "code.md");
+  const code = 'def area(r):\n    # circle\n    return 3.14 * r, "ok"';
+  writeFileSync(file, `# Code that is coloured\n\nA function follows this line.\n\n\`\`\`python\n${code}\n\`\`\`\n\nAnd text after it.\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Code that is coloured");
+    const block = page.locator(".doc pre.code-block");
+    await block.waitFor();
+    await until("each kind of part has its ranges", () => page.evaluate(() => ["keyword", "name", "comment", "number", "string"].every((k) => (CSS.highlights.get(`code-${k}`)?.size ?? 0) > 0)));
+    if ((await block.locator("code").evaluate((el) => el.childNodes.length)) !== 1) throw new Error("the code's text was rewrapped: highlights and Find are Ranges on that one text node");
+    if ((await block.getAttribute("data-lang")) !== "python") throw new Error("the block does not name its language");
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await block.hover();
+    await block.getByRole("button", { name: "Copy code" }).click();
+    await until("the code is on the clipboard", async () => (await page.evaluate(() => navigator.clipboard.readText())) === code);
+    await select(page, "return 3.14");
+    await page.locator(".popup").waitFor();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Meta+z");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+journey("tutor: a message sent while a reply is being written waits, goes when the reply lands, and comes back to the field if he edits it or stops the reply (D301)", async (page) => {
+  const held: (() => void)[] = [];
+  const asked: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    const args = JSON.parse(body).args as string[];
+    asked.push(args[1]!);
+    await new Promise<void>((ok) => held.push(ok));
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `Reply to ${args[1]}`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }) }).catch(() => {}); // a stopped reply's request is already gone
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    const waiting = tutor.locator(".ask-queued");
+    await field.fill("First question");
+    await page.keyboard.press("Enter");
+    await tutor.getByRole("button", { name: "Stop the reply" }).waitFor();
+    // Sent mid-reply: it waits in sight, the field is his again, and nothing has been asked yet.
+    await field.fill("Second question");
+    await page.keyboard.press("Enter");
+    await waiting.filter({ hasText: "Second question" }).waitFor();
+    if ((await field.inputValue()) !== "") throw new Error("the field kept the message that is waiting");
+    if (asked.length !== 1) throw new Error(`the waiting message was asked early: ${asked.join(", ")}`);
+    // The pencil puts it back in the field; sent again, it waits again.
+    await waiting.getByRole("button", { name: "Edit the waiting message" }).click();
+    await until("the waiting message is back in the field", async () => (await field.inputValue()) === "Second question" && (await waiting.count()) === 0);
+    await page.keyboard.press("Enter");
+    await waiting.waitFor();
+    // The reply lands: the waiting message goes as his next turn.
+    held.shift()!();
+    await tutor.getByText("Reply to First question").waitFor();
+    await until("the waiting message is asked once the reply lands", async () => asked.length === 2 && asked[1] === "Second question" && (await waiting.count()) === 0);
+    // A message waiting on a reply he stops comes back to the field instead of going.
+    await field.fill("Third question");
+    await page.keyboard.press("Enter");
+    await waiting.filter({ hasText: "Third question" }).waitFor();
+    await tutor.getByRole("button", { name: "Stop the reply" }).click();
+    await until("stopping gives the waiting message back", async () => (await field.inputValue()) === "Third question" && (await waiting.count()) === 0);
+    if ((asked.length as number) !== 2) throw new Error("a message waiting on a stopped reply was sent");
+    await field.fill("");
+  } finally {
+    held.forEach((ok) => ok());
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+});
+
+journey("⌘K: Tab on a source steps into what can be done with it, typing narrows the actions, ↵ runs one, and Esc steps back out (D302)", async (page) => {
+  await page.keyboard.press("Meta+k");
+  const input = page.getByPlaceholder("Search sources or run a command…");
+  await input.waitFor();
+  await page.keyboard.type("Testing Effect");
+  await page.locator("[cmdk-item][data-selected=true]").filter({ hasText: TESTING }).waitFor();
+  await page.locator(".panel-foot").getByText("Actions").waitFor();
+  await page.keyboard.press("Tab");
+  await page.getByPlaceholder(`Do what with “${TESTING}”?`).waitFor();
+  const rows = page.locator("[cmdk-item]");
+  await rows.filter({ hasText: "Move to Done" }).waitFor();
+  if (await rows.filter({ hasText: "Rename" }).count()) throw new Error("Rename is offered where there is no row to rename in place");
+  // Esc steps back to the search, which is empty again; Esc once more closes.
+  await page.keyboard.press("Escape");
+  await input.waitFor();
+  await page.keyboard.type("Testing Effect");
+  await page.locator("[cmdk-item][data-selected=true]").filter({ hasText: TESTING }).waitFor();
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("done");
+  await until("typing narrows the actions to the one he means", async () => (await rows.count()) === 1 && (await rows.first().innerText()).includes("Move to Done"));
+  await page.keyboard.press("Enter");
+  await page.getByRole("dialog", { name: "Command palette" }).waitFor({ state: "detached" });
+  await until("the source is marked done", async () => ((await ore("ls", "--status=done")) as { title: string }[]).some((i) => i.title === TESTING));
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts it back in To read", async () => !((await ore("ls", "--status=done")) as { title: string }[]).some((i) => i.title === TESTING));
+});
+
+journey("note / menu: its blocks sit under Text, Toggles, Insert and Link with a picture each, it is never taller than ten rows, and a search lists matches flat (D303)", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  const menu = page.locator(".note-menu");
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("/", { delay: 20 });
+  await menu.waitFor();
+  const heads = await menu.locator(".note-menu-head").allInnerTexts();
+  if (heads.join() !== "Text,Toggles,Insert,Link") throw new Error(`the groups are ${heads.join()}`);
+  const bare = await menu.locator(".note-menu-row").evaluateAll((rows) => rows.filter((r) => !r.querySelector("svg")).map((r) => r.textContent));
+  if (bare.length) throw new Error(`no picture on ${bare.join(", ")}`);
+  const size = await menu.evaluate((el) => ({ shown: el.getBoundingClientRect().height, all: el.scrollHeight }));
+  if (size.shown > 345 || size.all <= size.shown) throw new Error(`the menu is ${size.shown}px tall over ${size.all}px of rows: it should stop at 344 and scroll`);
+  // The arrows keep the highlighted block in sight as the list scrolls under it.
+  for (let i = 0; i < 15; i++) await page.keyboard.press("ArrowDown");
+  await until("the highlighted block is inside the menu", () => menu.evaluate((el) => {
+    const on = el.querySelector(".note-menu-row.on")?.getBoundingClientRect(), box = el.getBoundingClientRect();
+    return !!on && on.top >= box.top - 1 && on.bottom <= box.bottom + 1;
+  }));
+  await page.keyboard.type("div", { delay: 20 });
+  await until("a search lists its matches with no group names", async () => (await menu.locator(".note-menu-head").count()) === 0 && (await menu.locator(".note-menu-row").count()) === 1);
+  await page.keyboard.press("Escape");
+  for (let i = 0; i < 4; i++) await page.keyboard.press("Backspace");
+});
+
+journey("sidebar and side panel: an edge dragged past half its narrowest dims what it will hide, and letting go hides it; it comes back at the width it had (D304)", async (page) => {
+  const side = page.locator("nav.sidebar");
+  /** Presses `edge`, drags it to `x`, checks the dimmed look there, then lets go (or presses Esc first). */
+  const drag = async (edge: Locator, x: number, dim: string, esc = false) => {
+    const d = (await edge.boundingBox())!;
+    await page.mouse.move(d.x + d.width / 2, d.y + 300);
+    await page.mouse.down();
+    await page.mouse.move(x, d.y + 300, { steps: 6 });
+    await until("what will hide shows dimmed", () => page.evaluate((sel) => !!document.querySelector(sel), dim));
+    if (esc) await page.keyboard.press("Escape");
+    await page.mouse.up();
+  };
+  const sideEdge = page.getByRole("separator", { name: "Resize the sidebar" });
+  const before = Math.round((await side.boundingBox())!.width);
+  await drag(sideEdge, 60, ".app.folding", true);
+  if (!(await side.isVisible())) throw new Error("Esc mid-fold hid the sidebar");
+  if (await page.locator(".app.folding").count()) throw new Error("Esc left the sidebar dimmed");
+  await drag(sideEdge, 60, ".app.folding");
+  await side.waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Show sidebar" }).click();
+  await until("shown again, the sidebar has its old width", async () => Math.abs((await side.boundingBox())!.width - before) <= 2);
+  // The side panel folds from its own edge, toward the right.
+  await openSource(page, AGENTS);
+  await page.getByRole("tab", { name: "Source note" }).click().catch(() => {});
+  const panel = page.locator(".mynotes");
+  await panel.waitFor();
+  const wide = Math.round((await panel.boundingBox())!.width);
+  const right = page.viewportSize()!.width;
+  await drag(page.getByRole("separator", { name: "Resize the side panel" }), right - 100, ".mynotes.folding");
+  await panel.waitFor({ state: "hidden" });
+  await page.keyboard.press("n");
+  await until("opened again, the panel has its old width", async () => (await panel.count()) > 0 && Math.abs((await panel.boundingBox())!.width - wide) <= 2);
+});
+
+journey("a long table keeps its header row in view down it and its first column across it, inside its own box (D305)", async (page) => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-table-"));
+  const file = join(dir, "table.md");
+  const cols = ["Element", "Symbol", "Number", "Mass", "Group", "Period", "Block", "Discovered", "Named for"];
+  const rows = Array.from({ length: 60 }, (_, i) => `| Element ${i + 1} | E${i + 1} | ${i + 1} | ${(i * 2.1).toFixed(1)} | ${(i % 18) + 1} | ${(i % 7) + 1} | s | ${1700 + i} | a long reason for its name, number ${i + 1} |`);
+  writeFileSync(file, `# A long table of elements\n\nSixty rows follow.\n\n| ${cols.join(" | ")} |\n|${cols.map(() => "---").join("|")}|\n${rows.join("\n")}\n\nAnd text after it.\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await page.reload();
+    await openSource(page, "A long table of elements");
+    const table = page.locator(".doc table");
+    await table.waitFor();
+    const box = (await table.boundingBox())!;
+    if (box.height > 700 * 0.7 + 2) throw new Error(`the table is ${box.height}px tall in a 700px window: it should scroll in its own box`);
+    await table.evaluate((t) => { t.scrollTop = 900; t.scrollLeft = 300; });
+    await until("the header row stays at the table's top", async () => {
+      const head = (await table.locator("thead th").nth(3).boundingBox())!;
+      return Math.abs(head.y - box.y) <= 1;
+    });
+    const first = (await table.locator("tbody tr").nth(30).locator("td").first().boundingBox())!;
+    if (Math.abs(first.x - box.x) > 1) throw new Error(`the first column moved off the left edge: ${first.x} vs ${box.x}`);
+    // What is drawn at the header's place is the header, not a row scrolled under it.
+    const over = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest("th, td")?.tagName, [box.x + 260, box.y + 8]);
+    if (over !== "TH") throw new Error(`under the header's place is a ${over}`);
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+journey("side panel tabs: a click glides the pill to the new tab, a key moves it at once (D306)", async (page) => {
+  await openSource(page, AGENTS);
+  const tabs = page.locator(".side-tabs");
+  await tabs.waitFor();
+  await page.getByRole("tab", { name: "Source note" }).click();
+  await until("no ghost left from opening", async () => (await page.locator(".seg-ghost").count()) === 0);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Animation.enable");
+  await cdp.send("Animation.setPlaybackRate", { playbackRate: 0.05 });
+  try {
+    await page.getByRole("tab", { name: "Collected" }).click();
+    await until("a click glides a pill between the tabs", async () => (await page.locator(".side-tabs .seg-ghost").count()) === 1);
+  } finally {
+    await cdp.send("Animation.setPlaybackRate", { playbackRate: 1 });
+  }
+  await until("the glide ends and leaves nothing", async () => (await page.locator(".seg-ghost").count()) === 0);
+  await page.locator(".doc").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("n");
+  await until("N moved the tab", async () => (await page.getByRole("tab", { name: "Source note" }).getAttribute("aria-selected")) === "true");
+  if (await page.locator(".seg-ghost").count()) throw new Error("a key glided the pill: keys land at once");
+});
+
+journey("original: a PowerPoint deck's Original tab shows the slide itself, follows the slide being read, and ‹ › turn to another (D307)", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "deck.pptx"), "--no-enrich")) as { id: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+    await page.reload();
+    await openSource(page, "How memory works");
+    const show = page.getByRole("button", { name: "Show side panel" });
+    if (await show.count()) await show.click();
+    await page.getByRole("tab", { name: "Original" }).click();
+    const slide = page.locator(".original-slide");
+    const pager = page.locator(".original-pager span");
+    const total = async () => Number((await pager.innerText()).split("/")[1]);
+    const shown = (n: number) => until(`slide ${n} of the original is shown`, async () => (await slide.getAttribute("data-slide")) === String(n) && (await pager.innerText()).startsWith(`${n} /`), 15000);
+    await shown(1);
+    // The slide is drawn: its title's words are on it, laid out as PowerPoint does.
+    await until("the slide shows its own text", async () => (await slide.innerText()).includes("Encoding"));
+    const box = (await slide.boundingBox())!;
+    const panel = (await page.locator(".mynotes").boundingBox())!;
+    if (box.width > panel.width) throw new Error(`the slide is ${box.width}px in a ${panel.width}px panel`);
+    // Reading on to Retrieval, the last slide, brings it up beside it: the page's end is as far as he can scroll.
+    await page.locator(".doc h2", { hasText: "Retrieval" }).evaluate((h) => h.scrollIntoView({ block: "start" }));
+    await shown(3);
+    await until("its words are on the slide", async () => (await slide.innerText()).includes("Every recall changes the memory"));
+    if ((await total()) !== 3) throw new Error(`the pager counts ${await total()} slides, not 3`);
+    if (!(await page.getByRole("button", { name: "Next slide" }).isDisabled())) throw new Error("Next slide is offered past the last slide");
+    await page.getByRole("button", { name: "Previous slide" }).click();
+    await shown(2);
+    await page.locator(".doc h2").first().evaluate((h) => h.scrollIntoView({ block: "center" }));
+    await shown(1);
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.evaluate(([tab, open]) => {
+      tab ? localStorage.setItem("ore.sidetab", tab) : localStorage.removeItem("ore.sidetab");
+      open ? localStorage.setItem("ore.mynotes", open) : localStorage.removeItem("ore.mynotes");
+    }, before);
+  }
 });
 
 let failed = 0;
