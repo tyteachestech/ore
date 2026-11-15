@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { PHONE } from "./ore";
 import { load, save } from "./util";
 
 /* Review's sounds (D-new-review-sounds): one short sound on each key moment of a review and nowhere else. Showing
@@ -35,7 +36,6 @@ const LEVEL = 0.6;
 type Opts = { rate?: number; after?: number };
 type Player = (id: Sfx, o: Required<Opts>) => void;
 
-const PHONE = import.meta.env?.VITE_PHONE === "1"; // the iPhone build carries no sound files
 let ctx: AudioContext | null = null;
 const buffers = new Map<Sfx, Promise<AudioBuffer | null>>();
 function audio() {
@@ -55,7 +55,9 @@ function buffer(id: Sfx) {
   return b;
 }
 const webAudio: Player = (id, { rate, after }) => {
-  if (PHONE || typeof AudioContext !== "function") return;
+  if (PHONE || typeof AudioContext !== "function") return; // the iPhone build carries no sound files
+  // Made and woken here, inside his key or click: WebKit leaves a context asleep that was woken outside one.
+  audio();
   const due = performance.now() + after * 1000;
   void buffer(id).then((buf) => {
     // A sound that loaded too late for its moment is dropped: late, it would land on something else.

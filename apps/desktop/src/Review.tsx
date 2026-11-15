@@ -613,7 +613,6 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       return void setGuard(rating);
     }
     const after = momentFor(card.history, rating as 1 | 2 | 3 | 4, { sure: conf === 3, remix: !!card.variant });
-    rated(rating);
     const color = entry ? skillOf(entry.skills[0] ?? "").color : undefined;
     setBusy(true);
     let goalClosed = false, saved = false;
@@ -634,6 +633,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       ];
       await submit(args, rating, elapsed);
       saved = true;
+      // Its sound, once it is saved: a rating that failed to save is silent.
+      rated(rating);
       // An everyday rating leaves a moment still showing to run its time.
       if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
