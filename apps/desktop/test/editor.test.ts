@@ -162,6 +162,20 @@ describe("note editor (D38)", () => {
     expect(ed.menuTrigger("at 10:30")).toBeNull();
   });
 
+  test("F-new-slash-space: / takes a block's name with its spaces (/heading 2), as Notion does; / then a space, or two spaces, is prose", async () => {
+    expect(ed.menuTrigger("/heading 2")).toEqual({ kind: "slash", query: "heading 2", typed: 10 });
+    expect(ed.menuTrigger("Text /toggle heading 2")).toEqual({ kind: "slash", query: "toggle heading 2", typed: 17 });
+    expect(ed.menuTrigger("/heading ")).toEqual({ kind: "slash", query: "heading ", typed: 9 });
+    expect(ed.menuTrigger("/ ")).toBeNull();
+    expect(ed.menuTrigger("/heading  2")).toBeNull();
+    expect(ed.menuTrigger("/" + "a ".repeat(13))).toBeNull(); // past any block's name
+    const m = ed.slashMatch;
+    expect(m("Heading 2", ["h2", "##"], "heading 2")).toBe(true);
+    expect(m("Heading 1", ["h1", "#"], "heading 2")).toBe(false);
+    expect(m("Block equation", [], "block eq")).toBe(true);
+    expect(m("Divider", ["hr"], "etc folder")).toBe(false);
+  });
+
   test("/ finds a block by part of its name or by the name Notion takes for it (/h1, /#, /todo, /hr)", async () => {
     const m = ed.slashMatch;
     expect(m("Heading 1", ["h1", "#"], "h1")).toBe(true);

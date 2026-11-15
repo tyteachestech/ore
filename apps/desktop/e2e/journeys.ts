@@ -3435,6 +3435,25 @@ journey("note equations: /equation opens a TeX field that draws as he types; ↵
   await until("still drawn after a reload", async () => (await pm.locator(".note-math .katex annotation").last().textContent().catch(() => "")) === "\\pi r^2");
 });
 
+// F-new-slash-space: the / menu closed at the space in "/heading 2", and Enter left the words as prose.
+journey("note: /heading 2 and Enter makes a Heading 2, and /etc folder stays prose", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/heading 2", { delay: 20 });
+  await page.locator(".note-menu-row.on", { hasText: "Heading 2" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Plans");
+  await until("a Heading 2 with no slash left", async () => (await pm.locator("h2", { hasText: "Plans" }).count()) === 1 && !/\/heading/.test((await pm.textContent()) ?? ""));
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("See /etc folder", { delay: 20 });
+  await until("no menu once nothing answers", async () => (await page.locator(".note-menu").count()) === 0);
+  await page.keyboard.press("Enter");
+  await until("the words stay as he typed them", async () => (await pm.locator("p", { hasText: "See /etc folder" }).count()) === 1);
+});
+
 journey("note keys as in Notion: /h1 finds Heading 1, a / closed with Esc opens again, ⌘K links the selected words (Esc goes back to them, a press outside doesn't), ⌘↵ closes a toggle", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   const rows = async () => (await page.locator(".note-menu-row").allInnerTexts()).map((r) => r.split("\n")[0]);
