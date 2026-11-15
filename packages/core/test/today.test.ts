@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { findCard, writeCardContent, writeNewCard } from "../src/cards.ts";
+import { findCard, writeCardContent, writeCardMeta, writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { setItemStatus } from "../src/items.ts";
 import { appendJsonl } from "../src/fsutil.ts";
@@ -426,12 +426,40 @@ describe("strength breakdown and peak level (D63)", () => {
     expect(today(lib, at).skills.find((k) => k.skill === "learning")).toMatchObject({ solid: 4, level: 1, win_back: 1 });
   });
 
+  test("retiring a solid exercise lowers the count, not the level it earned (Codex sweep 3, numbers)", async () => {
+    const { lib, item } = await library(0);
+    const prompts = Array.from({ length: 5 }, (_, i) =>
+      writeNewCard(lib, { kind: "prompt", item: item.meta.id, skills: ["learning"], topics: [], content_type: "concept", question: `Why ${i}?`, answer: "A", rubric: ["a"] }));
+    let at = new Date("2026-01-01T09:00:00Z");
+    for (const c of prompts) {
+      let t = at;
+      for (let i = 0; i < 6; i++) t = new Date((await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: t })).due_next);
+      if (t > at) at = t;
+    }
+    expect(skillStrength(lib, "learning", at)).toMatchObject({ solid: 5, peak: 5, level: 1 });
+    const c = findCard(lib, prompts[0]!.meta.id);
+    writeCardMeta(c, { ...c.meta, state: "retired" });
+    expect(skillStrength(lib, "learning", at)).toMatchObject({ solid: 4, peak: 5, level: 1 });
+  });
+
+  test("an overdue exercise is one Good from solid when a Good today would make it so (Codex sweep 3, numbers)", async () => {
+    const { lib, cards } = await library(1);
+    const id = cards[0]!.meta.id;
+    let at = new Date("2026-01-01T09:00:00Z");
+    at = new Date((await recordReview(lib, id, { rating: 3, confidence: 2, now: at })).due_next);
+    // One more Good on its due day isn't enough (the test above), but months late it is.
+    const late = new Date(at.getTime() + 120 * 864e5);
+    expect(skillStrength(lib, "learning", late)).toMatchObject({ solid: 0, ready: 1, ready_today: 1 });
+    const r = await recordReview(lib, id, { rating: 3, confidence: 2, now: late });
+    expect(r.state_after.stability).toBeGreaterThanOrEqual(SOLID_DAYS);
+  });
+
   test("ready: growing cards one Good review from solid; ready_today: those due by tonight; cut: cards that became solid this session (D90)", async () => {
     const { lib, cards } = await library(1);
     const id = cards[0]!.meta.id;
     let at = new Date("2026-01-01T09:00:00Z");
     at = new Date((await recordReview(lib, id, { rating: 3, confidence: 2, now: at })).due_next);
-    expect(skillStrength(lib, "learning")).toMatchObject({ solid: 0, growing: 1, ready: 0 }); // one more Good isn't enough yet
+    expect(skillStrength(lib, "learning", at)).toMatchObject({ solid: 0, growing: 1, ready: 0 }); // one more Good on its due day isn't enough yet
     at = new Date((await recordReview(lib, id, { rating: 3, confidence: 2, now: at })).due_next);
     expect(skillStrength(lib, "learning", at)).toMatchObject({ solid: 0, growing: 1, ready: 1, ready_today: 1 });
     expect(skillStrength(lib, "learning", new Date(at.getTime() - 3 * 864e5))).toMatchObject({ ready: 1, ready_today: 0 }); // due in three days

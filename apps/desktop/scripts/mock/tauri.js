@@ -103,6 +103,8 @@ window.__TAURI_INTERNALS__ = {
     // The Open panel: set `window.__ORE_PICK = ["/path/a.pdf"]` for the files he picks; unset, he cancels.
     if (cmd === "plugin:dialog|open") return window.__ORE_PICK ?? null;
     // Reveal in Finder: the paths land in `window.__ORE_REVEALED`.
+    // A link opened in the browser or Mail: the URLs land in `window.__ORE_OPENED`.
+    if (cmd === "plugin:opener|open_url") return void (window.__ORE_OPENED = [...(window.__ORE_OPENED ?? []), args.url]);
     if (cmd === "plugin:opener|reveal_item_in_dir") return void (window.__ORE_REVEALED = args.paths);
     if (cmd === "plugin:event|listen") return listeners.push({ event: args.event, handler: args.handler });
     return null;

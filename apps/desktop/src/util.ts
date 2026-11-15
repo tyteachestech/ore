@@ -200,8 +200,8 @@ export function useKeptScroll(ref: RefObject<HTMLElement | null>, key: string): 
  *  (the sources list, the reader, a field), so closing a panel never strands focus on <body>. A field
  *  the panel's action just focused (Rename from ⌘K) keeps it. When what opened it is gone (a sheet that
  *  opened it has closed) or nothing had focus, `fallback` names the screen's own place for the keyboard (a
- *  layer with one says so in its markup, `data-gives-back`, for the e2e guard). `on` false: none of this (the phone). */
-export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>, fallback?: () => HTMLElement | null | undefined, on = true): void {
+ *  layer with one says so in its markup, `data-gives-back`, for the e2e guard). `on` false: none of this; `take` false: only the giving back (the phone's Review). */
+export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>, fallback?: () => HTMLElement | null | undefined, on = true, take = true): void {
   // Read as it first renders: by its effect a field's autoFocus has already taken focus (the Add box's), and
   // the control that opened it was lost.
   const [prev] = useState(() => document.activeElement);
@@ -210,7 +210,7 @@ export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>, fallbac
   useEffect(() => {
     if (!on) return;
     const panel = ref.current;
-    panel?.focus();
+    if (take) panel?.focus();
     return () => {
       const now = document.activeElement;
       const stranded = !now || now === document.body || !!panel?.contains(now);
@@ -218,7 +218,7 @@ export function useFocusWhileMounted(ref: RefObject<HTMLElement | null>, fallbac
       const opener = prev instanceof HTMLElement && prev !== document.body && !panel?.contains(prev) ? prev : null;
       settleFocus(() => (opener && usable(opener) ? opener : back.current?.()));
     };
-  }, [ref, prev, on]);
+  }, [ref, prev, on, take]);
 }
 
 /** Can take focus and be seen: on the page, laid out, not disabled, hidden or inert. */
@@ -345,8 +345,14 @@ export function singleFlight<T>(run: () => Promise<T>): () => Promise<T> {
  *  or the other device wrote beside it. Every open screen reads again (F173). */
 export const LIBRARY_BACK = "ore:library-back";
 export function wakeScreens() {
-  for (const wake of screens.keys()) wake();
+  wakeOpenScreens();
   dispatchEvent(new Event(LIBRARY_BACK));
+}
+/** A write from one screen that changes what another open one shows (a source archived under an open skill page,
+ *  an exercise retired in Review over it): every screen that reads the library reads it again. Review and the note
+ *  editor aren't among them, so the screen making the change isn't reloaded under him. */
+export function wakeOpenScreens() {
+  for (const wake of screens.keys()) wake();
 }
 
 /** Today's local date ("2026-11-14"): changes when midnight passes, checked every 30 s and when the window comes

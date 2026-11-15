@@ -40,6 +40,9 @@ const life = (t: Shown) => (t.kind === "error" ? 8000 : t.offer || t.show ? 6000
  *  Shared by the app, the quick quiz and the phone. */
 export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([]);
+  /** A quiet step (a highlight saved, its note) shows no toast, but VoiceOver still hears it (Codex sweep 3, a11y).
+   *  The same words twice in a row get a space more, or the live region wouldn't change and stays silent. */
+  const [said, setSaid] = useState("");
   const list = useRef<Toast[]>([]);
   const timers = useRef(new Map<number, number>());
   const held = useRef(false);
@@ -98,6 +101,7 @@ export function useToast() {
       if (slot && kind !== "quiet") commit(list.current.filter((x) => x.slot !== slot));
       // A slot's toast never takes the place of another step's running one (rehearsal 2026-11-15).
       if (kind !== "quiet") show({ message, kind, offer: step ? "undo" : undefined, step, show: go, stay: stay && !!go, slot }, slot ? () => false : undefined);
+      else setSaid((was) => (was === message ? `${message}\u00a0` : message));
       const forget = () => {
         if (!step) return;
         history.current.forget(step);
@@ -169,7 +173,7 @@ export function useToast() {
   const box = useRef<HTMLDivElement>(null);
   const [fanned, setFanned] = useState(false);
   useLayoutEffect(() => {
-    const els = [...(box.current?.children ?? [])] as HTMLElement[];
+    const els = [...(box.current?.querySelectorAll<HTMLElement>(":scope > .toast") ?? [])];
     const front = els.at(-1);
     if (!front) return;
     // Collapsed, an older toast takes the front one's height, so only its top edge shows.
@@ -194,6 +198,7 @@ export function useToast() {
       onFocus={PHONE ? undefined : hold}
       onBlur={PHONE ? undefined : release}
     >
+      <span className="sr-only">{said}</span>
       {toasts.map((t) => (
         <div key={t.id} className="toast" data-kind={t.kind} role={t.kind === "error" ? "alert" : undefined}>
           {t.kind === "progress" ? <Matrix /> : t.settled && <Sprite rows={t.settled === "ok" ? CHECK : CROSS} className={`toast-mark ${t.settled}`} />}

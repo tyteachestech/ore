@@ -33,6 +33,10 @@ function repaint(gone: AbstractRange[]) {
     let el = n instanceof Element ? n : n.parentElement;
     // The block, not an inline in it: a highlight's tint can reach past an inline's own box.
     while (el?.parentElement && /^(inline|contents|$)/.test(getComputedStyle(el).display)) el = el.parentElement;
+    // In the note editor, the editor's own root: ProseMirror redraws any node inside it whose class
+    // changes, so toggling each paragraph Find let go redrew the whole note, seconds per key in a long
+    // one (Codex sweep 3). A change on its root it ignores, and the root's repaint covers them.
+    el = el?.closest(".ProseMirror") ?? el;
     if (el?.isConnected) blocks.add(el);
   }
   for (const el of blocks) el.classList.add("repaint");

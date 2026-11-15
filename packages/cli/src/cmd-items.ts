@@ -19,7 +19,7 @@ import {
   enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
-  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
+  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, itemCardSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
   type AnchoredAnnotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
@@ -484,8 +484,8 @@ export const itemCommands: Record<string, Command> = {
   },
 
   edit: {
-    usage: '<item> [--title "<t>"] [--author "<a>"] [--skills a,b]   rename a source, set its author ("" clears it), or file it under exactly these skills ("" for none; its cards follow)',
-    options: { title: { type: "string" }, author: { type: "string" }, skills: { type: "string" } },
+    usage: '<item> [--title "<t>"] [--author "<a>"] [--skills a,b [--cards <json>]]   rename a source, set its author ("" clears it), or file it under exactly these skills ("" for none; its cards follow; the output\'s cards_before, passed back as --cards, puts each card\'s own skills back for Undo)',
+    options: { title: { type: "string" }, author: { type: "string" }, skills: { type: "string" }, cards: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();
       const id = findItem(lib, need(ref, "<item>")).meta.id;
@@ -495,8 +495,10 @@ export const itemCommands: Record<string, Command> = {
       if (f.title !== undefined && !str(f.title)?.trim()) throw new Error("a source needs a title");
       let meta = f.title !== undefined ? await renameItem(lib, id, str(f.title) ?? "") : findItem(lib, id).meta;
       if (f.author !== undefined) meta = await setItemAuthor(lib, id, str(f.author) ?? "");
-      if (f.skills !== undefined) meta = await setItemSkills(lib, id, strs(f.skills));
-      return { data: meta, text: `${meta.title}${meta.skills.length ? ` (${meta.skills.join(", ")})` : ""}` };
+      const cards = f.cards === undefined ? undefined : (JSON.parse(str(f.cards)!) as Record<string, string[]>);
+      const before = f.skills !== undefined ? itemCardSkills(lib, id) : undefined;
+      if (f.skills !== undefined) meta = await setItemSkills(lib, id, strs(f.skills), cards);
+      return { data: before ? { ...meta, cards_before: before } : meta, text: `${meta.title}${meta.skills.length ? ` (${meta.skills.join(", ")})` : ""}` };
     },
   },
 

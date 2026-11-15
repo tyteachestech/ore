@@ -431,10 +431,10 @@ export type SideTab = "note" | "questions" | "original";
 /** The reader's right panel: one panel, two tabs (D75), like Notion's side peek. N opens the source
  *  note, C what he collected (Q too, at his questions); the same key again closes the panel. The toggle at the
  *  window's top right (⌥⌘S) shows or hides it. Resizable, width remembered. */
-export function SidePanel({ tab, onTab, original, tool, bar, bodyRef, onBodyMouseDown, children }: { tab: SideTab; onTab: (t: SideTab) => void; /** The source is a PDF: its own pages get a tab (D202). */ original?: boolean; /** At the right of the tabs: the open tab's own control (Collected's filter, D219). */ tool?: ReactNode; /** A full-width row under the tabs: that control's field. */ bar?: ReactNode; bodyRef?: RefObject<HTMLDivElement | null>; onBodyMouseDown?: (e: ReactMouseEvent) => void; children: ReactNode }) {
+export function SidePanel({ away, tab, onTab, original, tool, bar, bodyRef, onBodyMouseDown, children }: { /** The phone's note page, slid off-screen beside the source: out of reach until it comes back. */ away?: boolean; tab: SideTab; onTab: (t: SideTab) => void; /** The source is a PDF: its own pages get a tab (D202). */ original?: boolean; /** At the right of the tabs: the open tab's own control (Collected's filter, D219). */ tool?: ReactNode; /** A full-width row under the tabs: that control's field. */ bar?: ReactNode; bodyRef?: RefObject<HTMLDivElement | null>; onBodyMouseDown?: (e: ReactMouseEvent) => void; children: ReactNode }) {
   const { width, dragging, divider } = useSideWidth("ore.notewidth", NOTE_WIDTH);
   return (
-    <aside className={`mynotes${dragging ? " dragging" : ""}`} aria-label={tab === "note" ? "Source note" : tab === "original" ? "Original" : "Collected"} style={{ width }}>
+    <aside className={`mynotes${dragging ? " dragging" : ""}`} inert={away} aria-label={tab === "note" ? "Source note" : tab === "original" ? "Original" : "Collected"} style={{ width }}>
       <Hint text="Drag to resize · double-click to reset" side="left">
         <div
           className="divider"

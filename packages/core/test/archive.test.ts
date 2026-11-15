@@ -5,7 +5,8 @@ import { Database } from "bun:sqlite";
 import { openIndex } from "../src/db.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { allItems, findItem, listItems, setItemArchived, setItemPinned } from "../src/items.ts";
-import { loadSkills, removeSkill, restoreSkill } from "../src/skills.ts";
+import { addSkill, loadSkills, removeSkill, restoreSkill } from "../src/skills.ts";
+import { getNotes, setNotes } from "../src/notes.ts";
 import { findCard, writeNewCard } from "../src/cards.ts";
 import { paths } from "../src/library.ts";
 import { tempLibrary } from "./helpers.ts";
@@ -68,6 +69,18 @@ describe("delete a skill", () => {
     expect(await removeSkill(lib, "focus-attention", { archive: true })).toMatchObject({ untagged: 2, archived: 2 });
     expect(findItem(lib, a).meta.archived_at).toBeDefined();
     expect(findItem(lib, only).meta.archived_at).toBeUndefined();
+  });
+
+  test("a new skill with a deleted one's name starts with its own empty note, and the deleted one can still come back (Codex sweep 3, lifecycle)", async () => {
+    const lib = await tempLibrary();
+    await setNotes(lib, { skill: "habits" }, "Week 1: walked daily.\n");
+    const r = await removeSkill(lib, "habits");
+    const made = await addSkill(lib, "Habits");
+    expect(made.id).not.toBe("habits");
+    expect(getNotes(lib, { skill: made.id }).text).toBe("");
+    await removeSkill(lib, made.id);
+    await restoreSkill(lib, r.removed);
+    expect(getNotes(lib, { skill: "habits" }).text).toContain("Week 1");
   });
 
   test("restore puts the skill back in its place, refiles its sources and unarchives what the delete archived", async () => {

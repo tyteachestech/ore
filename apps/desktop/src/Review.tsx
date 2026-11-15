@@ -188,7 +188,9 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const sureRef = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   // Closed (Esc, Done, Later on the last one), focus goes back to what started it, else to `giveBack`.
-  useFocusWhileMounted(root, giveBack, !PHONE); // the phone's screens move focus their own way
+  // The phone's screens move focus their own way as it opens; closed, it still gives focus back, never to the page
+  // itself (Codex sweep 3, a11y).
+  useFocusWhileMounted(root, giveBack, true, !PHONE);
   const reviewed = useRef(0);
   /** This window's session, named by id in every call: the main window and the quick quiz can each have
    *  one open (D76), and the last one started is not always this one. `open`: not ended yet. */
@@ -1148,7 +1150,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
 
       {/* VoiceOver hears each new card and the key points as marked (by the AI, or by him), not only the end screen. */}
       <div className="sr-only" aria-live="polite">
-        {card && !end && queue?.length ? `Exercise ${done + 1}. ${card.question.replace(/_{4,}/g, "blank")}${phase === "checked" && card.kind === "card" ? `. Answer: ${card.answer}. Rate your recall.` : ""}${marks?.some((m) => m !== undefined) ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
+        {card && !end && queue?.length ? `Exercise ${done + 1}. ${card.question.replace(/_{4,}/g, "blank")}${phase === "checked" ? (card.kind === "card" ? `. Answer: ${card.answer}. Rate your recall.` : `. Answer: ${card.answer}.${gradeError ? ` ${PHONE && gradeError !== KEY_POINTS_CHANGED ? "Checking answers runs on your Mac for now." : gradeError} Mark what you got, then rate your recall.` : ""}`) : ""}${marks?.some((m) => m !== undefined) ? `. Marked ${marks.filter(Boolean).length} of ${marks.length} key points` : ""}` : ""}
       </div>
       <div className="review-body">
         {error && (

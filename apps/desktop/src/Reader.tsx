@@ -39,7 +39,7 @@ import { clickBelow, SidePanel, SourceNoteBody, useSourceNote, type SideTab } fr
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
-import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
+import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type CardSkills, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { chunks, pageChunks, pageOf, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
@@ -532,7 +532,9 @@ const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, c
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     if (shown < total) {
-      const t = setTimeout(() => startTransition(() => setShown((n) => Math.min(total, n * 2))), 0);
+      // Doubles while small, then 16 slices (about 200 KB) a pass: doubling all the way mounted half a 20 MB
+      // source in one go, seconds with the page frozen (Codex sweep 3).
+      const t = setTimeout(() => startTransition(() => setShown((n) => Math.min(total, n + Math.min(n, 16)))), 0);
       return () => clearTimeout(t);
     }
     if (ref.current) onReady(ref.current);
@@ -1495,8 +1497,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     lastClosed.current = closedBook;
     if (lastOpen.current === notesShown) return;
     lastOpen.current = notesShown;
-    // On the phone the note opens to read; the keyboard waits for a tap, as in Notes.
-    if (notesShown && !PHONE && !back) notesField.current?.focus();
+    // On the phone the note opens to read; the keyboard waits for a tap, as in Notes: focus goes to the note's page, not
+    // the source's, now a screen to the left (Codex sweep 3, a11y).
+    if (notesShown && PHONE) readerRef.current?.querySelector<HTMLElement>(".mynotes-text")?.focus({ preventScroll: true });
+    else if (notesShown && !back) notesField.current?.focus();
     else if (!questionsShown) scrollRef.current?.focus({ preventScroll: true });
   }, [notesShown, questionsShown, closedBook]);
 
@@ -1860,7 +1864,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // before it; the step acts on the saved highlight once the write is back.
     let step: ReturnType<typeof annStep> | undefined;
     const act = (f: "remove" | "bring") => () => promise.then((ann) => (step ??= annStep(ann.id, ann))[f](), () => {});
-    const forget = p.notify("Highlight", "quiet", act("remove"), act("bring"));
+    const forget = p.notify("Highlighted", "quiet", act("remove"), act("bring"));
     promise.then(
       (ann) => {
         savedIds.current.set(tmp, ann.id);
@@ -1878,7 +1882,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           const both = union(old, r);
           ranges.current.set(ann.id, both);
           const s = spanStep(ann.id, { exact: was.exact, start: was.start, range: old }, { exact: ann.exact, start: ann.start, range: both });
-          p.notify("Highlight", "quiet", s.back, s.again);
+          p.notify("Highlighted", "quiet", s.back, s.again);
         } else if (was && old) ranges.current.set(ann.id, old);
         if (existing) forget(); // no new highlight: nothing of this one to take back
         setAnns((l) => (existing ? l.filter((a) => a.id !== tmp).map((a) => (a.id === ann.id ? { ...a, exact: ann.exact, prefix: ann.prefix, suffix: ann.suffix, start: ann.start, end: ann.end, rev: ann.rev } : a)) : l.map((a) => (a.id === tmp ? { ...ann, intent: a.intent, note: a.note } : a))));
@@ -2139,7 +2143,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       rid = await realId(id);
       await annotateWaking(wake, rid, opt("note", note));
       unsavedNotes.delete(rid);
-      if (undoable) p.notify(note ? "Highlight note" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
+      if (undoable) p.notify(note ? "Highlight note saved" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
     } catch (e) {
       setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note: was } : a)));
       // From the history (undo or redo): it puts the step back and says why.
@@ -2329,7 +2333,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       setAnns((l) => [...l.filter((a) => a.id !== ann.id), ann]);
       setLookup((cur) => cur && cur.range === range ? { ...cur, ann: ann.id } : cur);
       const s = annStep(ann.id);
-      p.notify("Question", "quiet", s.remove, s.bring);
+      p.notify("Question added", "quiet", s.remove, s.bring);
       return ann.id;
     } catch (e) {
       p.notify(errorText(e), "error");
@@ -2674,6 +2678,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         return t;
       }
     };
+    // A local file, a script or data link: the page's text keeps it inert, with no address left to name.
+    if (!href) return p.notify("Ore doesn’t open this kind of link (a file on the computer or a script).", "error");
     if (href.startsWith("#")) {
       const id = href.slice(1);
       const el = docEl.current;
@@ -2691,7 +2697,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       return p.notify(`That part of the page wasn’t saved with it.${doc?.reimport ? (PHONE ? " Reimport the source on your Mac to fetch it again." : " Reimport the source from its ⋯ menu to fetch it again.") : ""}`, "error");
     }
     if (/^(?:https?|mailto):/i.test(href)) return void openUrl(href).catch((e) => p.notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
-    p.notify(`This links to “${dec(href)}”, a file beside the original that isn’t in Ore. Add it with ${label(keys.file)} to read it here.`, "error");
+    p.notify(`This links to “${dec(href)}”, a file beside the original that isn’t in Ore. ${PHONE ? "Add it from Add a link › Choose a file to read it here." : `Add it with ${label(keys.file)} to read it here.`}`, "error");
   };
   const onClick = (e: MouseEvent) => {
     const fig = zoomable(e.target, docEl.current);
@@ -3019,18 +3025,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   /** Files the source under exactly `skills` (its cards follow), with Undo naming the one that changed. */
   /** The skills as last saved from here: the Questions list reads again once a filing has landed. */
   const [filed, setFiled] = useState("");
-  const fileUnder = async (skills: string[], changed?: Skill, fromHistory = false) => {
+  const fileUnder = async (skills: string[], changed?: Skill, fromHistory = false, cards?: CardSkills) => {
     if (!doc) return;
     const before = doc.skills;
     // Filing under an archived skill brings it back (D173, as App's refile); Undo archives it again.
     const revived = skills.filter((id) => !before.includes(id) && p.skills.some((s) => s.id === id && s.archived));
     setDoc((cur) => cur && { ...cur, skills });
     try {
-      await ore("edit", doc.id, "--skills", skills.join(","));
+      const r = await ore<{ cards_before?: CardSkills }>("edit", doc.id, "--skills", skills.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : []));
       setFiled(skills.join());
       p.onChanged();
       if (revived.length) p.onSkillsChanged();
-      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true).then(() => p.rearchive?.(revived)), () => fileUnder(skills, undefined, true));
+      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true, r?.cards_before).then(() => p.rearchive?.(revived)), () => fileUnder(skills, undefined, true));
     } catch (e) {
       setDoc((cur) => cur && { ...cur, skills: unfile(cur.skills, skills, before) });
       // From the history (undo or redo): it puts the step back and says why.
@@ -3255,7 +3261,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   return (
     <div className={`reader${closedBook ? " quizzing" : ""}${PHONE && panelShown ? " noting" : ""}${barsHidden && !find.open ? " bars-hidden" : ""}`} ref={readerRef}>
-      <div className={`reader-pane${hidden ? " hidden-src" : ""}`}>
+      {/* On the phone the page slid away is out of reach of VoiceOver and Tab, as a pushed screen's is. */}
+      <div className={`reader-pane${hidden ? " hidden-src" : ""}`} inert={PHONE && panelShown}>
       {/* Learn this's Read now (D97): back to the passage he left, as Books offers after following a link. ⌘[ too. */}
       {p.back && !closedBook && (
         <Hint text="Back to the passage you left" keys="nav-back" side="top">
@@ -3673,6 +3680,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       {/* On the phone the note stays beside the source, a swipe away, so each keeps its place. */}
       {(panelShown || (PHONE && !closedBook)) && (
         <SidePanel
+          away={PHONE && !panelShown}
           tab={sideTab}
           onTab={(t) => p.onShowSide(t, true)}
           original={!!pdf}

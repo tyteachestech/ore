@@ -3757,6 +3757,94 @@ journey("All sources: a row dragged onto a sidebar skill is filed there, and ⌘
   if (await on()) throw new Error("the drop's write landed after its undo");
 });
 
+journey("Undo of taking a source off a skill puts each exercise's own skills back, not the skill on all of them (Codex sweep 3, lifecycle)", async (page) => {
+  const item = ((await ore("ls")) as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!;
+  type C = { id: string; skills: string[] };
+  const cards = async () => Object.fromEntries(((await ore("cards", "--item", item.id)) as C[]).map((c) => [c.id, [...c.skills].sort().join(",")]));
+  const before = await cards();
+  // The seed files it under two skills, with an exercise under only one of them: that one mustn't gain the other.
+  const skill = item.skills.find((k) => Object.values(before).some((s) => !s.split(",").includes(k)));
+  if (!skill) throw new Error("the seed needs an exercise filed under fewer skills than its source");
+  const name = ((await ore("skills")) as { id: string; name: string }[]).find((k) => k.id === skill)!.name;
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: `Skills for ${TESTING}` }).click();
+  await page.locator(".skill-picker [cmdk-item]", { hasText: name }).click();
+  await page.keyboard.press("Escape");
+  await until("it is off the skill", async () => !((await ore("show", item.id)) as { skills: string[] }).skills.includes(skill));
+  await page.keyboard.press("Meta+KeyZ");
+  await until("Undo files it back", async () => ((await ore("show", item.id)) as { skills: string[] }).skills.includes(skill));
+  await until("each exercise has its own skills again", async () => JSON.stringify(await cards()) === JSON.stringify(before));
+});
+
+journey("Settings keeps focus inside as Tab and ⌥Tab run past its last control, as WebKit steps them (Codex sweep 3, a11y)", async (page) => {
+  await page.keyboard.press("Meta+Comma");
+  const sheet = page.locator(".settings-sheet");
+  await sheet.waitFor();
+  for (const key of ["Tab", "Alt+Tab", "Shift+Tab", "Shift+Alt+Tab"]) {
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press(key);
+      await Bun.sleep(20);
+      const where = await page.evaluate(() => (document.activeElement && document.activeElement !== document.body && !!document.activeElement.closest(".settings-sheet") ? "" : document.activeElement?.tagName ?? "nothing"));
+      if (where) throw new Error(`${key} number ${i + 1} put focus on ${where}, outside Settings`);
+    }
+  }
+  await page.keyboard.press("Escape");
+}, "webkit");
+
+journey("the skill picker is named, and says which skills are ticked apart from the row the arrows are on (Codex sweep 3, a11y)", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("button", { name: `Skills for ${TESTING}` }).click();
+  const picker = page.locator(".skill-picker");
+  await picker.waitFor();
+  if ((await picker.getAttribute("aria-label")) !== "Skills") throw new Error("the picker has no name");
+  const filed = ((await ore("ls")) as { title: string; skills: string[] }[]).find((i) => i.title === TESTING)!.skills;
+  const rows = await picker.locator("[cmdk-item]").evaluateAll((els) => els.map((e) => [e.getAttribute("data-value"), e.getAttribute("aria-checked")]));
+  for (const [id, checked] of rows) if (id && !id.startsWith("create") && (checked === "true") !== filed.includes(id)) throw new Error(`${id} says checked=${checked}, filed: ${filed.join(", ")}`);
+  await page.keyboard.press("Escape");
+});
+
+journey("a highlight saved without a toast is still read out (Codex sweep 3, a11y)", async (page) => {
+  await openSource(page, TESTING);
+  await select(page, "Free recall, short-answer questions");
+  await page.keyboard.press("h");
+  await until("the live region says it was highlighted", async () => (await page.locator(".toasts .sr-only").innerText()).trim() === "Highlighted");
+  await page.keyboard.press("Meta+z");
+});
+
+journey("archiving a skill's last source takes its questions off the open skill page at once (Codex sweep 3, lifecycle)", async (page) => {
+  const k = (await ore("skills", "add", "Ropework")) as { id: string };
+  const title = "Knots for a ridge line";
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", `--skill=${k.id}`], stdin: `# ${title}\n\nA taut-line hitch slides to tension and holds under load.` }) }).then((r) => r.json())) as { id: string };
+  await ore("highlight", made.id, "--exact", "A taut-line hitch slides to tension", "--intent", "question");
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^Ropework/ }).first().click();
+    const question = page.locator(".skill-col .question-quote", { hasText: "A taut-line hitch" });
+    await question.waitFor();
+    await page.locator(".skill-col .row", { hasText: title }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: /^Archive/ }).click();
+    await until("the archived source's question leaves the page", async () => (await question.count()) === 0);
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
+journey("retiring an exercise in Review updates the strength of the skill page left open under it (Codex sweep 3, numbers)", async (page) => {
+  await page.getByRole("button", { name: /^Learning/ }).first().click();
+  const gems = page.locator(".hero-strength");
+  await gems.waitFor();
+  const before = await gems.getAttribute("aria-label");
+  await startReview(page, /Learning/, true);
+  await page.keyboard.press("Shift+Meta+Backspace");
+  await page.locator(".toast", { hasText: "Exercise retired" }).waitFor();
+  await until("the open skill page counts the retired exercise out", async () => (await gems.getAttribute("aria-label")) !== before);
+  await page.keyboard.press("Meta+z");
+  await page.locator(".toast", { hasText: "Exercise restored" }).waitFor();
+  await until("Undo counts it back in", async () => (await gems.getAttribute("aria-label")) === before);
+  await page.keyboard.press("Escape");
+});
+
 journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at once, ⇧⌘U marks the selected one, Esc clears (F9)", async (page) => {
   const day = new Date(Date.now() - 864e5).toUTCString();
   const item = (n: number) => `<item><title>Pick post ${n}</title><link>http://localhost/pick-${n}.html</link><pubDate>${day}</pubDate></item>`;
@@ -4503,6 +4591,96 @@ journey("sidebar: a skill dragged into another collection, ⌘Z puts it back", a
   await page.waitForTimeout(300);
   await page.keyboard.press("Meta+z");
   await until("⌘Z puts it back in Life", async () => (await inGroup("Life", "Habits")) === 1);
+});
+
+journey("Find narrowing a 10,000-line note answers each key in well under a second (Codex sweep 3, hostile)", async (page) => {
+  const item = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === TESTING)!.id;
+  const { text: was, dir } = (await ore("notes", item)) as { text: string; dir: string };
+  // Too long for a command line: written as a text editor would.
+  writeFileSync(join(dir, "notes.md"), Array.from({ length: 10000 }, (_, i) => `Line ${i + 1}: a note about learning.`).join("\n\n") + "\n");
+  try {
+    await openSource(page, TESTING);
+    await page.getByRole("tab", { name: "Source note" }).click();
+    await page.getByText("Line 10000: a note about learning.").waitFor({ timeout: 20000 });
+    await page.keyboard.press("Meta+f");
+    const count = page.locator(".find-count");
+    // Toggling a repaint class on every paragraph Find let go made ProseMirror redraw the whole note:
+    // seconds per key in Chromium, a freeze in WebKit.
+    let before = "";
+    for (const ch of "2999") {
+      const t = Date.now();
+      await page.keyboard.type(ch);
+      await until(`"${ch}" counts its matches again`, async () => /\/\d+$/.test(await count.innerText()) && (await count.innerText()) !== before);
+      before = await count.innerText();
+      if (Date.now() - t > 1500) throw new Error(`typing "${ch}" took ${Date.now() - t} ms`);
+    }
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("notes", item, `--set=${was}`);
+  }
+});
+
+journey("a huge source mounts in small steps, so no one batch freezes the page while the rest comes in (Codex sweep 3, hostile)", async (page) => {
+  const title = "A very long source";
+  const para = (i: number) => `Paragraph ${i}: spacing your practice over days beats cramming it into one evening, because each return comes after some forgetting.`;
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich"], stdin: `# ${title}\n\n${Array.from({ length: 12000 }, (_, i) => para(i + 1)).join("\n\n")}\n\nTHE-LAST-LINE` }) }).then((r) => r.json())) as { id: string };
+  try {
+    await page.reload();
+    // Counted, not timed: the paragraphs each render adds to the page. Doubling each batch made the last one mount half
+    // the source at once, seconds frozen on a 20 MB one; a batch stays about 200 KB however long the source is.
+    await page.evaluate(() => {
+      const w = window as unknown as { __most: number };
+      w.__most = 0;
+      new MutationObserver((ms) => {
+        const added = ms.reduce((n, m) => n + (m.target instanceof Element && m.target.matches(".doc, .doc *") ? m.addedNodes.length : 0), 0);
+        w.__most = Math.max(w.__most, added);
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+    await openSource(page, title);
+    await page.waitForFunction(() => document.querySelector(".doc")?.lastElementChild?.textContent?.includes("THE-LAST-LINE"), null, { timeout: 60000, polling: 250 });
+    const most = await page.evaluate(() => (window as unknown as { __most: number }).__most);
+    if (most > 4000) throw new Error(`one batch put ${most} paragraphs of the 12,000 on the page at once`);
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
+journey("a source's link to a file on the computer says Ore doesn't open it, not an empty name (Codex sweep 3, hostile)", async (page) => {
+  const title = "A page with a local link";
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich"], stdin: `# ${title}\n\nSee [the local file](file:///Users/tyler/notes.txt) for more.` }) }).then((r) => r.json())) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, title);
+    await page.locator(".doc a", { hasText: "the local file" }).click();
+    await page.locator(".toast", { hasText: "Ore doesn’t open this kind of link" }).waitFor();
+    if (await page.locator(".toast", { hasText: "“”" }).count()) throw new Error("the toast names an empty file");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
+journey("a note's mail link opens Mail, a heading link goes to its heading, and any other link says why it does nothing (Codex sweep 3, hostile)", async (page) => {
+  const item = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === TESTING)!.id;
+  const { text: was } = (await ore("notes", item)) as { text: string };
+  const filler = Array.from({ length: 60 }, (_, i) => `Filler line ${i + 1}.`).join("\n\n");
+  await ore("notes", item, `--set=[Mail link](mailto:tyler@example.com) [Heading link](#far-heading) [Relative link](beside.md)\n\n${filler}\n\n## Far heading\n\nThe end.\n`);
+  try {
+    await openSource(page, TESTING);
+    await page.getByRole("tab", { name: "Source note" }).click();
+    const note = page.locator(".mynotes .ProseMirror");
+    await note.getByText("Mail link").click();
+    await until("the mail link goes to Mail", async () => ((await page.evaluate(() => (window as { __ORE_OPENED?: string[] }).__ORE_OPENED)) ?? []).includes("mailto:tyler@example.com"));
+    await note.getByText("Heading link").click();
+    const far = note.getByRole("heading", { name: "Far heading" });
+    await until("the heading link scrolls to its heading", async () => {
+      const [h, box] = await Promise.all([far.boundingBox(), note.evaluate((el) => el.closest(".mynotes")!.getBoundingClientRect().toJSON() as DOMRect)]);
+      return !!h && h.y >= box.y - 1 && h.y < box.y + box.height;
+    });
+    await note.getByText("Relative link").click();
+    await page.locator(".toast", { hasText: "“beside.md” isn’t one of those" }).waitFor();
+  } finally {
+    await ore("notes", item, `--set=${was}`);
+  }
 });
 
 journey("skill note: coming back to a long note puts it where he left it", async (page) => {
@@ -6839,9 +7017,11 @@ const ore = (...args: string[]) =>
   });
 
 /** Starts a review of the skills whose row in "What to review" matches `only` (null: every skill). */
-async function startReview(page: Page, only: RegExp | null) {
+async function startReview(page: Page, only: RegExp | null, keys = false) {
   const pick = page.getByRole("dialog", { name: "What to review" });
-  await page.getByRole("button", { name: "Start review" }).click();
+  // Home has the button; `keys` starts it with ⌘R from any other screen.
+  if (keys) await page.keyboard.press("Meta+KeyR");
+  else await page.getByRole("button", { name: "Start review" }).click();
   await pick.waitFor();
   await pick.getByRole("checkbox").first().waitFor(); // the rows can land after the sheet
   for (const row of await pick.getByRole("checkbox").all()) {
@@ -7271,7 +7451,12 @@ journey("quick quiz: put away and shown again in one go, it shows afresh with it
     await quiz.keyboard.press("Escape");
     await quiz.locator(".review").waitFor({ state: "detached" });
     await quiz.waitForTimeout(400);
-    const shown = await quiz.locator(".quick").innerText();
+    // What shows: a quiet step's words for VoiceOver (.sr-only) are not on screen.
+    const shown = await quiz.locator(".quick").evaluate((el) => {
+      const copy = el.cloneNode(true) as HTMLElement;
+      copy.querySelectorAll(".sr-only").forEach((s) => s.remove());
+      return copy.textContent ?? "";
+    });
     if (shown.trim()) throw new Error(`Esc left: ${shown}`);
   } finally {
     await calls.undoAll();
@@ -9142,7 +9327,7 @@ journey("review: changing an Explain card's key points after it was checked keep
   // Only reordered: both marks stay, but they were the AI's, so nothing is suggested until he marks.
   await save(`${changed}\n${kept}`, changed);
   await page.unroute(/\/ore$/);
-  await page.getByText("The key points changed.").waitFor();
+  await page.locator(".review-grade-failed", { hasText: "The key points changed." }).waitFor();
   if ((await points.locator("li.got").count()) !== 2) throw new Error("a reorder lost a mark");
   if (await suggested.count()) throw new Error("the AI's marks still suggest a rating after the points changed");
   // A changed point loses its mark; one left as it was keeps it.
@@ -11419,6 +11604,58 @@ journey("phone: an Undo toast in a source leaves the bottom bar and the pill the
     const r = await page.locator(".toasts").boundingBox();
     return !!r && 844 - (r.y + r.height) <= 24;
   });
+}, "phone");
+
+journey("phone: VoiceOver hears Explain's answer and that marking is his, its marks show no extra pictures, a picker's Select all is a 44 pt tap, and Done gives focus back (Codex sweep 3, a11y)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  const all = page.locator(".pick-all");
+  await all.waitFor();
+  const h = await all.evaluate((e) => Math.max(e.getBoundingClientRect().height, parseFloat(getComputedStyle(e, "::after").height) || 0));
+  if (h < 44) throw new Error(`Select all is a ${Math.round(h)} pt tap`);
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const field = page.locator(".phone-full textarea:visible");
+  for (let i = 0; ; i++) {
+    await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).waitFor();
+    if (await field.count()) break;
+    if (i > 10) throw new Error("no Explain exercise came up");
+    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+    await Bun.sleep(300);
+  }
+  await tap(page, field);
+  await page.keyboard.type("Rereading feels fluent.");
+  await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+  await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Check/ }));
+  const live = page.locator(".review > .sr-only[aria-live]");
+  await until("the live region says the answer is there and the marking is his", async () => /Answer: .*Mark what you got/.test(await live.innerText()));
+  const pictures = await page.locator(".quiz-mark svg:not([aria-hidden=true])").count();
+  if (pictures) throw new Error(`${pictures} mark pictures are read as unnamed images`);
+  await tap(page, page.getByRole("button", { name: "Leave review" }));
+  await tap(page, page.locator(".review-end button").filter({ hasText: /^Done/ }));
+  await page.locator(".phone-full").waitFor({ state: "detached" });
+  await until("focus is back on a control, not the page", async () => page.evaluate(() => !!document.activeElement && document.activeElement !== document.body));
+}, "phone");
+
+journey("phone: a refused link is read out and focus stays on the field; + Note puts focus on the note, with the source page out of reach (Codex sweep 3, a11y)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  const field = page.locator(".add-link input.field");
+  await field.fill("not a valid url");
+  await tap(page, page.getByRole("button", { name: "Add", exact: true }));
+  const error = page.locator(".add-link [role=alert]");
+  await error.waitFor();
+  const id = await error.getAttribute("id");
+  if ((await field.getAttribute("aria-describedby")) !== id || (await field.getAttribute("aria-invalid")) !== "true") throw new Error("the field isn't tied to its error");
+  if (!(await field.evaluate((e) => e === document.activeElement))) throw new Error("focus left the field he has to fix");
+  await page.keyboard.press("Escape");
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :nth-child(2)"));
+  await page.locator(".reader.noting").waitFor();
+  await until("focus is on the note's page, on screen", async () => page.evaluate(() => {
+    const a = document.activeElement;
+    const r = a?.getBoundingClientRect();
+    return !!a && !!a.closest(".mynotes") && !!r && r.right > 0 && r.left < innerWidth;
+  }));
+  if (!(await page.locator(".reader-pane").evaluate((e) => (e as HTMLElement).inert))) throw new Error("the source page slid away is still in reach");
 }, "phone");
 
 journey("phone: a half-typed Explain answer and a Finish recall survive a relaunch", async (page) => {
