@@ -11,7 +11,7 @@ import type { Library } from "../src/library.ts";
 import { Exercise, tutor, withSteps } from "../src/ai/tutor.ts";
 import { usePromptText } from "../src/ai/prompts.ts";
 import { addGolden } from "./ask.ts";
-import { columns, costText, pct, pool, range, resultPath, setId, wilson, withVendor } from "./grade.ts";
+import { columns, costText, pct, pool, range, resultPath, setId, vendorsFrom, wilson, withVendor } from "./grade.ts";
 
 const Expect = z.strictObject({
   hint: z.boolean().optional(),
@@ -193,10 +193,7 @@ export function runTutorEval(vendor: Vendor, model?: string, runs = 1, concurren
 
 if (import.meta.main) {
   const args = process.argv.slice(2);
-  const vendors = args.flatMap((a, i) => (args[i - 1] === "--vendor" ? [a] : [])) as Vendor[];
-  if (vendors.some((v) => v !== "claude" && v !== "codex")) throw new Error("--vendor must be claude or codex");
-  const pick: Vendor[] = vendors.length ? vendors : ["claude", "codex"];
-  if (args.includes("--model") && pick.length > 1) throw new Error("--model needs one --vendor");
+  const pick = vendorsFrom(args, ["claude", "codex"]);
   const model = args.includes("--model") ? args[args.indexOf("--model") + 1] : undefined;
   if (args.includes("--model") && !model) throw new Error("--model needs a model id");
   const runs = args.includes("--runs") ? Number(args[args.indexOf("--runs") + 1]) : 1;
