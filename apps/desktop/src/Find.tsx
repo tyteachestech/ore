@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUp, X } from "./icons";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Hint } from "./Hint";
-import { paint, unpaint } from "./paint";
+import { OVER, paint, unpaint } from "./paint";
 
 // Find in the open source (⌘F), the Claude app's and Safari's find bar: one list over every pane
 // on screen, the source first and then the side panel, so the count reads left to right as he sees
@@ -147,8 +147,8 @@ function reveal(r: Range) {
 
 function show(all: Range[], on: Range | undefined) {
   // Above highlights and the spoken text, so the current match always reads.
-  paint("find", all.filter((r) => r !== on), 2);
-  paint("find-on", on ? [on] : [], 3);
+  paint("find", all.filter((r) => r !== on), OVER);
+  paint("find-on", on ? [on] : [], OVER); // the two never overlap
 }
 
 /** The find bar at the top right of the source. `roots` lists what it searches, left to right;

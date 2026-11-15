@@ -3076,6 +3076,52 @@ async function selectPastTheEdge(page: Page, knob = false) {
     rmSync(dir, { recursive: true, force: true });
   }
 }
+// F-new-code-hl-crash: a saved highlight over a code block crashed WebKit's page as it opened (a click, or a drag carried
+// over it): the popup's underline lay between the code's colours and the highlight's tint, a priority WebKit can't paint.
+journey("highlight: a saved highlight over a code block opens in WebKit without taking the page down", async (page) => {
+  let crashed = false;
+  page.on("crash", () => (crashed = true));
+  const dir = mkdtempSync(join(tmpdir(), "ore-code-hl-"));
+  const file = join(dir, "code.md");
+  const prose = "Retrieval strengthens a memory when the learner reconstructs the idea before seeing the answer.";
+  writeFileSync(file, `# Code under a highlight\n\nFirst words here. ${prose}\n\n\`\`\`javascript\n// A comment\nconst message = "remember the exact words";\nconsole.log(message);\n\`\`\`\n\nLast words there. ${prose}\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Code under a highlight");
+    await until("the code is coloured", async () => page.evaluate(() => CSS.highlights.has("code-keyword")));
+    const ends = await page.evaluate(() => {
+      const ps = [...document.querySelectorAll(".doc p")];
+      const at = (p: Element, end: boolean) => {
+        const t = p.firstChild as Text;
+        const r = document.createRange();
+        r.setStart(t, end ? t.length - 1 : 0);
+        r.setEnd(t, end ? t.length : 1);
+        const b = r.getBoundingClientRect();
+        return { x: end ? b.right - 1 : b.left + 1, y: b.top + b.height / 2 };
+      };
+      return [at(ps.find((p) => p.textContent!.startsWith("First words"))!, false), at(ps.find((p) => p.textContent!.startsWith("Last words"))!, true)] as const;
+    });
+    await page.mouse.move(ends[0].x, ends[0].y);
+    await page.mouse.down();
+    await page.mouse.move(ends[1].x, ends[1].y, { steps: 8 });
+    await page.mouse.up();
+    const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+    await until("the highlight over the code is saved", async () => (await kept()).some((t) => t.includes("const message") && t.startsWith("First words")));
+    await page.mouse.click(5, 400); // away from it: the popup closes, the highlight stays
+    await page.locator(".popup").waitFor({ state: "detached" });
+    // Clicked again, it opens: its underline over the tint and the code's colours.
+    await page.mouse.click(ends[0].x + 30, ends[0].y);
+    await page.locator(".popup").waitFor();
+    await page.waitForTimeout(500);
+    if (crashed) throw new Error("the page crashed");
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+}, "webkit");
+
 journey("highlight: a drag held at the bottom of the screen turns the page after a moment and the highlight runs on (Books)", (page) => selectPastTheEdge(page));
 journey("highlight: in WebKit too, a drag held at the bottom of the screen turns the page and the highlight runs on", (page) => selectPastTheEdge(page), "webkit");
 journey("highlight: a highlight's end knob held at the bottom of the screen turns the page and the highlight runs on", (page) => selectPastTheEdge(page, true));

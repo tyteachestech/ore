@@ -5,12 +5,26 @@
 // and clicking it cleared it in chunks (an undone highlight, 2026-11-11). So the blocks under every
 // range that leaves are repainted here, by toggling a paint-only style for one frame.
 
-/** Sets highlight `name` to `ranges` (none deletes it), repainting where a range left. */
-export function paint(name: string, ranges: Range[], priority = 0) {
+//
+// Highlights paint in two layers over the code's colours, never between them. WebKit's page crashes when a highlight
+// overlaps one under it and one over it at a priority strictly between theirs: a saved highlight over a code block
+// crashed as it opened, its underline (then 0) between the code's colours (-1) and the tint (1), and with the
+// underline put over the tint instead (2) a new highlight crashed as its tint came in under it (Codex sweep 6).
+/** The code's colours, and what his highlights' colours win over: the spoken words, a quiz's evidence. */
+export const UNDER = -1;
+/** His highlights' tints and the underlines that go with them (the open one, a looked-up word, Listen's sentence),
+ *  which set no colour of their own, so the order among them is never seen. */
+export const MARKS = 1;
+/** Find's matches, over everything, as Safari's are. */
+export const OVER = 2;
+export type Layer = typeof UNDER | typeof MARKS | typeof OVER;
+
+/** Sets highlight `name` to `ranges` (none deletes it) in `layer`, repainting where a range left. */
+export function paint(name: string, ranges: Range[], layer: Layer) {
   const before = CSS.highlights.get(name);
   if (ranges.length) {
     const h = new Highlight(...ranges);
-    h.priority = priority;
+    h.priority = layer;
     CSS.highlights.set(name, h);
   } else CSS.highlights.delete(name);
   if (!before) return;
@@ -19,7 +33,7 @@ export function paint(name: string, ranges: Range[], priority = 0) {
 }
 
 /** Removes highlight `name` and repaints what it covered. */
-export const unpaint = (name: string) => paint(name, []);
+export const unpaint = (name: string) => paint(name, [], UNDER);
 
 /** Removes every highlight, repainting each (the reader closing). */
 export function unpaintAll() {
