@@ -6,13 +6,7 @@ This folder is Tyler's Ore library: captured material, highlights, review items 
 
 **Use `ore` for every write that has invariants**: creating items, highlights and annotation edits, review logging, sessions, enrichment, card state changes. Run `ore --help` for commands; every command accepts `--json`. Never hand-edit `*.jsonl` files or the `id`, `item`, `annotation`, `state`, `created`, `text_sha256` fields.
 
-Plain edits you may make directly:
-- Card wording in `cards/<id>.md` (question, answer, rubric, `skills`, `topics`, `content_type`). Then run `ore card show <id>` to check it parses.
-- Topic summaries in `topics/<slug>.md`.
-- Item frontmatter fields `skills`, `topics`, `status`, and prequestion wording (`prequestions[].q`). Record Tyler's attempts with `ore prequestion`, `ore recall` and `ore check`, not by hand.
-- `skills.yaml` only when Tyler asks.
-
-If you edit `doc.md` body text, run `ore doctor --fix` afterwards so highlights re-anchor.
+Never edit a library file by hand: `ore` checks what it writes and keeps the lock, the review history and the index right. Card wording goes through `ore card set <id> --question … --answer … --point …`, a source's title, author and skills through `ore edit`, its status through `ore status`, skills through `ore skills`. When no command does what Tyler asks, say so instead of editing the file.
 
 **`notes.md` (the source note, and each skill note in `skills/<id>/notes.md`) is Tyler's own writing.** Never edit it except through `ore notes` (when Tyler gives you his words) and `ore recall`. Never write AI text into it: no summaries, suggestions, corrections, links or "cleaned up" versions. Read it freely for questions about his library. A link in a note is `[text](ore:item/<id>)` or `[text](ore:skill/<id>)`; `ore backlinks <item>` (or `--skill <id>`) lists the notes that link somewhere.
 

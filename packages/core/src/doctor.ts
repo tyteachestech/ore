@@ -8,6 +8,7 @@ import { ID_END, itemDirs, readItemDir, type Item } from "./items.ts";
 import { brokenLinks } from "./links.ts";
 import { lockStale } from "./lock.ts";
 import { paths, type Library } from "./library.ts";
+import { VariantSchema } from "./remix.ts";
 import { reviewLogFiles, ReviewSchema, UndoSchema } from "./reviews.ts";
 import { loadParams } from "./scheduler.ts";
 import { loadSkills, skillsFileProblems } from "./skills.ts";
@@ -117,7 +118,8 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
       cardIds.add(c.meta.id);
       if (!path.endsWith(`${c.meta.id}.md`)) add("error", path, `id ${c.meta.id} does not match file name`);
       const item = items.get(c.meta.item);
-      if (!item) add("error", path, `its source ${c.meta.item} is missing or can't be read: restore the source's folder, or retire the card (ore card retire ${c.meta.id})`);
+      // A retired card is out of review, so a missing source no longer matters (doctor suggests retiring it).
+      if (!item) { if (c.meta.state !== "retired") add("error", path, `its source ${c.meta.item} is missing or can't be read: restore the source's folder, or retire the card (ore card retire ${c.meta.id})`); }
       else if (c.meta.annotation && !annotationRevs(item.dir).some((a) => a.id === c.meta.annotation)) add("warn", path, `annotation ${c.meta.annotation} not found`);
       if (c.meta.kind === "prompt" && (c.rubric.length < 2 || c.rubric.length > 4)) add("warn", path, `prompt has ${c.rubric.length} rubric points (want 2–4)`);
       checkRefs(path, c.meta.skills, c.meta.topics);
@@ -140,7 +142,20 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
 
   // Logs no other check reads line by line: a crash mid-write leaves a cut-off last line.
   const jsonl = (dir: string) => visible(dir).filter((f) => f.endsWith(".jsonl")).map((f) => join(dir, f));
-  for (const f of [...jsonl(paths.sessions(lib)), ...jsonl(paths.cards(lib))]) for (const l of readJsonlLines(f)) if (l.error) add("error", f, `line ${l.line}: ${CUT}`);
+  // A line that parses but isn't a record is skipped by its reader, so it is reported too.
+  const isReceipt = (v: unknown) => {
+    const r = v as { type?: unknown; id?: unknown; ts?: unknown } | null;
+    return !!r && (r.type === "start" || r.type === "end") && typeof r.id === "string" && typeof r.ts === "string" && !Number.isNaN(Date.parse(r.ts));
+  };
+  const checks: [string, string, (v: unknown) => boolean][] = [
+    ...jsonl(paths.sessions(lib)).map((f): [string, string, (v: unknown) => boolean] => [f, "session receipt", isReceipt]),
+    ...jsonl(paths.cards(lib)).map((f): [string, string, (v: unknown) => boolean] => [f, "variant", (v) => !f.endsWith(".variants.jsonl") || VariantSchema.safeParse(v).success]),
+  ];
+  for (const [f, what, valid] of checks)
+    for (const l of readJsonlLines(f)) {
+      if (l.error) add("error", f, `line ${l.line}: ${CUT}`);
+      else if (!valid(l.value)) add("warn", f, `line ${l.line}: not a valid ${what}, so it is skipped; fix or delete that line`);
+    }
 
   if (skillIds.size)
     try {

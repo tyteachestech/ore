@@ -1,0 +1,12 @@
+Your name is `a11y`. First read `codex-out/preamble.md` and follow it.
+
+Your ports: Mac app page http://localhost:1713/ with `window.__ORE_BRIDGE = 1714` (library `/Users/tylerpoelking/Developer/ore-wt/sweep3/codex-out/libs/a11y`); iPhone app http://localhost:1715/ (its seed is a copy at `/Users/tylerpoelking/Developer/ore-wt/sweep3/codex-out/libs/a11y-phone`; the page's writes stay in IndexedDB). WebKit server: `ws://[::1]:1719/`. The `ore` CLI: `ORE_LIBRARY=/Users/tylerpoelking/Developer/ore-wt/sweep3/codex-out/libs/a11y bun packages/cli/src/ore.ts`.
+
+## Your focus: VoiceOver and keyboard only, through the whole loop
+Run the daily loop (add a source, read, highlight, make a Key point, take a note, Review to the goal, the end screen, Settings) twice: once with only the keyboard on the Mac page, once as VoiceOver would hear it on both pages. Use Playwright's `page.accessibility.snapshot()` (or `ariaSnapshot()` on a locator) for what a screen reader gets, and `page.keyboard` only, no clicks, for the keyboard run. Read the keymap (`apps/desktop/src/keys*` or wherever `<Hint keys>` reads from) first.
+1. **Names and roles.** Every control has a name that says what it does (not "button", not an icon's name), the right role (a menu is a menu, a toggle says pressed, a tab says selected), and every picture that means something has a label. List each unnamed or misnamed one with its selector.
+2. **What changes is said.** A toast, an error, a grade arriving, "Goal met", a highlight saved, a wait starting and ending: is each in a live region, or would a VoiceOver user miss it?
+3. **Focus.** After every action (open, close a menu or sheet, delete, undo, finish a review, Esc), where is focus? It must land somewhere sensible and visible, never on `body` or on something hidden. Tab order follows the screen. A modal traps focus and gives it back on close.
+4. **Keyboard only.** Can every step of the loop be done with no mouse? Highlighting text, picking a skill, drag-only things (reorder, resize) need a keyboard way or a menu item. List each step that can't.
+5. **Settings that help.** Reduced motion (`page.emulateMedia({ reducedMotion: "reduce" })`): does every moving thing stop or fade? Increased contrast (`forcedColors`, `contrast: "more"`) and a 200% zoom on the Mac page: does anything vanish or overlap?
+The iPhone page: a tap target under 44 pt that a VoiceOver user must reach, and swipe-only actions with no other way (F70, text size, is known: skip it).

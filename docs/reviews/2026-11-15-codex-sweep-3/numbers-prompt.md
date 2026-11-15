@@ -1,0 +1,13 @@
+Your name is `numbers`. First read `codex-out/preamble.md` and follow it.
+
+Your ports: Mac app page http://localhost:1704/ with `window.__ORE_BRIDGE = 1705` (library `/Users/tylerpoelking/Developer/ore-wt/sweep3/codex-out/libs/numbers`); iPhone app http://localhost:1706/ (its seed is a copy at `/Users/tylerpoelking/Developer/ore-wt/sweep3/codex-out/libs/numbers-phone`; the page's writes stay in IndexedDB). WebKit server: `ws://[::1]:1719/`. The `ore` CLI: `ORE_LIBRARY=/Users/tylerpoelking/Developer/ore-wt/sweep3/codex-out/libs/numbers bun packages/cli/src/ore.ts`.
+Your library is seeded with `seed-big.ts` (a year of use), not `seed.ts`.
+
+## Your focus: every number the app shows is true
+Ore's promise is learning science first: what it counts and schedules must be right, or he studies the wrong thing. Read D21–D24, D157 and anything on skill levels, gems, strength, the daily goal and the due queue in `docs/DECISIONS.md`, `docs/design/daily-session.md`, and `packages/core/src/queue.ts`, `scheduler.ts`, `stats.ts` (or wherever `ore stats` is computed). For each number, compute it yourself from the library files (`reviews/`, `cards/`, `skills.yaml`) with your own script, using ts-fsrs from `node_modules` to replay reviews, and compare.
+1. **Due and queue.** How many are due on Home, the skill page, Review's bar and `ore due --json`, and in what order Review serves them: priority never changes FSRS math (D22), new exercises get about 1 in 5 of a session, a just-finished source gets room (D279). Do they agree with each other and with your replay?
+2. **Skills.** Each skill's level, gems, strength or progress ring, on the skill page, the sidebar and Home: does it match the rule in the decisions, and does it move by the right amount after one Good, one Again, an undo, and a retired exercise?
+3. **Minutes and the goal.** The ring's minutes, "N of 10 min", the bonus lap, the end screen's counts: time several sessions with known gaps (leave 5 minutes idle mid-session, switch away), and check what was counted against the rule in the code.
+4. **Stats.** `ore stats --json` (retention, ai_agreement, counts) against your own count from the files, and against anything the app shows from it. A rating made and then undone must count once or not at all, never twice.
+5. **Review replay.** Rebuild each exercise's FSRS state from its review log and compare with what the app shows as "next in …" and with `ore card show`. Try a log with two reviews in one second, an undone review, and a card moved between skills.
+On the iPhone too: Today's numbers and the skill page must match the Mac's for the same library.

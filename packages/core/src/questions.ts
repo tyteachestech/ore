@@ -98,10 +98,16 @@ export async function answerQuestion(lib: Library, ref: string, input: AnswerInp
   });
 }
 
+/** The question annotation `ref` names; throws when there is none, or it isn't a question. */
+export function questionFor(lib: Library, ref: string) {
+  const { annotation } = findAnnotation(lib, ref);
+  if (annotation.intent !== "question") throw new Error(`${annotation.id} is not a question`);
+  return annotation;
+}
+
 /** Marks a source as one that may answer a question (D75), or drops that mark ("Not answered here"). */
 export async function matchQuestion(lib: Library, itemRef: string, questionRef: string, opts: { drop?: boolean; quote?: string; start?: number } = {}) {
-  const { annotation } = findAnnotation(lib, questionRef);
-  if (annotation.intent !== "question") throw new Error(`${annotation.id} is not a question`);
+  const annotation = questionFor(lib, questionRef);
   const item = findItem(lib, itemRef);
   return updateItemMeta(lib, item.meta.id, (m) => {
     const rest = (m.question_matches ?? []).filter((x) => x.question !== annotation.id);

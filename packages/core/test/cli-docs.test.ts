@@ -54,3 +54,12 @@ describe("CLI docs match the CLI", () => {
     });
   }
 });
+
+// Codex sweep 3 (cli): the guides told agents to edit card files and frontmatter by hand, past `ore`'s checks.
+describe("agent guides send every write through ore", () => {
+  for (const doc of ["skills/ore/SKILL.md", "skills/ore/reference/cards.md", "packages/core/src/templates/library-agents.md"])
+    test(doc, () => {
+      const text = readFileSync(join(root, doc), "utf8");
+      expect(text).not.toMatch(/\b(edit|write|change)\w*\b[^.\n]{0,80}\bdirectly\b|\bEdit tool\b|one exception|Plain edits/i);
+    });
+});
