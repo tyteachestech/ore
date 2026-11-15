@@ -25,13 +25,13 @@ import { Palette } from "../Palette";
 import { SkillEditor, skillGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
-import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, shareOpen, shareSkills, type Item, type Skill, touched } from "../ore";
+import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, shareOpen, shareSkills, type CardSkills, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
 import { Working } from "../Working";
-import { count, errorText, inOrder, stepLanded, useKeptScroll, wakeScreens, type Notify } from "../util";
+import { count, errorText, inOrder, stepLanded, usable, useKeptScroll, wakeScreens, type Notify } from "../util";
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   const now = useRef(drag);
@@ -729,11 +729,12 @@ export function PhoneApp() {
       void refresh();
     }
   };
-  const refile = async (item: Item, next: string[], before: string[], changed?: Skill) => {
+  const refile = async (item: Item, next: string[], before: string[], changed?: Skill, cards?: CardSkills) => {
     try {
-      await ore("edit", item.id, "--skills", next.join(","));
+      const r = await ore<{ cards_before?: CardSkills }>("edit", item.id, "--skills", next.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : []));
+      // Undo gives each exercise back its own skills (Codex sweep 3).
       if (changed)
-        notify(next.includes(changed.id) ? `Filed “${item.title}” under ${changed.name}` : `Removed “${item.title}” from ${changed.name}`, "info", () => refile(item, before, next), () => refile(item, next, before));
+        notify(next.includes(changed.id) ? `Filed “${item.title}” under ${changed.name}` : `Removed “${item.title}” from ${changed.name}`, "info", () => refile(item, before, next, undefined, r?.cards_before), () => refile(item, next, before));
     } catch (e) {
       // From the history (Undo or Redo, with no `changed`): it puts the step back and says why.
       if (!changed) throw e;
@@ -856,6 +857,8 @@ export function PhoneApp() {
             // A rating undone after Review closed: Today, mounted under it all along, reads its numbers again (F159).
             onLogged={() => setTick((t) => t + 1)}
             notify={notify}
+            // Closed, focus goes to Today's Start review (else the screen's first control), never the page (Codex sweep 3, a11y).
+            giveBack={() => [".home .home-go", ".phone-app :is(main, .phone-page) button"].map((q) => document.querySelector<HTMLElement>(q)).find(usable)}
           />
         </Boundary>
       </Screen>

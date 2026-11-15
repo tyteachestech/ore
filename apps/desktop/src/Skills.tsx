@@ -140,7 +140,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
         <Popover.Trigger asChild>{button}</Popover.Trigger>
       </Hint>
       <Popover.Portal>
-        <Popover.Content className="popover menu skill-picker" side="bottom" align="start" sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => {
+        <Popover.Content className="popover menu skill-picker" aria-label="Skills" side="bottom" align="start" sideOffset={4} collisionPadding={8} onCloseAutoFocus={(e) => {
             if (!returnFocus?.current) return;
             e.preventDefault();
             returnFocus.current.focus();
@@ -149,7 +149,8 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
             <Command.Input className="menu-input" placeholder="Find or create a skill…" value={query} onValueChange={setQuery} autoFocus />
             <Command.List>
               {shown.map((k) => (
-                <Command.Item key={k.id} value={k.id} onSelect={() => toggle(k)}>
+                // cmdk's aria-selected is the row the arrows are on; whether it is filed under the skill is aria-checked (Codex sweep 3, a11y).
+                <Command.Item key={k.id} value={k.id} aria-checked={sel.includes(k.id)} onSelect={() => toggle(k)}>
                   <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />
                   <span className="menu-label">{k.name}</span>
                   {sel.includes(k.id) && <Check />}

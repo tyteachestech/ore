@@ -1033,8 +1033,21 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
             const href = String(link?.attrs.href ?? "");
             const m = href.match(LINK_URL);
             if (m) live.current.p.onOpen({ kind: m[1] as LinkTarget["kind"], id: m[2]! });
-            else if (/^https?:\/\//i.test(href)) void openUrl(href);
-            else return false;
+            else if (/^(?:https?:\/\/|mailto:)/i.test(href)) void openUrl(href).catch((err) => live.current.p.notify(`Couldn’t open the link: ${errorText(err)}`, "error"));
+            else if (href.startsWith("#")) {
+              // A heading in this note, as a source's own heading links go (Notion's block links).
+              const slug = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
+              let id = href.slice(1);
+              try {
+                id = decodeURIComponent(id);
+              } catch {
+                // kept as written
+              }
+              const want = slug(id);
+              const h = [...view.dom.querySelectorAll("h1, h2, h3, h4, h5, h6")].find((h) => slug(h.textContent ?? "") === want);
+              if (h) h.scrollIntoView({ block: "start" });
+              else live.current.p.notify("No heading in this note matches that link.", "error");
+            } else live.current.p.notify(`Ore opens web links, mail links and links to sources and skills; “${href}” isn’t one of those.`, "error");
             return true;
           },
         },

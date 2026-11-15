@@ -22,7 +22,8 @@ function sprite(rows: readonly string[]): Icon {
   return ({ size = 16, weight: _weight, ...rest }) => {
     const px = spriteSize(size);
     return (
-      <svg width={px} height={px} viewBox="0 0 16 16" fill="currentColor" data-sprite="" {...rest}>
+      // A picture beside words or in a named button: hidden from VoiceOver unless it is given a name (Codex sweep 3, a11y).
+      <svg width={px} height={px} viewBox="0 0 16 16" fill="currentColor" data-sprite="" aria-hidden={rest["aria-label"] ? undefined : true} {...rest}>
         <path d={d} />
       </svg>
     );

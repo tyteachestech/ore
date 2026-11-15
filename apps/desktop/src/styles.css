@@ -1614,7 +1614,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .gem-ring-lv { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); padding: 0 6px; height: 16px; line-height: 14px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); font-family: var(--round); font-size: 10px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .strength-side { display: flex; flex-direction: column; gap: 4px; }
 .strength-line { display: none; }
-.near-goal { display: inline-flex; align-items: center; gap: 12px; color: var(--muted); font-family: var(--mono); font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums; }
+.near-goal { display: inline-flex; align-items: center; height: 18px; gap: 12px; color: var(--muted); font-family: var(--mono); font-size: 14px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .near-goal > span { display: inline-flex; align-items: center; gap: 5px; color: var(--faint); font-size: 12px; }
 .hero-strength:is(:hover, [aria-expanded="true"]) .near-goal > span:not(.near-glow) { color: var(--muted); }
 .near-goal > .near-glow { color: var(--text); font-size: inherit; }
@@ -2894,6 +2894,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* Open in source keeps its small look and reaches 44 pt with an unseen margin, as a skill page's controls do. */
 .phone .review-passage figcaption button { position: relative; }
 .phone .review-passage figcaption button::after { content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: max(44px, 100%); transform: translateY(-50%); }
+/* A finger's 44 pt reaches the pick sheet's Select all and the end screen's Try it, without growing what shows (Codex sweep 3, a11y). */
+.phone :is(.pick-all, .review-try) { position: relative; }
+.phone :is(.pick-all, .review-try)::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: max(44px, 100%); transform: translateY(-50%); }
 /* The rest of a source's small controls at 44pt too. A highlight's note field is a field, so it is that tall. */
 .phone .popup .field { min-height: 44px; }
 /* The links under a question in Collected: 44pt tall, their text still just under the question, the room below it. */

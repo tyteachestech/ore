@@ -351,12 +351,14 @@ function Fold({ id, title, icon: I, tone, summary, summaryFolded = false, menu, 
 
 
 
-/** `ore stats --skill`: the D23 numbers, strength and its growth line, loaded once for the page. */
+/** `ore stats --skill`: the D23 numbers, strength and its growth line, read again when the library changes under the
+ *  open page (an exercise retired in Review over it). */
 function useStats(skill: string): SkillStats | null {
   const [s, setS] = useState<SkillStats | null>(null);
+  const changes = useLibraryChanges();
+  useEffect(() => setS(null), [skill]);
   useEffect(() => {
     let live = true;
-    setS(null);
     ore<SkillStats[]>("stats", opt("skill", skill)).then(
       (r) => live && setS(r[0] ?? null),
       () => live && setS(null),
@@ -364,7 +366,7 @@ function useStats(skill: string): SkillStats | null {
     return () => {
       live = false;
     };
-  }, [skill]);
+  }, [skill, changes]);
   return s;
 }
 

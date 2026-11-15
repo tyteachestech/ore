@@ -16,7 +16,7 @@ import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, searchFields, pinBetween, oreJob, opt, PHONE, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, searchFields, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
@@ -1693,9 +1693,14 @@ export function App() {
   /** Puts `k` on each of these sources, or takes it off, each keeping its other skills. */
   const fileItems = (sel: Item[], what: string, k: Skill, on: boolean) => {
     const next = (i: Item) => (on ? [...new Set([...i.skills, k.id])] : i.skills.filter((s) => s !== k.id));
+    // What each source's exercises were filed under before, so Undo puts each one back as it was.
+    const was = new Map<string, CardSkills | undefined>();
     batch(
       on ? `Filed ${what} under ${k.name}` : `Removed ${what} from ${k.name}`,
-      (i, f) => ore("edit", i.id, "--skills", (f ? next(i) : i.skills).join(",")),
+      (i, f) =>
+        f
+          ? ore<{ cards_before?: CardSkills }>("edit", i.id, "--skills", next(i).join(",")).then((r) => void was.set(i.id, r?.cards_before))
+          : ore("edit", i.id, "--skills", i.skills.join(","), ...(was.get(i.id) ? [opt("cards", JSON.stringify(was.get(i.id)))] : [])),
       (i) => ({ ...i, skills: next(i) }),
       on && k.archived ? (forward) => (forward ? reloadSkills() : rearchive([k.id])) : undefined,
       sel,
@@ -1790,11 +1795,11 @@ export function App() {
 
   /** Files a source, or every lesson of a course, under exactly `next` skills (their cards follow):
    *  optimistic, with Undo back to `before`. */
-  const refile = async (what: { title: string; ids: Set<string>; write: (skills: string[]) => Promise<unknown> }, next: string[], before: string[], changed?: Skill, fromHistory = false) => {
+  const refile = async (what: { title: string; ids: Set<string>; write: (skills: string[], cards?: CardSkills) => Promise<unknown> }, next: string[], before: string[], changed?: Skill, fromHistory = false, cards?: CardSkills) => {
     setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: next } : i)) ?? all);
     // Filing under an archived skill brings it back (D173); Undo archives it again.
     const revived = next.filter((id) => !before.includes(id) && skills.some((s) => s.id === id && s.archived));
-    const write = what.write(next);
+    const write = what.write(next, cards);
     const slot = `refile:${[...what.ids].join(",")}`;
     // The step goes on the history at once, so ⌘Z pressed before the write lands still takes it back
     // (F20); its undo waits for the write first.
@@ -1802,7 +1807,8 @@ export function App() {
       ? notify(
           next.includes(changed.id) ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`,
           "info",
-          () => write.then(() => refile(what, before, next, undefined, true)).then(() => rearchive(revived)),
+          // Each exercise gets back its own skills, not every skill the source had (Codex sweep 3).
+          () => write.then((r) => refile(what, before, next, undefined, true, (r as { cards_before?: CardSkills } | undefined)?.cards_before)).then(() => rearchive(revived)),
           () => refile(what, next, before, undefined, true),
           undefined,
           undefined,
@@ -1823,7 +1829,7 @@ export function App() {
       if (next.some((id) => skills.some((s) => s.id === id && s.archived))) reloadSkills();
     }
   };
-  const sourceFiling = (item: Item) => ({ title: item.title, ids: new Set([item.id]), write: (ids: string[]) => ore("edit", item.id, "--skills", ids.join(",")) });
+  const sourceFiling = (item: Item) => ({ title: item.title, ids: new Set([item.id]), write: (ids: string[], cards?: CardSkills) => ore("edit", item.id, "--skills", ids.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : [])) });
   /** Files a source under a skill, or takes it off one, from its ⋯ menu. */
   const fileSource = (item: Item, k: Skill) => {
     const on = item.skills.includes(k.id);

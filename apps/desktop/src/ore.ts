@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { passageText } from "./text";
+import { wakeOpenScreens } from "./util";
 
 /** The iPhone build (`ORE_PHONE=1 vite build`, apps/phone). */
 export const PHONE = import.meta.env.VITE_PHONE === "1";
@@ -26,8 +27,15 @@ export const pullFromMac = async (): Promise<boolean> => (PHONE ? (await import(
 /** Runs `ore <args> --json` and returns the parsed output. */
 export const ore = <T,>(...args: string[]): Promise<T> => oreWith<T>(null, ...args);
 
-/** `ore` with `stdin` piped in (`ore diagram <item> <name> --set`). */
-export const oreWith = <T,>(stdin: string | null, ...args: string[]): Promise<T> => oreJob<T>(null, stdin, ...args);
+/** `ore` with `stdin` piped in (`ore diagram <item> <name> --set`). Once a write lands that takes something out of
+ *  what other screens count, or puts it back (a source archived, an exercise retired), every open screen reads again,
+ *  whichever screen made it: a skill page left open under Review or a list keeps no stale row or number (Codex sweep 3). */
+export const oreWith = <T,>(stdin: string | null, ...args: string[]): Promise<T> =>
+  oreJob<T>(null, stdin, ...args).then((r) => {
+    if (args[0] === "archive" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"))) wakeOpenScreens();
+    return r;
+  });
+
 
 /** `ore` run under the name `job`, which `cancelOre(job)` stops (Cancel on an add). */
 export async function oreJob<T>(job: string | null, stdin: string | null, ...args: string[]): Promise<T> {
@@ -342,6 +350,8 @@ export type CardHistory = { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; ne
 
 /** `ore grade`: a proposed rating (never logged by itself, D21) and one mark per rubric point, with the words
  *  of his answer that earned each covered one ("" for none; absent from a grade made before D141). */
+/** Each of a source's exercises and its skills, as `ore edit --skills` gave them before (cards_before): passed back as --cards for Undo. */
+export type CardSkills = Record<string, string[]>;
 export type Grade = { rating: 1 | 2 | 3 | 4; gaps: string[]; feedback: string; covered: boolean[]; evidence?: string[]; ai?: { vendor: string; model: string; prompt_version: string } };
 
 /** `ore session end` (D62). */

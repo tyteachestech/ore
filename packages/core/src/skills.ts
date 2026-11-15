@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import type * as YAMLLib from "yaml";
 import { z } from "zod";
 import { listCards, writeCardMeta } from "./cards.ts";
@@ -167,12 +168,15 @@ export const desiredRetention = (skillIds: string[], skills: Skill[]): number =>
 /** A new skill's id: its name's slug, numbered when another skill holds it ("C#" after "C++"). A name with
  *  no Latin letters or digits keeps its own letters ("日本語", "русский") instead of "untitled": the id names
  *  the skills/<id>/ folder and `ore:skill/<id>` links, and both take any letter. */
-const newSkillId = (skills: Skill[], name: string): string => {
+const newSkillId = (lib: Library, skills: Skill[], name: string): string => {
   const ascii = slugify(name);
   const own = name.normalize("NFC").toLowerCase().replace(/[^\p{L}\p{N}\p{M}]+/gu, "-").replace(/^-+|-+$/g, "");
   const base = ascii === "untitled" && own ? [...own].slice(0, 60).join("").replace(/-+$/, "") : ascii;
   let id = base;
-  for (let n = 2; skills.some((s) => s.id === id); n++) id = `${base}-${n}`;
+  // A deleted skill's note stays on disk (removeSkill), so its folder's id is taken too: a new skill of
+  // the same name starts with its own empty note (Codex sweep 3).
+  const taken = (id: string) => skills.some((s) => s.id === id) || existsSync(join(paths.skillNotes(lib), id));
+  for (let n = 2; taken(id); n++) id = `${base}-${n}`;
   return id;
 };
 
@@ -336,7 +340,7 @@ export async function addSkill(lib: Library, name: string, collection = ""): Pro
     const skills = parseSkillsFile(doc.toJSON()).file.skills;
     const existing = skills.find((s) => sameName(s.name, n));
     if (existing) throw new Error(`skill "${existing.name}" already exists`);
-    const id = newSkillId(skills, n);
+    const id = newSkillId(lib, skills, n);
     const c = collectionName(collection);
     const skill: Skill = { id, name: n, priority: NEW_SKILL_PRIORITY, ...(c ? { collection: c } : {}) };
     (doc.get("skills") as YAMLLib.YAMLSeq).add(doc.createNode(skill));
@@ -356,7 +360,7 @@ export async function acceptSuggestedSkill(lib: Library, ref: string): Promise<{
     let skill = matchSkill(skills, s.name);
     const created = !skill;
     if (!skill) {
-      skill = { id: newSkillId(skills, s.name), name: s.name, priority: NEW_SKILL_PRIORITY, ...(s.hook ? { hook: s.hook } : {}) };
+      skill = { id: newSkillId(lib, skills, s.name), name: s.name, priority: NEW_SKILL_PRIORITY, ...(s.hook ? { hook: s.hook } : {}) };
       const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
       (doc.get("skills") as YAMLLib.YAMLSeq).add(doc.createNode(skill));
       writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
@@ -432,9 +436,17 @@ export function checkSkills(lib: Library, ids: string[]): void {
   if (unknown) throw new Error(`unknown skill "${unknown}"`);
 }
 
-export async function setItemSkills(lib: Library, ref: string, ids: string[]): Promise<ItemMeta> {
+/** Each of a source's cards and its skills: what `setItemSkills` takes back to put them as they were (Undo). */
+export function itemCardSkills(lib: Library, itemId: string): Record<string, string[]> {
+  return Object.fromEntries(listCards(lib).filter((c) => c.meta.item === itemId).map((c) => [c.meta.id, c.meta.skills]));
+}
+
+/** Files a source under exactly `ids`; its cards and topics follow (a card gains each added skill and
+ *  loses each removed one). `cards` (an Undo, from `itemCardSkills` taken before) puts each card listed
+ *  back to exactly its skills instead, so a card that never had an added skill doesn't gain it. */
+export async function setItemSkills(lib: Library, ref: string, ids: string[], cards?: Record<string, string[]>): Promise<ItemMeta> {
   return withLock(paths.lock(lib), () => {
-    checkSkills(lib, ids);
+    checkSkills(lib, [...ids, ...Object.values(cards ?? {}).flat()]);
     const item = findItem(lib, ref);
     const next = [...new Set(ids)];
     const added = next.filter((id) => !item.meta.skills.includes(id));
@@ -443,7 +455,7 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[]): P
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
     unarchiveFiled(lib, added);
     for (const c of listCards(lib).filter((c) => c.meta.item === meta.id)) {
-      const skills = [...new Set([...c.meta.skills.filter((s) => !removed.includes(s)), ...added])];
+      const skills = cards?.[c.meta.id] ?? [...new Set([...c.meta.skills.filter((s) => !removed.includes(s)), ...added])];
       if (skills.join() !== c.meta.skills.join()) writeCardMeta(c, { ...c.meta, skills });
     }
     for (const t of meta.topics.map((slug) => readTopic(lib, slug)))

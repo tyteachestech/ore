@@ -33,6 +33,7 @@ export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: 
     } catch (e) {
       setError(errorText(e));
       setBusy(false);
+      field.current?.focus(); // back on the link he can fix, as the Mac's Add does (Codex sweep 3, a11y)
     }
   };
   // A file or a photo instead: iOS's own picker (Photo Library, Take Photo, Choose Files), as Notes' attach is.
@@ -63,11 +64,13 @@ export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: 
             enterKeyHint="go"
             placeholder="Paste a link"
             aria-label="Link"
+            aria-invalid={!!error}
+            aria-describedby={error ? "add-link-error" : undefined}
             value={url}
             readOnly={busy}
             onChange={(e) => (setUrl(e.target.value), setError(null))}
           />
-          {error && <p className="phone-error">{error}</p>}
+          {error && <p className="phone-error" id="add-link-error" role="alert">{error}</p>}
           <button className="pill-btn" type="submit" disabled={!url.trim() || busy}>
             Add
           </button>

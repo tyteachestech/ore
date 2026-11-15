@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { findCard, writeNewCard } from "../src/cards.ts";
 import { createItem, findItem, renameItem, setItemAuthor } from "../src/items.ts";
-import { addSkill, setItemSkills } from "../src/skills.ts";
+import { addSkill, itemCardSkills, setItemSkills } from "../src/skills.ts";
 import { tempLibrary } from "./helpers.ts";
 
 describe("editing a source", () => {
@@ -32,5 +32,18 @@ describe("editing a source", () => {
     expect(setItemSkills(lib, meta.id, ["nope"])).rejects.toThrow('unknown skill "nope"');
     expect((await setItemSkills(lib, meta.id, [])).skills).toEqual([]);
     expect(findCard(lib, card.meta.id).meta.skills).toEqual(["other"]);
+  });
+
+  test("Undo of a filing puts each card back to its own skills (Codex sweep 3, lifecycle)", async () => {
+    const lib = await tempLibrary();
+    const { meta } = await createItem(lib, { type: "markdown", title: "S", body: "Text.\n", skills: ["learning", "teaching"] }); // starter skills
+    const fact = writeNewCard(lib, { kind: "card", item: meta.id, skills: ["learning"], topics: [], content_type: "fact", question: "Q?", answer: "A", rubric: [] });
+    const both = writeNewCard(lib, { kind: "card", item: meta.id, skills: ["learning", "teaching"], topics: [], content_type: "fact", question: "Q2?", answer: "A", rubric: [] });
+    const before = itemCardSkills(lib, meta.id);
+    await setItemSkills(lib, meta.id, ["learning"]);
+    await setItemSkills(lib, meta.id, ["learning", "teaching"], before);
+    expect(findCard(lib, fact.meta.id).meta.skills).toEqual(["learning"]);
+    expect(findCard(lib, both.meta.id).meta.skills).toEqual(["learning", "teaching"]);
+    expect(setItemSkills(lib, meta.id, ["learning"], { [fact.meta.id]: ["nope"] })).rejects.toThrow('unknown skill "nope"');
   });
 });

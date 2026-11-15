@@ -48,7 +48,7 @@ export function gemPast(reviews: Pick<Review, "variant" | "rating" | "state_afte
 
 /** A skill's strength (D62, D63). `solid`: live cards with stability of 21 days or more. `growing`:
  *  live, not solid yet. `ready`: growing cards that turn solid if he recalls them (Good) at their
- *  next review, the near goal beside the level (D90); `ready_today`: those due by the end of today. `new`: drafts not reviewed yet. `win_back`: once solid, now below.
+ *  next review (now, for one already overdue), the near goal beside the level (D90); `ready_today`: those due by the end of today. `new`: drafts not reviewed yet. `win_back`: once solid, now below.
  *  `level` comes from the most solid memories the skill ever had (`peak`), so it never drops.
  *  `explain`: his solid Explain cards, the latest to turn solid first.
  *  Gem grades (D197), each solid gem counted once: `polished` he has passed on a new case (a remix, D66);
@@ -72,7 +72,8 @@ export interface Strength {
 
 export function strength(cards: CardRow[], reviews: Review[], skill: string, w?: number[], now = new Date()): Strength {
   const mine = cards.filter((c) => c.state !== "retired" && c.skills.includes(skill));
-  const ids = new Set(mine.map((c) => c.id));
+  // The peak counts retired exercises too: a level, once earned, never drops (D63).
+  const ids = new Set(cards.filter((c) => c.skills.includes(skill)).map((c) => c.id));
   const stab = new Map<string, number>();
   const solidAt = new Map<string, string>();
   const wasSolid = new Set<string>();
@@ -96,7 +97,7 @@ export function strength(cards: CardRow[], reviews: Review[], skill: string, w?:
   const isSolid = (c: CardRow) => (c.fsrs?.stability ?? 0) >= SOLID_DAYS;
   const solid = live.filter(isSolid);
   const top = Math.max(peak, solid.length);
-  const ready = live.filter((c) => c.fsrs && !isSolid(c) && nextState(c.fsrs, new Date(c.fsrs.due), 3, c.retention, w).stability >= SOLID_DAYS);
+  const ready = live.filter((c) => c.fsrs && !isSolid(c) && nextState(c.fsrs, new Date(Math.max(Date.parse(c.fsrs.due), now.getTime())), 3, c.retention, w).stability >= SOLID_DAYS);
   const tonight = new Date(now);
   tonight.setHours(24, 0, 0, 0);
   return {
