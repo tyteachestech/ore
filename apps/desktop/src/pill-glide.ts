@@ -1,4 +1,4 @@
-/** The pill of a segmented control glides from the old choice to the new one when he clicks (D-new-pill-glide),
+/** The pill of a segmented control glides from the old choice to the new one when he clicks (D306),
  *  as Linear's and Raycast's segmented controls do. Only for a click: a key press, or a change made elsewhere,
  *  lands at once (keys never animate, D185). A ghost of the pill moves; the real one shows once it lands. */
 const GROUP = ".seg, .side-tabs";

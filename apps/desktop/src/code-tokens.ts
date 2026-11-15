@@ -1,4 +1,4 @@
-/** What a piece of code is, as far as its colour goes (D-new-code-blocks): five quiet tones, enough to
+/** What a piece of code is, as far as its colour goes (D300): five quiet tones, enough to
  *  tell a comment from a string from a keyword, no more. */
 export const KINDS = ["comment", "keyword", "string", "number", "name"] as const;
 export type Kind = (typeof KINDS)[number];

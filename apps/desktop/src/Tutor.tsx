@@ -79,7 +79,7 @@ type Reply = { reply: string; citations: AnyCitation[]; general: boolean; hint: 
 /** What he has typed and not sent yet, with the @-mentions in it. */
 /** `cases`: what he has written under a tell-apart exercise's two cases, not yet sent, and the turn that asked. */
 /** `files`: what he has attached to the message he is writing (D189). */
-export type TutorDraft = { input: string; mentions: Mention[]; files?: ChatFile[]; cases?: { turn: TutorTurn["id"]; said: string[] }; /** The message he sent while a reply was still being written (D-new-queued-message): it goes when that reply lands. */ queued?: { turn: Omit<TutorTurn, "id" | "pointed">; page: Mention[] } };
+export type TutorDraft = { input: string; mentions: Mention[]; files?: ChatFile[]; cases?: { turn: TutorTurn["id"]; said: string[] }; /** The message he sent while a reply was still being written (D301): it goes when that reply lands. */ queued?: { turn: Omit<TutorTurn, "id" | "pointed">; page: Mention[] } };
 export type TutorChat = ReturnType<typeof useTutorChat>;
 
 /** A file attached to a message (D189): its name, its path from the library's root, and what it is. */
@@ -829,7 +829,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
           );
         })}
         {chat.draft.queued && (
-          // What he sent while the reply above was being written (D-new-queued-message): his bubble, quieter,
+          // What he sent while the reply above was being written (D301): his bubble, quieter,
           // saying when it goes; the pencil puts it back in the field to change or drop.
           <div className="ask-queued">
             <p className="ask-me">

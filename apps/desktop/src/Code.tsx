@@ -46,7 +46,7 @@ function colour(code: HTMLElement, lang: string, live: () => boolean) {
   }, () => {});
 }
 
-/** A code block in a source or a tutor reply, as GitHub and Linear draw one (D-new-code-blocks): its
+/** A code block in a source or a tutor reply, as GitHub and Linear draw one (D300): its
  *  parts coloured by kind when its fence names a language, and on hover that language's name and Copy.
  *  The button holds no text and the name is drawn by CSS, so neither is part of the source's words. */
 export function CodeBlock({ children }: { children?: ReactNode }) {

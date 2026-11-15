@@ -385,7 +385,7 @@ export function setSidebarShown(width: number) {
  *  remembered under `key`; double-click resets it (D44). A right-hand panel is measured from its right
  *  edge and gives back what a wider sidebar takes; the sidebar (`left`) from the window's left. The width
  *  he chose is kept: a narrow window only clamps what is shown, so it comes back when the window widens. */
-/** How far under its narrowest a panel's edge is dragged before letting go folds the panel away (D-new-drag-fold):
+/** How far under its narrowest a panel's edge is dragged before letting go folds the panel away (D304):
  *  half its narrowest, as VS Code and Linear fold a sidebar. */
 export const foldsAt = (min: number) => min / 2;
 

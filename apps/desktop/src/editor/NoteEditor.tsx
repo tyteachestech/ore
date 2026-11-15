@@ -1316,7 +1316,7 @@ function useMenuPlace(box: { current: HTMLDivElement | null }, view: () => Edito
     const v = view();
     if (!opened || !el || !v || PHONE) return;
     Object.assign(el.style, { left: "0px", top: "0px", maxHeight: "none" });
-    // Never taller than MENU_MAX (D-new-slash-menu): 22 blocks ran to the window's bottom edge; now it scrolls.
+    // Never taller than MENU_MAX (D303): 22 blocks ran to the window's bottom edge; now it scrolls.
     size.current = { width: el.offsetWidth, height: Math.min(el.offsetHeight, MENU_MAX) };
     place.current = () => {
       const m = latest.current;

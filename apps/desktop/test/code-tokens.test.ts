@@ -5,7 +5,7 @@ import { languageOf, tokens } from "../src/code-tokens";
 const low = createLowlight(common);
 const kinds = (lang: string, code: string) => tokens(low.highlight(lang, code)).map((t) => `${t.kind}:${code.slice(t.from, t.to)}`);
 
-describe("code in a source is coloured by what each part is (D-new-code-blocks)", () => {
+describe("code in a source is coloured by what each part is (D300)", () => {
   test("a keyword, a name, a string, a number and a comment each get their kind, by offsets into the text", () => {
     const got = kinds("python", 'def area(r):\n    # circle\n    return 3.14 * r, "ok"\n');
     expect(got).toContain("keyword:def");

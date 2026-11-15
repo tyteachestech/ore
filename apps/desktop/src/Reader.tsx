@@ -1377,7 +1377,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   // Opening the source note puts the caret in it; closing writes what is pending.
   /** A PDF's own file, for the Original tab (D202); any other source has only the two tabs. */
   const pdf = doc?.source_file && /\.pdf$/i.test(doc.source_file) ? doc.source_file : null;
-  /** A PowerPoint deck's own file: its Original tab shows the slide (D-new-deck-original). */
+  /** A PowerPoint deck's own file: its Original tab shows the slide (D307). */
   const deck = doc?.source_file && /\.pptx$/i.test(doc.source_file) ? doc.source_file : null;
   const sideTab: SideTab = p.sideTab === "original" && !pdf && !deck ? "note" : p.sideTab;
   const notesShown = p.notesOpen && !closedBook && sideTab === "note";

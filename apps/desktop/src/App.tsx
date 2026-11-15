@@ -297,7 +297,7 @@ export function App() {
   const [hideSidebar, setHideSidebar] = useState(() => load("ore.sidebar") === "collapsed");
   // Its edge drags it from 180 (the title bar's buttons and a short skill name still fit) to 360, or 40% of a
   // narrow window so the content keeps its room (D44, D193). Everything sized off the sidebar reads --sidebar.
-  /** Set once toggleSidebar exists below: the sidebar's edge dragged past its narrowest hides it (D-new-drag-fold). */
+  /** Set once toggleSidebar exists below: the sidebar's edge dragged past its narrowest hides it (D304). */
   const foldSidebar = useRef<() => void>(undefined);
   const sideWidth = useSideWidth("ore.sidebarwidth", 216, 180, { left: true, share: 0.4, cap: 360, fold: () => foldSidebar.current?.() });
   useLayoutEffect(() => document.documentElement.style.setProperty("--sidebar", `${sideWidth.width}px`), [sideWidth.width]);

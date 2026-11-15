@@ -773,7 +773,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .doc code { font-family: var(--mono); font-size: 0.86em; background: var(--bg-raised); border-radius: 4px; padding: 1px 4px; }
 .doc pre { background: var(--bg-raised); padding: 12px 14px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
 .doc pre code { background: none; padding: 0; }
-/* A code block (D-new-code-blocks, Code.tsx; GitHub's and Linear's): the code scrolls sideways inside the
+/* A code block (D300, Code.tsx; GitHub's and Linear's): the code scrolls sideways inside the
    block, so Copy and the language's name stay at its top right; both show on hover or when Copy has focus.
    Its parts take five quiet tones through CSS Custom Highlights, the text itself left unwrapped. */
 .code-block { position: relative; }
@@ -817,7 +817,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .figure-tip { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); color: var(--faint); font-family: var(--mono); font-size: 11px; pointer-events: none; }
 .doc hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
 /* A long table scrolls in its own box, no taller than most of the window, so its header row and first column stay
-   in view while he reads down or across it (D-new-table-heads; Notion's and Airtable's frozen header and first column).
+   in view while he reads down or across it (D305; Notion's and Airtable's frozen header and first column).
    Sticky cells are drawn opaque, and their rules as shadows, since a collapsed border scrolls away under them. */
 .doc table { border-collapse: separate; border-spacing: 0; font-size: 0.92em; display: block; overflow: auto; max-height: 70vh; overscroll-behavior: auto; }
 .doc th, .doc td { border: 0; box-shadow: inset -1px -1px 0 var(--border); padding: 4px 8px; background: var(--bg); }
@@ -1202,7 +1202,7 @@ body.resizing iframe { pointer-events: none; }
 .mynotes .divider::after { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 1px; background: transparent; transition: background var(--t-1) ease-out; }
 .mynotes .divider:hover::after, .mynotes.dragging .divider::after { background: var(--accent); }
 .mynotes.dragging { user-select: none; -webkit-user-select: none; cursor: col-resize; }
-/* Dragged past its narrowest: what letting go will hide shows dimmed (D-new-drag-fold, VS Code and Linear). */
+/* Dragged past its narrowest: what letting go will hide shows dimmed (D304, VS Code and Linear). */
 .app.folding .sidebar > *, .mynotes.folding > :not(.divider) { opacity: 0.35; transition: opacity var(--t-1) var(--ease-out); }
 .mynotes-head { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px; flex: none; }
 .mynotes-head h2 { margin: 0; font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -2135,7 +2135,7 @@ button.home-plan:hover { color: var(--text); }
 .seg-item[data-state="on"], .side-tabs button[aria-selected="true"], .intents .intent.on { background: var(--bg-hover); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), var(--lift); }
 .intents .intent:not(.on):hover { background: none; }
 .seg-item:focus-visible, .side-tabs button:focus-visible { outline: none; color: var(--text); box-shadow: inset 0 0 0 2px var(--focus); }
-/* The pill gliding to a clicked choice (D-new-pill-glide, pill-glide.ts): a ghost under the labels; the real pill shows once it lands. */
+/* The pill gliding to a clicked choice (D306, pill-glide.ts): a ghost under the labels; the real pill shows once it lands. */
 .seg, .side-tabs { position: relative; }
 .seg-item, .side-tabs button { position: relative; z-index: 1; }
 .seg-ghost { position: absolute; z-index: 0; pointer-events: none; }
@@ -3410,7 +3410,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .ask-edit-btn { position: absolute; right: 100%; top: 50%; translate: 0 -50%; margin-right: 2px; opacity: 0; }
 .ask-me:hover .ask-edit-btn, .ask-edit-btn:focus-visible { opacity: 1; }
 .ask-edit-btn:hover { color: var(--text); background: var(--bg-hover); }
-/* A message waiting for the reply being written (D-new-queued-message): his bubble at 0.6, and when it goes. */
+/* A message waiting for the reply being written (D301): his bubble at 0.6, and when it goes. */
 .ask-queued { align-self: flex-end; max-width: 80%; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .ask-queued .ask-me { max-width: 100%; opacity: 0.6; }
 .ask-queued .ask-me:hover, .ask-queued .ask-me:focus-within { opacity: 1; }

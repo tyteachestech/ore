@@ -5,7 +5,7 @@ import { Hint } from "./Hint";
 import { CaretLeft, CaretRight } from "./icons";
 import { Working } from "./Working";
 
-/** The Original tab for a PowerPoint deck (D-new-deck-original): the slide itself, as PowerPoint lays it out,
+/** The Original tab for a PowerPoint deck (D307): the slide itself, as PowerPoint lays it out,
  *  beside the text Ore read from it. `slide` is the slide being read and the tab follows it; ‹ › look at another,
  *  until the reading moves to a new slide (as the PDF's pages do, D202). Drawn by Dice UI's `pptx` (Apache-2.0),
  *  read-only, and loaded only when the tab opens: it is a chunk of its own. */

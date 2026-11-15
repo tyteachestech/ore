@@ -10739,7 +10739,7 @@ journey("sidebar: its edge drags to resize between a min and a max, Esc puts it 
   await drag(1000);
   await settle("it stops at its max (360 in a 1280 window)", 360);
   await drag(120);
-  await settle("it stops at its min (180), short of where it folds (D-new-drag-fold)", 180);
+  await settle("it stops at its min (180), short of where it folds (D304)", 180);
   const sideways = await side.evaluate((n) => n.scrollWidth - n.clientWidth);
   if (sideways > 0) throw new Error(`at its min the sidebar scrolls ${sideways}px sideways`);
   await drag(300);
@@ -13426,7 +13426,7 @@ journey("a source that fails to open says why and offers Try again, which opens 
   await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
 });
 
-journey("code in a source: its parts are coloured without rewrapping the text, Copy puts the code on the clipboard, and a highlight across it still lands (D-new-code-blocks)", async (page) => {
+journey("code in a source: its parts are coloured without rewrapping the text, Copy puts the code on the clipboard, and a highlight across it still lands (D300)", async (page) => {
   const dir = mkdtempSync(join(tmpdir(), "ore-code-"));
   const file = join(dir, "code.md");
   const code = 'def area(r):\n    # circle\n    return 3.14 * r, "ok"';
@@ -13454,7 +13454,7 @@ journey("code in a source: its parts are coloured without rewrapping the text, C
   }
 });
 
-journey("tutor: a message sent while a reply is being written waits, goes when the reply lands, and comes back to the field if he edits it or stops the reply (D-new-queued-message)", async (page) => {
+journey("tutor: a message sent while a reply is being written waits, goes when the reply lands, and comes back to the field if he edits it or stops the reply (D301)", async (page) => {
   const held: (() => void)[] = [];
   const asked: string[] = [];
   await page.route(/\/ore$/, async (route) => {
@@ -13505,7 +13505,7 @@ journey("tutor: a message sent while a reply is being written waits, goes when t
   await page.keyboard.press("Escape");
 });
 
-journey("⌘K: Tab on a source steps into what can be done with it, typing narrows the actions, ↵ runs one, and Esc steps back out (D-new-palette-actions)", async (page) => {
+journey("⌘K: Tab on a source steps into what can be done with it, typing narrows the actions, ↵ runs one, and Esc steps back out (D302)", async (page) => {
   await page.keyboard.press("Meta+k");
   const input = page.getByPlaceholder("Search sources or run a command…");
   await input.waitFor();
@@ -13532,7 +13532,7 @@ journey("⌘K: Tab on a source steps into what can be done with it, typing narro
   await until("⌘Z puts it back in To read", async () => !((await ore("ls", "--status=done")) as { title: string }[]).some((i) => i.title === TESTING));
 });
 
-journey("note / menu: its blocks sit under Text, Toggles, Insert and Link with a picture each, it is never taller than ten rows, and a search lists matches flat (D-new-slash-menu)", async (page) => {
+journey("note / menu: its blocks sit under Text, Toggles, Insert and Link with a picture each, it is never taller than ten rows, and a search lists matches flat (D303)", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   const menu = page.locator(".note-menu");
   await openSource(page, AGENTS);
@@ -13560,7 +13560,7 @@ journey("note / menu: its blocks sit under Text, Toggles, Insert and Link with a
   for (let i = 0; i < 4; i++) await page.keyboard.press("Backspace");
 });
 
-journey("sidebar and side panel: an edge dragged past half its narrowest dims what it will hide, and letting go hides it; it comes back at the width it had (D-new-drag-fold)", async (page) => {
+journey("sidebar and side panel: an edge dragged past half its narrowest dims what it will hide, and letting go hides it; it comes back at the width it had (D304)", async (page) => {
   const side = page.locator("nav.sidebar");
   /** Presses `edge`, drags it to `x`, checks the dimmed look there, then lets go (or presses Esc first). */
   const drag = async (edge: Locator, x: number, dim: string, esc = false) => {
@@ -13594,7 +13594,7 @@ journey("sidebar and side panel: an edge dragged past half its narrowest dims wh
   await until("opened again, the panel has its old width", async () => (await panel.count()) > 0 && Math.abs((await panel.boundingBox())!.width - wide) <= 2);
 });
 
-journey("a long table keeps its header row in view down it and its first column across it, inside its own box (D-new-table-heads)", async (page) => {
+journey("a long table keeps its header row in view down it and its first column across it, inside its own box (D305)", async (page) => {
   const dir = mkdtempSync(join(tmpdir(), "ore-table-"));
   const file = join(dir, "table.md");
   const cols = ["Element", "Symbol", "Number", "Mass", "Group", "Period", "Block", "Discovered", "Named for"];
@@ -13625,7 +13625,7 @@ journey("a long table keeps its header row in view down it and its first column 
   }
 });
 
-journey("side panel tabs: a click glides the pill to the new tab, a key moves it at once (D-new-pill-glide)", async (page) => {
+journey("side panel tabs: a click glides the pill to the new tab, a key moves it at once (D306)", async (page) => {
   await openSource(page, AGENTS);
   const tabs = page.locator(".side-tabs");
   await tabs.waitFor();
@@ -13647,7 +13647,7 @@ journey("side panel tabs: a click glides the pill to the new tab, a key moves it
   if (await page.locator(".seg-ghost").count()) throw new Error("a key glided the pill: keys land at once");
 });
 
-journey("original: a PowerPoint deck's Original tab shows the slide itself, follows the slide being read, and ‹ › turn to another (D-new-deck-original)", async (page) => {
+journey("original: a PowerPoint deck's Original tab shows the slide itself, follows the slide being read, and ‹ › turn to another (D307)", async (page) => {
   const made = (await ore("add", join(FIXTURES, "deck.pptx"), "--no-enrich")) as { id: string };
   const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
   try {

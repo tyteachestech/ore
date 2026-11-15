@@ -29,7 +29,7 @@ type Props = {
   onOpen: (item: string, at?: string) => void;
   /** Ask your library: the query as a question to his sources. Left out on the phone (AI runs on the Mac). */
   onAsk?: (question: string) => void;
-  /** What can be done with a source, for its row's action page (Tab on the row, D-new-palette-actions). */
+  /** What can be done with a source, for its row's action page (Tab on the row, D302). */
   sourceActions?: (id: string) => Action[];
   /** A skill made from the palette (New skill, New collection). */
   onCreated: (s: Skill) => void;
