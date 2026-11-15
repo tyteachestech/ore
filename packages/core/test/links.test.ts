@@ -5,6 +5,7 @@ import { openIndex } from "../src/db.ts";
 import { doctor } from "../src/doctor.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { backlinks, brokenLinks, linkUrl, parseLinks } from "../src/links.ts";
+import { removeSkill, restoreSkill } from "../src/skills.ts";
 import { appendNote, attachToNote, getNotes, setNotes, skillNotesPath } from "../src/notes.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -69,6 +70,18 @@ describe("backlinks (D39)", () => {
     await setNotes(lib, b.id, `## Setup\n\n${code}\n\nThen [spacing](ore:item/${a.id}).\n`);
     expect(backlinks(lib, { kind: "item", id: a.id })).toEqual([{ from: { kind: "item", id: b.id, title: b.title }, heading: "Setup", line: "Then spacing." }]);
     expect(brokenLinks(lib)).toEqual([]);
+  });
+
+  test("a deleted skill's kept note is no backlink: it can't be opened from the list (Codex sweep 5)", async () => {
+    const { lib, a } = await setup();
+    await setNotes(lib, { skill: "teaching" }, `See [spacing](ore:item/${a.id}).\n`);
+    expect(backlinks(lib, { kind: "item", id: a.id }).map((l) => l.from.id)).toEqual(["teaching"]);
+    const { removed } = await removeSkill(lib, "teaching");
+    expect(backlinks(lib, { kind: "item", id: a.id })).toEqual([]);
+    // The note stays on disk, and its link is back once the skill is.
+    expect(existsSync(skillNotesPath(lib, "teaching"))).toBe(true);
+    await restoreSkill(lib, removed);
+    expect(backlinks(lib, { kind: "item", id: a.id }).map((l) => l.from.title)).toEqual(["Teaching"]);
   });
 
   test("doctor reports links that no longer resolve", async () => {

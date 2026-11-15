@@ -4,6 +4,7 @@ import * as Popover from "@radix-ui/react-popover";
 import * as Slider from "@radix-ui/react-slider";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react";
 import { Hint } from "./Hint";
+import { Working } from "./Working";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { load, save } from "./util";
 import { clampRate, MAX_RATE, MIN_RATE, PRESETS, snapRate } from "./rate";
@@ -40,11 +41,16 @@ export type Player = {
   seek: (t: number) => void;
   skip: (by: number) => void;
   setRate: (r: number) => void;
+  /** A recording's file asked for again, after it never came (error -3). */
+  retry?: () => void;
 };
 
 /** Where a source's video picks up next time: where he stopped, or the start once it played to the
  *  end (YouTube's own resume), so a finished video reopens at 0, paused. */
 export const resumeAt = (t: number, duration: number, ended: boolean) => (ended || (duration > 0 && t >= duration - 1) ? 0 : Math.floor(t));
+
+/** How long a player waits for its video or file before it says it hasn't come. */
+const LOAD_WAIT = 15000;
 
 /** One player per source; the position is saved per source and the rate once for all (D50). */
 export function useYouTube(video: string | undefined, id: string): Player {
@@ -78,9 +84,11 @@ export function useYouTube(video: string | undefined, id: string): Player {
     frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func, args, id: 1, channel: "widget" }), origin);
   }, [origin]);
 
+  // Only with a video: on a recording this player sits idle beside the audio's, which shares its key, and
+  // saving its opening place would put a later one back (Codex sweep 5).
   const persist = useCallback(() => {
-    if (base.current.t > 0) save(posKey, String(resumeAt(time(), durationRef.current, state.current === 0)));
-  }, [posKey, time]);
+    if (video && base.current.t > 0) save(posKey, String(resumeAt(time(), durationRef.current, state.current === 0)));
+  }, [video, posKey, time]);
 
   useEffect(() => {
     if (video) invoke<number | null>("player_port").then((p) => (p ? setPort(p) : setError(-1)), () => setError(-1));
@@ -169,7 +177,7 @@ export function useYouTube(video: string | undefined, id: string): Player {
   // clears itself if the embed answers later.
   useEffect(() => {
     if (!video || !origin || ready) return;
-    const t = setTimeout(() => setError((e) => e ?? -2), 15000);
+    const t = setTimeout(() => setError((e) => e ?? -2), LOAD_WAIT);
     return () => clearTimeout(t);
   }, [video, origin, ready]);
 
@@ -255,9 +263,12 @@ export function useAudio(file: string | undefined, id: string): Player {
   const [elapsed, setElapsed] = useState(start);
   // A stamp clicked before the file's metadata is read: that is where it plays from, not the saved place.
   const moved = useRef(false);
+  /** Bumped by Try again: the file is asked for once more, on a new element. */
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     if (!file) return;
     moved.current = false;
+    setReady(false);
     setError(null); // another file (an episode's kept audio after its address failed) starts clean
     const a = new Audio(/^(https?:|data:|blob:)/i.test(file) ? file : convertFileSrc(file));
     a.preload = "metadata";
@@ -272,6 +283,7 @@ export function useAudio(file: string | undefined, id: string): Player {
         if (start && start < a.duration && !moved.current) a.currentTime = start;
         loaded = true;
         setReady(true);
+        setError((e) => (e === -3 ? null : e));
       },
       play: () => (setPlaying(true), setStarted(true), setEnded(false)),
       pause: () => (setPlaying(false), persist()),
@@ -283,14 +295,18 @@ export function useAudio(file: string | undefined, id: string): Player {
     for (const [k, f] of Object.entries(on)) a.addEventListener(k, f);
     // As a video's: saved every few seconds while it plays, so a quit or crash keeps the place.
     const every = setInterval(() => !a.paused && persist(), 5000);
+    // A file that never comes (a stalled disk or address) says so after a video's wait, with Try again (Codex sweep 5).
+    const late = setTimeout(() => !loaded && setError((e) => e ?? -3), LOAD_WAIT);
     return () => {
       clearInterval(every);
+      clearTimeout(late);
       persist();
       a.pause();
       for (const [k, f] of Object.entries(on)) a.removeEventListener(k, f);
       el.current = null;
     };
-  }, [file, posKey, start]);
+  }, [file, posKey, start, attempt]);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
   // Before the file is read (and no stamp moved it), it is at the saved place, though currentTime says 0.
   const time = useCallback(() => (el.current && (el.current.duration || moved.current) ? el.current.currentTime : start), [start]);
   const play = useCallback(() => void el.current?.play().catch(() => {}), []);
@@ -312,7 +328,19 @@ export function useAudio(file: string | undefined, id: string): Player {
     setRateState(next);
     save(RATE_KEY, String(next));
   }, []);
-  return { frame, src: "", ready, playing, started, ended, error, blocked: false, duration, rate, elapsed, time, toggle, play, seek, skip, setRate };
+  return { frame, src: "", ready, playing, started, ended, error, blocked: false, duration, rate, elapsed, time, toggle, play, seek, skip, setRate, retry };
+}
+
+/** True once `on` has held for `ms`. */
+function useAfter(on: boolean, ms: number) {
+  const [after, setAfter] = useState(false);
+  useEffect(() => {
+    setAfter(false);
+    if (!on) return;
+    const t = setTimeout(() => setAfter(true), ms);
+    return () => clearTimeout(t);
+  }, [on, ms]);
+  return after;
 }
 
 export function clock(sec: number): string {
@@ -406,10 +434,21 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ow
   const shown = scrub ?? player.elapsed;
   const total = player.duration;
   const off = !player.ready;
+  // Said only once the wait is long enough to see, so a file read at once never flashes it.
+  const loading = useAfter(audio && off && player.error === null, 500);
   return (
     <div className={`player${audio ? " audio" : ""}`} ref={box} style={size.fit && !audio ? { width: size.fit.width, marginLeft: size.fit.left } : undefined}>
       {audio ? (
-        player.error !== null && <div className="video-error">{owed ? "This episode won’t play here. Its transcript is on its way." : "This recording won’t play here. Its transcript is below."}</div>
+        player.error === -3 ? (
+          <div className="video-error">
+            The recording hasn’t loaded. Its transcript is below.
+            <button onClick={player.retry}>Try again</button>
+          </div>
+        ) : player.error !== null ? (
+          <div className="video-error">{owed ? "This episode won’t play here. Its transcript is on its way." : "This recording won’t play here. Its transcript is below."}</div>
+        ) : (
+          loading && <div className="video-error"><Working stage="read" label="Loading the recording…" /></div>
+        )
       ) : (
       <div className="video-frame">
         <iframe

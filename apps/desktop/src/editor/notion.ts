@@ -1,7 +1,7 @@
 import { InputRule, undoInputRule } from "@milkdown/kit/prose/inputrules";
 import { keydownHandler, keymap } from "@milkdown/kit/prose/keymap";
 import { lift, setBlockType } from "@milkdown/kit/prose/commands";
-import type { ResolvedPos } from "@milkdown/kit/prose/model";
+import { Fragment, type ResolvedPos, Slice } from "@milkdown/kit/prose/model";
 import { splitListItem } from "@milkdown/kit/prose/schema-list";
 import { type Command, type EditorState, NodeSelection, Plugin, TextSelection } from "@milkdown/kit/prose/state";
 import { Decoration, DecorationSet } from "@milkdown/kit/prose/view";
@@ -326,6 +326,52 @@ export const pasteLink = $prose(
       },
     }),
 );
+
+/** Rows of tab-separated cells, as a spreadsheet's plain text gives them: two or more lines, each with
+ *  the same number of tabs. Null for any other text. */
+export function tsvRows(text: string): string[][] | null {
+  const lines = text.replace(/\r\n?/g, "\n").replace(/\n+$/, "").split("\n");
+  const tabs = (l: string) => l.split("\t").length - 1;
+  if (lines.length < 2 || !tabs(lines[0]!) || lines.some((l) => tabs(l) !== tabs(lines[0]!))) return null;
+  // Every line starting with a tab is indentation (code, an outline), not a first column.
+  if (lines.every((l) => l.startsWith("\t"))) return null;
+  return lines.map((l) => l.split("\t").map((c) => c.trim()));
+}
+
+/** Plain text the Markdown paste would garble: tab-separated rows paste as a table (Notion, Google Docs),
+ *  and lines indented with tabs paste one block per line with their tabs kept, where Markdown would run
+ *  them together. Text with HTML beside it, and code blocks, keep their own paste. */
+export const pastePlain = $prose(
+  () =>
+    new Plugin({
+      props: {
+        handlePaste: (view, e) => {
+          const text = e.clipboardData?.getData("text/plain") ?? "";
+          const { schema, selection } = view.state;
+          if (!text.includes("\t") || e.clipboardData?.getData("text/html") || selection.$from.parent.type.spec.code) return false;
+          const n = schema.nodes;
+          const para = (t: string) => n.paragraph!.create(null, t ? schema.text(t) : null);
+          const rows = tsvRows(text);
+          if (rows && n.table && !inTable(selection.$from)) {
+            const row = (cells: string[], head: boolean) =>
+              (head ? n.table_header_row : n.table_row)!.create(null, cells.map((c) => (head ? n.table_header : n.table_cell)!.create({ alignment: null }, para(c))));
+            const table = n.table.create(null, rows.map((r, i) => row(r, i === 0)));
+            view.dispatch(view.state.tr.replaceSelectionWith(table).scrollIntoView());
+            return true;
+          }
+          if (!/^\t/m.test(text)) return false;
+          const lines = text.replace(/\r\n?/g, "\n").replace(/\n+$/, "").split("\n");
+          view.dispatch(view.state.tr.replaceSelection(new Slice(Fragment.from(lines.map(para)), 1, 1)).scrollIntoView());
+          return true;
+        },
+      },
+    }),
+);
+
+const inTable = ($p: ResolvedPos) => {
+  for (let d = $p.depth; d > 0; d--) if ($p.node(d).type.name === "table") return true;
+  return false;
+};
 
 /** What an empty block says while the caret is on it, as in Notion: the empty line that / turns, and
  *  the kind of an empty heading, list item, to-do, quote or toggle title. Shown only while the note

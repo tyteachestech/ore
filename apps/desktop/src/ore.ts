@@ -34,7 +34,8 @@ export const ore = <T,>(...args: string[]): Promise<T> => oreWith<T>(null, ...ar
 export const oreWith = <T,>(stdin: string | null, ...args: string[]): Promise<T> =>
   oreJob<T>(null, stdin, ...args).then((r) => {
     // A goal setting too (Codex sweep 4): Home, Today and an open Review count toward the new one, and so does its Undo.
-    if (args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"))) wakeOpenScreens();
+    // And a skill renamed, deleted or put back (Codex sweep 5): a note's Linked from names the skills that link to it.
+    if (args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore")) || (args[0] === "skills" && ["set", "rm", "restore", "archive"].includes(args[1]!))) wakeOpenScreens();
     return r;
   });
 

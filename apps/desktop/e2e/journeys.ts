@@ -2677,6 +2677,27 @@ journey("a recording plays in place: its player over the transcript, his highlig
   await until("Space pauses it", async () => (await player.getByRole("button", { name: "Play", exact: true }).count()) === 1);
 });
 
+journey("a recording whose file is slow says it is loading, and one that never comes says so with Try again (Codex sweep 5)", async (page) => {
+  // The recording's file is held: no bytes and no error, as a stalled disk or address gives.
+  const held: (() => Promise<void>)[] = [];
+  await page.route(/\/file\?p=.*\.wav/, (route) => void held.push(() => route.continue()));
+  await openSource(page, "Lecture 4");
+  const player = page.locator(".player.audio");
+  await player.getByText("Loading the recording…").waitFor();
+  await player.getByText("The recording hasn’t loaded. Its transcript is below.").waitFor({ timeout: 20_000 });
+  if (await player.getByText("Loading the recording…").count()) throw new Error("the loading line stayed beside the message");
+  // Try again asks for it once more, and waits again.
+  const asked = held.length;
+  await player.getByRole("button", { name: "Try again" }).click();
+  await player.getByText("Loading the recording…").waitFor();
+  await until("the file is asked for again", async () => held.length > asked);
+  // It comes: the player is ready and says nothing more.
+  await page.unroute(/\/file\?p=.*\.wav/);
+  for (const go of held.splice(0)) await go().catch(() => {});
+  await until("the recording loads and its length shows", async () => (await player.locator(".time").innerText()).includes("1:00"));
+  if (await player.locator(".video-error").count()) throw new Error("a message stayed once the recording loaded");
+});
+
 journey("a recording added from a file offers Reimport, and one that can't be heard again here keeps its transcript and highlights (F181)", async (page) => {
   await openSource(page, "Lecture 4");
   await page.locator(".player.audio").waitFor();
@@ -4738,6 +4759,31 @@ journey("a note's mail link opens Mail, a heading link goes to its heading, and 
     await page.locator(".toast", { hasText: "“beside.md” isn’t one of those" }).waitFor();
   } finally {
     await ore("notes", item, `--set=${was}`);
+  }
+});
+
+journey("Linked from: a linking skill renamed from the sidebar shows its new name at once, and its ⌘Z the old one (Codex sweep 5)", async (page) => {
+  const ore = (args: string[]) => page.evaluate((args) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<{ text: string }> } }).__TAURI_INTERNALS__.invoke("ore", { args }), args);
+  const was = (await ore(["notes", "--skill=habits"])).text;
+  await ore(["notes", "--skill=habits", `--set=${was}\n\nSee [Learning](ore:skill/learning) for the plan.`]);
+  try {
+    await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+    const from = page.locator(".linked-from .backlink .from");
+    const named = async (name: string) => (await from.allInnerTexts()).some((t) => t.startsWith(`${name} notes`));
+    await from.filter({ hasText: /^Habits notes/ }).waitFor();
+    await page.locator(".sidebar .side-item", { hasText: /^Habits$/ }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+    const dialog = page.getByRole("dialog", { name: "Edit skill Habits" });
+    await dialog.getByLabel("Rename Habits").fill("Habit loops");
+    await dialog.getByLabel("Rename Habits").press("Enter");
+    await dialog.waitFor({ state: "detached" });
+    await page.locator(".sidebar .side-item", { hasText: "Habit loops" }).first().waitFor();
+    await until("Linked from names the skill by its new name", () => named("Habit loops"));
+    await page.keyboard.press("Meta+z");
+    await page.locator(".sidebar .side-item", { hasText: /^Habits$/ }).first().waitFor();
+    await until("and by its old one after ⌘Z", () => named("Habits"));
+  } finally {
+    await ore(["notes", "--skill=habits", `--set=${was}`]);
   }
 });
 

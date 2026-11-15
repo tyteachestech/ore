@@ -339,6 +339,30 @@ describe("paste", () => {
     expect(await md("‸", { paste: "one\ntwo" })).toMatch(/^one\n\n?two$/);
   });
 
+  test("an Ore link keeps its destination through a Markdown paste and the editor's own copy", async () => {
+    const link = "[Learning](ore:skill/learning)";
+    expect(await md("‸", { paste: link })).toBe(link);
+    expect(await md("‸", { paste: `See ${link} and [a page](https://ore.app).` })).toBe(`See ${link} and [a page](https://ore.app).`);
+    // What ⌘C puts on the clipboard, pasted back as the browser would: its HTML.
+    const copied = await run(`‹See ${link} now.›`, [], (s, v) => v.serializeForClipboard(s.selection.content()).dom.innerHTML);
+    expect(await md("‸", { paste: copied.hint!, html: true })).toBe(`See ${link} now.`);
+    // A web page's own `data-ore-href` is no way to smuggle another scheme in.
+    expect(await md("‸", { paste: '<a href="" data-ore-href="javascript:alert(1)">x</a>', html: true })).not.toContain("javascript");
+  });
+
+  test("tab-separated rows (a spreadsheet's plain text) paste as a table; other tabs survive", async () => {
+    expect(await md("‸", { paste: "Term\tValue\tNotes\nChain\t2\tFixed stages\nAgent\t3\tDynamic choices" })).toBe(
+      "| Term  | Value | Notes           |\n| ----- | ----- | --------------- |\n| Chain | 2     | Fixed stages    |\n| Agent | 3     | Dynamic choices |",
+    );
+    // Lines indented with tabs keep their lines and their indentation.
+    const outline = await md("‸", { paste: "Plan\n\tClaim\n\t\tEvidence\nEnd" });
+    expect(outline.split("\n").filter(Boolean).map((l) => l.replace(/&#x9;|\t/g, "\t"))).toEqual(["Plan", "\tClaim", "\t\tEvidence", "End"]);
+    // Every line indented by one tab is indentation, not a table with an empty first column.
+    expect(await md("‸", { paste: "\tfoo\n\tbar" })).not.toContain("|");
+    // And reopen the same: a leading tab is saved as `&#x9;`, never read back as a code block.
+    expect(await md(outline)).toBe(outline);
+  });
+
   test("in a code block a paste stays code", async () => {
     expect(await md("```\n‸\n```", { paste: "# not a heading\n- x" })).toBe("```\n# not a heading\n- x\n```");
   });

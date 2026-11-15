@@ -70,11 +70,14 @@ export interface Backlink {
   line: string; // the line holding the link, links shown as text
 }
 
-// "Linked from" (D39): every line in another note that links to target, in note order.
+// "Linked from" (D39): every line in another note that links to target, in note order. A deleted skill's note
+// stays on disk but has no skill to open it from, so it is left out until the skill comes back.
 export function backlinks(lib: Library, target: LinkTarget): Backlink[] {
   const out: Backlink[] = [];
+  const skills = new Set(loadSkills(lib).skills.map((s) => s.id));
   for (const f of noteFiles(lib)) {
     if (f.from.kind === target.kind && f.from.id === target.id) continue;
+    if (f.from.kind === "skill" && !skills.has(f.from.id)) continue;
     let heading: string | null = null;
     for (const line of proseLines(readFileSync(f.path, "utf8"))) {
       const h = line.match(/^#{1,6}\s+(.*)$/);

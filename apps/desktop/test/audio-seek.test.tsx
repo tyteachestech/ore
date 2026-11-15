@@ -70,3 +70,21 @@ test("a skip before the metadata loads goes from the saved place", () => {
   expect(FakeAudio.last.currentTime).toBe(1510);
   act(() => root.unmount());
 });
+
+// Codex sweep 5: the reader holds a YouTube player for every source, idle on a recording, while the recording's
+// own player lives above it (App's, so it plays on across screens). Leaving, the idle one's cleanup saved the
+// place it read on opening over the recording's, so a second visit lost its progress.
+test("leaving a recording keeps where it got to, not where it opened", async () => {
+  const { useYouTube } = await import("../src/Video");
+  localStorage.setItem("ore.video.rec", "30");
+  let player: ReturnType<typeof useAudio> | undefined;
+  const Reader = () => (useYouTube(undefined, "rec"), null);
+  const App = ({ reading }: { reading: boolean }) => ((player = useAudio("data:audio/mpeg;base64,", "rec")), reading ? <Reader /> : null);
+  const root = createRoot(document.createElement("div"));
+  act(() => root.render(<App reading />));
+  act(() => FakeAudio.last.loaded(60));
+  act(() => player!.skip(-15));
+  act(() => root.render(<App reading={false} />));
+  expect(localStorage.getItem("ore.video.rec")).toBe("15");
+  act(() => root.unmount());
+});
