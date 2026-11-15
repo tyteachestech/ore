@@ -6,6 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type Pointer
 import { Hint } from "./Hint";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { load, save } from "./util";
+import { clampRate, MAX_RATE, MIN_RATE, PRESETS, snapRate } from "./rate";
 
 // The YouTube player for a video source (D48, D50), driven over the embed's postMessage protocol
 // (what YouTube's iframe_api script does, without loading a remote script into this webview).
@@ -13,11 +14,8 @@ import { load, save } from "./util";
 // (src-tauri/src/player.html): YouTube refuses tauri://localhost as an embedder (error 153).
 
 const RATE_KEY = "ore.video.rate";
-export const MIN_RATE = 0.5;
-export const MAX_RATE = 2;
-const PRESETS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+export { MAX_RATE, MIN_RATE };
 
-const clampRate = (r: number) => Math.min(MAX_RATE, Math.max(MIN_RATE, Math.round(r * 20) / 20));
 const savedRate = () => clampRate(Number(load(RATE_KEY)) || 1);
 
 export type Player = {
@@ -499,6 +497,8 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ow
 
 /** Eleven Reader's speed sheet as a popover: a fine slider plus presets, applied at once. */
 export function Speed({ rate, onRate }: { rate: number; onRate: (r: number) => void }) {
+  /** A drag snaps to the presets; the arrow keys step freely. */
+  const dragging = useRef(false);
   return (
     <Popover.Root>
       <Hint text="Playback speed" keys={["slower", "faster"]} side="top">
@@ -513,7 +513,17 @@ export function Speed({ rate, onRate }: { rate: number; onRate: (r: number) => v
           <div className="speed-head">
             Playback speed <b>{rateLabel(rate)}</b>
           </div>
-          <Slider.Root className="speed-slider" min={MIN_RATE} max={MAX_RATE} step={0.05} value={[rate]} onValueChange={([v]) => v && onRate(v)} aria-label="Playback speed">
+          <Slider.Root
+            className="speed-slider"
+            min={MIN_RATE}
+            max={MAX_RATE}
+            step={0.05}
+            value={[rate]}
+            onPointerDown={() => (dragging.current = true)}
+            onValueChange={([v]) => v && onRate(dragging.current ? snapRate(v) : v)}
+            onValueCommit={() => (dragging.current = false)}
+            aria-label="Playback speed"
+          >
             <Slider.Track className="scrub-track">
               <Slider.Range className="scrub-range" />
             </Slider.Track>
