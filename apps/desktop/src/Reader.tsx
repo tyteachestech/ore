@@ -35,7 +35,7 @@ import { citeQuote, citeSources, copyCited, type Cited } from "./cite";
 import { group, MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { findChapterEnds, Margin, type ChapterEnd, type MarginHandle } from "./Margin";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
-import { clickBelow, SidePanel, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
+import { clickBelow, SidePanel, SidePanelFrame, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
@@ -599,6 +599,8 @@ type LookUp = { word: string; range: Range; ann: string | null; top: number; lef
 
 type Props = {
   id: string;
+  /** What the row he opened it from already knows, drawn at once while the text is read (D-new-no-blank-pages). */
+  known?: { title: string; author?: string };
   /** A post open beside the Feed (D289): J and K open the next and previous post. */
   onStep?: (by: 1 | -1) => void;
   /** Just added with no skill (D109): the skill picker opens with the source. */
@@ -3187,8 +3189,23 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   if (!doc)
     return (
       <div className="reader">
-        {/* Shows only if opening takes a beat, so a quick open doesn't flash it. */}
-        <p className="loading reader-loading"><Working label="Opening…" /></p>
+        {/* Its title and author stand where they will be, from the row he clicked (Linear and Notion draw
+            the page's head before its body), so the open is never an empty pane. */}
+        <div className="reader-pane">
+        <div className="reader-scroll">
+          <div className="page">
+            {p.known && (
+              <header className="doc-head">
+                <h1>{p.known.title}</h1>
+                {p.known.author && <div className="chips"><span className="byline"><span className="by">{p.known.author}</span></span></div>}
+              </header>
+            )}
+            {/* Shows only if opening takes a beat, so a quick open doesn't flash it. */}
+            <p className="loading reader-loading"><Working label="Opening…" /></p>
+          </div>
+        </div>
+        </div>
+        {p.notesOpen && !PHONE && <SidePanelFrame />}
       </div>
     );
 

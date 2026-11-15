@@ -13389,6 +13389,28 @@ journey("all sources: a search that matches nothing offers Clear the search, and
   await row.waitFor();
 });
 
+journey("opening a source: its title stands at once where it will stay, the panel's place held, while the text is read; a relaunch shows the sidebar whole (D-new-no-blank-pages, F-new-sidebar-jump)", async (page) => {
+  type Slow = { __ORE_SLOW?: Record<string, number> };
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row").filter({ hasText: TESTING }).first();
+  await row.waitFor();
+  await page.evaluate(() => ((window as Slow).__ORE_SLOW = { show: 1500 }));
+  await row.click();
+  const early = page.locator(".reader .doc-head h1");
+  await early.waitFor({ timeout: 1000 });
+  if ((await early.innerText()) !== TESTING) throw new Error("the title is not drawn while the source opens");
+  const before = (await early.boundingBox())!;
+  await page.locator(".reader .doc").waitFor();
+  await page.evaluate(() => delete (window as Slow).__ORE_SLOW);
+  const after = (await page.locator(".reader .doc-head h1").boundingBox())!;
+  if (Math.abs(before.x - after.x) > 1 || Math.abs(before.y - after.y) > 1) throw new Error(`the title moved as the text arrived: ${before.x},${before.y} to ${after.x},${after.y}`);
+  // A relaunch: the skills answer late, and the sidebar already shows them with their icons.
+  await page.addInitScript(() => ((window as Slow).__ORE_SLOW = { skills: 1500 }));
+  await page.reload();
+  await page.locator(".sidebar .side-main .mark").first().waitFor({ timeout: 1000 });
+  await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().waitFor({ timeout: 1000 });
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);

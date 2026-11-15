@@ -63,6 +63,17 @@ import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth
 /** wry on macOS reports file-drop positions in CSS points (see dropPoint). */
 const MAC = navigator.userAgent.includes("Mac");
 
+const LAST_SKILLS = "ore.skills.last";
+/** The skills the sidebar showed last time, or none: only a stand-in until `ore skills` answers. */
+function lastSkills(): Skill[] {
+  try {
+    const all: unknown = JSON.parse(load(LAST_SKILLS) ?? "[]");
+    return Array.isArray(all) && all.every((s) => s && typeof s.id === "string" && typeof s.name === "string") ? (all as Skill[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 const TABS: { id: Tab; label: string; key: KeyId }[] = [
   { id: "toread", label: "To read", key: "go-toread" },
   { id: "done", label: "Done", key: "go-done" },
@@ -169,7 +180,9 @@ export function App() {
   useReminderAgent();
   const [items, setItems] = useState<Item[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
-  const [skills, setSkills] = useState<Skill[]>([]);
+  // The skills as last seen stand in until this launch's answer comes (D-new-no-blank-pages): the sidebar opens
+  // whole, where it used to open as three bare words and jump when the icons arrived (F-new-sidebar-jump).
+  const [skills, setSkills] = useState<Skill[]>(lastSkills);
   const [status, setStatus] = useState<Tab>(() => lastView().status);
   /** Archived sources, for the Archived tab. */
   const [archived, setArchived] = useState<Item[]>([]);
@@ -347,6 +360,7 @@ export function App() {
     loadSkills().then(
       (all) => {
         setSkills(all);
+        save(LAST_SKILLS, JSON.stringify(all));
         setSkill((k) => (k && !all.some((s) => s.id === k) ? null : k));
       },
       // Try again while `ore` is still down says so again in the same toast.
@@ -2395,6 +2409,7 @@ export function App() {
           <Reader
             key={openId}
             id={openId}
+            known={items?.find((i) => i.id === openId)}
             onStep={feedSplit ? (by) => {
               // The list holds the keys while the next post loads; the post takes them when it shows.
               document.querySelector<HTMLElement>(".feed-col .feed-list")?.focus({ preventScroll: true });
