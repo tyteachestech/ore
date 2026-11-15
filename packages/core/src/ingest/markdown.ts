@@ -1,9 +1,12 @@
 import TurndownService from "turndown";
+import { flattenRuby } from "./check.ts";
 
 // Plain HTML → Markdown (turndown, the converter Defuddle uses), without
 // Defuddle's article heuristics, which drop chapter headings and short chapters.
 export const td = new TurndownService({ headingStyle: "atx", bulletListMarker: "-", codeBlockStyle: "fenced", emDelimiter: "*" });
 // Images show only once saved beside the source (src `assets/…`, D96); any other image is dropped.
+// Ruby as its letters with their reading in brackets (an EPUB in Japanese), not spaced apart (Codex sweep 4).
+td.addRule("ruby", { filter: (n) => n.nodeName === "RUBY", replacement: (_c, n) => flattenRuby((n as HTMLElement).outerHTML) });
 td.addRule("text-only", { filter: (n) => /^(svg|script|style)$/i.test(n.nodeName), replacement: () => "" });
 td.addRule("saved-image", {
   filter: "img",
@@ -39,3 +42,33 @@ td.addRule("table", {
     return `\n\n${[line(rows[0]!), line(Array(n).fill("---")), ...rows.slice(1).map(line)].join("\n")}\n\n`;
   },
 });
+
+/** An HTML block in a Markdown file (a `<p>`, `<div>` or `<table>` on its own lines) as Markdown: the reader
+ *  shows no raw HTML, so it read as if the paragraph wasn't there (Codex sweep 4). Code is left as written. */
+export function htmlBlocksToMarkdown(md: string): string {
+  const BLOCK = /^ {0,3}<(p|div|section|article|aside|figure|table|ul|ol|dl|blockquote|details|h[1-6]|center)\b/i;
+  const out: string[] = [];
+  let fence: string | null = null;
+  let chunk: string[] = [];
+  const flush = () => {
+    const text = flattenRuby(chunk.join("\n"));
+    if (chunk.length) out.push(BLOCK.test(chunk[0]!) ? td.turndown(text) : text);
+    chunk = [];
+  };
+  for (const line of md.split("\n")) {
+    const f = line.match(/^ {0,3}(`{3,}|~{3,})/)?.[1];
+    if (fence) {
+      out.push(line);
+      if (f && f[0] === fence[0] && f.length >= fence.length) fence = null;
+    } else if (f) {
+      flush();
+      fence = f;
+      out.push(line);
+    } else if (!line.trim()) {
+      flush();
+      out.push(line);
+    } else chunk.push(line);
+  }
+  flush();
+  return out.join("\n");
+}

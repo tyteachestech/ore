@@ -87,8 +87,12 @@ export async function recordReview(lib: Library, cardRef: string, input: ReviewI
       variant,
       in_head: input.in_head || undefined,
     };
+    // A review dated after now (a clock that ran ahead) comes after this one when the log is replayed, as the
+    // index does: the state saved is that replay, so the two never disagree (Codex sweep 4). Doctor names that review.
+    if (at > now) review.state_after = replay([...prior, review], retention, w) ?? after;
     appendReview(lib, review);
-    return { card: card.meta.id, ts: review.ts, rating: input.rating, due_next: after.due, state_after: after, finishing, session: session ?? null };
+    const saved = review.state_after;
+    return { card: card.meta.id, ts: review.ts, rating: input.rating, due_next: saved.due, state_after: saved, finishing, session: session ?? null };
   });
 }
 

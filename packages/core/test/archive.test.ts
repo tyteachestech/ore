@@ -52,6 +52,32 @@ describe("search terms with + or #", () => {
   });
 });
 
+describe("search in other scripts (Codex sweep 4)", () => {
+  test("a word inside Japanese, Chinese or Thai prose, written without spaces, is found", async () => {
+    const lib = await tempLibrary();
+    const ja = (await addSnippet(lib, { text: "毎朝、日本語を勉強しています。少しずつ覚えます。" })).item.meta.id;
+    const zh = (await addSnippet(lib, { text: "我每天学习中文，慢慢记住新的词语。" })).item.meta.id;
+    const th = (await addSnippet(lib, { text: "ฉันเรียนภาษาไทยทุกเช้าและทบทวนคำศัพท์" })).item.meta.id;
+    const items = (q: string) => [...new Set(search(lib, q))];
+    expect(items("勉強")).toEqual([ja]);
+    expect(items("学习")).toEqual([zh]);
+    expect(items("ภาษาไทย")).toEqual([th]);
+    expect(items("勉学")).toEqual([]); // its letters apart are not the word
+    const index = openIndex(lib);
+    expect(index.search("勉強")[0]?.snippet).toContain("[勉強]");
+    index.close();
+  });
+
+  test("an accent typed as its own mark finds the same words as one typed with its letter", async () => {
+    const lib = await tempLibrary();
+    const composed = (await addSnippet(lib, { text: "Η άλφα είναι το πρώτο γράμμα." })).item.meta.id;
+    const decomposed = (await addSnippet(lib, { text: "Το α\u0301λφα το μαθαίνουμε πρώτο." })).item.meta.id;
+    const items = (q: string) => [...new Set(search(lib, q))].sort();
+    expect(items("άλφα")).toEqual([composed, decomposed].sort());
+    expect(items("α\u0301λφα")).toEqual([composed, decomposed].sort());
+  });
+});
+
 describe("delete a skill", () => {
   test("untags its sources by default; --archive archives only the ones filed nowhere else", async () => {
     const lib = await tempLibrary();

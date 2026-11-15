@@ -233,6 +233,21 @@ describe("review loop", () => {
     expect(openSessionId(lib)).toBe(open.id);
   });
 
+  test("a miss rated after a review dated a year ahead (a wrong clock) is saved with the state the log replays to, and doctor names that review (Codex sweep 4)", async () => {
+    const { lib, a } = await setup();
+    const now = new Date();
+    await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: new Date(now.getTime() + 365 * 864e5) });
+    const miss = await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, now });
+    const idx = openIndex(lib);
+    const rebuilt = idx.cards().find((c) => c.id === a.meta.id)?.fsrs;
+    idx.close();
+    expect(rebuilt?.lapses).toBe(miss.state_after.lapses);
+    expect(rebuilt?.due).toBe(miss.state_after.due);
+    expect(rebuilt?.stability).toBe(miss.state_after.stability);
+    // The review from the wrong clock is named, with the way out.
+    expect((await doctor(lib)).issues.some((i) => i.message.includes("ahead of today (a clock was wrong)"))).toBe(true);
+  });
+
   test("a review on another device dated later than now (its clock ahead) doesn't block rating the card", async () => {
     const { lib, a } = await setup();
     const now = new Date(Date.now() + 864e5);

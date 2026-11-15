@@ -96,6 +96,15 @@ describe("a damaged library", () => {
     expect(() => openLibrary(join(lib.root, "nowhere"))).toThrow(/^no library at/);
   });
 
+  test("an add killed before its doc.md was written leaves a folder doctor names (Codex sweep 4)", async () => {
+    const lib = await tempLibrary();
+    const dir = join(paths.items(lib), "2026", "big-notes-01KX0000000000000000000000");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, ".source.md.123.456.tmp"), "half a source");
+    const report = await doctor(lib);
+    expect(report.issues.find((i) => i.message.includes("an add that stopped before it finished"))?.path).toBe("items/2026/big-notes-01KX0000000000000000000000");
+  });
+
   test("a source folder renamed in Finder still opens", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Retrieval practice beats rereading." });

@@ -14,7 +14,7 @@ import { desiredRetention, loadSkills } from "./skills.ts";
 // .index/library.sqlite is a disposable cache of the files: FTS5 search plus
 // card states replayed from the review log. Every open syncs it by comparing
 // file mtimes and sizes, so direct file edits by agents are picked up.
-const SCHEMA_VERSION = "7"; // 5: card_state.sig, so a new review replays only its own card; 6: rebuilt once to drop doubled search rows; 7: again, for rows from copied folders
+const SCHEMA_VERSION = "8"; // 5: card_state.sig, so a new review replays only its own card; 6: rebuilt once to drop doubled search rows; 7: again, for rows from copied folders; 8: fts.chars, words inside Chinese, Japanese and Thai
 
 const SCHEMA = `
 create table meta(key text primary key, value text);
@@ -22,7 +22,7 @@ create table files(path text primary key, kind text, mtime real, size integer);
 create table items(id text primary key, path text, title text, type text, status text, skills text, topics text, finished_at text, enriched_at text, archived integer);
 create table cards(id text primary key, path text, kind text, state text, item text, annotation text, from_notes integer, content_type text, skills text, topics text, question text, created text);
 create table card_state(id text primary key, retention real, fsrs text, due text, reps integer, sig text);
-create virtual table fts using fts5(kind unindexed, ref unindexed, item unindexed, title, body);
+create virtual table fts using fts5(kind unindexed, ref unindexed, item unindexed, title, body, chars);
 `;
 
 type FileKind = "doc" | "ann" | "notes" | "skill-notes" | "card" | "topic" | "review" | "config";
@@ -85,6 +85,15 @@ export interface ItemRow {
   enriched_at: string | null;
 }
 
+/** The text around a word found in `chars`, marked as the index marks its own hits (its snippet would be of the spaced letters). */
+function around(body: string, word: string): string | undefined {
+  const at = body.indexOf(word);
+  if (at < 0) return undefined;
+  const from = Math.max(0, at - 30);
+  const to = Math.min(body.length, at + word.length + 30);
+  return `${from ? "…" : ""}${body.slice(from, at)}[${word}]${body.slice(at + word.length, to)}${to < body.length ? "…" : ""}`.replace(/\s+/g, " ");
+}
+
 export interface SearchHit {
   kind: "item" | "annotation" | "notes" | "skill-notes" | "card" | "topic";
   ref: string;
@@ -133,20 +142,29 @@ export class LibraryIndex {
   search(query: string, limit = 20): SearchHit[] {
     // FTS5 drops "+" and "#" from words, so "c++" would find every word starting with c. A term that ends
     // in them ("c++", "c#", "f#") asks the index for the bare word and keeps only rows that spell it out.
-    const terms = query.match(/[\p{L}\p{N}_]+[+#]*/gu) ?? [];
+    const terms = query.normalize("NFC").match(/[\p{L}\p{M}\p{N}_]+[+#]*/gu) ?? [];
     if (!terms.length) return [];
     const literal = terms.filter((t) => /[+#]$/.test(t));
-    const match = terms.map((t) => (/[+#]$/.test(t) ? `"${t.replace(/[+#]+$/, "")}"` : `"${t}"*`)).join(" ");
+    // A word in a script without spaces is its letters side by side in `chars`; any other letters in it ask as usual.
+    const unspaced = terms.filter((t) => spacedOut(t));
+    const ask = (t: string) => {
+      const rest = t.replace(UNSPACED, " ").trim();
+      return [`"${spacedOut(t)}"`, ...(rest ? rest.split(/\s+/).map((w) => `"${w}"*`) : [])].join(" ");
+    };
+    const match = terms.map((t) => (spacedOut(t) ? ask(t) : /[+#]$/.test(t) ? `"${t.replace(/[+#]+$/, "")}"` : `"${t}"*`)).join(" ");
     const spelled = literal.map((t) => new RegExp(`(?<![\\p{L}\\p{N}_])${t.replace(/\+/g, "\\+")}(?![+#])`, "iu"));
     // A hit in the title counts five times one in the body (bm25 weights by column). Archived sources,
     // and everything in them, stay out.
     const rows = this.db
       .query<SearchHit & { body: string; annotation: string | null }, [string, number]>(
-        "select kind, ref, item, title, body, snippet(fts, -1, '[', ']', '…', 12) as snippet, case when kind = 'card' then (select annotation from cards where cards.id = fts.ref) end as annotation from fts where fts match ? and (item is null or item not in (select id from items where archived = 1)) order by bm25(fts, 0, 0, 0, 5, 1) limit ?",
+        "select kind, ref, item, title, body, snippet(fts, -1, '[', ']', '…', 12) as snippet, case when kind = 'card' then (select annotation from cards where cards.id = fts.ref) end as annotation from fts where fts match ? and (item is null or item not in (select id from items where archived = 1)) order by bm25(fts, 0, 0, 0, 5, 1, 1) limit ?"
+          // A word found in `chars` gets the body's snippet, never the spaced letters (and its own, below, where the body holds it).
+          .replace("snippet(fts, -1,", unspaced.length ? "snippet(fts, 4," : "snippet(fts, -1,"),
       )
       .all(match, spelled.length ? -1 : limit);
     return rows
       .filter((r) => spelled.every((re) => re.test(r.title) || re.test(r.body)))
+      .map((r) => (unspaced.length ? { ...r, snippet: around(r.body, unspaced[0]!) ?? r.snippet } : r))
       .slice(0, limit)
       .map(({ body: _, annotation, ...hit }) => (annotation ? { ...hit, annotation } : hit));
   }
@@ -210,6 +228,18 @@ function openDb(lib: Library): Database {
   return db;
 }
 
+/** Letters of scripts written without spaces between words (Chinese, Japanese, Thai and its neighbours),
+ *  with the marks on them. The index reads a run of them as one word, so a word inside one was never found. */
+const UNSPACED = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Thai}\p{sc=Lao}\p{sc=Khmer}\p{sc=Myanmar}]\p{M}*/gu;
+/** Those letters one by one, so a word is found as the letters side by side (`chars`). */
+const spacedOut = (s: string) => s.match(UNSPACED)?.join(" ") ?? "";
+
+/** A search row, in one Unicode form (an accent typed as its own mark finds the same text, Codex sweep 4). */
+function addFts(db: Database, [kind, ref, item, title, body]: [string, string, string | null, string, string]): void {
+  const [t, b] = [title.normalize("NFC"), body.normalize("NFC")];
+  db.run("insert into fts values (?, ?, ?, ?, ?, ?)", [kind, ref, item, t, b, spacedOut(`${t}\n${b}`)]);
+}
+
 function indexFile(db: Database, lib: Library, f: FileStat): void {
   const dir = dirname(f.path);
   if (f.kind === "doc") {
@@ -218,30 +248,30 @@ function indexFile(db: Database, lib: Library, f: FileStat): void {
     db.run("insert or replace into items values (?,?,?,?,?,?,?,?,?,?)", [
       m.id, relative(lib.root, f.path), m.title, m.type, m.status, JSON.stringify(m.skills), JSON.stringify(m.topics), m.finished_at ?? null, m.enriched_at ?? null, m.archived_at ? 1 : 0,
     ]);
-    db.run("insert into fts values ('item', ?, ?, ?, ?)", [m.id, m.id, m.title, item.body]);
+    addFts(db, ["item", m.id, m.id, m.title, item.body]);
   } else if (f.kind === "ann") {
     const item = readItemDir(dir);
     for (const a of readAnnotations(item)) {
-      db.run("insert into fts values ('annotation', ?, ?, ?, ?)", [a.id, item.meta.id, `${a.intent}: ${item.meta.title}`, [a.exact, a.note].filter(Boolean).join("\n")]);
+      addFts(db, ["annotation", a.id, item.meta.id, `${a.intent}: ${item.meta.title}`, [a.exact, a.note].filter(Boolean).join("\n")]);
     }
   } else if (f.kind === "notes") {
     const item = readItemDir(dir);
-    db.run("insert into fts values ('notes', ?, ?, ?, ?)", [item.meta.id, item.meta.id, `My notes: ${item.meta.title}`, readFileSync(f.path, "utf8")]);
+    addFts(db, ["notes", item.meta.id, item.meta.id, `My notes: ${item.meta.title}`, readFileSync(f.path, "utf8")]);
   } else if (f.kind === "skill-notes") {
     const id = basename(dir);
     const name = loadSkills(lib).skills.find((s) => s.id === id)?.name ?? id;
-    db.run("insert into fts values ('skill-notes', ?, null, ?, ?)", [id, `Notes: ${name}`, readFileSync(f.path, "utf8")]);
+    addFts(db, ["skill-notes", id, null, `Notes: ${name}`, readFileSync(f.path, "utf8")]);
   } else if (f.kind === "card") {
     const c = readCardFile(f.path);
     const m = c.meta;
     db.run("insert or replace into cards values (?,?,?,?,?,?,?,?,?,?,?,?)", [
       m.id, relative(lib.root, f.path), m.kind, m.state, m.item, m.annotation ?? null, m.from === "notes" ? 1 : 0, m.content_type, JSON.stringify(m.skills), JSON.stringify(m.topics), c.question, m.created,
     ]);
-    db.run("insert into fts values ('card', ?, ?, ?, ?)", [m.id, m.item, c.question, [c.answer, ...c.rubric].join("\n")]);
+    addFts(db, ["card", m.id, m.item, c.question, [c.answer, ...c.rubric].join("\n")]);
   } else if (f.kind === "topic") {
     const { data, body } = parseFrontmatter<{ name?: string; aliases?: string[] }>(readFileSync(f.path, "utf8"));
     const slug = f.path.split("/").pop()!.replace(/\.md$/, "");
-    db.run("insert into fts values ('topic', ?, null, ?, ?)", [slug, data.name ?? slug, [...(data.aliases ?? []), body].join("\n")]);
+    addFts(db, ["topic", slug, null, data.name ?? slug, [...(data.aliases ?? []), body].join("\n")]);
   }
 }
 

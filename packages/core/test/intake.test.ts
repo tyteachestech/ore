@@ -156,6 +156,36 @@ describe("import coverage: web pages", () => {
     expect(refusal("تكرار", "هذا نص قصير ".repeat(30), "ar.wikipedia.org")).toBeNull();
   });
 
+  test("a web page's joined emoji stay joined: a woman scientist, a family (Codex sweep 4)", async () => {
+    const p = "<p>The lab notebook 👩🏽‍🔬 belongs to the scientist, and the picnic 👨‍👩‍👧‍👦 to the whole family. Each one is a single symbol made of several joined together, and splitting them changes what they show.</p>";
+    const html = `<html><head><title>Joined symbols</title></head><body><article><h1>Joined symbols</h1>${p}${p.replace("lab notebook", "second notebook")}</article></body></html>`;
+    const md = (await htmlToDoc(html, "https://example.org/emoji")).markdown;
+    expect(md).toContain("👩🏽‍🔬");
+    expect(md).toContain("👨‍👩‍👧‍👦");
+    expect(md).not.toContain("\uf8f0");
+  });
+
+  test("Japanese ruby keeps its reading beside its letters, and a Markdown file's HTML paragraph is read, not hidden (Codex sweep 4)", async () => {
+    const ruby = "<ruby>東京<rp>（</rp><rt>とうきょう</rt><rp>）</rp></ruby>の<ruby>学<rt>がっ</rt>校<rt>こう</rt></ruby>";
+    const dir = mkdtempSync(join(tmpdir(), "ore-ruby-"));
+    const md = join(dir, "ja.md");
+    writeFileSync(md, `# 読み方の練習\n\n<p>読み方：${ruby}に行きます。</p>\n\n毎日少しずつ読みます。\n\n\`\`\`html\n<p>そのままのコード</p>\n\`\`\`\n`);
+    const item = await addSource(await tempLibrary(), md);
+    expect(item.body).toContain("読み方：東京（とうきょう）の学（がっ）校（こう）に行きます。");
+    expect(item.body).not.toContain("<p>読み方");
+    expect(item.body).toContain("<p>そのままのコード</p>"); // code stays as written
+    const p = `<p>読み方：${ruby}に行きます。${"毎朝、日本語を勉強しています。少しずつ覚えます。".repeat(5)}</p>`;
+    const web = (await htmlToDoc(`<html><head><title>読み方</title></head><body><article><h1>読み方</h1>${p}${p}</article></body></html>`, "https://example.org/ja")).markdown;
+    expect(web).toContain("東京（とうきょう）の学（がっ）校（こう）");
+  });
+
+  test("a Thai page, written without spaces between words, is read, not refused as almost no text (Codex sweep 4)", () => {
+    const thai = "การทบทวนแบบเว้นระยะช่วยให้จำได้นานขึ้น เมื่อเราพยายามนึกถึงสิ่งที่เรียนมา ความจำจะแข็งแรงกว่าการอ่านซ้ำ ลองเรียนภาษาไทยวันละนิดแล้วทบทวนคำศัพท์ทุกเช้า คำที่ตอบผิดให้ทบทวนอีกครั้งในวันพรุ่งนี้ นิสัยเล็กๆ ทำให้เกิดความแตกต่างอย่างมาก";
+    expect(wordCount(thai)).toBeGreaterThanOrEqual(50);
+    expect(refusal("เรียนภาษาไทย", thai, "th.example.org")).toBeNull();
+    expect(wordCount("ภาษาไทย")).toBe(2);
+  });
+
   test("arXiv abstract link reads the full paper from its HTML version", async () => {
     serve({ "https://arxiv.org/html/1706.03762": { body: web("arxiv-html.html"), type: HTML } });
     const item = await addSource(await tempLibrary(), "https://arxiv.org/abs/1706.03762");
@@ -1781,6 +1811,19 @@ describe("import coverage: other languages", () => {
     expect(b).toContain("而不是反复阅读。每次回忆都会让记忆更加牢固。");
     expect(b).toContain("التكرار المتباعد يساعد على التذكر، والاسترجاع يقوي الذاكرة");
     expect(b).not.toMatch(/[ﭐ-﷿ﹰ-﻾]/);
+  });
+
+  test("a Korean PDF whose font names its encoding instead of carrying it reads as Korean (Codex sweep 4)", async () => {
+    // make-korean-pdf.py: without the CMaps pdf.js read only the punctuation, and the PDF passed as read.
+    const item = await addSource(await tempLibrary(), file("korean.pdf"));
+    expect(item.meta.title).toBe("기억을 오래 남기는 방법");
+    expect(item.body).toContain("간격을 두고 복습하면 배운 내용을 더 오래 기억할 수 있다.");
+    expect(item.body).toContain("작은 습관이 큰 차이를 만든다.");
+  });
+
+  test("a PDF that reads as only punctuation is no text, so it goes to text recognition, not in as read (Codex sweep 4)", async () => {
+    const { pdfToDoc, ScannedPdf } = await import("../src/ingest/pdf.ts");
+    await expect(pdfToDoc(new Uint8Array(readFileSync(file("punctuation.pdf"))))).rejects.toBeInstanceOf(ScannedPdf);
   });
 
   test("a screenshot in Japanese: its lines join without spaces", () => {
