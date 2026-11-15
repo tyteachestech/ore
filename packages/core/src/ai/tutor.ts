@@ -105,7 +105,8 @@ export function readingOf(lib: Library, item: string, at?: string) {
   const marked = readAnnotations(it).filter((a) => (a.intent === "keep" || a.intent === "card") && !a.point).slice(0, 40)
     .map((a) => ({ text: cut(plainText(a.exact), 300), ...(a.intent === "card" ? { key: true } : {}), ...(a.note?.trim() ? { note: cut(a.note.trim(), 200) } : {}) }));
   const whole = wordCount(it.body) <= WHOLE_WORDS;
-  const outline = whole ? undefined : [...it.body.matchAll(/^#{1,6}[ \t]+(.+)$/gm)].map((m) => m[1]!.replace(/\\/g, "").trim()).slice(0, 80);
+  // Headings only: a `# comment` inside a code block is not one.
+  const outline = whole ? undefined : [...it.body.replace(/^(```|~~~)[\s\S]*?^\1.*$/gm, "").matchAll(/^#{1,6}[ \t]+(.+)$/gm)].map((m) => m[1]!.replace(/\\/g, "").trim()).slice(0, 80);
   return { title: it.meta.title, whole, ...(outline ? { outline } : {}), ...(at?.trim() ? { at: at.trim() } : {}), ...(marked.length ? { marked } : {}) };
 }
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n).trimEnd()}…` : s);
@@ -113,6 +114,7 @@ const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n).trimEnd()
 /** The exercises he got wrong the last time review brought them (D294), newest miss first, question
  *  only: from the source he is reading and the ones he @-mentioned, and from the skills he named. */
 export function missedIn(lib: Library, focus: TutorFocus): string[] {
+  if (!focus.item && !focus.sources?.length && !focus.skills?.length) return [];
   const items = new Set([...(focus.item ? [focus.item] : []), ...(focus.sources ?? [])].map((id) => findItem(lib, id).meta.id));
   const cards = listCards(lib).filter((c) => c.meta.state !== "retired" && (items.has(c.meta.item) || c.meta.skills.some((s) => focus.skills?.includes(s))));
   if (!cards.length) return [];
@@ -173,12 +175,14 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
   // Earlier turns go by size, newest first (D293): a chat of short turns goes whole, long replies push
   // the oldest out, and never fewer than six go. Of the turns left out, what he asked stays, a line each, so a long
   // chat still knows what it set out to do. Only the last six turns' files are read again.
+  // Turns come as JSON from the app or an agent: one with no reply (or no message) is an empty one.
+  earlier = earlier.map((t) => ({ ...t, message: String(t.message ?? ""), reply: String(t.reply ?? "") }));
   let from = earlier.length;
   for (let words = 0; from > 0; from--) {
     words += wordCount(earlier[from - 1]!.message) + wordCount(earlier[from - 1]!.reply);
     if (words > EARLIER_WORDS && earlier.length - from >= 6) break;
   }
-  const before = earlier.slice(0, from).slice(-30).map((t) => (t.message.length > 120 ? `${t.message.slice(0, 120).trimEnd()}…` : t.message));
+  const before = earlier.slice(0, from).slice(-30).map((t) => cut(t.message, 120));
   const recent = earlier.slice(from).map(({ message, reply, files }, i, all) => { const a = i >= all.length - 6 ? filesOf(files) : []; return { message, reply, ...(a.length ? { attached: a } : {}) }; });
   const toRead = [...new Set([...recent.flatMap((t) => t.attached ?? []), ...attached].map((f) => f.file))];
   // The exercise he is answering: the last one set, however long ago, with the card committed then.
@@ -251,11 +255,12 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
       const keep = d.citations.map((c) => isWebUrl(c.passage) || mend(c, byId.get(c.passage)?.text));
       if (keep.includes(false)) {
         repaired.dropped += keep.filter((k) => !k).length;
-        const renumber = (text: string) => text.replace(/ ?\[(\d+)\]/g, (all, n: string) => {
+        // Markers only: `xs[1]` in code, an index right after a name, and [0] are his reply's own words.
+        const renumber = (text: string) => text.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((part, at) => at % 2 ? part : part.replace(/ ?(?<![\p{L}\p{N}_])\[(\d+)\]/gu, (all, n: string) => {
           const i = +n - 1;
-          if (i >= keep.length) return all;
+          if (i < 0 || i >= keep.length) return all;
           return keep[i] ? `${all.startsWith(" ") ? " " : ""}[${keep.slice(0, i + 1).filter(Boolean).length}]` : "";
-        });
+        })).join("");
         d.reply = renumber(d.reply);
         d.steps = d.steps.map(renumber);
         d.citations = d.citations.filter((_, i) => keep[i]);

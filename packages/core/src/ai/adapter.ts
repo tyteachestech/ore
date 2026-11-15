@@ -429,7 +429,7 @@ export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<Age
   for (let attempt = 1; attempt <= 2; attempt++) {
     const raw = await run(prompt.text, message, schema, task as AgentTask<unknown>, opts);
     usage = addUsage(usage, raw.usage);
-    if (raw.web) web = web ? { searched: web.searched || raw.web.searched, pages: [...web.pages, ...raw.web.pages.filter((p) => !web!.pages.some((q) => samePage(q.url, p.url)))] } : raw.web;
+    if (raw.web) web = web ? { ...raw.web, searched: web.searched || raw.web.searched, pages: [...web.pages, ...raw.web.pages.filter((p) => !web!.pages.some((q) => samePage(q.url, p.url)))] } : raw.web;
     try {
       const parsed = task.schema.safeParse(parseOutput(raw.output));
       if (!parsed.success) throw new Error(parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "));
@@ -454,8 +454,9 @@ export interface ChatRun {
 // One turn of a chat (D61), through the vendor's own program on his plan: `claude -p` keeps the
 // conversation under a session id it is given; `codex exec` under the thread id it reports, picked
 // up again with `exec resume`. No tools: everything the chat needs is in the first message.
-/** `onProgress` (claude only): the reply so far as it is written, a few times a second (D296). */
-export async function runChatTurn(lib: Library, a: { system: string; message: string; schema: object; session?: string; cwd: string; onProgress?: (p: { reply: string }) => void }): Promise<ChatRun & { vendor: Vendor }> {
+/** `onProgress` (claude only): the reply so far as it is written, a few times a second, with the session it is
+ *  written in, which a run stopped part way never returns (D296). */
+export async function runChatTurn(lib: Library, a: { system: string; message: string; schema: object; session?: string; cwd: string; onProgress?: (p: { reply: string; session: string }) => void }): Promise<ChatRun & { vendor: Vendor }> {
   const vendor = chooseVendor(lib);
   const model = aiModel(lib, vendor);
   if (vendor === "claude") {
@@ -479,7 +480,7 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
       const p = streamProgress(line, state);
       if (!p || !("partial" in p) || Date.now() - last < 50) return;
       const reply = partialReply(p.partial);
-      if (reply) (last = Date.now()), a.onProgress!({ reply });
+      if (reply) (last = Date.now()), a.onProgress!({ reply, session });
     }));
     const out = claudeResult(r, a.onProgress ? streamEvents(r.stdout) : undefined);
     const usage = Object.entries(out.modelUsage ?? {}).sort((x, y) => (y[1].outputTokens ?? 0) - (x[1].outputTokens ?? 0));

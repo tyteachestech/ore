@@ -6491,10 +6491,12 @@ journey("review: Enter activates the focused button (Again, Edit exercise, Open 
 journey("review Ask: the reply shows as it is written, Stop keeps the words so far, and with none it says Stopped with Try again (D296)", async (page) => {
   let release = () => {};
   let streams: string[] = [];
+  const bodies: string[] = [];
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
     if (route.request().method() !== "POST" || !body.includes('"ask",')) return route.fallback();
     streams.push(/--stream=(ask-[\w-]+)/.exec(body)![1]!);
+    bodies.push(body);
     await new Promise<void>((done) => (release = done)); // the reply is still being written
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Because recalling it is the practice.", proposal: null, session: "s1" }) }).catch(() => {});
   });
@@ -6518,12 +6520,14 @@ journey("review Ask: the reply shows as it is written, Stop keeps the words so f
   await ask.getByRole("button", { name: "Stop the reply" }).click();
   await ask.getByText("Stopped.").waitFor();
   await ask.getByRole("button", { name: "Send" }).waitFor();
-  release();
-  // Asked again: the words come in place of the dots, another run's words don't, and ⌘. keeps what was written.
+  // Asked again at once, while the stopped run is still winding down: the words come in place of the dots,
+  // another run's words don't, and ⌘. keeps what was written.
+  const first = release;
   await ask.getByRole("button", { name: "Try again" }).click();
   await until("the second request went", async () => streams.length === 2);
-  await emit({ stream: streams[0], reply: "Words of the run he stopped" });
-  await emit({ stream: streams[1], reply: "Because recalling" });
+  first();
+  await emit({ stream: streams[0], reply: "Words of the run he stopped", session: "s-old" });
+  await emit({ stream: streams[1], reply: "Because recalling", session: "s-live" });
   await ask.getByText("Because recalling").waitFor();
   if (await ask.getByText("Words of the run he stopped").count()) throw new Error("a stopped run's words landed on the next one");
   if (await ask.getByLabel("Thinking").count()) throw new Error("the dots stayed beside the words");
@@ -6537,6 +6541,8 @@ journey("review Ask: the reply shows as it is written, Stop keeps the words so f
   await field.fill("And after a week?");
   await page.keyboard.press("Enter");
   await until("the third request went", async () => streams.length === 3);
+  // It follows the reply he stopped, in that reply's conversation, not a new one that never saw it.
+  if (!bodies[2]!.includes("--session=s-live")) throw new Error(`the message after a stopped reply started a new conversation: ${bodies[2]}`);
   release();
   await ask.getByText("Because recalling it is the practice.").waitFor();
   await page.keyboard.press("Escape");

@@ -63,6 +63,8 @@ async function library() {
   return { lib, a, b, c };
 }
 
+const OK = { reply: "Yes.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "A chat" };
+
 describe("tutor: what it sees", () => {
   test("the open source's passages come first, then the library's; unrelated sources stay out", async () => {
     const { lib, a, b } = await library();
@@ -193,6 +195,35 @@ describe("tutor: replies", () => {
     expect(r.citations.map((c) => [c.n, c.quote])).toEqual([[1, "goes back to the first box"]]);
     expect(r).toMatchObject({ general: true, repaired: { moved: 0, dropped: 2 } });
     expect(readFileSync(join(binDir, "count"), "utf8")).toBe("1");
+  });
+
+  // Found by the review of #426, before it merged.
+  test("a mended quote is a whole sentence across a decimal, and small words alone never make a quote real", async () => {
+    const { nearestSentence } = await import("../src/ai/ask.ts");
+    const text = "Version 2.5 of the scheduler improves recall by a wide margin over fixed intervals. It is the gap that matters, and that is the point.";
+    expect(nearestSentence(text, "Version 2.5 of the scheduler improved recall by a wide margin")).toBe("Version 2.5 of the scheduler improves recall by a wide margin over fixed intervals.");
+    expect(nearestSentence(text, "it is the tide that matters")).toBeNull();
+  });
+
+  test("dropping a citation leaves code and [0] in the reply alone", async () => {
+    const { lib, a } = await library();
+    fakeClaude([{ ...OK, reply: "Use `box[1]` or xs[0] for the first box [1], never the last [2].", citations: [{ passage: "P9", quote: "nothing like this is anywhere" }, { passage: "P2", quote: "A card you miss goes back to the first box." }] }]);
+    const r = await tutor(lib, "Which box?", { item: a.meta.id });
+    expect(r.reply).toBe("Use `box[1]` or xs[0] for the first box, never the last [1].");
+  });
+
+  test("an earlier turn with no reply, as an agent may send it, is read as an empty one", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK]);
+    await tutor(lib, "And then?", { item: a.meta.id, earlier: [{ message: "hi" } as never] });
+    expect(sent()[0]!.earlier).toEqual([{ message: "hi", reply: "" }]);
+  });
+
+  test("a long source's outline is its headings, never a # comment inside its code", async () => {
+    const { lib } = await library();
+    const { readingOf } = await import("../src/ai/tutor.ts");
+    const long = await createItem(lib, { type: "article", title: "Shell", body: `# Shell\n\n\`\`\`sh\n# install deps\nmake\n\`\`\`\n\n## Pipes\n\n${"word ".repeat(15_100)}` });
+    expect(readingOf(lib, long.meta.id).outline).toEqual(["Shell", "Pipes"]);
   });
 
   test("a marker with no citation still goes back once to fix", async () => {
@@ -613,5 +644,26 @@ fs.writeFileSync(process.argv[process.argv.indexOf("-o") + 1], ${JSON.stringify(
     expect(seen.filter((p) => "searching" in (p as object))).toEqual([{ searching: true }, { searching: false }]);
     expect(r.searched).toBe(true);
     expect(r.citations[0]).toMatchObject({ title: "Hermann Ebbinghaus" });
+  });
+
+  test("a retry on Codex still holds a web quote to nothing more than its link", async () => {
+    const { lib } = await library();
+    const url = "https://example.org/ebbinghaus";
+    const search = { type: "item.completed", item: { id: "s1", type: "web_search", query: "e", results: [{ snippet: "He ran the tests on himself.", title: "Hermann Ebbinghaus", url }] } };
+    const out = { title: "E", reply: "He published it in 1885 [1].", citations: [{ passage: url, quote: "published in 1885" }], general: false, hint: false, exercise: null, card: null, steps: [] };
+    // The first run's reply has one step, which goes back; the second is right.
+    writeFileSync(join(binDir, "n"), "0");
+    writeFileSync(join(binDir, "codex"), `#!/usr/bin/env bun
+const fs = require("fs");
+const n = Number(fs.readFileSync(${JSON.stringify(join(binDir, "n"))}, "utf8"));
+fs.writeFileSync(${JSON.stringify(join(binDir, "n"))}, String(n + 1));
+console.log(${JSON.stringify(JSON.stringify(search))});
+const out = ${JSON.stringify(out)};
+fs.writeFileSync(process.argv[process.argv.indexOf("-o") + 1], JSON.stringify(n ? out : { ...out, steps: ["one"] }));
+`);
+    chmodSync(join(binDir, "codex"), 0o755);
+    process.env.ORE_AI = "codex";
+    const r = await tutor(lib, "When did Ebbinghaus publish?");
+    expect(r.reply).toBe("He published it in 1885 [1].");
   });
 });

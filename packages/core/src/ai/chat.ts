@@ -17,7 +17,7 @@ export const ChatOutput = z.strictObject({
  *  rating is suggested (D21). */
 // On a variant (D66) the chat sees the variant he answered and the original, so "why is this the
 // same idea?" has an answer.
-export async function askAboutCard(lib: Library, cardRef: string, a: { message: string; answer?: string; session?: string; variant?: string; onProgress?: (p: { reply: string }) => void }) {
+export async function askAboutCard(lib: Library, cardRef: string, a: { message: string; answer?: string; session?: string; variant?: string; onProgress?: (p: { reply: string; session: string }) => void }) {
   if (!a.message.trim()) throw new Error("message is empty");
   const card = findCard(lib, cardRef);
   const prompt = loadPrompt("chat");

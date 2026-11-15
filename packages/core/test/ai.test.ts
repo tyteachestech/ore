@@ -71,7 +71,8 @@ describe("Ask about this (D61)", () => {
     fakeClaude([{ reply: "Because effort strengthens it.", card: null }, { reply: "Yes.", card: null }]);
     const seen: unknown[] = [];
     const r = await askAboutCard(lib, card.meta.id, { message: "Why?", answer: "x", onProgress: (p) => seen.push(p) });
-    expect(seen).toEqual([{ reply: "Because effort" }]);
+    // Each carries the session, so a reply he stops part way can still be followed up in it.
+    expect(seen).toEqual([{ reply: "Because effort", session: r.session }]);
     expect(r.reply).toBe("Because effort strengthens it.");
     rmSync(join(binDir, "while.js"));
     await askAboutCard(lib, card.meta.id, { message: "Sure?", session: r.session }); // nobody listening: one JSON answer, as before

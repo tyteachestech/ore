@@ -45,17 +45,21 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
 
   /** `again`: Try again on a message that failed; it is in the thread already, and what he has typed since stays. */
   /** One request at a time: a double click on Try again sends once (busy is a render behind). */
-  const sending = useRef(false);
+  const sending = useRef<string | null>(null);
+  /** The session the reply on its way is written in: a run stopped part way never returns it. */
+  const live = useRef<string | undefined>(undefined);
   const send = async (text: string, again = false) => {
     const message = text.trim();
     if (!message || busy || sending.current) return;
-    sending.current = true;
     // The reply lands on this run alone: Stop ends it, and whatever it still sends or returns is dropped.
     const job = `ask-${crypto.randomUUID()}`;
+    sending.current = job;
+    live.current = undefined;
     const mine = (c: AskChat) => c.job === job;
     setChat((c) => (again ? { ...c, error: null, busy: true, partial: undefined, job } : { ...c, turns: [...c.turns, { role: "me", text: message }], input: "", error: null, busy: true, partial: undefined, job }));
     // The reply as it is written (ChatGPT's streaming), as the tutor's comes: the first words in place of the dots.
-    const off = await listen<{ stream?: string; reply?: string }>("ore-progress", ({ payload: p }) => {
+    const off = await listen<{ stream?: string; reply?: string; session?: string }>("ore-progress", ({ payload: p }) => {
+      if (p.stream === job && sending.current === job && p.session) live.current = p.session;
       if (p.stream === job && p.reply !== undefined) setChat((c) => (mine(c) ? { ...c, partial: p.reply } : c));
     }).catch(() => () => {});
     try {
@@ -65,17 +69,20 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
       setChat((c) => (mine(c) ? { ...c, busy: false, partial: undefined, job: undefined, error: errorText(e, "answer that"), failed: message } : c));
     } finally {
       off();
-      sending.current = false;
+      // Stop already let go of it, and a message sent since then holds it now.
+      if (sending.current === job) sending.current = null;
       field.current?.focus();
     }
   };
   /** Stops the reply being written (the tutor's Stop, ChatGPT's): the words so far stay as its reply; with none
-   *  it says Stopped and offers Try again. */
+   *  it says Stopped and offers Try again. The next message can go at once, in the same conversation. */
   const stop = () => {
     if (!chat.job) return;
     void cancelOre(chat.job);
+    sending.current = null;
+    const session = live.current;
     const asked = turns.findLast((t) => t.role === "me")?.text;
-    setChat((c) => (c.job !== chat.job ? c : { ...c, busy: false, job: undefined, partial: undefined, ...(c.partial ? { turns: [...c.turns, { role: "ai", text: c.partial, stopped: true }] } : { error: "Stopped.", failed: asked }) }));
+    setChat((c) => (c.job !== chat.job ? c : { ...c, busy: false, job: undefined, partial: undefined, ...(c.partial ? { session: c.session ?? session, turns: [...c.turns, { role: "ai", text: c.partial, stopped: true }] } : { error: "Stopped.", failed: asked }) }));
     field.current?.focus();
   };
   // ⌘. stops it, as it stops the tutor's reply (the Mac's own cancel key).

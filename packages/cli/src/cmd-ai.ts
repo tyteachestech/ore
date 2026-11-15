@@ -87,7 +87,7 @@ export const aiCommands: Record<string, Command> = {
       const lib = openLibrary();
       // --stream <id>: the reply as it is written, as `{"progress": {stream, reply}}` lines on stderr, as `ore tutor` sends them (claude only).
       const stream = str(f.stream);
-      const onProgress = stream ? (p: { reply: string }) => void process.stderr.write(JSON.stringify({ progress: { stream, ...p } }) + "\n") : undefined;
+      const onProgress = stream ? (p: { reply: string; session: string }) => void process.stderr.write(JSON.stringify({ progress: { stream, ...p } }) + "\n") : undefined;
       const r = await askAboutCard(lib, need(ref, "<card>"), { message: need(str(f.message), "--message"), answer: str(f.answer), session: str(f.session), variant: str(f.variant), onProgress });
       const text = [r.reply, ...(r.proposal ? ["", "Proposed card:", `Q: ${r.proposal.question}`, `A: ${r.proposal.answer}`] : []), "", `(session ${r.session})`].join("\n");
       return { data: r, text };
