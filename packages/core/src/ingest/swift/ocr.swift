@@ -28,6 +28,41 @@ func recognize(_ image: CGImage) -> [Line] {
   }
 }
 
+// Vision reads an image scaled down to a size of its own, so the words in a very tall or very wide one
+// (a full-page capture, 900×10,000) come out too small to read (F188). Such an image is read in bands
+// along its long side, each twice as long as the short side (at least 2,048 px), each starting half a
+// band after the last; a line is kept from the band whose middle half holds its centre, so a line cut
+// by one band's edge is read whole in the next, and none is read twice.
+func lines(_ image: CGImage) -> [Line] {
+  let w = Double(image.width), h = Double(image.height)
+  let long = max(w, h), short = min(w, h)
+  guard long > 4096, long / short > 2 else { return recognize(image) }
+  let tall = h >= w
+  let band = max(short * 2, 2048)
+  var out: [Line] = []
+  var start = 0.0
+  while true {
+    let end = min(start + band, long)
+    let rect = tall ? CGRect(x: 0, y: start, width: w, height: end - start) : CGRect(x: start, y: 0, width: end - start, height: h)
+    // A band that can't be cut out: the whole image in one pass, never part of its text.
+    guard let tile = image.cropping(to: rect.integral) else { return recognize(image) }
+    let lo = start == 0 ? 0 : start + band / 4
+    let hi = end >= long ? long + 1 : start + band * 3 / 4
+    let size = end - start
+    for l in recognize(tile) {
+      // Back to fractions of the whole image, y still from the top.
+      let line = tall
+        ? Line(t: l.t, x: l.x, y: (start + l.y * size) / h, w: l.w, h: l.h * size / h)
+        : Line(t: l.t, x: (start + l.x * size) / w, y: l.y, w: l.w * size / w, h: l.h)
+      let centre = tall ? (line.y + line.h / 2) * h : (line.x + line.w / 2) * w
+      if centre >= lo && centre < hi { out.append(line) }
+    }
+    if end >= long { break }
+    start += band / 2
+  }
+  return out
+}
+
 guard CommandLine.arguments.count == 2 else { fail("usage: ocr <file>") }
 let url = URL(fileURLWithPath: CommandLine.arguments[1])
 var pages: [Page] = []
@@ -40,10 +75,10 @@ if url.pathExtension.lowercased() == "pdf" {
     let scale = 2000 / max(box.width, 1)
     let thumb = page.thumbnail(of: CGSize(width: box.width * scale, height: box.height * scale), for: .mediaBox)
     guard let cg = thumb.cgImage(forProposedRect: nil, context: nil, hints: nil) else { continue }
-    pages.append(Page(lines: recognize(cg)))
+    pages.append(Page(lines: lines(cg)))
   }
 } else {
   guard let image = NSImage(contentsOf: url), let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { fail("can't open the image") }
-  pages.append(Page(lines: recognize(cg)))
+  pages.append(Page(lines: lines(cg)))
 }
 FileHandle.standardOutput.write(try! JSONEncoder().encode(Out(pages: pages)))
