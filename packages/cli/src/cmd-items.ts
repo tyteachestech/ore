@@ -523,18 +523,20 @@ export const itemCommands: Record<string, Command> = {
   },
 
   reimport: {
-    usage: "<item> [--undo]   fetch a source's original again and update it in place: highlights re-anchor, ones whose passage is gone are removed (questions and cards stay); --undo puts the old version back, again redoes",
-    options: { undo: { type: "boolean" } },
+    usage: "<item> [--undo [--step <step>]]   fetch a source's original again and update it in place: highlights re-anchor, ones whose passage is gone are removed (questions and cards stay; questions whose passage is gone are listed as unplaced); --undo puts back the version the reimport --step (as the reimport printed it; the latest without it) replaced, again redoes",
+    options: { undo: { type: "boolean" }, step: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();
       const id = findItem(lib, need(ref, "<item>")).meta.id;
       if (f.undo) {
-        const item = await undoReimport(lib, id);
+        const item = await undoReimport(lib, id, str(f.step));
         return { data: { id, title: item.meta.title }, text: `Put back the previous version of ${item.meta.title}` };
       }
       const r = await reimportSource(lib, id);
-      const data = { id, title: r.item.meta.title, changed: r.changed, moved: r.moved, removed: r.removed.map((a) => ({ id: a.id, exact: a.exact, intent: a.intent })) };
-      const text = !r.changed ? `${r.item.meta.title} is up to date` : `Reimported ${r.item.meta.title}${r.removed.length ? `; removed ${r.removed.length} highlight(s) no longer in it` : ""}`;
+      const brief = (a: { id: string; exact: string; intent: string }) => ({ id: a.id, exact: a.exact, intent: a.intent });
+      const data = { id, title: r.item.meta.title, changed: r.changed, moved: r.moved, removed: r.removed.map(brief), unplaced: r.unplaced.map(brief), step: r.step };
+      const lost = [r.removed.length && `removed ${r.removed.length} highlight(s) no longer in it`, r.unplaced.length && `${r.unplaced.length} question(s) kept, their passage no longer in it`].filter(Boolean).join("; ");
+      const text = !r.changed ? `${r.item.meta.title} is up to date` : `Reimported ${r.item.meta.title}${lost ? `; ${lost}` : ""}${r.step ? ` (undo: --undo --step ${r.step})` : ""}`;
       return { data, text };
     },
   },
@@ -562,7 +564,7 @@ export const itemCommands: Record<string, Command> = {
       }
       const lib = openLibrary();
       const r = await readTables(lib, findItem(lib, need(ref, "<item>")).meta.id);
-      const data = { id: r.item.meta.id, title: r.item.meta.title, changed: r.changed, regions: r.regions, moved: r.moved, removed: r.removed.map((a) => ({ id: a.id, exact: a.exact, intent: a.intent })) };
+      const data = { id: r.item.meta.id, title: r.item.meta.title, changed: r.changed, regions: r.regions, moved: r.moved, removed: r.removed.map((a) => ({ id: a.id, exact: a.exact, intent: a.intent })), step: r.step };
       return { data, text: !r.changed ? `Found no tables or formulas to add in ${r.item.meta.title}` : `Read ${r.regions} table(s) and formula(s) into ${r.item.meta.title}` };
     },
   },

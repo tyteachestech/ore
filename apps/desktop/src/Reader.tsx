@@ -1192,12 +1192,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   /** Runs enrich again in the foreground, so a failure shows its reason. */
   /** The PDF's tables and formulas were read into its text: show it, with the way back. */
-  const tablesRead = (r: { changed: boolean; regions: number }) => {
+  const tablesRead = (r: { changed: boolean; regions: number; step?: string }) => {
     const id = p.id;
     p.reload();
     p.onChanged();
     if (!r.changed) return p.notify("Found no tables or formulas to read in this PDF");
-    const step = () => ore("reimport", id, "--undo").then(() => (p.reload(), p.onChanged()));
+    const step = () => ore("reimport", id, "--undo", ...(r.step ? ["--step", r.step] : [])).then(() => (p.reload(), p.onChanged()));
     p.notify("Read the tables and formulas into the text", "info", step, step);
   };
 
@@ -1766,7 +1766,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   function jumpToHighlight(id: string) {
     const el = scrollRef.current;
     const range = rangeOf(id);
-    if (!el || !range) return;
+    if (!el) return;
+    // Its passage gone from the text (a reimport): say so, never a click that does nothing.
+    if (!range) return void (annOf(id)?.anchor === null && p.notify("The passage it was marked on is no longer in this source.", "error"));
     toThird(range);
     fresh.current = null;
     openPopup(id, range, annOf(id)?.note ?? "");
@@ -3139,16 +3141,19 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const reimport = async () => {
     if (!doc) return;
     const d = doc;
-    // Run only from the history, which says so if it fails.
-    const swap = () => ore("reimport", d.id, "--undo").then(() => (p.reload(), p.onChanged()));
     p.notify(`Reimporting “${d.title}”…`, "progress");
     try {
-      const r = await ore<{ changed: boolean; removed: unknown[] }>("reimport", d.id);
+      const r = await ore<{ changed: boolean; removed: unknown[]; unplaced?: unknown[]; step?: string }>("reimport", d.id);
       if (!r.changed) return p.notify(`“${d.title}” is already up to date`);
+      // This reimport's own stash, so a second reimport's Undo never swaps this one's (run only from the history, which says so if it fails).
+      const swap = () => ore("reimport", d.id, "--undo", ...(r.step ? ["--step", r.step] : [])).then(() => (p.reload(), p.onChanged()));
       p.reload();
       p.onChanged();
       const n = r.removed.length;
-      const what = n ? `Reimported. ${n} ${n === 1 ? "highlight is" : "highlights are"} no longer in it, so ${n === 1 ? "it was" : "they were"} removed` : "Reimported with the latest text";
+      const q = r.unplaced?.length ?? 0;
+      const removed = n ? `${n} ${n === 1 ? "highlight is" : "highlights are"} no longer in it, so ${n === 1 ? "it was" : "they were"} removed.` : "";
+      const unplaced = q ? `${q === 1 ? "A question’s passage is" : `${q} questions’ passages are`} no longer in it; ${q === 1 ? "the question is" : "the questions are"} kept.` : "";
+      const what = n || q ? `Reimported. ${[removed, unplaced].filter(Boolean).join(" ")}`.replace(/\.$/, "") : "Reimported with the latest text";
       p.notify(what, "info", swap, swap);
     } catch (e) {
       p.notify(errorText(e, "reimport"), "error");

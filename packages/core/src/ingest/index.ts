@@ -6,7 +6,7 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { deviceName, latestRevs, sha256, writeAtomic } from "../fsutil.ts";
-import { nowIso } from "../ids.ts";
+import { isUlid, nowIso, ulid } from "../ids.ts";
 import { THEIRS_FIRST_MS } from "../inbox.ts";
 import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
@@ -727,12 +727,21 @@ export interface Reimported {
   moved: number;
   /** Highlights whose passage is no longer in the original, removed (their cards stay). */
   removed: Annotation[];
+  /** Questions whose passage is no longer in the original: kept, his own words, but placed nowhere. */
+  unplaced: Annotation[];
+  /** Names this reimport's stash: `undoReimport` with it puts back exactly what this one replaced. */
+  step?: string;
 }
 
-// Files a reimport replaces; the previous ones wait in `.ore/reimport/<id>/` for Undo.
+// Files a reimport replaces; the previous ones wait in `.ore/reimport/<id>/<step>/` for Undo, one stash
+// per reimport, so two in a row are undone one at a time, each to the version it replaced.
 // layout.json (D125) belongs to the version it was read into, so Undo takes its tables back out too.
 const REPLACED = (name: string) => name === "doc.md" || name === "transcript.vtt" || name === "layout.json" || name.startsWith("source.") || name === "page.html";
-const stash = (lib: Library, id: string) => join(lib.root, ".ore", "reimport", id);
+const stashes = (lib: Library, id: string) => join(lib.root, ".ore", "reimport", id);
+/** A source's stashes, oldest first (steps are ULIDs, so by time). */
+const steps = (lib: Library, id: string) => (existsSync(stashes(lib, id)) ? readdirSync(stashes(lib, id)).filter(isUlid).sort() : []);
+/** The reimports a source keeps for Undo: the app's history holds no more than a session's. */
+const KEPT_STEPS = 10;
 
 /** Keeps a replaced file for Undo. On the Mac's APFS a copy is a clone, sharing the blocks until either
  *  changes, so a recording (up to 200 MB) isn't stored twice; elsewhere it is a plain copy. Not a hard
@@ -820,11 +829,12 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
   if (draft.body === item.body) {
     // A better reader may learn something about the same text: a PDF's tables still to be read (D125).
     if (String(draft.structure ?? "") !== String(item.meta.structure ?? "")) item.meta = await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, structure: draft.structure }));
-    return { item, changed: false, moved: 0, removed: [] };
+    return { item, changed: false, moved: 0, removed: [], unplaced: [] };
   }
-  const dir = stash(lib, item.meta.id);
+  const step = ulid();
+  const dir = join(stashes(lib, item.meta.id), step);
   await withLock(paths.lock(lib), () => {
-    rmSync(dir, { recursive: true, force: true });
+    for (const old of steps(lib, item.meta.id).slice(0, -(KEPT_STEPS - 1))) rmSync(join(stashes(lib, item.meta.id), old), { recursive: true, force: true });
     mkdirSync(dir, { recursive: true });
     for (const f of readdirSync(item.dir).filter(REPLACED)) keepFile(join(item.dir, f), join(dir, f));
     writeAtomic(join(dir, "highlights.json"), JSON.stringify(latestRevs(annotationRevs(item.dir))));
@@ -847,9 +857,10 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
   });
   const next = readItemDir(item.dir);
   const report = await reanchorItem(lib, next);
-  const gone = readAnnotations(next).filter((a) => report.orphaned.includes(a.id) && a.intent !== "question");
+  const orphans = readAnnotations(next).filter((a) => report.orphaned.includes(a.id));
+  const gone = orphans.filter((a) => a.intent !== "question");
   for (const a of gone) reviseAnnotation(next, a, { status: "deleted" });
-  return { item: readItemDir(item.dir), changed: true, moved: report.moved.length, removed: gone };
+  return { item: readItemDir(item.dir), changed: true, moved: report.moved.length, removed: gone, unplaced: orphans.filter((a) => a.intent === "question"), step };
 }
 
 /** Where a source with a part owed is noted, beside the links waiting in inbox/: a pass that finds none
@@ -966,10 +977,12 @@ const alive = (pid: number) => {
   }
 };
 
-/** Puts back the version a reimport replaced, highlights included; run again, it redoes the reimport. */
-export async function undoReimport(lib: Library, ref: string): Promise<Item> {
+/** Puts back the version the reimport `step` replaced (the latest one without it), highlights included;
+ *  run again, it redoes that reimport. */
+export async function undoReimport(lib: Library, ref: string, step?: string): Promise<Item> {
   const item = findItem(lib, ref);
-  const dir = stash(lib, item.meta.id);
+  const name = step ?? steps(lib, item.meta.id).at(-1);
+  const dir = join(stashes(lib, item.meta.id), name && isUlid(name) ? name : "-");
   if (!existsSync(join(dir, "doc.md"))) throw new Error("There is no reimport of this source to undo.");
   const saved = JSON.parse(readFileSync(join(dir, "highlights.json"), "utf8")) as Annotation[];
   await withLock(paths.lock(lib), () => {

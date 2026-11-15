@@ -9,7 +9,7 @@ import { Working } from "./Working";
 // and removed from Settings › General › Import.
 
 export type TablesState = { installed: boolean };
-type Read = { changed: boolean; regions: number };
+type Read = { changed: boolean; regions: number; step?: string };
 
 /** The one download, shared by every reader and Settings: leaving a PDF doesn't stop it, and the next
  *  PDF opened shows it still going. `step` is the stage the CLI reports. */

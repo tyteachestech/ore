@@ -2,7 +2,8 @@ import search from "approx-string-match";
 
 // W3C-style selectors over the doc body: TextQuoteSelector (exact, prefix,
 // suffix) + TextPositionSelector (start, end). Re-anchoring follows the
-// Hypothesis pattern: position → exact → fuzzy → orphan.
+// Hypothesis pattern: position → exact → fuzzy → orphan, where a position whose context
+// changed is checked against the quote's other occurrences first.
 
 export const CONTEXT = 32;
 
@@ -96,14 +97,19 @@ export const MAX_FUZZY_ERROR_RATE = 0.25;
 
 export function anchor(text: string, sel: Selector): Anchor | null {
   if (!sel.exact) return null;
-  if (text.slice(sel.start, sel.end) === sel.exact) return { start: sel.start, end: sel.end, method: "position" };
+  const atOld = text.slice(sel.start, sel.end) === sel.exact;
+  // The quote and its context where they were: nothing elsewhere can match better.
+  if (atOld && text.slice(sel.start - sel.prefix.length, sel.start) === sel.prefix && text.slice(sel.end, sel.end + sel.suffix.length) === sel.suffix)
+    return { start: sel.start, end: sel.end, method: "position" };
 
+  // A quote found more than once goes to the copy whose context matches best; the old offset only
+  // breaks a tie (contextScore's position term), so a reworded copy left there doesn't keep it.
   const exact = occurrences(text, sel.exact);
   if (exact.length) {
     const best = exact
       .map((s) => ({ s, score: contextScore(text, sel, s, s + sel.exact.length) }))
       .sort((a, b) => b.score - a.score)[0]!;
-    return { start: best.s, end: best.s + sel.exact.length, method: "exact" };
+    return { start: best.s, end: best.s + sel.exact.length, method: atOld && best.s === sel.start ? "position" : "exact" };
   }
 
   const maxErrors = Math.floor(sel.exact.length * MAX_FUZZY_ERROR_RATE);

@@ -77,6 +77,46 @@ describe("reimport", () => {
     expect(V2.slice(anns[0]!.start, anns[0]!.end)).toBe("Testing yourself");
   });
 
+  test("two reimports undo one at a time: each Undo puts back the version and highlights its reimport replaced, and redo replays them in order (F-new-reimport-undo-stack)", async () => {
+    const lib = await tempLibrary();
+    page = V1;
+    serve();
+    const item = await addSource(lib, URL_);
+    const gone = addHighlight(item, { exact: "Sleep consolidates memory.", intent: "keep", note: "Keep this sleep note." });
+    page = V2;
+    const first = await reimportSource(lib, item.meta.id);
+    expect(first.removed.map((a) => a.id)).toEqual([gone.id]);
+    const V3 = V2.replace("# Spacing", "# Spacing, updated");
+    page = V3;
+    const second = await reimportSource(lib, item.meta.id);
+    expect(second.step).not.toBe(first.step);
+
+    expect((await undoReimport(lib, item.meta.id, second.step)).body).toBe(V2);
+    const back = await undoReimport(lib, item.meta.id, first.step);
+    expect(back.body).toBe(V1);
+    const g = readAnnotations(back).find((a) => a.id === gone.id);
+    expect(g?.note).toBe("Keep this sleep note.");
+    expect(V1.slice(g!.start, g!.end)).toBe("Sleep consolidates memory.");
+    // Redo, in the order they were made.
+    expect((await undoReimport(lib, item.meta.id, first.step)).body).toBe(V2);
+    expect(readAnnotations(findItem(lib, item.meta.id)).some((a) => a.id === gone.id)).toBe(false);
+    expect((await undoReimport(lib, item.meta.id, second.step)).body).toBe(V3);
+  });
+
+  test("a question whose passage is gone after a reimport is kept and reported, not lost silently (F-new-reimport-unplaced-question)", async () => {
+    const lib = await tempLibrary();
+    page = V1;
+    serve();
+    const item = await addSource(lib, URL_);
+    const asked = addHighlight(item, { exact: "Sleep consolidates memory.", intent: "question", note: "Why does sleep help?" });
+    const stays = addHighlight(findItem(lib, item.meta.id), { exact: "Testing yourself", intent: "question" });
+    page = V2;
+    const r = await reimportSource(lib, item.meta.id);
+    expect(r.removed).toEqual([]);
+    expect(r.unplaced.map((a) => a.id)).toEqual([asked.id]);
+    expect(readAnnotations(r.item).map((a) => a.id).sort()).toEqual([asked.id, stays.id].sort());
+  });
+
   test("an unchanged original changes nothing; a source with no link can't be reimported", async () => {
     const lib = await tempLibrary();
     page = V1;

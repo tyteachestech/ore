@@ -635,6 +635,61 @@ journey("PDF tables: read in the background after adding, Undo puts the lines ba
   await doc.locator("table").getByText("Massed").waitFor({ timeout: 15000 });
 });
 
+journey("reimport twice, then ⌘Z twice: each Undo puts back the version its reimport replaced, with the removed highlight; a question whose passage went says so (F-new-reimport-undo-stack, F-new-reimport-unplaced-question)", async (page) => {
+  const KETTLE = "The copper kettle whistles before the water boils.";
+  const ASKED = "Questions make learners examine the evidence carefully.";
+  const nb = (md: string) => JSON.stringify({ cells: [{ cell_type: "markdown", metadata: {}, source: md }], metadata: {}, nbformat: 4, nbformat_minor: 5 });
+  const V0 = `# Reimport undo study\n\n## First section\n\nA learner studies birds beside a quiet river.\n\n## Second section\n\n${KETTLE}\n\n${ASKED}\n\nThe last paragraph stays as it is.\n`;
+  const file = join(mkdtempSync(join(tmpdir(), "ore-e2e-nb-")), "reimport-undo-study.ipynb");
+  writeFileSync(file, nb(V0));
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(file);
+  await page.keyboard.press("Enter");
+  const doc = page.locator(".doc");
+  await doc.getByText(KETTLE).waitFor();
+  const item = ((await ore("ls")) as { id: string; title: string; dir: string }[]).find((i) => i.title === "Reimport undo study")!;
+  await ore("highlight", item.id, "--exact", KETTLE, "--intent", "keep", "--note", "Keep this kettle note.");
+  await ore("highlight", item.id, "--exact", ASKED, "--intent", "question", "--note", "How strong is the evidence?");
+  const kept = join(item.dir, "source.ipynb");
+  const reimport = async (md: string, says: string) => {
+    writeFileSync(kept, nb(md));
+    await page.getByRole("button", { name: "Source actions" }).first().click();
+    await page.getByRole("menuitem", { name: "Reimport" }).click();
+    await page.locator(".toast", { hasText: says }).waitFor();
+  };
+  await page.reload();
+  await openSource(page, "Reimport undo study");
+  const V1 = V0.replace(`${KETTLE}\n\n${ASKED}\n\n`, "");
+  await reimport(V1, "1 highlight is no longer in it, so it was removed. A question’s passage is no longer in it; the question is kept");
+  await reimport(V1.replace("## First section", "## Updated first section"), "Reimported with the latest text");
+  await doc.getByText("Updated first section").waitFor();
+
+  // The question is kept, and the way to where it was asked says its passage is gone instead of doing nothing.
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.locator(".qp-row", { hasText: "How strong is the evidence?" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Show where it was asked" }).click();
+  await page.locator(".toast", { hasText: "The passage it was marked on is no longer in this source." }).waitFor();
+
+  await doc.getByText("The last paragraph stays as it is.").click();
+  await page.keyboard.press("Meta+z");
+  await doc.getByText("First section", { exact: true }).waitFor();
+  await settled(page);
+  if (await doc.getByText(KETTLE).count()) throw new Error("the first ⌘Z went past the second reimport");
+  await page.keyboard.press("Meta+z");
+  await doc.getByText(KETTLE).waitFor();
+  await settled(page);
+  if (await doc.getByText("Updated first section").count()) throw new Error("the second ⌘Z brought back the newer version");
+  const ann = ((await ore("show", item.id, "--annotations")) as { annotations: { exact: string; note?: string; status: string }[] }).annotations.find((a) => a.exact === KETTLE);
+  if (ann?.status === "deleted" || ann?.note !== "Keep this kettle note.") throw new Error(`the removed highlight did not come back with its note: ${JSON.stringify(ann)}`);
+  // Redo replays them in order.
+  await page.keyboard.press("Meta+Shift+z");
+  await until("⇧⌘Z takes the first reimport again", async () => !(await doc.getByText(KETTLE).count()) && (await doc.getByText("First section", { exact: true }).count()) === 1);
+  await settled(page);
+  await page.keyboard.press("Meta+Shift+z");
+  await doc.getByText("Updated first section").waitFor();
+  await settled(page);
+});
+
 journey("cancel an add from its toast: nothing is added, and the link stays in the box", async (page) => {
   // A page that hangs on its picture, which is fetched after the source is written.
   const page$ = `<html><head><title>Slow page</title><meta property="og:image" content="/cover.jpg"></head><body><article><h1>Slow page</h1><p>${"Spacing beats cramming. ".repeat(40)}</p></article></body></html>`;
