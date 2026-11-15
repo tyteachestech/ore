@@ -13594,6 +13594,37 @@ journey("sidebar and side panel: an edge dragged past half its narrowest dims wh
   await until("opened again, the panel has its old width", async () => (await panel.count()) > 0 && Math.abs((await panel.boundingBox())!.width - wide) <= 2);
 });
 
+journey("a long table keeps its header row in view down it and its first column across it, inside its own box (D-new-table-heads)", async (page) => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-table-"));
+  const file = join(dir, "table.md");
+  const cols = ["Element", "Symbol", "Number", "Mass", "Group", "Period", "Block", "Discovered", "Named for"];
+  const rows = Array.from({ length: 60 }, (_, i) => `| Element ${i + 1} | E${i + 1} | ${i + 1} | ${(i * 2.1).toFixed(1)} | ${(i % 18) + 1} | ${(i % 7) + 1} | s | ${1700 + i} | a long reason for its name, number ${i + 1} |`);
+  writeFileSync(file, `# A long table of elements\n\nSixty rows follow.\n\n| ${cols.join(" | ")} |\n|${cols.map(() => "---").join("|")}|\n${rows.join("\n")}\n\nAnd text after it.\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await page.reload();
+    await openSource(page, "A long table of elements");
+    const table = page.locator(".doc table");
+    await table.waitFor();
+    const box = (await table.boundingBox())!;
+    if (box.height > 700 * 0.7 + 2) throw new Error(`the table is ${box.height}px tall in a 700px window: it should scroll in its own box`);
+    await table.evaluate((t) => { t.scrollTop = 900; t.scrollLeft = 300; });
+    await until("the header row stays at the table's top", async () => {
+      const head = (await table.locator("thead th").nth(3).boundingBox())!;
+      return Math.abs(head.y - box.y) <= 1;
+    });
+    const first = (await table.locator("tbody tr").nth(30).locator("td").first().boundingBox())!;
+    if (Math.abs(first.x - box.x) > 1) throw new Error(`the first column moved off the left edge: ${first.x} vs ${box.x}`);
+    // What is drawn at the header's place is the header, not a row scrolled under it.
+    const over = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest("th, td")?.tagName, [box.x + 260, box.y + 8]);
+    if (over !== "TH") throw new Error(`under the header's place is a ${over}`);
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);

@@ -816,8 +816,17 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .figure-label .field { width: 220px; }
 .figure-tip { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); color: var(--faint); font-family: var(--mono); font-size: 11px; pointer-events: none; }
 .doc hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
-.doc table { border-collapse: collapse; font-size: 0.92em; display: block; overflow-x: auto; }
-.doc th, .doc td { border: 1px solid var(--border); padding: 4px 8px; }
+/* A long table scrolls in its own box, no taller than most of the window, so its header row and first column stay
+   in view while he reads down or across it (D-new-table-heads; Notion's and Airtable's frozen header and first column).
+   Sticky cells are drawn opaque, and their rules as shadows, since a collapsed border scrolls away under them. */
+.doc table { border-collapse: separate; border-spacing: 0; font-size: 0.92em; display: block; overflow: auto; max-height: 70vh; overscroll-behavior: auto; }
+.doc th, .doc td { border: 0; box-shadow: inset -1px -1px 0 var(--border); padding: 4px 8px; background: var(--bg); }
+.doc tr > :first-child { box-shadow: inset 1px 0 0 var(--border), inset -1px -1px 0 var(--border); }
+.doc table tr:first-child > * { box-shadow: inset 0 1px 0 var(--border), inset -1px -1px 0 var(--border); }
+.doc table tr:first-child > :first-child { box-shadow: inset 1px 1px 0 var(--border), inset -1px -1px 0 var(--border); }
+.doc thead th, .doc thead th:has(.col-cover) { position: sticky; top: 0; z-index: 2; }
+.doc tr > :first-child { position: sticky; left: 0; z-index: 1; }
+.doc thead tr > :first-child { z-index: 3; }
 /* A covered column (D200): each cell a block he clicks to check himself. The text stays under it, unpainted. */
 .doc td.covered { position: relative; color: transparent; cursor: pointer; user-select: none; -webkit-user-select: none; }
 .doc td.covered > * { visibility: hidden; }
