@@ -43,8 +43,8 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-/** A small web: blogs, their feeds and posts; `down` hosts don't answer. */
-function serve(down = new Set<string>()) {
+/** A small web: blogs, their feeds and posts; `down` hosts don't answer, `swap` pages answer something else. */
+function serve(down = new Set<string>(), swap: Record<string, [string, string]> = {}) {
   const pages: Record<string, [string, string]> = {
     "https://simonwillison.net/": [`<html><head><link rel="alternate" type="application/atom+xml" title="Atom" href="/atom/everything/"></head><body>Blog</body></html>`, "text/html"],
     "https://simonwillison.net/atom/everything/": [ATOM, "application/atom+xml"],
@@ -54,6 +54,7 @@ function serve(down = new Set<string>()) {
     // A Wikipedia article names the wiki's feed of recent edits, which answers.
     "https://en.wikipedia.org/wiki/Spaced_repetition": [readFileSync(join(import.meta.dir, "fixtures/intake/web/wikipedia.html"), "utf8"), "text/html"],
     "https://en.wikipedia.org/w/index.php?title=Special:RecentChanges&feed=atom": [ATOM, "application/atom+xml"],
+    ...swap,
   };
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input);
@@ -155,6 +156,42 @@ describe("the Feed", () => {
     const v = feedView(lib);
     expect(v.feeds[0]!.error).toMatch(/Couldn’t reach/);
     expect(v.posts.length).toBe(1);
+  });
+
+  // Codex sweep 10, OFF-1: a download cut off partway parsed as a feed with no posts, and refresh put that in place of them.
+  test("a feed cut off partway keeps its last posts and says why (F-new-feed-truncated)", async () => {
+    serve();
+    const lib = await tempLibrary();
+    await followFeed(lib, "https://howiai.example.com/");
+    await refreshFeeds(lib);
+    expect(feedView(lib).posts.length).toBe(2);
+    const cut = readFileSync(join(import.meta.dir, "fixtures/feeds/truncated.xml"), "utf8");
+    serve(new Set(), { "https://howiai.example.com/feed": [cut, "application/rss+xml"] });
+    const r = await refreshFeeds(lib);
+    expect(r.failed[0]?.error).toMatch(/howiai.example.com sent a feed that stops partway/);
+    const v = feedView(lib);
+    expect(v.feeds[0]!.error).toMatch(/stops partway/);
+    expect(v.posts.map((p) => p.title)).toEqual(["Newest", "Claire on agents"]);
+    // Cut off mid-tag, or with the channel closed and the feed not: the same.
+    for (const body of [RSS.slice(0, -20), RSS.replace("</rss>", "")]) {
+      serve(new Set(), { "https://howiai.example.com/feed": [body, "application/rss+xml"] });
+      expect((await refreshFeeds(lib)).failed.length).toBe(1);
+    }
+    // A whole feed with no posts in it is no error: the feed has none.
+    serve(new Set(), { "https://howiai.example.com/feed": [`<?xml version="1.0"?><rss version="2.0"><channel><title>How I AI</title></channel></rss>\n<!-- cached -->\n`, "application/rss+xml"] });
+    expect((await refreshFeeds(lib)).failed).toEqual([]);
+    expect(feedView(lib).posts).toEqual([]);
+  });
+
+  // Codex sweep 10, OFF-2: 30 copies of one post used up the 30 a feed keeps, so the next post never showed.
+  test("repeated items don't use up a feed's posts (F-new-feed-duplicates)", async () => {
+    const xml = readFileSync(join(import.meta.dir, "fixtures/feeds/duplicates.xml"), "utf8").replaceAll("__DATE__", ago(1));
+    serve(new Set(), { "https://howiai.example.com/feed": [xml, "application/rss+xml"] });
+    expect((await findFeed("https://howiai.example.com/feed")).posts).toBe(2);
+    const lib = await tempLibrary();
+    await followFeed(lib, "https://howiai.example.com/");
+    await refreshFeeds(lib);
+    expect(feedView(lib).posts.map((p) => p.url).sort()).toEqual(["https://offline.example/post-1", "https://offline.example/post-2"]);
   });
 });
 
