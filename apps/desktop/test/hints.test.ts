@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { BINDINGS } from "../src/keys";
 
-// The shortcut-hint rule (AGENTS.md, UI quality bar): a control whose action has a binding shows
+// The shortcut-hint rule (apps/desktop/AGENTS.md, UI quality bar): a control whose action has a binding shows
 // that binding, through <Hint keys=…> or an inline label(keys.<id>). A binding with no on-screen
 // control is listed here with the reason; add a control's hint instead whenever one exists.
 const NO_CONTROL: Record<string, string> = {
