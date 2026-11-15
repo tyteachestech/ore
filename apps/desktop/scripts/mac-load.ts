@@ -34,10 +34,16 @@ export function refusal(free: number | null, running: number, alone = false): st
   return null;
 }
 
-/** The folders `clean` refuses: Tyler's own checkout, app and library. */
+/** The folders `clean` refuses: Tyler's own checkout, app and library, anything inside them, and any folder holding
+ *  them (`~`, `~/Developer`), which would stop his too. */
 export function isTylers(dir: string, home = homedir()): boolean {
-  return dir === `${home}/Developer/ore` || dir.startsWith("/Applications") || dir === `${home}/Ore` || dir.startsWith(`${home}/Ore/`);
+  const own = [`${home}/Developer/ore`, `${home}/Ore`, "/Applications"];
+  return dir === "/" || own.some((o) => dir === o || dir.startsWith(o + "/") || o.startsWith(dir + "/"));
 }
+
+/** A Claude session or the shell it runs a command in, matched on the program, not on words in its arguments. */
+export const isClaude = (command: string) =>
+  /^(\S*\/)?claude(\s|$)|\/claude\.app\/Contents\/MacOS\/claude(\s|$)|^\/Applications\/Claude\.app\/|\/Contents\/Helpers\/disclaimer\s|\.claude\/shell-snapshots\//i.test(command);
 
 /** Processes started from `dir` (its path in their command or their working folder inside it), never `self`,
  *  its ancestors or its process group, and never a Claude session. */
@@ -47,9 +53,10 @@ export function toStop(procs: Proc[], dir: string, self: number, spareGroup = tr
   for (let p = byPid.get(self); p && !keep.has(p.pid); p = byPid.get(p.ppid)) keep.add(p.pid);
   const group = spareGroup ? byPid.get(self)?.pgid : undefined;
   const inside = (path?: string) => !!path && (path === dir || path.startsWith(dir + "/"));
+  const named = (command: string) => command.split(dir).slice(1).some((after) => after === "" || /^[\/\s"']/.test(after));
   return procs
-    .filter((p) => !keep.has(p.pid) && p.pgid !== group && !/claude/i.test(p.command))
-    .filter((p) => p.command.includes(dir) || inside(p.cwd))
+    .filter((p) => !keep.has(p.pid) && p.pgid !== group && !isClaude(p.command))
+    .filter((p) => named(p.command) || inside(p.cwd))
     .map((p) => p.pid);
 }
 
@@ -76,10 +83,13 @@ export function processes(withCwd = false): Proc[] {
   return procs;
 }
 
-/** null when a run may start, else why not. Prints what it saw. */
-export function check(alone = false, log = console.log): string | null {
+/** null when a run may start, else why not. Prints what it saw. `own` counts testers this process is starting,
+ *  which may not show as Codex yet, in place of its own descendants. */
+export function check(alone = false, log = console.log, own?: number): string | null {
   const free = freePercent(sh(["memory_pressure", "-Q"]));
-  const running = testers(processes());
+  const procs = processes();
+  const mine = own === undefined ? new Set<number>() : new Set(descendants(procs, process.pid));
+  const running = testers(procs.filter((p) => !mine.has(p.pid))) + (own ?? 0);
   log(`memory free: ${free ?? "?"}%   Codex testers running: ${running}`);
   return refusal(free, running, alone);
 }

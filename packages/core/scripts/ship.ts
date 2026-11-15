@@ -44,10 +44,18 @@ export async function ship({ sh, log, reviewed, wait = Bun.sleep, tries = 3, liv
     }
     must(["bun", "packages/core/scripts/ids.ts", "--check"], "A placeholder is still left (an F-new or D-new name with no row to number).");
     must(["git", "push", "-q", "-u", "origin", branch], "git push failed.");
-    const red = sh(["gh", "run", "list", "--workflow", "test.yml", "--branch", "master", "--status", "completed", "--limit", "1", "--json", "conclusion,url", "-q", '.[] | select(.conclusion != "success") | .url']).out;
+    // The last run that finished: a cancelled or skipped run says nothing about master.
+    const red = sh(["gh", "run", "list", "--workflow", "test.yml", "--branch", "master", "--status", "completed", "--limit", "20", "--json", "conclusion,url", "-q",
+      '[.[] | select(.conclusion != "cancelled" and .conclusion != "skipped")][0] | select(.conclusion != "success") | .url']).out;
     if (red) throw new Error(`Master's last finished test run is red (${red}): fix master first.`);
     log(`waiting for PR #${pr}'s checks…`);
-    await wait(10_000); // the push's checks take a moment to register
+    const pushed = must(["git", "rev-parse", "HEAD"], "No HEAD.");
+    for (let t = 0; ; t++) { // the push's checks take a moment to register, longer on a busy Actions queue
+      const n = sh(["gh", "api", `repos/{owner}/{repo}/commits/${pushed}/check-runs`, "-q", ".total_count"]).out;
+      if (Number(n) > 0) break;
+      if (t >= 36) throw new Error(`No checks registered for ${pushed} after 6 minutes.`);
+      await wait(10_000);
+    }
     if (sh(["gh", "pr", "checks", String(pr), "--watch", "--fail-fast"], { live: true }).code !== 0) throw new Error(`PR #${pr}'s checks failed.`);
     must(["git", "fetch", "-q", "origin", "master"], "git fetch failed.");
     if (must(["git", "rev-parse", "origin/master"], "No origin/master.") !== master) {

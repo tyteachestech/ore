@@ -1,6 +1,6 @@
 // The Codex sweep runner and its Mac load guard (retro 2026-11-15: five testers at once froze Tyler's Mac).
 import { describe, expect, test } from "bun:test";
-import { freePercent, isTylers, refusal, testers, toStop, type Proc } from "../scripts/mac-load";
+import { freePercent, isClaude, isTylers, refusal, testers, toStop, type Proc } from "../scripts/mac-load";
 import { alone, fill, next, pickPorts, type Tester } from "../scripts/sweep";
 
 const proc = (pid: number, ppid: number, command: string, cwd?: string, pgid = pid): Proc => ({ pid, ppid, pgid, command, cwd });
@@ -42,13 +42,27 @@ describe("mac load", () => {
       proc(202, 1, "claude --resume", dir),
       proc(203, 1, "bun serve.ts", `${dir}2`),
       proc(204, 101, `sh -c pgrep -f ${dir}`, dir, 101),
+      proc(205, 1, `bun ${dir}-retry/codex-out/serve.ts`, "/u"),
+      proc(206, 1, `codex exec -C ${dir} "read CLAUDE.md first"`, dir),
     ];
-    expect(toStop(ps, dir, 101).sort()).toEqual([200, 201]);
-    expect(toStop(ps, dir, 101, false).sort()).toEqual([200, 201, 204]);
+    expect(toStop(ps, dir, 101).sort()).toEqual([200, 201, 206]);
+    expect(toStop(ps, dir, 101, false).sort()).toEqual([200, 201, 204, 206]);
     expect(isTylers("/u/Developer/ore", "/u")).toBe(true);
     expect(isTylers("/u/Ore/items", "/u")).toBe(true);
+    expect(isTylers("/u/Developer/ore/apps", "/u")).toBe(true);
+    expect(isTylers("/u/Developer", "/u")).toBe(true);
+    expect(isTylers("/u", "/u")).toBe(true);
     expect(isTylers("/u/Developer/ore-wt/sweep4", "/u")).toBe(false);
+    expect(isTylers("/u/Developer/ore-wt", "/u")).toBe(false);
   });
+});
+
+test("a Claude session is known by its program, not by words in its arguments", () => {
+  expect(isClaude("/Users/t/Library/Application Support/Claude/claude-code/2.1/x/claude.app/Contents/MacOS/claude --output-format stream-json")).toBe(true);
+  expect(isClaude("claude --resume")).toBe(true);
+  expect(isClaude("/Applications/Claude.app/Contents/MacOS/Claude")).toBe(true);
+  expect(isClaude("/bin/zsh -c source /Users/t/.claude/shell-snapshots/snapshot-zsh-1.sh && bun test")).toBe(true);
+  expect(isClaude("codex exec -C /u/Developer/ore-wt/claude-x read CLAUDE.md")).toBe(false);
 });
 
 describe("sweep runner", () => {

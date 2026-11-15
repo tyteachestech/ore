@@ -7,7 +7,7 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { freePercent, refusal } from "../../desktop/scripts/mac-load";
 
@@ -65,7 +65,8 @@ async function main() {
   console.log(describe(installedVersion(iphone.udid), build));
   if (process.argv.includes("--status")) return;
 
-  while (spawnSync("pgrep", ["-f", "app-install"]).status === 0) {
+  // The Mac app's reinstall after a pull holds this lock (.githooks/post-commit); two Rust builds at once load the Mac.
+  while (existsSync(join(homedir(), "Library/Caches/ore/app-install.lock"))) {
     console.log("waiting for the Mac app's reinstall to finish…");
     await Bun.sleep(15_000);
   }

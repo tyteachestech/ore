@@ -16,6 +16,7 @@ function fake(over: (cmd: string) => { code?: number; out?: string } | undefined
     if (c === "gh pr view --json number -q .number") return { code: 0, out: "431" };
     if (c === "git rev-parse origin/master") return { code: 0, out: masters.length > 1 ? masters.shift()! : masters[0]! };
     if (c === "git rev-parse HEAD") return { code: 0, out: "h1" };
+    if (c.includes("/check-runs")) return { code: 0, out: "6" };
     return { code: 0, out: "" };
   };
   return { sh, calls, setMasters: (m: string[]) => (masters = m) };
@@ -45,6 +46,19 @@ test("refuses without a review, from master, with uncommitted work, or while mas
   const red = fake((c) => (c.startsWith("gh run list") ? { out: "https://github.com/x/runs/1" } : undefined));
   await expect(go(red.sh)).rejects.toThrow("red");
   expect(red.calls.some((c) => c.startsWith("gh pr merge"))).toBe(false);
+});
+
+test("waits for the pushed commit's checks to register before watching them", async () => {
+  let n = 0;
+  const f = fake((c) => (c.includes("/check-runs") ? { out: String(n++ < 2 ? 0 : 3) } : undefined));
+  expect(await go(f.sh)).toBe(431);
+  expect(f.calls.filter((c) => c.includes("/check-runs")).length).toBe(3);
+});
+
+test("a cancelled run on master is skipped when asking whether master is red", async () => {
+  const f = fake();
+  await go(f.sh);
+  expect(f.calls.find((c) => c.startsWith("gh run list"))).toContain('"cancelled"');
 });
 
 test("failed checks stop it, and master moving during the checks starts it again", async () => {
