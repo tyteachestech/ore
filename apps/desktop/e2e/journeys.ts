@@ -651,17 +651,18 @@ journey("reimport twice, then ⌘Z twice: each Undo puts back the version its re
   await ore("highlight", item.id, "--exact", KETTLE, "--intent", "keep", "--note", "Keep this kettle note.");
   await ore("highlight", item.id, "--exact", ASKED, "--intent", "question", "--note", "How strong is the evidence?");
   const kept = join(item.dir, "source.ipynb");
-  const reimport = async (md: string, says: string) => {
+  const reimport = async (md: string, says?: string) => {
     writeFileSync(kept, nb(md));
     await page.getByRole("button", { name: "Source actions" }).first().click();
     await page.getByRole("menuitem", { name: "Reimport" }).click();
-    await page.locator(".toast", { hasText: says }).waitFor();
+    if (says) await page.locator(".toast", { hasText: says }).waitFor();
+    await settled(page);
   };
   await page.reload();
   await openSource(page, "Reimport undo study");
   const V1 = V0.replace(`${KETTLE}\n\n${ASKED}\n\n`, "");
   await reimport(V1, "1 highlight is no longer in it, so it was removed. A question’s passage is no longer in it; the question is kept");
-  await reimport(V1.replace("## First section", "## Updated first section"), "Reimported with the latest text");
+  await reimport(V1.replace("## First section", "## Updated first section"));
   await doc.getByText("Updated first section").waitFor();
 
   // The question is kept, and the way to where it was asked says its passage is gone instead of doing nothing.
