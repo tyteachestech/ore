@@ -54,13 +54,22 @@ export async function oreJob<T>(job: string | null, stdin: string | null, ...arg
 }
 
 let creating: Promise<unknown> | null = null;
+/** A call has found the library this launch, so a missing one later was moved, not never made. */
+const launch = { opened: false };
 /** First launch on a new Mac: there is no library yet, so make the default one (~/Ore) once and
- *  try again, instead of greeting a friend with "no library at …". */
-export async function firstRun<T>(call: () => Promise<T>, init: () => Promise<unknown>): Promise<T> {
+ *  try again, instead of greeting a friend with "no library at …". A library that was there and is
+ *  gone (moved or renamed while Ore is open) is said so, never replaced by an empty one (Codex sweep 4). */
+export async function firstRun<T>(call: () => Promise<T>, init: () => Promise<unknown>, seen = launch): Promise<T> {
   try {
-    return await call();
+    const r = await call();
+    seen.opened = true;
+    return r;
   } catch (e) {
     if (!(e instanceof Error && e.message.startsWith("no library at"))) throw e;
+    if (seen.opened) {
+      const at = e.message.slice("no library at ".length).replace(/ \(run .*$/, "");
+      throw new Error(`Your library is no longer at ${at}: it was moved, renamed or deleted. Put the folder back there, then try again.`);
+    }
     await (creating ??= init().catch((err) => {
       creating = null;
       throw new Error(typeof err === "string" ? err : String(err));

@@ -2565,6 +2565,48 @@ journey("notebook: a cell's output is folded until he opens it, a click or Enter
   }
 });
 
+journey("reader: a drag over a long book's first page while the rest is still loading is highlighted, not dropped (Codex sweep 4)", async (page) => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-long-"));
+  const file = join(dir, "long.md");
+  const para = (c: number, i: number) => `Paragraph ${i} of chapter ${c} says that spacing practice over days beats cramming it into one night, and that recall beats rereading. `.repeat(6);
+  writeFileSync(file, `# A very long book to load\n\nRetrieval first is the opening line of this book.\n\n${Array.from({ length: 60 }, (_, c) => `## Chapter ${c + 1}\n\n${Array.from({ length: 40 }, (_, i) => para(c + 1, i)).join("\n\n")}`).join("\n\n")}\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "A very long book to load");
+    await page.locator(".doc p", { hasText: "Retrieval first" }).waitFor();
+    await select(page, "Retrieval first is the opening line");
+    const chapters = await page.locator(".doc h2").count();
+    if (chapters >= 60) throw new Error("the whole book had loaded before the drag: nothing was tested");
+    await page.locator(".popup").waitFor({ timeout: 15000 });
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+journey("reader: Arabic and Hebrew read right to left, their list numbers on the right, beside English left to right (Codex sweep 4)", async (page) => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-rtl-"));
+  const file = join(dir, "rtl.md");
+  writeFileSync(file, "# دروس قصيرة\n\nالتكرار المتباعد يساعد على التذكر مع Ore 2026 كل يوم.\n\n1. الدرس الأول\n2. הלימוד השני\n\n> اقتباس قصير من الكتاب.\n\nA line in English stays left to right.\n");
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "دروس قصيرة");
+    const dirOf = (sel: string, text: string) => page.locator(sel, { hasText: text }).first().evaluate((e) => getComputedStyle(e).direction);
+    await page.locator(".doc p", { hasText: "التكرار" }).waitFor();
+    if ((await dirOf(".doc p", "التكرار")) !== "rtl") throw new Error("an Arabic paragraph reads left to right");
+    if ((await dirOf(".doc ol", "الدرس")) !== "rtl") throw new Error("an Arabic list keeps its numbers on the left");
+    if ((await dirOf(".doc li", "הלימוד")) !== "rtl") throw new Error("a Hebrew list item reads left to right");
+    if ((await dirOf(".doc blockquote", "اقتباس")) !== "rtl") throw new Error("an Arabic quote keeps its rule on the left");
+    if ((await dirOf(".doc p", "English")) !== "ltr") throw new Error("English beside them turned right to left");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 journey("original: a PDF's side panel has an Original tab that draws its page, follows the page being read, and ‹ › turn to another (D202)", async (page) => {
   const made = (await ore("add", join(FIXTURES, "textbook.pdf"), "--no-enrich")) as { id: string };
   const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
@@ -8231,12 +8273,16 @@ async function finishWithNothingDrafted(page: Page) {
 }
 
 journey("review: a first day with no exercises yet says how to get one, not that he is caught up (Codex sweep 4)", async (page) => {
+  await page.reload();
+  await page.locator(".home-goal h1").waitFor();
   await page.evaluate(() => {
     const w = window as unknown as { __ORE_REPLY: Record<string, unknown>; __ORE_EDIT: Record<string, (j: unknown) => unknown> };
     w.__ORE_REPLY = { due: [] };
     w.__ORE_EDIT = { today: (t) => ({ ...(t as object), due: 0, new_waiting: 0, exercises: 0 }) };
   });
   await page.keyboard.press("Meta+KeyR");
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  if (await pick.waitFor({ timeout: 3000 }).then(() => true, () => false)) await pick.getByRole("button", { name: "Start review" }).click();
   await page.locator(".toast").filter({ hasText: "No exercises yet" }).waitFor();
   await page.evaluate(() => {
     const w = window as unknown as { __ORE_REPLY: Record<string, unknown>; __ORE_EDIT: Record<string, unknown> };
@@ -11431,6 +11477,10 @@ journey("phone: a file picked with + is read on the phone; a picture waits for t
   await pick("outline.pdf");
   await page.locator(".add-link").waitFor({ state: "detached" });
   await page.getByText("Added “Remembering on purpose”").waitFor();
+  // Codex sweep 4: a Korean PDF whose font names its encoding read as only its punctuation without the CMaps.
+  await pick("korean.pdf");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText("Added “기억을 오래 남기는 방법”").waitFor();
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
   const drawn = page.locator("li", { hasText: "Remembering on purpose" }).locator("img.thumb");

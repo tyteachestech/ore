@@ -3,6 +3,7 @@ import * as pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
+import { CMAPS } from "./pdf-cmaps.ts";
 import { cleanTitle, fileAuthor, lineBreakSpace } from "./check.ts";
 import type { Box, Region } from "./docling.ts";
 import { pageFigures, png } from "./pdf-figures.ts";
@@ -425,10 +426,24 @@ async function pdfMeta(doc: PdfDocument): Promise<{ title?: string; author?: str
   return { title: info.Title?.trim() || undefined, author: fileAuthor(author) };
 }
 
+/** What pdf.js asks for beyond the file: the CMaps a CJK font names instead of carrying (Codex sweep 4:
+ *  a Korean PDF read as only its punctuation without them), from the ones carried in `ore`. */
+class CarriedData {
+  constructor(_: unknown) {}
+  async fetch({ kind, filename }: { kind: string; filename: string }): Promise<Uint8Array> {
+    const path = kind === "cMapUrl" ? CMAPS[filename.replace(/\.bcmap$/, "")] : undefined;
+    if (!path) throw new Error(`Unable to load ${kind} data: ${filename}`);
+    // In `ore` a carried file; on the iPhone (no Bun.file) one of the app's own files, or a small one inlined
+    // as a data URL, decoded here since the phone's CSP lets it fetch only its own files.
+    if (path.startsWith("data:")) return Uint8Array.from(atob(path.slice(path.indexOf(",") + 1)), (c) => c.charCodeAt(0));
+    return new Uint8Array(await (typeof Bun !== "undefined" && typeof Bun.file === "function" ? Bun.file(path) : await fetch(path)).arrayBuffer());
+  }
+}
+
 /** Opens a PDF quietly (pdf.js warns on stdout about any damage it works around), refusing one it
  *  can't open with the next step. */
 export function openPdf(data: Uint8Array) {
-  const task = getDocument({ data: data.slice(), useSystemFonts: true, fontExtraProperties: true, verbosity: 0, isOffscreenCanvasSupported: false, isImageDecoderSupported: false });
+  const task = getDocument({ data: data.slice(), BinaryDataFactory: CarriedData, useSystemFonts: true, fontExtraProperties: true, verbosity: 0, isOffscreenCanvasSupported: false, isImageDecoderSupported: false });
   const promise = task.promise.catch((e: Error) => {
     if (e.name === "PasswordException") throw new Error("That PDF is locked with a password. Open it in Preview, enter the password, choose File › Export as PDF, and add the copy.");
     throw new Error("That file isn’t a readable PDF: it may be damaged or only partly downloaded. Download it again, or open it in Preview and choose File › Export as PDF.");
@@ -629,7 +644,8 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   const notes = footnotes(paras);
   const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => (isBlock(x.text) ? blocks[Number(x.text.slice(1, -1))]! : notes(x.text, i))), ...kept[i]!.filter((a) => shown.has(a.name)).map((a) => `![](assets/${a.name})`)].join("\n\n")}`);
   const text = pages.join("\n\n") + "\n";
-  if (text.replace(/<!-- page \d+ -->|!\[\]\(assets\/[^)]+\)/g, "").trim().length < 20) {
+  // Letters and numbers only: a font pdf.js can't map leaves its punctuation, which is no text to read.
+  if (text.replace(/<!-- page \d+ -->|!\[\]\(assets\/[^)]+\)/g, "").replace(/[^\p{L}\p{N}]/gu, "").length < 20) {
     throw new ScannedPdf();
   }
   // A metadata title that is only a file or tool name ("1706", "Microsoft Word - draft.docx") loses to page 1's.

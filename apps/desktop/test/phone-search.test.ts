@@ -20,6 +20,7 @@ beforeAll(async () => {
   const add = "insert into fts (kind, ref, item, title, body) values (?, ?, ?, ?, ?)";
   db.run(add, ["item", "a", "a", "Spaced repetition", "Reviewing at growing intervals beats cramming."]);
   db.run(add, ["card", "c1", "b", "How the web works", "A browser asks a server for a page."]);
+  db.run("insert into fts (kind, ref, item, title, body, chars) values (?, ?, ?, ?, ?, ?)", ["item", "j", "j", "日本語", "毎朝勉強する。", "日 本 語 毎 朝 勉 強 す る"]);
 });
 
 const search = (q: string) =>
@@ -37,4 +38,10 @@ test("the start of a word finds it, as FTS5's prefix query does", () => {
 
 test("the kind, ref and item columns aren't searched", () => {
   expect(search("card")).toEqual([]);
+});
+
+test("a word inside Japanese is found from its letters side by side, as on the Mac (Codex sweep 4)", () => {
+  const q = statement(/select kind, ref, item, title, body, snippet\(fts[^"]*/);
+  expect(db.query<{ ref: string }>(q).all('"勉 強"', 10).map((h) => h.ref)).toEqual(["j"]);
+  expect(db.query<{ ref: string }>(q).all('"勉 朝"', 10)).toEqual([]);
 });

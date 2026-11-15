@@ -17,3 +17,18 @@ Five Codex testers on ground no earlier sweep took. The Mac froze with all five 
 | settings 7 | A goal off the list showed no choice picked | fixed |
 | settings 8 | A bad value in skills.yaml fell back silently | fixed (Settings names it) |
 | settings 9 | An empty skill name in skills.yaml showed a blank skill | fixed (its id shows; doctor names it) |
+| durability 1 | A failed phone save looked saved, gone on reload | not a bug: only the browser build's IndexedDB stand-in; the iPhone app keeps and retries a failed write |
+| durability 2 | A library moved while Ore was open was replaced by an empty one | fixed (says it was moved, makes none) |
+| durability 3 | A wrong clock's future review made the replayed schedule differ from the saved one | fixed (the rating is saved as the log replays; doctor names the future-dated review) |
+| durability 4 | A killed add left a folder nothing names | fixed (doctor names it) |
+| languages 1 | A Korean PDF came in as punctuation | fixed (CMaps carried in `ore` and the phone; punctuation alone is no text) |
+| languages 2 | A Hebrew PDF from macOS saved words in reverse | open: needs the sweep's file |
+| languages 3 | Arabic and Hebrew read left to right | fixed (each block takes its direction from its letters) |
+| languages 4 | A Thai page was refused as almost no text | fixed |
+| languages 5 | Search missed words inside Chinese, Japanese, Thai | fixed |
+| languages 6 | Accents typed two ways didn't find each other | fixed (search and Find) |
+| languages 7 | Ruby spaced off or hidden | fixed (letters with the reading in brackets) |
+| languages 8 | Joined emoji came apart from web pages | fixed |
+| scale 1 | A drag on a long book while it loads was dropped | fixed (kept, highlighted once loaded) |
+| scale 2 | Phone holds a frame ~500 ms opening a skill, ~330 ms starting Review | open: needs a profile |
+| scale 3 | Filing or archiving one source rereads both source lists | open |
