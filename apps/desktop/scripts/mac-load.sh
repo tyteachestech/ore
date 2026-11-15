@@ -17,8 +17,15 @@ clean)
   dir=$(cd "${2:?usage: mac-load.sh clean <worktree dir>}" && pwd)
   case "$dir" in "$HOME/Developer/ore" | /Applications* | "$HOME/Ore"*) echo "Refusing $dir: that is Tyler's own."; exit 1 ;; esac
   pids=$( { pgrep -f "$dir" || true; lsof -d cwd -Fpn 2>/dev/null | awk -v d="$dir" '/^p/{p=substr($0,2)} /^n/ && index(substr($0,2)"/", d"/")==1{print p}'; } | sort -u | grep -vx -e "$$" -e "$PPID" || true)
-  # never the Claude session that runs this, or its shell
-  pids=$(for p in $pids; do ps -o command= -p "$p" 2>/dev/null | grep -qi claude || echo "$p"; done)
+  # never this script's own helpers or its ancestors, never a Claude session, and only processes still alive
+  me=$(ps -o pgid= -p $$ | tr -d ' '); up=" "; p=$$
+  while [ "$p" -gt 1 ]; do up="$up$p "; p=$(ps -o ppid= -p "$p" | tr -d ' '); done
+  pids=$(for p in $pids; do
+    case "$up" in *" $p "*) continue ;; esac
+    [ "$(ps -o pgid= -p "$p" 2>/dev/null | tr -d ' ')" = "$me" ] && continue
+    kill -0 "$p" 2>/dev/null || continue
+    ps -o command= -p "$p" | grep -qi claude || echo "$p"
+  done)
   [ -n "$pids" ] || { echo "Nothing running from $dir."; exit 0; }
   ps -o pid=,command= -p $(echo $pids | tr ' ' ',') | cut -c1-120
   kill $pids 2>/dev/null || true; sleep 2; kill -9 $pids 2>/dev/null || true
