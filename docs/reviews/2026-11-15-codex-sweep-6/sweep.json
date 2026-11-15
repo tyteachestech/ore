@@ -1,0 +1,6 @@
+{ "testers": [
+  { "name": "today", "seed": "seed" },
+  { "name": "exercises", "seed": "seed" },
+  { "name": "looks", "seed": "seed" },
+  { "name": "organize", "seed": "big" }
+] }
