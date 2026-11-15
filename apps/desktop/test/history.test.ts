@@ -8,7 +8,7 @@ const step = (name: string, redoable = true) => ({
   redo: redoable ? async () => void log.push(`redo ${name}`) : undefined,
 });
 
-test("undo walks back a run of steps, redo walks forward, newest first", () => {
+test("undo walks back a run of steps, redo walks forward, newest first", async () => {
   log.length = 0;
   const h = new History();
   h.push(step("a"));
@@ -19,6 +19,7 @@ test("undo walks back a run of steps, redo walks forward, newest first", () => {
   expect(h.redo()?.message).toBe("a");
   expect(h.redo()?.message).toBe("b");
   expect(h.redo()).toBeUndefined();
+  await Bun.sleep(0);
   expect(log).toEqual(["undo b", "undo a", "redo a", "redo b"]);
 });
 
@@ -52,7 +53,7 @@ test("a forgotten step is gone from undo, as if it never went on", () => {
   expect(log).toEqual(["undo a"]);
 });
 
-test("a toast's own Undo takes back its step out of order, and its Redo does it again", () => {
+test("a toast's own Undo takes back its step out of order, and its Redo does it again", async () => {
   log.length = 0;
   const h = new History();
   const a = step("a");
@@ -64,6 +65,7 @@ test("a toast's own Undo takes back its step out of order, and its Redo does it 
   expect(h.undo()?.message).toBe("b");
   expect(h.again(a)).toBe(true);
   expect(h.again(a)).toBe(false);
+  await Bun.sleep(0);
   expect(log).toEqual(["undo a", "undo b", "redo a"]);
   expect(h.undo()?.message).toBe("a");
 });
@@ -176,4 +178,62 @@ test("it names what undo and redo would take and says each time that changes, fo
     ["a", undefined],
     ["c", undefined], // its undo failed: it is back on top
   ]);
+});
+
+/** A write that lands when `land` is called (or fails with `fail`). */
+const slow = () => {
+  let land!: () => void, fail!: (e: Error) => void;
+  const p = new Promise<void>((res, rej) => ((land = res), (fail = rej)));
+  return { p, land, fail };
+};
+
+test("a held step's undo and redo wait for its write, then run in the order asked (review of #442)", async () => {
+  log.length = 0;
+  const h = new History();
+  const a = step("a");
+  h.push(a);
+  const b = step("b");
+  h.push(b);
+  const w = slow();
+  h.hold(b, w.p);
+  h.undo(); // b: waits for its write
+  h.redo(); // b again: after that undo
+  h.undo(); // b
+  h.undo(); // a: after b's undo, though its own write is long done
+  await Bun.sleep(0);
+  expect(log).toEqual([]);
+  w.land();
+  await Bun.sleep(0);
+  expect(log).toEqual(["undo b", "redo b", "undo b", "undo a"]);
+});
+
+test("a step after a slow undo waits for it: each undo's write lands in the order he pressed ⌘Z (review of #442)", async () => {
+  const seen: string[] = [];
+  const h = new History();
+  const w = slow();
+  h.push({ message: "a", undo: async () => void seen.push("undo a") });
+  h.push({ message: "b", undo: () => w.p.then(() => void seen.push("undo b")) });
+  h.undo();
+  h.undo();
+  await Bun.sleep(0);
+  expect(seen).toEqual([]);
+  w.land();
+  await Bun.sleep(0);
+  expect(seen).toEqual(["undo b", "undo a"]);
+});
+
+test("a held step whose write fails is taken off, and an undo already asked for never runs (review of #442)", async () => {
+  log.length = 0;
+  const h = new History();
+  h.push(step("a"));
+  const b = step("b");
+  h.push(b);
+  const w = slow();
+  h.hold(b, w.p);
+  h.undo();
+  w.fail(new Error("offline"));
+  await Bun.sleep(0);
+  expect(log).toEqual([]);
+  expect(h.canRedo).toBe(false);
+  expect(h.undoName).toBe("a");
 });

@@ -1,7 +1,10 @@
 // The Codex sweep runner and its Mac load guard (retro 2026-11-15: five testers at once froze Tyler's Mac).
 import { describe, expect, test } from "bun:test";
 import { freePercent, isClaude, isTylers, refusal, testers, toStop, type Proc } from "../scripts/mac-load";
-import { alone, fill, next, pickPorts, type Tester } from "../scripts/sweep";
+import { alone, copyLibrary, fill, next, pickPorts, seedLabel, type Tester } from "../scripts/sweep";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const proc = (pid: number, ppid: number, command: string, cwd?: string, pgid = pid): Proc => ({ pid, ppid, pgid, command, cwd });
 
@@ -84,5 +87,24 @@ describe("sweep runner", () => {
     expect(next([big, t("b")], [t("a")])?.name).toBe("b");
     expect(next([big], [])?.name).toBe("scale");
     expect(next([t("b")], [big])).toBeUndefined();
+  });
+});
+
+// Review of #442 (F360): `cp -R from lib` into a lib left by an earlier run made lib/<from's name>.
+describe("a tester from a library folder (F360)", () => {
+  test("its library is a copy of the folder, even where an earlier run left one", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ore-sweep-"));
+    const from = join(dir, "old-ore");
+    mkdirSync(from);
+    writeFileSync(join(from, "skills.yaml"), "ai: claude\n");
+    const lib = join(dir, "lib");
+    await copyLibrary(from, lib);
+    await copyLibrary(from, lib);
+    expect(existsSync(join(lib, "skills.yaml"))).toBe(true);
+    expect(existsSync(join(lib, "old-ore"))).toBe(false);
+  });
+  test("is said as its folder, with no seed or scale", () => {
+    expect(seedLabel({ name: "old", seed: "seed", scale: 5, from: "libs/old" })).toBe("from libs/old");
+    expect(seedLabel({ name: "big", seed: "big", scale: 5 })).toBe("seed big ×5");
   });
 });

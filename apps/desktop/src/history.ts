@@ -2,7 +2,7 @@
  *  step itself. Both go through `ore`, never a snapshot of the library, and return the write's promise
  *  (a type error otherwise, so a write can't fail unseen): if it fails, the step goes back where it was
  *  and `onFail` says why; once it lands, `onLanded` lets screens opened since read their data again. */
-export type Step = { message: string; undo: () => Promise<unknown>; redo?: () => Promise<unknown> };
+export type Step = { message: string; undo: () => Promise<unknown>; redo?: () => Promise<unknown>; pending?: Promise<unknown> };
 
 const LIMIT = 50;
 
@@ -48,6 +48,38 @@ export class History {
     private onLanded?: (step: Step) => void,
   ) {}
 
+  /** The newest undo or redo still out: the next one runs after it, so writes land in the order he asked. */
+  private tail: Promise<unknown> | null = null;
+
+  /** Runs one undo or redo of `step` once its turn comes: after the step's own write (`hold`), and after every
+   *  undo and redo asked before it. With nothing out it runs at once. A step whose write failed is not run. */
+  private turn(step: Step, run: () => Promise<unknown>): Promise<unknown> {
+    const prior = this.tail;
+    const wait = step.pending;
+    const p = !prior && !wait
+      ? run()
+      : (async () => {
+          await prior?.catch(() => {});
+          if (wait && !(await wait.then(() => true, () => false))) return;
+          return run();
+        })();
+    const t: Promise<unknown> = p.catch(() => {}).then(() => {
+      if (this.tail === t) this.tail = null;
+    });
+    this.tail = t;
+    return p;
+  }
+
+  /** The step's own write, still out (it went on the history at once, as the change showed): its undo and redo
+   *  wait for it. One that fails takes the step off, as `forget`. */
+  hold(step: Step, write: Promise<unknown>) {
+    step.pending = write;
+    write.then(
+      () => step.pending === write && (step.pending = undefined),
+      () => this.forget(step),
+    );
+  }
+
   /** A write that failed leaves the library as it was, so its step goes back: ⌘Z (or ⇧⌘Z) tries it again. */
   private watch(step: Step, run: Promise<unknown>, what: "undo" | "redo") {
     run.then(() => this.onLanded?.(step), (e) => {
@@ -73,7 +105,7 @@ export class History {
   undo(): Step | undefined {
     const step = this.past.pop();
     if (!step) return;
-    this.watch(step, step.undo(), "undo");
+    this.watch(step, this.turn(step, step.undo), "undo");
     this.future = step.redo ? [...this.future, step] : [];
     this.onChange?.();
     return step;
@@ -84,7 +116,7 @@ export class History {
     const step = this.future.pop();
     if (!step?.redo) return;
     this.past.push(step);
-    this.watch(step, step.redo(), "redo");
+    this.watch(step, this.turn(step, step.redo), "redo");
     this.onChange?.();
     return step;
   }
@@ -94,7 +126,7 @@ export class History {
   take(step: Step): boolean {
     if (!this.past.includes(step)) return false;
     this.past = this.past.filter((s) => s !== step);
-    const run = step.undo();
+    const run = this.turn(step, step.undo);
     this.future = step.redo ? [...this.future.filter((s) => s !== step), step] : [];
     this.watch(step, run, "undo");
     this.onChange?.();
@@ -106,7 +138,7 @@ export class History {
     if (!step.redo || !this.future.includes(step)) return false;
     this.future = this.future.filter((s) => s !== step);
     this.past.push(step);
-    this.watch(step, step.redo(), "redo");
+    this.watch(step, this.turn(step, step.redo), "redo");
     this.onChange?.();
     return true;
   }

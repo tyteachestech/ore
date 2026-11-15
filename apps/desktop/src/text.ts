@@ -1,12 +1,20 @@
 // Mapping between the rendered reader text and the Markdown source, for highlights.
 // Both sides are reduced to a "skeleton": the characters that render as text, minus whitespace
-// and the punctuation Markdown uses for emphasis, code, links and tables. A selection is matched
+// and, outside code, the punctuation Markdown uses for emphasis, code, links and tables (in code each
+// one is a character he reads, `items[0]`). A formula is one character of its own (MATH), drawn by
+// KaTeX from its TeX: a selection touching it takes all of it, quoted as its `$$…$$`. A selection is matched
 // in the source skeleton to recover the exact source text (so `ore highlight` gets an exact
 // match), and a stored annotation's `exact` is matched in the rendered skeleton to paint it.
 
 import { decodeNamedCharacterReference } from "decode-named-character-reference";
 
-const IGNORED = new Set([..." \t\n\r\f\v   *_`[]|~"]);
+const BLANK = new Set([..." \t\n\r\f\v   "]);
+const IGNORED = new Set([...BLANK, ..."*_`[]|~"]);
+/** A formula's place in both skeletons: one character, never one of the text's. */
+const MATH = "\uFFFC";
+/** A rendered formula: KaTeX's drawing, or its error showing the TeX it could not draw. */
+const MATH_EL = ".katex, .katex-error";
+const skipped = (c: string, code: boolean) => (code ? BLANK : IGNORED).has(c);
 
 /** `refs`: where a character reference (`&amp;`) starts in the source, and how long it is there. */
 export type Skeleton = { chars: string; map: number[]; refs: Map<number, number> };
@@ -26,14 +34,37 @@ const FOOTNOTE_REF = /\[\^[^\]\s]+\]/g;
 const WORD = /[\p{L}\p{N}]/u;
 const SPACE = /\s/;
 
-/** Which characters are code (a fenced block's lines, a code span's text), where Markdown syntax does
- *  not apply: the reader shows each one as written. 1 marks code, 2 a fence line (never shown). */
+/** A line's indent in columns (a tab to the next multiple of 4) and where its text starts. */
+function indentOf(line: string): { cols: number; lead: number } {
+  let cols = 0;
+  let lead = 0;
+  for (; line[lead] === " " || line[lead] === "\t"; lead++) cols = line[lead] === "\t" ? cols + 4 - (cols % 4) : cols + 1;
+  return { cols, lead };
+}
+const LIST_ITEM = /^( {0,3}(?:[-+*]|\d{1,9}[.)]))([ \t]+|$)/;
+
+/** Which characters are code (a fenced block's lines, an indented block's, a code span's text), where Markdown
+ *  syntax does not apply: the reader shows each one as written. 1 marks code, 2 a fence line (never shown).
+ *  An indented block is CommonMark's: 4 columns in, not a paragraph's lazy line, and in a list 4 past the item's text. */
 function codeOf(md: string): Uint8Array {
   const code = new Uint8Array(md.length);
   let open: { ch: string; len: number; quotes: number } | null = null;
   let at = 0;
+  /** The line before was a paragraph's (an indented line then continues it), and the open list's text column. */
+  let para = false;
+  let list = -1;
   for (const line of md.split("\n")) {
     const end = at + line.length;
+    const { cols, lead } = indentOf(line);
+    const blank = lead === line.length;
+    if (!open && !blank) {
+      if (list >= 0 && cols < list && !LIST_ITEM.test(line) && !para) list = -1; // a line left of the item's text ends the list
+      if (!para && cols >= (list >= 0 ? list : 0) + 4) {
+        code.fill(1, at + lead, end);
+        at = end + 1;
+        continue;
+      }
+    }
     if (open) {
       const close = line.match(/^[ \t>]*(`{3,}|~{3,})[ \t]*$/);
       if (close && close[1]![0] === open.ch && close[1]!.length >= open.len) {
@@ -58,6 +89,14 @@ function codeOf(md: string): Uint8Array {
         code.fill(2, at + m[1]!.length, end);
       }
     }
+    if (!open && !blank) {
+      const item = line.match(LIST_ITEM);
+      // Its text starts past the marker and 1 to 4 spaces (more, and the text is 1 past the marker: code).
+      const w = item && indentOf(item[2]!).cols;
+      if (item) list = item[1]!.length + (w! >= 1 && w! <= 4 ? w! : 1);
+    }
+    // A paragraph goes on until a blank line; a heading, a fence or a rule is a line of its own.
+    para = !blank && !open && !code[at + lead] && !/^ {0,3}(#{1,6}([ \t]|$)|(\*[ \t]*){3,}$|(-[ \t]*){3,}$|(_[ \t]*){3,}$)/.test(line);
     at = end + 1;
   }
   // Code spans: a run of backticks up to the next run of the same length in the same paragraph.
@@ -98,8 +137,8 @@ function entity(ref: string): string | null {
 /** What of Markdown source shows on the page: `mask` 1 hides a character, `sub` gives one that shows
  *  as other text (a character reference), `code` marks code. Syntax is looked for outside code only, so a
  *  `# comment`, `List<String>` or `echo $$` in code stays text. Emphasis, code and link brackets are left
- *  to the caller (the skeleton ignores them everywhere). */
-function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<number, { text: string; len: number }> } {
+ *  to the caller (the skeleton ignores them outside code). `math` is each formula's start and length. */
+function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<number, { text: string; len: number }>; math: Map<number, number> } {
   const code = codeOf(md);
   // Code is blanked out (same length, lines kept), so the patterns below never match inside it.
   let prose = md;
@@ -113,7 +152,19 @@ function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<numbe
     for (const m of prose.matchAll(re)) mask.fill(1, m.index + from, m.index + m[0].length);
   };
   hide(/<!--[\s\S]*?-->/g);
-  hide(/\$\$[\s\S]*?\$\$/g); // math: rendered by KaTeX, outside the text index
+  // Math, drawn by KaTeX: hidden as text (the caller shows each formula whole, at its start) and blanked
+  // like code, so no pattern below reads its TeX as Markdown.
+  const math = new Map<number, number>();
+  for (const m of prose.matchAll(/\$\$[\s\S]*?\$\$/g)) {
+    if (mask[m.index]) continue;
+    math.set(m.index, m[0].length);
+    mask.fill(1, m.index, m.index + m[0].length);
+  }
+  if (math.size) {
+    const cs = prose.split("");
+    for (const [at, len] of math) for (let i = at; i < at + len; i++) if (cs[i] !== "\n") cs[i] = "\x01";
+    prose = cs.join("");
+  }
   hide(IMAGE); // images
   hide(LINK_TAIL, 1); // link destinations
   // Reference links: a definition never shows, and `[text][label]` shows only its text.
@@ -142,21 +193,27 @@ function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<numbe
     sub.set(m.index, { text, len: m[0].length });
     mask.fill(1, m.index + 1, m.index + m[0].length);
   }
-  return { code, mask, sub };
+  return { code, mask, sub, math };
 }
 
 /** Skeleton of Markdown source; `map[i]` is the source offset of skeleton char i. */
 export function sourceSkeleton(md: string): Skeleton {
-  const { mask, sub } = shown(md);
+  const { code, mask, sub, math } = shown(md);
   const parts: string[] = [];
   const map: number[] = [];
   const refs = new Map<number, number>();
   for (const [at, r] of sub) refs.set(at, r.len);
+  for (const [at, len] of math) refs.set(at, len);
   for (let i = 0; i < md.length; i++) {
+    if (math.has(i)) {
+      parts.push(MATH);
+      map.push(i);
+      continue;
+    }
     if (mask[i]) continue;
     const t = sub.get(i)?.text ?? md[i]!;
     for (let k = 0; k < t.length; k++) {
-      if (IGNORED.has(t[k]!)) continue;
+      if (skipped(t[k]!, code[i] === 1)) continue;
       parts.push(t[k]!);
       map.push(i);
     }
@@ -167,7 +224,7 @@ export function sourceSkeleton(md: string): Skeleton {
 /** A passage's Markdown as it reads on the page, on one line (a highlight in a list): `a [link](…)` is
  *  "a link", `\#` "#", `**bold**` "bold"; code keeps every character. */
 export function passageText(md: string): string {
-  const { code, mask, sub } = shown(md);
+  const { code, mask, sub, math } = shown(md);
   // Cut from the body, a passage has no definitions: `[text][label]` shows its text alone, and a
   // footnote mark (a raised number on the page) goes; a note's own "[^3]:" shows its number.
   for (const m of md.matchAll(FULL_REF)) {
@@ -197,6 +254,8 @@ export function passageText(md: string): string {
   const word = (c: string | undefined) => !!c && WORD.test(c);
   let out = "";
   for (let i = 0; i < md.length; i++) {
+    const tex = math.get(i);
+    if (tex) out += md.slice(i + 2, i + tex - 2); // a formula reads as its TeX
     if (mask[i]) continue;
     const c = md[i]!;
     if (syntax(i)) {
@@ -225,8 +284,11 @@ export function plainSkeleton(text: string): string {
   return out;
 }
 
-/** Skeleton of the rendered DOM text, with each char's text node and offset. */
-export type TextIndex = { chars: string; nodes: Text[]; node: Int32Array; off: Int32Array; first: Map<Text, number> };
+/** Skeleton of the rendered DOM text, with each char's text node and offset. A formula is one MATH
+ *  character at its first text node; `math` gives each formula's place. */
+export type TextIndex = { chars: string; nodes: Text[]; node: Int32Array; off: Int32Array; first: Map<Text, number>; math: Map<Element, number> };
+
+const mathOf = (n: Node | null): Element | null => (n ? (n.nodeType === 1 ? (n as Element) : n.parentElement)?.closest(MATH_EL) ?? null : null);
 
 export function indexText(root: HTMLElement): TextIndex {
   const nodes: Text[] = [];
@@ -234,23 +296,35 @@ export function indexText(root: HTMLElement): TextIndex {
   const nodeOf: number[] = [];
   const offOf: number[] = [];
   const first = new Map<Text, number>();
-  // Rendered math is drawn glyphs, not the TeX in the body: left out, as the skeleton leaves out `$$…$$`. So is
-  // a video card's bar and player (D92), which sit in the text but are not part of it.
+  const math = new Map<Element, number>();
+  // A video card's bar and player (D92) sit in the text but are not part of it.
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
-    acceptNode: (n) => (n.parentElement?.closest(".katex, [data-noindex]") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    acceptNode: (n) => (n.parentElement?.closest("[data-noindex]") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
   });
   for (let n = walker.nextNode() as Text | null; n; n = walker.nextNode() as Text | null) {
+    // Rendered math is drawn glyphs, not the TeX in the body: one MATH for the formula, at its first text.
+    const f = mathOf(n);
+    if (f) {
+      if (math.has(f)) continue;
+      math.set(f, parts.length);
+      first.set(n, parts.length);
+      nodeOf.push(nodes.push(n) - 1);
+      offOf.push(0);
+      parts.push(MATH);
+      continue;
+    }
     const k = nodes.push(n) - 1;
     first.set(n, parts.length);
     const s = n.data;
+    const code = !!n.parentElement?.closest("code");
     for (let i = 0; i < s.length; i++) {
-      if (IGNORED.has(s[i]!)) continue;
+      if (skipped(s[i]!, code)) continue;
       parts.push(s[i]!);
       nodeOf.push(k);
       offOf.push(i);
     }
   }
-  return { chars: parts.join(""), nodes, node: Int32Array.from(nodeOf), off: Int32Array.from(offOf), first };
+  return { chars: parts.join(""), nodes, node: Int32Array.from(nodeOf), off: Int32Array.from(offOf), first, math };
 }
 
 function occurrences(hay: string, needle: string): number[] {
@@ -274,11 +348,19 @@ function find(hay: string, pre: string, needle: string, suf: string, hint: numbe
   return hits.length ? nearest(hits) : null;
 }
 
-/** Skeleton offset of a DOM point inside the indexed root. */
-export function skeletonOffset(idx: TextIndex, node: Node, offset: number): number {
+/** Skeleton offset of a DOM point inside the indexed root. A point inside a formula is before it, or
+ *  after it as a selection's `end`: a selection touching a formula takes all of it. */
+export function skeletonOffset(idx: TextIndex, node: Node, offset: number, end = false): number {
+  const f = idx.math.get(mathOf(node)!);
+  if (f !== undefined) return end ? f + 1 : f;
   const base = node.nodeType === Node.TEXT_NODE ? idx.first.get(node as Text) : undefined;
-  if (base !== undefined) return base + plainSkeleton((node as Text).data.slice(0, offset)).length;
-  // Between elements, or in text left out of the index (math): the first indexed text after the point.
+  if (base !== undefined) {
+    const code = !!node.parentElement?.closest("code");
+    let n = 0;
+    for (const c of (node as Text).data.slice(0, offset)) if (!skipped(c, code)) n++;
+    return base + n;
+  }
+  // Between elements, or in text left out of the index: the first indexed text after the point.
   const at = document.createRange();
   at.setStart(node, offset);
   let lo = 0;
@@ -315,7 +397,7 @@ export function sourceHint(src: Skeleton, idx: TextIndex, sel: Range): number {
  *  needle is the index's own text between the selection's ends, so it skips what the index skips (math). */
 export function sourceQuote(src: Skeleton, body: string, idx: TextIndex, sel: Range): { exact: string; start: number } | null {
   const at = skeletonOffset(idx, sel.startContainer, sel.startOffset);
-  const to = skeletonOffset(idx, sel.endContainer, sel.endOffset);
+  const to = skeletonOffset(idx, sel.endContainer, sel.endOffset, true);
   const needle = idx.chars.slice(at, to);
   if (!needle) return null;
   const pre = idx.chars.slice(Math.max(0, at - 24), at);
@@ -325,7 +407,7 @@ export function sourceQuote(src: Skeleton, body: string, idx: TextIndex, sel: Ra
   if (h === null) return null;
   const start = src.map[h]!;
   let end = src.map[h + needle.length - 1]! + 1;
-  // A character reference ("&amp;") is one character on the page: the quote takes all of it.
+  // A character reference ("&amp;") is one character on the page, as a formula is: the quote takes all of it.
   end += (src.refs.get(end - 1) ?? 1) - 1;
   return { exact: body.slice(start, end), start };
 }
@@ -335,13 +417,31 @@ type Quote = { exact: string; prefix: string; suffix: string; start: number };
 /** A DOM range for a stored annotation, located by its quote (context first, then position). A quote
  *  still at its offset is cut from the body's own skeleton, since a piece of code read alone (a
  *  `# comment` line out of its fence) would read as Markdown. */
+/** Where a quote that is no longer at its offset now is in the body: the place whose context matches best,
+ *  then the nearest. -1 when its words are gone. */
+function movedTo(body: string, q: Quote): number {
+  let best = -1;
+  let score = -1;
+  for (let i = body.indexOf(q.exact); i >= 0; i = body.indexOf(q.exact, i + 1)) {
+    const s = (q.prefix && body.endsWith(q.prefix, i) ? 2 : 0) + (q.suffix && body.startsWith(q.suffix, i + q.exact.length) ? 2 : 0);
+    if (s > score || (s === score && Math.abs(i - q.start) < Math.abs(best - q.start))) [best, score] = [i, s];
+  }
+  return best;
+}
+
 export function rangeFor(idx: TextIndex, src: Skeleton, body: string, q: Quote): Range | null {
   let needle: string;
   let pre: string;
   let suf: string;
-  if (q.exact && body.startsWith(q.exact, q.start)) {
-    const a = sourceIndex(src, q.start);
-    const b = sourceIndex(src, q.start + q.exact.length);
+  // A quote that moved (text changed before it) is mapped where it now is, as one still in place: code stays code.
+  let start = !q.exact ? -1 : body.startsWith(q.exact, q.start) ? q.start : movedTo(body, q);
+  // Words found again only where nothing shows (a link's address) are looked for as they read instead.
+  if (start >= 0 && start !== q.start && sourceIndex(src, start) === sourceIndex(src, start + q.exact.length)) start = -1;
+  if (start >= 0) {
+    let a = sourceIndex(src, start);
+    // A quote starting inside a formula's TeX (saved before formulas were whole) is on that formula.
+    if (a > 0 && src.chars[a - 1] === MATH && src.map[a - 1]! + src.refs.get(src.map[a - 1]!)! > start) a--;
+    const b = sourceIndex(src, start + q.exact.length);
     needle = src.chars.slice(a, b);
     pre = src.chars.slice(Math.max(0, a - 24), a);
     suf = src.chars.slice(b, b + 24);
@@ -351,14 +451,27 @@ export function rangeFor(idx: TextIndex, src: Skeleton, body: string, q: Quote):
     suf = sourceSkeleton(q.suffix).chars;
   }
   if (!needle) return null;
-  const hint = (q.start / Math.max(1, body.length)) * idx.chars.length;
+  const hint = ((start >= 0 ? start : q.start) / Math.max(1, body.length)) * idx.chars.length;
   const h = find(idx.chars, pre, needle, suf, hint);
   if (h === null) return null;
   const last = h + needle.length - 1;
   const range = document.createRange();
   range.setStart(idx.nodes[idx.node[h]!]!, idx.off[h]!);
   range.setEnd(idx.nodes[idx.node[last]!]!, idx.off[last]! + 1);
+  if (idx.chars[h] === MATH) range.setStartBefore(mathOf(idx.nodes[idx.node[h]!]!)!);
+  if (idx.chars[last] === MATH) range.setEndAfter(mathOf(idx.nodes[idx.node[last]!]!)!);
   return range;
+}
+
+/** A selection with each end that lies in a formula moved to take the whole formula, as it is saved. */
+export function wholeMath(sel: Range): Range {
+  const a = mathOf(sel.startContainer);
+  const b = mathOf(sel.endContainer);
+  if (!a && !b) return sel;
+  const r = sel.cloneRange();
+  if (a) r.setStartBefore(a);
+  if (b) r.setEndAfter(b);
+  return r;
 }
 
 /** The rendered text node holding the first character at or after source offset `at` (e.g. just
@@ -375,10 +488,23 @@ export function renderedNodeAt(src: Skeleton, idx: TextIndex, at: number): Text 
   return null;
 }
 
-/** Which stored range is under the point, if any. */
+/** Of highlights that overlap, the innermost (the shortest): the one his click or selection means,
+ *  whatever order they were made or brought back in. */
+function innermost(hits: [string, Range][]): [string, Range] | undefined {
+  let best: [string, Range] | undefined;
+  let len = Infinity;
+  for (const h of hits) {
+    const n = h[1].toString().length;
+    if (n < len) [best, len] = [h, n];
+  }
+  return best;
+}
+
+/** Which stored range is under the point, if any; the innermost where they overlap. */
 export function hitTest(ranges: Map<string, Range>, x: number, y: number): string | null {
   const caret = document.caretRangeFromPoint(x, y);
   if (!caret) return null;
+  const hits: [string, Range][] = [];
   for (const [id, r] of ranges) {
     try {
       if (r.comparePoint(caret.startContainer, caret.startOffset) !== 0) continue;
@@ -386,11 +512,18 @@ export function hitTest(ranges: Map<string, Range>, x: number, y: number): strin
       continue;
     }
     for (const b of r.getClientRects()) {
-      if (x >= b.left - 1 && x <= b.right + 1 && y >= b.top - 1 && y <= b.bottom + 1) return id;
+      if (x >= b.left - 1 && x <= b.right + 1 && y >= b.top - 1 && y <= b.bottom + 1) {
+        hits.push([id, r]);
+        break;
+      }
     }
   }
-  return null;
+  return innermost(hits)?.[0] ?? null;
 }
+
+/** The stored range holding all of `r`, the innermost where several do. */
+export const holderOf = (ranges: Map<string, Range>, r: Range): [string, Range] | undefined =>
+  innermost([...ranges].filter(([, h]) => h.compareBoundaryPoints(Range.START_TO_START, r) <= 0 && h.compareBoundaryPoints(Range.END_TO_END, r) >= 0));
 
 /** Splits a long Markdown body at blank lines (outside code fences) so a book renders in slices. */
 export function chunks(md: string, size = 12000): string[] {

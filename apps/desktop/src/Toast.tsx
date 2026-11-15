@@ -108,7 +108,12 @@ export function useToast() {
         const t = list.current.find((x) => x.step === step);
         if (t) commit(list.current.map((x) => (x === t ? { ...x, offer: undefined, step: undefined } : x)));
       };
-      return Object.assign(forget, { undo: () => void (step && takeBack.current(step)) });
+      const hold = (write: Promise<unknown>) => {
+        if (!step) return;
+        history.current.hold(step, write);
+        write.catch(forget);
+      };
+      return Object.assign(forget, { undo: () => void (step && takeBack.current(step)), hold });
     },
     [show, commit],
   );
