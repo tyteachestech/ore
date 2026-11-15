@@ -23,9 +23,19 @@ export const FONTS = [
 ] as const;
 export type Font = (typeof FONTS)[number]["id"];
 
+/** Room between lines, as Books, Kindle and Readwise offer it: each a step from the reader's own line height
+ *  (the Mac's 1.65, the phone's 1.5, D-new-phone-reading-text). */
+export const SPACINGS = [
+  { id: "tight", label: "Tight" },
+  { id: "normal", label: "Normal" },
+  { id: "loose", label: "Loose" },
+] as const;
+export type Spacing = (typeof SPACINGS)[number]["id"];
+
 /** Text sizes in px, Books-style steps: one at a time near the default, bigger jumps above it. */
 export const SIZES = [14, 15, 16, 17, 18, 20, 22, 24, 26] as const;
-export const DEFAULT_SIZE = 17;
+/** 17 on the Mac; 20 on the phone, about 35 letters a line as Books sets it (D-new-phone-reading-text). */
+export const DEFAULT_SIZE = import.meta.env?.VITE_PHONE === "1" ? 20 : 17;
 
 /** The next size up (`by` 1) or down (-1) from `size`, held at the ends. */
 export function stepSize(size: number, by: 1 | -1): number {
@@ -34,7 +44,7 @@ export function stepSize(size: number, by: 1 | -1): number {
   return SIZES[Math.max(0, Math.min(SIZES.length - 1, i))]!;
 }
 
-type State = { width: Width; size: number; page: Page; font: Font };
+type State = { width: Width; size: number; page: Page; font: Font; spacing: Spacing };
 const root = document.documentElement;
 const pick = <T extends string>(key: string, ids: readonly { id: T }[], fallback: T): T => {
   const v = load(key);
@@ -46,6 +56,7 @@ let state: State = {
   size: (SIZES as readonly number[]).includes(storedSize) ? storedSize : DEFAULT_SIZE,
   page: pick("ore.page", PAGES, "dark"),
   font: pick("ore.font", FONTS, "charter"),
+  spacing: pick("ore.spacing", SPACINGS, "normal"),
 };
 const listeners = new Set<() => void>();
 const places = new Set<() => () => void>();
@@ -54,6 +65,7 @@ function paint() {
   root.dataset.width = state.width;
   root.dataset.page = state.page;
   root.dataset.font = state.font;
+  root.dataset.spacing = state.spacing;
   root.style.setProperty("--read-size", `${state.size}px`);
 }
 paint();
@@ -68,6 +80,7 @@ function set(next: Partial<State>) {
   save("ore.size", String(state.size));
   save("ore.page", state.page);
   save("ore.font", state.font);
+  save("ore.spacing", state.spacing);
   listeners.forEach((l) => l());
 }
 
@@ -75,6 +88,7 @@ export const setWidth = (width: Width) => set({ width });
 export const setSize = (size: number) => set({ size });
 export const setPage = (page: Page) => set({ page });
 export const setFont = (font: Font) => set({ font });
+export const setSpacing = (spacing: Spacing) => set({ spacing });
 export const bigger = () => set({ size: stepSize(state.size, 1) });
 export const smaller = () => set({ size: stepSize(state.size, -1) });
 

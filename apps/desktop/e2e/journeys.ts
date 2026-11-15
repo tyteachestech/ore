@@ -11196,6 +11196,36 @@ journey("phone: Today in a library with nothing to read says to add a first sour
   if (await page.getByText("Read something new").count()) throw new Error("Today says to read something new in a library with nothing to read");
 }, "phone");
 
+journey("phone: Aa sets the text size, line spacing, margins, font and page, each at once and still there after a relaunch (D-new-phone-reading-looks)", async (page) => {
+  // The phone had no way to change how a source reads; the five every good reader offers sit behind Aa (Books, Kindle, Readwise).
+  await phoneSource(page, "The Story Spine");
+  const looks = () => page.locator(".phone-reader .doc").first().evaluate((d) => {
+    const s = getComputedStyle(d);
+    return { size: parseFloat(s.fontSize), leading: parseFloat(s.lineHeight) / parseFloat(s.fontSize), gutter: parseFloat(getComputedStyle(d.closest(".page")!).paddingLeft), face: s.fontFamily, page: document.documentElement.dataset.page };
+  });
+  const was = await looks();
+  if (was.size !== 20 || Math.abs(was.leading - 1.5) > 0.01 || was.gutter !== 24) throw new Error(`a source opened at ${JSON.stringify(was)}, not 20px on 1.5 with 24px margins`);
+  await tap(page, page.getByRole("button", { name: "Text and page" }));
+  const sheet = page.getByRole("dialog", { name: "Text and page" });
+  await tap(page, sheet.getByRole("button", { name: "Larger text" }));
+  await tap(page, sheet.getByRole("radio", { name: "Loose" }));
+  await tap(page, sheet.getByRole("radio", { name: "Narrow margins" }));
+  await tap(page, sheet.getByRole("radio", { name: "Geist" }));
+  await tap(page, sheet.getByRole("radio", { name: "Light" }));
+  const want = (l: Awaited<ReturnType<typeof looks>>) => l.size === 22 && Math.abs(l.leading - 1.7) < 0.01 && l.gutter === 16 && !/^Charter/.test(l.face) && l.page === "light";
+  await until("each tap shows in the text at once", async () => want(await looks()));
+  // Every tap a target of 44pt or more, and the sheet as wide as the screen.
+  for (const b of await sheet.locator("button").all()) {
+    const r = (await b.boundingBox())!;
+    if (r.height < 44 || r.width < 44) throw new Error(`a control in Aa is ${r.width}×${r.height}`);
+  }
+  await page.reload();
+  // The phone reopens on the source it was reading.
+  await page.locator(".phone-reader .doc").first().waitFor();
+  const after = await looks();
+  if (!want(after)) throw new Error(`after a relaunch the source read at ${JSON.stringify(after)}`);
+}, "phone");
+
 journey("phone: every screen's text follows the iPhone's text size, and Start review still holds its label at the largest (F70)", async (page) => {
   // Ore drew every size in fixed pixels, so a phone set to larger text read Ore at the default size.
   const size = (sel: string) => page.locator(sel).first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));

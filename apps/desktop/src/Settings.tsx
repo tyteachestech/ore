@@ -18,7 +18,7 @@ import { ShortcutEditor } from "./Shortcuts";
 import { setStyleControls, STYLE_CONTROLS, useStyleControls, type StyleControls } from "./draw/quick";
 import { CHIP_LOOKS, chipLook, setChipLook, type ChipLook } from "./Skills";
 import { errorText, load, save, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
-import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth, SIZES, smaller, useReading, WIDTHS, type Font, type Page, type Width } from "./reading";
+import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setSpacing, setWidth, SIZES, smaller, SPACINGS, useReading, WIDTHS, type Font, type Page, type Spacing, type Width } from "./reading";
 import * as RadioGroup from "@radix-ui/react-radio-group";
 
 type Vendor = "claude" | "codex";
@@ -212,7 +212,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     return change({ ...d, model: m }, () => ore("settings", opt("model", m)), record ? { message: "Changed the model", undo: () => setModel(was, false), redo: () => setModel(m, false) } : undefined);
   };
 
-  const { width, size, page, font } = useReading();
+  const { width, size, page, font, spacing } = useReading();
   const keys = useKeymap();
   const [tray, setTrayState] = useState(trayOn);
   const [chips, setChips] = useState(chipLook);
@@ -280,6 +280,9 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                       </button>
                     </Hint>
                   </div>
+                </Row>
+                <Row title="Line spacing" text="How much room is between the lines.">
+                  <Seg label="Line spacing" value={spacing} options={SPACINGS} onChange={(v) => setSpacing(v as Spacing)} />
                 </Row>
                 <Row title="Reading page" text="A light page for reading by day. The rest of the app stays dark.">
                   <Previews label="Reading page" value={page} options={PAGES} onChange={(v) => setPage(v as Page)} render={(o) => <span className="preview-page" data-page={o.id}><i /><i /><i /></span>} />

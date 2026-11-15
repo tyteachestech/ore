@@ -82,6 +82,9 @@
 :root[data-width="narrow"] { --measure-em: 26; }
 :root[data-width="wide"] { --measure-em: 34.5; }
 :root[data-font="geist"] { --face-width: 1.03; }
+/* Line spacing (reading.ts): a step from the reader's own line height. */
+:root[data-spacing="tight"] { --leading-step: -0.15; }
+:root[data-spacing="loose"] { --leading-step: 0.2; }
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -744,7 +747,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .field::placeholder { color: var(--faint); }
 
 .doc {
-  font-size: var(--read-size, 17px); line-height: 1.65; color: var(--text-read);
+  font-size: var(--read-size, 17px); line-height: calc(1.65 + var(--leading-step, 0)); color: var(--text-read);
   max-width: var(--measure);
   user-select: text; -webkit-user-select: text; cursor: text;
   overflow-wrap: break-word;
@@ -829,7 +832,8 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
    and side panel stay dark. Tints are deeper than on dark so a pale wash still reads on white (≥3:1 for
    the type icons, ≥4.5:1 for --faint). Highlight pseudo-elements get literal colours: WebKit doesn't
    resolve custom properties set below :root inside ::highlight. */
-:root[data-page="light"] .reader-pane {
+:root[data-page="light"] .reader-pane,
+:root[data-page="light"].phone .phone-source:not(:has(.reader.noting)) > .phone-bar {
   color-scheme: light;
   --bg: #fbfbfa;
   --bg-card: #f4f4f2;
@@ -2869,13 +2873,45 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .reader-tools { top: -44px; right: 4px; }
 .phone .reader-tools button { min-width: 44px; min-height: 44px; }
 /* Reading text on the iPhone (D-new-phone-reading-text): 20px Charter on 1.5 with 24px margins, about 35 characters a
-   line on a 390 to 402pt phone, as Books sets a page. It follows iOS's text size (--type, D250) at three quarters
-   of the change, so it never falls under iOS's own body size; as it grows the margins give way (to 16px) and the
-   lines sit closer, since short lines need less room between them. */
-.phone { --read-gutter: max(16px, calc(24px - (var(--type, 1) - 1) * 14px)); }
+   line on a 390 to 402pt phone, as Books sets a page; Aa changes each a step (reading.ts). It follows iOS's text
+   size (--type, D250) at three quarters of the change, so it never falls under iOS's own body size; as it grows
+   the margins give way and the lines sit closer, since short lines need less room between them. */
+.phone { --gutter: 24px; --gutter-min: 16px; --read-gutter: max(var(--gutter-min), calc(var(--gutter) - (var(--type, 1) - 1) * 14px)); }
+.phone[data-width="narrow"] { --gutter: 32px; --gutter-min: 20px; }
+.phone[data-width="wide"] { --gutter: 16px; --gutter-min: 12px; }
 .phone .page, .phone .reader-scroll > .page { padding-left: var(--read-gutter); padding-right: var(--read-gutter); margin-left: 0; }
-.phone .doc { font-size: calc(20px * (1 + (var(--type, 1) - 1) * 0.75)); line-height: calc(1.5 - (var(--type, 1) - 1) * 0.15); }
+.phone .doc { font-size: calc(var(--read-size, 20px) * (1 + (var(--type, 1) - 1) * 0.75)); line-height: calc(1.5 + var(--leading-step, 0) - (var(--type, 1) - 1) * 0.15); }
 /* Headings step down: at 20px the desktop's steps put a section head at the title's own size. */
+/* The reader's Aa (ReadingLooks.tsx, D-new-phone-reading-looks): Books' Themes & Settings in one sheet, the text
+   left in view above it to judge each tap by. */
+.looks-sheet { display: grid; gap: 12px; padding-inline: 16px !important; }
+.looks-sheet h2 { margin: 0 0 2px; }
+.looks-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.looks-pair > button { display: block; padding: 0; }
+.looks-pair > button > .looks-tile { width: 100%; }
+/* A light page on the phone takes the strip under the status bar and the Back bar with it, until he swipes to the note. */
+:root[data-page="light"].phone .phone-source:not(:has(.reader.noting)) { background: #fbfbfa; }
+/* No dimming: the text above the sheet is what he judges each tap by. */
+.phone .overlay.looks-overlay { background: transparent; }
+.looks-size { display: grid; grid-template-columns: 1fr 1fr; height: 52px; border-radius: 12px; background: var(--bg-hover); overflow: hidden; }
+.looks-size button { display: grid; place-items: center; color: var(--text); font-family: Charter, "Bitstream Charter", "New York", serif; }
+.looks-size button:first-child { font-size: 15px; }
+.looks-size button:last-child { font-size: 24px; border-left: 1px solid var(--border); }
+.looks-size button:disabled { color: var(--faint); }
+.looks-size button:active:not(:disabled) { background: var(--bg-active); }
+.looks-seg { display: grid; grid-template-columns: repeat(3, 1fr); height: 52px; padding: 3px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border); }
+.looks-seg button { display: grid; place-items: center; border-radius: 9px; }
+.looks-seg button[aria-checked="true"] { background: var(--bg-hover); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.35); }
+.looks-lines { display: grid; justify-items: center; width: 24px; }
+.looks-lines i { display: block; height: 2px; border-radius: 1px; background: var(--muted); }
+.looks-seg button[aria-checked="true"] .looks-lines i { background: var(--text); }
+.looks-tile { min-height: 64px; padding: 8px 4px; box-sizing: border-box; border-radius: 12px; background: var(--bg-hover); display: grid; place-items: center; align-content: center; gap: 4px; color: var(--muted); font-size: 12px; }
+.looks-tile b { font-size: 22px; font-weight: 500; line-height: 1; color: var(--text); }
+[aria-checked="true"] > .looks-tile { color: var(--text); box-shadow: 0 0 0 2px var(--bg-raised), 0 0 0 4px var(--text); }
+.looks-tile[data-page="light"] { background: #f7f6f2; color: #555; }
+.looks-tile[data-page="light"] b { color: #1a1a1a; }
+.looks-pair > button:focus-visible > .looks-tile, .looks-seg button:focus-visible, .looks-size button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus); }
+.phone .phone-source .reader-tools .looks-btn { width: 44px; height: 44px; padding: 0; border-radius: 999px; background: var(--bg-hover); color: var(--text); display: grid; place-items: center; font: 600 17px/1 Charter, "Bitstream Charter", "New York", serif; }
 .phone .doc h1 { font-size: 1.3em; } .phone .doc h2 { font-size: 1.2em; } .phone .doc h3 { font-size: 1.08em; }
 /* A double tap highlights the paragraph (D224): never the zoom iOS gives it; a pinch still zooms. */
 .phone .page { touch-action: manipulation; }

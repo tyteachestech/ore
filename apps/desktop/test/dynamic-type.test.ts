@@ -41,8 +41,8 @@ describe("the iPhone's text size", () => {
   // F-new-phone-reading-text: the phone read a source in the Mac's 17px, about 43 letters a line, smaller and longer than Books.
   test("a source on the iPhone reads at 20px on 24px margins, and at every iOS text size no smaller than iOS's own body", () => {
     const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
-    const [, base, share] = css.match(/\.phone \.doc \{ font-size: calc\((\d+)px \* \(1 \+ \(var\(--type, 1\) - 1\) \* ([\d.]+)\)\)/) ?? [];
-    const [, floor, gutter, give] = css.match(/--read-gutter: max\((\d+)px, calc\((\d+)px - \(var\(--type, 1\) - 1\) \* (\d+)px\)\)/) ?? [];
+    const [, base, share] = css.match(/\.phone \.doc \{ font-size: calc\(var\(--read-size, (\d+)px\) \* \(1 \+ \(var\(--type, 1\) - 1\) \* ([\d.]+)\)\)/) ?? [];
+    const [, gutter, floor, give] = css.match(/\.phone \{ --gutter: (\d+)px; --gutter-min: (\d+)px; --read-gutter: max\(var\(--gutter-min\), calc\(var\(--gutter\) - \(var\(--type, 1\) - 1\) \* (\d+)px\)\)/) ?? [];
     expect({ base, gutter }).toEqual({ base: "20", gutter: "24" });
     const size = (type: number) => Number(base) * (1 + (type - 1) * Number(share));
     const column = (type: number, phone: number) => phone - 2 * Math.max(Number(floor), Number(gutter) - (type - 1) * Number(give));

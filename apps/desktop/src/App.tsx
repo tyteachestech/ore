@@ -58,7 +58,7 @@ import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded
 import { count, errorText, focusQuietly, inOrder as inTurn, keepScroll, keptScrolls, load, save, usable, wakeScreens } from "./util";
 import { questionText } from "./Questions";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
-import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth, smaller, useReading, WIDTHS } from "./reading";
+import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setSpacing, setWidth, smaller, SPACINGS, useReading, WIDTHS } from "./reading";
 
 /** wry on macOS reports file-drop positions in CSS points (see dropPoint). */
 const MAC = navigator.userAgent.includes("Mac");
@@ -291,7 +291,7 @@ export function App() {
     const t = load("ore.sidetab");
     return t === "questions" || t === "original" ? t : "note";
   });
-  const { width, size, page, font } = useReading();
+  const { width, size, page, font, spacing } = useReading();
   const keys = useKeymap();
   /** Files dragged over the window: their kinds, and the skill they would go to (null: no skill). */
   const [dropping, setDropping] = useState<{ kinds: (FileKind | null)[]; skill: string | null } | null>(null);
@@ -1952,6 +1952,7 @@ export function App() {
           ...(size !== DEFAULT_SIZE ? [{ id: "size-default", label: "Default text size", keywords: ["font", "zoom", "reset"], run: () => setSize(DEFAULT_SIZE) }] : []),
           ...PAGES.filter((t) => t.id !== page).map((t) => ({ id: `page:${t.id}`, label: `Reading page: ${t.label}`, keywords: ["theme", "light", "dark", "white"], run: () => setPage(t.id) })),
           ...FONTS.filter((t) => t.id !== font).map((t) => ({ id: `font:${t.id}`, label: `Reading font: ${t.label}`, keywords: ["font", "serif", "sans", "typeface"], run: () => setFont(t.id) })),
+          ...SPACINGS.filter((t) => t.id !== spacing).map((t) => ({ id: `spacing:${t.id}`, label: `Line spacing: ${t.label}`, keywords: ["leading", "line height", "spacing"], run: () => setSpacing(t.id) })),
         ]
       : []),
     // The list's details, as the row menus' Show submenu (D108).
