@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { passageText } from "./text";
+import { answersWithAi } from "./ai-commands";
 import { siteOf } from "./details";
 import { wakeOpenScreens } from "./util";
 
@@ -54,9 +55,7 @@ export function wakesScreens(args: string[]): boolean {
  *  an object. Empty output, from a run that ended without printing (or the mock's AI-off null), comes back as
  *  null: for these it is a failure, so the caller's error path says so with Try again, instead of a property
  *  read on null throwing where no catch sees it, inside a React state updater (Codex sweep 6). */
-export function mustAnswer(args: string[]): boolean {
-  return ["tutor", "ask", "ask-library", "grade", "key-points", "check", "explain", "research"].includes(args[0]!) || (args[0] === "recall" && args.includes("--feedback"));
-}
+export const mustAnswer = answersWithAi;
 
 /** A run's result, or a TypeError (so errorText says "got an unexpected reply") when a command that must answer didn't. */
 export function answered<T>(args: string[], r: T): T {

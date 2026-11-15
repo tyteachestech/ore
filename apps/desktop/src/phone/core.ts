@@ -14,6 +14,7 @@ import { ready } from "./sqlite";
 import { iterableStreams } from "./streams";
 import { shareList } from "./share-skills";
 import { setFilling } from "../Filling";
+import { callsAi } from "../ai-commands";
 
 // Before any import runs: iOS 26 can't iterate a stream with `for await`, and pdf.js reads a PDF's text that way.
 iterableStreams();
@@ -246,7 +247,8 @@ async function command<T>({ commands, errorLine }: typeof import("ore-commands")
   if (isTauri() && !existsSync(`${ROOT}/skills.yaml`)) throw new Error("Your library is on its way from iCloud. It shows here once your Mac has uploaded it.");
   const cmd = commands[name ?? ""];
   if (!cmd) throw new Error(`unknown command "${name}"`);
-  if (needsAi(name!, rest)) throw new Error("AI runs on your Mac for now.");
+  // Said plainly up front instead of failing on a missing prompt file. Storing a recall or his own key-point marks needs no AI.
+  if (callsAi(args)) throw new Error("AI runs on your Mac for now.");
   const { values, positionals } = parseArgs({ args: rest.filter((a) => a !== "--json"), options: { json: { type: "boolean" }, ...cmd.options }, allowPositionals: true, strict: true });
   stdin = input ?? "";
   try {
@@ -274,11 +276,6 @@ function picture(path: string): string | undefined {
   }
 }
 
-/** Commands that call Claude or Codex (D7), which the phone can't run: said plainly up front instead of
- *  failing on a missing prompt file. Storing a recall or his own key-point marks needs no AI. */
-const AI = new Set(["grade", "ask", "enrich", "key-points", "research", "remix", "catch-up"]);
-const needsAi = (name: string, args: string[]) =>
-  AI.has(name) || (name === "recall" && args.includes("--feedback")) || (name === "check" && !args.some((a) => a.startsWith("--covered")));
 
 /** A file picked on the phone (a PDF, a book, a photo) is saved to the inbox, as a link is (D235): its bytes
  *  pass through a scratch path the folder never sees. */
