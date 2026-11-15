@@ -39,7 +39,7 @@ import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
 import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type CardSkills, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
-import { chunks, pageChunks, pageOf, footnotes, hitTest, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, type TextIndex } from "./text";
+import { chunks, pageChunks, pageOf, footnotes, hitTest, holderOf as holding, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, wholeMath, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { byTime, topLevel } from "./sections";
 import { glow, LampRing, pulse } from "./Lamp";
@@ -1860,9 +1860,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }
 
   // D15: a selection becomes a Keep highlight at once; the popup only refines it.
-  function createHighlight(range: Range, intent: Intent = "keep", aim?: Aim, popupToo = true) {
+  function createHighlight(sel: Range, intent: Intent = "keep", aim?: Aim, popupToo = true) {
     const index = idx.current;
     if (!doc || !src || !index) return;
+    const range = wholeMath(sel); // a formula is highlighted whole, as it is saved
     const text = range.toString();
     if (!text.trim()) return;
     const q = sourceQuote(src, doc.body, index, range);
@@ -1923,8 +1924,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   /** A passage chosen with the mouse or the keyboard: inside a highlight he already made, that one opens
    *  (with the type he keyed) instead of stacking a second; otherwise it becomes a new highlight. */
-  const holderOf = (r: Range) =>
-    [...ranges.current].find(([, h]) => h.compareBoundaryPoints(Range.START_TO_START, r) <= 0 && h.compareBoundaryPoints(Range.END_TO_END, r) >= 0);
+  const holderOf = (r: Range) => holding(ranges.current, r);
   function highlightRange(r: Range, intent?: Intent, aim?: Aim, snap = false) {
     const inside = holderOf(r);
     if (inside) {
@@ -1937,7 +1937,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   // The quiz's "In the source" passage as a key point, in one click: inside a highlight he made, that
   // one is marked (or unmarked); otherwise the passage becomes a new key point highlight.
   const passage = reveal ? evidence[reveal.at] : null;
-  const holder = passage ? [...ranges.current].find(([, h]) => h.compareBoundaryPoints(Range.START_TO_START, passage) <= 0 && h.compareBoundaryPoints(Range.END_TO_END, passage) >= 0) : undefined;
+  const holder = passage ? holderOf(passage) : undefined;
   const passageKey = !!holder && anns.find((a) => a.id === holder[0])?.intent === "card";
   function keyPassage() {
     if (holder) void setIntentOf(holder[0], passageKey ? "keep" : "card");
@@ -2073,6 +2073,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       if (range) ranges.current.set(rid, range);
       if (ann) setAnns((l) => (l.some((a) => a.id === rid) ? l : [...l, ann!]));
     };
+    // Brought back whole, type and note too: a note changed while it was gone (an older step of the history
+    // run meanwhile) comes back as it was when it went.
+    const whole = () => (ann ? ["--status", ann.status, "--intent", ann.intent, opt("note", ann.note ?? "")] : ["--status", "open"]);
     return {
       drop,
       restore,
@@ -2086,7 +2089,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       },
       bring: () => {
         restore();
-        return annotate(rid, "--status", ann?.status ?? "open").catch((e) => {
+        return annotate(rid, ...whole()).catch((e) => {
           drop();
           throw e;
         });
@@ -2113,7 +2116,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }
 
   /** An edge let go: the passage is saved where it now ends, and the popup comes back beside it. */
-  async function dropEdge(id: string, range: Range, was: Range) {
+  async function dropEdge(id: string, edge: Range, was: Range) {
+    const range = wholeMath(edge); // an edge let go in a formula takes all of it, as it is saved
     const index = idx.current;
     const a = annOf(id);
     const note = popup?.id === id ? popup.note : (a?.note ?? "");
@@ -2188,32 +2192,34 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     }
     // A selection he dropped (Esc, or one made only to point) leaves no step behind.
     if (!undoable) made.current.get(rid)?.();
+    await removeStep(rid, undoable);
+  }
+
+  /** Takes a saved highlight away as one step of the history, put on it at once, as the highlight goes: a ⌘Z
+   *  while the write is out takes back this step, not the one before it (a note, which it then cleared). Its
+   *  Undo shows the highlight at once and writes it back once the removal has landed, so it never lands first. */
+  async function removeStep(rid: string, undoable = true) {
     const s = annStep(rid);
     s.drop();
+    const write = annotate(rid, "--status", "deleted");
+    const bring = () => {
+      s.restore();
+      return write.then(s.bring, () => {}); // a removal that failed has put it back already
+    };
+    const forget = undoable ? p.notify("Highlight removed", "info", bring, s.remove) : undefined;
     try {
-      await annotate(rid, "--status", "deleted");
+      await write;
     } catch (e) {
+      forget?.();
       p.notify(errorText(e), "error");
       s.restore();
-      return;
     }
-    if (undoable) p.notify("Highlight removed", "info", s.bring, s.remove);
   }
 
   /** Removes a saved highlight from outside its popup (the Collected tab's menu); Undo brings it back. */
   async function removeSaved(id: string) {
     if (popup?.id === id) closePopup(false);
-    const s = annStep(id);
-    s.drop();
-    // On the history at once, as the row goes: a ⌘Z right after must take back this step, not the one before.
-    const forget = p.notify("Highlight removed", "info", s.bring, s.remove);
-    try {
-      await annotate(id, "--status", "deleted");
-    } catch (e) {
-      forget();
-      p.notify(errorText(e), "error");
-      s.restore();
-    }
+    await removeStep(id);
   }
 
   /** A highlight's menu in the Collected tab: its type, copy, remove, as in its popup. */

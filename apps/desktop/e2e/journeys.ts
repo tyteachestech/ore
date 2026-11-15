@@ -3260,6 +3260,57 @@ journey("highlight note: a note whose save fails is kept, and saves when the hig
   await until("the retried save landed", async () => (await note.inputValue()) === "first thought and two");
 });
 
+// F-new-undo-pending-remove: Remove highlight put its step on the history only once its write was back, so a ⌘Z
+// meanwhile took back the step before it, his note, and cleared it; and Undo of a removal wrote back only its status.
+journey("highlight: ⌘Z while its removal is being written brings it back with its type and note (F-new-undo-pending-remove)", async (page) => {
+  const title = `Pending removal ${Date.now()}`;
+  const NOTE = "My explanation must remain.";
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# ${title}\n\nThe essential passage should survive an immediate undo. Another sentence provides context.`);
+  await page.keyboard.press("Enter");
+  await page.locator(".doc").getByText("Another sentence provides context").waitFor();
+  const popup = page.getByRole("dialog", { name: "Highlight" });
+  await select(page, "essential passage");
+  await popup.waitFor();
+  await popup.locator(".intent.card").click();
+  await popup.getByLabel("Note").fill(NOTE);
+  await page.keyboard.press("Enter");
+  await popup.waitFor({ state: "hidden" });
+  await settled(page);
+  const id = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === title)!.id;
+  type Saved = { id: string; intent: string; note?: string };
+  const saved = async () => ((await ore("show", id)) as { annotations: Saved[] }).annotations;
+  const kept = async () => {
+    const l = await saved();
+    return l.length === 1 && l[0]!.intent === "card" && l[0]!.note === NOTE;
+  };
+  await until("the Key point and its note are saved", kept);
+  const open = async () => {
+    const at = await pointAt(page, "essential passage");
+    await page.mouse.click(at.x, at.y);
+    await popup.waitFor();
+  };
+  await open();
+  const slow = (ms: number | null) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { annotate: ms } : undefined), ms);
+  await slow(1500);
+  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await page.waitForTimeout(100);
+  await page.keyboard.press("Meta+z");
+  await settled(page);
+  await slow(null);
+  if (!(await kept())) throw new Error(`⌘Z during the removal left ${JSON.stringify(await saved())}`);
+  // Brought back whole: a note changed while it was gone (here by another device) comes back as it went.
+  const aid = (await saved())[0]!.id;
+  await open();
+  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await settled(page);
+  await until("it is removed", async () => (await saved()).length === 0);
+  await ore("annotate", aid, "--note=");
+  await page.keyboard.press("Meta+z");
+  await settled(page);
+  if (!(await kept())) throw new Error(`Undo of the removal brought back ${JSON.stringify(await saved())}`);
+});
+
 journey("author: add one by hand from the title's menu or the empty byline field, it survives a reload, and ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   await page.locator(".doc-head h1").click({ button: "right" });
@@ -5084,6 +5135,64 @@ journey("answer pieces: one click rewrites a piece in place, ⌘Z puts the old w
   await page.keyboard.press("Enter");
   await until("the piece is gone again", async () => (await piece.count()) === 0);
   await page.waitForTimeout(300);
+});
+
+// F-new-undo-pending-siblings: removes that take the row away at once put their step on the history only once the write
+// was back, so a ⌘Z meanwhile took back the step before (here the piece's edit) instead.
+journey("answer pieces: ⌘Z while an emptied piece is being removed brings that piece back, not the edit before it (F-new-undo-pending-siblings)", async (page) => {
+  type Q = { id: string; note?: string; answers: { ts: string; text: string }[] };
+  const kids = async () => ((await ore("questions", "--skill=learning")) as Q[]).find((x) => x.note === "Does this hold for kids?")!;
+  const slow = (ms: number | null) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { answer: ms } : undefined), ms);
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Answer…" }).click();
+  await page.getByLabel("Your answer to Does this hold for kids?").fill("Mostly yes.");
+  await page.keyboard.press("Enter");
+  const edit = page.getByLabel("Edit this part of your answer");
+  await page.getByRole("button", { name: "Edit: Mostly yes." }).click();
+  await edit.fill("Yes, from about age 8.");
+  await page.keyboard.press("Enter");
+  const fixed = page.getByRole("button", { name: "Edit: Yes, from about age 8." });
+  await fixed.waitFor();
+  await settled(page);
+  await fixed.click();
+  await edit.fill("");
+  await slow(1500);
+  await page.keyboard.press("Enter");
+  await until("emptied, it goes", async () => (await fixed.count()) === 0);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  await settled(page);
+  await slow(null);
+  const k = await kids();
+  const left = k.answers.map((c) => c.text).join(" | ");
+  for (const c of k.answers) await ore("answer", k.id, `--remove=${c.ts}`); // leave it as the seed had it
+  if (left !== "Yes, from about age 8.") throw new Error(`⌘Z during the removal left the answer as “${left}”`);
+});
+
+journey("question panel: ⌘Z while Not answered here is being written puts the match back (F-new-undo-pending-siblings)", async (page) => {
+  const item = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === TESTING)!.id;
+  const q = ((await ore("questions", "--skill=learning")) as { id: string; note?: string }[]).find((x) => x.note === "Does this hold for kids?")!;
+  await ore("match", item, q.id);
+  const matched = async () => !!((await ore("show", item)) as { question_matches?: { question: string }[] }).question_matches?.some((m) => m.question === q.id);
+  try {
+    await openSource(page, TESTING);
+    await page.getByRole("tab", { name: "Collected" }).click();
+    const toggle = page.locator(".cp-head.question .cp-toggle");
+    if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+    const row = page.locator(".qp-q").filter({ hasText: "Does this hold for kids?" }).first();
+    await row.getByRole("button", { name: "Question actions" }).click();
+    await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = { match: 1500 }));
+    await page.getByRole("menuitem", { name: "Not answered here" }).click();
+    // A click on the page first: the panel's "Ask one", focused once its list is empty, goes as ⌘Z fills it (F-new-ask-one-focus).
+    await page.locator(".doc-head h1").click();
+    await page.keyboard.press("Meta+z");
+    await settled(page);
+    await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = undefined));
+    if (!(await matched())) throw new Error("⌘Z during Not answered here left the match dropped");
+  } finally {
+    await ore("match", item, q.id, "--drop");
+  }
 });
 
 journey("answer pieces: a correction he is writing stays through a blur and a failed save, and saves on the next try", async (page) => {

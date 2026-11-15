@@ -65,10 +65,26 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
     const before = answers;
     const was = before.find((c) => c.ts === ts)!;
     setAnswers((l) => (gone ? l.filter((c) => c.ts !== ts) : l.map((c) => (c.ts === ts ? { ...c, text: to } : c))));
+    const write = ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)]));
+    // On the history at once, as the piece changes: a ⌘Z while the write is out takes back this step, not the one
+    // before it. Its Undo writes once this write has landed (a failed one has put the piece back already).
+    // A removed piece comes back as it was written (its source and passage), at the end of his answer.
+    let back = ts;
+    const after = (f: () => Promise<unknown>) => () => write.then(f, () => {});
+    const forget = !record
+      ? undefined
+      : gone
+        ? notify("Removed from your answer", "info", after(async () => {
+            const r = await ore<Saved["question"]>("answer", q.id, opt("text", from), ...(was.item ? [opt("item", was.item)] : []), ...(was.quote ? [opt("quote", was.quote)] : []));
+            back = r.answers?.at(-1)?.ts ?? back;
+            setAnswers((l) => [...l, { ...was, ts: back }]);
+          }), () => rewrite(back, "", from, false))
+        : notify("Changed your answer", "quiet", after(() => rewrite(ts, from, to, false)), () => rewrite(ts, to, from, false));
     try {
-      const r = await ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)]));
+      const r = await write;
       setAnswers((l) => r.answers?.map((c) => ({ ...c, item_title: l.find((x) => x.ts === c.ts)?.item_title })) ?? []);
     } catch (e) {
+      forget?.();
       // Only this piece goes back: another piece saved meanwhile keeps its new words.
       const at = before.indexOf(was);
       setAnswers((l) => (gone ? (l.some((c) => c.ts === ts) ? l : [...l.slice(0, at), was, ...l.slice(at)]) : l.map((c) => (c.ts === ts ? was : c))));
@@ -76,17 +92,6 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
       notify(errorText(e), "error");
       return false;
     }
-    if (!record) return true;
-    // A removed piece comes back as it was written (its source and passage), at the end of his answer.
-    const piece = before.find((c) => c.ts === ts)!;
-    let back = ts;
-    if (gone)
-      notify("Removed from your answer", "info", async () => {
-        const r = await ore<Saved["question"]>("answer", q.id, opt("text", from), ...(piece.item ? [opt("item", piece.item)] : []), ...(piece.quote ? [opt("quote", piece.quote)] : []));
-        back = r.answers?.at(-1)?.ts ?? back;
-        setAnswers((l) => [...l, { ...piece, ts: back }]);
-      }, () => rewrite(back, "", from, false));
-    else notify("Changed your answer", "quiet", () => rewrite(ts, from, to, false), () => rewrite(ts, to, from, false));
     return true;
   };
 
@@ -455,11 +460,14 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
 
   const dismiss = async (q: Question) => {
     setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, here: "skill", matches: x.matches.filter((m) => m.item !== item) } : x)));
+    // On the history at once, as the row moves: its Undo writes once the drop has landed (one that failed is undone).
+    const write = ore("match", item, q.id, "--drop");
+    const set = (drop: boolean) => ore("match", item, q.id, ...(drop ? ["--drop"] : [])).then(reload);
+    const forget = notify("Not answered here", "info", () => write.then(() => set(false), () => {}), () => set(true));
     try {
-      await ore("match", item, q.id, "--drop");
-      const set = (drop: boolean) => ore("match", item, q.id, ...(drop ? ["--drop"] : [])).then(reload);
-      notify("Not answered here", "info", () => set(false), () => set(true));
+      await write;
     } catch (e) {
+      forget();
       notify(errorText(e), "error");
       reload();
     }
