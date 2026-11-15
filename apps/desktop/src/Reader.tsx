@@ -2673,6 +2673,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       word.quiet();
     }
     pressedAt.current = { x: e.clientX, y: e.clientY };
+    // A drag begun in the text and let go past the page (the margin beside it, Codex sweep 5): the page never hears
+    // that release, so the window hands it on, and a selection wholly in the source is highlighted all the same.
+    if (e.button === 0) {
+      const page = e.currentTarget;
+      window.addEventListener("mouseup", (up) => void (!page.contains(up.target as Node) && !window.getSelection()?.isCollapsed && mouseUp.current(up)), { once: true, capture: true });
+    }
     setFocus(null); // the mouse takes over from the keyboard focus
     if (popup && !popupRef.current?.contains(e.target as Node)) {
       keepNote();
@@ -2762,8 +2768,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   useEffect(() => dropWord, []);
   // A drag over the text before a long source has finished mounting (its offsets aren't known yet) is
   // kept and highlighted once it has, if the words are still selected, never dropped (Codex sweep 4).
-  const early = useRef<MouseEvent | null>(null);
-  const onMouseUp = (e: MouseEvent) => {
+  const early = useRef<MouseEvent | globalThis.MouseEvent | null>(null);
+  const onMouseUp = (e: MouseEvent | globalThis.MouseEvent) => {
     const el = docEl.current;
     if (!ready && e.button === 0 && !e.ctrlKey && !popupRef.current?.contains(e.target as Node) && !lookupRef.current?.contains(e.target as Node)) early.current = e;
     if (!ready || !el || closedBook || popupRef.current?.contains(e.target as Node) || lookupRef.current?.contains(e.target as Node)) return;
@@ -2823,6 +2829,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       openPopup(id, range, annOf(id)?.note ?? "", { x: e.clientX, y: e.clientY });
     }
   };
+  const mouseUp = useRef(onMouseUp);
+  mouseUp.current = onMouseUp;
   useEffect(() => {
     const e = early.current;
     early.current = null;

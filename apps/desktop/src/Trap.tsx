@@ -1,5 +1,5 @@
 import { FocusScope } from "@radix-ui/react-focus-scope";
-import { useEffect, useRef, type ReactElement } from "react";
+import { useEffect, useRef, type MouseEvent, type ReactElement } from "react";
 
 /** Keeps Tab and ⇧Tab inside a modal panel, looping at its ends (a Mac sheet, Radix Dialog). Focus on
  *  open and close stays with the panel's own code (useFocusWhileMounted); a Radix popover opened from
@@ -19,6 +19,15 @@ export function Trap({ children, off = false }: { children: ReactElement; off?: 
     </FocusScope>
   );
 }
+
+/** A sheet's backdrop: a press on it closes the sheet, but first the field he was typing in lets go, so its own
+ *  click-away save runs (D211) as it would for a click anywhere else. Closed at once, the field was gone before it
+ *  lost focus and his typing went with it (Edit skill's name, Codex sweep 5). */
+export const onBackdrop = (close: () => void) => (e: MouseEvent) => {
+  if (e.target !== e.currentTarget) return;
+  (document.activeElement as HTMLElement | null)?.blur?.();
+  close();
+};
 
 const CONTROLS = "a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1']), [contenteditable=true]";
 

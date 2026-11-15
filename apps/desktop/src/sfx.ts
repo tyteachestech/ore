@@ -65,15 +65,33 @@ const webAudio: Player = (id, { rate, after }) => {
   void buffer(id).then((buf) => {
     // A sound that loaded too late for its moment is dropped: late, it would land on something else.
     const wait = (due - performance.now()) / 1000;
-    if (!buf || !on || wait < -0.3) return;
+    if (!buf || !on || hidden() || wait < -0.3) return;
     const c = audio(), src = c.createBufferSource(), gain = c.createGain();
     src.buffer = buf;
     src.playbackRate.value = rate;
     gain.gain.value = LEVEL;
     src.connect(gain).connect(c.destination);
-    src.start(c.currentTime + Math.max(0, wait));
+    const at = c.currentTime + Math.max(0, wait);
+    // A quick fade, not a click, where the next sound cuts this one.
+    const cut = (t: number) => (gain.gain.setTargetAtTime(0, t, 0.01), src.stop(t + 0.05));
+    src.start(FEEDBACK.includes(id) ? take(at, buf.duration / rate, id === "goal", cut) : at);
   });
 };
+
+/** A hidden window (another app in front, the Mac asleep) hears nothing: a save that lands then is not a moment he sees. */
+const hidden = () => typeof document !== "undefined" && document.hidden;
+
+/** The sounds that answer him during a review. At most one plays at a time: rating fast, each new one cuts the one
+ *  still playing, so they never pile up (four at once, Codex sweep 5); the goal's chime waits for the rating's sound to end. */
+const FEEDBACK: Sfx[] = ["tap", "right", "missed", "goal"];
+let voice: { end: number; cut: (at: number) => void } | null = null;
+/** When a feedback sound asked for `at` (audio clock seconds) and lasting `length` starts; the one before it is cut there. */
+export function take(at: number, length: number, waits: boolean, cut: (at: number) => void): number {
+  const start = waits && voice ? Math.max(at, voice.end) : at;
+  if (voice && voice.end > start) voice.cut(start);
+  voice = { end: start + length, cut };
+  return start;
+}
 let player = webAudio;
 /** Tests listen here in place of the speakers. */
 export const setPlayer = (p: Player | null) => void (player = p ?? webAudio);
@@ -84,7 +102,7 @@ export function warm() {
 }
 
 export function sfx(id: Sfx, o: Opts = {}) {
-  if (!on) return;
+  if (!on || hidden()) return;
   // The journeys' ear: `window.__ORE_SFX = []` collects what played.
   if (import.meta.env?.DEV) (globalThis as { __ORE_SFX?: string[] }).__ORE_SFX?.push(id);
   player(id, { rate: o.rate ?? 1, after: o.after ?? 0 });

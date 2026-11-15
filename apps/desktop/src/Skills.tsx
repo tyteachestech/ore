@@ -6,7 +6,7 @@ import { Hint } from "./Hint";
 import { keepKeysIn } from "./keys";
 import { isOther } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
-import { Trap } from "./Trap";
+import { onBackdrop, Trap } from "./Trap";
 import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
 import { ore, opt, type Skill, type SkillColor } from "./ore";
 import { count, errorText, load, save, settleFocus, usable, useFocusWhileMounted, type Notify } from "./util";
@@ -367,7 +367,7 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
   }, [onClose]);
 
   return (
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" onMouseDown={onBackdrop(onClose)}>
       <Trap>
       <div ref={panelRef} className="panel skill-edit" role="dialog" aria-modal="true" aria-label={`Edit skill ${skill.name}`}>
         <div className="skill-edit-head">

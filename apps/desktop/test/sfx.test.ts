@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { newSession, rated, setPlayer, setSounds, sfx, SFX } from "../src/sfx";
+import { newSession, rated, setPlayer, setSounds, sfx, SFX, take } from "../src/sfx";
 
 // Review's sounds (D277): which moment plays what, read off the player in place of the speakers.
 let heard: [string, number][] = [];
@@ -55,5 +55,38 @@ describe("review sounds", () => {
     const config = readFileSync(join(import.meta.dir, "../vite.config.ts"), "utf8");
     for (const id of SFX) expect(config).toContain(`"${id}"`);
     expect(readFileSync(join(import.meta.dir, "../../../.gitignore"), "utf8")).toContain("apps/desktop/public/sounds/");
+  });
+
+  // F-new-review-sounds-overlap: fast ratings stacked up to four sounds, and the goal's chime rang over the rating's.
+  test("one review sound at a time: a new one cuts the one still playing, and the goal's chime waits for it to end", () => {
+    const cuts: [string, number][] = [];
+    const cut = (name: string) => (at: number) => void cuts.push([name, at]);
+    // The answer's tick (0.55 s), then a rating 0.08 s in: the tick stops where the rating starts.
+    expect(take(100, 0.55, false, cut("tap"))).toBe(100);
+    expect(take(100.08, 0.85, false, cut("right"))).toBe(100.08);
+    expect(cuts).toEqual([["tap", 100.08]]);
+    // The goal asked for half a second after the rating: it starts once the rating's shine has ended, cutting nothing.
+    expect(take(100.58, 1, true, cut("goal"))).toBeCloseTo(100.93);
+    expect(cuts).toEqual([["tap", 100.08]]);
+    // A sound that has ended is not cut.
+    take(200, 0.5, false, cut("tap"));
+    take(201, 0.5, false, cut("missed"));
+    expect(cuts).toEqual([["tap", 100.08]]);
+  });
+
+  // F-new-review-sounds-hidden: a rating whose save came back after the window was hidden still played.
+  test("nothing plays while the page is hidden", () => {
+    const g = globalThis as { document?: unknown };
+    const was = g.document;
+    g.document = { hidden: true };
+    try {
+      sfx("tap");
+      rated(3);
+      expect(heard).toEqual([]);
+    } finally {
+      g.document = was;
+    }
+    sfx("tap");
+    expect(heard.map((h) => h[0])).toEqual(["tap"]);
   });
 });

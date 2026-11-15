@@ -5,7 +5,7 @@ import {
   closestCenter, defaultDropAnimationSideEffects, DndContext, DragOverlay, pointerWithin, useSensor, useSensors,
   type CollisionDetection, type DragEndEvent, type DragOverEvent, type DragStartEvent, type DropAnimation, type UniqueIdentifier,
 } from "@dnd-kit/core";
-import { RowSensor } from "./drag";
+import { RowSensor, dropWithin } from "./drag";
 import { arrayMove, SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
@@ -119,14 +119,14 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
 
   // A dragged collection only meets other collections. A dragged skill meets the row under the
   // pointer, or the group (header, collapsed or empty) when no row is.
-  const collide: CollisionDetection = (args) => {
+  const collide: CollisionDetection = dropWithin(() => nav.current, (args) => {
     if (active !== null && isGroup(active)) return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => isGroup(c.id)) });
     const hits = pointerWithin(args);
     const row = hits.find((h) => !isGroup(h.id));
     if (row) return [row];
     if (hits.length) return [hits[0]!];
     return closestCenter({ ...args, droppableContainers: args.droppableContainers.filter((c) => !isGroup(c.id)) });
-  };
+  });
 
   const onDragStart = ({ active: a }: DragStartEvent) => {
     setActive(a.id);
@@ -146,6 +146,8 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
       i === from ? { ...g, skills: g.skills.filter((s) => s.id !== a.id) } : i === to ? { ...g, skills: [...target.slice(0, at), moving, ...target.slice(at)] } : g));
   };
   const onDragEnd = ({ active: a, over }: DragEndEvent) => {
+    // Let go over nothing (off the sidebar): nothing moves, not even a group it crossed on the way.
+    if (!over) return onDragCancel();
     let next = draft ?? groups;
     if (over && isGroup(a.id)) {
       const from = groupOf(next, a.id);
