@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { newSession, rated, setPlayer, setSounds, sfx, SFX } from "../src/sfx";
 
-// Review's sounds (D-new-review-sounds): which moment plays what, read off the player in place of the speakers.
+// Review's sounds (D277): which moment plays what, read off the player in place of the speakers.
 let heard: [string, number][] = [];
 beforeEach(() => {
   heard = [];

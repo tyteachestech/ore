@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { PHONE } from "./ore";
 import { load, save } from "./util";
 
-/* Review's sounds (D-new-review-sounds): one short sound on each key moment of a review and nowhere else. Showing
+/* Review's sounds (D277): one short sound on each key moment of a review and nowhere else. Showing
    the answer is a pickaxe tick, a recall a gem's shine, a miss a gem chipping, the day's goal a chime; the end screen
    has the cart's roll, the mole's pop and a closing jingle. Nothing plays on undo, Later, an edit or any other key.
    The files are ElevenLabs output, kept out of git and taken from the Mac's sounds folder as the radio's are (D254,
