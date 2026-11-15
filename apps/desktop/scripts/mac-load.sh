@@ -16,7 +16,7 @@ check)
 clean)
   dir=$(cd "${2:?usage: mac-load.sh clean <worktree dir>}" && pwd)
   case "$dir" in "$HOME/Developer/ore" | /Applications* | "$HOME/Ore"*) echo "Refusing $dir: that is Tyler's own."; exit 1 ;; esac
-  pids=$( { pgrep -f "$dir" || true; lsof -t -a -d cwd +D "$dir" 2>/dev/null || true; } | sort -u | grep -vx -e "$$" -e "$PPID" || true)
+  pids=$( { pgrep -f "$dir" || true; lsof -d cwd -Fpn 2>/dev/null | awk -v d="$dir" '/^p/{p=substr($0,2)} /^n/ && index(substr($0,2)"/", d"/")==1{print p}'; } | sort -u | grep -vx -e "$$" -e "$PPID" || true)
   [ -n "$pids" ] || { echo "Nothing running from $dir."; exit 0; }
   ps -o pid=,command= -p $(echo $pids | tr ' ' ',') | cut -c1-120
   kill $pids 2>/dev/null || true; sleep 2; kill -9 $pids 2>/dev/null || true
