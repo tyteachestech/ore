@@ -48,6 +48,7 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "6.0.0",
     "remark-parse": "^11.0.0",
+    "remend": "^1.4.0",
     "sql.js": "1.13.0",
     "tailwindcss": "^4.3.5",
     "unified": "^11.0.5",
