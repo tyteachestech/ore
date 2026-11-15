@@ -10,6 +10,7 @@ import { escTaken, Hint } from "./Hint";
 import { Trap } from "./Trap";
 import { comboOf, label, rebind, useKeymap } from "./keys";
 import { ore, opt, PHONE } from "./ore";
+import { setSounds, useSounds } from "./sfx";
 import { TablesSetting } from "./Tables";
 import { setTray, trayOn } from "./quick";
 import { ShortcutEditor } from "./Shortcuts";
@@ -83,6 +84,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
   const [section, setSection] = useState<Section>(() => initial ?? (SECTIONS.some((s) => s.id === load(LAST)) ? (load(LAST) as Section) : "general"));
   const [data, setData] = useState<Data | null>(null);
   const styleCtl = useStyleControls();
+  const sounds = useSounds();
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useFocusWhileMounted(ref);
@@ -408,6 +410,15 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                 <Group title="Exercises">
                   <Row title="Remix exercises" text="Exercises you know come back as new questions on the same idea, so you apply it instead of reciting it." htmlFor="remix">
                     <Switch.Root id="remix" className="switch" checked={data.review.remix} onCheckedChange={(v) => void setGoal("remix", "remix", v)}>
+                      <Switch.Thumb className="switch-thumb" />
+                    </Switch.Root>
+                  </Row>
+                </Group>
+              )}
+              {!PHONE && (
+                <Group title="Sound">
+                  <Row title="Sound effects" text="A short sound when you show an answer, rate it, reach your goal and finish." htmlFor="sounds">
+                    <Switch.Root id="sounds" className="switch" checked={sounds} onCheckedChange={setSounds}>
                       <Switch.Thumb className="switch-thumb" />
                     </Switch.Root>
                   </Row>
