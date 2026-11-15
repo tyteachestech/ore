@@ -50,6 +50,15 @@ const cancelInstall = () => cancelOre(JOB);
 
 const what = (s: string[]) => (s.includes("tables") && s.includes("formulas") ? "Formulas and tables" : s.includes("tables") ? "Tables" : "Formulas");
 
+/** What the line under a PDF's title says: nothing once its tables and formulas are read (or it has none),
+ *  the Mac's own line with its button ("mac"), or on the phone, which can't run the reader, where to read them. */
+export function tablesLine(doc: Doc, phone: boolean): string | null {
+  if (doc.type !== "pdf" || !doc.structure?.length || doc.tables === "read") return null;
+  // The Mac is reading them now: the phone gets the result through sync.
+  if (phone && doc.tables === "reading") return null;
+  return phone ? `${what(doc.structure)} in this PDF read as plain text. Open it on your Mac to read them properly.` : "mac";
+}
+
 /** The quiet line under a PDF's title while its tables or formulas still read as plain text. */
 export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => void }) {
   const downloading = useStep();
@@ -58,7 +67,7 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
   const [error, setError] = useState(doc.tables_error);
   const cancelled = useRef(false);
   // Read in the background (the reader was there when he added the PDF): wait for that run to end.
-  const background = useRef(doc.tables === "reading");
+  const background = useRef(!PHONE && doc.tables === "reading");
   useEffect(() => {
     if (!background.current) return;
     const t = setInterval(() => {
@@ -77,7 +86,14 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
     return () => clearInterval(t);
   }, [doc.id]);
 
-  if (PHONE || doc.type !== "pdf" || !doc.structure?.length || doc.tables === "read") return null;
+  const line = tablesLine(doc, PHONE);
+  if (line === null) return null;
+  if (line !== "mac")
+    return (
+      <div className="pdf-tables">
+        <span>{line}</span>
+      </div>
+    );
 
   const read = async () => {
     setError(undefined);
@@ -106,7 +122,7 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
           </button>
         </>
       ) : reading ? (
-        <Working stage="read" label={`Reading the ${what(doc.structure).toLowerCase()}…`} slow="Up to a few minutes for a long paper" />
+        <Working stage="read" label={`Reading the ${what(doc.structure ?? []).toLowerCase()}…`} slow="Up to a few minutes for a long paper" />
       ) : error ? (
         <>
           <span className="pdf-tables-err">{error}</span>
@@ -116,7 +132,7 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
         </>
       ) : (
         <>
-          <span>{what(doc.structure)} in this PDF read as plain text.</span>
+          <span>{what(doc.structure ?? [])} in this PDF read as plain text.</span>
           <button className="pdf-tables-btn" onClick={() => void read()}>
             Read them properly
           </button>

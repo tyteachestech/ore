@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { passageText } from "./text";
 
 /** The iPhone build (`ORE_PHONE=1 vite build`, apps/phone). */
 export const PHONE = import.meta.env.VITE_PHONE === "1";
@@ -317,7 +318,10 @@ export type DueEntry = { id: string; kind: "card" | "prompt"; state: "draft" | "
 
 /** `ore card show`. */
 export type CardFull = {
-  id: string; kind: "card" | "prompt"; state: "draft" | "live" | "retired"; item: string; annotation?: string; question: string; answer: string; rubric: string[];
+  id: string; kind: "card" | "prompt"; state: "draft" | "live" | "retired"; item: string; annotation?: string;
+  /** D118: the other highlights it was planned from. */
+  also?: string[];
+  question: string; answer: string; rubric: string[];
   /** A remixed version shown in review (D66), with the card it stands in for. */
   variant?: string; original?: { question: string; answer: string; rubric: string[] };
   /** Review may offer "In my head" (D68): an Explain card he has passed twice. */
@@ -358,6 +362,26 @@ export function lastWin(queue: DueEntry[]): DueEntry[] | null {
     if (!e.relearn && e.due && (e.retrievability ?? 0) >= LAST_WIN_AT && (best < 0 || e.retrievability! > queue[best]!.retrievability!)) best = i;
   });
   return best < 0 ? null : [queue[best]!, ...queue.slice(0, best), ...queue.slice(best + 1)];
+}
+
+/** A missed card comes back this many cards later (D59). */
+const AGAIN_GAP = 3;
+/** The queue once its first card is answered. A miss comes back once (D59), a few cards later; a second
+ *  miss waits for its next FSRS date. Answered, a new card is live: it comes back as one he has seen. */
+export function afterAnswer(q: DueEntry[], again: boolean): DueEntry[] {
+  if (!q.length) return q;
+  const [head, ...rest] = q;
+  if (!again || head!.relearn) return rest;
+  return [...rest.slice(0, AGAIN_GAP), { ...head!, relearn: true, state: "live" }, ...rest.slice(AGAIN_GAP)];
+}
+
+/** The highlights a card was planned from (D118: `annotation`, then `also`), as review shows them after the answer. */
+export function cardQuotes(c: Pick<CardFull, "annotation" | "also">, annotations: Annotation[]): { text: string; at: string }[] {
+  const ids = new Set([c.annotation, ...(c.also ?? [])].filter((id): id is string => !!id));
+  return [...ids].flatMap((id) => {
+    const a = annotations.find((x) => x.id === id && x.status !== "deleted");
+    return a ? [{ text: passageText(a.exact), at: a.id }] : [];
+  });
 }
 
 /** Later (D192, Anki's Bury for one session): the exercise on screen goes to the end of the session, nothing
