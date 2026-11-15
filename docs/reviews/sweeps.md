@@ -65,6 +65,7 @@ When a sweep's triage is done, add a row per tester here.
 | 11-15 | [sweep 6](2026-11-15-codex-sweep-6/) exercises | Codex | Making, fixing and keeping exercises and their history | both | 3 | #440 |
 | 11-15 | [sweep 6](2026-11-15-codex-sweep-6/) looks | Codex | Light and dark, window sizes, zoom, reduced motion, contrast | both | 1 | #440 |
 | 11-15 | [sweep 6](2026-11-15-codex-sweep-6/) organize | Codex | Finding and organizing a big library (238 sources, not 950) | both | 4 (+9 from #440's review, F339–F347) | #440 |
+| 11-15 | [sweep 7](2026-11-15-codex-sweep-7/) highlights | Codex | Highlighting at its limits: overlaps, formulas, code, tables, every source type | both | 4 (+3 of the same kinds the fix found) | sweep 7's PR |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
@@ -73,7 +74,7 @@ Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claud
 Ranked by likely yield.
 
 1. **The real Tauri window.** Native menu bar, ⌘Q with drafts open, the quick quiz's global shortcut and menu bar item, reminders firing, open at login. Every tester so far drove a browser page. F15 has been open since 11-11, and these are the paths that run on his Mac every day.
-2. **Highlighting at its limits.** Overlapping highlights, and highlights across headings, tables, math, images, code, transcripts and the PDF view. Sweep 6 found two WebKit page crashes from overlapping paint layers (F331, F339), and that kind of crash rarely comes alone.
+2. ~~**Highlighting at its limits.**~~ Taken by sweep 7. Overlapping highlights, and highlights across headings, tables, math, images, code, transcripts and the PDF view. Sweep 6 found two WebKit page crashes from overlapping paint layers (F331, F339), and that kind of crash rarely comes alone.
 3. **Reimport and anchoring, for every source type.** A better reader re-imports a source that already has highlights, notes and exercises (D122 keeps the original for this). Anchoring is a core rule, and only the lifecycle tester touched it, with one changed page.
 4. **A library from an older Ore.** Open a library written by an earlier commit: old frontmatter, card files, review logs, skills.yaml. Nobody has tested an upgrade, and his ~/Ore is weeks of formats deep.
 5. **Months of use in a few minutes.** Run 60–90 simulated days of sessions with `page.clock`: queue order (D22, D24), new exercises a day, the backlog that never empties, levels, the end screen. The time tester only jumped days. The numbers tester checked one moment.
