@@ -8210,6 +8210,184 @@ journey("archive a source from its row, then Undo from the toast; VoiceOver hear
   await row.waitFor();
 });
 
+journey("finish: a source that gave no exercises says so and what to mark, not that they start tomorrow (Codex sweep 4)", async (page) => {
+  // Put back as it was after: the next journey finishes this source too.
+  const item = ((await ore("ls")) as { id: string; title: string; status: string }[]).find((i) => i.title === AGENTS)!;
+  try {
+    await finishWithNothingDrafted(page);
+  } finally {
+    await ore("status", item.id, item.status);
+  }
+});
+
+async function finishWithNothingDrafted(page: Page) {
+  await openSource(page, AGENTS);
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: Record<string, unknown> }).__ORE_REPLY = { enrich: { item: "x", title: "x", prequestions: [], skills: [], topics: [], topics_created: [], cards: [] } }));
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByRole("button", { name: "Just mark done" }).click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await page.locator(".toast").filter({ hasText: "No exercises came from" }).filter({ hasText: "Key point" }).waitFor();
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: Record<string, unknown> }).__ORE_REPLY = {}));
+}
+
+journey("review: a first day with no exercises yet says how to get one, not that he is caught up (Codex sweep 4)", async (page) => {
+  await page.evaluate(() => {
+    const w = window as unknown as { __ORE_REPLY: Record<string, unknown>; __ORE_EDIT: Record<string, (j: unknown) => unknown> };
+    w.__ORE_REPLY = { due: [] };
+    w.__ORE_EDIT = { today: (t) => ({ ...(t as object), due: 0, new_waiting: 0, exercises: 0 }) };
+  });
+  await page.keyboard.press("Meta+KeyR");
+  await page.locator(".toast").filter({ hasText: "No exercises yet" }).waitFor();
+  await page.evaluate(() => {
+    const w = window as unknown as { __ORE_REPLY: Record<string, unknown>; __ORE_EDIT: Record<string, unknown> };
+    w.__ORE_REPLY = {};
+    w.__ORE_EDIT = {};
+  });
+});
+
+/** Settings › Review › Minutes a day (or another of its choices), picked in Settings, which closes after. */
+async function pickGoal(page: Page, min: number, row = "Minutes a day") {
+  await page.keyboard.press("Meta+Comma");
+  await page.getByRole("tab", { name: "Review" }).click();
+  const seg = page.getByRole("radiogroup", { name: row });
+  await seg.getByRole("radio", { name: String(min), exact: true }).click();
+  await until(`${min} is picked`, async () => (await seg.getByRole("radio", { name: String(min), exact: true }).getAttribute("aria-checked")) === "true");
+  await loaded(page);
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog", { name: "Settings" }).waitFor({ state: "detached" });
+}
+
+journey("settings: a new daily goal reaches an open Review, and ⌘Z of it reaches Home (Codex sweep 4)", async (page) => {
+  const log = oreCalls(page);
+  const was = (await ore("today")) as { goal_minutes: number };
+  await ore("goal", "--minutes", "30");
+  try {
+    await page.reload();
+    await page.locator(".home-today .goal-of").waitFor();
+    await startReview(page, null);
+    // Paused on a card's source, as he would step out to Settings (⌘, is the app's, not Review's).
+    const open = page.getByRole("button", { name: /Open in source/ });
+    for (let n = 0; n < 6 && !(await open.isVisible()); n++) {
+      const q = await page.locator(".review-q").innerText();
+      await reveal(page);
+      if (await open.isVisible()) break;
+      await page.getByRole("button", { name: "Good", exact: true }).click();
+      await until("the next card", async () => (await page.locator(".review-q").innerText()) !== q);
+    }
+    await open.click();
+    await page.locator(".doc-head").waitFor();
+    await pickGoal(page, 5);
+    await page.getByRole("button", { name: /Back to Review/ }).click();
+    await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+    // Six minutes of review, three a card (the cap per card): past the new goal of 5, short of the old 30.
+    for (let n = 0; n < 2 && !(await page.locator(".review-goal").isVisible()); n++) {
+      await page.evaluate(() => { const now = Date.now; Date.now = () => now() + 181_000; });
+      const q = await page.locator(".review-q").innerText();
+      if (!(await page.getByRole("button", { name: "Good", exact: true }).isVisible())) await reveal(page);
+      await page.getByRole("button", { name: "Good", exact: true }).click();
+      await until("the next card or the goal note", async () => (await page.locator(".review-goal").isVisible()) || (await page.locator(".review-q").innerText().catch(() => q)) !== q);
+    }
+    await page.locator(".review-goal").waitFor({ timeout: 10000 });
+    await page.keyboard.press("Escape");
+    await page.locator(".review-foot").getByRole("button", { name: "Done", exact: true }).click();
+    await page.locator(".review").waitFor({ state: "detached" });
+    const of = page.locator(".home-today .goal-of");
+    await until("Home says of 5", async () => (await of.innerText()).includes("of 5 min"));
+    await pickGoal(page, 15);
+    await until("Home says of 15", async () => (await of.innerText()).includes("of 15 min"));
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z puts Home back on 5", async () => (await of.innerText()).includes("of 5 min"));
+  } finally {
+    await log.undoAll();
+    await ore("goal", "--minutes", String(was.goal_minutes));
+  }
+});
+
+journey("settings: New exercises a day set to 0 mid-session holds back the new exercises still ahead (Codex sweep 4)", async (page) => {
+  const log = oreCalls(page);
+  const was = (await ore("today")) as { new_per_day: number };
+  try {
+    await startReview(page, null);
+    const q = page.locator(".review-q");
+    await q.waitFor();
+    const open = page.getByRole("button", { name: /Open in source/ });
+    await reveal(page);
+    if (!(await open.isVisible())) throw new Error("the first exercise offers no Open in source");
+    const ahead = (await page.evaluate(() => document.querySelector(".review-new") === null)) as boolean;
+    if (!ahead) throw new Error("the first exercise is a new one: this journey wants a due one first");
+    await open.click();
+    await page.locator(".doc-head").waitFor();
+    await pickGoal(page, 0, "New exercises a day");
+    await page.getByRole("button", { name: /Back to Review/ }).click();
+    await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+    // Rate through the rest: none is a new exercise any more (one in five was, D144).
+    for (let n = 0; n < 8 && (await q.isVisible()); n++) {
+      const was = await q.innerText();
+      if (n > 0 && (await page.locator(".review-new").isVisible())) throw new Error(`“${was}” is new, past a limit of 0`);
+      if (!(await page.getByRole("button", { name: "Good", exact: true }).isVisible())) await reveal(page);
+      await page.getByRole("button", { name: "Good", exact: true }).click();
+      await until("the next card or the end", async () => !(await q.isVisible()) || (await q.innerText()) !== was);
+    }
+  } finally {
+    await page.keyboard.press("Escape");
+    await log.undoAll();
+    await ore("goal", `--new-per-day=${was.new_per_day}`);
+  }
+});
+
+journey("settings: a When you review that fails to save keeps the words he typed (Codex sweep 4)", async (page) => {
+  const was = (await ore("today")) as { plan: string };
+  try {
+    await page.keyboard.press("Meta+Comma");
+    await page.getByRole("tab", { name: "Review" }).click();
+    const field = page.getByLabel("After what do you review?");
+    await field.fill("before my study block");
+    await field.press("Enter");
+    await until("the cue saved", async () => ((await ore("today")) as { plan: string }).plan === "before my study block");
+    await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { goal: "The disk is unavailable." }));
+    await field.fill("keep these unsaved words");
+    await field.press("Enter");
+    await page.locator(".toast").filter({ hasText: "The disk is unavailable." }).waitFor();
+    await page.waitForTimeout(300);
+    if ((await field.inputValue()) !== "keep these unsaved words") throw new Error(`the field went back to “${await field.inputValue()}”: his words are lost`);
+  } finally {
+    await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+    await page.keyboard.press("Escape");
+    await ore("goal", "--plan", was.plan);
+  }
+});
+
+journey("settings: a value in skills.yaml Ore can't use is named in Settings, not used silently (Codex sweep 4)", async (page) => {
+  const file = join(LIB, "skills.yaml");
+  const was = readFileSync(file, "utf8");
+  // An earlier journey may have saved a review section: change its goal there, or add one.
+  const bad = /^review:$/m.test(was) ? (/^  goal_minutes: .*$/m.test(was) ? was.replace(/^  goal_minutes: .*$/m, "  goal_minutes: -1") : was.replace(/^review:$/m, "review:\n  goal_minutes: -1")) : `${was.trimEnd()}\nreview:\n  goal_minutes: -1\n`;
+  writeFileSync(file, bad);
+  try {
+    await page.keyboard.press("Meta+Comma");
+    await page.getByRole("dialog", { name: "Settings" }).getByText("review.goal_minutes is -1").waitFor();
+    await page.keyboard.press("Escape");
+  } finally {
+    writeFileSync(file, was);
+  }
+});
+
+journey("settings: a goal set outside the list (ore goal --minutes 7) shows picked in Minutes a day (Codex sweep 4)", async (page) => {
+  const was = (await ore("today")) as { goal_minutes: number };
+  await ore("goal", "--minutes", "7");
+  try {
+    await page.reload();
+    await page.keyboard.press("Meta+Comma");
+    await page.getByRole("tab", { name: "Review" }).click();
+    const seven = page.getByRole("radio", { name: "7", exact: true });
+    await seven.waitFor();
+    if ((await seven.getAttribute("aria-checked")) !== "true") throw new Error("7 is offered but not picked");
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("goal", "--minutes", String(was.goal_minutes));
+  }
+});
+
 journey("finish: when drafting the cards fails, a toast says why and Try again drafts them", async (page) => {
   await openSource(page, AGENTS);
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { enrich: "Claude is signed out." }));
@@ -11377,6 +11555,22 @@ journey("phone: Settings in the drawer changes the daily goal and the reminder, 
   await page.locator(".phone-settings").waitFor({ state: "detached" });
 }, "phone");
 
+journey("phone: a goal changed in Settings shows on Today on the way back, without a relaunch (Codex sweep 4)", async (page) => {
+  const of = page.locator(".home-today .goal-of");
+  await of.waitFor();
+  const was = await of.innerText();
+  const want = was.includes("of 5 min") ? "15" : "5";
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+  await page.locator(".phone-settings h1").waitFor();
+  const radio = page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: want, exact: true });
+  await tap(page, radio);
+  await until(`${want} is picked`, async () => (await radio.getAttribute("aria-checked")) === "true");
+  await tap(page, page.locator(".phone-back"));
+  await page.locator(".phone-settings").waitFor({ state: "detached" });
+  await until(`Today says of ${want} min`, async () => (await of.innerText()).includes(`of ${want} min`));
+}, "phone");
+
 journey("phone: a double tap highlights the paragraph and opens it, a heading and a highlight keep their taps (D224)", async (page) => {
   await phoneSource(page, TESTING);
   await page.waitForTimeout(400);
@@ -11870,6 +12064,17 @@ journey("phone: the small controls of a source answer a 44pt touch", async (page
   await tap(page, page.getByRole("button", { name: "Just mark done" }));
   await page.locator(".quiz-foot button").first().waitFor();
   await fits(".quiz-foot button", "the closing card's Done");
+}, "phone");
+
+journey("phone: finishing a source says its exercises are drafted on the Mac, not that they start tomorrow (Codex sweep 4)", async (page) => {
+  await phoneSource(page, TESTING);
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  await tap(page, page.getByRole("button", { name: "Just mark done" }));
+  const card = page.locator(".quiz-made");
+  await card.waitFor();
+  const said = await card.innerText();
+  if (!said.includes("Mac") || said.includes("tomorrow")) throw new Error(`the closing card says “${said}” on a phone that drafts nothing`);
 }, "phone");
 
 /** Every row of the open bottom sheet that something else covers somewhere across its width (the reader's bar or

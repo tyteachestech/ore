@@ -24,7 +24,7 @@ import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { LapCentre, lapPlan, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useFocusWhileMounted, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useFocusWhileMounted, useLibraryChanges, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { MOMENT_MOOD, momentFor, type Moment } from "./moment";
@@ -312,6 +312,26 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     const un = quick || PHONE ? null : listen("quiz-closed", () => void reconcile(false));
     return () => (removeEventListener(LIBRARY_BACK, back), void un?.then((f) => f()));
   }, [quick, pick, source]);
+
+  // A setting changed while the session is open (paused on a source, Settings, then back): the goal it counts
+  // toward and the day's new-exercise limit follow the saved ones, as a fresh session would (Codex sweep 4).
+  const changes = useLibraryChanges();
+  useEffect(() => {
+    if (!changes || quick) return;
+    void ore<Today>("today").then((t) => {
+      const b = before.current;
+      if (!b) return;
+      before.current = { ...b, goal_minutes: t.goal_minutes, goal_ms: t.goal_ms, counts: t.counts, met: t.counts && (b.active_ms >= t.goal_ms || (b.met && b.active_ms < b.goal_ms)) };
+      setStart(before.current);
+    }, () => {});
+    // A source's own review is past the limits on purpose; otherwise new exercises the limit no longer lets in go.
+    if (source) return;
+    void ore<DueEntry[]>("due", ...pickArgs(pick, source)).then((capped) => {
+      const keep = new Set(capped.map((e) => e.id));
+      // The card on screen stays: he is in the middle of it.
+      setQueue((q) => q && q.filter((e, i) => i === 0 || e.due || e.relearn || keep.has(e.id)));
+    }, () => {});
+  }, [changes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** A fresh start on a card: no answer, no marks, its clock not yet started. */
   const reset = () => {
@@ -1467,6 +1487,7 @@ const pickArgs = (pick: string[] | null, source?: string) => [...(pick ?? []).ma
 function nothingDue(t: Today | null, pick: string[] | null, source?: string): string {
   if (source) return "Nothing from this source is due right now.";
   if (pick && t && t.due > 0) return `Nothing is due in the skills you picked today. ${t.due} ${t.due === 1 ? "exercise waits" : "exercises wait"} in the others.`;
+  if (t && !t.exercises) return "No exercises yet. Mark Key points in a source and Finish it: they start the next day.";
   return t?.new_waiting ? `All caught up. ${waiting(t)}` : "All caught up. Nothing is due right now.";
 }
 

@@ -23,7 +23,8 @@ import * as RadioGroup from "@radix-ui/react-radio-group";
 
 type Vendor = "claude" | "codex";
 type Review = { goal_minutes: number; weekdays_only: boolean; new_per_day: number; remix: boolean; plan: string; reminder: string };
-type Data = { library: string; ai: Vendor; ai_env: string | null; model: string; model_env: string | null; review: Review };
+/** `problems`: values in skills.yaml Ore left out for their defaults (a hand edit it can't use). */
+type Data = { library: string; ai: Vendor; ai_env: string | null; model: string; model_env: string | null; review: Review; problems?: string[] };
 type Model = { id: string; label: string; description?: string };
 
 const SECTIONS = [
@@ -33,7 +34,9 @@ const SECTIONS = [
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
 
-export const GOALS = [5, 10, 15, 20, 30];
+const GOALS = [5, 10, 15, 20, 30];
+/** The choices for Minutes a day: the list, plus the library's own goal when `ore goal` or a hand edit set one off it, so one is always shown picked. */
+export const goalOptions = (now: number) => [...new Set([...GOALS, now])].sort((a, b) => a - b);
 const NEW = [0, 5, 10, 20];
 /** The choices for New exercises a day: the list, plus the library's own value when `ore goal` or a hand edit set one off it, so one is always shown picked. */
 export const newOptions = (now: number) => [...new Set([...NEW, now])].sort((a, b) => a - b);
@@ -133,7 +136,8 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
   /** Shows the change at once and rolls it back if the CLI refuses it. Once it lands it goes on the
    *  app history, so ⌘Z takes it back (and ⇧⌘Z gives it again) like any other change he makes;
    *  those replays pass no `step`. */
-  const change = async (next: Data, run: () => Promise<unknown>, step?: { message: string; undo: () => Promise<unknown>; redo: () => Promise<unknown> }) => {
+  /** Resolves false when the write failed (and said so), so a field can keep what he typed. */
+  const change = async (next: Data, run: () => Promise<unknown>, step?: { message: string; undo: () => Promise<unknown>; redo: () => Promise<unknown> }): Promise<boolean> => {
     const prev = dataRef.current;
     setData(next);
     dataRef.current = next;
@@ -150,7 +154,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
         }
         if (!step) throw e;
         notify(errorText(e), "error");
-        return;
+        return false;
       }
       // Once the latest choice lands, reconcile the whole form. Its optimistic copy may
       // still include another field whose earlier write failed. Never overwrite a newer edit.
@@ -160,21 +164,22 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
         if (saved && dataRef.current === next) { setData(saved); dataRef.current = saved; }
       }
       if (step) notify(step.message, "quiet", step.undo, step.redo);
+      return true;
     });
   };
   /** What each goal setting is called in an Undone toast. */
   const NAMES: Record<string, string> = { minutes: "Minutes a day", "weekdays-only": "Weekdays only", "new-per-day": "New exercises a day", plan: "When you review", remix: "Remix exercises" };
-  const setGoal = async <K extends keyof Review>(key: K, flag: string, value: Review[K], record = true): Promise<void> => {
+  const setGoal = async <K extends keyof Review>(key: K, flag: string, value: Review[K], record = true): Promise<boolean> => {
     const d = dataRef.current;
-    if (!d) return;
+    if (!d) return false;
     const was = d.review[key];
     return change({ ...d, review: { ...d.review, [key]: value } }, () => ore("goal", opt(flag, String(value))), record ? { message: `Changed “${NAMES[flag] ?? flag}”`, undo: () => setGoal(key, flag, was, false), redo: () => setGoal(key, flag, value, false) } : undefined);
   };
 
   /** The reminder lives in skills.yaml and in a LaunchAgent that fires with the app closed (D67). */
-  const setReminder = async (t: string, record = true): Promise<void> => {
+  const setReminder = async (t: string, record = true): Promise<boolean> => {
     const d = dataRef.current;
-    if (!d) return;
+    if (!d) return false;
     const was = d.review.reminder;
     return change(
       { ...d, review: { ...d.review, reminder: t } },
@@ -190,9 +195,9 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
       record ? { message: "Changed the reminder", undo: () => setReminder(was, false), redo: () => setReminder(t, false) } : undefined,
     );
   };
-  const setVendor = async (v: Vendor, record = true): Promise<void> => {
+  const setVendor = async (v: Vendor, record = true): Promise<boolean> => {
     const d = dataRef.current;
-    if (!d) return;
+    if (!d) return false;
     const was = { ai: d.ai, model: d.model };
     const next = { ...d, ai: v, model: v === "claude" ? "sonnet" : "" };
     return change(next, async () => {
@@ -200,9 +205,9 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
       if (dataRef.current === next) { setData(r); dataRef.current = r; }
     }, record ? { message: "Changed the AI provider", undo: () => setVendor(was.ai, false).then(() => setModel(was.model, false)), redo: () => setVendor(v, false) } : undefined);
   };
-  const setModel = async (m: string, record = true): Promise<void> => {
+  const setModel = async (m: string, record = true): Promise<boolean> => {
     const d = dataRef.current;
-    if (!d) return;
+    if (!d) return false;
     const was = d.model;
     return change({ ...d, model: m }, () => ore("settings", opt("model", m)), record ? { message: "Changed the model", undo: () => setModel(was, false), redo: () => setModel(m, false) } : undefined);
   };
@@ -249,6 +254,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
               <h1>{title}</h1>
             </div>
             {error && <p className="err">{error}</p>}
+            {data?.problems?.map((p) => <p key={p} className="err">skills.yaml in your library: {p}. Fix it in a text editor.</p>)}
 
             <Tabs.Content value="general" tabIndex={-1}>
               <Group title="Reading">
@@ -346,7 +352,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                     <Seg
                       label="Minutes a day"
                       value={String(data.review.goal_minutes)}
-                      options={GOALS.map((m) => ({ id: String(m), label: String(m) }))}
+                      options={goalOptions(data.review.goal_minutes).map((m) => ({ id: String(m), label: String(m) }))}
                       onChange={(v) => void setGoal("goal_minutes", "minutes", Number(v))}
                     />
                   </Row>
@@ -373,7 +379,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
               {data && (
                 <Group title="Daily plan">
                   <Row title="When you review" text="Tie review to something you already do every day.">
-                    <PlanField plan={data.review.plan} onSave={(v) => void setGoal("plan", "plan", v)} />
+                    <PlanField plan={data.review.plan} onSave={(v) => setGoal("plan", "plan", v)} />
                   </Row>
                   <Row title="Reminder" text="One notification at this time, only while today’s goal is still open.">
                     <SelectMenu label="Reminder time" value={data.review.reminder} options={REMINDERS} onChange={(t) => void setReminder(t)} />
@@ -521,9 +527,23 @@ export function Row({ title, text, htmlFor, children }: { title: string; text: s
 }
 
 /** "After ___, I review." Enter or clicking away saves, Esc keeps what was there (D211). */
-export function PlanField({ plan, onSave }: { plan: string; onSave: (v: string) => void }) {
+export function PlanField({ plan, onSave }: { plan: string; onSave: (v: string) => Promise<boolean> }) {
   const [text, setText] = useState(plan);
-  useEffect(() => setText(plan), [plan]);
+  // While his words save, the saved cue moving under them (shown at once, put back on a failure) leaves them be;
+  // a save that failed (and said why) keeps them, to try again (D211).
+  const kept = useRef<string | null>(null);
+  const latest = useRef(plan);
+  latest.current = plan;
+  useEffect(() => void (kept.current === null && setText(plan)), [plan]);
+  const save = (v: string) => {
+    kept.current = v;
+    void onSave(v).then((ok) => {
+      // A failure keeps his words until he types again; the saved plan put back arrives after this.
+      if (!ok) return setText(v);
+      kept.current = null;
+      setText(latest.current);
+    });
+  };
   /** Enter or Esc already settled it: the blur their focus move causes saves nothing more. */
   const settled = useRef(false);
   // Leaving the field hands focus to the sheet, not the page under it, so the next Esc closes Settings.
@@ -542,7 +562,7 @@ export function PlanField({ plan, onSave }: { plan: string; onSave: (v: string) 
         placeholder="my morning coffee"
         maxLength={80}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => ((kept.current = null), setText(e.target.value))}
         // Clicking away saves it, as Enter does (D211).
         onFocus={() => (settled.current = false)}
         onBlur={() => {
@@ -550,19 +570,20 @@ export function PlanField({ plan, onSave }: { plan: string; onSave: (v: string) 
           if (!document.hasFocus()) return;
           const v = text.trim().replace(/[.,;]+$/, "");
           setText(v);
-          if (v !== plan) onSave(v);
+          if (v !== plan) save(v);
         }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
             const v = text.trim().replace(/[.,;]+$/, "");
             setText(v);
-            if (v !== plan) onSave(v);
+            if (v !== plan) save(v);
             settled.current = true;
             done(e.currentTarget);
           } else if (e.key === "Escape") {
             e.preventDefault();
             e.stopPropagation();
+            kept.current = null;
             setText(plan);
             settled.current = true;
             done(e.currentTarget);

@@ -48,6 +48,8 @@ test("the plan: minutes run from where the day stood to where it stands, and wha
   expect(lapPlan(null, today(16, { counts: false }) as never)).toEqual({ from: 0, to: 16, goal: 0 });
   // 9 min 40 s rounds to 10 but is not the goal: the count stops short of it, so nothing says the goal was met.
   expect(lapPlan(null, { ...today(0), active_ms: 580_000, met: false } as never)).toEqual({ from: 0, to: 9, goal: 10 });
+  // Met because nothing is left due (D60), one minute in: the count shows the one minute, never the goal's 10.
+  expect(lapPlan(null, today(1, { met: true, caught_up: true }) as never)).toEqual({ from: 0, to: 1, goal: 10 });
   expect(lapSteps({ from: 4, to: 16, goal: 10 })).toEqual([4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
   // A long session never takes long to count: at most 24 steps.
   expect(lapSteps({ from: 0, to: 90, goal: 10 }).length).toBeLessThanOrEqual(25);

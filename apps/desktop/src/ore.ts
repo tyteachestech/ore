@@ -29,10 +29,12 @@ export const ore = <T,>(...args: string[]): Promise<T> => oreWith<T>(null, ...ar
 
 /** `ore` with `stdin` piped in (`ore diagram <item> <name> --set`). Once a write lands that takes something out of
  *  what other screens count, or puts it back (a source archived, an exercise retired), every open screen reads again,
- *  whichever screen made it: a skill page left open under Review or a list keeps no stale row or number (Codex sweep 3). */
+ *  or changes the daily goal, every open screen reads again, whichever screen made it: a skill page left open under
+ *  Review or a list keeps no stale row or number (Codex sweeps 3 and 4). */
 export const oreWith = <T,>(stdin: string | null, ...args: string[]): Promise<T> =>
   oreJob<T>(null, stdin, ...args).then((r) => {
-    if (args[0] === "archive" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"))) wakeOpenScreens();
+    // A goal setting too (Codex sweep 4): Home, Today and an open Review count toward the new one, and so does its Undo.
+    if (args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"))) wakeOpenScreens();
     return r;
   });
 
@@ -275,6 +277,8 @@ export type Today = {
   due: number;
   new_today: number;
   new_waiting: number;
+  /** Exercises he has, live or draft: none means a first day, not "caught up". */
+  exercises: number;
   /** Of `due`, the exercises filed under no skill: What to review's "No skill" row (D204). */
   no_skill_due: number;
   estimate_ms: number;

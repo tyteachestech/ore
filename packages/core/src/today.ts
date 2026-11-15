@@ -139,6 +139,8 @@ export interface Today {
   new_today: number;
   /** New cards held back by the daily limits (D65): "caught up" must not hide them. */
   new_waiting: number;
+  /** Cards he has, live or draft: none means a first day, not "caught up". */
+  exercises: number;
   estimate_ms: number;
   /** Today's slice (D65): the most urgent cards that fit what is left of the goal. */
   slice_ms: number;
@@ -209,6 +211,7 @@ export function today(lib: Library, now = new Date()): Today {
       no_skill_due: queue.filter((e) => unfiled(e.skills, skillList)).length,
       new_today: done.filter((r) => r.finishing).length,
       new_waiting: cards.filter((c) => c.state !== "retired" && !c.fsrs).length - queue.filter((e) => !e.due && !e.relearn).length,
+      exercises: cards.filter((c) => c.state !== "retired").length,
       estimate_ms: estimate,
       slice_ms: Math.max(0, Math.min(estimate, goal - active(done))),
       week,
