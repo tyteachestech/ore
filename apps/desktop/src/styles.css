@@ -413,21 +413,29 @@ img.thumb { filter: brightness(0.86); }
 .empty-state.err .pill-btn { margin: 8px 0; }
 
 /* Overlays: palette, add panel */
-.overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 20; display: flex; justify-content: center; align-items: flex-start; padding-top: 14vh; }
+.overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); z-index: 20; display: flex; justify-content: center; align-items: flex-start; padding-top: 14vh; padding-bottom: 16px; }
+/* A panel never runs past the window (a small window, a zoomed page): one with a list or a growing field keeps
+   its field and footer and scrolls that part; any other scrolls whole. */
 .panel {
   width: min(640px, 90vw);
+  max-height: 100%;
   background: var(--bg-raised);
   border: 1px solid rgba(255, 255, 255, 0.07);
   border-radius: 12px;
   box-shadow: var(--float);
-  overflow: hidden;
+  overflow: hidden auto;
 }
+.panel:has(> [cmdk-list]), .panel.add-box { display: flex; flex-direction: column; overflow: hidden; }
+.panel > [cmdk-list] { flex: 0 1 auto; min-height: 0; }
+.panel.add-box > .add-input { flex: 0 1 auto; }
 .panel-input { width: 100%; height: 50px; padding: 0 16px; background: transparent; border: 0; border-bottom: 1px solid var(--border); font-size: 15px; }
 .panel-input::placeholder { color: var(--faint); }
 .panel-foot { display: flex; gap: 14px; align-items: center; padding: 8px 14px; color: var(--faint); font-size: 12px; min-height: 36px; }
 .panel-foot .err { min-width: 0; line-height: 1.4; color: var(--error); user-select: text; -webkit-user-select: text; }
 .panel-foot .right { margin-left: auto; display: flex; gap: 12px; }
-[cmdk-list] { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; padding: 6px; }
+/* scroll-padding: a row the arrows or End bring into view brings the list's padding too, so the last row is at the
+   end and isn't faded as if more waited below (.fade-more). */
+[cmdk-list] { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; padding: 6px; scroll-padding-block: 6px; }
 [cmdk-group-heading] { color: var(--faint); font-size: 11px; font-weight: 600; padding: 8px 10px 4px; }
 [cmdk-item] { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 6px; color: var(--text); }
 [cmdk-item][data-selected="true"] { background: var(--bg-active); }

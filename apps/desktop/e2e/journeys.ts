@@ -4652,6 +4652,46 @@ journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette 
   await page.keyboard.press("Escape");
 });
 
+// F-new-panel-past-window: at 150% in an 800×600 window (533×400 CSS px) ⌘K ran below the window: its last
+// rows and its footer couldn't be reached, and End picked a row out of sight.
+journey("a small window: ⌘K, the Add box and the shortcuts sheet fit in it, and End shows the palette's last row", async (page) => {
+  await page.setViewportSize({ width: 533, height: 400 });
+  const inWindow = async (what: string, l: Locator) => {
+    const b = (await l.boundingBox())!;
+    if (b.y < 0 || b.y + b.height > 400 + 0.5) throw new Error(`${what} runs from y=${Math.round(b.y)} to ${Math.round(b.y + b.height)} in a 400px window`);
+  };
+  try {
+    const palette = page.getByRole("dialog", { name: "Command palette" });
+    await page.keyboard.press("Meta+k");
+    await palette.waitFor();
+    await inWindow("the palette", palette.locator(".panel"));
+    await inWindow("the palette's footer", palette.locator(".panel-foot"));
+    await page.keyboard.press("End");
+    const last = palette.locator("[cmdk-item]").last();
+    await until("End selects the last row", async () => (await last.getAttribute("aria-selected")) === "true");
+    await until("the last row is in the window", async () => inWindow("the palette's last row", last).then(() => true, () => false));
+    // …at the list's end, so it isn't faded as if more waited below it.
+    await until("the list is at its end", async () => (await palette.locator("[cmdk-list]").getAttribute("data-more")) === null);
+    await page.keyboard.press("Escape");
+    await palette.waitFor({ state: "detached" });
+    await page.keyboard.press("Meta+Slash");
+    const sheet = page.getByRole("dialog", { name: "Keyboard shortcuts" });
+    await sheet.waitFor();
+    await inWindow("the shortcuts sheet", sheet);
+    await page.keyboard.press("Escape");
+    await sheet.waitFor({ state: "detached" });
+    await page.getByRole("button", { name: "+ Add" }).click();
+    const add = page.getByRole("dialog", { name: "Add a source" });
+    await add.getByLabel("Link, file path or text").fill(Array.from({ length: 40 }, (_, i) => `Line ${i + 1}`).join("\n"));
+    await inWindow("the Add box", add);
+    await inWindow("the Add box's footer", add.locator(".panel-foot"));
+    await page.keyboard.press("Escape");
+    await add.waitFor({ state: "detached" });
+  } finally {
+    await page.setViewportSize({ width: 1280, height: 800 });
+  }
+});
+
 journey("Review: ⌘K and ⌘/ open over it, Esc goes back to the card, and a palette action leaves Review as Esc does (controls-08)", async (page) => {
   await startReview(page, /Teaching/); // its one due card is an Explain card, answered by typing
   const question = await page.locator(".review-q").innerText();
