@@ -51,7 +51,7 @@ import { SkillPage } from "./SkillPage";
 import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
 import { FilterButton, FilterTags } from "./FilterBar";
-import { passes, type Filter } from "./filters";
+import { kindLabel, passes, type Filter } from "./filters";
 import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
@@ -67,9 +67,6 @@ const TABS: { id: Tab; label: string; key: KeyId }[] = [
   { id: "toread", label: "To read", key: "go-toread" },
   { id: "done", label: "Done", key: "go-done" },
 ];
-
-/** Source kinds as he would say them. */
-const KIND: Record<string, string> = { article: "Article", youtube: "Video", pdf: "PDF", epub: "Book", markdown: "Text", snippet: "Snippet" };
 
 /** Sources a skill page lists before "Show all". */
 const SKILL_CAP = 8;
@@ -2067,7 +2064,7 @@ export function App() {
               </span>
             )}
             {/* A skill page's rows are Reader's (D130): a third line says what kind it is (its length joins once import records one). */}
-            {!lesson && !snip && <span className="kind-line">{KIND[r.type] ?? r.type}</span>}
+            {!lesson && !snip && <span className="kind-line">{kindLabel(r.type)}</span>}
           </span>
         )}
         {onSkillPage && mayAnswer.has(r.id) && (
@@ -2077,7 +2074,7 @@ export function App() {
             </span>
           </Hint>
         )}
-        {details.includes("type") && <span className="col kind">{KIND[r.type] ?? r.type}</span>}
+        {details.includes("type") && <span className="col kind">{kindLabel(r.type)}</span>}
         {detailCols(r, [r.captured_at])}
         <MoreButton label={pickN > 1 ? `Actions for ${count(pickN, "source")}` : `Actions for ${r.title}`} actions={acts} hoverOnly />
       </DragRow>

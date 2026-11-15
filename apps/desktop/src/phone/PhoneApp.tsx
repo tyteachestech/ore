@@ -31,7 +31,7 @@ import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { useToast } from "../Toast";
 import { Working } from "../Working";
-import { errorText, inOrder, stepLanded, useKeptScroll, wakeScreens, type Notify } from "../util";
+import { count, errorText, inOrder, stepLanded, useKeptScroll, wakeScreens, type Notify } from "../util";
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   const now = useRef(drag);
@@ -280,7 +280,7 @@ function CourseRow({ line, onCourse, menu }: { line: Extract<Line, { kind: "cour
           {cover ? <Thumb item={cover} className="thumb phone-thumb" /> : <span className="thumb phone-thumb none" aria-hidden="true"><GraduationCap size={16} /></span>}
           <span className="phone-title phone-two">
             <span>{line.title}</span>
-            <small>{line.next && started ? `${line.next.course!.part} · ${line.next.title}` : `${line.lessons.length} lessons`}</small>
+            <small>{line.next && started ? `${line.next.course!.part} · ${line.next.title}` : count(line.lessons.length, "lesson")}</small>
           </span>
           <CaretRight size={16} aria-hidden="true" />
         </button>

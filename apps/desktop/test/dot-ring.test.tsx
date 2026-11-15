@@ -110,8 +110,8 @@ test("nothing glows but the lamp: no blurred shadow in a colour, and no halo beh
 test("a source's type is written in sentence case, like every other label", async () => {
   const css = await Bun.file(new URL("../src/styles.css", import.meta.url)).text();
   expect(/\.kind-line \{[^}]*uppercase/.test(css)).toBe(false);
-  const app = await Bun.file(new URL("../src/App.tsx", import.meta.url)).text();
-  const kinds = app.match(/const KIND[^\n]*/)![0].match(/: "([^"]+)"/g)!.map((k) => k.slice(3, -1));
+  const filters = await Bun.file(new URL("../src/filters.ts", import.meta.url)).text();
+  const kinds = filters.match(/const KINDS[^\n]*/)![0].match(/: "([^"]+)"/g)!.map((k) => k.slice(3, -1));
   for (const k of kinds) expect(k[0]).toBe(k[0]!.toUpperCase());
 });
 

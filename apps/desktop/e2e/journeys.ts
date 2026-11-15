@@ -4899,6 +4899,21 @@ journey("⌘K: a match in a skill note opens the skill's note scrolled to the wo
   await until("Esc gives focus back to the note it searched", () => page.evaluate(() => !!document.activeElement?.closest(".skill-note")));
 });
 
+journey("All sources' Filter by keys alone: Enter picks the field, Enter picks its first value, and a search that matches no field says so (F218)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.getByRole("button", { name: "Filter by kind, skill or author" }).click();
+  const menu = page.locator(".filter-menu");
+  await page.keyboard.type("zzz");
+  await menu.getByText("No filters match").waitFor();
+  for (let i = 0; i < 3; i++) await page.keyboard.press("Backspace");
+  await page.keyboard.press("Enter");
+  await menu.getByPlaceholder("Find kinds…").waitFor();
+  await until("the first kind is highlighted, as Linear's is", async () => (await menu.locator("[cmdk-item][data-selected=true]").count()) === 1);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Kind: Text" }).waitFor();
+});
+
 journey("search: when searching the text fails, ⌘K and the sources filter say so instead of “no matches”", async (page) => {
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { search: "The index is busy." }));
   await page.keyboard.press("Meta+k");

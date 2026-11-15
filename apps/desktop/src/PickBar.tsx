@@ -34,8 +34,8 @@ export function PickBar({ n, actions, onClear }: { n: number; actions: MenuActio
         </Hint>
       )}
       <i className="pick-sep" aria-hidden="true" />
-      <Hint text="Let go of the pick">
-        <button className="pick-x" aria-label="Let go of the pick" onClick={onClear}>
+      <Hint text={<>Clear the pick <kbd>Esc</kbd></>}>
+        <button className="pick-x" aria-label="Clear the pick" onClick={onClear}>
           <X size={16} aria-hidden="true" />
         </button>
       </Hint>
