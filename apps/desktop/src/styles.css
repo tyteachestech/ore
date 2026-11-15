@@ -453,6 +453,13 @@ img.thumb { filter: brightness(0.86); }
   z-index: 30; background: var(--bg-raised); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 12px;
   box-shadow: var(--float); overflow: hidden;
 }
+/* A popup or menu grows from what he pressed, or from the pointer on a right-click (D280; Radix gives
+   the origin on the side it landed), and leaves quicker than it came. From the keyboard it appears and goes
+   at once (input-mode.ts sets data-keys). A submenu opens at hover speed, so it does not move. */
+.popover[data-state] { transform-origin: var(--radix-popper-transform-origin); }
+:root:not([data-keys]) .popover[data-state="open"]:not(.menu-sub) { animation: pop-in var(--t-3) var(--ease-out); }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.96); } }
+@media (prefers-reduced-motion: reduce) { .popover[data-state] { animation: none !important; } }
 .popover.menu { width: 260px; border-radius: 10px; }
 .popover.menu [cmdk-list] { max-height: 240px; padding: 4px; }
 .popover.menu [cmdk-item] { height: 30px; }
@@ -1472,6 +1479,15 @@ body.resizing iframe { pointer-events: none; }
 button.skill-badge:hover { filter: brightness(1.2); }
 .skill-badge.tinted { background: color-mix(in srgb, var(--skill) 17%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--skill) 26%, transparent); }
 .skill-badge .initial { font-size: 20px; font-weight: 700; color: var(--skill); }
+/* The player's controls take a click 4px above and below what they draw (D282; Dice UI's hitbox): one row,
+   nothing above or below to steal from, and up and down only, so neighbours side by side never take each other's
+   clicks. Not every small button: stacked ones (a toast's ×, the tutor's lists) would. */
+:where(.controls .ctl) { position: relative; }
+:where(.controls .ctl)::after { content: ""; position: absolute; inset: -4px 0; }
+/* The full text of a title cut off by an ellipsis, laid over it (full-text.ts; Finder's expansion tooltip). */
+.full-text { position: fixed; z-index: 40; pointer-events: none; white-space: normal; overflow-wrap: anywhere; background: var(--bg-raised); border-radius: 4px; box-shadow: var(--float); }
+/* A control with its own hint shows the hint, never both: both wait the same 400ms, so either may come first. */
+body:has(.hint) .full-text { display: none; }
 .icon-btn { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; color: var(--faint); }
 .icon-btn:hover { background: var(--bg-hover); color: var(--text); }
 /* D132: one quiet line (Linear), no band: the question in muted, a small bordered Start whose hint carries the why. */
@@ -2467,6 +2483,21 @@ button.home-plan:hover { color: var(--text); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* A list that hides rows below its foot fades its last one (more.ts sets data-more; D281), and stops
+   fading at the end. A sticky strip the colour of the surface, so the rows fade and the surface does not. */
+.fade-more::after {
+  content: ""; display: block; position: sticky; bottom: calc(-1 * var(--fade-pad, 0px)); z-index: 1; height: 32px;
+  margin: -32px calc(-1 * var(--fade-pad, 0px)) 0; pointer-events: none; opacity: 0;
+  background: linear-gradient(to bottom, transparent, var(--fade-to, var(--bg-raised))); transition: opacity var(--t-2) var(--ease-out);
+}
+.fade-more[data-more]::after { opacity: 1; }
+.sidebar.fade-more { --fade-to: var(--bg-side); --fade-pad: 8px; }
+/* Sticky edges sit inside the scroller's padding, so the sidebar's strip reaches past its foot room to the window's foot. */
+.sidebar.fade-more::after { bottom: calc(-1 * var(--mole-room)); height: 56px; margin: -56px -8px 0; }
+.menu-list.fade-more { --fade-pad: 4px; }
+[cmdk-list].fade-more { --fade-pad: 6px; }
+@media (prefers-reduced-motion: reduce) { .fade-more::after { transition: none; } }
 
 /* Object menus (Menu.tsx): right-click and the row's ⋯ show the same list, macOS-style. */
 /* No taller than the room Radix finds beside its trigger, scrolling past it, so a ⋯ menu in a short window never runs off the top. */

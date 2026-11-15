@@ -21,6 +21,7 @@ import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
 import { Radio } from "./Radio";
+import { FullText } from "./full-text";
 import { CHANNELS } from "./ambience-art";
 import { stop as stopAmbience, toggle as playAmbience, ambienceState } from "./ambience";
 import { Reader, type PracticeRef } from "./Reader";
@@ -2344,6 +2345,7 @@ export function App() {
         {tutorButton}
         {/* The ambience radio, the mole's twin at the bottom left (D254). */}
         {!PHONE && <Radio open={radioOpen} onOpenChange={setRadioOpen} />}
+        {!PHONE && <FullText />}
         <span className="sr-only" role="status">{unheard.said ? `The tutor answered: ${unheard.said}` : ""}</span>
         {/* A skill page is the same page wherever it was opened from: a place change under it (its folder tab,
             ⌘1, from Home) must not remount it and drop the tab that has focus (F55). */}
