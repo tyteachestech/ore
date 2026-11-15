@@ -126,10 +126,13 @@ const textImports: Plugin = {
 // point it at their own tones). Served as /sounds/<id>.mp3 in dev and written into the build when they are there;
 // a channel with no file says so in the app.
 const SOUNDS = process.env.ORE_SOUNDS ?? join(homedir(), "Library/Application Support/Ore/sounds");
-const SOUND_IDS = ["cave", "rain", "lamp", "deep", "focus"];
+// The `fx-` ones are Review's sounds (src/sfx.ts).
+const SOUND_IDS = ["cave", "rain", "lamp", "deep", "focus", ...["tap", "right", "missed", "goal", "cart", "pop", "done"].map((id) => `fx-${id}`)];
 const soundFile = (id: string) => join(SOUNDS, `${id}.mp3`);
 const ambienceSounds: Plugin = {
   name: "ambience-sounds",
+  // Review's sounds ask only for the files that are here (src/sfx.ts): a build without them asks for none.
+  config: () => ({ define: { __ORE_FX__: JSON.stringify(SOUND_IDS.filter((id) => id.startsWith("fx-") && existsSync(soundFile(id))).map((id) => id.slice(3))) } }),
   configureServer(server) {
     server.middlewares.use("/sounds", (req, res, next) => {
       const id = (req.url ?? "").split("?")[0]!.replace(/^\//, "").replace(/\.mp3$/, "");

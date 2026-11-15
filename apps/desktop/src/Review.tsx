@@ -10,6 +10,7 @@ import { EndMark } from "./EndMark";
 import { SkillIcon } from "./IconPicker";
 import { Mole, Mound } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
+import { newSession, rated, sfx, warm, type Sfx } from "./sfx";
 import { still } from "./SideCursor";
 import { Hint } from "./Hint";
 import { MoreButton } from "./Menu";
@@ -248,6 +249,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   useEffect(() => {
     let live = true;
     setError(null);
+    newSession();
+    warm();
     void (async () => {
       try {
         // Try again after `due` failed keeps the session already started: a second would be left open.
@@ -510,6 +513,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     setInHead(true);
     setMarks(card.rubric.map(() => undefined));
     setPhase("checked");
+    sfx("tap");
     shownAnswerAt.current = Date.now();
     loadPassage(card);
   };
@@ -530,6 +534,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       setConf(1);
     }
     setPhase("checked");
+    sfx("tap");
     shownAnswerAt.current = Date.now();
     loadPassage(card);
     if (card.kind !== "prompt") return;
@@ -628,6 +633,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       ];
       await submit(args, rating, elapsed);
       saved = true;
+      // Its sound, once it is saved: a rating that failed to save is silent.
+      rated(rating);
       // An everyday rating leaves a moment still showing to run its time.
       if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
@@ -670,6 +677,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     if (quick) return void finish();
     goalTold.current = true;
     setGoalSaid(true);
+    // After the rating's own sound, so the two are heard apart.
+    sfx("goal", { after: 0.5 });
   };
 
   /** Records a rating and moves on. The first time (`forget` absent) it goes on the app history, so
@@ -949,6 +958,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     if (card?.kind === "prompt") keepDraft(card, answer, n);
     if (card?.kind === "card") {
       setPhase("checked");
+      sfx("tap");
       shownAnswerAt.current = Date.now();
       loadPassage(card);
     } else if (askSure) {
@@ -1674,6 +1684,13 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     return () => clearTimeout(id);
   }, [risen]);
   const full = stage !== "cart";
+  // The end screen's sounds (D277): the cart rolling in, the jingle as the ring fills, and the mole's pop as he comes up (260ms into his rise).
+  // Each once: an effect can run again for the same moment (React's strict mode runs a mount's twice).
+  const played = useRef(new Set<Sfx>());
+  const once = (id: Sfx, after = 0) => void (!played.current.has(id) && (played.current.add(id), sfx(id, { after })));
+  useEffect(() => void (pour && once("cart")), []);
+  useEffect(() => void (full && once("done")), [full]);
+  useEffect(() => void (risen && !quick && !still() && once("pop", 0.26)), [risen]);
   // D197: a cut gem that was won back has a gold rim; a gem passed on a new case this session shows polished.
   const cutN = s.cut?.length ?? 0;
   const mendedN = (s.grades ?? []).filter((g) => g === "mended").length;

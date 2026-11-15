@@ -1103,6 +1103,27 @@ describe("import coverage: text recognition", () => {
     }
   });
 
+  // F188: the Mac's own Vision, not the stand-in, on a full-page capture's shape and a wide one
+  // (make-long-screenshots.py). Mac only: Vision is a macOS API.
+  test.skipIf(process.platform !== "darwin")("a very tall or very wide screenshot is read whole, each line once (F188)", async () => {
+    const ocr = process.env.ORE_OCR;
+    delete process.env.ORE_OCR;
+    try {
+      const tall = (await addSource(await tempLibrary(), file("tall.png"))).body;
+      expect(tall).toContain("TALL START: a long page of notes.");
+      for (let i = 1; i <= 20; i++) expect(tall.split(`Section ${i}: learning marker ${String(i).padStart(2, "0")}`)).toHaveLength(2);
+      expect(tall).toContain("TALL END: final learning sentence.");
+      const wide = (await addSource(await tempLibrary(), file("wide.png"))).body;
+      for (let i = 1; i <= 10; i++) {
+        expect(wide.split(`Column ${i}: spacing`)).toHaveLength(2);
+        expect(wide.split(`marker ${String(i).padStart(2, "0")} holds`)).toHaveLength(2);
+      }
+      expect(wide).toContain("WIDE END: one more line.");
+    } finally {
+      process.env.ORE_OCR = ocr;
+    }
+  }, 120_000);
+
   test("lines become paragraphs: gaps and columns split, broken words join", () => {
     const l = (t: string, x: number, y: number, h = 0.02) => ({ t, x, y, w: 0.4, h });
     const md = ocrMarkdown({ lines: [l("Spacing spreads re-", 0.05, 0.1), l("views over days.", 0.05, 0.125), l("A new paragraph.", 0.05, 0.2), l("Right column text.", 0.55, 0.1)] });
