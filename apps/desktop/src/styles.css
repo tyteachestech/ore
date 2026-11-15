@@ -764,7 +764,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .doc p:has(> a.fn-back:first-child) { font-size: 0.86em; color: var(--muted); }
 /* Its preview on hover or tap: the note's text, wrapped at a reading width. */
 .tip.note { max-width: min(360px, calc(100vw - 24px)); line-height: 1.45; }
-.doc blockquote { border-left: 2px solid var(--border); padding-left: 14px; color: var(--muted); margin-left: 0; }
+.doc blockquote { border-inline-start: 2px solid var(--border); padding-inline-start: 14px; color: var(--muted); margin-inline-start: 0; }
 .doc code { font-family: var(--mono); font-size: 0.86em; background: var(--bg-raised); border-radius: 4px; padding: 1px 4px; }
 .doc pre { background: var(--bg-raised); padding: 12px 14px; border-radius: 8px; overflow-x: auto; line-height: 1.5; }
 .doc pre code { background: none; padding: 0; }

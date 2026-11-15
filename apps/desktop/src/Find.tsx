@@ -23,12 +23,30 @@ export function fold(s: string): string {
 }
 
 /** Where `needle` starts in `hay`, without overlaps, ignoring case. */
-export function findAll(hay: string, needle: string): number[] {
-  const n = fold(needle);
+export const findAll = (hay: string, needle: string): number[] => findRanges(hay, needle).map(([a]) => a);
+
+/** Where `needle` is in `hay` (start, end), without overlaps, ignoring case and how an accent is typed:
+ *  é as one letter or as e and its mark look the same, so each finds both (Codex sweep 4). */
+export function findRanges(hay: string, needle: string): [number, number][] {
+  const n = fold(needle).normalize("NFC");
   if (!n.trim()) return [];
-  const h = fold(hay);
-  const at: number[] = [];
-  for (let i = h.indexOf(n); i >= 0; i = h.indexOf(n, i + n.length)) at.push(i);
+  let h = fold(hay);
+  let start = (i: number) => i;
+  let end = (i: number) => i;
+  // Text with an accent typed as its own mark (rare): searched in one form, each letter mapped back to where it sits.
+  if (h.normalize("NFC") !== h) {
+    const from: number[] = [];
+    const to: number[] = [];
+    let c = "";
+    for (const m of h.matchAll(/\P{M}\p{M}*|\p{M}+/gu)) {
+      const piece = m[0].normalize("NFC");
+      for (let k = 0; k < piece.length; k++) (from.push(m.index), to.push(m.index + m[0].length));
+      c += piece;
+    }
+    [h, start, end] = [c, (i) => from[i]!, (i) => to[i - 1]!];
+  }
+  const at: [number, number][] = [];
+  for (let i = h.indexOf(n); i >= 0; i = h.indexOf(n, i + n.length)) at.push([start(i), end(i + n.length)]);
   return at;
 }
 
@@ -75,12 +93,12 @@ export function search(roots: HTMLElement[], query: string): Range[] {
       }
       return lo;
     };
-    for (const i of findAll(text, query)) {
+    for (const [i, j] of findRanges(text, query)) {
       const a = nodeAt(i);
-      const b = nodeAt(i + query.length - 1);
+      const b = nodeAt(j - 1);
       const r = document.createRange();
       r.setStart(nodes[a]!, i - starts[a]!);
-      r.setEnd(nodes[b]!, i + query.length - starts[b]!);
+      r.setEnd(nodes[b]!, j - starts[b]!);
       out.push(r);
     }
   }

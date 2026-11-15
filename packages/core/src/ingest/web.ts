@@ -1,7 +1,7 @@
 import { Readability } from "@mozilla/readability";
 import { Defuddle } from "defuddle/node";
 import { parseHTML } from "linkedom";
-import { cleanAuthor, cleanDate, escapeMarkdown, FROM_TAB } from "./check.ts";
+import { cleanAuthor, cleanDate, escapeMarkdown, flattenRuby, FROM_TAB } from "./check.ts";
 import { td } from "./markdown.ts";
 import { notionMarkdown } from "./rendered.ts";
 import { youtubeId } from "./youtube.ts";
@@ -349,6 +349,19 @@ function hackerNews(doc: Document, url: string): string | undefined {
 /** `min`: the fewest characters a page's article holds before the plain reader is tried instead; a
  *  paste is all content, however short. */
 export async function htmlToDoc(html: string, url: string, min = 200): Promise<WebDoc> {
+  // Defuddle deletes every zero-width joiner, which splits a joined emoji (👩🏽‍🔬 into 👩🏽🔬) and some Indic
+  // letters: held as a private-use letter through it, then put back (Codex sweep 4).
+  // Ruby flattened first, as in a Markdown file: Defuddle spaced its reading off, 東京 （ とうきょう ）.
+  html = flattenRuby(html);
+  if (!html.includes(ZWJ)) return readHtml(html, url, min);
+  const d = await readHtml(html.replaceAll(ZWJ, HELD_ZWJ), url, min);
+  const back = (t: string | undefined) => t?.replaceAll(HELD_ZWJ, ZWJ);
+  return { ...d, title: back(d.title)!, author: back(d.author), markdown: back(d.markdown)! };
+}
+const ZWJ = "\u200d";
+const HELD_ZWJ = "\uf8f0";
+
+async function readHtml(html: string, url: string, min: number): Promise<WebDoc> {
   // A Notion page as the browser drew it (added from the tab, or reimported from its copy).
   const notion = notionMarkdown(html, url);
   if (notion) {

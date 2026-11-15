@@ -149,6 +149,8 @@ const ambienceSounds: Plugin = {
 // Tauri expects a fixed dev port and no screen clearing (it prints its own logs).
 // The icon picker's icons ship with the app, so it works offline: the pixel skill icons (pixelSkillIcons, D157).
 export default defineConfig({
+  // The CMaps the core's PDF reader carries (packages/core/src/ingest/pdf-cmaps.ts): files the phone fetches.
+  assetsInclude: ["**/*.bcmap"],
   plugins: [
     react(),
     tailwindcss(),

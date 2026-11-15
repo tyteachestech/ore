@@ -11,7 +11,8 @@ export type Lap = { from: number; to: number; goal: number };
 export function lapPlan(before: Today | null, today: Today): Lap {
   const goal = today.counts && today.goal_ms > 0 ? today.goal_minutes : 0;
   // Minutes round, the goal does not: 9 min 40 s is not 10, so a day short of its goal never shows the goal's number.
-  const side = (t: Today | null) => (!t ? 0 : !goal ? minutes(t.active_ms) : t.met ? Math.max(goal, minutes(t.active_ms)) : Math.min(goal - 1, minutes(t.active_ms)));
+  // A day met by being caught up (D60) still shows the minutes spent, never the goal's.
+  const side = (t: Today | null) => (!t ? 0 : !goal || t.met ? minutes(t.active_ms) : Math.min(goal - 1, minutes(t.active_ms)));
   const from = side(before), to = Math.max(from, side(today));
   return { from, to, goal };
 }

@@ -58,6 +58,15 @@ describe("a damaged library", () => {
     expect(report.issues.filter((i) => i.path === "skills.yaml").map((i) => i.message).join("\n")).toContain('color "violet"');
   });
 
+  test("a skill saved with an empty name shows its id, and doctor names it (Codex sweep 4)", async () => {
+    const lib = await tempLibrary();
+    const first = loadSkills(lib).skills[0]!;
+    writeFileSync(paths.skills(lib), readFileSync(paths.skills(lib), "utf8").replace(`name: ${first.name}`, 'name: ""'));
+    expect(loadSkills(lib).skills[0]!.name).toBe(first.id);
+    const report = await doctor(lib);
+    expect(report.issues.filter((i) => i.path === "skills.yaml").map((i) => i.message).join("\n")).toContain("no name");
+  });
+
   // Every screen read it, but a drag in the sidebar saved and then failed, and Settings › AI › Model and
   // renaming that skill failed outright: the writes still read the file strictly.
   test("skills.yaml with one bad look value can still be written", async () => {
@@ -85,6 +94,15 @@ describe("a damaged library", () => {
     renameSync(paths.skills(lib), join(lib.root, ".skills.yaml.icloud"));
     expect(() => openLibrary(lib.root)).toThrow(/skills\.yaml is missing from your library.*iCloud/);
     expect(() => openLibrary(join(lib.root, "nowhere"))).toThrow(/^no library at/);
+  });
+
+  test("an add killed before its doc.md was written leaves a folder doctor names (Codex sweep 4)", async () => {
+    const lib = await tempLibrary();
+    const dir = join(paths.items(lib), "2026", "big-notes-01KX0000000000000000000000");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, ".source.md.123.456.tmp"), "half a source");
+    const report = await doctor(lib);
+    expect(report.issues.find((i) => i.message.includes("an add that stopped before it finished"))?.path).toBe("items/2026/big-notes-01KX0000000000000000000000");
   });
 
   test("a source folder renamed in Finder still opens", async () => {

@@ -22,3 +22,17 @@ test("the compiled CLI starts its background work", async () => {
   for (let i = 0; i < 100 && !said().trim(); i++) await Bun.sleep(100);
   expect(said().trim()).toBe("Enriched 0 of 0");
 }, 60_000);
+
+// The CMaps a Korean, Japanese or Chinese PDF's font can name (packages/core/src/ingest/pdf-cmaps.ts) are
+// carried in the compiled file, so the app reads that text as `bun test` does (Codex sweep 4).
+test("the compiled CLI reads a Korean PDF whose font names its encoding", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-compiled-"));
+  const bin = join(dir, "ore-cli");
+  await compileCli(bin);
+  const env = { ...process.env, ORE_LIBRARY: join(dir, "library"), ORE_NO_ENRICH: "1" };
+  expect(await Bun.spawn([bin, "init"], { env, cwd: dir, stdout: "ignore" }).exited).toBe(0);
+  const pdf = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files/korean.pdf");
+  const add = Bun.spawn([bin, "add", pdf, "--no-enrich", "--json"], { env, cwd: dir, stdout: "pipe", stderr: "inherit" });
+  const out = await new Response(add.stdout).text();
+  expect(out).toContain("기억을 오래 남기는 방법");
+}, 60_000);

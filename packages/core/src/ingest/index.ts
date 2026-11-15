@@ -57,7 +57,7 @@ const titleFromMarkdown = (text: string, fallback: string) =>
 
 /** A Markdown file's own YAML frontmatter (Obsidian, Jekyll, Hugo notes) isn't text to read: it comes
  *  off the body, and its title, author and date fill the source's. One that won't parse stays as text. */
-function markdownFile(text: string, fallback: string): { title: string; author?: string; published?: string; body: string } {
+async function markdownFile(text: string, fallback: string): Promise<{ title: string; author?: string; published?: string; body: string }> {
   let data: Record<string, unknown> = {};
   let body = text;
   if (/^﻿?---\r?\n/.test(text)) {
@@ -67,6 +67,8 @@ function markdownFile(text: string, fallback: string): { title: string; author?:
   }
   const one = (v: unknown) => (typeof v === "string" ? v : v instanceof Date ? v.toISOString() : Array.isArray(v) && v.every((x) => typeof x === "string") ? v.join(", ") : undefined);
   body = body.replace(/^\n+/, "");
+  // Raw HTML the reader would hide (Codex sweep 4); turndown loads only for a file that has some.
+  if (/<(ruby|p|div|section|article|aside|figure|table|ul|ol|dl|blockquote|details|h[1-6]|center)\b/i.test(body)) body = (await import("./markdown.ts")).htmlBlocksToMarkdown(body);
   return {
     title: one(data.title)?.trim() || titleFromMarkdown(body, fallback),
     author: cleanAuthor(one(data.author) ?? one(data.authors)),
@@ -203,7 +205,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
   }
   if (kind === "markdown") {
     const ext = /\.(md|markdown|txt|text)$/i.exec(name)?.[1]?.toLowerCase() ?? "md";
-    return { type: "markdown", ...markdownFile(text, fileStem(name)), url, source: { ext, data: text } };
+    return { type: "markdown", ...(await markdownFile(text, fileStem(name))), url, source: { ext, data: text } };
   }
   if (/^\s*(?:<\?xml[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*)*<(?:rss|feed)\b/.test(text.slice(0, 2000)))
     throw new Error("That’s a podcast or blog feed, not one episode or post. Add the link of the episode or post you want instead.");
@@ -634,7 +636,7 @@ export async function addText(lib: Library, text: string, opts: AddOptions & { h
   if (!text.trim()) throw new Error("text is empty");
   const draft = opts.html ? await pastedDraft(text) : null;
   const source = draft ? draft.source.data : text.trim() + "\n";
-  const md = draft ?? markdownFile(source, "");
+  const md = draft ?? (await markdownFile(source, ""));
   if (!md.body.trim()) throw new Error(opts.html ? "the pasted text is empty" : "text is empty: only frontmatter, no text to read");
   // The same paste again is the source already here, whether or not its images were saved the first time.
   const before = sameText(lib, md.body.trim() + "\n");

@@ -201,8 +201,12 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     // Run in the app, not detached, so a failure says why at once, wherever he has gone, with a retry.
     // Its Try again is the only way back to the cards, so the failure stays until he acts on it.
     const run = (): Promise<boolean> =>
-      ore("enrich", doc.id).then(
-        () => undrafted.delete(doc.id) || true,
+      ore<{ cards?: unknown[]; skipped?: string } | null>("enrich", doc.id).then(
+        (r) => {
+          // A run with something to draft from that drafted nothing: say so, and what gives it something.
+          if (r && !r.skipped && !r.cards?.length) void back.then(() => notify(`No exercises came from “${doc.title}”: mark a Key point to draft some.`, "info"));
+          return undrafted.delete(doc.id) || true;
+        },
         (e) => {
           undrafted.set(doc.id, { title: doc.title, run });
           void back.then(() => sayUndrafted(notify, errorText(e)));
@@ -619,7 +623,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             <PixelBurst />
           </span>
           <h2>Source finished</h2>
-          <p>New exercises start in tomorrow’s review.</p>
+          <p>{PHONE ? "AI runs on your Mac for now: it drafts the exercises." : "New exercises start in tomorrow’s review."}</p>
         </div>
       )}
 
@@ -637,8 +641,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           {marked && (
             <div className="quiz-verdict yes quiz-made">
               <div>
-                <b>New exercises tomorrow</b>
-                <span>Drafted from what you marked and answered. They start in tomorrow’s review.</span>
+                <b>{PHONE ? "Exercises come from your Mac" : "New exercises tomorrow"}</b>
+                <span>{PHONE ? "AI runs on your Mac for now: it drafts them from what you marked and answered." : "Drafted from what you marked and answered. They start in tomorrow’s review."}</span>
               </div>
             </div>
           )}

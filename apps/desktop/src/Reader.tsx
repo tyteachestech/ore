@@ -88,7 +88,22 @@ const PLACEHOLDER: Record<Intent, string> = {
 // That also drops the `<!-- page N -->` / `<!-- chapter N -->` markers. Links open in the browser.
 // Math is `$$…$$` only (intake writes inline TeX that way), so a price's `$` never reads as math.
 const remarkPlugins = [remarkGfm, [remarkMath, { singleDollarTextMath: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["remarkPlugins"]>;
-const rehypePlugins = [[rehypeKatex, { output: "htmlAndMathml", throwOnError: false }]] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
+/** Each block takes its direction from its own first letter (`dir="auto"`), as a browser does with a page that
+ *  says its own: Arabic and Hebrew read right to left, list numbers on the right, beside English ones (Codex sweep 4). */
+const AUTO_DIR = new Set(["p", "li", "h1", "h2", "h3", "h4", "h5", "h6", "td", "th"]);
+type HastNode = { type: string; tagName?: string; value?: string; properties?: Record<string, unknown>; children?: HastNode[] };
+const textOf = (n: HastNode): string => n.value ?? n.children?.map(textOf).join("") ?? "";
+const rehypeAutoDir = () => (tree: HastNode) => {
+  const walk = (n: HastNode) => {
+    if (n.type === "element" && AUTO_DIR.has(n.tagName!)) n.properties = { ...n.properties, dir: "auto" };
+    // A list's or quote's own `auto` would skip its items (each has its own), so it is set from its first letter.
+    else if (n.type === "element" && (n.tagName === "ol" || n.tagName === "ul" || n.tagName === "blockquote"))
+      n.properties = { ...n.properties, dir: /^[^\p{L}]*[\p{sc=Arabic}\p{sc=Hebrew}\p{sc=Syriac}\p{sc=Thaana}\p{sc=Nko}]/u.test(textOf(n)) ? "rtl" : "ltr" };
+    n.children?.forEach(walk);
+  };
+  walk(tree);
+};
+const rehypePlugins = [[rehypeKatex, { output: "htmlAndMathml", throwOnError: false }], rehypeAutoDir] as NonNullable<Parameters<typeof ReactMarkdown>[0]["rehypePlugins"]>;
 // A click on a link is handled by the reader (`followLink`). Footnotes (`footnotes` in text.ts) keep
 // their "^" in the text for the index, drawn as a small raised number.
 const caret = (children: ReactNode) => (typeof children === "string" && children.startsWith("^") ? <><span className="fn-caret">^</span>{children.slice(1)}</> : children);
@@ -142,9 +157,9 @@ const stamped: Components = {
     const kids = Children.toArray(children);
     const head = kids[0];
     const m = typeof head === "string" ? head.match(STAMP) : null;
-    if (!m) return <p>{children}</p>;
+    if (!m) return <p dir="auto">{children}</p>;
     return (
-      <p className="tp">
+      <p className="tp" dir="auto">
         <span className="ts" data-t={seconds(m[1]!)} title="Play from here">
           {m[1]}
         </span>
@@ -2745,8 +2760,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     wordWait.current = null;
   };
   useEffect(() => dropWord, []);
+  // A drag over the text before a long source has finished mounting (its offsets aren't known yet) is
+  // kept and highlighted once it has, if the words are still selected, never dropped (Codex sweep 4).
+  const early = useRef<MouseEvent | null>(null);
   const onMouseUp = (e: MouseEvent) => {
     const el = docEl.current;
+    if (!ready && e.button === 0 && !e.ctrlKey && !popupRef.current?.contains(e.target as Node) && !lookupRef.current?.contains(e.target as Node)) early.current = e;
     if (!ready || !el || closedBook || popupRef.current?.contains(e.target as Node) || lookupRef.current?.contains(e.target as Node)) return;
     // Right-click (or ⌃-click) opens the Mac's own menu, whose Look Up needs the word selected: no Keep.
     if (e.button !== 0 || e.ctrlKey) return;
@@ -2804,6 +2823,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       openPopup(id, range, annOf(id)?.note ?? "", { x: e.clientX, y: e.clientY });
     }
   };
+  useEffect(() => {
+    const e = early.current;
+    early.current = null;
+    if (ready && e && !window.getSelection()?.isCollapsed) onMouseUp(e);
+  }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // iPhone: a selection made with the touch handles fires no mouseup, so once it settles the four
   // highlight types show at the bottom of the screen (under the selection, iOS's Copy bar covers

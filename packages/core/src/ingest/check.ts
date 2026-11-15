@@ -8,12 +8,16 @@ export const MIN_WORDS = 50;
 /** Chinese and Japanese letters. */
 const CJK_SCRIPTS = "\\p{sc=Han}\\p{sc=Hiragana}\\p{sc=Katakana}";
 
-/** Words in any script. Chinese and Japanese put no spaces between words, so each of their characters counts as one. */
+/** Thai, Lao, Khmer and Burmese: written without spaces between words, which run to about four letters. */
+const UNSPACED = /[\p{sc=Thai}\p{sc=Lao}\p{sc=Khmer}\p{sc=Myanmar}]/gu;
+
+/** Words in any script. Chinese and Japanese put no spaces between words, so each of their characters counts
+ *  as one; Thai and its neighbours put none either, so every four of their letters do (Codex sweep 4). */
 export function wordCount(md: string): number {
   const text = md.replace(/!\[[^\]]*\]\([^)]*\)/g, " ").replace(/\]\([^)]*\)/g, "]");
   const CJK = new RegExp(`[${CJK_SCRIPTS}]`, "gu");
-  const spaced = text.replace(CJK, " ").split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
-  return spaced + (text.match(CJK)?.length ?? 0);
+  const spaced = text.replace(CJK, " ").replace(UNSPACED, " ").split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
+  return spaced + (text.match(CJK)?.length ?? 0) + Math.round((text.match(UNSPACED)?.length ?? 0) / 4);
 }
 
 // Chinese and Japanese letters, punctuation and full-width forms.
@@ -76,3 +80,14 @@ export function cleanDate(d: string | undefined): string | undefined {
   if (!s || s.length > 40 || (s.match(/\d{4}/g) ?? []).length !== 1 || Number.isNaN(Date.parse(s))) return undefined;
   return s;
 }
+
+/** Ruby (a reading set over Japanese or Chinese letters) as the letters with their reading after them in
+ *  brackets, 東京（とうきょう）, the way books without ruby print it: the reader shows no raw HTML (Codex sweep 4). */
+export const flattenRuby = (html: string): string =>
+  html.replace(/<ruby\b[^>]*>([\s\S]*?)<\/ruby>/gi, (_, inner: string) => {
+    const parts = inner.replace(/<rp\b[^>]*>[\s\S]*?<\/rp>/gi, "").split(/<rt\b[^>]*>([\s\S]*?)<\/rt>/i);
+    const text = (s = "") => s.replace(/<[^>]+>/g, "").trim();
+    let out = "";
+    for (let i = 0; i < parts.length; i += 2) out += text(parts[i]) + (parts[i + 1] !== undefined && text(parts[i + 1]) ? `（${text(parts[i + 1])}）` : "");
+    return out;
+  });

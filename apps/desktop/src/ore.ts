@@ -29,10 +29,12 @@ export const ore = <T,>(...args: string[]): Promise<T> => oreWith<T>(null, ...ar
 
 /** `ore` with `stdin` piped in (`ore diagram <item> <name> --set`). Once a write lands that takes something out of
  *  what other screens count, or puts it back (a source archived, an exercise retired), every open screen reads again,
- *  whichever screen made it: a skill page left open under Review or a list keeps no stale row or number (Codex sweep 3). */
+ *  or changes the daily goal, every open screen reads again, whichever screen made it: a skill page left open under
+ *  Review or a list keeps no stale row or number (Codex sweeps 3 and 4). */
 export const oreWith = <T,>(stdin: string | null, ...args: string[]): Promise<T> =>
   oreJob<T>(null, stdin, ...args).then((r) => {
-    if (args[0] === "archive" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"))) wakeOpenScreens();
+    // A goal setting too (Codex sweep 4): Home, Today and an open Review count toward the new one, and so does its Undo.
+    if (args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"))) wakeOpenScreens();
     return r;
   });
 
@@ -52,13 +54,22 @@ export async function oreJob<T>(job: string | null, stdin: string | null, ...arg
 }
 
 let creating: Promise<unknown> | null = null;
+/** A call has found the library this launch, so a missing one later was moved, not never made. */
+const launch = { opened: false };
 /** First launch on a new Mac: there is no library yet, so make the default one (~/Ore) once and
- *  try again, instead of greeting a friend with "no library at …". */
-export async function firstRun<T>(call: () => Promise<T>, init: () => Promise<unknown>): Promise<T> {
+ *  try again, instead of greeting a friend with "no library at …". A library that was there and is
+ *  gone (moved or renamed while Ore is open) is said so, never replaced by an empty one (Codex sweep 4). */
+export async function firstRun<T>(call: () => Promise<T>, init: () => Promise<unknown>, seen = launch): Promise<T> {
   try {
-    return await call();
+    const r = await call();
+    seen.opened = true;
+    return r;
   } catch (e) {
     if (!(e instanceof Error && e.message.startsWith("no library at"))) throw e;
+    if (seen.opened) {
+      const at = e.message.slice("no library at ".length).replace(/ \(run .*$/, "");
+      throw new Error(`Your library is no longer at ${at}: it was moved, renamed or deleted. Put the folder back there, then try again.`);
+    }
     await (creating ??= init().catch((err) => {
       creating = null;
       throw new Error(typeof err === "string" ? err : String(err));
@@ -275,6 +286,8 @@ export type Today = {
   due: number;
   new_today: number;
   new_waiting: number;
+  /** Exercises he has, live or draft: none means a first day, not "caught up". */
+  exercises: number;
   /** Of `due`, the exercises filed under no skill: What to review's "No skill" row (D204). */
   no_skill_due: number;
   estimate_ms: number;

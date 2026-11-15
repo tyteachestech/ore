@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { AnnotationSchema, anchorAnnotations, annotationRevs, annotationsPath, reanchorItem } from "./annotations.ts";
 import { cardFiles, readCardFile } from "./cards.ts";
 import { syncIndex } from "./db.ts";
-import { errorLine, logFiles, readJsonlLines, sha256, visible } from "./fsutil.ts";
+import { errorLine, logFiles, readJsonlLines, sha256, subdirs, visible } from "./fsutil.ts";
 import { ID_END, itemDirs, readItemDir, type Item } from "./items.ts";
 import { brokenLinks } from "./links.ts";
 import { lockStale } from "./lock.ts";
@@ -111,6 +111,12 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
     }
   }
 
+  // An add stopped before doc.md was written (Ore quit or was killed): its folder lists nowhere, so say so (Codex sweep 4).
+  const root = paths.items(lib);
+  for (const y of subdirs(root))
+    for (const d of subdirs(join(root, y)))
+      if (!existsSync(join(root, y, d, "doc.md"))) add("warn", join(root, y, d), "an add that stopped before it finished (no doc.md), so it is not in the library; delete this folder, then add the source again");
+
   const cardIds = new Set<string>();
   for (const path of cardFiles(lib)) {
     try {
@@ -136,6 +142,8 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
         const r = ReviewSchema.safeParse(l.value);
         if (!r.success) add("error", f, `line ${l.line}: not a valid review (${errorLine(r.error)}), so it is skipped; fix or delete that line`);
         else if (!cardIds.has(r.data.card)) add("warn", f, `line ${l.line}: card ${r.data.card} not found`);
+        // A device whose clock ran ahead: the card's schedule counts from that review until the day it names.
+        else if (Date.parse(r.data.ts) > Date.now() + 864e5) add("warn", f, `line ${l.line}: dated ${r.data.ts.slice(0, 10)}, ahead of today (a clock was wrong), so card ${r.data.card} is scheduled from then; delete that line if it never happened`);
       }
     }
   }
