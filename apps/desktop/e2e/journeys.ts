@@ -10989,7 +10989,8 @@ journey("phone: every screen's text follows the iPhone's text size, and Start re
   const body = await size(".phone-reader .doc p");
   await type(1.353);
   const larger = await size(".phone-reader .doc p");
-  if (Math.abs(larger / body - 1.353) > 0.02) throw new Error(`the reader's text went from ${body}px to ${larger}px at 1.353`);
+  // A source reads at 20px and takes three quarters of the change (F-new-phone-reading-text): 25.3px, above iOS's 23pt body.
+  if (Math.abs(body - 20) > 0.1 || Math.abs(larger - 20 * (1 + 0.353 * 0.75)) > 0.2) throw new Error(`the reader's text went from ${body}px to ${larger}px at 1.353`);
 }, "phone");
 
 journey("phone: a long title on Today and in Sources shows on two lines, with the reading dots on the picture's foot, at every text size (F87)", async (page) => {
