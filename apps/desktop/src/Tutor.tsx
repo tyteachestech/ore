@@ -14,6 +14,7 @@ import { copiedFiles, pastesFiles } from "./copied";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import { mend } from "./mend";
+import { CodeBlock } from "./Code";
 import remarkGfm from "remark-gfm";
 import { Evidence } from "./Evidence";
 import { SkillIcon } from "./IconPicker";
@@ -979,6 +980,7 @@ function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }
   const open = (c: AnyCitation) => ("url" in c ? opener.current.onLink(c.url) : opener.current.onOpen(c.item, `q:${c.start}:${c.end}`));
   // Made once per set of citations, so a re-render (a keystroke, a streaming reply) doesn't remount the pills and close an open card.
   const components = useMemo(() => ({
+    pre: ({ children }: { children?: ReactNode }) => <CodeBlock>{children}</CodeBlock>,
     a: ({ href, children }: { href?: string; children?: ReactNode }) => {
       if (!href?.startsWith("#cite-")) return <span>{children}</span>;
       const nums = href.slice(6).split(",");

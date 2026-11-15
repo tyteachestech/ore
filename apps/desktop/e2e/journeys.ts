@@ -13426,6 +13426,34 @@ journey("a source that fails to open says why and offers Try again, which opens 
   await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
 });
 
+journey("code in a source: its parts are coloured without rewrapping the text, Copy puts the code on the clipboard, and a highlight across it still lands (D-new-code-blocks)", async (page) => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-code-"));
+  const file = join(dir, "code.md");
+  const code = 'def area(r):\n    # circle\n    return 3.14 * r, "ok"';
+  writeFileSync(file, `# Code that is coloured\n\nA function follows this line.\n\n\`\`\`python\n${code}\n\`\`\`\n\nAnd text after it.\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Code that is coloured");
+    const block = page.locator(".doc pre.code-block");
+    await block.waitFor();
+    await until("each kind of part has its ranges", () => page.evaluate(() => ["keyword", "name", "comment", "number", "string"].every((k) => (CSS.highlights.get(`code-${k}`)?.size ?? 0) > 0)));
+    if ((await block.locator("code").evaluate((el) => el.childNodes.length)) !== 1) throw new Error("the code's text was rewrapped: highlights and Find are Ranges on that one text node");
+    if ((await block.getAttribute("data-lang")) !== "python") throw new Error("the block does not name its language");
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await block.hover();
+    await block.getByRole("button", { name: "Copy code" }).click();
+    await until("the code is on the clipboard", async () => (await page.evaluate(() => navigator.clipboard.readText())) === code);
+    await select(page, "return 3.14");
+    await page.locator(".popup").waitFor();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Meta+z");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);

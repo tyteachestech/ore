@@ -35,6 +35,7 @@ import { citeQuote, citeSources, copyCited, type Cited } from "./cite";
 import { group, MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { findChapterEnds, Margin, type ChapterEnd, type MarginHandle } from "./Margin";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
+import { CodeBlock } from "./Code";
 import { clickBelow, SidePanel, SidePanelFrame, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
@@ -134,6 +135,7 @@ const placeError = (e: unknown) => {
 };
 
 const components: Components = {
+  pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   a: ({ href, children }) => {
     const fn = href?.match(/^#fn(ref)?-(.+)$/);
     if (fn) return (
@@ -515,7 +517,7 @@ const notebook: Components = {
   pre: ({ children }) => {
     const code = Children.toArray(children)[0];
     const out = isValidElement<{ className?: string }>(code) && /\blanguage-text\b/.test(code.props.className ?? "");
-    return out ? <Output>{children}</Output> : <pre>{children}</pre>;
+    return out ? <Output>{children}</Output> : <CodeBlock>{children}</CodeBlock>;
   },
 };
 
