@@ -16,7 +16,7 @@ import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, searchFields, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, searchFieldsOf, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
@@ -1173,13 +1173,8 @@ export function App() {
       clearTimeout(t);
     };
   }, [q]);
-  /** What each row is searched by, worked out once per list and not on every key: a site is a parsed URL
-   *  and a skill a lookup, which on a big library was most of a key's time (bench "filter sources"). */
-  const fieldsOf = useMemo(() => {
-    const names = new Map(skills.map((s) => [s.id, s.name]));
-    return new Map(tabRows.map((r) => [r, searchFields(r, siteOf(r.url), r.skills.map((id) => names.get(id) ?? id))]));
-  }, [tabRows, skills]);
-  const byTitle = useMemo(() => (q ? ranked(tabRows, q, (r) => fieldsOf.get(r)!) : tabRows), [tabRows, q, fieldsOf]);
+  const fieldsOf = useMemo(() => searchFieldsOf(tabRows, skills), [tabRows, skills]);
+  const byTitle = useMemo(() => (q ? ranked(tabRows, q, fieldsOf) : tabRows), [tabRows, q, fieldsOf]);
   const byText = useMemo(
     () => (q && hits.q === q ? tabRows.filter((r) => hits.snip.has(r.id) && !byTitle.includes(r)) : []),
     [tabRows, byTitle, hits, q],

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { passageText } from "./text";
+import { siteOf } from "./details";
 import { wakeOpenScreens } from "./util";
 
 /** The iPhone build (`ORE_PHONE=1 vite build`, apps/phone). */
@@ -208,6 +209,14 @@ export function pinBetween(before?: string, after?: string): string {
 
 /** What a list's search knows a source by (`ranked`): its title first, then its course, author, site, skills and type. */
 export const searchFields = (i: Item, site?: string, skills: string[] = []): (string | undefined)[] => [i.title, i.course?.title, i.author, siteName(site), ...skills, i.type];
+/** Each source's `searchFields` with its site and its skills by name, worked out once per list and not on every
+ *  key: a site is a parsed URL, which on a big library was most of a key's time (bench "filter sources"). */
+export function searchFieldsOf(items: Item[], skills: Pick<Skill, "id" | "name">[]): (i: Item) => (string | undefined)[] {
+  const names = new Map(skills.map((s) => [s.id, s.name]));
+  const of = (i: Item) => searchFields(i, siteOf(i.url), i.skills.map((id) => names.get(id) ?? id));
+  const by = new Map(items.map((i) => [i, of(i)]));
+  return (i) => by.get(i) ?? of(i);
+}
 /** A site as searched: its name without the ending ("nytimes" for nytimes.com, "bbc.co" for bbc.co.uk), or
  *  "com" would find nearly every web page as one types "Complete" (bench "filter sources"). */
 const siteName = (site?: string) => site?.replace(/\.[^.]+$/, "");

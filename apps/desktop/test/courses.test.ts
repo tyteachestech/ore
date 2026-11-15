@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { lessonsOf, nextLesson, searchFields, type Item } from "../src/ore";
+import { lessonsOf, nextLesson, searchFields, searchFieldsOf, type Item } from "../src/ore";
 import { rankScore } from "../src/match";
 
 const lesson = (id: string, part: number, status: Item["status"], course = "c1"): Item => ({
@@ -26,5 +26,13 @@ describe("courses in lists (D79)", () => {
     const page = source("Other", "inbox");
     expect(rankScore(searchFields(page, "nytimes.com"), "nytimes")).toBeGreaterThan(0);
     expect(rankScore(searchFields(page, "nytimes.com"), "com")).toBe(0);
+  });
+
+  test("a list, ⌘K and the phone search a source by its site and its skills' names, from one helper", () => {
+    const page = { ...source("Other", "inbox"), url: "https://www.nytimes.com/a", skills: ["s1", "gone"] };
+    const fields = searchFieldsOf([page], [{ id: "s1", name: "Memory" }])(page);
+    expect(fields).toContain("nytimes");
+    expect(fields).toContain("Memory");
+    expect(fields).toContain("gone");
   });
 });
