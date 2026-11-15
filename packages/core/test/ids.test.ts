@@ -17,3 +17,19 @@ test("ids: a placeholder with no row is refused", () => {
 test("ids: rows a merge left above master's newer ones go back in number order, the rest of the file untouched", () => {
   expect(ordered("intro F9\n\n| ID |\n| F1 | a |\n| F4 | mine |\n| F2 | b |\n| F3 | c |\n\nend\n")).toBe("intro F9\n\n| ID |\n| F1 | a |\n| F2 | b |\n| F3 | c |\n| F4 | mine |\n\nend\n");
 });
+
+test("ids: a file not yet added to git is renumbered too (the #408 slip: a new test reached master with its placeholder)", () => {
+  const { mkdtempSync, mkdirSync, writeFileSync, readFileSync } = require("node:fs") as typeof import("node:fs");
+  const { execFileSync } = require("node:child_process") as typeof import("node:child_process");
+  const { join } = require("node:path") as typeof import("node:path");
+  const dir = mkdtempSync(join(require("node:os").tmpdir(), "ore-ids-"));
+  const git = (...a: string[]) => execFileSync("git", a, { cwd: dir, stdio: "pipe" });
+  mkdirSync(join(dir, "docs/reviews"), { recursive: true });
+  writeFileSync(join(dir, "docs/reviews/findings.md"), "| ID |\n|---|\n| F1 | a |\n| F-new-thing | b |\n");
+  writeFileSync(join(dir, "docs/DECISIONS.md"), "- D1. one\n- D-new-choice. two\n");
+  git("init", "-q");
+  git("add", "-A");
+  writeFileSync(join(dir, "fresh.test.ts"), "// F-new-thing, D-new-choice\n"); // written on the branch, never added
+  execFileSync("bun", [join(import.meta.dir, "../scripts/ids.ts")], { cwd: dir, stdio: "pipe" });
+  expect(readFileSync(join(dir, "fresh.test.ts"), "utf8")).toBe("// F2, D2\n");
+});
