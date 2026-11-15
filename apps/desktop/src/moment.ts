@@ -8,13 +8,13 @@ export type Moment = { from: CardGem; to: CardGem; days: number; line: string; t
 
 /** The mole's pose for each kind of moment (D258), sized to how rare it is: winning a gem back is the hardest
  *  thing in a session, so it alone gets the laugh; a miss gets a steady look, never a sad one (D62). */
-export const MOMENT_MOOD = { cut: "proud", won: "laugh", polished: "wink", deep: "surprised", miss: "set" } as const satisfies Record<Moment["kind"], Mood>;
+export const MOMENT_MOOD = { cut: "proud", won: "laugh", polished: "wink", deep: "surprised", miss: "nod" } as const satisfies Record<Moment["kind"], Mood>;
 /** How the box behaves for each kind: a win springs in, a miss stays longer. */
 const TONE = { cut: "cut", won: "cut", polished: "cut", deep: "deep", miss: "miss" } as const satisfies Record<Moment["kind"], Moment["tone"]>;
 const moment = (kind: Moment["kind"], m: Omit<Moment, "kind" | "tone">): Moment => ({ ...m, kind, tone: TONE[kind] });
 
 /** A recall that adds this many days of memory is a moment even on a gem already cut: three weeks, a cut gem's worth. */
-export const DEEP_DAYS = 21;
+const DEEP_DAYS = 21;
 const DAY = 86_400_000;
 
 const ago = (ts: string | undefined, now: number): string => {

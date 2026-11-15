@@ -133,6 +133,8 @@ export interface QueueOptions {
 
 /** One card in this many is new while due cards last (D144). */
 const NEW_EVERY = 5;
+/** A source finished this long ago or less still counts as just read (D279). */
+const RECENT_MS = 7 * 864e5;
 
 // Due queue (SPEC §3): live cards due now in queue order, opening on a likely recall (D176), with unseen
 // drafts (his own work first, D176, then the freshest source, D60) taking every fifth place, and today's pending relearn passes last. A draft waits until the day
@@ -200,7 +202,11 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     unseen.sort((a, b) => a.tier - b.tier || b.fresh.localeCompare(a.fresh) || a.entry.id.localeCompare(b.entry.id));
     // A backlog of due cards is the normal case (D144): new cards get every fifth place of the session,
     // so new learning comes in whatever is due, and the due cards fill the rest, most urgent first.
-    const fresh = unseen.slice(0, newLeft).map((u) => u.entry);
+    // D279: what he finished this week takes up to half of today's new places first, freshest
+    // first, so it's reviewed while fresh, not queued behind a backlog of older drafts; his own work fills the rest.
+    const recent = unseen.filter((u) => u.fresh && now.getTime() - Date.parse(u.fresh) <= RECENT_MS).sort((a, b) => b.fresh.localeCompare(a.fresh) || a.tier - b.tier || a.entry.id.localeCompare(b.entry.id));
+    const room = recent.slice(0, Math.ceil(newLeft / 2));
+    const fresh = [...room, ...unseen.filter((u) => !room.includes(u))].slice(0, newLeft).map((u) => u.entry);
     const ordered = orderQueue(entries);
     const due = ordered.filter((e) => !e.relearn);
     const live = opts.start ? winFirst(due) : due;

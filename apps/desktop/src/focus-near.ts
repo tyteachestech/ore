@@ -21,7 +21,7 @@ const OPENS_MS = 1500;
 const shown = (el: Element) => el.getClientRects().length > 0;
 
 /** The control that stands for a row: the row itself when it takes focus, else its first visible button or link. */
-export function rowControl(row: Element): HTMLElement | null {
+function rowControl(row: Element): HTMLElement | null {
   if (row instanceof HTMLElement && row.matches('[tabindex="0"]')) return row;
   return [...row.querySelectorAll<HTMLElement>(CONTROL)].find((el) => !el.matches(HOVER_ONLY) && shown(el)) ?? null;
 }

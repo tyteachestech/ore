@@ -33,7 +33,7 @@ Mood names are the ones in `Mole.tsx`. "Today" moods are on master; the rest com
 | A gem is won back (gold rim) | `happy` | `laugh`: the biggest mid-session pose, since it is the hardest thing to do. Built | "Won back" |
 | A gem is polished (passed on a new case) | `happy` | `wink`. Built | "Polished" |
 | Recalled across a long gap | `happy` | `surprised`, settling into `nod`. Built: `surprised` | today's line (how long it had been) |
-| A miss on a cut gem | `peek` (he only looks up) | `set`: chin up, steady. Never `sad` or `shake`. Built | "Came loose" |
+| A miss on a cut gem | `peek` (he only looks up) | `nod`: a gentle nod, no frown. Never `sad`, `shake` or `set` (Tyler: "he looks mad at me"). Built | "Came loose" |
 | Today's goal is met | 48px, `happy`, "Goal met. The rest is extra." | rises, one `wave`, then rests while the line is up. Built | same line |
 | Past the goal, still going | not on screen | not on screen: the bonus is in the end screen's numbers | none |
 
@@ -63,7 +63,7 @@ His reaction, by the line he says (built as `endMood`; where the table says two 
 | Goal met, nothing rarer | `happy`, one `nod` | "Goal met. Quarry on tomorrow." |
 | An ordinary day | `nod` | a pun: "You rock." |
 | Nothing left due, short of the goal | `happy` | "Seam's empty. Today counts." |
-| Every answer a miss | `set`, no cheer | "Schist happens. Every miss comes back sooner." |
+| Every answer a miss | `nod`, no cheer | "Schist happens. Every miss comes back sooner." |
 | Then and now is showing (once in four weeks) | `curious`, looking down at the two answers | "6 weeks back that one beat you. Read it now." |
 
 Before D258 every day with something kept ended on the same `cheer`. Scaling it was the last piece of "three sizes of ending": the row's colour already makes a big day look bigger, and his pose would make it feel bigger.

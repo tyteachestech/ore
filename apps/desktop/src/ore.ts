@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { passageText } from "./text";
 
 /** The iPhone build (`ORE_PHONE=1 vite build`, apps/phone). */
 export const PHONE = import.meta.env.VITE_PHONE === "1";
@@ -75,7 +76,7 @@ export const INTENTS: Intent[] = ["keep", "card", "question", "apply"];
 
 /** A passage of the body that supports a key point, anchored like a highlight (D56). */
 export type Evidence = { exact: string; prefix: string; suffix: string; start: number; end: number };
-export type KeyPoint = { text: string; evidence: Evidence[] };
+type KeyPoint = { text: string; evidence: Evidence[] };
 /** `confidence` 1 guess, 2 think so, 3 sure; `check.covered` has one mark per key point (D53 to D56). */
 /** `skipped`: not part of this finish (D100), its answer past where he stopped or left out by his note. */
 export type Prequestion = { q: string; before?: string; after?: string; confidence?: number; points?: KeyPoint[]; check?: { covered: boolean[]; edited?: boolean }; skipped?: "past" | "left_out" };
@@ -139,7 +140,7 @@ export type Item = {
   /** From `ore ls`, on the lesson that holds it: the course's own picture (its page's og:image). */
   course_cover?: string;
 };
-export type Course = { id: string; title: string; part: number; url?: string };
+type Course = { id: string; title: string; part: number; url?: string };
 
 /** A course's lessons among `items`, in course order. */
 export const lessonsOf = (items: Item[], course: string): Item[] =>
@@ -166,7 +167,7 @@ const siteName = (site?: string) => site?.replace(/\.[^.]+$/, "");
 /** The lesson to open next: the first one not done (null when all are). */
 export const nextLesson = (lessons: Item[]): Item | null => lessons.find((l) => l.status !== "done") ?? null;
 /** EPUB chapter recall (D18); `n` is the number in the body's `<!-- chapter N -->` marker. */
-export type ChapterRecall = { n: number; text: string; at: string; feedback?: ChapterFeedback };
+type ChapterRecall = { n: number; text: string; at: string; feedback?: ChapterFeedback };
 /** `section_lines`: one line on his section lines (D32), null when he wrote none in that range. */
 export type ChapterFeedback = { feedback: string; missed: string[]; section_lines?: string | null };
 
@@ -317,7 +318,10 @@ export type DueEntry = { id: string; kind: "card" | "prompt"; state: "draft" | "
 
 /** `ore card show`. */
 export type CardFull = {
-  id: string; kind: "card" | "prompt"; state: "draft" | "live" | "retired"; item: string; annotation?: string; question: string; answer: string; rubric: string[];
+  id: string; kind: "card" | "prompt"; state: "draft" | "live" | "retired"; item: string; annotation?: string;
+  /** D118: the other highlights it was planned from. */
+  also?: string[];
+  question: string; answer: string; rubric: string[];
   /** A remixed version shown in review (D66), with the card it stands in for. */
   variant?: string; original?: { question: string; answer: string; rubric: string[] };
   /** Review may offer "In my head" (D68): an Explain card he has passed twice. */
@@ -358,6 +362,26 @@ export function lastWin(queue: DueEntry[]): DueEntry[] | null {
     if (!e.relearn && e.due && (e.retrievability ?? 0) >= LAST_WIN_AT && (best < 0 || e.retrievability! > queue[best]!.retrievability!)) best = i;
   });
   return best < 0 ? null : [queue[best]!, ...queue.slice(0, best), ...queue.slice(best + 1)];
+}
+
+/** A missed card comes back this many cards later (D59). */
+const AGAIN_GAP = 3;
+/** The queue once its first card is answered. A miss comes back once (D59), a few cards later; a second
+ *  miss waits for its next FSRS date. Answered, a new card is live: it comes back as one he has seen. */
+export function afterAnswer(q: DueEntry[], again: boolean): DueEntry[] {
+  if (!q.length) return q;
+  const [head, ...rest] = q;
+  if (!again || head!.relearn) return rest;
+  return [...rest.slice(0, AGAIN_GAP), { ...head!, relearn: true, state: "live" }, ...rest.slice(AGAIN_GAP)];
+}
+
+/** The highlights a card was planned from (D118: `annotation`, then `also`), as review shows them after the answer. */
+export function cardQuotes(c: Pick<CardFull, "annotation" | "also">, annotations: Annotation[]): { text: string; at: string }[] {
+  const ids = new Set([c.annotation, ...(c.also ?? [])].filter((id): id is string => !!id));
+  return [...ids].flatMap((id) => {
+    const a = annotations.find((x) => x.id === id && x.status !== "deleted");
+    return a ? [{ text: passageText(a.exact), at: a.id }] : [];
+  });
 }
 
 /** Later (D192, Anki's Bury for one session): the exercise on screen goes to the end of the session, nothing

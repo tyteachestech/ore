@@ -9,9 +9,10 @@ import { PHONE, type Skill, type Today } from "./ore";
 import { sheetLayer, useSwipeDown } from "./phone/sheet";
 import { load, save } from "./util";
 import { NO_SKILL } from "../../../packages/core/src/no-skill";
+import { localDay } from "../../../packages/core/src/ids";
 
 const PICK = "ore.review-pick";
-const day = () => new Date().toLocaleDateString("sv-SE");
+const day = () => localDay(new Date());
 
 /** The skills he picked to review today, or null for all (D58, D80). A new day starts with all. */
 export function loadPick(): string[] | null {

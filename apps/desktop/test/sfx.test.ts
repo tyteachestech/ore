@@ -1,0 +1,59 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { newSession, rated, setPlayer, setSounds, sfx, SFX } from "../src/sfx";
+
+// Review's sounds (D277): which moment plays what, read off the player in place of the speakers.
+let heard: [string, number][] = [];
+beforeEach(() => {
+  heard = [];
+  setSounds(true);
+  newSession();
+  setPlayer((id, o) => heard.push([id, Math.round(Math.log2(o.rate) * 12)]));
+});
+afterEach(() => setPlayer(null));
+
+describe("review sounds", () => {
+  test("Again is the miss; Hard, Good and Easy are the recall", () => {
+    for (const r of [1, 2, 3, 4]) (newSession(), rated(r));
+    expect(heard.map((h) => h[0])).toEqual(["missed", "right", "right", "right"]);
+  });
+
+  test("recalls in a row climb a semitone each, up to four; Hard holds the note and a miss starts over", () => {
+    for (const r of [3, 4, 3, 2, 3, 3, 3, 1, 3]) rated(r);
+    expect(heard).toEqual([["right", 0], ["right", 1], ["right", 2], ["right", 3], ["right", 3], ["right", 4], ["right", 4], ["missed", 0], ["right", 0]]);
+  });
+
+  test("a new session starts the climb again", () => {
+    rated(3);
+    rated(3);
+    newSession();
+    rated(3);
+    expect(heard.at(-1)).toEqual(["right", 0]);
+  });
+
+  test("turned off in Settings, nothing plays, and the climb still starts over on a miss", () => {
+    setSounds(false);
+    for (const id of SFX) sfx(id);
+    rated(3);
+    rated(1);
+    expect(heard).toEqual([]);
+    setSounds(true);
+    rated(3);
+    expect(heard).toEqual([["right", 0]]);
+  });
+
+  test("only the key moments have a sound: none for undo, Later or an edit", () => {
+    expect([...SFX]).toEqual(["tap", "right", "missed", "goal", "cart", "pop", "done"]);
+    const review = readFileSync(join(import.meta.dir, "../src/Review.tsx"), "utf8");
+    // Every call in Review, by the sound it plays.
+    expect([...review.matchAll(/\b(?:sfx|once)\("(\w+)"/g)].map((m) => m[1]).sort()).toEqual(["cart", "done", "goal", "pop", "tap", "tap", "tap"]);
+    expect(review.match(/\brated\(/g)?.length).toBe(1);
+  });
+
+  test("the build takes every sound from the Mac's folder, never from git", () => {
+    const config = readFileSync(join(import.meta.dir, "../vite.config.ts"), "utf8");
+    for (const id of SFX) expect(config).toContain(`"${id}"`);
+    expect(readFileSync(join(import.meta.dir, "../../../.gitignore"), "utf8")).toContain("apps/desktop/public/sounds/");
+  });
+});

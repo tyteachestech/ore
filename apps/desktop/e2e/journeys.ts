@@ -333,11 +333,21 @@ async function select(page: Page, phrase: string) {
 /** Waits until every title is back in the library, not only on screen: rows come back the moment ⌘Z is
  *  pressed, while its write may still wait behind the archive's. A journey that ended there closed its
  *  page first, the queued Undo was never sent, and the next journeys lost those sources (“The Testing
- *  Effect” from To read, failing the hang and a11y journeys on CI). */
-async function inLibrary(titles: string[]) {
+ *  Effect” from To read, failing the hang and a11y journeys on CI). The app's own writes answer first
+ *  (`settled`): a fixed wait for the library timed out on CI while a runner stalled (F190). */
+async function inLibrary(page: Page, titles: string[]) {
+  await settled(page);
   await until("the library has them all back", async () => {
     const live = new Set(((await ore("ls")) as { title: string }[]).map((i) => i.title));
     return titles.every((t) => live.has(t));
+  });
+}
+
+/** Waits for every `ore` call the page has made to answer, however long a slow machine takes (past the library
+ *  lock's 15 s, so a write stuck there answers with its error first); a call that never answers is named. */
+async function settled(page: Page, ms = 20_000) {
+  await until("its ore calls have answered", () => page.evaluate(() => !(window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING), ms).catch(async () => {
+    throw new Error(`ore calls still in flight: ${JSON.stringify(await page.evaluate(() => (window as unknown as { __ORE_INFLIGHT?: string[] }).__ORE_INFLIGHT))}`);
   });
 }
 
@@ -3424,7 +3434,7 @@ journey("note / menu at the bottom of a long note: it opens above the line, insi
   await inside("the format bar after the panel narrows", bar);
 });
 
-journey("note tables: / makes one, Tab adds a row, the column grip deletes a column, + adds a row; kept after a reload; widen and back", async (page) => {
+journey("note tables: / makes one, Tab adds a row, the column grip deletes a column and drags one first, + adds a row; kept after a reload; widen and back", async (page) => {
   const cells = () => page.locator(".note-editor .note-table tr").evaluateAll((rs) => rs.map((r) => [...r.children].map((c) => c.textContent ?? "")));
   await openSource(page, AGENTS);
   await page.locator(".note-editor [contenteditable=true]").first().click();
@@ -3445,13 +3455,22 @@ journey("note tables: / makes one, Tab adds a row, the column grip deletes a col
   await page.locator(".table-grip.cols").click();
   await page.getByRole("menuitem", { name: "Delete column" }).click();
   await until("the column is gone", async () => (await cells())[0]!.join() === "Tool,Cost");
+  // The grip drags too (drag.ts resizeDrag, F193): Cost before Tool, past the 4 px click slop.
+  await page.locator(".note-editor .note-table th", { hasText: "Cost" }).hover();
+  const grip = (await page.locator(".table-grip.cols").boundingBox())!;
+  const tool = (await page.locator(".note-editor .note-table th", { hasText: "Tool" }).boundingBox())!;
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(tool.x + 4, tool.y + tool.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await until("the column moved first", async () => (await cells())[0]!.join() === "Cost,Tool");
   await page.locator(".note-editor .note-table td", { hasText: "Memory" }).hover();
   await page.locator(".table-add.rows").click();
   await until("+ added a row", async () => (await cells()).length === 5);
   await page.waitForTimeout(600); // the note saves after a pause
   await page.reload();
   await openSource(page, AGENTS);
-  await until("the table survives a reload", async () => (await cells()).length === 5 && (await cells())[3]!.join() === "Memory,");
+  await until("the table survives a reload", async () => (await cells()).length === 5 && (await cells())[3]!.join() === ",Memory");
   // The skill page's widen button gives the note the whole page, and back.
   await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
   const side = page.locator(".skill-col.side");
@@ -3583,7 +3602,7 @@ journey("Home: archiving a Continue reading row or a skill tile from its menu pu
   await page.getByRole("menuitem", { name: /^Archive/ }).click();
   await until(`focus moves to “${titles[1]}”`, async () => (await focusedOn(page)) === titles[1]);
   await page.keyboard.press("Meta+z");
-  await inLibrary([titles[0]!]);
+  await inLibrary(page, [titles[0]!]);
   await page.locator(".home-skill").nth(1).waitFor();
   const names = (await page.locator(".home-skill .home-open").allInnerTexts()).map((n) => n.trim());
   await page.locator(".home-skill").first().click({ button: "right" });
@@ -3941,7 +3960,7 @@ journey("Home: focus put on a row after an archive never comes back later: a rev
     if ((await focusedOn(page)) === titles[1]) throw new Error("focus jumped back to the row the archive left it on, long after");
   } finally {
     await page.keyboard.press("Meta+z");
-    await inLibrary([titles[0]!]);
+    await inLibrary(page, [titles[0]!]);
   }
 });
 
@@ -3962,7 +3981,7 @@ journey("Home: archiving the only Continue reading row puts focus on what is lef
     await until("focus is on a skill tile", async () => tiles.includes((await focusedOn(page)) ?? ""));
   } finally {
     for (let n = 0; n < titles.length; n++) await page.keyboard.press("Meta+z");
-    await inLibrary(titles);
+    await inLibrary(page, titles);
   }
 });
 
@@ -6062,7 +6081,7 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   if ((await moment.innerText()).includes("days")) throw new Error("a miss showed days added");
   const mole = moment.locator(".mole");
   if ((await mole.getAttribute("width")) !== "48") throw new Error("a rating's mole is not 48px");
-  if ((await mole.getAttribute("data-mood")) !== "set") throw new Error("a missed cut gem did not get the steady pose");
+  if ((await mole.getAttribute("data-mood")) !== "nod") throw new Error("a missed cut gem did not get the gentle nod (D278)");
   // ⌘Z: the rating and its moment are both taken back.
   await page.keyboard.press("Meta+z");
   await moment.waitFor({ state: "detached" });
@@ -6692,6 +6711,46 @@ journey("review: ⌘Z on the end screen takes the last rating back and returns t
   await page.keyboard.press("Escape");
 });
 
+journey("review sounds: showing the answer ticks and a rating shines, ⌘Z is silent, and Settings turns them off (D277)", async (page) => {
+  const heard = () => page.evaluate(() => (window as { __ORE_SFX?: string[] }).__ORE_SFX!.join(" "));
+  const q = page.locator(".review-q");
+  const sounds = async (on: boolean) => {
+    await page.keyboard.press("Meta+Comma");
+    await page.getByRole("tab", { name: "Review" }).click();
+    const sw = page.getByRole("switch", { name: "Sound effects" });
+    if (((await sw.getAttribute("aria-checked")) === "true") !== on) await sw.click();
+    await until(`Sound effects is ${on ? "on" : "off"}`, async () => ((await sw.getAttribute("aria-checked")) === "true") === on);
+    await page.keyboard.press("Escape");
+    await page.getByRole("dialog", { name: "Settings" }).waitFor({ state: "detached" });
+  };
+  await page.evaluate(() => ((window as { __ORE_SFX?: string[] }).__ORE_SFX = []));
+  await startReview(page, null);
+  const first = await q.first().innerText();
+  await reveal(page);
+  if ((await heard()) !== "tap") throw new Error(`showing the answer played “${await heard()}”, not the tick`);
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await until("the rating plays the shine", async () => (await heard()) === "tap right");
+  await until("the card moves on", async () => (await q.count()) === 0 || (await q.first().innerText().catch(() => first)) !== first);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z brings the card back", async () => (await q.first().innerText().catch(() => "")) === first);
+  await page.waitForTimeout(300);
+  if ((await heard()) !== "tap right") throw new Error(`⌘Z played a sound: “${await heard()}”`);
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
+  // Off in Settings: the same moments are silent.
+  await sounds(false);
+  try {
+    await startReview(page, null);
+    await reveal(page);
+    await page.waitForTimeout(200);
+    if ((await heard()) !== "tap right") throw new Error(`with Sound effects off, showing the answer played: “${await heard()}”`);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  } finally {
+    await sounds(true);
+  }
+});
+
 journey("review: at a session's end the cart tips its ore into the ring and leaves, the mole comes up after, and Reduce Motion skips it (D190)", async (page) => {
   const doneButton = page.locator(".review-foot").getByRole("button", { name: "Done" });
   const q = page.locator(".review-q");
@@ -6724,6 +6783,8 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
     await page.keyboard.press("Escape");
     await page.locator(".review").waitFor({ state: "detached" });
   };
+  await page.evaluate(() => ((window as { __ORE_SFX?: string[] }).__ORE_SFX = []));
+  const endSounds = () => page.evaluate(() => (window as { __ORE_SFX?: string[] }).__ORE_SFX!.filter((x) => ["cart", "done", "pop"].includes(x)).join(" "));
   await finish();
   // The cart plays only with something to tip (a ring dot this session lit, or a gem it cut).
   // Whether this library has that depends on the journeys before it, so that the cart mounts at all is
@@ -6738,6 +6799,8 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   }
   const after = await page.evaluate(() => ({ mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length, waiting: document.querySelectorAll(".review-cut > span[data-wait]").length, ore: document.querySelectorAll(".cart-ore").length }));
   if (!after.mole || after.waiting || after.ore || after.on < first.on) throw new Error(`the end screen didn't settle: ${JSON.stringify({ first, after })}`);
+  // Its sounds (D277): the cart's roll if it came, the jingle as the ring fills, the mole's pop as he comes up.
+  await until("the end screen's sounds played in order", async () => (await endSounds()) === (first.cart ? "cart done pop" : "done pop"));
   await back();
   // Reduce Motion: the same screen, at once, with no cart.
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -6748,6 +6811,8 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   })().finally(() => page.emulateMedia({ reducedMotion: null }));
   // A second session only adds minutes, so the ring is at least as full.
   if (still.cart || !still.mole || still.on < after.on) throw new Error(`Reduce Motion: ${JSON.stringify({ still, after })}`);
+  // He is just there, so nothing pops: only the jingle.
+  if (!(await endSounds()).endsWith("pop done")) throw new Error(`Reduce Motion's end screen played: ${await endSounds()}`);
   await back();
 });
 
@@ -7872,9 +7937,17 @@ journey("finish: when drafting the cards fails, a toast says why and Try again d
   await page.getByRole("button", { name: "Done", exact: true }).click();
   const toast = page.locator(".toast").filter({ hasText: "weren’t drafted: Claude is signed out." });
   await toast.waitFor();
-  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await page.evaluate(() => {
+    const w = window as unknown as { __ORE_FAIL: Record<string, string>; __ORE_SLOW?: Record<string, number> };
+    w.__ORE_FAIL = {};
+    w.__ORE_SLOW = { ...w.__ORE_SLOW, enrich: 1500 };
+  });
   await toast.getByRole("button", { name: "Try again" }).click();
   await toast.waitFor({ state: "detached" });
+  // He asked for it, so it shows while it runs and says when it's done (rehearsal 2026-11-15).
+  await page.locator(".toast").filter({ hasText: "Drafting exercises for" }).waitFor();
+  await page.locator(".toast").filter({ hasText: "drafted." }).waitFor({ timeout: 8000 });
+  await page.evaluate(() => delete (window as unknown as { __ORE_SLOW: Record<string, number> }).__ORE_SLOW.enrich);
   // Back to reading, for the journeys after this one.
   await page.evaluate(async (title) => {
     const ore = (args: string[]) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke("ore", { args });
@@ -8472,7 +8545,7 @@ journey("undo that fails: the toast says why, and ⌘Z tries the same step again
   await page.locator(".list").click({ position: { x: 5, y: 5 } }).catch(() => {});
   await page.keyboard.press("Meta+z");
   await row.waitFor();
-  await inLibrary([AGENTS]);
+  await inLibrary(page, [AGENTS]);
 });
 
 journey("settings: a Review setting goes on the history; ⌘Z takes it back, ⇧⌘Z gives it again", async (page) => {
@@ -9376,7 +9449,7 @@ journey("list archive: ⇧⌘A selects the row after the archived one, so a seco
   await page.keyboard.press("Meta+z");
   await until("⌘Z ⌘Z bring both back", async () => (await titles()).length === before.length);
   for (const t of before) if (!(await titles()).includes(t)) throw new Error(`“${t}” did not come back`);
-  await inLibrary(before);
+  await inLibrary(page, before);
 });
 
 journey("list archive Undo selects the source it put back, as Finder does, though the row was never selected", async (page) => {
@@ -9654,6 +9727,9 @@ journey("toast: a long title is clipped to two lines, not a wall of text over th
     await page.keyboard.press("Meta+z");
     await until("⌘Z brings it back", async () => (await row.count()) === 1);
   } finally {
+    // After the ⌘Z's own write: archived alongside it, the two raced and the source could stay out for the next journeys.
+    // A call that never answers is named by the check as the journey ends; the archive runs anyway.
+    await settled(page).catch(() => {});
     await ore("archive", made.id);
   }
 });
@@ -9686,10 +9762,15 @@ journey("prequestions: a source added with --no-enrich offers to write them, nev
 });
 
 journey("stacked Undo: each ⌘Z's toast comes to the front and names the source it put back", async (page) => {
+  // A ⌘Z whose write runs late, as one did on a stalled CI runner (F190): the library has
+  // all three back only once the app's writes have answered, past any fixed wait.
   await page.getByRole("button", { name: /^All sources/ }).click();
   const titles = () => page.locator(".list .row .title").allInnerTexts();
   await until("All sources lists three sources", async () => (await titles()).length >= 3);
   const before = await titles();
+  // The first one archived is the last one put back: its archive saves at once, its ⌘Z's write runs 6 s late.
+  const first = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === before[0])!;
+  await page.evaluate((key) => void ((window as unknown as { __ORE_HOLD?: Record<string, number[]> }).__ORE_HOLD = { [key]: [0, 6000] }), `archive ${first.id}`);
   await page.locator(".list").focus();
   await page.keyboard.press("ArrowDown");
   for (const t of before.slice(0, 3)) {
@@ -9703,7 +9784,7 @@ journey("stacked Undo: each ⌘Z's toast comes to the front and names the source
   await until("the second ⌘Z's toast is in front, naming the one it put back", async () => (await front()) === `Undone: Archived “${before[1]}”`);
   await page.keyboard.press("Meta+z");
   await until("all three are back", async () => (await titles()).length === before.length);
-  await inLibrary(before);
+  await inLibrary(page, before);
 });
 
 journey("delete skill: with nothing to decide it deletes at once, and ⌘Z puts it back (no Are you sure)", async (page) => {
@@ -12379,7 +12460,7 @@ journey("skill rename: pending Undo preserves the preceding source (F146)", asyn
   }
 });
 
-journey("source rename: pending Undo takes back the rename, not the source added before it (F156)", async (page) => {
+journey("source rename: pending Undo takes back the rename, not the source added before it (F190)", async (page) => {
   const title = `Source to rename ${Date.now()}`;
   await page.reload();
   await page.keyboard.press("Meta+n");
@@ -12629,8 +12710,8 @@ for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) 
     await run(page);
     // Nothing of the journey's still in flight as its page closes: a save cut off there is lost to the next
     // journey's library, and WebKit reports the cut request as a page error. A call held and never let go fails here.
-    await until("its ore calls have answered", () => page!.evaluate(() => !(window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING)).catch(async () => {
-      throw new Error(`the journey ended with ore calls in flight: ${JSON.stringify(await page!.evaluate(() => (window as unknown as { __ORE_INFLIGHT?: string[] }).__ORE_INFLIGHT))}`);
+    await settled(page).catch((e: Error) => {
+      throw new Error(`the journey ended with ${e.message}`);
     });
     const broke = await page.evaluate(async () => {
       const w = window as unknown as { __hygiene?: Set<string>; __hygieneCheck?: () => Promise<void> };

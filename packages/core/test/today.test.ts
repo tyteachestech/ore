@@ -233,6 +233,26 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(dueQueue(lib, tomorrow).map((e) => e.question)).toEqual([wrote, markedFresh, marked, asked].map((c) => c.question));
   });
 
+  test("a source finished this week gets up to half the day's new exercises, ahead of older drafts from his notes (D279)", async () => {
+    const { lib, item: old } = await library(0);
+    const { item: just } = await addSnippet(lib, { text: "Attention needs word order." });
+    const now = new Date();
+    await setItemStatus(lib, old.meta.id, "done", new Date(now.getTime() - 40 * 864e5).toISOString());
+    await setItemStatus(lib, just.meta.id, "done", now.toISOString());
+    const draft = (item: string, q: string, over: object = {}) => writeNewCard(lib, { kind: "card", item, skills: ["learning"], topics: ["spacing"], content_type: "fact", question: q, answer: "A", rubric: [], ...over });
+    const backlog = Array.from({ length: 12 }, (_, i) => draft(old.meta.id, `Old note ${i}?`, { from: "notes" }));
+    const fresh = Array.from({ length: 8 }, (_, i) => draft(just.meta.id, `Just read ${i}?`, { from: "prequestion", prequestion: i + 1 }));
+    const tomorrow = new Date(now.getTime() + 864e5);
+    const q = dueQueue(lib, tomorrow).map((e) => e.question);
+    // Ten new a day: five from what he just finished, then his own older work.
+    expect(q).toHaveLength(10);
+    expect(q.slice(0, 5)).toEqual(fresh.slice(0, 5).map((c) => c.question));
+    expect(q.slice(5)).toEqual(backlog.slice(0, 5).map((c) => c.question));
+    // A week on, the source is no longer fresh: his own work comes first again (D176).
+    const later = new Date(now.getTime() + 9 * 864e5);
+    expect(dueQueue(lib, later).map((e) => e.question).slice(0, 10)).toEqual(backlog.slice(0, 10).map((c) => c.question));
+  });
+
   test("over a backlog the session opens on the likeliest recall of its first ten (D176)", async () => {
     const { lib, cards } = await library(6);
     const day1 = T();

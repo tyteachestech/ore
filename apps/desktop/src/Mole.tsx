@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { COLS, FINE_ORDER, ROWS, fineDots } from "./mole-fine";
+import { still } from "./SideCursor";
 
 /* The tutor's mole (D168, a puppet since D214, an old miner since D238, traced from concept 4 since D251, one drawing
    at every size since D261): its head and two paws over a strip of dirt, drawn as round dots
@@ -173,7 +174,7 @@ export function start(s: Puppet, mood: Exclude<Mood, "idle">, now: number) {
   push(s, m);
 }
 /** Shows `pose` at once, with nothing moving. */
-export function hold(s: Puppet, mood: Mood, pose: Partial<State>) {
+function hold(s: Puppet, mood: Mood, pose: Partial<State>) {
   Object.assign(s, { move: null, mood, to: { ...REST, ...pose }, v: { ...REST, ...pose }, vel: zero() });
 }
 const settled = (s: Puppet) => KEYS.every((k) => Math.abs(s.to[k] - s.v[k]) < 0.002 && Math.abs(s.vel[k]) < 0.002);
@@ -200,7 +201,6 @@ export function advance(s: Puppet, now: number, dt: number) {
 /** In its button the sprite sits 3.3 dots below a square's top, so its dirt lands low and it pokes out of the ground. */
 const LIFT = 3.3;
 const BLINK_MS = 120, LOOK_MS = 900;
-const still = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
 /** The mole, `size` px wide (in its button, the dirt sits low in a square; `bare`, just the sprite; the dome may

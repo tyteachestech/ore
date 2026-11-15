@@ -96,7 +96,8 @@ export function useToast() {
       }
       // A slot's new toast goes in front, in place of its last one.
       if (slot && kind !== "quiet") commit(list.current.filter((x) => x.slot !== slot));
-      if (kind !== "quiet") show({ message, kind, offer: step ? "undo" : undefined, step, show: go, stay: stay && !!go, slot });
+      // A slot's toast never takes the place of another step's running one (rehearsal 2026-11-15).
+      if (kind !== "quiet") show({ message, kind, offer: step ? "undo" : undefined, step, show: go, stay: stay && !!go, slot }, slot ? () => false : undefined);
       const forget = () => {
         if (!step) return;
         history.current.forget(step);

@@ -10,13 +10,14 @@ import { EndMark } from "./EndMark";
 import { SkillIcon } from "./IconPicker";
 import { Mole, Mound } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
+import { newSession, rated, sfx, warm, type Sfx } from "./sfx";
 import { still } from "./SideCursor";
 import { Hint } from "./Hint";
 import { MoreButton } from "./Menu";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
-import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { afterAnswer, cardQuotes, lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { endMood, endSays, endTiles, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
@@ -47,16 +48,6 @@ const GEM_SAYS: Record<CardGem["kind"], string> = {
   cut: "Cut: you'd still recall this three weeks from now",
   dull: "Missed since it was cut: recall it to win it back",
 };
-/** A missed card comes back this many cards later (D59). */
-const AGAIN_GAP = 3;
-/** The queue once its first card is answered. A miss comes back once (D59), a few cards later; a second
- *  miss waits for its next FSRS date. */
-function afterAnswer(q: DueEntry[], again: boolean): DueEntry[] {
-  if (!q.length) return q;
-  const [head, ...rest] = q;
-  if (!again || head!.relearn) return rest;
-  return [...rest.slice(0, AGAIN_GAP), { ...head!, relearn: true }, ...rest.slice(AGAIN_GAP)];
-}
 /** One card adds at most this much active time (D60, as in core). */
 const ACTIVE_CAP_MS = 3 * 60_000;
 /** Cut gems drawn on the end screen; the rest show as "+N". */
@@ -248,6 +239,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   useEffect(() => {
     let live = true;
     setError(null);
+    newSession();
+    warm();
     void (async () => {
       try {
         // Try again after `due` failed keeps the session already started: a second would be left open.
@@ -483,8 +476,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         if (at !== showing.current) return;
         if (c.evidence?.length)
           return setPassage({ item: c.item, title: s.title, quotes: c.evidence.map((e) => ({ text: passageText(e.exact.replace(/\[[\d:.]+\]\s*/g, "")), at: `q:${e.start}:${e.end}`, time: stampBefore(s.body, e.start) })) });
-        const a = c.annotation ? s.annotations.find((x) => x.id === c.annotation && x.status !== "deleted") : undefined;
-        setPassage({ item: c.item, title: s.title, quotes: a ? [{ text: passageText(a.exact), at: a.id }] : [] });
+        setPassage({ item: c.item, title: s.title, quotes: cardQuotes(c, s.annotations) });
       },
       (e) => {
         if (at !== showing.current) return;
@@ -510,6 +502,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     setInHead(true);
     setMarks(card.rubric.map(() => undefined));
     setPhase("checked");
+    sfx("tap");
     shownAnswerAt.current = Date.now();
     loadPassage(card);
   };
@@ -530,6 +523,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       setConf(1);
     }
     setPhase("checked");
+    sfx("tap");
     shownAnswerAt.current = Date.now();
     loadPassage(card);
     if (card.kind !== "prompt") return;
@@ -628,6 +622,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       ];
       await submit(args, rating, elapsed);
       saved = true;
+      // Its sound, once it is saved: a rating that failed to save is silent.
+      rated(rating);
       // An everyday rating leaves a moment still showing to run its time.
       if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
@@ -670,6 +666,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     if (quick) return void finish();
     goalTold.current = true;
     setGoalSaid(true);
+    // After the rating's own sound, so the two are heard apart.
+    sfx("goal", { after: 0.5 });
   };
 
   /** Records a rating and moves on. The first time (`forget` absent) it goes on the app history, so
@@ -949,6 +947,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     if (card?.kind === "prompt") keepDraft(card, answer, n);
     if (card?.kind === "card") {
       setPhase("checked");
+      sfx("tap");
       shownAnswerAt.current = Date.now();
       loadPassage(card);
     } else if (askSure) {
@@ -1673,6 +1672,13 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
     return () => clearTimeout(id);
   }, [risen]);
   const full = stage !== "cart";
+  // The end screen's sounds (D277): the cart rolling in, the jingle as the ring fills, and the mole's pop as he comes up (260ms into his rise).
+  // Each once: an effect can run again for the same moment (React's strict mode runs a mount's twice).
+  const played = useRef(new Set<Sfx>());
+  const once = (id: Sfx, after = 0) => void (!played.current.has(id) && (played.current.add(id), sfx(id, { after })));
+  useEffect(() => void (pour && once("cart")), []);
+  useEffect(() => void (full && once("done")), [full]);
+  useEffect(() => void (risen && !quick && !still() && once("pop", 0.26)), [risen]);
   // D197: a cut gem that was won back has a gold rim; a gem passed on a new case this session shows polished.
   const cutN = s.cut?.length ?? 0;
   const mendedN = (s.grades ?? []).filter((g) => g === "mended").length;
