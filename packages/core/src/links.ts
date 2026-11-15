@@ -46,7 +46,8 @@ export interface NoteFile {
   path: string;
 }
 
-// Every note in the library: each source's My notes, then each skill's note.
+// Every note in the library: each source's My notes, then each skill's note. A deleted skill's note stays on disk
+// but has no skill to open it from, so it is left out (of backlinks and `ore doctor`) until the skill comes back.
 export function noteFiles(lib: Library): NoteFile[] {
   const out: NoteFile[] = [];
   for (const dir of itemDirs(lib)) {
@@ -59,7 +60,8 @@ export function noteFiles(lib: Library): NoteFile[] {
   const root = paths.skillNotes(lib);
   for (const id of subdirs(root)) {
     const path = skillNotesPath(lib, id);
-    if (existsSync(path)) out.push({ from: { kind: "skill", id, title: names.get(id) ?? id }, path });
+    const title = names.get(id);
+    if (title !== undefined && existsSync(path)) out.push({ from: { kind: "skill", id, title }, path });
   }
   return out;
 }
@@ -70,14 +72,11 @@ export interface Backlink {
   line: string; // the line holding the link, links shown as text
 }
 
-// "Linked from" (D39): every line in another note that links to target, in note order. A deleted skill's note
-// stays on disk but has no skill to open it from, so it is left out until the skill comes back.
+// "Linked from" (D39): every line in another note that links to target, in note order.
 export function backlinks(lib: Library, target: LinkTarget): Backlink[] {
   const out: Backlink[] = [];
-  const skills = new Set(loadSkills(lib).skills.map((s) => s.id));
   for (const f of noteFiles(lib)) {
     if (f.from.kind === target.kind && f.from.id === target.id) continue;
-    if (f.from.kind === "skill" && !skills.has(f.from.id)) continue;
     let heading: string | null = null;
     for (const line of proseLines(readFileSync(f.path, "utf8"))) {
       const h = line.match(/^#{1,6}\s+(.*)$/);

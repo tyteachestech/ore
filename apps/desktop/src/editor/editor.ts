@@ -46,6 +46,8 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     .use(notionKeys)
     // Before the presets' own rules, which would take a shortcut first and do it otherwise.
     .use(notionRules)
+    // Before the tables' own paste, which spreads lines pasted in a cell over the cells after it.
+    .use(pastePlain)
     // Without it an empty paragraph saves as nothing, not as a `<br />` line.
     .use(commonmark.filter((p) => !remarkPreserveEmptyLinePlugin.includes(p)))
     .use(gfm)
@@ -58,7 +60,6 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     .use(alonePlugin)
     .use(emptyHints)
     .use(pasteLink)
-    .use(pastePlain)
     .use(clipboard)
     .use(plugins)
     .create()

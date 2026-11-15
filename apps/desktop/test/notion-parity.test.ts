@@ -354,13 +354,27 @@ describe("paste", () => {
     expect(await md("‸", { paste: "Term\tValue\tNotes\nChain\t2\tFixed stages\nAgent\t3\tDynamic choices" })).toBe(
       "| Term  | Value | Notes           |\n| ----- | ----- | --------------- |\n| Chain | 2     | Fixed stages    |\n| Agent | 3     | Dynamic choices |",
     );
-    // Lines indented with tabs keep their lines and their indentation.
+    // Lines indented with tabs, and no Markdown, keep their lines and tabs in a code block: plain tabs in the
+    // file, which any Markdown editor reads as written (a tab leading a paragraph would be lost or escaped).
     const outline = await md("‸", { paste: "Plan\n\tClaim\n\t\tEvidence\nEnd" });
-    expect(outline.split("\n").filter(Boolean).map((l) => l.replace(/&#x9;|\t/g, "\t"))).toEqual(["Plan", "\tClaim", "\t\tEvidence", "End"]);
+    expect(outline).toBe("```\nPlan\n\tClaim\n\t\tEvidence\nEnd\n```");
+    expect(await md(outline)).toBe(outline);
     // Every line indented by one tab is indentation, not a table with an empty first column.
     expect(await md("‸", { paste: "\tfoo\n\tbar" })).not.toContain("|");
-    // And reopen the same: a leading tab is saved as `&#x9;`, never read back as a code block.
-    expect(await md(outline)).toBe(outline);
+  });
+
+  test("Markdown with tabs pastes as its Markdown: an Obsidian list, a fenced block, a list with tabs in it (Codex sweep 5 review)", async () => {
+    expect(await md("‸", { paste: "- a\n\t- b\n\t\t- c" })).toBe("- a\n  - b\n    - c");
+    expect(await md("‸", { paste: "```py\ndef f():\n\treturn 1\n```" })).toBe("```py\ndef f():\n\treturn 1\n```");
+    expect(await md("‸", { paste: "- a\tb\n- c\td" })).not.toContain("|");
+    // Code with its comments lined up by tabs is no table either.
+    expect(await md("‸", { paste: "const a = 1;\t// one\nconst b = 2;\t// two" })).not.toContain("|");
+  });
+
+  test("tab-separated text pasted in a table cell goes in the cell, on its line (Codex sweep 5 review)", async () => {
+    const out = await md("| A | B |\n| - | - |\n| ‸ | x |", { paste: "one\ttwo\nthree" });
+    expect(out.split("\n")).toHaveLength(3);
+    expect(out.split("\n")[2]).toMatch(/^\| one\ttwo three +\| x +\|$/);
   });
 
   test("in a code block a paste stays code", async () => {

@@ -76,8 +76,11 @@ describe("backlinks (D39)", () => {
     const { lib, a } = await setup();
     await setNotes(lib, { skill: "teaching" }, `See [spacing](ore:item/${a.id}).\n`);
     expect(backlinks(lib, { kind: "item", id: a.id }).map((l) => l.from.id)).toEqual(["teaching"]);
+    await setNotes(lib, { skill: "teaching" }, `See [spacing](ore:item/${a.id}) and [gone](ore:skill/old).\n`);
     const { removed } = await removeSkill(lib, "teaching");
     expect(backlinks(lib, { kind: "item", id: a.id })).toEqual([]);
+    // Nor does `ore doctor` report a broken link in a note no skill can open.
+    expect(brokenLinks(lib)).toEqual([]);
     // The note stays on disk, and its link is back once the skill is.
     expect(existsSync(skillNotesPath(lib, "teaching"))).toBe(true);
     await restoreSkill(lib, removed);

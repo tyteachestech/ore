@@ -303,6 +303,9 @@ export function useAudio(file: string | undefined, id: string): Player {
       persist();
       a.pause();
       for (const [k, f] of Object.entries(on)) a.removeEventListener(k, f);
+      // A file still on its way is let go (after its listeners, so the abort says nothing), so Try again's new
+      // element isn't one of two waiting on it.
+      if (!loaded) (a.removeAttribute("src"), a.load());
       el.current = null;
     };
   }, [file, posKey, start, attempt]);
@@ -332,7 +335,7 @@ export function useAudio(file: string | undefined, id: string): Player {
 }
 
 /** True once `on` has held for `ms`. */
-function useAfter(on: boolean, ms: number) {
+export function useAfter(on: boolean, ms: number) {
   const [after, setAfter] = useState(false);
   useEffect(() => {
     setAfter(false);
@@ -340,7 +343,8 @@ function useAfter(on: boolean, ms: number) {
     const t = setTimeout(() => setAfter(true), ms);
     return () => clearTimeout(t);
   }, [on, ms]);
-  return after;
+  // Not `after` alone: it stays true for the one render before the effect above clears it.
+  return on && after;
 }
 
 export function clock(sec: number): string {
@@ -441,7 +445,7 @@ export function VideoPlayer({ player, title, onFinish, onOpen, audio = false, ow
       {audio ? (
         player.error === -3 ? (
           <div className="video-error">
-            The recording hasn’t loaded. Its transcript is below.
+            {owed ? "This episode hasn’t loaded. Its transcript is on its way." : "The recording hasn’t loaded. Its transcript is below."}
             <button onClick={player.retry}>Try again</button>
           </div>
         ) : player.error !== null ? (

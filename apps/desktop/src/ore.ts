@@ -33,11 +33,20 @@ export const ore = <T,>(...args: string[]): Promise<T> => oreWith<T>(null, ...ar
  *  Review or a list keeps no stale row or number (Codex sweeps 3 and 4). */
 export const oreWith = <T,>(stdin: string | null, ...args: string[]): Promise<T> =>
   oreJob<T>(null, stdin, ...args).then((r) => {
-    // A goal setting too (Codex sweep 4): Home, Today and an open Review count toward the new one, and so does its Undo.
-    // And a skill renamed, deleted or put back (Codex sweep 5): a note's Linked from names the skills that link to it.
-    if (args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore")) || (args[0] === "skills" && ["set", "rm", "restore", "archive"].includes(args[1]!))) wakeOpenScreens();
+    if (wakesScreens(args)) wakeOpenScreens();
     return r;
   });
+
+/** Whether a write's `ore` arguments change what other open screens show, so they read again. */
+export function wakesScreens(args: string[]): boolean {
+  // A goal setting too (Codex sweep 4): Home, Today and an open Review count toward the new one, and so does its Undo.
+  // And a skill or source renamed, a skill deleted or put back (Codex sweep 5): a note's Linked from names what links
+  // to it. A skill's other settings (goal, colour, icon, priority) leave the names alone, so they wake nothing more.
+  const has = (flag: string) => args.some((a) => a === flag || a.startsWith(`${flag}=`));
+  if (args[0] === "skills") return ["rm", "restore", "archive"].includes(args[1]!) || (args[1] === "set" && has("--name"));
+  if (args[0] === "edit") return has("--title");
+  return args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"));
+}
 
 
 /** `ore` run under the name `job`, which `cancelOre(job)` stops (Cancel on an add). */

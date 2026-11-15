@@ -1,7 +1,7 @@
 import { InputRule, undoInputRule } from "@milkdown/kit/prose/inputrules";
 import { keydownHandler, keymap } from "@milkdown/kit/prose/keymap";
 import { lift, setBlockType } from "@milkdown/kit/prose/commands";
-import { Fragment, type ResolvedPos, Slice } from "@milkdown/kit/prose/model";
+import type { ResolvedPos } from "@milkdown/kit/prose/model";
 import { splitListItem } from "@milkdown/kit/prose/schema-list";
 import { type Command, type EditorState, NodeSelection, Plugin, TextSelection } from "@milkdown/kit/prose/state";
 import { Decoration, DecorationSet } from "@milkdown/kit/prose/view";
@@ -327,20 +327,29 @@ export const pasteLink = $prose(
     }),
 );
 
+/** A line that starts a Markdown block (a list item, heading, quote, fence or table row): text holding one is
+ *  Markdown, pasted as Markdown, whatever tabs it has (an Obsidian list is indented with them). */
+const BLOCK = /^\s*(?:[-*+] |\d+[.)] |#{1,6} |>|```|~~~|\|)/;
+/** A cell that starts a code comment: tab-aligned comments are code, not columns. */
+const COMMENT = /^(?:\/\/|\/\*|# |-- )/;
+const linesOf = (text: string) => text.replace(/\r\n?/g, "\n").replace(/\n+$/, "").split("\n");
+
 /** Rows of tab-separated cells, as a spreadsheet's plain text gives them: two or more lines, each with
- *  the same number of tabs. Null for any other text. */
+ *  the same number of tabs, none of them Markdown or code. Null for any other text. */
 export function tsvRows(text: string): string[][] | null {
-  const lines = text.replace(/\r\n?/g, "\n").replace(/\n+$/, "").split("\n");
+  const lines = linesOf(text);
   const tabs = (l: string) => l.split("\t").length - 1;
-  if (lines.length < 2 || !tabs(lines[0]!) || lines.some((l) => tabs(l) !== tabs(lines[0]!))) return null;
+  if (lines.length < 2 || !tabs(lines[0]!) || lines.some((l) => tabs(l) !== tabs(lines[0]!) || BLOCK.test(l))) return null;
   // Every line starting with a tab is indentation (code, an outline), not a first column.
   if (lines.every((l) => l.startsWith("\t"))) return null;
-  return lines.map((l) => l.split("\t").map((c) => c.trim()));
+  const rows = lines.map((l) => l.split("\t").map((c) => c.trim()));
+  return rows.some((r) => r.some((c) => COMMENT.test(c))) ? null : rows;
 }
 
-/** Plain text the Markdown paste would garble: tab-separated rows paste as a table (Notion, Google Docs),
- *  and lines indented with tabs paste one block per line with their tabs kept, where Markdown would run
- *  them together. Text with HTML beside it, and code blocks, keep their own paste. */
+/** Plain text the Markdown paste would garble (Codex sweep 5): tab-separated rows paste as a table (Notion,
+ *  Google Docs); other lines indented with tabs, and no Markdown, paste as a code block, which keeps their
+ *  lines and plain tabs in the file. In a table cell either goes in on the cell's one line. Markdown, text
+ *  with HTML or VS Code's data beside it, and a paste into code keep their own paste. */
 export const pastePlain = $prose(
   () =>
     new Plugin({
@@ -348,20 +357,23 @@ export const pastePlain = $prose(
         handlePaste: (view, e) => {
           const text = e.clipboardData?.getData("text/plain") ?? "";
           const { schema, selection } = view.state;
-          if (!text.includes("\t") || e.clipboardData?.getData("text/html") || selection.$from.parent.type.spec.code) return false;
-          const n = schema.nodes;
-          const para = (t: string) => n.paragraph!.create(null, t ? schema.text(t) : null);
-          const rows = tsvRows(text);
-          if (rows && n.table && !inTable(selection.$from)) {
-            const row = (cells: string[], head: boolean) =>
-              (head ? n.table_header_row : n.table_row)!.create(null, cells.map((c) => (head ? n.table_header : n.table_cell)!.create({ alignment: null }, para(c))));
-            const table = n.table.create(null, rows.map((r, i) => row(r, i === 0)));
-            view.dispatch(view.state.tr.replaceSelectionWith(table).scrollIntoView());
+          if (!text.includes("\t") || e.clipboardData?.getData("text/html") || e.clipboardData?.getData("vscode-editor-data") || selection.$from.parent.type.spec.code) return false;
+          const lines = linesOf(text);
+          if (inTable(selection.$from)) {
+            view.dispatch(view.state.tr.insertText(lines.map((l) => l.trim()).filter(Boolean).join(" ")).scrollIntoView());
             return true;
           }
-          if (!/^\t/m.test(text)) return false;
-          const lines = text.replace(/\r\n?/g, "\n").replace(/\n+$/, "").split("\n");
-          view.dispatch(view.state.tr.replaceSelection(new Slice(Fragment.from(lines.map(para)), 1, 1)).scrollIntoView());
+          const n = schema.nodes;
+          const rows = tsvRows(text);
+          if (rows && n.table) {
+            const para = (t: string) => n.paragraph!.create(null, t ? schema.text(t) : null);
+            const row = (cells: string[], head: boolean) =>
+              (head ? n.table_header_row : n.table_row)!.create(null, cells.map((c) => (head ? n.table_header : n.table_cell)!.create({ alignment: null }, para(c))));
+            view.dispatch(view.state.tr.replaceSelectionWith(n.table.create(null, rows.map((r, i) => row(r, i === 0)))).scrollIntoView());
+            return true;
+          }
+          if (!lines.some((l) => l.startsWith("\t")) || lines.some((l) => BLOCK.test(l)) || !n.code_block) return false;
+          view.dispatch(view.state.tr.replaceSelectionWith(n.code_block.create(null, schema.text(lines.join("\n")))).scrollIntoView());
           return true;
         },
       },
