@@ -3890,6 +3890,8 @@ journey("Undo of taking a source off a skill puts each exercise's own skills bac
   await page.locator(".skill-picker [cmdk-item]", { hasText: name }).click();
   await page.keyboard.press("Escape");
   await until("it is off the skill", async () => !((await ore("show", item.id)) as { skills: string[] }).skills.includes(skill));
+  // The file changes before the app hears back and puts the step in its history: ⌘Z waits for the toast, as he would.
+  await page.locator(".toast", { hasText: `Removed from ${name}` }).waitFor();
   await page.keyboard.press("Meta+KeyZ");
   await until("Undo files it back", async () => ((await ore("show", item.id)) as { skills: string[] }).skills.includes(skill));
   await until("each exercise has its own skills again", async () => JSON.stringify(await cards()) === JSON.stringify(before));
@@ -13509,11 +13511,15 @@ journey("opening a source: its title stands at once where it will stay, the pane
   await page.evaluate(() => delete (window as Slow).__ORE_SLOW);
   const after = (await page.locator(".reader .doc-head h1").boundingBox())!;
   if (Math.abs(before.x - after.x) > 1 || Math.abs(before.y - after.y) > 1) throw new Error(`the title moved as the text arrived: ${before.x},${before.y} to ${after.x},${after.y}`);
-  // A relaunch: the skills answer late, and the sidebar already shows them with their icons.
-  await page.addInitScript(() => ((window as Slow).__ORE_SLOW = { skills: 1500 }));
+  // A relaunch: the skills haven't answered, and the sidebar already shows them with their icons. The answer is held
+  // until the check, not slowed by a time, so a slow runner's first draw can't outlast it.
+  await page.addInitScript(() => ((window as Slow).__ORE_SLOW = { skills: 60_000 }));
   await page.reload();
-  await page.locator(".sidebar .side-main .mark").first().waitFor({ timeout: 1000 });
-  await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().waitFor({ timeout: 1000 });
+  await page.locator(".sidebar .side-main .mark").first().waitFor();
+  await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().waitFor();
+  const held = await page.evaluate(() => (window as unknown as { __ORE_HELD: string[] }).__ORE_HELD);
+  if (!held.includes("skills")) throw new Error("the skills answered before the sidebar was checked");
+  await release(page, "skills");
 });
 
 journey("a source that fails to open says why and offers Try again, which opens it once the cause is gone (F299)", async (page) => {
