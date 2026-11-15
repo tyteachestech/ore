@@ -62,18 +62,55 @@ const webAudio: Player = (id, { rate, after }) => {
   // Made and woken here, inside his key or click: WebKit leaves a context asleep that was woken outside one.
   audio();
   const due = performance.now() + after * 1000;
-  void buffer(id).then((buf) => {
+  const play = (buf: AudioBuffer | null) => {
     // A sound that loaded too late for its moment is dropped: late, it would land on something else.
     const wait = (due - performance.now()) / 1000;
-    if (!buf || !on || wait < -0.3) return;
+    if (!buf || !on || hidden() || wait < -0.3) return;
     const c = audio(), src = c.createBufferSource(), gain = c.createGain();
     src.buffer = buf;
     src.playbackRate.value = rate;
     gain.gain.value = LEVEL;
     src.connect(gain).connect(c.destination);
-    src.start(c.currentTime + Math.max(0, wait));
-  });
+    const at = c.currentTime + Math.max(0, wait);
+    // A quick fade, not a click, where the next sound cuts this one.
+    const cut = (t: number) => (gain.gain.setTargetAtTime(0, t, 0.01), src.stop(t + 0.05));
+    src.start(FEEDBACK.includes(id) ? take(at, buf.duration / rate, id === "goal", cut) : at);
+  };
+  if (FEEDBACK.includes(id)) void inOrder(buffer(id), play);
+  else void buffer(id).then(play);
 };
+
+/** A hidden window (another app in front, the Mac asleep) hears nothing: a save that lands then is not a moment he sees. */
+const hidden = () => typeof document !== "undefined" && document.hidden;
+
+/** The sounds that answer him during a review. At most one plays at a time: rating fast, each new one cuts the one
+ *  still playing, so they never pile up (four at once, Codex sweep 5); the goal's chime waits for the rating's sound to end. */
+const FEEDBACK: Sfx[] = ["tap", "right", "missed", "goal"];
+type Voice = { start: number; end: number; cut: (at: number) => void };
+/** The tick, recall or miss last placed, and the goal's chime, which may still be waiting its turn. */
+let sounding: Voice | null = null;
+let goal: Voice | null = null;
+/** When a feedback sound asked for `at` (audio clock seconds) and lasting `length` starts. A tick, recall or miss
+ *  starts at once and cuts whatever is sounding then; the goal (`waits`) starts once the sound before it has ended,
+ *  and is never cut while it waits for its turn, only once it is sounding. */
+export function take(at: number, length: number, waits: boolean, cut: (at: number) => void): number {
+  if (waits) {
+    const start = Math.max(at, sounding?.end ?? at);
+    goal = { start, end: start + length, cut };
+    return start;
+  }
+  for (const v of [sounding, goal]) if (v && v.start <= at && v.end > at) v.cut(at);
+  sounding = { start: at, end: at + length, cut };
+  return at;
+}
+/** Feedback sounds are placed in the order they were asked for, not the order their files load: on a cold start an
+ *  older tick must not cut the rating after it, and the goal must see the rating it waits for. */
+let queue: Promise<unknown> = Promise.resolve();
+export function inOrder<T>(load: Promise<T>, place: (v: T) => void): Promise<void> {
+  const turn = queue.then(() => load).then(place, () => {});
+  queue = turn;
+  return turn;
+}
 let player = webAudio;
 /** Tests listen here in place of the speakers. */
 export const setPlayer = (p: Player | null) => void (player = p ?? webAudio);
@@ -84,7 +121,7 @@ export function warm() {
 }
 
 export function sfx(id: Sfx, o: Opts = {}) {
-  if (!on) return;
+  if (!on || hidden()) return;
   // The journeys' ear: `window.__ORE_SFX = []` collects what played.
   if (import.meta.env?.DEV) (globalThis as { __ORE_SFX?: string[] }).__ORE_SFX?.push(id);
   player(id, { rate: o.rate ?? 1, after: o.after ?? 0 });

@@ -54,6 +54,7 @@ import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
 import { paint, unpaint, unpaintAll } from "./paint";
 import { Working } from "./Working";
+import { edgeTurn } from "./edge-turn";
 
 /** Background enrich gets this long after capture before the reader stops waiting for it. */
 const ENRICH_GIVE_UP_MS = 20 * 60_000;
@@ -2676,6 +2677,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   });
 
   const pressedAt = useRef({ x: 0, y: 0 });
+  /** Lets go of the window's ear for a press's release outside the page (below). */
+  const disarm = useRef(() => {});
+  useEffect(() => () => disarm.current(), []);
   const onMouseDown = (e: MouseEvent) => {
     // A click that is not the third of a triple: the double click's sentence is kept now, quietly (no popup,
     // and the selection this click starts is left alone).
@@ -2685,6 +2689,28 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       word.quiet();
     }
     pressedAt.current = { x: e.clientX, y: e.clientY };
+    // A drag begun in the text and let go past the page (the margin beside it, Codex sweep 5): the page never hears
+    // that release, so the window hands it on, and a selection wholly in the source is highlighted all the same.
+    // Only this press's own release: a press that ends some other way (a native drag of the words, a cancelled
+    // pointer, the window losing focus) or the next press lets go of it, as does leaving the source.
+    disarm.current();
+    if (e.button === 0) {
+      const page = e.currentTarget;
+      const up = (ev: globalThis.MouseEvent) => {
+        off();
+        if (!page.contains(ev.target as Node) && !window.getSelection()?.isCollapsed) mouseUp.current(ev);
+      };
+      const ends = ["dragend", "pointercancel", "pointerdown", "blur"] as const;
+      const off = () => {
+        window.removeEventListener("mouseup", up, true);
+        for (const t of ends) window.removeEventListener(t, off, true);
+        disarm.current = () => {};
+      };
+      window.addEventListener("mouseup", up, true);
+      for (const t of ends) window.addEventListener(t, off, true);
+      disarm.current = off;
+    }
+    if (e.button === 0 && !e.ctrlKey && !PHONE && docEl.current?.contains(e.target as Node) && !popupRef.current?.contains(e.target as Node)) turnWhileDragging(e.clientY);
     setFocus(null); // the mouse takes over from the keyboard focus
     if (popup && !popupRef.current?.contains(e.target as Node)) {
       keepNote();
@@ -2694,6 +2720,40 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     if (lookup && !lookupRef.current?.contains(e.target as Node) && !(e.target as Element).closest?.("[data-radix-popper-content-wrapper]")) closeLookUp();
     setTip(null);
   };
+
+  // A drag that selects past the bottom of the text, held there a moment, turns the page and selects on into
+  // the next screen of it (Books, Kindle); at the top, the one before (edge-turn.ts). Off the pane the Mac's
+  // own drag scrolling takes over.
+  const dragTurn = useRef<(() => void) | null>(null);
+  const turnWhileDragging = (from: number) => {
+    const scroller = scrollRef.current;
+    if (!scroller) return;
+    dragTurn.current?.();
+    const turn = edgeTurn({
+      scroller,
+      band,
+      extend: (x, y) => {
+        const sel = window.getSelection();
+        const el = docEl.current;
+        const c = document.caretRangeFromPoint?.(x, y);
+        if (!sel?.rangeCount || !el || !c || !sel.anchorNode || !el.contains(sel.anchorNode) || !el.contains(c.startContainer)) return;
+        sel.extend(c.startContainer, c.startOffset);
+      },
+    });
+    // The way he is selecting: below where he pressed it runs on, above it runs back.
+    const move = (e: globalThis.MouseEvent) => (e.buttons & 1 ? turn.aim(e.clientX, e.clientY, e.clientY >= from ? 1 : -1) : end());
+    const end = () => {
+      turn.stop();
+      if (dragTurn.current === end) dragTurn.current = null;
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", end, true);
+    };
+    dragTurn.current = end;
+    document.addEventListener("mousemove", move);
+    // Before the page's mouseup, so the highlight it keeps is the selection as it stands.
+    document.addEventListener("mouseup", end, true);
+  };
+  useEffect(() => () => dragTurn.current?.(), []);
 
   // One click opens a link (Safari, Readwise Reader): the web in his browser, a footnote or heading
   // in this page. A drag across one selects text instead: no link opens while text is selected.
@@ -2774,8 +2834,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   useEffect(() => dropWord, []);
   // A drag over the text before a long source has finished mounting (its offsets aren't known yet) is
   // kept and highlighted once it has, if the words are still selected, never dropped (Codex sweep 4).
-  const early = useRef<MouseEvent | null>(null);
-  const onMouseUp = (e: MouseEvent) => {
+  const early = useRef<MouseEvent | globalThis.MouseEvent | null>(null);
+  const onMouseUp = (e: MouseEvent | globalThis.MouseEvent) => {
     const el = docEl.current;
     if (!ready && e.button === 0 && !e.ctrlKey && !popupRef.current?.contains(e.target as Node) && !lookupRef.current?.contains(e.target as Node)) early.current = e;
     if (!ready || !el || closedBook || popupRef.current?.contains(e.target as Node) || lookupRef.current?.contains(e.target as Node)) return;
@@ -2835,6 +2895,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       openPopup(id, range, annOf(id)?.note ?? "", { x: e.clientX, y: e.clientY });
     }
   };
+  const mouseUp = useRef(onMouseUp);
+  mouseUp.current = onMouseUp;
   useEffect(() => {
     const e = early.current;
     early.current = null;
@@ -2872,6 +2934,66 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       document.removeEventListener("scroll", settle, true);
     };
   }, []);
+  // iPhone: a selection handle held at the bottom of the text a moment turns the page and the selection runs on
+  // into the next screen, as in Books; its start held at the top turns back (edge-turn.ts). The handles fire no
+  // touch events, so the edge that moved is read from each change of the selection.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!PHONE || !scroller) return;
+    let was: Range | null = null;
+    let side: "start" | "end" = "end";
+    /** The selection as this effect last set it: its own change is no move of his. */
+    let mine: Range | null = null;
+    const turn = edgeTurn({
+      scroller,
+      band,
+      edge: 72, // a finger's handle, and the home indicator below it
+      again: false,
+      extend: (x, y) => {
+        const sel = window.getSelection();
+        const c = document.caretRangeFromPoint?.(x, y);
+        const el = docEl.current;
+        if (!sel?.rangeCount || !c || !el || !el.contains(c.startContainer)) return;
+        const r = sel.getRangeAt(0).cloneRange();
+        if (side === "end") r.setEnd(c.startContainer, c.startOffset);
+        else r.setStart(c.startContainer, c.startOffset);
+        if (r.collapsed) return;
+        sel.setBaseAndExtent(r.startContainer, r.startOffset, r.endContainer, r.endOffset);
+        mine = r;
+        was = r.cloneRange();
+      },
+    });
+    const onChange = () => {
+      const sel = window.getSelection();
+      const el = docEl.current;
+      const r = sel?.rangeCount ? sel.getRangeAt(0) : null;
+      if (!r || r.collapsed || !el || !el.contains(r.startContainer) || !el.contains(r.endContainer)) {
+        was = null;
+        return turn.stop();
+      }
+      const same = (a: Range | null) => !!a && r.compareBoundaryPoints(Range.START_TO_START, a) === 0 && r.compareBoundaryPoints(Range.END_TO_END, a) === 0;
+      if (same(mine)) return void (mine = null);
+      mine = null;
+      // Only a handle he moved turns the page: a new selection (a long press on the last line) never does.
+      const prev = was;
+      was = r.cloneRange();
+      if (!prev) return void (side = "end");
+      const sameStart = r.compareBoundaryPoints(Range.START_TO_START, prev) === 0;
+      const sameEnd = r.compareBoundaryPoints(Range.END_TO_END, prev) === 0;
+      if (sameStart && sameEnd) return;
+      side = !sameStart && sameEnd ? "start" : "end";
+      const rects = [...r.getClientRects()].filter((b) => b.width > 0 && b.height > 0);
+      const b = side === "end" ? rects.at(-1) : rects[0];
+      if (!b) return;
+      turn.aim(side === "end" ? b.right - 1 : b.left + 1, b.top + b.height / 2, side === "end" ? 1 : -1);
+    };
+    document.addEventListener("selectionchange", onChange);
+    return () => {
+      turn.stop();
+      document.removeEventListener("selectionchange", onChange);
+    };
+  }, [!!doc]); // the pane mounts with the source
+
   const highlightSelection = (intent: Intent) => {
     const r = touchRange.current;
     touchRange.current = null;
@@ -3575,6 +3697,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                   setRepaint((n) => n + 1);
                 }}
                 onDrop={(r, was) => void dropEdge(id, r, was)}
+                band={band}
               />
             );
           })()}

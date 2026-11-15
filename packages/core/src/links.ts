@@ -46,7 +46,8 @@ export interface NoteFile {
   path: string;
 }
 
-// Every note in the library: each source's My notes, then each skill's note.
+// Every note in the library: each source's My notes, then each skill's note. A deleted skill's note stays on disk
+// but has no skill to open it from, so it is left out (of backlinks and `ore doctor`) until the skill comes back.
 export function noteFiles(lib: Library): NoteFile[] {
   const out: NoteFile[] = [];
   for (const dir of itemDirs(lib)) {
@@ -59,7 +60,8 @@ export function noteFiles(lib: Library): NoteFile[] {
   const root = paths.skillNotes(lib);
   for (const id of subdirs(root)) {
     const path = skillNotesPath(lib, id);
-    if (existsSync(path)) out.push({ from: { kind: "skill", id, title: names.get(id) ?? id }, path });
+    const title = names.get(id);
+    if (title !== undefined && existsSync(path)) out.push({ from: { kind: "skill", id, title }, path });
   }
   return out;
 }

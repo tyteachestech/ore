@@ -8,7 +8,7 @@ import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { escTaken, Hint } from "./Hint";
-import { Trap } from "./Trap";
+import { onBackdrop, Trap } from "./Trap";
 import { comboOf, label, rebind, useKeymap } from "./keys";
 import { ore, opt, PHONE } from "./ore";
 import { setSounds, useSounds } from "./sfx";
@@ -228,7 +228,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
 
   return (
     // A large sheet over the app (ChatGPT's settings): the app shows in the margin around it, and a click there closes it.
-    <div className="settings" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="settings" onMouseDown={onBackdrop(onClose)}>
       <div className="titlebar" data-tauri-drag-region />
       <Trap>
       <div className="settings-sheet" ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Settings">
