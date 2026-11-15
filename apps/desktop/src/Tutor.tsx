@@ -15,7 +15,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import { mend } from "./mend";
 import { CodeBlock } from "./Code";
-import remarkGfm from "remark-gfm";
+import { aiMath, reply as math } from "./math-md";
 import { Evidence } from "./Evidence";
 import { SkillIcon } from "./IconPicker";
 import { Grow } from "./Grow";
@@ -249,12 +249,12 @@ export function useTutorChat(notify: Notify) {
     const i = now.current.findIndex((t) => t.id === id);
     if (i < 0) return;
     const old = now.current[i]!;
-    const { item, title, pointed, files } = old;
+    const { item, at, title, pointed, files } = old;
     const message = edited ?? old.message;
     // An @ he took out of the message no longer points it.
     const mentions = old.mentions?.filter((m) => message.includes(`@${m.name}`));
     stepsShown.delete(id); // a new reply starts its steps from the first
-    const t: TutorTurn = { id, message, item, title, ...(mentions?.length ? { mentions } : {}), pointed, ...(files?.length ? { files } : {}), ...shelve(old) };
+    const t: TutorTurn = { id, message, item, ...(at ? { at } : {}), title, ...(mentions?.length ? { mentions } : {}), pointed, ...(files?.length ? { files } : {}), ...shelve(old) };
     update((ts) => ts.map((x) => (x.id === id ? t : x)));
     save();
     void run(t, now.current.slice(0, i));
@@ -1029,14 +1029,14 @@ function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }
   }), [citations]);
   return (
     <>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-        {citeRuns(text)}
+      <ReactMarkdown {...math} components={components}>
+        {citeRuns(aiMath(text))}
       </ReactMarkdown>
       {!!steps?.length && id && (
         <Steps id={id} steps={steps} onDone={onSteps}>
           {(s) => (
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-              {citeRuns(s)}
+            <ReactMarkdown {...math} components={components}>
+              {citeRuns(aiMath(s))}
             </ReactMarkdown>
           )}
         </Steps>
