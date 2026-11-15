@@ -14359,6 +14359,81 @@ journey("list search: Back to the list brings its search and filters back (F-new
   await until("the skill page's search is its own, empty", async () => (await field.count()) === 0 || (await field.inputValue()) === "");
 });
 
+/** What the mole and the ambience radio cover once every scroller on screen is at its end: text, a control or a picture
+ * a person would need, drawn where the pointer would land on the round button instead (Notion's ? and Intercom's bubble
+ * keep their corner clear the same way). */
+async function underTheCorners(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    for (const el of document.querySelectorAll<HTMLElement>("*")) {
+      const o = getComputedStyle(el).overflowY;
+      if ((o === "auto" || o === "scroll") && el.scrollHeight > el.clientHeight) el.scrollTop = el.scrollHeight;
+    }
+    const corners = [...document.querySelectorAll<HTMLElement>(".tutor-bubble, .radio-orb")].filter((c) => c.getClientRects().length);
+    const hit: string[] = [];
+    for (const c of corners) {
+      const r = c.getBoundingClientRect();
+      for (let x = r.left + 4; x < r.right - 4; x += 6)
+        for (let y = r.top + 4; y < r.bottom - 4; y += 6) {
+          if (Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)) > r.width / 2) continue;
+          for (const el of document.elementsFromPoint(x, y)) {
+            if (el === document.documentElement || el === document.body || c.contains(el) || el.closest(".radio-tag")) continue;
+            const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent!.trim());
+            const thing = own || el.matches("button, a, input, textarea, img, svg, [role=button], [role=checkbox]");
+            if (!thing || getComputedStyle(el).visibility === "hidden") continue;
+            const name = `${el.tagName.toLowerCase()}.${[...el.classList].join(".")} "${(el.textContent ?? "").trim().slice(0, 30)}"`;
+            if (!hit.includes(name)) hit.push(name);
+          }
+        }
+    }
+    return hit;
+  });
+}
+
+journey("the mole and the ambience radio never cover the last of a screen: every scroller ends clear of the bottom corners (round 6 pick 11)", async (page) => {
+  // At the usual size and at the smallest window the app allows (720 × 480).
+  const check = async (where: string) => {
+    const size = page.viewportSize()!;
+    for (const [width, height] of [[size.width, size.height], [720, 480]] as const) {
+      await page.setViewportSize({ width, height });
+      await Bun.sleep(300);
+      const hit = await underTheCorners(page);
+      if (hit.length) throw new Error(`${where} at ${width} × ${height}: under the corners at the end: ${hit.join("; ")}`);
+    }
+    await page.setViewportSize(size);
+  };
+  await page.getByRole("button", { name: /^Home/ }).click();
+  await page.locator(".home").waitFor();
+  await check("Home");
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".row").first().waitFor();
+  await check("All sources");
+  await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().click();
+  await page.locator(".skill-col").first().waitFor();
+  await check("a skill page");
+  await openSource(page, TESTING);
+  await check("a source");
+  // Twenty posts, enough to scroll the Feed's list, with a post open beside it.
+  const server = Bun.serve({ port: 0, fetch: (r: Request): Response => new URL(r.url).pathname === "/feed.xml"
+    ? new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Corners</title><link>http://localhost/</link>${Array.from({ length: 20 }, (_, i) => `<item><title>Post number ${i + 1} on learning</title><link>http://localhost:${server.port}/p${i}.html</link><pubDate>${new Date(Date.now() - i * 864e5).toUTCString()}</pubDate></item>`).join("")}</channel></rss>`, { headers: { "content-type": "application/rss+xml" } })
+    : new Response(`<html><head><title>Post</title></head><body><article><h1>Post on learning</h1>${"<p>Retrieval practice is the act of pulling information out of memory rather than putting it back in.</p>".repeat(12)}</article></body></html>`, { headers: { "content-type": "text/html" } }) });
+  try {
+    await ore("feed", "follow", `http://localhost:${server.port}/feed.xml`, "--skill=teaching");
+    await page.getByRole("button", { name: "Feed", exact: true }).click();
+    await page.locator(".row.post").first().waitFor();
+    await check("the Feed");
+    await page.locator(".row.post").nth(1).click();
+    await page.locator(".reader .doc").waitFor();
+    await check("a post beside the Feed");
+  } finally {
+    server.stop(true);
+  }
+  await startReview(page, null, true);
+  await check("Review");
+  await page.keyboard.press("Space");
+  await check("Review, its answer shown");
+  await page.keyboard.press("Escape");
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
