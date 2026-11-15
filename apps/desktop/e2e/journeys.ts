@@ -3000,6 +3000,67 @@ journey("highlight: an edge he dragged is his, so Esc keeps the highlight and �
   await until("⌘Z puts the edge back", async () => (await kept()).includes("That might mean not building"));
 });
 
+/** A long source of numbered passages, for the journeys that select past the screen's edge. */
+const longPassages = (title: string) =>
+  `# ${title}\n\n${Array.from({ length: 40 }, (_, i) => `Passage ${i + 1} goes on about recall and spacing, long enough to wrap across a couple of lines of the reading column.`).join("\n\n")}\n`;
+
+/** Drags from a passage low on the screen to its bottom edge and holds there (Books, Kindle): after a moment the
+ *  page turns and the highlight runs on into the next screen. */
+async function selectPastTheEdge(page: Page, knob = false) {
+  const dir = mkdtempSync(join(tmpdir(), "ore-edge-"));
+  const file = join(dir, "edge.md");
+  writeFileSync(file, longPassages("A passage across the page"));
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "A passage across the page");
+    await page.locator(".doc p", { hasText: "Passage 40 " }).waitFor();
+    await page.waitForTimeout(300);
+    const pane = page.locator(".reader-scroll");
+    const top = () => pane.evaluate((e) => e.scrollTop);
+    const at = await page.evaluate(() => {
+      const b = document.querySelector<HTMLElement>(".reader-scroll")!.getBoundingClientRect();
+      const ps = [...document.querySelectorAll<HTMLElement>(".doc p")];
+      const p = ps.find((p) => p.getBoundingClientRect().top > b.top + b.height / 2 && p.getBoundingClientRect().bottom < b.bottom - 80)!;
+      const last = ps.findLast((p) => p.getBoundingClientRect().top < b.bottom)!;
+      const r = p.getBoundingClientRect();
+      const n = (e: HTMLElement) => Number(e.textContent!.match(/Passage (\d+)/)![1]);
+      return { x: r.left + 1, y: r.top + 6, x2: r.left + r.width / 2, bottom: b.bottom, from: n(p), last: n(last) };
+    });
+    const kept = () => page.evaluate(() => [...(CSS.highlights.get("hl-keep") ?? [])].map((r) => r.toString()));
+    if (knob) {
+      // A highlight's end knob (D117) dragged there carries it on the same way.
+      await select(page, `Passage ${at.from} goes on`); // scrolls it to the middle
+      await until("the highlight is saved", async () => (await kept()).includes(`Passage ${at.from} goes on`));
+      at.last = await page.evaluate(() => {
+        const b = document.querySelector<HTMLElement>(".reader-scroll")!.getBoundingClientRect();
+        const last = [...document.querySelectorAll<HTMLElement>(".doc p")].findLast((p) => p.getBoundingClientRect().top < b.bottom)!;
+        return Number(last.textContent!.match(/Passage (\d+)/)![1]);
+      });
+      const k = (await page.locator(".grab-edge.end").boundingBox())!;
+      await page.mouse.move(k.x + k.width / 2, k.y + k.height / 2);
+    } else await page.mouse.move(at.x, at.y);
+    const was = await top();
+    await page.mouse.down();
+    // Above the last 20px, where the browser scrolls a drag by itself at once.
+    await page.mouse.move(at.x2, at.bottom - 28, { steps: 8 });
+    await page.waitForTimeout(300);
+    if ((await top()) !== was) throw new Error("the page turned the moment the drag reached the edge, before any pause");
+    await until("held at the bottom, the page turns", async () => (await top()) > was + 300, 3000);
+    await page.waitForTimeout(500); // the turn lands
+    await page.mouse.up();
+    const beyond = `Passage ${at.last + 2} `;
+    await until("the highlight runs from where the drag began into the next screen", async () => (await kept()).some((t) => t.startsWith(`Passage ${at.from} `) && t.includes(beyond)));
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+journey("highlight: a drag held at the bottom of the screen turns the page after a moment and the highlight runs on (Books)", (page) => selectPastTheEdge(page));
+journey("highlight: in WebKit too, a drag held at the bottom of the screen turns the page and the highlight runs on", (page) => selectPastTheEdge(page), "webkit");
+journey("highlight: a highlight's end knob held at the bottom of the screen turns the page and the highlight runs on", (page) => selectPastTheEdge(page, true));
+
 journey("highlight note: what he types is kept when he clicks away or presses Esc, and after a reload", async (page) => {
   await openSource(page, AGENTS);
   const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
@@ -3850,6 +3911,8 @@ journey("Undo of taking a source off a skill puts each exercise's own skills bac
   await page.locator(".skill-picker [cmdk-item]", { hasText: name }).click();
   await page.keyboard.press("Escape");
   await until("it is off the skill", async () => !((await ore("show", item.id)) as { skills: string[] }).skills.includes(skill));
+  // The file changes before the app hears back and puts the step in its history: ⌘Z waits for the toast, as he would.
+  await page.locator(".toast", { hasText: `Removed from ${name}` }).waitFor();
   await page.keyboard.press("Meta+KeyZ");
   await until("Undo files it back", async () => ((await ore("show", item.id)) as { skills: string[] }).skills.includes(skill));
   await until("each exercise has its own skills again", async () => JSON.stringify(await cards()) === JSON.stringify(before));
@@ -10784,8 +10847,8 @@ journey("sidebar: its edge drags to resize between a min and a max, Esc puts it 
   await settle("dragged wider, the sidebar and the content follow", 300);
   await drag(1000);
   await settle("it stops at its max (360 in a 1280 window)", 360);
-  await drag(40);
-  await settle("it stops at its min (180)", 180);
+  await drag(120);
+  await settle("it stops at its min (180), short of where it folds (D304)", 180);
   const sideways = await side.evaluate((n) => n.scrollWidth - n.clientWidth);
   if (sideways > 0) throw new Error(`at its min the sidebar scrolls ${sideways}px sideways`);
   await drag(300);
@@ -12604,6 +12667,48 @@ journey("phone: a recording plays from a bar above the bottom bar, its timestamp
   if (left < 0) throw new Error(`a timestamp starts at x ${Math.round(left)}, off the screen`);
 }, "phone");
 
+journey("phone: a selection handle held at the bottom of the screen turns the page after a moment and the selection runs on (Books)", async (page) => {
+  const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
+  const md = longPassages("Passages on the phone");
+  await phoneWith(page, async () => (await createItem({ root: PHONE_LIB }, { type: "article", title: "Passages on the phone", body: md.slice(md.indexOf("Passage 1 ")) })).dir, async () => {
+    await phoneSource(page, "Passages on the phone");
+    await page.locator(".phone-reader .doc p", { hasText: "Passage 40 " }).waitFor();
+    await page.waitForTimeout(400);
+    const pane = page.locator(".phone-reader .reader-scroll");
+    const top = () => pane.evaluate((e) => e.scrollTop);
+    const was = await top();
+    // As iOS's handles move it: a word selected, then the selection's end dragged down to a word at the bottom of the screen.
+    const start = await page.evaluate(() => {
+      const b = document.querySelector<HTMLElement>(".phone-reader .reader-scroll")!.getBoundingClientRect();
+      const ps = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")];
+      const p = ps.find((p) => p.getBoundingClientRect().top > b.top + b.height / 2)!;
+      const t = p.firstChild as Text;
+      getSelection()!.setBaseAndExtent(t, 0, t, 7);
+      return Number(p.textContent!.match(/Passage (\d+)/)![1]);
+    });
+    await page.waitForTimeout(150); // a change of its own: a new selection alone never turns the page
+    const from = await page.evaluate((n) => {
+      const b = document.querySelector<HTMLElement>(".phone-reader .reader-scroll")!.getBoundingClientRect();
+      const ps = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")];
+      const t = ps.find((p) => p.textContent!.startsWith(`Passage ${n} `))!.firstChild as Text;
+      const end = ps.find((q) => q.getBoundingClientRect().bottom > b.bottom - 40)!;
+      const c = document.caretRangeFromPoint(end.getBoundingClientRect().left + 20, Math.min(end.getBoundingClientRect().bottom, b.bottom) - 30)!;
+      getSelection()!.setBaseAndExtent(t, 0, c.startContainer, c.startOffset);
+      return { n, last: Number(end.textContent!.match(/Passage (\d+)/)![1]) };
+    }, start);
+    await page.waitForTimeout(300);
+    if ((await top()) !== was) throw new Error("the page turned before any pause");
+    await until("held at the bottom, the page turns", async () => (await top()) > was + 300, 3000);
+    await page.waitForTimeout(500);
+    const sel = await page.evaluate(() => getSelection()!.toString());
+    if (!sel.startsWith(`Passage ${from.n} `) || !sel.includes(`Passage ${from.last + 2} `)) throw new Error(`the selection didn't run on with the page: “${sel.slice(0, 60)}…${sel.slice(-60)}”`);
+    // Its handle held still sends nothing, so it can't be told from a lifted finger: one turn per move, never a run to the end.
+    const turned = await top();
+    await page.waitForTimeout(1500);
+    if ((await top()) !== turned) throw new Error("the page kept turning by itself after one turn, with no move of the handle");
+  });
+}, "phone");
+
 journey("phone: a video stays pinned under the top bar while its transcript scrolls", async (page) => {
   const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
   const lines = Array.from({ length: 30 }, (_, i) => `Line ${i + 1} of the talk, long enough to wrap onto a second line on a phone.`);
@@ -13387,6 +13492,141 @@ journey("feed: a post reads beside the list, J and K step through the posts, and
   }
 });
 
+// —— Codex sweep 5 (docs/reviews/2026-11-15-codex-sweep-5) ——
+
+journey("feed: Esc back from a post low in a long list keeps that post in view (sweep 5, F303)", async (page) => {
+  const stamp = Date.now();
+  const titles = Array.from({ length: 30 }, (_, i) => `Long feed ${i + 1} ${stamp}`);
+  const server: ReturnType<typeof Bun.serve> = Bun.serve({ port: 0, fetch: (r: Request): Response => {
+    const path = new URL(r.url).pathname;
+    if (path === "/feed.xml") return new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Long ${stamp}</title><link>http://localhost/</link>${titles.map((t, i) => `<item><title>${t}</title><link>http://localhost:${server.port}/p${i}.html</link><pubDate>${new Date(Date.now() - i * 3600_000).toUTCString()}</pubDate></item>`).join("")}</channel></rss>`, { headers: { "content-type": "application/rss+xml" } });
+    const t = titles[Number(path.match(/p(\d+)/)?.[1] ?? 0)]!;
+    return new Response(`<html><head><title>${t}</title></head><body><article><h1>${t}</h1>${"<p>Space the practice out, then test yourself before you look back at the page.</p>".repeat(6)}</article></body></html>`, { headers: { "content-type": "text/html" } });
+  } });
+  const url = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", url);
+    await page.getByRole("button", { name: "Feed", exact: true }).click();
+    const row = page.locator(".row.post").filter({ hasText: titles[24] });
+    await row.scrollIntoViewIfNeeded();
+    await row.click();
+    await until("the post opens beside the list", async () => (await page.locator(".feed-col .row.post.open").innerText().catch(() => "")).includes(titles[24]!));
+    await page.locator(".feed-read p").filter({ hasText: "Space the practice" }).first().waitFor();
+    await page.keyboard.press("Escape");
+    await until("the whole list is back", async () => (await page.locator(".feed-split").count()) === 0);
+    await page.waitForTimeout(200);
+    const box = await row.boundingBox();
+    if (!box || box.y < 0 || box.y + box.height > 800) throw new Error(`the post just read is out of view after Esc (top ${box?.y})`);
+  } finally {
+    await ore("feed", "unfollow", url);
+    server.stop();
+  }
+});
+
+journey("add: the footer's ↵ Add is a button, so a pointer adds typed text; ↵ Follow follows a feed's own link (sweep 5, F306)", async (page) => {
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByRole("dialog", { name: "Add a source" });
+  await box.getByLabel("Link, file path or text").fill("# Added by pointer\n\nA pointer user adds what he typed with one click on the footer's Add.");
+  await box.getByRole("button", { name: /^↵\s*Add$/ }).click();
+  await page.locator(".doc").getByText("A pointer user adds what he typed").waitFor();
+  const stamp = Date.now();
+  const server = Bun.serve({ port: 0, fetch: () => new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Pointer ${stamp}</title><link>http://localhost/</link><item><title>Pointer post ${stamp}</title><link>http://localhost/p</link><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } }) });
+  const url = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await box.getByLabel("Link, file path or text").fill(url);
+    await box.getByRole("button", { name: /^↵\s*Follow$/ }).click();
+    await box.waitFor({ state: "detached" });
+    await until("the feed is followed", async () => ((await ore("feed")) as { feeds: { url: string }[] }).feeds.some((f) => f.url === url));
+  } finally {
+    await ore("feed", "unfollow", url).catch(() => {});
+    server.stop();
+  }
+});
+
+journey("Edit skill: a click outside saves the typed name, as Enter does (D211, sweep 5, F307)", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit skill Creativity" });
+  await dialog.getByLabel("Rename Creativity").fill("Creative pointer"); // the name opens in edit
+  await page.mouse.click(1200, 760); // the dimmed page around the editor
+  await dialog.waitFor({ state: "detached" });
+  await until("the sidebar shows the new name", async () => (await page.locator(".sidebar .side-item", { hasText: "Creative pointer" }).count()) === 1);
+  await settled(page);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the old name back", async () => (await page.locator(".sidebar .side-item", { hasText: "Creativity" }).count()) === 1);
+});
+
+journey("Settings: a click outside the sheet saves the review plan he typed (D211, sweep 5)", async (page) => {
+  await page.keyboard.press("Meta+Comma");
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await settings.getByRole("tab", { name: "Review" }).click();
+  const plan = settings.getByLabel("After what do you review?");
+  const was = await plan.inputValue();
+  await plan.click();
+  await plan.fill("my pointer coffee");
+  await page.mouse.click(8, 400); // the app's margin around the sheet
+  await settings.waitFor({ state: "detached" });
+  await page.keyboard.press("Meta+Comma");
+  await settings.getByRole("tab", { name: "Review" }).click();
+  await until("the plan was saved", async () => (await plan.inputValue()) === "my pointer coffee");
+  await plan.fill(was);
+  await page.keyboard.press("Enter");
+  await settled(page);
+  await page.keyboard.press("Escape");
+});
+
+journey("sidebar: a skill dropped on the page outside the sidebar stays where it was (sweep 5, F308)", async (page) => {
+  const order = () => page.locator(".sidebar [role=group] .side-item").allInnerTexts();
+  await until("the skills are in the sidebar", async () => (await order()).includes("Creativity"));
+  const before = await order();
+  const from = (await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().boundingBox())!;
+  await page.mouse.move(from.x + 40, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + 40, from.y + from.height / 2 + 10, { steps: 4 });
+  await page.mouse.move(900, 720, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForTimeout(500);
+  await settled(page);
+  const after = await order();
+  if (JSON.stringify(after) !== JSON.stringify(before)) throw new Error(`the skills moved: ${JSON.stringify(before)} → ${JSON.stringify(after)}`);
+});
+
+journey("highlight: a drag from the text let go in the margin beside it still makes the highlight (sweep 5, F309)", async (page) => {
+  await openSource(page, TESTING);
+  const keeps = page.locator(".collected-chip.keep");
+  const before = Number(await keeps.innerText());
+  const at = await page.evaluate(() => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf("Multiple-choice works too");
+      if (i < 0) continue;
+      n.parentElement!.scrollIntoView({ block: "center" });
+      const r = document.createRange();
+      r.setStart(n, i);
+      r.setEnd(n, i + 1);
+      const a = r.getBoundingClientRect();
+      return { x: a.left + 1, y: a.top + a.height / 2 };
+    }
+    return null;
+  });
+  if (!at) throw new Error("the phrase is not in the reader");
+  const box = (await page.locator(".reader-scroll").boundingBox())!;
+  const col = (await page.locator(".page").boundingBox())!;
+  const right = box.x + box.width - (col.x + col.width);
+  if (right < 20) throw new Error("no margin right of the page to let go in");
+  await page.mouse.move(at.x, at.y);
+  await page.mouse.down();
+  await page.mouse.move(col.x + col.width + right / 2, at.y, { steps: 8 });
+  await page.mouse.up();
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await until("the Keep count goes up", async () => Number(await keeps.innerText()) === before + 1);
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z takes it back", async () => Number(await keeps.innerText()) === before);
+});
+
 journey("source note: the format bar shows whole in the side panel, reaching over the page when the panel is narrower than it (F295)", async (page) => {
   await openSource(page, TESTING);
   const pm = page.locator(".mynotes .note-editor .ProseMirror").first();
@@ -13452,11 +13692,15 @@ journey("opening a source: its title stands at once where it will stay, the pane
   await page.evaluate(() => delete (window as Slow).__ORE_SLOW);
   const after = (await page.locator(".reader .doc-head h1").boundingBox())!;
   if (Math.abs(before.x - after.x) > 1 || Math.abs(before.y - after.y) > 1) throw new Error(`the title moved as the text arrived: ${before.x},${before.y} to ${after.x},${after.y}`);
-  // A relaunch: the skills answer late, and the sidebar already shows them with their icons.
-  await page.addInitScript(() => ((window as Slow).__ORE_SLOW = { skills: 1500 }));
+  // A relaunch: the skills haven't answered, and the sidebar already shows them with their icons. The answer is held
+  // until the check, not slowed by a time, so a slow runner's first draw can't outlast it.
+  await page.addInitScript(() => ((window as Slow).__ORE_SLOW = { skills: 60_000 }));
   await page.reload();
-  await page.locator(".sidebar .side-main .mark").first().waitFor({ timeout: 1000 });
-  await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().waitFor({ timeout: 1000 });
+  await page.locator(".sidebar .side-main .mark").first().waitFor();
+  await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().waitFor();
+  const held = await page.evaluate(() => (window as unknown as { __ORE_HELD: string[] }).__ORE_HELD);
+  if (!held.includes("skills")) throw new Error("the skills answered before the sidebar was checked");
+  await release(page, "skills");
 });
 
 journey("a source that fails to open says why and offers Try again, which opens it once the cause is gone (F299)", async (page) => {
@@ -13470,6 +13714,317 @@ journey("a source that fails to open says why and offers Try again, which opens 
   await page.evaluate(() => ((window as Fail).__ORE_FAIL = {}));
   await page.locator(".reader").getByRole("button", { name: "Try again" }).click();
   await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+});
+
+journey("Edit skill: a click outside with a name already taken stays open and says why (sweep 5 review)", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: "Creativity" }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Edit skill…" }).click();
+  const dialog = page.getByRole("dialog", { name: "Edit skill Creativity" });
+  const name = dialog.getByLabel("Rename Creativity");
+  await name.fill("Habits");
+  await page.mouse.click(1200, 760);
+  await page.locator(".toast[data-kind=error]").filter({ hasText: "already exists" }).waitFor();
+  await page.waitForTimeout(300);
+  if (!(await dialog.isVisible())) throw new Error("the editor closed on a name that failed to save");
+  if ((await name.inputValue()) !== "Habits") throw new Error("the draft was lost");
+  await page.keyboard.press("Escape"); // drops the draft
+  await page.keyboard.press("Escape");
+  await dialog.waitFor({ state: "detached" });
+  await settled(page);
+});
+
+journey("highlight: a drag that turns into a native text drag arms nothing for a later click (sweep 5 review)", async (page) => {
+  await openSource(page, TESTING);
+  const keeps = page.locator(".collected-chip.keep");
+  const before = Number(await keeps.innerText());
+  // A press on the text whose release never comes (a native drag took it over and ended in dragend).
+  const at = (await page.locator(".page p").filter({ hasText: "Space the tests out" }).first().boundingBox())!;
+  await page.locator(".page p").filter({ hasText: "Space the tests out" }).first().dispatchEvent("mousedown", { button: 0, clientX: at.x + 5, clientY: at.y + 5, bubbles: true });
+  await page.evaluate(() => document.dispatchEvent(new DragEvent("dragend", { bubbles: true })));
+  // Later: words selected some other way, and a click let go outside the page.
+  await page.evaluate(() => {
+    const p = [...document.querySelectorAll(".page p")].find((e) => e.textContent!.includes("Space the tests out"))!;
+    const r = document.createRange();
+    r.selectNodeContents(p.firstChild!);
+    getSelection()!.removeAllRanges();
+    getSelection()!.addRange(r);
+    document.querySelector(".reader-scroll")!.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0, clientX: 5, clientY: 400 }));
+  });
+  await page.waitForTimeout(600);
+  if (Number(await keeps.innerText()) !== before) throw new Error("an unrelated mouseup made a highlight");
+  if (await page.getByRole("dialog", { name: "Highlight" }).isVisible()) throw new Error("a highlight popup opened");
+});
+
+journey("add: after a click on ↵ Add that fails, the caret is back in the box (sweep 5 review)", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL?: Record<string, string> }).__ORE_FAIL = { add: "The disk is full" }));
+  await page.getByRole("button", { name: "+ Add" }).click();
+  const box = page.getByRole("dialog", { name: "Add a source" });
+  const field = box.getByLabel("Link, file path or text");
+  await field.fill("# Will fail\n\nThis text fails to add.");
+  await box.getByRole("button", { name: /^↵\s*Add$/ }).click();
+  await box.getByRole("alert").waitFor();
+  await until("focus is back in the box", () => field.evaluate((f) => document.activeElement === f));
+  await page.evaluate(() => delete (window as unknown as { __ORE_FAIL?: unknown }).__ORE_FAIL);
+  await page.keyboard.press("Escape");
+});
+
+journey("code in a source: its parts are coloured without rewrapping the text, Copy puts the code on the clipboard, and a highlight across it still lands (D300)", async (page) => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-code-"));
+  const file = join(dir, "code.md");
+  const code = 'def area(r):\n    # circle\n    return 3.14 * r, "ok"';
+  writeFileSync(file, `# Code that is coloured\n\nA function follows this line.\n\n\`\`\`python\n${code}\n\`\`\`\n\nAnd text after it.\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Code that is coloured");
+    const block = page.locator(".doc pre.code-block");
+    await block.waitFor();
+    await until("each kind of part has its ranges", () => page.evaluate(() => ["keyword", "name", "comment", "number", "string"].every((k) => (CSS.highlights.get(`code-${k}`)?.size ?? 0) > 0)));
+    if ((await block.locator("code").evaluate((el) => el.childNodes.length)) !== 1) throw new Error("the code's text was rewrapped: highlights and Find are Ranges on that one text node");
+    if ((await block.getAttribute("data-lang")) !== "python") throw new Error("the block does not name its language");
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await block.hover();
+    await block.getByRole("button", { name: "Copy code" }).click();
+    await until("the code is on the clipboard", async () => (await page.evaluate(() => navigator.clipboard.readText())) === code);
+    await select(page, "return 3.14");
+    await page.locator(".popup").waitFor();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Meta+z");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+journey("tutor: a message sent while a reply is being written waits, goes when the reply lands, and comes back to the field if he edits it or stops the reply (D301)", async (page) => {
+  const held: (() => void)[] = [];
+  const asked: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    const args = JSON.parse(body).args as string[];
+    asked.push(args[1]!);
+    await new Promise<void>((ok) => held.push(ok));
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `Reply to ${args[1]}`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }) }).catch(() => {}); // a stopped reply's request is already gone
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    const waiting = tutor.locator(".ask-queued");
+    await field.fill("First question");
+    await page.keyboard.press("Enter");
+    await tutor.getByRole("button", { name: "Stop the reply" }).waitFor();
+    // Sent mid-reply: it waits in sight, the field is his again, and nothing has been asked yet.
+    await field.fill("Second question");
+    await page.keyboard.press("Enter");
+    await waiting.filter({ hasText: "Second question" }).waitFor();
+    if ((await field.inputValue()) !== "") throw new Error("the field kept the message that is waiting");
+    if (asked.length !== 1) throw new Error(`the waiting message was asked early: ${asked.join(", ")}`);
+    // The pencil puts it back in the field; sent again, it waits again.
+    await waiting.getByRole("button", { name: "Edit the waiting message" }).click();
+    await until("the waiting message is back in the field", async () => (await field.inputValue()) === "Second question" && (await waiting.count()) === 0);
+    await page.keyboard.press("Enter");
+    await waiting.waitFor();
+    // The reply lands: the waiting message goes as his next turn.
+    held.shift()!();
+    await tutor.getByText("Reply to First question").waitFor();
+    await until("the waiting message is asked once the reply lands", async () => asked.length === 2 && asked[1] === "Second question" && (await waiting.count()) === 0);
+    // A message waiting on a reply he stops comes back to the field instead of going.
+    await field.fill("Third question");
+    await page.keyboard.press("Enter");
+    await waiting.filter({ hasText: "Third question" }).waitFor();
+    await tutor.getByRole("button", { name: "Stop the reply" }).click();
+    await until("stopping gives the waiting message back", async () => (await field.inputValue()) === "Third question" && (await waiting.count()) === 0);
+    if ((asked.length as number) !== 2) throw new Error("a message waiting on a stopped reply was sent");
+    await field.fill("");
+  } finally {
+    held.forEach((ok) => ok());
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+});
+
+journey("⌘K: Tab on a source steps into what can be done with it, typing narrows the actions, ↵ runs one, and Esc steps back out (D302)", async (page) => {
+  await page.keyboard.press("Meta+k");
+  const input = page.getByPlaceholder("Search sources or run a command…");
+  await input.waitFor();
+  await page.keyboard.type("Testing Effect");
+  await page.locator("[cmdk-item][data-selected=true]").filter({ hasText: TESTING }).waitFor();
+  await page.locator(".panel-foot").getByText("Actions").waitFor();
+  await page.keyboard.press("Tab");
+  await page.getByPlaceholder(`Do what with “${TESTING}”?`).waitFor();
+  const rows = page.locator("[cmdk-item]");
+  await rows.filter({ hasText: "Move to Done" }).waitFor();
+  if (await rows.filter({ hasText: "Rename" }).count()) throw new Error("Rename is offered where there is no row to rename in place");
+  // Esc steps back to the search, which is empty again; Esc once more closes.
+  await page.keyboard.press("Escape");
+  await input.waitFor();
+  await page.keyboard.type("Testing Effect");
+  await page.locator("[cmdk-item][data-selected=true]").filter({ hasText: TESTING }).waitFor();
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("done");
+  await until("typing narrows the actions to the one he means", async () => (await rows.count()) === 1 && (await rows.first().innerText()).includes("Move to Done"));
+  await page.keyboard.press("Enter");
+  await page.getByRole("dialog", { name: "Command palette" }).waitFor({ state: "detached" });
+  await until("the source is marked done", async () => ((await ore("ls", "--status=done")) as { title: string }[]).some((i) => i.title === TESTING));
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts it back in To read", async () => !((await ore("ls", "--status=done")) as { title: string }[]).some((i) => i.title === TESTING));
+});
+
+journey("note / menu: its blocks sit under Text, Toggles, Insert and Link with a picture each, it is never taller than ten rows, and a search lists matches flat (D303)", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  const menu = page.locator(".note-menu");
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("/", { delay: 20 });
+  await menu.waitFor();
+  const heads = await menu.locator(".note-menu-head").allInnerTexts();
+  if (heads.join() !== "Text,Toggles,Insert,Link") throw new Error(`the groups are ${heads.join()}`);
+  const bare = await menu.locator(".note-menu-row").evaluateAll((rows) => rows.filter((r) => !r.querySelector("svg")).map((r) => r.textContent));
+  if (bare.length) throw new Error(`no picture on ${bare.join(", ")}`);
+  const size = await menu.evaluate((el) => ({ shown: el.getBoundingClientRect().height, all: el.scrollHeight }));
+  if (size.shown > 345 || size.all <= size.shown) throw new Error(`the menu is ${size.shown}px tall over ${size.all}px of rows: it should stop at 344 and scroll`);
+  // The arrows keep the highlighted block in sight as the list scrolls under it.
+  for (let i = 0; i < 15; i++) await page.keyboard.press("ArrowDown");
+  await until("the highlighted block is inside the menu", () => menu.evaluate((el) => {
+    const on = el.querySelector(".note-menu-row.on")?.getBoundingClientRect(), box = el.getBoundingClientRect();
+    return !!on && on.top >= box.top - 1 && on.bottom <= box.bottom + 1;
+  }));
+  await page.keyboard.type("div", { delay: 20 });
+  await until("a search lists its matches with no group names", async () => (await menu.locator(".note-menu-head").count()) === 0 && (await menu.locator(".note-menu-row").count()) === 1);
+  await page.keyboard.press("Escape");
+  for (let i = 0; i < 4; i++) await page.keyboard.press("Backspace");
+});
+
+journey("sidebar and side panel: an edge dragged past half its narrowest dims what it will hide, and letting go hides it; it comes back at the width it had (D304)", async (page) => {
+  const side = page.locator("nav.sidebar");
+  /** Presses `edge`, drags it to `x`, checks the dimmed look there, then lets go (or presses Esc first). */
+  const drag = async (edge: Locator, x: number, dim: string, esc = false) => {
+    const d = (await edge.boundingBox())!;
+    await page.mouse.move(d.x + d.width / 2, d.y + 300);
+    await page.mouse.down();
+    await page.mouse.move(x, d.y + 300, { steps: 6 });
+    await until("what will hide shows dimmed", () => page.evaluate((sel) => !!document.querySelector(sel), dim));
+    if (esc) await page.keyboard.press("Escape");
+    await page.mouse.up();
+  };
+  const sideEdge = page.getByRole("separator", { name: "Resize the sidebar" });
+  const before = Math.round((await side.boundingBox())!.width);
+  await drag(sideEdge, 60, ".app.folding", true);
+  if (!(await side.isVisible())) throw new Error("Esc mid-fold hid the sidebar");
+  if (await page.locator(".app.folding").count()) throw new Error("Esc left the sidebar dimmed");
+  await drag(sideEdge, 60, ".app.folding");
+  await side.waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Show sidebar" }).click();
+  await until("shown again, the sidebar has its old width", async () => Math.abs((await side.boundingBox())!.width - before) <= 2);
+  // The side panel folds from its own edge, toward the right.
+  await openSource(page, AGENTS);
+  await page.getByRole("tab", { name: "Source note" }).click().catch(() => {});
+  const panel = page.locator(".mynotes");
+  await panel.waitFor();
+  const wide = Math.round((await panel.boundingBox())!.width);
+  const right = page.viewportSize()!.width;
+  await drag(page.getByRole("separator", { name: "Resize the side panel" }), right - 100, ".mynotes.folding");
+  await panel.waitFor({ state: "hidden" });
+  await page.keyboard.press("n");
+  await until("opened again, the panel has its old width", async () => (await panel.count()) > 0 && Math.abs((await panel.boundingBox())!.width - wide) <= 2);
+});
+
+journey("a long table keeps its header row in view down it and its first column across it, inside its own box (D305)", async (page) => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-table-"));
+  const file = join(dir, "table.md");
+  const cols = ["Element", "Symbol", "Number", "Mass", "Group", "Period", "Block", "Discovered", "Named for"];
+  const rows = Array.from({ length: 60 }, (_, i) => `| Element ${i + 1} | E${i + 1} | ${i + 1} | ${(i * 2.1).toFixed(1)} | ${(i % 18) + 1} | ${(i % 7) + 1} | s | ${1700 + i} | a long reason for its name, number ${i + 1} |`);
+  writeFileSync(file, `# A long table of elements\n\nSixty rows follow.\n\n| ${cols.join(" | ")} |\n|${cols.map(() => "---").join("|")}|\n${rows.join("\n")}\n\nAnd text after it.\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.setViewportSize({ width: 1000, height: 700 });
+    await page.reload();
+    await openSource(page, "A long table of elements");
+    const table = page.locator(".doc table");
+    await table.waitFor();
+    const box = (await table.boundingBox())!;
+    if (box.height > 700 * 0.7 + 2) throw new Error(`the table is ${box.height}px tall in a 700px window: it should scroll in its own box`);
+    await table.evaluate((t) => { t.scrollTop = 900; t.scrollLeft = 300; });
+    await until("the header row stays at the table's top", async () => {
+      const head = (await table.locator("thead th").nth(3).boundingBox())!;
+      return Math.abs(head.y - box.y) <= 1;
+    });
+    const first = (await table.locator("tbody tr").nth(30).locator("td").first().boundingBox())!;
+    if (Math.abs(first.x - box.x) > 1) throw new Error(`the first column moved off the left edge: ${first.x} vs ${box.x}`);
+    // What is drawn at the header's place is the header, not a row scrolled under it.
+    const over = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest("th, td")?.tagName, [box.x + 260, box.y + 8]);
+    if (over !== "TH") throw new Error(`under the header's place is a ${over}`);
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+journey("side panel tabs: a click glides the pill to the new tab, a key moves it at once (D306)", async (page) => {
+  await openSource(page, AGENTS);
+  const tabs = page.locator(".side-tabs");
+  await tabs.waitFor();
+  await page.getByRole("tab", { name: "Source note" }).click();
+  await until("no ghost left from opening", async () => (await page.locator(".seg-ghost").count()) === 0);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Animation.enable");
+  await cdp.send("Animation.setPlaybackRate", { playbackRate: 0.05 });
+  try {
+    await page.getByRole("tab", { name: "Collected" }).click();
+    await until("a click glides a pill between the tabs", async () => (await page.locator(".side-tabs .seg-ghost").count()) === 1);
+  } finally {
+    await cdp.send("Animation.setPlaybackRate", { playbackRate: 1 });
+  }
+  await until("the glide ends and leaves nothing", async () => (await page.locator(".seg-ghost").count()) === 0);
+  await page.locator(".doc").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("n");
+  await until("N moved the tab", async () => (await page.getByRole("tab", { name: "Source note" }).getAttribute("aria-selected")) === "true");
+  if (await page.locator(".seg-ghost").count()) throw new Error("a key glided the pill: keys land at once");
+});
+
+journey("original: a PowerPoint deck's Original tab shows the slide itself, follows the slide being read, and ‹ › turn to another (D307)", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "deck.pptx"), "--no-enrich")) as { id: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+    await page.reload();
+    await openSource(page, "How memory works");
+    const show = page.getByRole("button", { name: "Show side panel" });
+    if (await show.count()) await show.click();
+    await page.getByRole("tab", { name: "Original" }).click();
+    const slide = page.locator(".original-slide");
+    const pager = page.locator(".original-pager span");
+    const total = async () => Number((await pager.innerText()).split("/")[1]);
+    const shown = (n: number) => until(`slide ${n} of the original is shown`, async () => (await slide.getAttribute("data-slide")) === String(n) && (await pager.innerText()).startsWith(`${n} /`), 15000);
+    await shown(1);
+    // The slide is drawn: its title's words are on it, laid out as PowerPoint does.
+    await until("the slide shows its own text", async () => (await slide.innerText()).includes("Encoding"));
+    const box = (await slide.boundingBox())!;
+    const panel = (await page.locator(".mynotes").boundingBox())!;
+    if (box.width > panel.width) throw new Error(`the slide is ${box.width}px in a ${panel.width}px panel`);
+    // Reading on to Retrieval, the last slide, brings it up beside it: the page's end is as far as he can scroll.
+    await page.locator(".doc h2", { hasText: "Retrieval" }).evaluate((h) => h.scrollIntoView({ block: "start" }));
+    await shown(3);
+    await until("its words are on the slide", async () => (await slide.innerText()).includes("Every recall changes the memory"));
+    if ((await total()) !== 3) throw new Error(`the pager counts ${await total()} slides, not 3`);
+    if (!(await page.getByRole("button", { name: "Next slide" }).isDisabled())) throw new Error("Next slide is offered past the last slide");
+    await page.getByRole("button", { name: "Previous slide" }).click();
+    await shown(2);
+    await page.locator(".doc h2").first().evaluate((h) => h.scrollIntoView({ block: "center" }));
+    await shown(1);
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.evaluate(([tab, open]) => {
+      tab ? localStorage.setItem("ore.sidetab", tab) : localStorage.removeItem("ore.sidetab");
+      open ? localStorage.setItem("ore.mynotes", open) : localStorage.removeItem("ore.mynotes");
+    }, before);
+  }
 });
 
 let failed = 0;

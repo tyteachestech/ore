@@ -1,4 +1,4 @@
-import { PointerSensor, type PointerSensorOptions } from "@dnd-kit/core";
+import { PointerSensor, type CollisionDetection, type PointerSensorOptions } from "@dnd-kit/core";
 import type { PointerEvent } from "react";
 
 /** A row that drags, except from what sits on it: a press on a `data-no-drag` control, or in a popover
@@ -17,6 +17,15 @@ export class RowSensor extends PointerSensor {
     },
   ];
 }
+
+/** A sortable list's drop target, only while the pointer is over the list: let go anywhere else (the page beside
+ *  the sidebar) and there is none, so the drag cancels instead of landing on the nearest row (Codex sweep 5). A
+ *  drag from the keyboard has no pointer and goes where the arrows took it. */
+export const dropWithin = (el: () => Element | null, detect: CollisionDetection): CollisionDetection => (args) => {
+  const p = args.pointerCoordinates, r = el()?.getBoundingClientRect();
+  if (p && (!r || p.x < r.left || p.x > r.right || p.y < r.top || p.y > r.bottom)) return [];
+  return detect(args);
+};
 
 /** A drag from a handle's pointer-down (the video's edges, a side panel's divider, a note diagram's grips, a
  *  note block's or table row's handle): `move` while the button is down, then `end` once, with the pointer-up, or with null when Esc or the

@@ -387,7 +387,11 @@ export function setSidebarShown(width: number) {
  *  remembered under `key`; double-click resets it (D44). A right-hand panel is measured from its right
  *  edge and gives back what a wider sidebar takes; the sidebar (`left`) from the window's left. The width
  *  he chose is kept: a narrow window only clamps what is shown, so it comes back when the window widens. */
-export function useSideWidth(key: string, initial: number, min = 280, { left = false, share = 0.6, cap = Infinity } = {}) {
+/** How far under its narrowest a panel's edge is dragged before letting go folds the panel away (D304):
+ *  half its narrowest, as VS Code and Linear fold a sidebar. */
+export const foldsAt = (min: number) => min / 2;
+
+export function useSideWidth(key: string, initial: number, min = 280, { left = false, share = 0.6, cap = Infinity, fold }: { left?: boolean; share?: number; cap?: number; /** Dragged past its narrowest and let go: the panel closes, keeping the width it had. */ fold?: () => void } = {}) {
   const [vw, setVw] = useState(() => window.innerWidth);
   const extra = useSyncExternalStore(onExtra, () => (left ? 0 : sidebarExtra));
   const clamp = (w: number) => clampSide(w, vw, { min, share, cap, less: extra });
@@ -396,6 +400,10 @@ export function useSideWidth(key: string, initial: number, min = 280, { left = f
     return Number.isFinite(w) && w > 0 ? w : initial;
   });
   const [dragging, setDragging] = useState(false);
+  /** The drag is past where letting go folds the panel: it shows dimmed at its narrowest until then. */
+  const [folding, setFolding] = useState(false);
+  const onFold = useRef(fold);
+  onFold.current = fold;
 
   useEffect(() => {
     const fit = () => setVw(window.innerWidth);
@@ -409,12 +417,23 @@ export function useSideWidth(key: string, initial: number, min = 280, { left = f
     const right = e.currentTarget.parentElement!.getBoundingClientRect().right;
     const before = width;
     let w = width;
+    let past = false;
     setDragging(true);
     resizeDrag(e, {
-      move: (m) => setWidth((w = clamp(left ? m.clientX : right - m.clientX))),
+      move: (m) => {
+        const raw = left ? m.clientX : right - m.clientX;
+        past = !!onFold.current && raw < foldsAt(min);
+        setFolding(past);
+        setWidth((w = clamp(raw)));
+      },
       end: (ev) => {
         setDragging(false);
-        if (ev) save(key, String(w));
+        setFolding(false);
+        if (ev && past) {
+          // Folded: it opens again at the width it had before this drag.
+          setWidth(before);
+          onFold.current?.();
+        } else if (ev) save(key, String(w));
         else setWidth(before);
       },
     });
@@ -423,7 +442,7 @@ export function useSideWidth(key: string, initial: number, min = 280, { left = f
     setWidth(initial);
     save(key, String(initial));
   };
-  return { width: clamp(width), dragging, divider: { onPointerDown, onDoubleClick } };
+  return { width: clamp(width), dragging, folding, divider: { onPointerDown, onDoubleClick } };
 }
 
 /** The source note (D31, D44) as the right half of a split screen: the divider drags to resize,
@@ -440,11 +459,11 @@ export function SidePanelFrame() {
 /** The reader's right panel: one panel, two tabs (D75), like Notion's side peek. N opens the source
  *  note, C what he collected (Q too, at his questions); the same key again closes the panel. The toggle at the
  *  window's top right (⌥⌘S) shows or hides it. Resizable, width remembered. */
-export function SidePanel({ away, tab, onTab, original, tool, bar, bodyRef, onBodyMouseDown, children }: { /** The phone's note page, slid off-screen beside the source: out of reach until it comes back. */ away?: boolean; tab: SideTab; onTab: (t: SideTab) => void; /** The source is a PDF: its own pages get a tab (D202). */ original?: boolean; /** At the right of the tabs: the open tab's own control (Collected's filter, D219). */ tool?: ReactNode; /** A full-width row under the tabs: that control's field. */ bar?: ReactNode; bodyRef?: RefObject<HTMLDivElement | null>; onBodyMouseDown?: (e: ReactMouseEvent) => void; children: ReactNode }) {
-  const { width, dragging, divider } = useSideWidth("ore.notewidth", NOTE_WIDTH);
+export function SidePanel({ away, tab, onTab, onFold, original, tool, bar, bodyRef, onBodyMouseDown, children }: { /** Its edge dragged past its narrowest: close the panel. */ onFold?: () => void; /** The phone's note page, slid off-screen beside the source: out of reach until it comes back. */ away?: boolean; tab: SideTab; onTab: (t: SideTab) => void; /** The source is a PDF: its own pages get a tab (D202). */ original?: boolean; /** At the right of the tabs: the open tab's own control (Collected's filter, D219). */ tool?: ReactNode; /** A full-width row under the tabs: that control's field. */ bar?: ReactNode; bodyRef?: RefObject<HTMLDivElement | null>; onBodyMouseDown?: (e: ReactMouseEvent) => void; children: ReactNode }) {
+  const { width, dragging, folding, divider } = useSideWidth("ore.notewidth", NOTE_WIDTH, undefined, { fold: onFold });
   return (
-    <aside className={`mynotes${dragging ? " dragging" : ""}`} inert={away} aria-label={tab === "note" ? "Source note" : tab === "original" ? "Original" : "Collected"} style={{ width }}>
-      <Hint text="Drag to resize · double-click to reset" side="left">
+    <aside className={`mynotes${dragging ? " dragging" : ""}${folding ? " folding" : ""}`} inert={away} aria-label={tab === "note" ? "Source note" : tab === "original" ? "Original" : "Collected"} style={{ width }}>
+      <Hint text="Drag to resize or hide · double-click to reset" side="left">
         <div
           className="divider"
           role="separator"
@@ -463,7 +482,7 @@ export function SidePanel({ away, tab, onTab, original, tool, bar, bodyRef, onBo
               <Tabs.Trigger value="questions" data-tone="read"><PixelStack className="card-icon" size={12} aria-hidden="true" />Collected</Tabs.Trigger>
             </Hint>
             {original && (
-              <Hint text="The PDF’s own page, beside the text you are reading">
+              <Hint text="The original’s own page or slide, beside the text you are reading">
                 <Tabs.Trigger value="original"><PixelPage className="card-icon" size={12} aria-hidden="true" />Original</Tabs.Trigger>
               </Hint>
             )}

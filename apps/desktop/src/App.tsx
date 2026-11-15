@@ -297,7 +297,9 @@ export function App() {
   const [hideSidebar, setHideSidebar] = useState(() => load("ore.sidebar") === "collapsed");
   // Its edge drags it from 180 (the title bar's buttons and a short skill name still fit) to 360, or 40% of a
   // narrow window so the content keeps its room (D44, D193). Everything sized off the sidebar reads --sidebar.
-  const sideWidth = useSideWidth("ore.sidebarwidth", 216, 180, { left: true, share: 0.4, cap: 360 });
+  /** Set once toggleSidebar exists below: the sidebar's edge dragged past its narrowest hides it (D304). */
+  const foldSidebar = useRef<() => void>(undefined);
+  const sideWidth = useSideWidth("ore.sidebarwidth", 216, 180, { left: true, share: 0.4, cap: 360, fold: () => foldSidebar.current?.() });
   useLayoutEffect(() => document.documentElement.style.setProperty("--sidebar", `${sideWidth.width}px`), [sideWidth.width]);
   const [notesOpen, setNotesOpen] = useState(() => load("ore.mynotes") !== "closed");
   const [sideTab, setSideTab] = useState<SideTab>(() => {
@@ -951,6 +953,7 @@ export function App() {
       return !v;
     });
   }, [autoHide, hideSidebar, collapsed, leaveSidebar]);
+  foldSidebar.current = toggleSidebar;
 
   /** Back from Settings; Home re-reads the goal it may have changed. */
   const closeSettings = useCallback(() => {
@@ -1906,6 +1909,16 @@ export function App() {
     ...(r.archived_at ? [] : [{ id: "archive", label: "Archive", hint: label(keys.archive), danger: true, divider: true, run: () => void archiveSource(r) }]),
   ];
 
+  /** What ⌘K offers on a source row of its own (Tab on the row): its ⋯ menu's actions, each skill a row of
+   *  its own. Not Rename, which edits a list row in place, nor the list's own Show menu and pin moves. */
+  const paletteSourceActions = (id: string): Action[] => {
+    const r = (items ?? []).find((i) => i.id === id);
+    if (!r) return [];
+    return rowActions(r)
+      .filter((a) => !["rename", "pin-up", "pin-down"].includes(a.id) && a !== showMenu)
+      .flatMap((a): Action[] => (a.sub ? a.sub.map((b) => ({ id: `${a.id}:${b.id}`, label: b.checked ? `Remove from ${b.label}` : `File under ${b.label}`, keywords: ["skill", "move"], run: b.run })) : [{ id: a.id, label: a.label, hint: a.hint, run: a.run }]));
+  };
+
   /** ⌘K follows what is open (a source, a skill page), never what is selected in a list (D178): a row's
    *  actions are on its ⋯ and its right-click. */
   const actions: Action[] = [
@@ -2312,7 +2325,7 @@ export function App() {
 
   const tutorButton = !tutorOpen && !overlay && <TutorBubble onOpen={() => openTutor()} said={unheard.said} failed={unheard.failed} thinking={unheard.thinking} onHush={unheard.hush} />;
   return (
-    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}${sideWidth.dragging ? " sizing" : ""}`}>
+    <div className={`app${collapsed ? " collapsed" : ""}${tutorDocked ? " tutoring" : ""}${sideWidth.dragging ? " sizing" : ""}${sideWidth.folding ? " folding" : ""}`}>
       <div className="titlebar" data-tauri-drag-region />
       <Hint text={collapsed ? "Show sidebar" : "Hide sidebar"} keys="sidebar">
       <button
@@ -2340,7 +2353,7 @@ export function App() {
       </div>
       {collapsed && <div className="side-edge" aria-hidden="true" onMouseEnter={peekIn} onMouseLeave={() => !peek && clearTimeout(peekTimer.current)} />}
       {!collapsed && (
-        <Hint text="Drag to resize · double-click to reset" side="right">
+        <Hint text="Drag to resize or hide · double-click to reset" side="right">
           <div className={`divider side-divider${sideWidth.dragging ? " dragging" : ""}`} role="separator" aria-orientation="vertical" aria-label="Resize the sidebar" {...sideWidth.divider} />
         </Hint>
       )}
@@ -2601,6 +2614,7 @@ export function App() {
           }}
           onOpen={openSource}
           onAsk={(q) => openTutor(q)}
+          sourceActions={paletteSourceActions}
           onCreated={(s) => {
             reloadSkills();
             madeSkill(s);
