@@ -32,7 +32,14 @@ func recognize(_ image: CGImage) -> [Line] {
 // (a full-page capture, 900×10,000) come out too small to read (F188). Such an image is read in bands
 // along its long side, each twice as long as the short side (at least 2,048 px), each starting half a
 // band after the last; a line is kept from the band whose middle half holds its centre, so a line cut
-// by one band's edge is read whole in the next, and none is read twice.
+// by one band's edge is read whole in the next. Two bands can place the same line a few pixels apart,
+// so each middle half reaches a little past its edges and a line whose box mostly covers one already
+// kept is the same line read twice: neither lost nor doubled on a boundary.
+func same(_ a: Line, _ b: Line) -> Bool {
+  let iw = min(a.x + a.w, b.x + b.w) - max(a.x, b.x), ih = min(a.y + a.h, b.y + b.h) - max(a.y, b.y)
+  return iw > 0 && ih > 0 && iw * ih > 0.5 * min(a.w * a.h, b.w * b.h)
+}
+
 func lines(_ image: CGImage) -> [Line] {
   let w = Double(image.width), h = Double(image.height)
   let long = max(w, h), short = min(w, h)
@@ -46,8 +53,9 @@ func lines(_ image: CGImage) -> [Line] {
     let rect = tall ? CGRect(x: 0, y: start, width: w, height: end - start) : CGRect(x: start, y: 0, width: end - start, height: h)
     // A band that can't be cut out: the whole image in one pass, never part of its text.
     guard let tile = image.cropping(to: rect.integral) else { return recognize(image) }
-    let lo = start == 0 ? 0 : start + band / 4
-    let hi = end >= long ? long + 1 : start + band * 3 / 4
+    let margin = band / 16
+    let lo = start == 0 ? 0 : start + band / 4 - margin
+    let hi = end >= long ? long + 1 : start + band * 3 / 4 + margin
     let size = end - start
     for l in recognize(tile) {
       // Back to fractions of the whole image, y still from the top.
@@ -55,7 +63,7 @@ func lines(_ image: CGImage) -> [Line] {
         ? Line(t: l.t, x: l.x, y: (start + l.y * size) / h, w: l.w, h: l.h * size / h)
         : Line(t: l.t, x: (start + l.x * size) / w, y: l.y, w: l.w * size / w, h: l.h)
       let centre = tall ? (line.y + line.h / 2) * h : (line.x + line.w / 2) * w
-      if centre >= lo && centre < hi { out.append(line) }
+      if centre >= lo && centre < hi && !out.contains(where: { same($0, line) }) { out.append(line) }
     }
     if end >= long { break }
     start += band / 2
