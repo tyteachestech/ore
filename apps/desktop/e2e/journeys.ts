@@ -11207,6 +11207,8 @@ journey("phone: Aa sets the text size, line spacing, margins, font and page, eac
   if (was.size !== 20 || Math.abs(was.leading - 1.5) > 0.01 || was.gutter !== 24) throw new Error(`a source opened at ${JSON.stringify(was)}, not 20px on 1.5 with 24px margins`);
   await tap(page, page.getByRole("button", { name: "Text and page" }));
   const sheet = page.getByRole("dialog", { name: "Text and page" });
+  // The page starts on Auto, the iPhone's own mode (dark here, where no iPhone says otherwise).
+  if ((await sheet.getByRole("radio", { name: "Auto" }).getAttribute("aria-checked")) !== "true" || was.page !== "dark") throw new Error(`the page started at ${was.page}, not Auto`);
   await tap(page, sheet.getByRole("button", { name: "Larger text" }));
   await tap(page, sheet.getByRole("radio", { name: "Loose" }));
   await tap(page, sheet.getByRole("radio", { name: "Narrow margins" }));

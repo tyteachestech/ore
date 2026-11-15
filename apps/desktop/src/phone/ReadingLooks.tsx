@@ -1,8 +1,10 @@
 // The reader's Aa on the iPhone (D-new-phone-reading-looks): the five things every good reader lets you change
 // (Books, Kindle, Readwise Reader, Instapaper), in one bottom sheet as Books lays out its Themes & Settings. Each
 // tap applies at once and keeps the passage in view (reading.ts), the text left showing above the sheet.
-import { useRef, useState, type ReactNode } from "react";
-import { FONTS, PAGES, setFont, setPage, setSpacing, setWidth, SIZES, SPACINGS, WIDTHS, bigger, smaller, useReading } from "../reading";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { CircleHalf } from "../icons";
+import { FONTS, PAGES, pageShown, setFont, setPage, setSpacing, setWidth, SIZES, SPACINGS, WIDTHS, bigger, smaller, useReading } from "../reading";
+import { lightBars } from "./appearance";
 import { Trap } from "../Trap";
 import { sheetLayer, useSwipeDown } from "./sheet";
 
@@ -29,14 +31,28 @@ function Choice<T extends string>({ label, value, options, onPick, className, re
 }
 
 export function ReadingLooks() {
-  const { size, spacing, width, font, page } = useReading();
+  const looks = useReading();
+  const { size, spacing, width, font, page } = looks;
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  // A light page under the status bar takes a dark clock, until he swipes over to the note (dark) or leaves.
+  useEffect(() => {
+    const reader = btn.current?.closest(".reader");
+    const sync = () => lightBars(pageShown() === "light" && !reader?.classList.contains("noting"));
+    sync();
+    const watch = new MutationObserver(sync);
+    if (reader) watch.observe(reader, { attributes: true, attributeFilter: ["class"] });
+    return () => {
+      watch.disconnect();
+      lightBars(false);
+    };
+  }, [looks]);
   const close = () => setOpen(false);
   useSwipeDown(box, close, open);
   return (
     <>
-      <button className="looks-btn" aria-label="Text and page" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+      <button ref={btn} className="looks-btn" aria-label="Text and page" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
         Aa
       </button>
       {open && sheetLayer(
@@ -53,7 +69,7 @@ export function ReadingLooks() {
                 <Choice className="looks-seg" label="Margins" value={width} options={[...WIDTHS].reverse().map((w, i) => ({ id: w.id, label: ["Narrow margins", "Medium margins", "Wide margins"][i]! }))} onPick={setWidth} render={(_, i) => <Lines gap={4} width={[22, 17, 12][i]!} />} />
               </div>
               <Choice className="looks-pair" label="Font" value={font} options={FONTS} onPick={setFont} render={(id) => <span className="looks-tile" data-font={id}><b style={{ fontFamily: id === "charter" ? 'Charter, "Bitstream Charter", "New York", serif' : "var(--font)" }}>Aa</b>{FONTS.find((f) => f.id === id)!.label}</span>} />
-              <Choice className="looks-pair" label="Page" value={page} options={PAGES} onPick={setPage} render={(id) => <span className="looks-tile" data-page={id}><b>{PAGES.find((p) => p.id === id)!.label}</b></span>} />
+              <Choice className="looks-pair looks-pages" label="Page" value={page} options={PAGES} onPick={setPage} render={(id) => <span className="looks-tile" data-page={id}>{id === "auto" && <CircleHalf size={16} aria-hidden="true" />}<b>{PAGES.find((p) => p.id === id)!.label}</b></span>} />
             </div>
           </Trap>
         </div>,

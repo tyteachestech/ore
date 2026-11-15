@@ -10,11 +10,16 @@ export const WIDTHS = [
 ] as const;
 export type Width = (typeof WIDTHS)[number]["id"];
 
+const PHONE = import.meta.env?.VITE_PHONE === "1";
+/** The reading page (D26). On the phone, Auto follows the iPhone's Light or Dark mode, and is where it starts
+ *  (D-new-phone-reading-looks: dark text on a light page reads better by day, a dark page is kinder at night).
+ *  The Mac's window is always dark, so it offers no Auto. */
 export const PAGES = [
+  ...(PHONE ? [{ id: "auto", label: "Auto" } as const] : []),
   { id: "dark", label: "Dark" },
   { id: "light", label: "Light" },
 ] as const;
-export type Page = (typeof PAGES)[number]["id"];
+export type Page = "auto" | "dark" | "light";
 
 /** The face a source reads in (D151): Charter, the book serif, or Geist, the interface sans. */
 export const FONTS = [
@@ -35,7 +40,7 @@ export type Spacing = (typeof SPACINGS)[number]["id"];
 /** Text sizes in px, Books-style steps: one at a time near the default, bigger jumps above it. */
 export const SIZES = [14, 15, 16, 17, 18, 20, 22, 24, 26] as const;
 /** 17 on the Mac; 20 on the phone, about 35 letters a line as Books sets it (D-new-phone-reading-text). */
-export const DEFAULT_SIZE = import.meta.env?.VITE_PHONE === "1" ? 20 : 17;
+export const DEFAULT_SIZE = PHONE ? 20 : 17;
 
 /** The next size up (`by` 1) or down (-1) from `size`, held at the ends. */
 export function stepSize(size: number, by: 1 | -1): number {
@@ -54,16 +59,21 @@ const storedSize = Number(load("ore.size"));
 let state: State = {
   width: pick("ore.width", WIDTHS, "medium"),
   size: (SIZES as readonly number[]).includes(storedSize) ? storedSize : DEFAULT_SIZE,
-  page: pick("ore.page", PAGES, "dark"),
+  page: pick("ore.page", PAGES, PHONE ? "auto" : "dark"),
   font: pick("ore.font", FONTS, "charter"),
   spacing: pick("ore.spacing", SPACINGS, "normal"),
 };
 const listeners = new Set<() => void>();
 const places = new Set<() => () => void>();
 
+/** Whether the device is in Dark mode, for Auto: the phone asks iOS (phone/appearance.ts). */
+let systemDark = true;
+/** The page as drawn: Auto resolved to Dark or Light. */
+export const pageShown = (): "dark" | "light" => (state.page === "auto" ? (systemDark ? "dark" : "light") : state.page);
+
 function paint() {
   root.dataset.width = state.width;
-  root.dataset.page = state.page;
+  root.dataset.page = pageShown();
   root.dataset.font = state.font;
   root.dataset.spacing = state.spacing;
   root.style.setProperty("--read-size", `${state.size}px`);
@@ -88,6 +98,12 @@ export const setWidth = (width: Width) => set({ width });
 export const setSize = (size: number) => set({ size });
 export const setPage = (page: Page) => set({ page });
 export const setFont = (font: Font) => set({ font });
+/** iOS's mode came in or changed: Auto repaints, keeping the passage in view. */
+export function setSystemDark(dark: boolean) {
+  if (dark === systemDark) return;
+  systemDark = dark;
+  set({});
+}
 export const setSpacing = (spacing: Spacing) => set({ spacing });
 export const bigger = () => set({ size: stepSize(state.size, 1) });
 export const smaller = () => set({ size: stepSize(state.size, -1) });
