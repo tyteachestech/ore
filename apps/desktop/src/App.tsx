@@ -16,7 +16,7 @@ import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, lessonsOf, loadSkills, nextLesson, ore, searchFields, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, searchFields, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
@@ -1001,7 +1001,20 @@ export function App() {
     [addSources, openSource, showSide],
   );
 
-  const history = useHistory({ openId, skill, status, place }, (v, by) => {
+  /** All sources' filters (D286, D288): by kind, skill or author, let go on leaving the list for another skill. */
+  const [filters, setFilters] = useState<Filter[]>([]);
+  /** A list's search; see `byTitle` below. */
+  const [query, setQuery] = useState("");
+  /** The skill the list's search and filters are for: another skill's list starts with neither, but Back
+   *  and Forward bring back the ones that view had (they set this first, so they aren't let go). */
+  const listSkill = useRef(skill);
+  useEffect(() => {
+    if (listSkill.current === skill) return;
+    listSkill.current = skill;
+    setQuery("");
+    setFilters([]);
+  }, [skill]);
+  const history = useHistory({ openId, skill, status, place, query, filters }, (v, by) => {
     if (v.openId && !(items ?? []).some((i) => i.id === v.openId)) return false;
     if (v.skill && !skills.some((s) => s.id === v.skill)) return false;
     if (by < 0 && v.place === "home" && !v.openId && !v.skill) comingBackHome();
@@ -1012,6 +1025,9 @@ export function App() {
     setSkill(v.skill);
     setOpenId(v.openId);
     if (v.openId) setCursor(v.openId);
+    listSkill.current = v.skill;
+    setQuery(v.query);
+    setFilters(v.filters);
     return true;
   });
 
@@ -1117,9 +1133,6 @@ export function App() {
 
   const inSkill = useMemo(() => (items ?? []).filter((i) => !skill || i.skills.includes(skill)), [items, skill]);
   const archivedInSkill = useMemo(() => archived.filter((i) => !skill || i.skills.includes(skill)), [archived, skill]);
-  /** All sources' filters (D286): by kind, skill or author, let go on leaving the list. */
-  const [filters, setFilters] = useState<Filter[]>([]);
-  useEffect(() => setFilters([]), [skill]);
   const tabAll = useMemo(
     // Last touched (added or opened) first, D110. Archived: last archived first.
     () =>
@@ -1135,23 +1148,24 @@ export function App() {
   /** A list's search (⌘F on All sources, the magnifying glass on a skill page, D203): sources known by
    *  the words first, best match first (title, then course, author, site, skill, type; a typo still
    *  finds it), then sources whose text, highlights or note match (`ore search`), each with its line. */
-  const [query, setQuery] = useState("");
   const filterRef = useRef<HTMLInputElement>(null);
   const q = query.trim();
-  useEffect(() => setQuery(""), [skill]);
-  /** `error`: why searching the text failed, so it never reads as "nothing matches". */
-  const [hits, setHits] = useState<{ q: string; snip: Map<string, string>; error?: string }>({ q: "", snip: new Map() });
+  /** Each source whose text, highlights or notes hold the words: its best match's line and where opening it lands
+   *  (as ⌘K's does). Every source that has one, so a tab or filter is never left with only those that made a
+   *  cut across the whole library. `error`: why searching the text failed, so it never reads as "nothing matches". */
+  const [hits, setHits] = useState<{ q: string; snip: Map<string, string>; at: Map<string, string | undefined>; error?: string }>({ q: "", snip: new Map(), at: new Map() });
   useEffect(() => {
     if (!q) return;
     let live = true;
     const t = setTimeout(() => {
-      ore<SearchHit[]>("search", q, "--limit", "60").then(
+      ore<SearchHit[]>("search", q, "--sources").then(
         (r) => {
           const snip = new Map<string, string>();
-          for (const h of r) if (h.item && h.snippet && !snip.has(h.item)) snip.set(h.item, h.snippet);
-          if (live) setHits({ q, snip });
+          const at = new Map<string, string | undefined>();
+          for (const h of r) if (h.item) (snip.set(h.item, h.snippet ?? ""), at.set(h.item, landing(h, q)));
+          if (live) setHits({ q, snip, at });
         },
-        (e) => live && setHits({ q, snip: new Map(), error: errorText(e) }),
+        (e) => live && setHits({ q, snip: new Map(), at: new Map(), error: errorText(e) }),
       );
     }, 120);
     return () => {
@@ -1169,6 +1183,11 @@ export function App() {
   const byText = useMemo(
     () => (q && hits.q === q ? tabRows.filter((r) => hits.snip.has(r.id) && !byTitle.includes(r)) : []),
     [tabRows, byTitle, hits, q],
+  );
+  /** Opens a row of the list: one found by its text at the match, as ⌘K opens it. */
+  const openRow = useCallback(
+    (id: string) => openSource(id, byText.some((r) => r.id === id) && (place === "sources" || onSkillPage) ? hits.at.get(id) : undefined),
+    [openSource, byText, hits, place, onSkillPage],
   );
   /** On a skill page, the open questions each source may answer (D75's matches), so picking what to read
    *  next and chasing a question are one act (D130): a question mark on the row, the questions in its hint. */
@@ -1438,7 +1457,8 @@ export function App() {
       }
     } else if (e.key === "Enter" && keyed) {
       e.preventDefault();
-      openSource(currentLine.kind === "course" ? lessonFirst(currentLine).id : currentLine.item.id);
+      if (currentLine.kind === "course") openSource(lessonFirst(currentLine).id);
+      else openRow(currentLine.item.id);
     } else if (is(e.nativeEvent, "rename") && keyed) {
       e.preventDefault();
       setRenamingRow(lineKey(currentLine));
@@ -1881,7 +1901,7 @@ export function App() {
     ];
   };
   const rowActions = (r: Item): MenuAction[] => [
-    { id: "open", label: "Open", hint: "↵", run: () => openSource(r.id) },
+    { id: "open", label: "Open", hint: "↵", run: () => openRow(r.id) },
     { id: "review-source", label: "Review this source", run: () => startReview(null, r.id) },
     { id: "rename", divider: true, label: "Rename…", hint: label(keys.rename), run: () => setRenamingRow(r.id) },
     ...(r.archived_at ? [] : [{ id: "pin", label: r.pinned_at ? "Unpin" : "Pin to top", hint: label(keys.pin), run: () => void pinSource(r) }]),
@@ -1996,8 +2016,8 @@ export function App() {
   const view = <ViewMenu status={status} archived={archivedInSkill.length > 0} go={go} details={details} toggle={toggleDetail} />;
   // What a row's handlers and menus call, read when they run: a row re-renders only when what it
   // shows changes (below), so ↑↓ through a long list repaints two rows, not all of them.
-  const live = useRef({ openSource, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked, boxPick });
-  live.current = { openSource, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked, boxPick };
+  const live = useRef({ openSource, openRow, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked, boxPick });
+  live.current = { openSource, openRow, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked, boxPick };
   useEffect(() => {
     if (!listShown) return;
     const down = (e: MouseEvent) => {
@@ -2035,7 +2055,7 @@ export function App() {
     );
   };
   const row = (r: Item, lesson = false) => {
-    const snip = q && !byTitle.includes(r) ? hits.snip.get(r.id) : undefined;
+    const snip = q && !byTitle.includes(r) ? hits.snip.get(r.id) || undefined : undefined;
     const on = keyed && currentLine?.kind === "item" && currentLine.item === r;
     const sel = picked.includes(r.id);
     const dragged = rowDrag?.many ? rowDrag.many.some((i) => i.id === r.id) : rowDrag?.item.id === r.id && !rowDrag.course;
@@ -2062,7 +2082,7 @@ export function App() {
         role="row"
         aria-selected={on || sel}
         className={`row${lesson ? " lesson" : ""}${on ? " on" : ""}${sel ? " sel" : ""}${lesson && r.status === "done" ? " finished" : ""}${r.pinned_at ? " pinned" : ""}${snip ? " hit" : ""}`}
-        onClick={(e) => (e.shiftKey ? live.current.pickRange(r.id) : e.metaKey ? live.current.pickToggle(r.id) : live.current.openSource(r.id))}
+        onClick={(e) => (e.shiftKey ? live.current.pickRange(r.id) : e.metaKey ? live.current.pickToggle(r.id) : live.current.openRow(r.id))}
       >
         {/* A lesson (D79): its number in the course, and a check once done, where a source has its picture. */}
         {lesson && <span className="part">{r.course!.part}</span>}
@@ -2282,7 +2302,7 @@ export function App() {
       setKeyed(true);
       setCursor(rows[0]!.id);
       listRef.current?.focus({ preventScroll: true });
-    } else if (e.key === "Enter" && rows[0]) openSource(rows[0].id);
+    } else if (e.key === "Enter" && rows[0]) openRow(rows[0].id);
   };
   // A press in the field off its tags focuses the search; a press in a tag's list (a portal, whose events bubble here) does not.
   const toSearch = () => filterRef.current?.focus();
@@ -2683,7 +2703,8 @@ export function App() {
 }
 
 type Place = "home" | "sources" | "feed";
-type View = { openId: string | null; skill: string | null; status: Tab; place: Place };
+/** `query` and `filters`: the list's search and filter tags as he left that view, kept up to date while he is on it. */
+type View = { openId: string | null; skill: string | null; status: Tab; place: Place; query: string; filters: Filter[] };
 /** A wrapper only where it lays something out: elsewhere the screen stays a child of <main>, which focus-near.ts reads. */
 const Box = ({ on, className, children }: { on: boolean; className: string; children: ReactNode }) => (on ? <div className={className}>{children}</div> : <>{children}</>);
 const sameView = (a: View, b: View) => a.openId === b.openId && a.skill === b.skill && a.status === b.status && a.place === b.place;
@@ -2703,6 +2724,11 @@ function useHistory(view: View, restore: (v: View, by: -1 | 1) => boolean) {
     h.current = { stack: next, at: next.length - 1 };
     rerender();
   }, [view.openId, view.skill, view.status, view.place]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Typing a search or picking a filter is not a step of its own: it updates the view he is on (a browser's replaceState).
+  useEffect(() => {
+    const { stack, at } = h.current;
+    if (stack[at] && sameView(stack[at], view)) stack[at] = { ...stack[at], query: view.query, filters: view.filters };
+  }, [view.query, view.filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const step = useCallback((by: -1 | 1) => {
     const { stack } = h.current;

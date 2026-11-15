@@ -1,12 +1,13 @@
 import { more } from "./more";
-import { fold, WORDS } from "./match";
+import { fold, rankScore, WORDS } from "./match";
+import { siteOf } from "./details";
 import { GraduationCap, X } from "./icons";
 import { Command } from "cmdk";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { SkillIcon } from "./IconPicker";
 import { isOther } from "../../../packages/core/src/collection-name";
 import { LABEL } from "./Collected";
-import { courseThumb, lessonsOf, nextLesson, ore, opt, PHONE, touched, type Intent, type Item, type SearchHit, type Skill } from "./ore";
+import { courseThumb, landing, lessonsOf, nextLesson, ore, opt, PHONE, searchFields, touched, type Intent, type Item, type SearchHit, type Skill } from "./ore";
 import { Thumb } from "./Thumb";
 import { useSwipeDown } from "./phone/sheet";
 import { errorText, useFocusWhileMounted } from "./util";
@@ -66,6 +67,14 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
   const [page, setPage] = useState<Page | null>(null);
   const byRecent = useMemo(() => [...items].sort((a, b) => touched(b).localeCompare(touched(a))), [items]);
   const touchedAt = useMemo(() => new Map(items.map((i) => [i.id, touched(i)])), [items]);
+  /** What else a source is known by, as in a list's search (`searchFields`): its course, author, site, skills and type. */
+  const fieldsOf = useMemo(() => {
+    const names = new Map(skills.map((s) => [s.id, s.name]));
+    return new Map(items.map((i) => [i.id, searchFields(i, siteOf(i.url), i.skills.map((id) => names.get(id) ?? id))]));
+  }, [items, skills]);
+  /** A source's score: its title's, else a quarter of how the rest matches, so a source found by its author
+   *  (or a typo) comes below every title that holds the words. */
+  const sourceScore = (i: Item, query: string) => titleScore(i.title, query) || rankScore(fieldsOf.get(i.id)!, query) / 4;
   const [hits, setHits] = useState<Hit[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -101,7 +110,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
               item,
               title: items.find((i) => i.id === item)?.title ?? r.title,
               what: intent ? (LABEL[intent] ?? "highlight").toLowerCase() : r.kind === "notes" ? "source note" : r.kind === "card" ? "exercise" : undefined,
-              at: r.kind === "item" ? `find:${query}` : r.kind === "notes" ? `note:${query}` : r.kind === "annotation" ? `ann:${r.ref}` : r.annotation && `ann:${r.annotation}`,
+              at: landing(r, query),
               snippet: r.snippet,
             });
           }
@@ -211,7 +220,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
             }),
             // A lesson names its course, as on Home: "Skills" alone doesn't say which course it is from.
             // Last touched first, so among equally good matches the one he had open lately leads (sort is stable).
-            ...byRecent.map((i) => ({ value: `source ${i.id}`, score: titleScore(i.title, query), label: sourceLabel(i), extra: i.course && <span className="sub course-of">{i.course.title}</span>, run: () => onOpen(i.id) })),
+            ...byRecent.map((i) => ({ value: `source ${i.id}`, score: sourceScore(i, query), label: sourceLabel(i), extra: i.course && <span className="sub course-of">{i.course.title}</span>, run: () => onOpen(i.id) })),
           ]
         : [],
       undefined,

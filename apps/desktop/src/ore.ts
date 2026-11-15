@@ -268,6 +268,11 @@ export type Skill = { id: string; name: string; priority?: Priority; archived?: 
 
 export type SearchHit = { kind: string; ref: string; item?: string; title: string; snippet?: string; annotation?: string };
 
+/** Where a search match lands in its source (Reader's `jumpTo`), for ⌘K and a list's search alike: the words in
+ *  its text, a highlight's popup, the words in its source note; an exercise at the highlight it was made from. */
+export const landing = (h: SearchHit, query: string): string | undefined =>
+  h.kind === "item" ? `find:${query}` : h.kind === "notes" ? `note:${query}` : h.kind === "annotation" ? `ann:${h.ref}` : h.annotation && `ann:${h.annotation}`;
+
 /** `ore notes`: a source note or a skill note (notes.md) as it now is; `dir` is its folder, absolute. */
 export type Notes = { kept_from_feed?: boolean; item?: string; skill?: string; text: string; path: string; dir: string };
 

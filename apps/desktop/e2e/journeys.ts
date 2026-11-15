@@ -14120,6 +14120,88 @@ journey("original: a PowerPoint deck's Original tab shows the slide itself, foll
   }
 });
 
+// —— Codex sweep 6, round C: finding things (docs/reviews/2026-11-15-codex-sweep-6/organize-report.md) ——
+
+journey("list search: every source in the tab and its filters that holds the words is found, however many others hold them too (F-new-list-search-cap)", async (page) => {
+  const word = `zircon${Date.now()}`;
+  // 36 sources and their highlights hold the word, 72 matches; the one under Habits holds it once, deep in a longer text, so it ranks last.
+  const made: string[] = [];
+  try {
+    for (let i = 0; i < 36; i += 9) {
+      const batch = await Promise.all(Array.from({ length: 9 }, (_, j) => ore("snippet", `--text=${word} note ${i + j} on durable practice.`, "--no-enrich") as Promise<{ id: string }>));
+      made.push(...batch.map((b) => b.id));
+    }
+    const habit = (await ore("snippet", `--text=Habits form slowly when a cue predicts a reward, and the routine runs on its own long after. ${"A loop like this takes weeks to build. ".repeat(8)}Then ${word}.`, "--skill=habits", "--no-enrich")) as { id: string; title: string };
+    made.push(habit.id);
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await page.getByRole("button", { name: "Filter by kind, skill or author" }).click();
+    await page.getByRole("option", { name: "Skill" }).click();
+    await page.locator(".filter-menu [cmdk-item]").filter({ hasText: "Habits" }).first().click();
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Skill: Habits" }).waitFor();
+    await page.getByLabel("Search sources").fill(word);
+    await until("the Habits source that holds the word is listed", async () => (await page.locator(".row.hit").count()) === 1, 8000);
+    if (await page.locator(".empty-state").count()) throw new Error(`the list says ${await page.locator(".empty-state").innerText()}`);
+  } finally {
+    for (const id of made) await ore("archive", id).catch(() => {});
+  }
+});
+
+journey("list search: a match in a highlight's note opens that highlight; ↵ on one in the source note opens the note on it, as ⌘K does (F-new-list-search-lands)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const search = page.getByLabel("Search sources");
+  await search.fill("hold for kids");
+  await page.locator(".row.hit").filter({ hasText: TESTING }).click();
+  const note = page.getByRole("dialog", { name: "Highlight" }).getByLabel("Note");
+  await until("the highlight's popup is open on its note", async () => (await note.isVisible()) && (await note.inputValue()) === "Does this hold for kids?");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await search.fill("just a measurement");
+  await page.locator(".row.hit").filter({ hasText: TESTING }).waitFor();
+  await search.press("Enter");
+  await foundOnScreen(page, "just a measurement", ".mynotes-text");
+  await page.keyboard.press("Escape");
+});
+
+journey("⌘K: a source is found by its author, as the list's search finds it (F-new-palette-author)", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.locator("[cmdk-input]").fill("Barry Zhang");
+  await page.locator("[cmdk-item]").filter({ hasText: AGENTS }).first().click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+});
+
+journey("phone: Search finds a source by its author (F-new-palette-author)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Search" }));
+  await page.locator("[cmdk-input]").fill("Barry Zhang");
+  await page.locator("[cmdk-item]").filter({ hasText: AGENTS }).first().waitFor();
+}, "phone");
+
+journey("list search: Back to the list brings its search and filters back (F-new-back-keeps-search)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.getByRole("button", { name: "Filter by kind, skill or author" }).click();
+  await page.getByRole("option", { name: "Skill" }).click();
+  await page.locator(".filter-menu [cmdk-item]").filter({ hasText: "AI" }).first().click();
+  await page.keyboard.press("Escape");
+  const search = page.getByRole("textbox", { name: "Search sources" });
+  await search.fill("Effective Agents");
+  await page.locator(".row").filter({ hasText: AGENTS }).first().click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+  await page.locator(".side-item").filter({ hasText: "Learning" }).first().click();
+  await page.locator(".skill-page").waitFor();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+  await page.getByRole("button", { name: "Back", exact: true }).click();
+  await until("the search is back", async () => (await search.count()) === 1 && (await search.inputValue()) === "Effective Agents");
+  await page.getByRole("button", { name: "Skill: AI" }).waitFor();
+  await page.getByRole("button", { name: "Forward", exact: true }).click();
+  await page.locator(".doc-head").filter({ hasText: AGENTS }).waitFor();
+  await page.getByRole("button", { name: "Forward", exact: true }).click();
+  await page.locator(".skill-page").waitFor();
+  const field = page.getByRole("textbox", { name: "Search sources" });
+  await until("the skill page's search is its own, empty", async () => (await field.count()) === 0 || (await field.inputValue()) === "");
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
