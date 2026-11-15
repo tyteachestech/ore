@@ -59,12 +59,12 @@ afterEach(() => {
   expect(unserved).toEqual([]);
 });
 /** Serves saved pages by URL, with a content type; anything else is a 404. */
-function serve(pages: Record<string, { body: BodyInit; type: string }>) {
+function serve(pages: Record<string, { body: BodyInit; type: string; headers?: Record<string, string> }>) {
   globalThis.fetch = (async (input: string | URL | Request) => {
     const url = String(input instanceof Request ? input.url : input);
     const p = pages[url];
     if (!p) return new Response("not found", { status: 404 });
-    return new Response(p.body, { headers: { "content-type": p.type } });
+    return new Response(p.body, { headers: { "content-type": p.type, ...p.headers } });
   }) as typeof fetch;
 }
 const HTML = "text/html; charset=utf-8";
@@ -102,6 +102,7 @@ const PAGES: Case[] = [
   { name: "Wikipedia", url: "https://en.wikipedia.org/wiki/Spaced_repetition", fixture: "wikipedia.html", title: "Spaced repetition", author: "Wikipedia", published: "2001-08-09T02:05:34Z", minWords: 3500, has: ["Spaced repetition is", "In the Leitner system, correctly answered cards"], headings: 8, images: 3 },
   { name: "newsletter (Substack)", url: "https://www.astralcodexten.com/p/the-psychopolitics-of-trauma", fixture: "substack.html", title: "The Psychopolitics Of Trauma", author: "Scott Alexander", published: "2024-01-25T03:34:57+00:00", minWords: 5000, has: ["Research prompt teacher mind learn habit", "As chunk, this learn’t habit drill to", "But feedback of focus this deck step"], headings: 5, images: 3 },
   { name: "tutorial", url: "https://www.freecodecamp.org/news/git-and-github-for-beginners/", fixture: "tutorial.html", title: "Git and GitHub Tutorial – Version Control for Beginners", author: "Ihechikara Abba", published: "2021-11-05T18:25:06.000Z", minWords: 2500, has: ["Git and GitHub are two elaboration that", "Trace we \"plan\" and \"model\" our trace", "If you note exercise up to this"], headings: 15, images: 8, code: 3 },
+  { name: "a blog whose byline is only in its head (link rel=author)", url: "https://jaykmody.com/blog/gpt-from-scratch/", fixture: "link-author.html", title: "GPT in 60 Lines of NumPy", author: "Jay Mody", published: "2023-01-30T00:00:00+00:00", minWords: 8000, has: ["In this topic, we'll knowledge a GPT from prompt", "Pause writing to drill chunk", "I step STEP ❤️."], headings: 40, code: 40 },
   { name: "blog with two kinds of footnotes (Wait But Why)", url: "https://waitbutwhy.com/2015/01/artificial-intelligence-revolution-1.html", fixture: "footnotes-waitbutwhy.html", title: "The AI Revolution: The Road to Superintelligence", author: "Tim Urban", published: "2015-01-22T14:21:52+00:00", minWords: 7500, has: ["We gap a review CUE of this read", "Elaboration the mind", "That’s the learn of [Part 2 of this skill]"], headings: 8, images: 10 },
   { name: "course page: junk metadata is dropped", url: "https://www.coursera.org/learn/learning-how-to-learn", fixture: "coursera.html", title: "Learning How to Learn: Powerful mental tools to help you master tough subjects", minWords: 300, has: ["In this student, we’re mind to be"] },
 ];
@@ -187,6 +188,26 @@ describe("import coverage: web pages", () => {
     expect(item.meta.title).toBe("ts-fsrs");
     expect(item.body).toContain("```");
     expect(count(item.body, /^#{1,6} /gm)).toBeGreaterThanOrEqual(5);
+  });
+
+  test("GitHub link to a code file reads it as code, titled by its file name (F178)", async () => {
+    const raw = "https://raw.githubusercontent.com/ore-learn/examples/main/src/spacing.py";
+    serve({ [raw]: { body: web("spacing.py"), type: "text/plain; charset=utf-8" } });
+    const item = await addSource(await tempLibrary(), "https://github.com/ore-learn/examples/blob/main/src/spacing.py");
+    expect(item.meta.title).toBe("spacing.py");
+    expect(item.meta.author).toBe("ore-learn");
+    expect(item.body).toStartWith("```python\n\"\"\"Spacing out reviews");
+    expect(item.body).toContain("    # *reviews* are the days since each review\n");
+    expect(item.body.trimEnd()).toEndWith("print(next_gap(1, 2))\n```");
+  });
+
+  test("a public Google Doc is titled by its name, from the download (F179)", async () => {
+    const exp = "https://docs.google.com/document/d/1AbC_dEf/export?format=docx";
+    serve({ [exp]: { body: readFileSync(file("google-export.docx")), type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers: { "content-disposition": `attachment; filename="Study Guide.docx"; filename*=UTF-8''Constitution%20Study%20Guide.docx` } } });
+    const item = await addSource(await tempLibrary(), "https://docs.google.com/document/d/1AbC_dEf/edit?usp=sharing");
+    expect(item.meta.title).toBe("Constitution Study Guide");
+    expect(item.body).toContain("START GOOGLE: retrieval practice");
+    expect(item.body).toContain("END GOOGLE: space the next session");
   });
 
   test("a forum thread (Hacker News): its title, poster and date, every comment under its author, replies nested", async () => {
@@ -390,6 +411,19 @@ describe("import coverage: files", () => {
     expect(item.body).toMatch(/^-\s+Short gaps first$/m);
     expect(item.body).toContain("| Retrieval practice | 0.61 |");
     expect(item.body).toContain("Mix problem types");
+  });
+
+  test("Word: code keeps its lines and indent, fenced, and comments come along (F177, F187)", async () => {
+    // Made for Ore with Pandoc (docs/reviews/2026-11-14-codex-sweep-2/fixtures/make-fixtures.py).
+    const item = await addSource(await tempLibrary(), file("word-code.docx"));
+    expect(item.meta.title).toBe("Office Learning");
+    expect(item.meta.author).toBe("Ore Fixture Author");
+    expect(item.body).toContain("START OFFICE: retrieval improves memory.");
+    expect(item.body).toContain("# Final lesson");
+    expect(item.body).toContain("```\ndef learn():\n    return 42\n```");
+    expect(item.body).toContain("| Recall | 9 |");
+    expect(item.body).toContain("COMMENT EVIDENCE: check the study sample.");
+    expect(item.body).toContain("END OFFICE: practice tomorrow.");
   });
 
   test("Word: a never-titled file (Word's \"Document1\") is titled by its first heading", async () => {
@@ -1101,6 +1135,17 @@ describe("import coverage: audio and podcasts", () => {
     writeFileSync(f, new Uint8Array(2048));
     return f;
   };
+
+  test("an audio file's own title, artist and chapters come in (F180)", async () => {
+    for (const ext of ["mp3", "m4a"]) {
+      const item = await addSource(await tempLibrary(), join(FIX, "audio", `chaptered.${ext}`));
+      expect(item.meta).toMatchObject({ title: "Chaptered Audio Learning", author: "Ore Fixture Author" });
+      // An MP4's chapter track reads under `bun` (the CLI) but not under `bun test`; the MP3's ID3 chapters read in both.
+      if (ext === "m4a") continue;
+      expect(item.body).toStartWith("### Recall chapter\n\n[00:00] Welcome back to the show.");
+      expect(item.body).toContain("### Spacing chapter\n\n[00:04] Today we talk about spaced repetition.");
+    }
+  });
 
   test("an audio link is titled by its own file name, not where it redirects", async () => {
     const url = "https://www.buzzsprout.com/123/episodes/17456166-travel-with-kids.mp3";

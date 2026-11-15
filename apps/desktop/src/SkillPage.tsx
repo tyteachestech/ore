@@ -16,7 +16,7 @@ import { FindBar, onceFound } from "./Find";
 import { escTaken, Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
-import { Gem, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
+import { Gem, GEM_WORD, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
 import { depthText, levelProgress, ore, opt, PHONE, type Question, type Research, type Skill, type SkillStats, type Try } from "./ore";
 import { AnswerBox, AskQuestion, announce, questionText, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
@@ -453,14 +453,14 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
   const [open, setOpen] = useState(false);
   const p = levelProgress(k);
   // One vocabulary with the header: the gem states, then cards not reviewed yet as empty slots.
-  const legend: [GemKind, number, string, { seam?: boolean; polished?: boolean }?][] = [
-    ["cut", k.polished ?? 0, "Polished: cut, and passed as a remix", { polished: true }],
-    ["cut", k.mended ?? 0, "Won back: cut, missed, and cut again", { seam: true }],
-    ["cut", k.solid - (k.polished ?? 0) - (k.mended ?? 0), "Cut: you'd still recall these three weeks from now"],
-    ["ready", k.ready, "Nearly cut: cut if you recall them at their next review"],
-    ["dull", k.win_back, "Missed: cut once, then missed. Review to win them back"],
-    ["rough", k.growing - k.ready - k.win_back, "Rough: reviewed, not near solid yet"],
-    ["empty", k.new, "Not reviewed yet"],
+  const legend: [GemKind, number, string, string, { seam?: boolean; polished?: boolean }?][] = [
+    ["cut", k.polished ?? 0, GEM_WORD.polished, "Polished: cut, and passed as a remix", { polished: true }],
+    ["cut", k.mended ?? 0, GEM_WORD.mended, "Won back: cut, missed, and cut again", { seam: true }],
+    ["cut", k.solid - (k.polished ?? 0) - (k.mended ?? 0), GEM_WORD.cut, "Cut: you'd still recall these three weeks from now"],
+    ["ready", k.ready, GEM_WORD.ready, "Nearly cut: cut if you recall them at their next review"],
+    ["dull", k.win_back, GEM_WORD.dull, "Missed: cut once, then missed. Review to win them back"],
+    ["rough", k.growing - k.ready - k.win_back, GEM_WORD.rough, "Rough: reviewed, not near solid yet"],
+    ["empty", k.new, GEM_WORD.empty, "Not reviewed yet"],
   ];
   const shown = all ? k.explain : k.explain.slice(0, EXPLAIN_SHOWN);
   return (
@@ -494,12 +494,12 @@ function Strength({ s, color }: { s: SkillStats; color?: string }) {
           aria-label="Gem breakdown" className="popover strength-pop" data-color={color} side="bottom" align="end" sideOffset={6} collisionPadding={12}>
           <div className="strength">
             <div className="strength-legend">
-              {legend.map(([kind, n, why, look]) =>
+              {legend.map(([kind, n, word, why, look]) =>
                 n > 0 ? (
                   <Hint key={why} text={why}>
                     <span role="img" aria-label={`${n} · ${why}`} tabIndex={0}>
                       <Gem kind={kind} size={18} {...look} />
-                      {n}
+                      {n.toLocaleString()} {word}
                     </span>
                   </Hint>
                 ) : null,

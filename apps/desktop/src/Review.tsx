@@ -23,7 +23,7 @@ import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { LapCentre, lapPlan, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, kept, useFocusWhileMounted, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, kept, LIBRARY_BACK, useFocusWhileMounted, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { MOMENT_MOOD, momentFor, type Moment } from "./moment";
@@ -211,9 +211,11 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const before = useRef<Today | null>(null);
   /** Today as the session started, for the quick quiz's ring. */
   const [start, setStart] = useState<Today | null>(null);
+  /** The local day `before` was read on. */
+  const beforeDay = useRef("");
   /** The ratings of this session, newest last, to take back with ⌘Z one after another (Anki's Undo): each
    *  review's ts and the session as it was before it. */
-  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget }[]>([]);
+  const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget; day: string; ms: number }[]>([]);
   const last = undos.at(-1);
   /** Cards retired in this session: taking back a rating before one brings the queue back without it. */
   const retired = useRef(new Set<string>());
@@ -259,6 +261,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         }
         const t = ore<Today>("today").then((t) => {
           before.current = t;
+          beforeDay.current = new Date().toLocaleDateString("sv");
           setStart(t);
         }, () => {});
         // --start: a session opens on a likely recall (D176); the quick quiz asks the card that is next.
@@ -294,17 +297,25 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
   // comes up twice. Past the day's new-card limits, so a draft it didn't rate stays; the card on screen
   // goes only if he hasn't started on it.
+  // Back after time away does the same, since the CLI, `/ore` or the phone may have rated, changed or deleted one
+  // (F173); the next card loads again, and the one on screen too if he hasn't started on it.
   useEffect(() => {
-    if (quick || PHONE) return;
-    const un = listen("quiz-closed", () => {
+    const reconcile = (outside: boolean) =>
       ore<DueEntry[]>("due", "--all", ...pickArgs(pick, source)).then((fresh) => {
         const due = new Set(fresh.map((e) => e.id));
         const s = now.current;
         const started = s.phase !== "answer" || !!s.answer.trim();
+        if (outside) dropAhead();
+        if (outside && !started && s.card && due.has(s.card.id)) {
+          const id = s.card.id;
+          loadCard(id).then((c) => now.current.card?.id === id && now.current.phase === "answer" && !now.current.answer.trim() && setCard(c), () => {});
+        }
         setQueue((q) => q && (q.every((e) => due.has(e.id)) ? q : q.filter((e, i) => due.has(e.id) || (i === 0 && started))));
       }, () => {});
-    });
-    return () => void un.then((f) => f());
+    const back = () => void reconcile(true);
+    addEventListener(LIBRARY_BACK, back);
+    const un = quick || PHONE ? null : listen("quiz-closed", () => void reconcile(false));
+    return () => (removeEventListener(LIBRARY_BACK, back), void un?.then((f) => f()));
   }, [quick, pick, source]);
 
   /** A fresh start on a card: no answer, no marks, its clock not yet started. */
@@ -601,7 +612,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     setBusy(true);
     let goalClosed = false, saved = false;
     try {
-      const elapsed = Date.now() - shownAt.current;
+      // A wall clock set back since it showed (a time zone fix, a sync) never makes it negative (F183).
+      const elapsed = Math.max(0, Date.now() - shownAt.current);
       await sessionReady.current;
       const args = [
         card.id,
@@ -619,6 +631,21 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       // An everyday rating leaves a moment still showing to run its time.
       if (after) setMoment({ ...after, n: Date.now(), color });
       drafts.delete(card.id);
+      // Past midnight the day's minutes start again: read the new day's Today, as if it was read just before this
+      // rating, so the goal and the ring count today's minutes, not yesterday's plus these (F184).
+      if (before.current && new Date().toLocaleDateString("sv") !== beforeDay.current) {
+        const t = await ore<Today>("today").catch(() => null);
+        if (t) {
+          const add = Math.min(elapsed, ACTIVE_CAP_MS, t.active_ms);
+          before.current = { ...t, active_ms: t.active_ms - add, met: t.active_ms - add >= t.goal_ms };
+          beforeDay.current = new Date().toLocaleDateString("sv");
+          setStart(before.current);
+          activeMs.current = add;
+          // Yesterday's goal note was yesterday's: today's goal is told when it closes.
+          goalTold.current = false;
+          setGoalSaid(false);
+        }
+      }
       // The day's goal closing (D65) is told by the mole; the session flows on (D246).
       const b = before.current;
       goalClosed = !!b && b.counts && !b.met && b.active_ms + activeMs.current >= b.goal_ms;
@@ -674,7 +701,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
           );
         },
       );
-    setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget }]);
+    setUndos((u) => [...u, { card: id, ts: r.ts, ...was, forget, day: beforeDay.current, ms: Math.min(elapsed, ACTIVE_CAP_MS) }]);
     // Every rating is a step, a miss too: a rating always moves "Exercise N of M" on, and a miss adds its retry
     // as one more step (D59).
     setDone((n) => n + 1);
@@ -699,7 +726,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         setEnd(null);
       }
       reviewed.current--;
-      activeMs.current = last.activeMs;
+      // A rating from before midnight's rollover: the count is the new day's now, so only its own time comes off.
+      activeMs.current = last.day === beforeDay.current ? last.activeMs : Math.max(0, activeMs.current - last.ms);
       putOffIds.current = new Set(last.off);
       // D177's one more goes with the rating that earned it.
       wonLast.current = last.won;
@@ -728,7 +756,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   /** What he has on screen, for ⌘Z after a Later. An Explain answer still being checked comes back to check
    *  again (that grade is dropped as it moves on), with what he typed and how sure he was. */
   const shownNow = (c: CardFull): Shown => {
-    const base = { card: c, answer, conf, elapsed: Date.now() - shownAt.current };
+    const base = { card: c, answer, conf, elapsed: Math.max(0, Date.now() - shownAt.current) };
     if (phase !== "checked" || (c.kind === "prompt" && !inHead && !marks && !gradeError))
       return { ...base, phase: "answer", inHead: false, grade: null, marks: null, remark: false, gradeError: null, passage: null, quoteAt: 0, passageGone: null, asking: false };
     // Ask open (D192): it comes back open, its chat kept as closing and opening it keeps it.
@@ -863,10 +891,17 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
 
   /** A card's new wording, and an Explain card's key points when given, on the history: undo puts the old
    *  ones back (and on screen, if it still is). */
-  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true) => {
+  /** Only what changed from `from` is written, so a field edited outside meanwhile keeps its edit (F174). */
+  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true, from: { question: string; answer: string; rubric?: string[] } = c) => {
     const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric };
+    const changed = [
+      ...(question !== from.question ? [opt("question", question)] : []),
+      ...(answer !== from.answer ? [opt("answer", answer)] : []),
+      ...(rubric && rubric.join("\n") !== (from.rubric ?? c.rubric).join("\n") ? rubric.map((p) => opt("point", p)) : []),
+    ];
+    if (!changed.length) return;
     dropAhead();
-    const saved = await ore<CardFull>("card", "set", c.id, opt("question", question), opt("answer", answer), ...(rubric ?? []).map((p) => opt("point", p)), ...variantOpt(c));
+    const saved = await ore<CardFull>("card", "set", c.id, ...changed, ...variantOpt(c));
     const s = now.current;
     setCard((cur) => (cur?.id === c.id ? saved : cur));
     // New key points: the AI's grade was for the old ones, so it goes (and one still on its way). A point
@@ -888,8 +923,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       setDraft(loaded.current);
     }
     if (undoable) {
-      const put = (w: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false);
-      notify("Exercise edit", "quiet", put(was), put({ question, answer, rubric }));
+      const put = (w: typeof was, f: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false, f);
+      notify("Exercise edit", "quiet", put(was, { question, answer, rubric }), put({ question, answer, rubric }, was));
     }
   };
 

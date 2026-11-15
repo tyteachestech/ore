@@ -1,0 +1,13 @@
+;FFMETADATA1
+title=Chaptered Audio Learning
+artist=Ore Fixture Author
+[CHAPTER]
+TIMEBASE=1/1000
+START=0
+END=4000
+title=Recall chapter
+[CHAPTER]
+TIMEBASE=1/1000
+START=4000
+END=12000
+title=Spacing chapter

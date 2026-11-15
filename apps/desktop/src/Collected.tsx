@@ -26,6 +26,9 @@ const CELEBRATE: Intent[] = ["card", "question", "apply"];
 /** How many dots of ore a highlight sends to its chip. */
 const ORE = 6;
 const PLURAL: Record<Intent, string> = { keep: "Highlights", card: "Key points", question: "Questions", apply: "To try" };
+const ONE: Record<Intent, string> = { keep: "Highlight", card: "Key point", question: "Question", apply: "To try" };
+/** A chip's count in words: "1 Question", "3 Key points". */
+export const collectedCount = (i: Intent, n: number) => `${n} ${(n === 1 ? ONE : PLURAL)[i]}`;
 
 type Props = {
   anns: Annotation[];
@@ -138,12 +141,12 @@ export function Collected({ anns, ready, rectOf, onOpen, fit = "all" }: Props) {
         const Glyph = ICON[i];
         const popping = pop?.intent === i;
         return (
-          <Hint key={i} text={`${counts[i]} ${PLURAL[i].toLowerCase()} collected here`} keys="collected" side="top">
+          <Hint key={i} text={`${collectedCount(i, counts[i]).toLowerCase()} collected here`} keys="collected" side="top">
             <button
               key={popping ? `${i}-${pop.n}` : i}
               ref={(el) => void (el ? chips.current.set(i, el) : chips.current.delete(i))}
               className={`collected-chip ${i}${popping ? " pop" : ""}`}
-              aria-label={`${counts[i]} ${PLURAL[i]}`}
+              aria-label={collectedCount(i, counts[i])}
               onClick={() => onOpen(i)}
             >
               {popping && <span className="plus" aria-hidden="true">+1</span>}

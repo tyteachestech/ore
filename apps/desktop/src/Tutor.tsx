@@ -170,7 +170,9 @@ export function useTutorChat(notify: Notify) {
     const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: said(x), ...(x.exercise ? { exercise: x.exercise } : {}), ...(x.files?.length ? { files: x.files } : {}) }] : []));
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
     // second or two instead of the whole reply after five.
-    const stop = await listen<{ stream?: string; reply?: string; searching?: boolean }>("ore-progress", ({ payload: p }) => {
+    const stop = await listen<{ stream?: string; reply?: string; searching?: boolean; ai?: TutorTurn["ai"] }>("ore-progress", ({ payload: p }) => {
+      // Who is answering, said first: a reply stopped part way is saved with it (F186).
+      if (p.stream === t.id && mine() && p.ai) return void answering.current.set(t.id, p.ai);
       if (p.stream === t.id && mine() && p.reply !== undefined) pulse("tutor"); // words arriving: the mole's lamp follows them (D263)
       if (p.stream === t.id && mine()) patch(chat, t.id, p.reply !== undefined ? { partial: p.reply } : p.searching ? { searching: true } : { searching: false, searched: true });
     }).catch(() => () => {});
@@ -206,6 +208,8 @@ export function useTutorChat(notify: Notify) {
   /** Stops the reply being written (ChatGPT's and Claude's Stop): the words so far stay as the reply, with
    *  none it says Stopped and offers Try again. The turn settles now; the cancelled run's end is ignored. */
   const jobs = useRef(new Map<string, string>());
+  /** Who is writing each reply in flight, as its stream said. */
+  const answering = useRef(new Map<string, NonNullable<TutorTurn["ai"]>>());
   const stop = () => {
     const chat = metaNow.current?.id;
     const t = now.current.find((x) => x.reply === undefined && !x.error);
@@ -215,7 +219,8 @@ export function useTutorChat(notify: Notify) {
     flying.current.delete(t.id);
     void cancelOre(job);
     const said = t.partial?.replace(CUT_MARKS, "").trim();
-    patch(chat, t.id, { ...(said ? { reply: said, citations: [], steps: [], marks: [] } : { error: "Stopped." }), stopped: true, partial: undefined, searching: undefined });
+    const ai = answering.current.get(t.id);
+    patch(chat, t.id, { ...(said ? { reply: said, citations: [], steps: [], marks: [], ...(ai ? { ai } : {}) } : { error: "Stopped." }), stopped: true, partial: undefined, searching: undefined });
   };
   /** Asks a turn again: Try again after a failure, Try another reply, or his message edited (`edited`). A
    *  reply it already had is kept as a version he can flip back to (D201); a failure is replaced. */

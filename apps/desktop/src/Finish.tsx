@@ -85,7 +85,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const burstColor = doc.skills.map((id) => skills?.find((s) => s.id === id)?.color).find(Boolean);
   const draft = drafts.get(doc.id) ?? keptDraft(doc);
   const [qs, setQs] = useState<Prequestion[]>(draft?.qs ?? doc.prequestions ?? []);
-  /** "Leave anything out?" (D100): his words, sent to the AI with the recall. */
+  /** "Skip a part of this source?" (D100): his words, sent to the AI with the recall. */
   const [leave, setLeave] = useState(draft?.leave ?? doc.leave_out?.text ?? "");
   // Stopped before the last few lines: the finish covers what he reached, shown as where he stopped.
   const partway = reached !== undefined && doc.body.length - reached > 400;
@@ -229,7 +229,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       r = await ore<{ prequestions: Prequestion[] }>("scope", doc.id, ...(partway ? [opt("reached", String(reached))] : []), ...(leave.trim() ? [opt("leave-out", leave.trim())] : []));
     } catch (e) {
       // His recall and note stay; Continue tries again.
-      notify(`Couldn’t leave that out: ${errorText(e)} Try again, or clear “Leave anything out?”.`, "error");
+      notify(`Couldn’t leave that out: ${errorText(e)} Try again, or clear “Skip a part of this source?”.`, "error");
       return null;
     }
     setQs((cur) => cur.map((p, i) => ({ ...p, points: p.points ?? r.prequestions[i]?.points, skipped: r.prequestions[i]?.skipped })));
@@ -452,8 +452,9 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           {qs.length > 0 && (
             <input
               className="field quiz-leave"
-              aria-label="Leave anything out?"
-              placeholder="Leave anything out? Like “the coding part”"
+              aria-label="Skip a part of this source?"
+              // The iPhone's field is 320pt of 16pt text: the full line would be cut there, so it drops three words.
+              placeholder={PHONE ? "Skip a part? Like “the coding part”" : "Skip a part of this source? Like “the coding part”"}
               value={leave}
               onChange={(e) => setLeave(e.target.value)}
               readOnly={busy}
