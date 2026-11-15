@@ -90,8 +90,8 @@ describe("sweep runner", () => {
   });
 });
 
-// Review of #442 (F-new-sweep-from-copy): `cp -R from lib` into a lib left by an earlier run made lib/<from's name>.
-describe("a tester from a library folder (F-new-sweep-from-copy)", () => {
+// Review of #442 (F360): `cp -R from lib` into a lib left by an earlier run made lib/<from's name>.
+describe("a tester from a library folder (F360)", () => {
   test("its library is a copy of the folder, even where an earlier run left one", async () => {
     const dir = mkdtempSync(join(tmpdir(), "ore-sweep-"));
     const from = join(dir, "old-ore");

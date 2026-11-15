@@ -248,9 +248,9 @@ function saveAndPaint(md: string, root: HTMLElement, sel: Range) {
   return { q, painted: r };
 }
 
-// F-new-formula-highlight: a formula is drawn by KaTeX, so the reader's text index left it out. A selection inside
+// F352: a formula is drawn by KaTeX, so the reader's text index left it out. A selection inside
 // one saved the nearest same letter of the prose ("E" in the title), and one starting in it dropped the formula.
-describe("a selection on a formula saves that formula and paints it again (F-new-formula-highlight)", () => {
+describe("a selection on a formula saves that formula and paints it again (F352)", () => {
   const inMath = (n: Text) => !!n.parentElement?.closest(".katex-html");
   const cases: [string, (root: HTMLElement) => Range, string][] = [
     ["a letter inside an inline formula", (root) => over(root, "E", 0, inMath), "$$E = mc^2$$"],
@@ -296,9 +296,9 @@ describe("a selection on a formula saves that formula and paints it again (F-new
   });
 });
 
-// F-new-code-symbols: in code every character is literal, but the skeletons dropped `*_\`[]|~` there as in prose:
+// F353: in code every character is literal, but the skeletons dropped `*_\`[]|~` there as in prose:
 // `items[0]` was saved as "items[0", and a quote of only "|" or "_" could never be painted.
-describe("code keeps its brackets, underscores and pipes in a highlight (F-new-code-symbols)", () => {
+describe("code keeps its brackets, underscores and pipes in a highlight (F353)", () => {
   for (const [phrase, nth] of [["items[0]", 0], ["[1, 2, 3]", 0], ["_private_", 0], ["|", 0], ["_", 0], ["values[0]", 0]] as const) {
     test(phrase, () => {
       const root = render(LAB);
@@ -312,9 +312,9 @@ describe("code keeps its brackets, underscores and pipes in a highlight (F-new-c
   }
 });
 
-// F-new-inner-highlight: where highlights overlap, the one opened is the innermost under the click or the
+// F354: where highlights overlap, the one opened is the innermost under the click or the
 // selection, never the first in the reader's list: Undo puts a restored inner highlight last, behind its outer one.
-describe("the innermost of overlapping highlights opens, in any order (F-new-inner-highlight)", () => {
+describe("the innermost of overlapping highlights opens, in any order (F354)", () => {
   const { hitTest, holderOf } = textMod;
   const setup = () => {
     const root = render("Alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike november.\n");
@@ -350,10 +350,10 @@ describe("the innermost of overlapping highlights opens, in any order (F-new-inn
   });
 });
 
-// Review of #442 (F-new-indented-code-symbols): the page keeps `*_[]|~` in any <code>, but the source's code map knew
+// Review of #442 (F358): the page keeps `*_[]|~` in any <code>, but the source's code map knew
 // only fences and backtick spans, so an indented code block read "consta=items0;" in the source and
 // "consta=items[0];" on the page, and nothing in it could be highlighted.
-describe("indented code keeps its symbols too, as CommonMark reads it (F-new-indented-code-symbols)", () => {
+describe("indented code keeps its symbols too, as CommonMark reads it (F358)", () => {
   const INDENTED = [
     "Some prose with a [link](https://example.com) and *emphasis*.",
     "",
@@ -381,9 +381,9 @@ describe("indented code keeps its symbols too, as CommonMark reads it (F-new-ind
   });
 });
 
-// Review of #442 (F-new-moved-code-highlight): a quote no longer at its offset (text added above it) was read as prose,
+// Review of #442 (F359): a quote no longer at its offset (text added above it) was read as prose,
 // its brackets dropped, so a highlight in code never painted again once the text before it changed.
-test("a code highlight paints again after the text before it changes (F-new-moved-code-highlight)", () => {
+test("a code highlight paints again after the text before it changes (F359)", () => {
   const md = LAB;
   const fence = md.indexOf("```js");
   const at = md.indexOf("values[0]", fence);

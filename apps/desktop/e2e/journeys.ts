@@ -3260,9 +3260,9 @@ journey("highlight note: a note whose save fails is kept, and saves when the hig
   await until("the retried save landed", async () => (await note.inputValue()) === "first thought and two");
 });
 
-// F-new-undo-pending-remove: Remove highlight put its step on the history only once its write was back, so a ⌘Z
+// F350: Remove highlight put its step on the history only once its write was back, so a ⌘Z
 // meanwhile took back the step before it, his note, and cleared it; and Undo of a removal wrote back only its status.
-journey("highlight: ⌘Z while its removal is being written brings it back with its type and note (F-new-undo-pending-remove)", async (page) => {
+journey("highlight: ⌘Z while its removal is being written brings it back with its type and note (F350)", async (page) => {
   const title = `Pending removal ${Date.now()}`;
   const NOTE = "My explanation must remain.";
   await page.getByRole("button", { name: "+ Add" }).click();
@@ -3338,10 +3338,10 @@ async function keyPointWithNote(page: Page, note: string) {
   return { popup, saved, open, slow };
 }
 
-// Review of #442 (F-new-held-undo-order): the held Undo of a slow removal ran its write once the removal was back,
+// Review of #442 (F356): the held Undo of a slow removal ran its write once the removal was back,
 // but a Redo pressed meanwhile ran at once, so the Undo's write landed last and the highlight came back on the page
 // and in the library, while the history said it was removed.
-journey("highlight: ⌘Z then ⇧⌘Z while its removal is being written leaves it removed (F-new-held-undo-order)", async (page) => {
+journey("highlight: ⌘Z then ⇧⌘Z while its removal is being written leaves it removed (F356)", async (page) => {
   const { popup, saved, open, slow } = await keyPointWithNote(page, "Keep me.");
   await open();
   await popup.waitFor();
@@ -3359,9 +3359,9 @@ journey("highlight: ⌘Z then ⇧⌘Z while its removal is being written leaves 
   if (await popup.isVisible()) throw new Error("⌘Z then ⇧⌘Z during the removal left the highlight on the page");
 });
 
-// Review of #442 (F-new-held-undo-order): two quick ⌘Z during a slow removal took back the note change before it at
+// Review of #442 (F356): two quick ⌘Z during a slow removal took back the note change before it at
 // once, then the removal's held Undo landed and wrote back the note it had captured over it.
-journey("highlight: two quick ⌘Z while its removal is being written bring it back with the note before (F-new-held-undo-order)", async (page) => {
+journey("highlight: two quick ⌘Z while its removal is being written bring it back with the note before (F356)", async (page) => {
   const { popup, saved, open, slow } = await keyPointWithNote(page, "First note.");
   await open();
   await popup.waitFor();
@@ -5209,9 +5209,9 @@ journey("answer pieces: one click rewrites a piece in place, ⌘Z puts the old w
   await page.waitForTimeout(300);
 });
 
-// Review of #442 (F-new-stale-answer-redo): a piece's Redo ran `rewrite` from the render that removed it, whose answer
+// Review of #442 (F357): a piece's Redo ran `rewrite` from the render that removed it, whose answer
 // list had only the piece's old ts; after Undo gave it a new one, a Redo that failed put `undefined` in the list.
-journey("answer pieces: Undo of a removed piece, then a Redo that fails, keeps the piece (F-new-stale-answer-redo)", async (page) => {
+journey("answer pieces: Undo of a removed piece, then a Redo that fails, keeps the piece (F357)", async (page) => {
   type Q = { id: string; note?: string; answers: { ts: string; text: string }[] };
   const kids = async () => ((await ore("questions", "--skill=learning")) as Q[]).find((x) => x.note === "Does this hold for kids?")!;
   const fail = (why: string | null) => page.evaluate((why) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = why ? { answer: why } : {}), why);
@@ -5242,9 +5242,9 @@ journey("answer pieces: Undo of a removed piece, then a Redo that fails, keeps t
   }
 });
 
-// F-new-undo-pending-siblings: removes that take the row away at once put their step on the history only once the write
+// F351: removes that take the row away at once put their step on the history only once the write
 // was back, so a ⌘Z meanwhile took back the step before (here the piece's edit) instead.
-journey("answer pieces: ⌘Z while an emptied piece is being removed brings that piece back, not the edit before it (F-new-undo-pending-siblings)", async (page) => {
+journey("answer pieces: ⌘Z while an emptied piece is being removed brings that piece back, not the edit before it (F351)", async (page) => {
   type Q = { id: string; note?: string; answers: { ts: string; text: string }[] };
   const kids = async () => ((await ore("questions", "--skill=learning")) as Q[]).find((x) => x.note === "Does this hold for kids?")!;
   const slow = (ms: number | null) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { answer: ms } : undefined), ms);
@@ -5279,7 +5279,7 @@ journey("answer pieces: ⌘Z while an emptied piece is being removed brings that
   }
 });
 
-journey("question panel: ⌘Z while Not answered here is being written puts the match back (F-new-undo-pending-siblings)", async (page) => {
+journey("question panel: ⌘Z while Not answered here is being written puts the match back (F351)", async (page) => {
   const item = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === TESTING)!.id;
   const q = ((await ore("questions", "--skill=learning")) as { id: string; note?: string }[]).find((x) => x.note === "Does this hold for kids?")!;
   await ore("match", item, q.id);
@@ -5293,7 +5293,7 @@ journey("question panel: ⌘Z while Not answered here is being written puts the 
     await row.getByRole("button", { name: "Question actions" }).click();
     await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = { match: 1500 }));
     await page.getByRole("menuitem", { name: "Not answered here" }).click();
-    // A click on the page first: the panel's "Ask one", focused once its list is empty, goes as ⌘Z fills it (F-new-ask-one-focus).
+    // A click on the page first: the panel's "Ask one", focused once its list is empty, goes as ⌘Z fills it (F355).
     await page.locator(".doc-head h1").click();
     await page.keyboard.press("Meta+z");
     await settled(page);

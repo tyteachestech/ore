@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { Window } from "happy-dom";
 
 // Math renders through KaTeX (D96): its glyphs and the `$$…$$` TeX are one character in both skeletons, so a
-// highlight across or inside a formula lines up with the source, and takes the whole formula (F-new-formula-highlight).
+// highlight across or inside a formula lines up with the source, and takes the whole formula (F352).
 const w = new Window();
 for (const k of ["document", "NodeFilter"] as const) (globalThis as Record<string, unknown>)[k] = (w as unknown as Record<string, unknown>)[k];
 const { indexText, sourceSkeleton } = await import("../src/text");
