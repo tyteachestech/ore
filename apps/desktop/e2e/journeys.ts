@@ -13496,13 +13496,40 @@ journey("tutor: a message sent while a reply is being written waits, goes when t
     await waiting.filter({ hasText: "Third question" }).waitFor();
     await tutor.getByRole("button", { name: "Stop the reply" }).click();
     await until("stopping gives the waiting message back", async () => (await field.inputValue()) === "Third question" && (await waiting.count()) === 0);
-    if (asked.length !== 2) throw new Error("a message waiting on a stopped reply was sent");
+    if ((asked.length as number) !== 2) throw new Error("a message waiting on a stopped reply was sent");
     await field.fill("");
   } finally {
     held.forEach((ok) => ok());
     await page.unroute(/\/ore$/);
   }
   await page.keyboard.press("Escape");
+});
+
+journey("⌘K: Tab on a source steps into what can be done with it, typing narrows the actions, ↵ runs one, and Esc steps back out (D-new-palette-actions)", async (page) => {
+  await page.keyboard.press("Meta+k");
+  const input = page.getByPlaceholder("Search sources or run a command…");
+  await input.waitFor();
+  await page.keyboard.type("Testing Effect");
+  await page.locator("[cmdk-item][data-selected=true]").filter({ hasText: TESTING }).waitFor();
+  await page.locator(".panel-foot").getByText("Actions").waitFor();
+  await page.keyboard.press("Tab");
+  await page.getByPlaceholder(`Do what with “${TESTING}”?`).waitFor();
+  const rows = page.locator("[cmdk-item]");
+  await rows.filter({ hasText: "Move to Done" }).waitFor();
+  if (await rows.filter({ hasText: "Rename" }).count()) throw new Error("Rename is offered where there is no row to rename in place");
+  // Esc steps back to the search, which is empty again; Esc once more closes.
+  await page.keyboard.press("Escape");
+  await input.waitFor();
+  await page.keyboard.type("Testing Effect");
+  await page.locator("[cmdk-item][data-selected=true]").filter({ hasText: TESTING }).waitFor();
+  await page.keyboard.press("Tab");
+  await page.keyboard.type("done");
+  await until("typing narrows the actions to the one he means", async () => (await rows.count()) === 1 && (await rows.first().innerText()).includes("Move to Done"));
+  await page.keyboard.press("Enter");
+  await page.getByRole("dialog", { name: "Command palette" }).waitFor({ state: "detached" });
+  await until("the source is marked done", async () => ((await ore("ls", "--status=done")) as { title: string }[]).some((i) => i.title === TESTING));
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts it back in To read", async () => !((await ore("ls", "--status=done")) as { title: string }[]).some((i) => i.title === TESTING));
 });
 
 let failed = 0;

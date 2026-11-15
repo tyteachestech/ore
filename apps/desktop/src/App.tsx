@@ -1906,6 +1906,16 @@ export function App() {
     ...(r.archived_at ? [] : [{ id: "archive", label: "Archive", hint: label(keys.archive), danger: true, divider: true, run: () => void archiveSource(r) }]),
   ];
 
+  /** What ⌘K offers on a source row of its own (Tab on the row): its ⋯ menu's actions, each skill a row of
+   *  its own. Not Rename, which edits a list row in place, nor the list's own Show menu and pin moves. */
+  const paletteSourceActions = (id: string): Action[] => {
+    const r = (items ?? []).find((i) => i.id === id);
+    if (!r) return [];
+    return rowActions(r)
+      .filter((a) => !["rename", "pin-up", "pin-down"].includes(a.id) && a !== showMenu)
+      .flatMap((a): Action[] => (a.sub ? a.sub.map((b) => ({ id: `${a.id}:${b.id}`, label: b.checked ? `Remove from ${b.label}` : `File under ${b.label}`, keywords: ["skill", "move"], run: b.run })) : [{ id: a.id, label: a.label, hint: a.hint, run: a.run }]));
+  };
+
   /** ⌘K follows what is open (a source, a skill page), never what is selected in a list (D178): a row's
    *  actions are on its ⋯ and its right-click. */
   const actions: Action[] = [
@@ -2601,6 +2611,7 @@ export function App() {
           }}
           onOpen={openSource}
           onAsk={(q) => openTutor(q)}
+          sourceActions={paletteSourceActions}
           onCreated={(s) => {
             reloadSkills();
             madeSkill(s);

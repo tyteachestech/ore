@@ -29,6 +29,8 @@ type Props = {
   onOpen: (item: string, at?: string) => void;
   /** Ask your library: the query as a question to his sources. Left out on the phone (AI runs on the Mac). */
   onAsk?: (question: string) => void;
+  /** What can be done with a source, for its row's action page (Tab on the row, D-new-palette-actions). */
+  sourceActions?: (id: string) => Action[];
   /** A skill made from the palette (New skill, New collection). */
   onCreated: (s: Skill) => void;
   onClose: () => void;
@@ -51,13 +53,15 @@ type Group = { heading: string; score: number; rows: Row[] };
 /** A match in the text: `what` names a match that isn't in the source's own text; `at` is where it lands (Reader's `jumpTo`). */
 type Hit = { key: string; item?: string; skill?: string; title: string; what?: string; at?: string; snippet?: string };
 /** A naming step, Raycast-style: the input names the thing, ↵ makes it, Esc goes back. */
-type Page = { kind: "skill"; collection: string } | { kind: "collection" };
+type Page = { kind: "skill"; collection: string } | { kind: "collection" } | { kind: "source"; id: string; title: string };
+/** The source a row stands for, if it is one: a title match, a recent one, or a match in its text. */
+const sourceOf = (value: string, hits: Hit[]) => (value.startsWith("source ") ? value.slice(7) : hits.find((h) => h.key === value)?.item);
 
 const TITLES = 8;
 
 /** ⌘K: recent sources, actions, skills, sources and courses by title, then sources whose text matches
  *  (`ore search`, SQLite FTS5) in their own group below. */
-export function Palette({ actions, recent, items, skills, skill, onSkill, onSkillNote, onOpen, onAsk, onCreated, onClose, leave }: Props) {
+export function Palette({ actions, recent, items, skills, skill, onSkill, onSkillNote, onOpen, onAsk, sourceActions, onCreated, onClose, leave }: Props) {
   const [q, setQ] = useState("");
   const [page, setPage] = useState<Page | null>(null);
   const byRecent = useMemo(() => [...items].sort((a, b) => touched(b).localeCompare(touched(a))), [items]);
@@ -125,7 +129,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
   };
 
   const create = async (name: string) => {
-    if (!page || !name || busy) return;
+    if (!page || page.kind === "source" || !name || busy) return;
     setBusy(true);
     try {
       const made = await ore<Skill>("skills", "add", name, opt("collection", page.kind === "skill" ? page.collection : ""));
@@ -153,7 +157,11 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
   const current = skills.find((s) => s.id === skill);
   const collections = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
   let groups: Group[];
-  if (page) {
+  if (page?.kind === "source") {
+    // A source's own actions (Raycast's action panel, Dice UI's command-stack): what its ⋯ menu offers,
+    // narrowed by what he types.
+    groups = [group("", (sourceActions?.(page.id) ?? []).map((a) => ({ value: a.label, label: a.label, keywords: a.keywords, extra: a.hint && <kbd>{a.hint}</kbd>, run: a.run })))];
+  } else if (page) {
     // "Other" is the skills in no collection, so naming it adds a skill there, as naming a collection that exists adds one to it.
     const other = page.kind === "collection" && isOther(query);
     const exists = page.kind === "collection" && (other ? "Other" : collections.find((c) => c.toLowerCase() === query.toLowerCase()));
@@ -277,7 +285,9 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
     f();
   };
   // A naming step keeps the palette open; every other row closes it first.
-  const pick = (r: Row) => (r.value === "create" || /^New (skill|collection)…$/.test(r.value) ? r.run() : run(r.run));
+  const pick = (r: Row) => (page?.kind !== "source" && (r.value === "create" || /^New (skill|collection)…$/.test(r.value)) ? r.run() : run(r.run));
+  /** The source under the highlight, when its row has an action page to step into. */
+  const stepInto = !page && sourceActions ? items.find((i) => i.id === sourceOf(selected, hits)) : undefined;
   const quick = groups.flatMap((g) => g.rows).slice(0, 9);
 
   useEffect(() => {
@@ -291,7 +301,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
     };
   }, []);
 
-  const placeholder = !page ? "Search sources or run a command…" : page.kind === "collection" ? "Name the collection…" : page.collection ? `Name the first skill in ${page.collection}…` : "Name the skill…";
+  const placeholder = !page ? "Search sources or run a command…" : page.kind === "source" ? `Do what with “${page.title}”?` : page.kind === "collection" ? "Name the collection…" : page.collection ? `Name the first skill in ${page.collection}…` : "Name the skill…";
 
   return (
     <Trap>
@@ -312,7 +322,11 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
             e.stopPropagation();
             setNumbers(false);
             pick(n);
-          } else if (e.key === "Tab") e.preventDefault(); // one input; arrows move through the list
+          } else if (e.key === "Tab") {
+            e.preventDefault(); // one input; arrows move through the list
+            // Tab on a source steps into what can be done with it (Raycast's ⌘K on a result, Linear's Tab).
+            if (!e.shiftKey && stepInto) open({ kind: "source", id: stepInto.id, title: stepInto.title });
+          }
           // Esc clears what he typed first, then goes back a page, then closes (Raycast).
           else if (e.key === "Escape" && q) {
             e.preventDefault();
@@ -349,7 +363,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
           )}
         </div>
         <Command.List ref={more}>
-          {!page && <Command.Empty>No matches</Command.Empty>}
+          {(!page || page.kind === "source") && <Command.Empty>No matches</Command.Empty>}
           {groups.map((g) => (
             <Command.Group key={g.heading} heading={g.heading || undefined}>
               {g.rows.map((r) => {
@@ -370,7 +384,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
             {page ? (
               <>
                 <span>
-                  <kbd>↵</kbd> {page.kind === "collection" ? "Next" : "Create"}
+                  <kbd>↵</kbd> {page.kind === "source" ? "Run" : page.kind === "collection" ? "Next" : "Create"}
                 </span>
                 <span>
                   <kbd>Esc</kbd> Back
@@ -381,6 +395,11 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
                 {groups.some((g) => g.rows.length > 0) && (
                   <span>
                     <kbd>↵</kbd> {/^(source |course |text |skill notes |Go to skill|All sources)/.test(selected) ? "Open" : selected === "ask" ? "Ask" : "Run"}
+                  </span>
+                )}
+                {stepInto && (
+                  <span>
+                    <kbd>Tab</kbd> Actions
                   </span>
                 )}
                 <span>
