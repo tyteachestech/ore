@@ -1,3 +1,5 @@
+import { still } from "./SideCursor";
+
 /** A highlight carried past the screen's edge (Books, Kindle): a selection or a highlight's edge held at the
  *  bottom of the text for a moment turns to the next screen of it, and at the top to the one before, so a
  *  passage that runs on past the page is kept whole. It waits first, so one that only ends on the last line
@@ -29,21 +31,22 @@ export function turnBy(dir: 1 | -1, el: { scrollTop: number; scrollHeight: numbe
   return dir * Math.max(0, Math.min(page, room));
 }
 
-const still = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-const token = () => (typeof getComputedStyle === "function" && parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--t-4"))) || 300;
-/** --ease-in-out (DESIGN.md "Motion"): the page is already on screen, moving. */
-const ease = (t: number) => {
-  // cubic-bezier(0.77, 0, 0.175, 1), solved for x by bisection.
+/** A motion token in ms, and a cubic-bezier() curve token as a function of time (DESIGN.md "Motion"). */
+const token = (name: string, fallback: string) => (typeof getComputedStyle === "function" && getComputedStyle(document.documentElement).getPropertyValue(name).trim()) || fallback;
+export function curve(css: string): (t: number) => number {
+  const [x1, y1, x2, y2] = (css.match(/-?[\d.]+/g) ?? ["0", "0", "1", "1"]).map(Number) as [number, number, number, number];
   const bez = (a: number, b: number, s: number) => 3 * a * s * (1 - s) ** 2 + 3 * b * s * s * (1 - s) + s ** 3;
-  let lo = 0,
-    hi = 1;
-  for (let i = 0; i < 20; i++) {
-    const m = (lo + hi) / 2;
-    if (bez(0.77, 0.175, m) < t) lo = m;
-    else hi = m;
-  }
-  return bez(0, 1, (lo + hi) / 2);
-};
+  return (t) => {
+    let lo = 0,
+      hi = 1;
+    for (let i = 0; i < 20; i++) {
+      const m = (lo + hi) / 2;
+      if (bez(x1, x2, m) < t) lo = m;
+      else hi = m;
+    }
+    return bez(y1, y2, (lo + hi) / 2);
+  };
+}
 
 export type EdgeTurn = {
   /** Where the moving edge is now, on screen; `only` keeps it to one way (a selection's end turns on, its start back). */
@@ -60,6 +63,9 @@ export function edgeTurn(o: {
   extend: (x: number, y: number) => void;
   /** How close to the band's edge a point turns it (a finger needs more room than the pointer). */
   edge?: number;
+  /** Held on, it turns again after each wait (default). Off where a held edge can't be told from a lifted
+   *  one (the iPhone's handles send nothing): one turn per move he makes. */
+  again?: boolean;
 }): EdgeTurn {
   let at: { x: number; y: number } | null = null;
   let dir: 1 | -1 | 0 = 0;
@@ -84,14 +90,17 @@ export function edgeTurn(o: {
     const done = () => {
       frame = 0;
       if (at) o.extend(at.x, at.y);
-      arm(); // still held there: the next turn waits its moment
+      if (o.again !== false) arm(); // still held there: the next turn waits its moment
+      else dir = 0;
     };
     if (still()) {
       el.scrollTop = from + d;
       return done();
     }
     const t0 = performance.now();
-    const ms = token();
+    const ms = parseFloat(token("--t-4", "300")) || 300;
+    // --ease-in-out: the page is already on screen, moving.
+    const ease = curve(token("--ease-in-out", "cubic-bezier(0.77, 0, 0.175, 1)"));
     const step = (now: number) => {
       const t = Math.min(1, (now - t0) / ms);
       el.scrollTop = from + d * ease(t);

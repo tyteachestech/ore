@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Intent } from "./ore";
 import { snapEdge, type Side } from "./snap";
 import { edgeTurn, type Band, type EdgeTurn } from "./edge-turn";
+import { PHONE, type Intent } from "./ore";
 
 // The open highlight's two edges, to drag (Kindle, Apple Books on iPhone): a stem the height of the line
 // with a knob, above the start and below the end, in the highlight's colour. An edge snaps to whole words (snap.ts), ⌥ for part of one;
@@ -83,7 +83,7 @@ export function Grab(p: {
     e.currentTarget.setPointerCapture(e.pointerId);
     const scroller = p.root.closest<HTMLElement>(".reader-scroll");
     // Held at the bottom of the text (the end) or its top (the start), the page turns and the edge goes on with it.
-    const turn = scroller ? edgeTurn({ scroller, band: p.band, extend: (x, y) => to(x, y) }) : null;
+    const turn = scroller ? edgeTurn({ scroller, band: p.band, edge: PHONE ? 72 : undefined, extend: (x, y) => to(x, y) }) : null;
     drag.current = { side, was: p.range.cloneRange(), now: p.range.cloneRange(), id: e.pointerId, alt: e.altKey, turn };
     p.onDragging(true);
   };

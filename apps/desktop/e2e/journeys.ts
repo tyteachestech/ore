@@ -12629,24 +12629,35 @@ journey("phone: a selection handle held at the bottom of the screen turns the pa
     const pane = page.locator(".phone-reader .reader-scroll");
     const top = () => pane.evaluate((e) => e.scrollTop);
     const was = await top();
-    // As iOS's handles move it: the selection's end dragged down to a word at the bottom of the screen.
-    const from = await page.evaluate(() => {
+    // As iOS's handles move it: a word selected, then the selection's end dragged down to a word at the bottom of the screen.
+    const start = await page.evaluate(() => {
       const b = document.querySelector<HTMLElement>(".phone-reader .reader-scroll")!.getBoundingClientRect();
       const ps = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")];
       const p = ps.find((p) => p.getBoundingClientRect().top > b.top + b.height / 2)!;
       const t = p.firstChild as Text;
       getSelection()!.setBaseAndExtent(t, 0, t, 7);
+      return Number(p.textContent!.match(/Passage (\d+)/)![1]);
+    });
+    await page.waitForTimeout(150); // a change of its own: a new selection alone never turns the page
+    const from = await page.evaluate((n) => {
+      const b = document.querySelector<HTMLElement>(".phone-reader .reader-scroll")!.getBoundingClientRect();
+      const ps = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")];
+      const t = ps.find((p) => p.textContent!.startsWith(`Passage ${n} `))!.firstChild as Text;
       const end = ps.find((q) => q.getBoundingClientRect().bottom > b.bottom - 40)!;
       const c = document.caretRangeFromPoint(end.getBoundingClientRect().left + 20, Math.min(end.getBoundingClientRect().bottom, b.bottom) - 30)!;
       getSelection()!.setBaseAndExtent(t, 0, c.startContainer, c.startOffset);
-      return { n: Number(p.textContent!.match(/Passage (\d+)/)![1]), last: Number(end.textContent!.match(/Passage (\d+)/)![1]) };
-    });
+      return { n, last: Number(end.textContent!.match(/Passage (\d+)/)![1]) };
+    }, start);
     await page.waitForTimeout(300);
     if ((await top()) !== was) throw new Error("the page turned before any pause");
     await until("held at the bottom, the page turns", async () => (await top()) > was + 300, 3000);
     await page.waitForTimeout(500);
     const sel = await page.evaluate(() => getSelection()!.toString());
     if (!sel.startsWith(`Passage ${from.n} `) || !sel.includes(`Passage ${from.last + 2} `)) throw new Error(`the selection didn't run on with the page: “${sel.slice(0, 60)}…${sel.slice(-60)}”`);
+    // Its handle held still sends nothing, so it can't be told from a lifted finger: one turn per move, never a run to the end.
+    const turned = await top();
+    await page.waitForTimeout(1500);
+    if ((await top()) !== turned) throw new Error("the page kept turning by itself after one turn, with no move of the handle");
   });
 }, "phone");
 
