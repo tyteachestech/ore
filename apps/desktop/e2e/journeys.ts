@@ -12443,6 +12443,23 @@ journey("phone: the reading pill and the reader's bottom bar each keep their own
   await until("a tap on the pill opens the sections", async () => (await pill.getAttribute("aria-expanded")) === "true");
 }, "phone");
 
+journey("phone: a source he has started keeps its prequestions a tap away in the bottom bar, and a question goes back to the block (D179)", async (page) => {
+  // The Mac's Reading for chip is a hover card in the toolbar; the phone had no way to them once a screen down.
+  const q = "What makes a retrieval attempt more useful?";
+  await phoneSource(page, TESTING);
+  const chip = page.locator(".phone-tools").getByRole("button", { name: /^Reading for 3 questions$/ });
+  await chip.waitFor();
+  if ((await page.locator(".preq-head").getAttribute("aria-expanded")) === "true") await tap(page, page.locator(".preq-head"));
+  await page.locator(".reader-scroll").first().evaluate((el) => el.scrollTo(0, el.scrollHeight / 2));
+  await tap(page, chip);
+  const sheet = page.getByRole("dialog", { name: "What you’re reading for" });
+  await tap(page, sheet.getByRole("button").filter({ hasText: q }));
+  await sheet.waitFor({ state: "detached" });
+  await until("the block is open and the question in view", async () =>
+    (await page.locator(".preq-head").getAttribute("aria-expanded")) === "true" &&
+    (await page.locator(".preq-q").filter({ hasText: q }).evaluate((el) => { const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; })));
+}, "phone");
+
 journey("phone: an Undo toast in a source leaves the bottom bar and the pill their taps", async (page) => {
   // The toast sat on the bar for its six seconds: a tap on Collected, Note or Find hit the toast.
   await phoneSource(page, TESTING);
