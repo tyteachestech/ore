@@ -35,7 +35,7 @@ import { citeQuote, citeSources, copyCited, type Cited } from "./cite";
 import { group, MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { findChapterEnds, Margin, type ChapterEnd, type MarginHandle } from "./Margin";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
-import { clickBelow, SidePanel, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
+import { clickBelow, SidePanel, SidePanelFrame, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
@@ -600,6 +600,8 @@ type LookUp = { word: string; range: Range; ann: string | null; top: number; lef
 
 type Props = {
   id: string;
+  /** What the row he opened it from already knows, drawn at once while the text is read (D299). */
+  known?: { title: string; author?: string };
   /** A post open beside the Feed (D289): J and K open the next and previous post. */
   onStep?: (by: 1 | -1) => void;
   /** Just added with no skill (D109): the skill picker opens with the source. */
@@ -1134,6 +1136,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const filling = useFilling(p.id);
   const opened = useRef<string | null>(null);
   const shownBodyOf = useRef<string | null>(null);
+  /** Goes up on "Try again" after a failed open: the read runs once more (F299). */
+  const [tries, setTries] = useState(0);
   useEffect(() => {
     let live = true;
     ore<Doc>("show", p.id, "--annotations").then(
@@ -1158,7 +1162,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     return () => {
       live = false;
     };
-  }, [p.id, changes]);
+  }, [p.id, changes, tries]);
 
   // Enrichment runs in the background after `ore add`; poll for prequestions for up to ~3 minutes
   // (`ore ls` carries the frontmatter without the body, which can be megabytes for a book).
@@ -3255,18 +3259,39 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   if (error)
     return (
       <div className="reader">
-        <div className="empty-state">
-          {error}
-          <br />
-          <kbd>Esc</kbd> back to sources
+        {/* The same block as Home's and the list's failure: what went wrong, Try again, and the way out. */}
+        <div className="empty-state err" role="alert">
+          <p>{error}</p>
+          {!/no longer in your library/.test(error) && (
+            <button className="pill-btn" onClick={() => (setError(null), setTries((n) => n + 1))}>
+              Try again
+            </button>
+          )}
+          <p className="empty-out"><kbd>Esc</kbd> back to sources</p>
         </div>
       </div>
     );
   if (!doc)
     return (
       <div className="reader">
-        {/* Shows only if opening takes a beat, so a quick open doesn't flash it. */}
-        <p className="loading reader-loading"><Working label="Opening…" /></p>
+        {/* Its title and author stand where they will be, from the row he clicked (Linear and Notion draw
+            the page's head before its body), so the open is never an empty pane.
+            Its own class: `.doc-head` means the source is read and its title can be worked. */}
+        <div className="reader-pane">
+        <div className="reader-scroll">
+          <div className="page">
+            {p.known && (
+              <header className="doc-opening">
+                <h1>{p.known.title}</h1>
+                {p.known.author && <div className="chips"><span className="byline"><span className="by">{p.known.author}</span></span></div>}
+              </header>
+            )}
+            {/* Shows only if opening takes a beat, so a quick open doesn't flash it. */}
+            <p className="loading reader-loading"><Working label="Opening…" /></p>
+          </div>
+        </div>
+        </div>
+        {p.notesOpen && !PHONE && <SidePanelFrame />}
       </div>
     );
 

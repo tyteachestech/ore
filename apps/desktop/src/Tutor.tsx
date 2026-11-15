@@ -13,6 +13,7 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { copiedFiles, pastesFiles } from "./copied";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
+import { mend } from "./mend";
 import remarkGfm from "remark-gfm";
 import { Evidence } from "./Evidence";
 import { SkillIcon } from "./IconPicker";
@@ -721,7 +722,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
                   </p>
                 ) : t.reply === undefined && t.partial ? (
                   // Its [n] markers wait for the citations, which come with the whole reply.
-                  <Answer text={t.partial.replace(CUT_MARKS, "")} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
+                  <Answer text={mend(t.partial.replace(CUT_MARKS, ""))} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
                 ) : t.reply === undefined ? (
                   // What it is doing, as far as the stream says (D146): his sources come first (D137), a web search
                   // is reported as it starts and ends, and after one the reply is written from what it found.

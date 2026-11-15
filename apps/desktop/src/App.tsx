@@ -63,6 +63,17 @@ import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setWidth
 /** wry on macOS reports file-drop positions in CSS points (see dropPoint). */
 const MAC = navigator.userAgent.includes("Mac");
 
+const LAST_SKILLS = "ore.skills.last";
+/** The skills the sidebar showed last time, or none: only a stand-in until `ore skills` answers. */
+function lastSkills(): Skill[] {
+  try {
+    const all: unknown = JSON.parse(load(LAST_SKILLS) ?? "[]");
+    return Array.isArray(all) && all.every((s) => s && typeof s.id === "string" && typeof s.name === "string") ? (all as Skill[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 const TABS: { id: Tab; label: string; key: KeyId }[] = [
   { id: "toread", label: "To read", key: "go-toread" },
   { id: "done", label: "Done", key: "go-done" },
@@ -169,7 +180,9 @@ export function App() {
   useReminderAgent();
   const [items, setItems] = useState<Item[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
-  const [skills, setSkills] = useState<Skill[]>([]);
+  // The skills as last seen stand in until this launch's answer comes (D299): the sidebar opens
+  // whole, where it used to open as three bare words and jump when the icons arrived (F300).
+  const [skills, setSkills] = useState<Skill[]>(lastSkills);
   const [status, setStatus] = useState<Tab>(() => lastView().status);
   /** Archived sources, for the Archived tab. */
   const [archived, setArchived] = useState<Item[]>([]);
@@ -347,6 +360,7 @@ export function App() {
     loadSkills().then(
       (all) => {
         setSkills(all);
+        save(LAST_SKILLS, JSON.stringify(all));
         setSkill((k) => (k && !all.some((s) => s.id === k) ? null : k));
       },
       // Try again while `ore` is still down says so again in the same toast.
@@ -2187,7 +2201,7 @@ export function App() {
         </div>
       ) : <div className="empty-state">{empty(status, keys)}</div>)}
       {q && hits.q === q && hits.error && <div className="empty-state err" role="alert">Couldn’t search the text: {hits.error} Titles still filter.</div>}
-      {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">Nothing in {TABS.find((s) => s.id === status)?.label ?? "Archived"} matches “{q}”.</div>}
+      {q && hits.q === q && !hits.error && rows.length === 0 && <div className="empty-state">Nothing in {TABS.find((s) => s.id === status)?.label ?? "Archived"} matches “{q}”. <button className="link" onClick={() => setQuery("")}>Clear the search</button></div>}
       {/* A grid, not a listbox: a row holds its own controls (chips, ⋯), which an option may not (ARIA's layout grid). */}
       {rows.length > 0 && <div role="grid" aria-multiselectable="true" aria-label="Sources">
       <DndContext
@@ -2395,6 +2409,7 @@ export function App() {
           <Reader
             key={openId}
             id={openId}
+            known={items?.find((i) => i.id === openId)}
             onStep={feedSplit ? (by) => {
               // The list holds the keys while the next post loads; the post takes them when it shows.
               document.querySelector<HTMLElement>(".feed-col .feed-list")?.focus({ preventScroll: true });

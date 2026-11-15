@@ -13433,6 +13433,91 @@ journey("feed: a post reads beside the list, J and K step through the posts, and
   }
 });
 
+journey("source note: the format bar shows whole in the side panel, reaching over the page when the panel is narrower than it (F295)", async (page) => {
+  await openSource(page, TESTING);
+  const pm = page.locator(".mynotes .note-editor .ProseMirror").first();
+  await pm.click();
+  await page.keyboard.press("Meta+a");
+  await page.keyboard.type("## Recall beats rereading every time");
+  await page.keyboard.press("Shift+Home");
+  const bar = page.locator(".sel-bar");
+  await bar.waitFor();
+  await until("every part of the bar is in sight", () => bar.evaluate((el) => {
+    const b = el.getBoundingClientRect();
+    if (b.left < 0 || b.right > innerWidth) return false;
+    // What is drawn at the bar's two ends is the bar itself, not a panel over it.
+    return [b.left + 3, b.right - 3].every((x) => el.contains(document.elementFromPoint(x, b.top + b.height / 2)));
+  }));
+  await page.keyboard.press("Meta+z");
+});
+
+journey("Settings: each section opens at its top, however far the last one was scrolled (F296)", async (page) => {
+  await page.setViewportSize({ width: 1280, height: 600 });
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await page.keyboard.press("Meta+Comma");
+  await settings.waitFor();
+  await settings.getByRole("tab", { name: "General" }).click();
+  const main = settings.locator(".settings-main");
+  await main.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  await until("General scrolls", () => main.evaluate((el) => el.scrollTop > 0));
+  await settings.getByRole("tab", { name: "Review" }).click();
+  await until("Review opens at its top", () => main.evaluate((el) => el.scrollTop === 0));
+  await settings.getByRole("tab", { name: "General" }).click();
+  await page.keyboard.press("Escape");
+});
+
+journey("all sources: a search that matches nothing offers Clear the search, and the rows stop at 1120px on a wide window (F297, F298)", async (page) => {
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator("main .list .row").first();
+  await row.waitFor();
+  const box = (await row.boundingBox())!;
+  if (box.width > 1144) throw new Error(`a row is ${box.width}px wide on a 1920px window`);
+  const bar = (await page.locator("main .list-bar").boundingBox())!;
+  if (Math.abs(bar.x - (box.x + 12)) > 1) throw new Error(`the head starts at ${bar.x}, the rows' text column at ${box.x + 12}`);
+  await page.keyboard.press("Meta+f");
+  const search = page.getByRole("textbox", { name: "Search sources" });
+  await until("⌘F puts the keys in the search", () => search.evaluate((el) => el === document.activeElement));
+  await page.keyboard.type("zzqqzz");
+  await page.getByRole("button", { name: "Clear the search" }).click();
+  await row.waitFor();
+});
+
+journey("opening a source: its title stands at once where it will stay, the panel's place held, while the text is read; a relaunch shows the sidebar whole (D299, F300)", async (page) => {
+  type Slow = { __ORE_SLOW?: Record<string, number> };
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row").filter({ hasText: TESTING }).first();
+  await row.waitFor();
+  await page.evaluate(() => ((window as Slow).__ORE_SLOW = { show: 1500 }));
+  await row.click();
+  const early = page.locator(".reader .doc-opening h1");
+  await early.waitFor({ timeout: 1000 });
+  if ((await early.innerText()) !== TESTING) throw new Error("the title is not drawn while the source opens");
+  const before = (await early.boundingBox())!;
+  await page.locator(".reader .doc").waitFor();
+  await page.evaluate(() => delete (window as Slow).__ORE_SLOW);
+  const after = (await page.locator(".reader .doc-head h1").boundingBox())!;
+  if (Math.abs(before.x - after.x) > 1 || Math.abs(before.y - after.y) > 1) throw new Error(`the title moved as the text arrived: ${before.x},${before.y} to ${after.x},${after.y}`);
+  // A relaunch: the skills answer late, and the sidebar already shows them with their icons.
+  await page.addInitScript(() => ((window as Slow).__ORE_SLOW = { skills: 1500 }));
+  await page.reload();
+  await page.locator(".sidebar .side-main .mark").first().waitFor({ timeout: 1000 });
+  await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().waitFor({ timeout: 1000 });
+});
+
+journey("a source that fails to open says why and offers Try again, which opens it once the cause is gone (F299)", async (page) => {
+  type Fail = { __ORE_FAIL?: Record<string, string> };
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const row = page.locator(".row").filter({ hasText: TESTING }).first();
+  await row.waitFor();
+  await page.evaluate(() => ((window as Fail).__ORE_FAIL = { show: "The library is busy." }));
+  await row.click();
+  await page.locator(".reader [role=alert]").filter({ hasText: "The library is busy." }).waitFor();
+  await page.evaluate(() => ((window as Fail).__ORE_FAIL = {}));
+  await page.locator(".reader").getByRole("button", { name: "Try again" }).click();
+  await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
