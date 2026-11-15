@@ -1,4 +1,4 @@
-// Tyler's four picks from Impeccable round 8 (2026-11-14, D-new-words-where-he-looks).
+// Tyler's four picks from Impeccable round 8 (2026-11-14, D276).
 import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { GEM_WORD } from "../src/Gem";
@@ -35,7 +35,7 @@ test("the paper primary is flat wherever it shows: Review and Finish join Home's
   expect(lips).toEqual([]);
 });
 
-test("keyboard focus shows on a paper button: its ring sits outside it, on the page (F-new-paper-focus)", () => {
+test("keyboard focus shows on a paper button: its ring sits outside it, on the page (F189)", () => {
   // The ring is the paper colour and the global rule draws it 2px inside, where a paper button hides it.
   expect(/\.pill-btn:focus-visible \{ outline-offset: 2px; \}/.test(src("retro.css"))).toBe(true);
 });
