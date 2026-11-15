@@ -34,7 +34,7 @@ import { useToast } from "../Toast";
 import { Working } from "../Working";
 import { count, errorText, inOrder, stepLanded, usable, useKeptScroll, wakeScreens, type Notify } from "../util";
 
-// The reading page's Auto follows the iPhone's Light or Dark mode (D-new-phone-reading-looks).
+// The reading page's Auto follows the iPhone's Light or Dark mode (D299).
 followAppearance();
 
 function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {

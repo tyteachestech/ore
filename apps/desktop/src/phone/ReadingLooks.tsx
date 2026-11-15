@@ -1,4 +1,4 @@
-// The reader's Aa on the iPhone (D-new-phone-reading-looks): the five things every good reader lets you change
+// The reader's Aa on the iPhone (D299): the five things every good reader lets you change
 // (Books, Kindle, Readwise Reader, Instapaper), in one bottom sheet as Books lays out its Themes & Settings. Each
 // tap applies at once and keeps the passage in view (reading.ts), the text left showing above the sheet.
 import { useEffect, useRef, useState, type ReactNode } from "react";

@@ -1,4 +1,4 @@
-// The reading page's Auto on the iPhone (D-new-phone-reading-looks): Ore's window is held dark (tauri.conf.json
+// The reading page's Auto on the iPhone (D299): Ore's window is held dark (tauri.conf.json
 // "theme"), so the web view can't see the iPhone's Light or Dark mode; Appearance.swift reads it from the screen.
 // Asked at launch, on each return to the app and once a minute (iOS switches at sunset with Ore open). And while a
 // light page shows, the status bar's clock turns dark, to be read over it.

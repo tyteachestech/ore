@@ -1,4 +1,4 @@
-// The reading page's Auto (D-new-phone-reading-looks). Ore's window is held dark (tauri.conf.json "theme"), so the
+// The reading page's Auto (D299). Ore's window is held dark (tauri.conf.json "theme"), so the
 // web view always sees Dark; the screen's own traits still say which mode the iPhone is in. And the status bar's
 // text follows the window's style, so a light reading page sets the window light while it shows, for a dark clock.
 import UIKit
