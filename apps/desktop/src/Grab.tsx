@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Intent } from "./ore";
 import { snapEdge, type Side } from "./snap";
+import { edgeTurn, type Band, type EdgeTurn } from "./edge-turn";
+import { PHONE, type Intent } from "./ore";
 
 // The open highlight's two edges, to drag (Kindle, Apple Books on iPhone): a stem the height of the line
 // with a knob, above the start and below the end, in the highlight's colour. An edge snaps to whole words (snap.ts), ⌥ for part of one;
@@ -39,10 +40,12 @@ export function Grab(p: {
   onChange: (r: Range) => void;
   /** Let go: the passage to keep (unchanged when he put it back). */
   onDrop: (r: Range, was: Range) => void;
+  /** The part of the scroll pane the text shows in: an edge held at its bottom or top turns the page (edge-turn.ts). */
+  band?: () => Band;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [spots, setSpots] = useState<Record<Side, Spot> | null>(null);
-  const drag = useRef<{ side: Side; was: Range; now: Range; id: number } | null>(null);
+  const drag = useRef<{ side: Side; was: Range; now: Range; id: number; alt: boolean; turn: EdgeTurn | null } | null>(null);
 
   useLayoutEffect(() => {
     const box = ref.current;
@@ -54,6 +57,8 @@ export function Grab(p: {
     return () => ro.disconnect();
   }, [p.range]);
 
+  useEffect(() => () => drag.current?.turn?.stop(), []);
+
   // Esc mid-drag puts the edge back and closes nothing else (the top layer only).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -62,6 +67,7 @@ export function Grab(p: {
       e.preventDefault();
       e.stopImmediatePropagation();
       drag.current = null;
+      d.turn?.stop();
       p.onChange(d.was);
       p.onDragging(false);
       p.onDrop(d.was, d.was);
@@ -75,17 +81,21 @@ export function Grab(p: {
     // No text selection starts under the knob (the page's own mouse handlers are kept out by .grab).
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { side, was: p.range.cloneRange(), now: p.range.cloneRange(), id: e.pointerId };
+    const scroller = p.root.closest<HTMLElement>(".reader-scroll");
+    // Held at the bottom of the text (the end) or its top (the start), the page turns and the edge goes on with it.
+    const turn = scroller ? edgeTurn({ scroller, band: p.band, edge: PHONE ? 72 : undefined, extend: (x, y) => to(x, y) }) : null;
+    drag.current = { side, was: p.range.cloneRange(), now: p.range.cloneRange(), id: e.pointerId, alt: e.altKey, turn };
     p.onDragging(true);
   };
 
-  const move = (e: React.PointerEvent<HTMLDivElement>) => {
+  /** Moves the dragged edge to the words at a point on screen. */
+  const to = (x: number, y: number) => {
     const d = drag.current;
-    if (!d || e.pointerId !== d.id) return;
+    if (!d) return;
     // The knob sits off the line: aim at the line it stands for.
-    const at = pointAt(p.root, e.clientX, e.clientY + (d.side === "start" ? 6 : -6));
+    const at = pointAt(p.root, x, y + (d.side === "start" ? 6 : -6));
     if (!at) return;
-    const [n, o] = e.altKey ? [at.node, at.offset] : snapEdge(at.node, at.offset, d.side);
+    const [n, o] = d.alt ? [at.node, at.offset] : snapEdge(at.node, at.offset, d.side);
     const r = d.now.cloneRange();
     // Past the other edge, the range collapses: the highlight stops at its last word instead.
     if (d.side === "start") r.setStart(n, o);
@@ -96,10 +106,19 @@ export function Grab(p: {
     p.onChange(r);
   };
 
+  const move = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d || e.pointerId !== d.id) return;
+    d.alt = e.altKey;
+    d.turn?.aim(e.clientX, e.clientY, d.side === "start" ? -1 : 1);
+    to(e.clientX, e.clientY);
+  };
+
   const up = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (!d || e.pointerId !== d.id) return;
     drag.current = null;
+    d.turn?.stop();
     p.onDragging(false);
     p.onDrop(d.now, d.was);
   };
