@@ -25,10 +25,9 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 - Name files in NFC Unicode (macOS shows NFD names as untracked).
 
 ## Mac load
-Five Codex testers at once, each with its own WebKit pages, servers and bridges, froze Tyler's Mac until it restarted (2026-11-15). Every thread that runs Codex testers, Playwright or a test instance of Ore on the Mac:
-- Runs `apps/desktop/scripts/mac-load.sh check` before each start. It fails below 25% free memory, or when two Codex testers already run across all threads. Then wait, don't start.
-- Runs at most two Codex testers at once, and a big-library run (`ORE_SEED_SCALE` above 1) alone.
-- Runs `mac-load.sh clean <worktree>` when a run ends or fails. That stops every process started from that worktree, and never Tyler's own Ore or `~/Developer/ore`.
+Five Codex testers at once, each with its own WebKit pages, servers and bridges, froze Tyler's Mac until it restarted (2026-11-15). So:
+- Run a Codex sweep with `bun run sweep <folder>` from a worktree. The folder holds `sweep.json` (each tester's name and seed), an optional `preamble.md` and a `<name>-prompt.md` per tester, written with `{{mac}}`, `{{bridge}}`, `{{phone}}`, `{{webkit}}`, `{{library}}`, `{{phoneLibrary}}` and `{{out}}` for this run's ports and folders (the header of `apps/desktop/scripts/sweep.ts`; `--dry-run` prints the plan). It runs at most two testers, a library bigger than the big seed alone, starts each only when the load check passes, never uses a port WebKit refuses, and stops everything it started when it ends or is stopped.
+- Anything else that loads the Mac (Playwright, a test instance of Ore, a hand-run tester) runs `bun apps/desktop/scripts/mac-load.ts check` before each start and waits while it fails (below 25% free memory, or two Codex testers already running across all threads), and `mac-load.ts clean <worktree>` when it ends or fails. Clean never stops Tyler's own Ore, `~/Developer/ore` or a Claude session.
 
 ## Component catalogs (shadcn MCP)
 - `.mcp.json` starts the shadcn MCP server (`bunx --bun shadcn@latest mcp`, no key) in Claude Code sessions on this repo. Approve it once when Claude Code asks; check with `/mcp`.
