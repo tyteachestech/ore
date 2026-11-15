@@ -9,6 +9,8 @@ import { BINDINGS } from "../src/keys";
 const NO_CONTROL: Record<string, string> = {
   "go-toread": "Hint keys={keys} on the sources' To read folder tab (HeadTabs.tsx; the id comes from ViewMenu's list in App.tsx)",
   "go-done": "as go-toread, on the Done tab",
+  "next-post": "no control: J in a post read beside the Feed (Mail's and Reader's), listed in the shortcuts sheet",
+  "prev-post": "as next-post, K",
   questions: "opens the Collected tab with the open passage as his answer's quote; the tab itself shows C (collected)",
   keep: "Hint keys={i} on the highlight popup's intent buttons",
   question: "Hint keys={i} on the highlight popup's intent buttons",

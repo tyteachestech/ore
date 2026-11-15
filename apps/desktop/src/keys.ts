@@ -27,6 +27,9 @@ const DEFAULTS = [
   { id: "original", label: "Open original", group: "General", combo: "Shift+Meta+KeyO" },
   { id: "reveal", label: "Reveal in Finder", group: "General", combo: "Shift+Meta+KeyR", global: true },
   { id: "mark-read", label: "Mark post read or unread", group: "Feed", combo: "Shift+Meta+KeyU" },
+  // With a post open beside the Feed (D289), as Mail's and Reader's J and K; a video keeps its own.
+  { id: "next-post", label: "Next post", group: "Feed", combo: "KeyJ", scope: "silent" },
+  { id: "prev-post", label: "Previous post", group: "Feed", combo: "KeyK", scope: "silent" },
   { id: "tutor", label: "Tutor chat", group: "General", combo: "Meta+KeyJ", global: true },
   { id: "ambience", label: "Ambience", group: "General", combo: "Alt+Meta+KeyA", global: true },
   { id: "tutor-stop", label: "Stop the tutor's reply", group: "General", combo: "Meta+Period", global: true },

@@ -116,8 +116,10 @@ describe("shortcut editor: the player's second keys (YouTube's K J L)", () => {
     resetKeys();
     expect(clash("forward-alt", "KeyL")).toBeNull();
     expect(clash("listen", "KeyL")).toBeNull();
-    expect(clash("listen", "KeyJ")).toBeNull();
-    expect(rebind("listen", "KeyK")).toBeNull();
+    // J and K on a silent source are the next and previous post beside the Feed (D289), not the player's.
+    expect(clash("listen", "KeyJ")?.id).toBe("next-post");
+    expect(clash("listen", "KeyK")?.id).toBe("prev-post");
+    expect(clash("next-post", "KeyL")?.id).toBe("listen");
     resetKeys();
   });
 
@@ -126,7 +128,7 @@ describe("shortcut editor: the player's second keys (YouTube's K J L)", () => {
     expect(clash("forward-alt", "KeyN")?.id).toBe("notes");
     expect(clash("back-alt", "KeyH")?.id).toBe("highlight");
     expect(clash("play-alt", "KeyL")?.id).toBe("forward-alt");
-    expect(clash("forward", "KeyJ")?.id).toBe("back-alt");
+    expect(["back-alt", "next-post"]).toContain(clash("forward", "KeyJ")?.id);
     // Space and [ ] drive read-aloud on an article too, where L is Listen.
     expect(clash("listen", "Space")?.id).toBe("play");
     expect(clash("play", "KeyL")?.id).toBe("listen");

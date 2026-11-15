@@ -12365,6 +12365,7 @@ journey("feed: leaving and reopening waits for the pending note (F143)", async (
     const id = posts.posts.find((p) => p.title === feed.title)!.preview;
     await hold(page, "notes");
     await editor.fill("Keep the words I just wrote before leaving.");
+    await page.getByRole("button", { name: "Show sidebar" }).click(); // a post beside the Feed folds it away (D289)
     await page.getByRole("button", { name: "Home", exact: true }).click();
     await until("the note write is held", () => isHeld(page, "notes"));
     // Let cleanup run while the write is held: it must not discard the source.
@@ -12402,6 +12403,7 @@ journey("feed: a note keeps the reader and skill list current (F144)", async (pa
     const editor = page.getByRole("textbox", { name: "Source note", exact: true });
     await editor.fill("Keep this post with my note and show it in Teaching.");
     await until("the reader shows that the post is saved", async () => !(await page.getByText("Not saved", { exact: true }).count()) && !!(await page.getByRole("button", { name: "Finish", exact: true }).count()));
+    await page.getByRole("button", { name: "Show sidebar" }).click(); // a post beside the Feed folds it away (D289)
     await page.getByRole("navigation", { name: "Skills" }).getByRole("button", { name: "Teaching", exact: true }).click();
     await page.getByRole("tab", { name: "To read", exact: true }).click();
     await page.getByRole("row").filter({ hasText: feed.title }).waitFor();
@@ -12630,6 +12632,7 @@ journey("feed: a failed departing note keeps its preview for retry (F143)", asyn
     const id = posts.posts.find((p) => p.title === feed.title)!.preview;
     await failNext(page, "notes", "The disk is temporarily unavailable.");
     await editor.fill("Recover these words after a failed save.");
+    await page.getByRole("button", { name: "Show sidebar" }).click(); // a post beside the Feed folds it away (D289)
     await page.getByRole("button", { name: "Home", exact: true }).click();
     await page.locator(".toast").filter({ hasText: "Notes not saved" }).last().waitFor();
     await ore("show", id); // cleanup must not delete the only source the draft belongs to
@@ -12733,6 +12736,36 @@ journey("all sources: a filter is a tag in the search; closing its list leaves t
   await page.locator(".filter-tag-x").click();
   await until("× takes the tag off", async () => (await tag.count()) === 0);
   await until("the search keeps the keys after ×", () => search.evaluate((el) => el === document.activeElement));
+});
+
+journey("feed: a post reads beside the list, J and K step through the posts, and Esc gives the list back (D289)", async (page) => {
+  const stamp = Date.now();
+  const titles = [`Split first ${stamp}`, `Split second ${stamp}`];
+  const server: ReturnType<typeof Bun.serve> = Bun.serve({ port: 0, fetch: (r: Request): Response => {
+    const path = new URL(r.url).pathname;
+    if (path === "/feed.xml") return new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Split ${stamp}</title><link>http://localhost/</link>${titles.map((t, i) => `<item><title>${t}</title><link>http://localhost:${server.port}/p${i}.html</link><pubDate>${new Date(Date.now() - i * 3600_000).toUTCString()}</pubDate></item>`).join("")}</channel></rss>`, { headers: { "content-type": "application/rss+xml" } });
+    const t = titles[Number(path.match(/p(\d)/)?.[1] ?? 0)]!;
+    return new Response(`<html><head><title>${t}</title></head><body><article><h1>${t}</h1>${"<p>Space the practice out, then test yourself before you look back at the page.</p>".repeat(6)}</article></body></html>`, { headers: { "content-type": "text/html" } });
+  } });
+  const url = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", url);
+    await page.getByRole("button", { name: "Feed", exact: true }).click();
+    await page.locator(".row.post").filter({ hasText: titles[0] }).click();
+    const open = page.locator(".feed-col .row.post.open");
+    await until("the post opens beside the list, the sidebar folded", async () => (await open.innerText().catch(() => "")).includes(titles[0]!) && (await page.locator(".app.collapsed").count()) === 1);
+    await page.keyboard.press("j");
+    await until("J in the list opens the next post", async () => (await open.innerText().catch(() => "")).includes(titles[1]!));
+    await page.locator(".feed-read p").filter({ hasText: "Space the practice" }).first().click();
+    await page.keyboard.press("k");
+    await until("K in the post opens the one before", async () => (await open.innerText().catch(() => "")).includes(titles[0]!));
+    await until("a post read meanwhile stays in the list", async () => (await page.locator(".feed-col .row.post").filter({ hasText: titles[1] }).count()) === 1);
+    await page.keyboard.press("Escape");
+    await until("Esc gives the whole list back", async () => (await page.locator(".feed-split").count()) === 0 && (await page.locator(".feed-list").count()) === 1);
+  } finally {
+    await ore("feed", "unfollow", url);
+    server.stop();
+  }
 });
 
 let failed = 0;
