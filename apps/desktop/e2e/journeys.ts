@@ -13959,6 +13959,58 @@ journey("tutor: a message sent while a reply is being written waits, goes when t
   await page.keyboard.press("Escape");
 });
 
+// F-new-tutor-null: a reply that came back empty left "Reading your sources…" up for good, the waiting message stuck
+// under it, and Stop did nothing.
+journey("tutor: a reply that comes back empty says so with Try again and gives the waiting message back", async (page) => {
+  const held: (() => void)[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    const body = route.request().postData() ?? "";
+    if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
+    await new Promise<void>((ok) => held.push(ok));
+    await route.fulfill({ contentType: "application/json", body: "null" }).catch(() => {});
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const fresh = tutor.getByRole("button", { name: "New chat" });
+    if (await fresh.isEnabled()) await fresh.click();
+    const field = page.getByRole("textbox", { name: "Message the tutor" });
+    await field.fill("Explain this part");
+    await page.keyboard.press("Enter");
+    await tutor.getByRole("button", { name: "Stop the reply" }).waitFor();
+    await field.fill("Keep my follow up");
+    await page.keyboard.press("Enter");
+    await tutor.locator(".ask-queued").filter({ hasText: "Keep my follow up" }).waitFor();
+    await until("the request went", async () => held.length === 1);
+    held.shift()!();
+    await tutor.getByRole("button", { name: "Try again" }).waitFor();
+    await until("the wait ends and the waiting message is back in the field", async () => (await field.inputValue()) === "Keep my follow up" && (await tutor.locator(".ask-queued").count()) === 0 && (await tutor.getByRole("button", { name: "Stop the reply" }).count()) === 0);
+    await field.fill("");
+  } finally {
+    held.forEach((ok) => ok());
+    await page.unroute(/\/ore$/);
+  }
+  await page.keyboard.press("Escape");
+});
+
+// F-new-ask-null: Ask about this with an empty answer replaced Review with "This view hit a snag".
+journey("Ask about this: an answer that comes back empty says so with Try again, and Review stays", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { ask: null }));
+  try {
+    await startReview(page, null);
+    await reveal(page);
+    const question = await page.locator(".review-q").textContent();
+    await page.getByRole("button", { name: "Ask about this" }).click();
+    const ask = page.getByRole("region", { name: "Ask about this" });
+    await ask.getByRole("button", { name: "Make this exercise clearer" }).click();
+    await ask.getByRole("button", { name: "Try again" }).waitFor();
+    if (await page.getByText("This view hit a snag").count()) throw new Error("the view crashed");
+    if ((await page.locator(".review-q").textContent()) !== question) throw new Error("the exercise left the screen");
+  } finally {
+    await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = {}));
+  }
+});
+
 journey("⌘K: Tab on a source steps into what can be done with it, typing narrows the actions, ↵ runs one, and Esc steps back out (D302)", async (page) => {
   await page.keyboard.press("Meta+k");
   const input = page.getByPlaceholder("Search sources or run a command…");

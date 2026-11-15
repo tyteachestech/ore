@@ -49,8 +49,26 @@ export function wakesScreens(args: string[]): boolean {
 }
 
 
+/** Whether a command's answer is one the app reads (an AI reply, a grade, a check), which the CLI always prints as
+ *  an object. Empty output, from a run that ended without printing (or the mock's AI-off null), comes back as
+ *  null: for these it is a failure, so the caller's error path says so with Try again, instead of a property
+ *  read on null throwing where no catch sees it, inside a React state updater (Codex sweep 6). */
+export function mustAnswer(args: string[]): boolean {
+  return ["tutor", "ask", "ask-library", "grade", "key-points", "check", "explain", "research"].includes(args[0]!) || (args[0] === "recall" && args.includes("--feedback"));
+}
+
+/** A run's result, or a TypeError (so errorText says "got an unexpected reply") when a command that must answer didn't. */
+export function answered<T>(args: string[], r: T): T {
+  if (r == null && mustAnswer(args)) throw new TypeError(`ore ${args[0]} gave no answer`);
+  return r;
+}
+
 /** `ore` run under the name `job`, which `cancelOre(job)` stops (Cancel on an add). */
 export async function oreJob<T>(job: string | null, stdin: string | null, ...args: string[]): Promise<T> {
+  return answered(args, await oreRun<T>(job, stdin, args));
+}
+
+async function oreRun<T>(job: string | null, stdin: string | null, args: string[]): Promise<T> {
   // On iPhone the same commands run inside the app (src/phone/core.ts).
   if (PHONE) return (await import("./phone/core")).run<T>(args, stdin);
   const call = async () => {
