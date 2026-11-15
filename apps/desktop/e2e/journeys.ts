@@ -7937,9 +7937,17 @@ journey("finish: when drafting the cards fails, a toast says why and Try again d
   await page.getByRole("button", { name: "Done", exact: true }).click();
   const toast = page.locator(".toast").filter({ hasText: "weren’t drafted: Claude is signed out." });
   await toast.waitFor();
-  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await page.evaluate(() => {
+    const w = window as unknown as { __ORE_FAIL: Record<string, string>; __ORE_SLOW?: Record<string, number> };
+    w.__ORE_FAIL = {};
+    w.__ORE_SLOW = { ...w.__ORE_SLOW, enrich: 1500 };
+  });
   await toast.getByRole("button", { name: "Try again" }).click();
   await toast.waitFor({ state: "detached" });
+  // He asked for it, so it shows while it runs and says when it's done (rehearsal 2026-11-15).
+  await page.locator(".toast").filter({ hasText: "Drafting exercises for" }).waitFor();
+  await page.locator(".toast").filter({ hasText: "drafted." }).waitFor({ timeout: 8000 });
+  await page.evaluate(() => delete (window as unknown as { __ORE_SLOW: Record<string, number> }).__ORE_SLOW.enrich);
   // Back to reading, for the journeys after this one.
   await page.evaluate(async (title) => {
     const ore = (args: string[]) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke("ore", { args });

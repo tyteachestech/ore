@@ -17,7 +17,7 @@ import { MoreButton } from "./Menu";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
-import { lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { afterAnswer, cardQuotes, lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { endMood, endSays, endTiles, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
@@ -48,16 +48,6 @@ const GEM_SAYS: Record<CardGem["kind"], string> = {
   cut: "Cut: you'd still recall this three weeks from now",
   dull: "Missed since it was cut: recall it to win it back",
 };
-/** A missed card comes back this many cards later (D59). */
-const AGAIN_GAP = 3;
-/** The queue once its first card is answered. A miss comes back once (D59), a few cards later; a second
- *  miss waits for its next FSRS date. */
-function afterAnswer(q: DueEntry[], again: boolean): DueEntry[] {
-  if (!q.length) return q;
-  const [head, ...rest] = q;
-  if (!again || head!.relearn) return rest;
-  return [...rest.slice(0, AGAIN_GAP), { ...head!, relearn: true }, ...rest.slice(AGAIN_GAP)];
-}
 /** One card adds at most this much active time (D60, as in core). */
 const ACTIVE_CAP_MS = 3 * 60_000;
 /** Cut gems drawn on the end screen; the rest show as "+N". */
@@ -486,8 +476,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
         if (at !== showing.current) return;
         if (c.evidence?.length)
           return setPassage({ item: c.item, title: s.title, quotes: c.evidence.map((e) => ({ text: passageText(e.exact.replace(/\[[\d:.]+\]\s*/g, "")), at: `q:${e.start}:${e.end}`, time: stampBefore(s.body, e.start) })) });
-        const a = c.annotation ? s.annotations.find((x) => x.id === c.annotation && x.status !== "deleted") : undefined;
-        setPassage({ item: c.item, title: s.title, quotes: a ? [{ text: passageText(a.exact), at: a.id }] : [] });
+        setPassage({ item: c.item, title: s.title, quotes: cardQuotes(c, s.annotations) });
       },
       (e) => {
         if (at !== showing.current) return;
