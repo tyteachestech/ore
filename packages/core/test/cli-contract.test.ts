@@ -119,6 +119,21 @@ describe("the CLI as an agent drives it", () => {
     expect(past(original.history)).toEqual(past(shown.history));
     expect(original.in_head_ok).toBe(shown.in_head_ok);
   });
+
+  // F-new-card-show-reads-doc (review of #440): every card show and card set read the source's whole doc.md (a book
+  // runs to megabytes) only to learn its folder.
+  test("card show names the source's folder without reading its doc.md", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, "# Spacing\n\nSpaced practice beats massed practice.");
+    const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "Q?", answer: "A", rubric: [] });
+    chmodSync(item.docPath, 0o000);
+    try {
+      const shown = JSON.parse((await ore(lib.root, ["card", "show", card.meta.id, "--json"])).out);
+      expect(shown.source_dir).toBe(item.dir);
+    } finally {
+      chmodSync(item.docPath, 0o644);
+    }
+  });
 });
 
 describe("doctor", () => {

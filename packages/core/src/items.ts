@@ -246,6 +246,13 @@ export function findItem(lib: Library, ref: string): Item {
   throw new Error(`no item matches "${ref}"`);
 }
 
+/** An item's folder, found by its full id without reading its doc.md (a book's runs to megabytes); a copy or a
+ *  folder renamed in Finder is looked up as `findItem` does. */
+export function findItemDir(lib: Library, id: string): string {
+  const hits = itemDirs(lib).filter((d) => d.endsWith(`-${id.toUpperCase()}`));
+  return hits.length === 1 ? hits[0]! : findItem(lib, id).dir;
+}
+
 /** A folder named as Ore names it: `<slug>-<26-letter id>`. */
 export const ID_END = /-[0-9A-HJKMNP-TV-Z]{26}$/;
 
