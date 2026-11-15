@@ -24,7 +24,8 @@
     "bench": "bun apps/desktop/scripts/bench.ts",
     "ids": "bun packages/core/scripts/ids.ts",
     "sweep": "bun apps/desktop/scripts/sweep.ts",
-    "ship": "bun packages/core/scripts/ship.ts"
+    "ship": "bun packages/core/scripts/ship.ts",
+    "phone:install": "bun apps/phone/scripts/install.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
