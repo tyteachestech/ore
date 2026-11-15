@@ -13625,6 +13625,28 @@ journey("a long table keeps its header row in view down it and its first column 
   }
 });
 
+journey("side panel tabs: a click glides the pill to the new tab, a key moves it at once (D-new-pill-glide)", async (page) => {
+  await openSource(page, AGENTS);
+  const tabs = page.locator(".side-tabs");
+  await tabs.waitFor();
+  await page.getByRole("tab", { name: "Source note" }).click();
+  await until("no ghost left from opening", async () => (await page.locator(".seg-ghost").count()) === 0);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("Animation.enable");
+  await cdp.send("Animation.setPlaybackRate", { playbackRate: 0.05 });
+  try {
+    await page.getByRole("tab", { name: "Collected" }).click();
+    await until("a click glides a pill between the tabs", async () => (await page.locator(".side-tabs .seg-ghost").count()) === 1);
+  } finally {
+    await cdp.send("Animation.setPlaybackRate", { playbackRate: 1 });
+  }
+  await until("the glide ends and leaves nothing", async () => (await page.locator(".seg-ghost").count()) === 0);
+  await page.locator(".doc").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("n");
+  await until("N moved the tab", async () => (await page.getByRole("tab", { name: "Source note" }).getAttribute("aria-selected")) === "true");
+  if (await page.locator(".seg-ghost").count()) throw new Error("a key glided the pill: keys land at once");
+});
+
 let failed = 0;
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
