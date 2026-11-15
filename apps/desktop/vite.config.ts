@@ -131,6 +131,8 @@ const SOUND_IDS = ["cave", "rain", "lamp", "deep", "focus", ...["tap", "right", 
 const soundFile = (id: string) => join(SOUNDS, `${id}.mp3`);
 const ambienceSounds: Plugin = {
   name: "ambience-sounds",
+  // Review's sounds ask only for the files that are here (src/sfx.ts): a build without them asks for none.
+  config: () => ({ define: { __ORE_FX__: JSON.stringify(SOUND_IDS.filter((id) => id.startsWith("fx-") && existsSync(soundFile(id))).map((id) => id.slice(3))) } }),
   configureServer(server) {
     server.middlewares.use("/sounds", (req, res, next) => {
       const id = (req.url ?? "").split("?")[0]!.replace(/^\//, "").replace(/\.mp3$/, "");
