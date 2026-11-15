@@ -2916,7 +2916,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .phone-back { min-height: 44px; }
 .phone .reader-tools { top: -44px; right: 4px; }
 .phone .reader-tools button { min-width: 44px; min-height: 44px; }
-/* Reading text on the iPhone (D308): 20px Charter on 1.5 with 24px margins, about 35 characters a
+/* Reading text on the iPhone (D310): 20px Charter on 1.5 with 24px margins, about 35 characters a
    line on a 390 to 402pt phone, as Books sets a page; Aa changes each a step (reading.ts). It follows iOS's text
    size (--type, D250) at three quarters of the change, so it never falls under iOS's own body size; as it grows
    the margins give way and the lines sit closer, since short lines need less room between them. */
@@ -2926,7 +2926,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .page, .phone .reader-scroll > .page { padding-left: var(--read-gutter); padding-right: var(--read-gutter); margin-left: 0; }
 .phone .doc { font-size: calc(var(--read-size, 20px) * (1 + (var(--type, 1) - 1) * 0.75)); line-height: calc(1.5 + var(--leading-step, 0) - (var(--type, 1) - 1) * 0.15); }
 /* Headings step down: at 20px the desktop's steps put a section head at the title's own size. */
-/* The reader's Aa (ReadingLooks.tsx, D309): Books' Themes & Settings in one sheet, the text
+/* The reader's Aa (ReadingLooks.tsx, D311): Books' Themes & Settings in one sheet, the text
    left in view above it to judge each tap by. */
 .looks-sheet { display: grid; gap: 12px; padding-inline: 16px !important; }
 .looks-sheet h2 { margin: 0 0 2px; }

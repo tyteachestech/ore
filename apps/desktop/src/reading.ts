@@ -12,7 +12,7 @@ export type Width = (typeof WIDTHS)[number]["id"];
 
 const PHONE = import.meta.env?.VITE_PHONE === "1";
 /** The reading page (D26). On the phone, Auto follows the iPhone's Light or Dark mode, and is where it starts
- *  (D309: dark text on a light page reads better by day, a dark page is kinder at night).
+ *  (D311: dark text on a light page reads better by day, a dark page is kinder at night).
  *  The Mac's window is always dark, so it offers no Auto. */
 export const PAGES = [
   ...(PHONE ? [{ id: "auto", label: "Auto" } as const] : []),
@@ -29,7 +29,7 @@ export const FONTS = [
 export type Font = (typeof FONTS)[number]["id"];
 
 /** Room between lines, as Books, Kindle and Readwise offer it: each a step from the reader's own line height
- *  (the Mac's 1.65, the phone's 1.5, D308). */
+ *  (the Mac's 1.65, the phone's 1.5, D310). */
 export const SPACINGS = [
   { id: "tight", label: "Tight" },
   { id: "normal", label: "Normal" },
@@ -39,7 +39,7 @@ export type Spacing = (typeof SPACINGS)[number]["id"];
 
 /** Text sizes in px, Books-style steps: one at a time near the default, bigger jumps above it. */
 export const SIZES = [14, 15, 16, 17, 18, 20, 22, 24, 26] as const;
-/** 17 on the Mac; 20 on the phone, about 35 letters a line as Books sets it (D308). */
+/** 17 on the Mac; 20 on the phone, about 35 letters a line as Books sets it (D310). */
 export const DEFAULT_SIZE = PHONE ? 20 : 17;
 
 /** The next size up (`by` 1) or down (-1) from `size`, held at the ends. */
