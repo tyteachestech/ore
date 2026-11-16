@@ -91,9 +91,12 @@ const oneLine = (s: string) => s.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").tr
 /** A feed's title and its posts, newest first. RSS 2.0, RSS 1.0 and Atom (YouTube's included). */
 export async function parseFeed(xml: string, base: string): Promise<{ title: string; site?: string; posts: Omit<Post, "feed">[] }> {
   // The forgiving parser reads a download cut off partway as a feed with fewer posts, or none: one whose root
-  // never closes is refused, so a refresh keeps the last posts and says why (F-new-feed-truncated).
+  // never closes is refused, so a refresh keeps the last posts and says why (F-new-feed-truncated). What comes
+  // after a closed root (a site's script, a PHP notice, NULs) is not the feed's and is left out.
   const top = /<(rss|feed|rdf:RDF)\b/.exec(xml)?.[1];
-  if (!top || !new RegExp(`</${top}\\s*>\\s*(?:<!--[\\s\\S]*?-->\\s*)*$`).test(xml)) throw new Error(`${host(base)} sent a feed that stops partway.`);
+  const close = top ? [...xml.matchAll(new RegExp(`</${top}\\s*>`, "g"))].at(-1) : undefined;
+  if (!close) throw new Error(`${host(base)} sent a feed that stops partway.`);
+  xml = xml.slice(0, close.index + close[0].length);
   const { DOMParser } = await import("linkedom");
   const doc = new DOMParser().parseFromString(xml, "text/xml") as unknown as Document;
   type El = Element;

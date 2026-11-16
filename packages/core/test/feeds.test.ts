@@ -183,6 +183,12 @@ describe("the Feed", () => {
     expect(feedView(lib).posts).toEqual([]);
   });
 
+  test("a whole feed with something after its end, a script or NULs, is read, not called cut off (review of #443)", async () => {
+    const whole = await parseFeed(RSS, "https://howiai.example.com/feed");
+    for (const tail of ["\n<script>track('feed')</script>\n", "\0\0\0\0", "<br />\n<b>Notice</b>: Undefined index in feed.php"])
+      expect(await parseFeed(RSS + tail, "https://howiai.example.com/feed")).toEqual(whole);
+  });
+
   // Codex sweep 10, OFF-2: 30 copies of one post used up the 30 a feed keeps, so the next post never showed.
   test("repeated items don't use up a feed's posts (F-new-feed-duplicates)", async () => {
     const xml = readFileSync(join(import.meta.dir, "fixtures/feeds/duplicates.xml"), "utf8").replaceAll("__DATE__", ago(1));

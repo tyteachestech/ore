@@ -25,3 +25,10 @@ Two testers on `32f3dc4`: months of review on the Mac and iPhone (`months-report
 - Offline: a link added twice keeps one source and its note; failed adds keep the URL and create nothing; nothing to fix.
 - Offline: tutor, grading, enrichment and Explain failures each offer Try again and recover; nothing to fix.
 - Offline: the phone reads loaded content offline and queues links for the Mac; nothing to fix. No phone Feed (D107).
+
+## Review of #443: Review and feeds
+
+| Item | Verdict | Cause | Fix | Guard |
+|---|---|---|---|---|
+| 4: ratings after midnight whose Today read failed counted as none | Real. F-new-midnight-failed-read | A failed read left the day unturned; `finish()` (and the midnight effect) then called `newDay(today, 0)` | `turnedMs` keeps what was rated since midnight that no new day's start counted; `newDay` gets it (capped by the day's minutes) and clears it, and undoing such a rating takes it off | phone journey `phone: a rating after midnight whose day could not be read still counts on the end ring` |
+| 5: a whole feed with trailing junk was called cut off | Real. F-new-feed-trailing-junk | The check wanted the root's close at the very end, comments aside | A feed is cut off only when its root never closes; what follows the last close is sliced off before parsing | core `a whole feed with something after its end, a script or NULs, is read…` |

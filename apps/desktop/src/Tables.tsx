@@ -9,7 +9,7 @@ import { Working } from "./Working";
 // and removed from Settings › General › Import.
 
 export type TablesState = { installed: boolean };
-type Read = { changed: boolean; regions: number; step?: string };
+type Read = { changed: boolean; regions: number; step?: string; removed?: unknown[]; unplaced?: unknown[] };
 
 /** The one download, shared by every reader and Settings: leaving a PDF doesn't stop it, and the next
  *  PDF opened shows it still going. `step` is the stage the CLI reports. */
@@ -77,7 +77,8 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
           clearInterval(t);
           background.current = false;
           setReading(false);
-          if (s.tables === "read") onRead({ changed: true, regions: 0 });
+          // Its own step, so its Undo never takes back a later reimport's (review of #443); none when it found nothing.
+          if (s.tables === "read") onRead({ changed: !!s.tables_step, regions: 0, step: s.tables_step });
           else setError(s.tables_error);
         },
         () => {},

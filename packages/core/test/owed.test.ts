@@ -1,7 +1,7 @@
 // A video added on a device with no yt-dlp (the iPhone) is in the library at once, its transcript owed;
 // a device that has yt-dlp fills it as a reimport (D227).
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addSource, fillOwed, findItem, reimportSource, transcriptOf } from "../src/index.ts";
@@ -61,6 +61,8 @@ test("with no yt-dlp the video comes in at once with its transcript owed, and a 
   expect(readFileSync(now.docPath, "utf8")).not.toContain("owed");
   expect(transcriptOf(now)!.words.length).toBeGreaterThan(3);
   expect(readdirSync(paths.inbox(lib))).toEqual([]);
+  // No Undo reaches a fill, so it keeps no stash (review of #443).
+  expect(existsSync(join(lib.root, ".ore", "reimport", added.meta.id))).toBe(false);
   expect(await fillOwed(lib)).toEqual([]);
 });
 

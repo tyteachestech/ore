@@ -166,6 +166,8 @@ export type Item = {
   fills_here?: boolean;
   /** `ore show`: being read now, or read; why the last reading failed; whether the reader is installed. */
   tables?: "reading" | "read";
+  /** The step a PDF's tables read took, for its Undo (`ore reimport --undo --step`). */
+  tables_step?: string;
   tables_error?: string;
   tables_reader?: boolean;
   /** An episode whose own page is kept and whose text isn't in it yet (D219): one click adds it. */

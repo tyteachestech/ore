@@ -1191,14 +1191,29 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }, [waiting, p.id]);
 
   /** Runs enrich again in the foreground, so a failure shows its reason. */
-  /** The PDF's tables and formulas were read into its text: show it, with the way back. */
-  const tablesRead = (r: { changed: boolean; regions: number; step?: string }) => {
-    const id = p.id;
+  /** A reimport, or a PDF's tables read into its text, has landed: show it, and its toast's Undo and Redo swap
+   *  exactly that one's `step`, never the newest stash, which may be a later reimport's (run only from the history,
+   *  which says so if it fails). Without a step nothing was kept to undo. */
+  const reimported = (id: string, what: string, step?: string) => {
     p.reload();
     p.onChanged();
-    if (!r.changed) return p.notify("Found no tables or formulas to read in this PDF");
-    const step = () => ore("reimport", id, "--undo", ...(r.step ? ["--step", r.step] : [])).then(() => (p.reload(), p.onChanged()));
-    p.notify("Read the tables and formulas into the text", "info", step, step);
+    const swap = step ? () => ore("reimport", id, "--undo", "--step", step).then(() => (p.reload(), p.onChanged())) : undefined;
+    p.notify(what, "info", swap, swap);
+  };
+  /** What a reimport left out, for its toast: highlights removed, questions kept with their passage gone. */
+  const lostText = (r: { removed?: unknown[]; unplaced?: unknown[] }) => {
+    const n = r.removed?.length ?? 0;
+    const q = r.unplaced?.length ?? 0;
+    const removed = n ? `${n} ${n === 1 ? "highlight is" : "highlights are"} no longer in it, so ${n === 1 ? "it was" : "they were"} removed.` : "";
+    const unplaced = q ? `${q === 1 ? "A question’s passage is" : `${q} questions’ passages are`} no longer in it; ${q === 1 ? "the question is" : "the questions are"} kept.` : "";
+    return [removed, unplaced].filter(Boolean).join(" ").replace(/\.$/, "");
+  };
+
+  /** The PDF's tables and formulas were read into its text: show it, with the way back. */
+  const tablesRead = (r: { changed: boolean; regions: number; step?: string; removed?: unknown[]; unplaced?: unknown[] }) => {
+    if (!r.changed) return (p.reload(), p.onChanged(), p.notify("Found no tables or formulas to read in this PDF"));
+    const lost = lostText(r);
+    reimported(p.id, `Read the tables and formulas into the text${lost ? `. ${lost}` : ""}`, r.step);
   };
 
   const retryEnrich = async () => {
@@ -3145,16 +3160,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     try {
       const r = await ore<{ changed: boolean; removed: unknown[]; unplaced?: unknown[]; step?: string }>("reimport", d.id);
       if (!r.changed) return p.notify(`“${d.title}” is already up to date`);
-      // This reimport's own stash, so a second reimport's Undo never swaps this one's (run only from the history, which says so if it fails).
-      const swap = () => ore("reimport", d.id, "--undo", ...(r.step ? ["--step", r.step] : [])).then(() => (p.reload(), p.onChanged()));
-      p.reload();
-      p.onChanged();
-      const n = r.removed.length;
-      const q = r.unplaced?.length ?? 0;
-      const removed = n ? `${n} ${n === 1 ? "highlight is" : "highlights are"} no longer in it, so ${n === 1 ? "it was" : "they were"} removed.` : "";
-      const unplaced = q ? `${q === 1 ? "A question’s passage is" : `${q} questions’ passages are`} no longer in it; ${q === 1 ? "the question is" : "the questions are"} kept.` : "";
-      const what = n || q ? `Reimported. ${[removed, unplaced].filter(Boolean).join(" ")}`.replace(/\.$/, "") : "Reimported with the latest text";
-      p.notify(what, "info", swap, swap);
+      const lost = lostText(r);
+      reimported(d.id, lost ? `Reimported. ${lost}` : "Reimported with the latest text", r.step);
     } catch (e) {
       p.notify(errorText(e, "reimport"), "error");
     }

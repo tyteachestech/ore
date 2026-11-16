@@ -12474,6 +12474,54 @@ journey("phone: a review left after midnight with no rating since shows the new 
   if (shown !== today) throw new Error(`the end ring shows ${shown} min, but today has ${today} (the ring's own label: “${ring}”)`);
 }, "phone");
 
+journey("phone: a rating after midnight whose day could not be read still counts on the end ring (review of #443)", async (page) => {
+  // Ratings just after midnight whose read of the new day failed, then leaving: finish took the new day as one
+  // this session added nothing to, so the ring started at the day's whole count and never ran up. (Past the goal,
+  // so the count runs up from the goal however many gems the session cut.)
+  const late = new Date();
+  late.setHours(23, 58, 0, 0);
+  await page.clock.install({ time: late });
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  const rate = async (wait: string) => {
+    await sure.waitFor();
+    await page.clock.fastForward(wait);
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+  };
+  const fail = (on: boolean) => page.evaluate((on) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = on ? { today: "The library is busy." } : {}), on);
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  await sure.waitFor();
+  // The new day can't be read at midnight, nor after the ratings that follow it.
+  await fail(true);
+  for (let i = 0; i < 4; i++) await rate("03:00");
+  await sure.waitFor();
+  await fail(false);
+  // Every number the centre shows on its way up, from its first.
+  await page.evaluate(() => {
+    const seen: string[] = ((window as unknown as { __centre: string[] }).__centre = []);
+    new MutationObserver(() => {
+      const n = document.querySelector(".review-end .end-lap-n")?.getAttribute("aria-label");
+      if (n && seen.at(-1) !== n) seen.push(n);
+    }).observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
+  await tap(page, page.getByRole("button", { name: "Leave review" }));
+  const centre = page.locator(".review-end .end-lap-n");
+  await centre.waitFor({ timeout: 8000 });
+  const ring = await page.locator(".review-end [aria-label$='minutes today']").first().getAttribute("aria-label");
+  const today = Number(/^(\d+) of/.exec(ring ?? "")?.[1]);
+  await page.waitForTimeout(2500);
+  const seen = (await page.evaluate(() => (window as unknown as { __centre: string[] }).__centre)).map((l) => Number(/^(\d+)/.exec(l)?.[1]));
+  if (!(today >= 10)) throw new Error(`today has ${today} min, short of the goal the ratings after midnight met (“${ring}”)`);
+  if (!(seen[0]! < today) || seen.at(-1) !== today) throw new Error(`the end ring counted ${seen.join(" → ")}, never up to today's ${today}: the ratings after midnight were taken as none of this session's`);
+}, "phone");
+
 journey("phone: a source added on the phone and a new skill each take ⌘Z (F160)", async (page) => {
   const words = "Spacing out practice sessions makes what is learned last longer than cramming it into one sitting. ".repeat(12);
   const article = `<html><head><title>Spacing on the phone</title></head><body><article><h1>Spacing on the phone</h1>${`<p>${words}</p>`.repeat(3)}</article></body></html>`;

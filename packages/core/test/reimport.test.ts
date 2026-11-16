@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmdirSync, statSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addHighlight, readAnnotations } from "../src/annotations.ts";
@@ -59,7 +59,7 @@ describe("reimport", () => {
     const gone = addHighlight(item, { exact: "Sleep consolidates memory.", intent: "keep" });
     const kept = addHighlight(item, { exact: "Testing yourself", intent: "keep" });
     page = V2;
-    await reimportSource(lib, item.meta.id);
+    const { step } = await reimportSource(lib, item.meta.id);
     await setItemStatus(lib, item.meta.id, "done");
 
     let back = await undoReimport(lib, item.meta.id);
@@ -70,7 +70,7 @@ describe("reimport", () => {
     expect(anns.map((a) => a.id).sort()).toEqual([gone.id, kept.id].sort());
     expect(anns.every((a) => V1.slice(a.start, a.end) === a.exact)).toBe(true);
 
-    back = await undoReimport(lib, item.meta.id);
+    back = await undoReimport(lib, item.meta.id, step);
     expect(back.body).toBe(V2);
     anns = readAnnotations(back);
     expect(anns.map((a) => a.id)).toEqual([kept.id]);
@@ -115,6 +115,82 @@ describe("reimport", () => {
     expect(r.removed).toEqual([]);
     expect(r.unplaced.map((a) => a.id)).toEqual([asked.id]);
     expect(readAnnotations(r.item).map((a) => a.id).sort()).toEqual([asked.id, stays.id].sort());
+  });
+
+  test("a step-less undo takes back the newest reimport not yet undone, so a second one goes on to the one before (review of #443)", async () => {
+    const lib = await tempLibrary();
+    page = V1;
+    serve();
+    const item = await addSource(lib, URL_);
+    page = V2;
+    await reimportSource(lib, item.meta.id);
+    const V3 = V2.replace("# Spacing", "# Spacing, updated");
+    page = V3;
+    await reimportSource(lib, item.meta.id);
+    expect((await undoReimport(lib, item.meta.id)).body).toBe(V2);
+    expect((await undoReimport(lib, item.meta.id)).body).toBe(V1);
+    await expect(undoReimport(lib, item.meta.id)).rejects.toThrow("no reimport");
+  });
+
+  test("a stash in the old flat layout is one step: undone without a step, and removed once a day old (review of #443)", async () => {
+    const lib = await tempLibrary();
+    page = V1;
+    serve();
+    const item = await addSource(lib, URL_);
+    page = V2;
+    const { step } = await reimportSource(lib, item.meta.id);
+    // As an older Ore left it: the stash's files right in .ore/reimport/<id>/.
+    const flat = join(lib.root, ".ore", "reimport", item.meta.id);
+    for (const f of readdirSync(join(flat, step!))) renameSync(join(flat, step!, f), join(flat, f));
+    rmdirSync(join(flat, step!));
+    expect((await undoReimport(lib, item.meta.id)).body).toBe(V1);
+    expect(readdirSync(flat).some((f) => f === "doc.md")).toBe(false);
+
+    // Another left flat a week ago is removed by any reimport, of any source.
+    const old = join(lib.root, ".ore", "reimport", "01OLDSOURCE0000000000000000");
+    mkdirSync(old, { recursive: true });
+    writeFileSync(join(old, "doc.md"), "---\ntitle: Old\n---\nOld text\n");
+    writeFileSync(join(old, "highlights.json"), "[]");
+    const week = Date.now() / 1000 - 7 * 86400;
+    utimesSync(join(old, "doc.md"), week, week);
+    page = V2;
+    expect((await reimportSource(lib, item.meta.id)).changed).toBe(true);
+    expect(existsSync(old)).toBe(false);
+  });
+
+  test("a stash lives a day: any reimport removes the ones older, of every source, and keeps the rest (review of #443)", async () => {
+    const lib = await tempLibrary();
+    page = V1;
+    serve();
+    const a = await addSource(lib, URL_);
+    page = V2;
+    const first = await reimportSource(lib, a.meta.id);
+    page = V1;
+    const fresh = await reimportSource(lib, a.meta.id);
+    const dir = (s: string) => join(lib.root, ".ore", "reimport", a.meta.id, s);
+    const day = Date.now() / 1000 - 25 * 3600;
+    utimesSync(dir(first.step!), day, day);
+    page = "# Other\n\nA second source.\n";
+    const b = await addSource(lib, "https://example.com/other.md");
+    page = "# Other\n\nA second source, changed.\n";
+    await reimportSource(lib, b.meta.id);
+    expect(existsSync(dir(first.step!))).toBe(false);
+    expect(existsSync(dir(fresh.step!))).toBe(true);
+  });
+
+  test("a highlight still at its offset whose context changed takes the new context, so the next open finds it at once (review of #443)", async () => {
+    const lib = await tempLibrary();
+    page = V1;
+    serve();
+    const item = await addSource(lib, URL_);
+    const kept = addHighlight(item, { exact: "Spaced practice beats massed practice.", intent: "keep" });
+    const V = V1.replace("Sleep consolidates memory.", "Naps consolidate memory too.");
+    page = V;
+    await reimportSource(lib, item.meta.id);
+    const a = readAnnotations(findItem(lib, item.meta.id)).find((x) => x.id === kept.id)!;
+    expect(a.start).toBe(kept.start);
+    expect(a.suffix).toBe(V.slice(a.end, a.end + a.suffix.length));
+    expect(a.suffix).toContain("Naps");
   });
 
   test("an unchanged original changes nothing; a source with no link can't be reimported", async () => {
@@ -224,7 +300,7 @@ describe("reimport", () => {
     expect(back.body).toContain("Cramming is the old way");
     expect(readAnnotations(back).map((a) => a.id)).toContain(goes.id);
     expect(readFileSync(join(item.dir, "source.mp3")).equals(audio)).toBe(true);
-    expect((await undoReimport(lib, item.meta.id)).body).toContain("overnight");
+    expect((await undoReimport(lib, item.meta.id, r.step)).body).toContain("overnight");
     expect(readNotes(findItem(lib, item.meta.id))).toBe("My own thoughts on recall.");
   });
 
