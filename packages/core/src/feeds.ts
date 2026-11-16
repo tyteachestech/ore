@@ -91,7 +91,7 @@ const oneLine = (s: string) => s.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").tr
 /** A feed's title and its posts, newest first. RSS 2.0, RSS 1.0 and Atom (YouTube's included). */
 export async function parseFeed(xml: string, base: string): Promise<{ title: string; site?: string; posts: Omit<Post, "feed">[] }> {
   // The forgiving parser reads a download cut off partway as a feed with fewer posts, or none: one whose root
-  // never closes is refused, so a refresh keeps the last posts and says why (F-new-feed-truncated). What comes
+  // never closes is refused, so a refresh keeps the last posts and says why (F366). What comes
   // after a closed root (a site's script, a PHP notice, NULs) is not the feed's and is left out.
   const top = /<(rss|feed|rdf:RDF)\b/.exec(xml)?.[1];
   const close = top ? [...xml.matchAll(new RegExp(`</${top}\\s*>`, "g"))].at(-1) : undefined;
@@ -150,7 +150,7 @@ export async function parseFeed(xml: string, base: string): Promise<{ title: str
       return [{ url, title: oneLine(text(e, "title") ?? "") || host(url), author: author(e), published: date(text(e, "published", "pubdate", "dc:date", "updated")), image: image(e) }];
     })
     .sort((a, b) => (b.published ?? "").localeCompare(a.published ?? ""))
-    // A post listed twice is one post, so copies never use up the posts a feed keeps (F-new-feed-duplicates).
+    // A post listed twice is one post, so copies never use up the posts a feed keeps (F367).
     .filter((p) => !seen.has(p.url) && !!seen.add(p.url));
   const siteLink = atom ? abs(kids(channel, "link").find((l) => (l.getAttribute("rel") ?? "alternate") === "alternate")?.getAttribute("href")) : abs(text(channel, "link"));
   return { title: oneLine(text(channel, "title") ?? "") || host(base), site: siteLink, posts };

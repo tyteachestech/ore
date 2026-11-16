@@ -77,7 +77,7 @@ describe("reimport", () => {
     expect(V2.slice(anns[0]!.start, anns[0]!.end)).toBe("Testing yourself");
   });
 
-  test("two reimports undo one at a time: each Undo puts back the version and highlights its reimport replaced, and redo replays them in order (F-new-reimport-undo-stack)", async () => {
+  test("two reimports undo one at a time: each Undo puts back the version and highlights its reimport replaced, and redo replays them in order (F362)", async () => {
     const lib = await tempLibrary();
     page = V1;
     serve();
@@ -103,7 +103,7 @@ describe("reimport", () => {
     expect((await undoReimport(lib, item.meta.id, second.step)).body).toBe(V3);
   });
 
-  test("a question whose passage is gone after a reimport is kept and reported, not lost silently (F-new-reimport-unplaced-question)", async () => {
+  test("a question whose passage is gone after a reimport is kept and reported, not lost silently (F364)", async () => {
     const lib = await tempLibrary();
     page = V1;
     serve();

@@ -208,7 +208,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   /** The local day `before` was read on. */
   const beforeDay = useRef("");
   /** Past midnight the day's minutes start again: `t` is the new day's Today, read as if just before this session,
-   *  with `add` ms of this session already in it (F184, F-new-midnight-end-ring). A skill's level is no day's, so
+   *  with `add` ms of this session already in it (F184, F365). A skill's level is no day's, so
    *  the session's level-ups still count from where it started. */
   const newDay = (t: Today, add: number) => {
     turnedMs.current = 0;

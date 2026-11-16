@@ -159,7 +159,7 @@ describe("the Feed", () => {
   });
 
   // Codex sweep 10, OFF-1: a download cut off partway parsed as a feed with no posts, and refresh put that in place of them.
-  test("a feed cut off partway keeps its last posts and says why (F-new-feed-truncated)", async () => {
+  test("a feed cut off partway keeps its last posts and says why (F366)", async () => {
     serve();
     const lib = await tempLibrary();
     await followFeed(lib, "https://howiai.example.com/");
@@ -190,7 +190,7 @@ describe("the Feed", () => {
   });
 
   // Codex sweep 10, OFF-2: 30 copies of one post used up the 30 a feed keeps, so the next post never showed.
-  test("repeated items don't use up a feed's posts (F-new-feed-duplicates)", async () => {
+  test("repeated items don't use up a feed's posts (F367)", async () => {
     const xml = readFileSync(join(import.meta.dir, "fixtures/feeds/duplicates.xml"), "utf8").replaceAll("__DATE__", ago(1));
     serve(new Set(), { "https://howiai.example.com/feed": [xml, "application/rss+xml"] });
     expect((await findFeed("https://howiai.example.com/feed")).posts).toBe(2);

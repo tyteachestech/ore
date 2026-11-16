@@ -635,7 +635,7 @@ journey("PDF tables: read in the background after adding, Undo puts the lines ba
   await doc.locator("table").getByText("Massed").waitFor({ timeout: 15000 });
 });
 
-journey("reimport twice, then ⌘Z twice: each Undo puts back the version its reimport replaced, with the removed highlight; a question whose passage went says so (F-new-reimport-undo-stack, F-new-reimport-unplaced-question)", async (page) => {
+journey("reimport twice, then ⌘Z twice: each Undo puts back the version its reimport replaced, with the removed highlight; a question whose passage went says so (F362, F364)", async (page) => {
   const KETTLE = "The copper kettle whistles before the water boils.";
   const ASKED = "Questions make learners examine the evidence carefully.";
   const nb = (md: string) => JSON.stringify({ cells: [{ cell_type: "markdown", metadata: {}, source: md }], metadata: {}, nbformat: 4, nbformat_minor: 5 });
@@ -12428,7 +12428,7 @@ journey("phone: a session across midnight counts only the new day's minutes towa
   if (await page.getByText("Goal met").count()) throw new Error("the goal was said met with 6 of today's 10 minutes");
 }, "phone");
 
-journey("phone: a review left after midnight with no rating since shows the new day's minutes in its end ring (F-new-midnight-end-ring)", async (page) => {
+journey("phone: a review left after midnight with no rating since shows the new day's minutes in its end ring (F365)", async (page) => {
   // A session before midnight, then a second rated before it and left after it: the ring's centre kept the minutes
   // from before the second session, yesterday's, though the new day had none (Codex sweep 10, MONTHS-1).
   const late = new Date();

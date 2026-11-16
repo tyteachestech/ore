@@ -38,7 +38,7 @@ describe("anchoring", () => {
     expect(a.start).toBe(second + "New first line.\n".length);
   });
 
-  test("exact: a quote that occurs twice follows the copy whose context still matches, not its old offset (F-new-anchor-duplicate-context)", () => {
+  test("exact: a quote that occurs twice follows the copy whose context still matches, not its old offset (F363)", () => {
     const block = (river: string, habitat: string) => `A learner studies birds beside a ${river} river.\n\nThe blue heron nests beside the river each spring.\n\nThis observation describes the ${habitat} habitat.\n\n`;
     const quote = "The blue heron nests beside the river each spring.";
     const before = "# Birds\n\n" + block("quiet", "northern") + "| Bird | Season |\n|---|---|\n| Heron | Spring |\n";
