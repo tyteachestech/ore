@@ -8,7 +8,7 @@ import { PHONE } from "./ore";
 import { CaretLeft, CaretRight } from "./icons";
 import { Working } from "./Working";
 // The CMaps a CJK font names instead of carrying, the ones import reads the text with (F284): without them the
-// page of a Korean, Japanese or Chinese PDF draws blank (F-new-original-cjk-blank).
+// page of a Korean, Japanese or Chinese PDF draws blank (F379).
 import { CarriedData } from "../../../packages/core/src/ingest/pdf-data";
 
 GlobalWorkerOptions.workerSrc = workerUrl;

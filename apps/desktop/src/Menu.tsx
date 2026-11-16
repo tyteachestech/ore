@@ -216,7 +216,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
   keepFocus?: boolean;
   /** Shown only while its row is hovered: focus goes back to the row, not to it (`focusRow`). */
   hoverOnly?: boolean;
-  /** In a list's row: no Tab stop of its own (the list is one stop); ⌃↵ on the row opens it (F-new-list-tab-stops). */
+  /** In a list's row: no Tab stop of its own (the list is one stop); ⌃↵ on the row opens it (F381). */
   inRow?: boolean;
 }) {
   const { later, pick, closed } = useLater();

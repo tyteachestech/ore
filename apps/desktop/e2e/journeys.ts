@@ -14931,7 +14931,7 @@ async function textFile(name: string, text: string) {
   return path;
 }
 
-journey("review: under a long answer in a short window the four ratings stay in view, clear of the radio (D-new-review-rate-stays)", async (page) => {
+journey("review: under a long answer in a short window the four ratings stay in view, clear of the radio (D313)", async (page) => {
   const size = page.viewportSize()!;
   await page.setViewportSize({ width: 720, height: 480 });
   try {
@@ -14966,7 +14966,7 @@ journey("review: under a long answer in a short window the four ratings stay in 
   }
 });
 
-journey("add: a refused link says why on a line of its own, as wide as the box (F-new-add-error-squeezed)", async (page) => {
+journey("add: a refused link says why on a line of its own, as wide as the box (F378)", async (page) => {
   const gone = Bun.serve({ port: 0, fetch: () => new Response("gone", { status: 404 }) });
   try {
     await page.getByRole("button", { name: "+ Add" }).click();
@@ -14985,7 +14985,7 @@ journey("add: a refused link says why on a line of its own, as wide as the box (
   }
 });
 
-journey("All sources: the list is one Tab stop, and ⌃↵ opens the row's actions, Skills among them (F-new-list-tab-stops)", async (page) => {
+journey("All sources: the list is one Tab stop, and ⌃↵ opens the row's actions, Skills among them (F381)", async (page) => {
   await page.getByRole("button", { name: /^All sources/ }).click();
   const list = page.locator(".list");
   await list.locator(".row").first().waitFor();
@@ -15004,7 +15004,7 @@ journey("All sources: the list is one Tab stop, and ⌃↵ opens the row's actio
   await until("focus is back on the list, so the arrows go on", () => page.evaluate(() => document.activeElement?.classList.contains("list") ?? false));
 });
 
-journey("All sources: a source with no author and no skill has no empty line between its title and its kind (F-new-row-empty-line)", async (page) => {
+journey("All sources: a source with no author and no skill has no empty line between its title and its kind (F384)", async (page) => {
   const made = (await ore("add", await textFile("bare-row.md", "# A bare row\n\nNo author, no skill."), "--no-enrich")) as { id: string };
   try {
     await page.reload();
@@ -15024,7 +15024,7 @@ journey("All sources: a source with no author and no skill has no empty line bet
   }
 });
 
-journey("Feed: Follow opens a box that takes a link only, and never saves what is typed as a source (F-new-follow-saves-text)", async (page) => {
+journey("Feed: Follow opens a box that takes a link only, and never saves what is typed as a source (F385)", async (page) => {
   // The empty Feed is where Follow sits: this journey unfollows what an earlier one left.
   for (const f of ((await ore("feed")) as { feeds: { url: string }[] }).feeds) await ore("feed", "unfollow", f.url);
   await page.reload();
@@ -15049,7 +15049,7 @@ journey("Feed: Follow opens a box that takes a link only, and never saves what i
   await page.keyboard.press("Escape");
 });
 
-journey("original: a Korean PDF's page is drawn with its words, not blank (F-new-original-cjk-blank)", async (page) => {
+journey("original: a Korean PDF's page is drawn with its words, not blank (F379)", async (page) => {
   const made = (await ore("add", join(FIXTURES, "korean.pdf"), "--no-enrich")) as { id: string };
   const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
   try {
@@ -15076,7 +15076,7 @@ journey("original: a Korean PDF's page is drawn with its words, not blank (F-new
   }
 });
 
-journey("narrow window: Home's plan line is whole with Start review under it, and a source's prequestion head keeps its words together (F-new-home-goal-narrow, F-new-preq-head-wrap)", async (page) => {
+journey("narrow window: Home's plan line is whole with Start review under it, and a source's prequestion head keeps its words together (F383, F382)", async (page) => {
   const made = (await ore("add", await textFile("narrow-head.md", "# Narrow head\n\nA source added with no enrich has no prequestions yet."), "--no-enrich")) as { id: string };
   const size = page.viewportSize()!;
   await page.setViewportSize({ width: 720, height: 480 });
@@ -15103,7 +15103,7 @@ journey("narrow window: Home's plan line is whole with Start review under it, an
   }
 });
 
-journey("iPhone menu: every skill's name starts on one line, with an icon or without one (F-new-drawer-dot-indent)", async (page) => {
+journey("iPhone menu: every skill's name starts on one line, with an icon or without one (F386)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   const rows = page.locator(".phone-drawer section button");
   await rows.first().waitFor();

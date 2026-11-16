@@ -274,7 +274,7 @@ export function App() {
     if (back) focusQuietly(back);
   };
   const [adding, setAdding] = useState(false);
-  /** Feed's Follow opened the add box: it takes one link and follows it (F-new-follow-saves-text). Ends with the box. */
+  /** Feed's Follow opened the add box: it takes one link and follows it (F385). Ends with the box. */
   const [following, setFollowing] = useState(false);
   useEffect(() => void (adding || setFollowing(false)), [adding]);
   const [help, setHelp] = useState(false);
@@ -1481,7 +1481,7 @@ export function App() {
         setCursor(`course:${currentLine.item.course!.id}`);
       }
     } else if (e.key === "Enter" && e.ctrlKey && keyed) {
-      // The Mac's own key for a shortcut menu (⌃↵): the row's ⋯, which is no Tab stop of its own (F-new-list-tab-stops).
+      // The Mac's own key for a shortcut menu (⌃↵): the row's ⋯, which is no Tab stop of its own (F381).
       e.preventDefault();
       const more = document.getElementById(`row-${lineKey(currentLine)}`)?.querySelector<HTMLElement>(".more");
       more?.focus({ preventScroll: true });
@@ -2158,7 +2158,7 @@ export function App() {
                 </SkillPicker>
               );
               // No author and no skill to show: the hover + joins the kind line, so no empty line sits
-              // between the title and it (F-new-row-empty-line).
+              // between the title and it (F384).
               const bare = !by && !others.length;
               return (
                 <>

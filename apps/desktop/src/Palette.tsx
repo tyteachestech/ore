@@ -455,7 +455,7 @@ export function titleScore(title: string, query: string): number {
  *  source's own (a link, an image) and stays. The marks Markdown adds around the words are taken out. */
 export function snippet(text: string, query: string): ReactNode {
   const terms = query.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? [];
-  // What the source's Markdown adds around the words is not why it matched (F-new-snippet-markup): page markers
+  // What the source's Markdown adds around the words is not why it matched (F380): page markers
   // and other comments (whole, or a page marker cut by the snippet's edge; an arrow in his own words stays), heading and quote marks, code fences, bold and
   // code ticks. A link's or image's brackets stay, as before.
   const line = text

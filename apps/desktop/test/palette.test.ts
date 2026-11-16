@@ -63,7 +63,7 @@ test("only a source listed by its title loses its row in “In the text”", () 
   expect(textHits(hits, listed, "retrieval").map((h) => h.key)).toEqual(["text item b", "skill notes s"]);
 });
 
-// F-new-snippet-markup (round 7 walk): a PDF's match read "<!-- page 1 --> ### Retrieval practice Testing…",
+// F380 (round 7 walk): a PDF's match read "<!-- page 1 --> ### Retrieval practice Testing…",
 // and a book's kept its code fence and quote mark.
 test("a search snippet shows the source's words without its Markdown", () => {
   const words = (text: string) => renderToStaticMarkup(createElement("p", null, snippet(text, "test")));

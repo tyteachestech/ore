@@ -74,7 +74,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   /** Opens as it appears: on a source just added with no skill, so filing it is the next keystroke. */
   startOpen?: boolean;
   onClosed?: () => void;
-  /** In a list's row: no Tab stop of its own, since the list is one stop and its arrows move through the rows (F-new-list-tab-stops).
+  /** In a list's row: no Tab stop of its own, since the list is one stop and its arrows move through the rows (F381).
    *  The row's menu (⌃↵, right-click) holds Skills. */
   inRow?: boolean;
   /** Where focus goes when it closes, instead of back to the pills (the add box's text field, so ↵ adds). */
