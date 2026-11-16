@@ -10,6 +10,7 @@
 // 2026-11-16, Tyler (check, hashtag, clapperboard, baseball, pray, planet, telescope, rocket "look weird"): six were still the
 // automatic conversion. Each is drawn on the grid now: upright and mirrored where the subject allows (hashtag, rocket, hands),
 // the baseball's seams curved, the planet's ring one line across the ball with a clear row either side.
+// The guitar stands upright and mirrored (Tyler picked C of four): tilted, its two sides never matched.
 export const FIXES: Record<string, readonly string[]> = {
   game_1: [
     "................",
@@ -1234,5 +1235,23 @@ export const FIXES: Record<string, readonly string[]> = {
     "..############..",
     "................",
     "................",
+  ],
+  guitar: [
+    "......####......",
+    "......####......",
+    ".......##.......",
+    ".......##.......",
+    ".......##.......",
+    ".......##.......",
+    ".....######.....",
+    "....########....",
+    "....###..###....",
+    ".....##..##.....",
+    "....########....",
+    "...##########...",
+    "...##########...",
+    "...##########...",
+    "....########....",
+    ".....######.....",
   ],
 };
