@@ -12211,7 +12211,7 @@ journey("phone: a goal changed in Settings shows on Today on the way back, witho
   await until(`Today says of ${want} min`, async () => (await of.innerText()).includes(`of ${want} min`));
 }, "phone");
 
-journey("phone: in Settings each picked choice sits inside its frame, in the Mac's order (F-new-phone-seg-frame)", async (page) => {
+journey("phone: in Settings each picked choice sits inside its frame, in the Mac's order (F377)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
   await page.locator(".phone-settings .seg").first().waitFor();
@@ -14293,7 +14293,7 @@ journey("Settings: enlarged to 200% the sections run across the top and no choic
   await page.keyboard.press("Escape");
 });
 
-journey("Settings: the reading sample follows each choice as it is made (D-new-settings-sections)", async (page) => {
+journey("Settings: the reading sample follows each choice as it is made (D312)", async (page) => {
   const settings = page.getByRole("dialog", { name: "Settings" });
   await page.keyboard.press("Meta+Comma");
   await settings.waitFor();
