@@ -66,6 +66,10 @@ When a sweep's triage is done, add a row per tester here.
 | 11-15 | [sweep 6](2026-11-15-codex-sweep-6/) looks | Codex | Light and dark, window sizes, zoom, reduced motion, contrast | both | 1 | #440 |
 | 11-15 | [sweep 6](2026-11-15-codex-sweep-6/) organize | Codex | Finding and organizing a big library (238 sources, not 950) | both | 4 (+9 from #440's review, F339–F347) | #440 |
 | 11-15 | [sweep 7](2026-11-15-codex-sweep-7/) highlights | Codex | Highlighting at its limits: overlaps, formulas, code, tables, every source type | both | 4 (+3 of the same kinds the fix found) | #442 |
+| 11-15 | [sweep 8](2026-11-15-codex-sweep-8/) reimport | Codex | Reimport a source that has highlights, notes, questions and exercises; the kept original changed | Mac | 3 | #443 |
+| 11-15 | [sweep 9](2026-11-15-codex-sweep-8/) upgrade | Codex | A library written by Ore as of 11-06 (`aa6bc6f`), opened and used by today's | both | 0 (small seed: no media, PDF or chats) | — |
+| 11-15 | [sweep 10](2026-11-15-codex-sweep-10/) months | Codex | 60–90 simulated days of sessions with `page.clock` | both | 1 | #443 |
+| 11-15 | [sweep 11](2026-11-15-codex-sweep-10/) offline | Codex | The Feed over weeks; the Mac offline or on a bad network | both | 2 | #443 |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
@@ -75,16 +79,16 @@ Ranked by likely yield.
 
 1. **The real Tauri window.** Native menu bar, ⌘Q with drafts open, the quick quiz's global shortcut and menu bar item, reminders firing, open at login. Every tester so far drove a browser page. F15 has been open since 11-11, and these are the paths that run on his Mac every day.
 2. ~~**Highlighting at its limits.**~~ Taken by sweep 7. Overlapping highlights, and highlights across headings, tables, math, images, code, transcripts and the PDF view. Sweep 6 found two WebKit page crashes from overlapping paint layers (F331, F339), and that kind of crash rarely comes alone.
-3. **Reimport and anchoring, for every source type.** A better reader re-imports a source that already has highlights, notes and exercises (D122 keeps the original for this). Anchoring is a core rule, and only the lifecycle tester touched it, with one changed page.
-4. **A library from an older Ore.** Open a library written by an earlier commit: old frontmatter, card files, review logs, skills.yaml. Nobody has tested an upgrade, and his ~/Ore is weeks of formats deep.
-5. **Months of use in a few minutes.** Run 60–90 simulated days of sessions with `page.clock`: queue order (D22, D24), new exercises a day, the backlog that never empties, levels, the end screen. The time tester only jumped days. The numbers tester checked one moment.
+3. ~~**Reimport and anchoring, for every source type.**~~ Taken by sweep 8. A better reader re-imports a source that already has highlights, notes and exercises (D122 keeps the original for this). Anchoring is a core rule, and only the lifecycle tester touched it, with one changed page.
+4. ~~**A library from an older Ore.**~~ Taken by sweep 9. Open a library written by an earlier commit: old frontmatter, card files, review logs, skills.yaml. Nobody has tested an upgrade, and his ~/Ore is weeks of formats deep.
+5. ~~**Months of use in a few minutes.**~~ Taken by sweep 10. Run 60–90 simulated days of sessions with `page.clock`: queue order (D22, D24), new exercises a day, the backlog that never empties, levels, the end screen. The time tester only jumped days. The numbers tester checked one moment.
 6. **Mac and iPhone writing at once.** Both apps on one iCloud folder at the same time: per-device review logs, note merges, an archive on one device while the source is open on the other. The outside tester only simulated a second device through files.
 7. **The kept original.** OriginalPage and OriginalSlides for PDFs, slides and pages, against what doc.md shows, plus Reimport from it. No prompt has aimed at this surface.
 8. **A day-long soak.** The Mac left open a whole working day, with background enrichment, many adds, timers, stale screens and memory growth. "Mac left open overnight" was the normal case behind sweep 2's midnight bug.
 9. **Drag and paste from other apps.** Finder files, Safari links and images, Preview pages and Notes text, dropped or pasted into Add, notes and the reader. The pointer tester stayed inside Ore.
-10. **The Feed over weeks.** Feeds that change, vanish, return malformed or double up, many followed feeds, and posts kept versus left. The Feed has only been reached in passing, yet it has produced bugs every time (F143, F144, F303).
+10. ~~**The Feed over weeks.**~~ Taken by sweep 11. Feeds that change, vanish, return malformed or double up, many followed feeds, and posts kept versus left. The Feed has only been reached in passing, yet it has produced bugs every time (F143, F144, F303).
 11. **The other AI vendor and model switches.** `ai: codex` against `claude`, and a model changed mid-enrichment or mid-grade. Check the vendor, model and prompt version stamps on every write. The ai tester used the mock, and two of its "mock-only" drops turned out real.
-12. **Mac offline or on a bad network.** Imports, the tutor, grading and Feed refresh while offline, on a captive portal or very slow, then back online. s4b did this on the phone only.
+12. ~~**Mac offline or on a bad network.**~~ Taken by sweep 11. Imports, the tutor, grading and Feed refresh while offline, on a captive portal or very slow, then back online. s4b did this on the phone only.
 13. **Courses and playlists end to end.** Filing, lessons, next lesson and progress on both devices. s1 iPhone left the next lesson untested, and lifecycle and organize only touched courses.
 14. **Ask your library at real scale.** Retrieval and citations over 950 sources (`ORE_SEED_SCALE=4`, which sweep 6's prompt missed): wrong-source citations, misses, waits.
 15. **Recovering from the library's own git history.** Restore a source, note or day from the snapshots and see what each screen shows afterwards. No one has tested it.

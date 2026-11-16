@@ -198,10 +198,13 @@ export async function reanchorItem(lib: Library, item: Item): Promise<ReanchorRe
   if (!report.hashChanged) return report;
   for (const a of anchorAnnotations(item)) {
     if (!a.anchor) report.orphaned.push(a.id);
-    else if (a.anchor.method !== "position") {
+    else {
       const { anchor: found, ...current } = a;
-      reviseAnnotation(item, current, quoteSelector(item.body, found.start, found.end));
-      report.moved.push({ id: a.id, method: found.method });
+      const sel = quoteSelector(item.body, found.start, found.end);
+      // Placed by anything but its quote and context where they were, it takes the text around it now, so the
+      // next read finds it at once and a later reimport compares against this text (review of #443).
+      if (found.method !== "position" || sel.prefix !== a.prefix || sel.suffix !== a.suffix) reviseAnnotation(item, current, sel);
+      if (found.method !== "position") report.moved.push({ id: a.id, method: found.method });
     }
   }
   await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, text_sha256: sha256(item.body) }));

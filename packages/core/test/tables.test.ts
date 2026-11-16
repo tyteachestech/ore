@@ -57,7 +57,8 @@ describe("PDF tables and formulas (D125)", () => {
     expect(now.body).not.toMatch(/412\s+91%/); // the cells are not also left as a line
     expect(readAnnotations(now).find((a) => a.id === kept.id)?.status).not.toBe("orphaned");
     expect(existsSync(join(now.dir, "layout.json"))).toBe(true);
-    expect(tablesState(lib, now)).toEqual({ tables: "read" });
+    // Its step, for a read run in the background: the reader's Undo takes back exactly this one (review of #443).
+    expect(tablesState(lib, now)).toEqual({ tables: "read", tables_step: r.step });
 
     // The reading is kept: a later reimport (a better pdf.js reader) keeps the tables without Docling.
     delete process.env.ORE_DOCLING;
@@ -68,6 +69,19 @@ describe("PDF tables and formulas (D125)", () => {
     const back = await undoReimport(lib, item.meta.id);
     expect(back.body).not.toContain("| Schedule |");
     expect(existsSync(join(back.dir, "layout.json"))).toBe(false);
+  });
+
+  test("ore tables reports the questions whose passage the read took away, as reimport does (review of #443)", async () => {
+    const lib = await tempLibrary();
+    const item = await addSource(lib, join(FIX, "tables.pdf"));
+    const asked = addHighlight(item, { exact: "Spaced 412 91% 74% Massed 398 93% 41%", intent: "question", note: "Why does massed drop so far?" });
+    const p = Bun.spawn(["bun", join(import.meta.dir, "../../cli/src/ore.ts"), "tables", item.meta.id, "--json"], { env: { ...process.env, ORE_LIBRARY: lib.root, ORE_NO_ENRICH: "1", ORE_DOCLING: fakeDocling() }, stdout: "pipe", stderr: "pipe" });
+    const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited]);
+    expect(code).toBe(0);
+    const r = JSON.parse(out) as { changed: boolean; step?: string; unplaced?: { id: string; exact: string; intent: string }[] };
+    expect(r.changed).toBe(true);
+    expect(r.step).toBeTruthy();
+    expect(r.unplaced).toEqual([{ id: asked.id, exact: asked.exact, intent: "question" }]);
   });
 
   test("a PDF of prose has nothing to offer; one added before tables were spotted learns it on reimport", async () => {

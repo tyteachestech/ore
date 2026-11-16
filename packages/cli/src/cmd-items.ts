@@ -63,6 +63,9 @@ async function keptFromFeed(lib: Library, item: Item): Promise<boolean> {
   return true;
 }
 
+/** A highlight or question as a reimport reports it. */
+const brief = (a: { id: string; exact: string; intent: string }) => ({ id: a.id, exact: a.exact, intent: a.intent });
+
 export const itemCommands: Record<string, Command> = {
   add: {
     usage: "<url|path> | --stdin [--html] | --tab [--skill s] [--type t] [--for <question>] [--course] [--no-enrich]   ingest → items/, status inbox (--stdin: pasted text as a Markdown source, --html: the paste is HTML, its headings, tables, math, code and images kept; --tab: the page open in the frontmost Safari or Chrome window, as signed in there, D96; --for: added for a question, D75; --course: every lesson of a Claude Academy course or YouTube playlist as its own source, D79); enrich runs in background",
@@ -523,24 +526,25 @@ export const itemCommands: Record<string, Command> = {
   },
 
   reimport: {
-    usage: "<item> [--undo]   fetch a source's original again and update it in place: highlights re-anchor, ones whose passage is gone are removed (questions and cards stay); --undo puts the old version back, again redoes",
-    options: { undo: { type: "boolean" } },
+    usage: "<item> [--undo [--step <step>]]   fetch a source's original again and update it in place: highlights re-anchor, ones whose passage is gone are removed (questions and cards stay; questions whose passage is gone are listed as unplaced); --undo --step <step> (as the reimport printed it) puts back the version that reimport replaced, and again redoes it; --undo alone undoes the newest reimport not undone yet, each time one further back",
+    options: { undo: { type: "boolean" }, step: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();
       const id = findItem(lib, need(ref, "<item>")).meta.id;
       if (f.undo) {
-        const item = await undoReimport(lib, id);
+        const item = await undoReimport(lib, id, str(f.step));
         return { data: { id, title: item.meta.title }, text: `Put back the previous version of ${item.meta.title}` };
       }
       const r = await reimportSource(lib, id);
-      const data = { id, title: r.item.meta.title, changed: r.changed, moved: r.moved, removed: r.removed.map((a) => ({ id: a.id, exact: a.exact, intent: a.intent })) };
-      const text = !r.changed ? `${r.item.meta.title} is up to date` : `Reimported ${r.item.meta.title}${r.removed.length ? `; removed ${r.removed.length} highlight(s) no longer in it` : ""}`;
+      const data = { id, title: r.item.meta.title, changed: r.changed, moved: r.moved, removed: r.removed.map(brief), unplaced: r.unplaced.map(brief), step: r.step };
+      const lost = [r.removed.length && `removed ${r.removed.length} highlight(s) no longer in it`, r.unplaced.length && `${r.unplaced.length} question(s) kept, their passage no longer in it`].filter(Boolean).join("; ");
+      const text = !r.changed ? `${r.item.meta.title} is up to date` : `Reimported ${r.item.meta.title}${lost ? `; ${lost}` : ""}${r.step ? ` (undo: --undo --step ${r.step})` : ""}`;
       return { data, text };
     },
   },
 
   tables: {
-    usage: "<item> [--status] | --install | --remove | --status   read a PDF's tables and display formulas with Docling and put them in its text in place of their lines; highlights stay (D125). Docling is an optional download of about 2 GB: --install gets it, --remove deletes it, --status says whether it is here. Undo with `ore reimport <item> --undo`",
+    usage: "<item> [--status] | --install | --remove | --status   read a PDF's tables and display formulas with Docling and put them in its text in place of their lines; highlights stay (D125). Docling is an optional download of about 2 GB: --install gets it, --remove deletes it, --status says whether it is here (and, for a PDF read, its step). Undo with `ore reimport <item> --undo --step <step>`",
     options: { install: { type: "boolean" }, remove: { type: "boolean" }, status: { type: "boolean" } },
     async run([ref], f) {
       if (f.status && ref) {
@@ -562,7 +566,7 @@ export const itemCommands: Record<string, Command> = {
       }
       const lib = openLibrary();
       const r = await readTables(lib, findItem(lib, need(ref, "<item>")).meta.id);
-      const data = { id: r.item.meta.id, title: r.item.meta.title, changed: r.changed, regions: r.regions, moved: r.moved, removed: r.removed.map((a) => ({ id: a.id, exact: a.exact, intent: a.intent })) };
+      const data = { id: r.item.meta.id, title: r.item.meta.title, changed: r.changed, regions: r.regions, moved: r.moved, removed: r.removed.map(brief), unplaced: r.unplaced.map(brief), step: r.step };
       return { data, text: !r.changed ? `Found no tables or formulas to add in ${r.item.meta.title}` : `Read ${r.regions} table(s) and formula(s) into ${r.item.meta.title}` };
     },
   },

@@ -38,6 +38,23 @@ describe("anchoring", () => {
     expect(a.start).toBe(second + "New first line.\n".length);
   });
 
+  test("exact: a quote that occurs twice follows the copy whose context still matches, not its old offset (F363)", () => {
+    const block = (river: string, habitat: string) => `A learner studies birds beside a ${river} river.\n\nThe blue heron nests beside the river each spring.\n\nThis observation describes the ${habitat} habitat.\n\n`;
+    const quote = "The blue heron nests beside the river each spring.";
+    const before = "# Birds\n\n" + block("quiet", "northern") + "| Bird | Season |\n|---|---|\n| Heron | Spring |\n";
+    const s = before.indexOf(quote);
+    const sel = quoteSelector(before, s, s + quote.length);
+    // Moved below the table; a reworded copy left where it was, the quote at the same offset.
+    const after = "# Birds\n\n" + block("noisy", "southern") + "| Bird | Season |\n|---|---|\n| Heron | Spring |\n\n" + block("quiet", "northern");
+    expect(after.slice(s, s + quote.length)).toBe(quote);
+    const a = anchor(after, sel)!;
+    expect(a.start).toBe(after.lastIndexOf(quote));
+    expect(a.method).toBe("exact");
+    // With nothing to tell the copies apart, the old offset still wins.
+    const twice = "# Birds\n\n" + block("quiet", "northern") + "| Bird | Season |\n|---|---|\n| Heron | Spring |\n\n" + block("quiet", "northern");
+    expect(anchor(twice, sel)).toEqual({ start: s, end: s + quote.length, method: "position" });
+  });
+
   test("fuzzy: the passage itself was edited slightly", () => {
     const sel = selectorFor(DOC, PASSAGE);
     const edited = DOC.replace("Spacing reviews over days strengthens", "Spacing reviews across days strengthens");

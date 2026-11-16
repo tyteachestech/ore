@@ -1,0 +1,4 @@
+{ "testers": [
+  { "name": "reimport", "seed": "seed" },
+  { "name": "upgrade", "seed": "seed", "from": "/Users/tylerpoelking/Developer/ore-wt/old-lib-1106" }
+] }

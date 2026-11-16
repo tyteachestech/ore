@@ -1,4 +1,4 @@
-import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import type { Region } from "./docling.ts";
 import { doclingPath } from "./docling-path.ts";
 import { homedir } from "node:os";
@@ -6,7 +6,7 @@ import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { deviceName, latestRevs, sha256, writeAtomic } from "../fsutil.ts";
-import { nowIso } from "../ids.ts";
+import { isUlid, nowIso, ulid } from "../ids.ts";
 import { THEIRS_FIRST_MS } from "../inbox.ts";
 import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
@@ -727,12 +727,48 @@ export interface Reimported {
   moved: number;
   /** Highlights whose passage is no longer in the original, removed (their cards stay). */
   removed: Annotation[];
+  /** Questions whose passage is no longer in the original: kept, his own words, but placed nowhere. */
+  unplaced: Annotation[];
+  /** Names this reimport's stash: `undoReimport` with it puts back exactly what this one replaced. */
+  step?: string;
 }
 
-// Files a reimport replaces; the previous ones wait in `.ore/reimport/<id>/` for Undo.
+// Files a reimport replaces; the previous ones wait in `.ore/reimport/<id>/<step>/` for Undo, one stash
+// per reimport, so two in a row are undone one at a time, each to the version it replaced.
 // layout.json (D125) belongs to the version it was read into, so Undo takes its tables back out too.
 const REPLACED = (name: string) => name === "doc.md" || name === "transcript.vtt" || name === "layout.json" || name.startsWith("source.") || name === "page.html";
-const stash = (lib: Library, id: string) => join(lib.root, ".ore", "reimport", id);
+const stashRoot = (lib: Library) => join(lib.root, ".ore", "reimport");
+const stashes = (lib: Library, id: string) => join(stashRoot(lib), id);
+/** In a stash whose reimport is undone (it holds the newer side): a step-less undo passes over it. */
+const UNDONE = "undone";
+/** How long a stash is kept: the app's Undo for a reimport lives while its window is open (history.ts), so a
+ *  day covers a day's work; every reimport, of any source, removes the older ones. */
+const STASH_MS = 24 * 3600_000;
+
+/** A source's stashes, oldest first (steps are ULIDs, so by time). An older Ore's one stash, its files right in
+ *  the source's folder, becomes a step dated by its doc.md, so it can be undone and is removed in its turn. */
+function steps(lib: Library, id: string): string[] {
+  const root = stashes(lib, id);
+  if (!existsSync(root)) return [];
+  if (existsSync(join(root, "doc.md"))) {
+    const at = statSync(join(root, "doc.md")).mtime;
+    const dir = join(root, ulid(at.getTime()));
+    mkdirSync(dir);
+    for (const f of readdirSync(root)) if (!isUlid(f) && statSync(join(root, f)).isFile()) renameSync(join(root, f), join(dir, f));
+    utimesSync(dir, at, at);
+  }
+  return readdirSync(root).filter(isUlid).sort();
+}
+
+/** Removes every stash older than a day, of every source. */
+function pruneStashes(lib: Library) {
+  if (!existsSync(stashRoot(lib))) return;
+  for (const id of readdirSync(stashRoot(lib))) {
+    if (!statSync(stashes(lib, id)).isDirectory()) continue;
+    for (const s of steps(lib, id)) if (Date.now() - statSync(join(stashes(lib, id), s)).mtimeMs > STASH_MS) rmSync(join(stashes(lib, id), s), { recursive: true, force: true });
+    if (!readdirSync(stashes(lib, id)).length) rmSync(stashes(lib, id), { recursive: true, force: true });
+  }
+}
 
 /** Keeps a replaced file for Undo. On the Mac's APFS a copy is a clone, sharing the blocks until either
  *  changes, so a recording (up to 200 MB) isn't stored twice; elsewhere it is a plain copy. Not a hard
@@ -772,7 +808,7 @@ async function lessonOf(item: Item): Promise<CourseLesson> {
  *  notes, progress, title he gave it), its highlights re-anchored where their passage still is, and
  *  the ones whose passage is gone removed, except questions (his own words, listed on the skill page).
  *  The previous version is kept for `undoReimport`. */
-export async function reimportSource(lib: Library, ref: string, { local = false, regions: read, onProgress, turn = (f) => f() }: { local?: boolean; regions?: Region[]; onProgress?: AddOptions["onProgress"]; turn?: Turn } = {}): Promise<Reimported> {
+export async function reimportSource(lib: Library, ref: string, { local = false, regions: read, onProgress, turn = (f) => f(), stash = true }: { local?: boolean; regions?: Region[]; onProgress?: AddOptions["onProgress"]; turn?: Turn; /** False where no Undo can reach it (a fill, D227): nothing is kept. */ stash?: boolean } = {}): Promise<Reimported> {
   const item = findItem(lib, ref);
   const { url, course, type } = item.meta;
   // `local` reads the kept copy of a link's file too (a PDF's tables, read from the copy they came from).
@@ -788,7 +824,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
     throw PASTE_STEP.test(e.message) ? new Error(e.message.replace(PASTE_STEP, " Its transcript is as it was.")) : e;
   });
   if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
-  return turn(() => rewrite(lib, item, draft, regions, kept));
+  return turn(() => rewrite(lib, item, draft, regions, kept, stash));
 }
 
 /** The original a file source is read again from: the copy kept beside it (source.*), so a better reader
@@ -805,7 +841,7 @@ export type Turn = <T>(f: () => Promise<T>) => Promise<T>;
 
 /** `draft`, read again from where `item` came from, in its place: the old version stashed for Undo, its
  *  highlights moved to the new text. */
-async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[] | undefined, kept?: string): Promise<Reimported> {
+async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[] | undefined, kept?: string, stash = true): Promise<Reimported> {
   // As it is now: he may have renamed or filed it while it was read, and one he deleted is not brought back.
   const item = findItem(lib, was.meta.id);
   const { url, course } = item.meta;
@@ -820,14 +856,17 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
   if (draft.body === item.body) {
     // A better reader may learn something about the same text: a PDF's tables still to be read (D125).
     if (String(draft.structure ?? "") !== String(item.meta.structure ?? "")) item.meta = await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, structure: draft.structure }));
-    return { item, changed: false, moved: 0, removed: [] };
+    return { item, changed: false, moved: 0, removed: [], unplaced: [] };
   }
-  const dir = stash(lib, item.meta.id);
+  const step = stash ? ulid() : undefined;
   await withLock(paths.lock(lib), () => {
-    rmSync(dir, { recursive: true, force: true });
-    mkdirSync(dir, { recursive: true });
-    for (const f of readdirSync(item.dir).filter(REPLACED)) keepFile(join(item.dir, f), join(dir, f));
-    writeAtomic(join(dir, "highlights.json"), JSON.stringify(latestRevs(annotationRevs(item.dir))));
+    pruneStashes(lib);
+    if (step) {
+      const dir = join(stashes(lib, item.meta.id), step);
+      mkdirSync(dir, { recursive: true });
+      for (const f of readdirSync(item.dir).filter(REPLACED)) keepFile(join(item.dir, f), join(dir, f));
+      writeAtomic(join(dir, "highlights.json"), JSON.stringify(latestRevs(annotationRevs(item.dir))));
+    }
     // A file read again from its kept copy keeps that copy as it is: the same bytes need no second write.
     const same = draft.source && kept === `source.${draft.source.ext}` ? kept : undefined;
     for (const f of readdirSync(item.dir).filter((f) => REPLACED(f) && f !== "doc.md" && f !== same)) unlinkSync(join(item.dir, f));
@@ -847,9 +886,10 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
   });
   const next = readItemDir(item.dir);
   const report = await reanchorItem(lib, next);
-  const gone = readAnnotations(next).filter((a) => report.orphaned.includes(a.id) && a.intent !== "question");
+  const orphans = readAnnotations(next).filter((a) => report.orphaned.includes(a.id));
+  const gone = orphans.filter((a) => a.intent !== "question");
   for (const a of gone) reviseAnnotation(next, a, { status: "deleted" });
-  return { item: readItemDir(item.dir), changed: true, moved: report.moved.length, removed: gone };
+  return { item: readItemDir(item.dir), changed: true, moved: report.moved.length, removed: gone, unplaced: orphans.filter((a) => a.intent === "question"), step };
 }
 
 /** Where a source with a part owed is noted, beside the links waiting in inbox/: a pass that finds none
@@ -887,7 +927,7 @@ export async function fillOwed(lib: Library, opts: { onProgress?: (id: string, d
       // Its own now: a long download here starts the other devices' five minutes again, so two never hear it at once.
       writeAtomic(owedNote(lib, id), JSON.stringify({ ...note, id, owed: item.meta.owed, device: deviceName(), added: nowIso(), self: true }) + "\n");
       try {
-        filled.push((await reimportSource(lib, id, { onProgress: (done, label) => opts.onProgress?.(id, done, label), turn })).item);
+        filled.push((await reimportSource(lib, id, { onProgress: (done, label) => opts.onProgress?.(id, done, label), turn, stash: false })).item);
       } catch (e) {
         // Archived or deleted while it downloaded: nothing left to mark.
         await turn(() => updateItemMeta(lib, id, (m) => ({ ...m, owed_error: e instanceof Error ? e.message : String(e) }))).catch(() => {});
@@ -908,7 +948,7 @@ function layoutOf(dir: string): Region[] | undefined {
   }
 }
 
-const tablesFile = (lib: Library, id: string, ext: "reading" | "error") => join(paths.logs(lib), `tables-${id}.${ext}`);
+const tablesFile = (lib: Library, id: string, ext: "reading" | "error" | "step") => join(paths.logs(lib), `tables-${id}.${ext}`);
 
 /** Reads a PDF source's tables and formulas with Docling (D125) and puts them in its text in place of
  *  pdf.js's lines, through a reimport from the kept PDF: the prose is unchanged, so every highlight
@@ -922,6 +962,8 @@ export async function readTables(lib: Library, ref: string): Promise<Reimported 
     const r = await reimportSource(lib, item.meta.id, { local: true, regions });
     // Nothing to swap in is still a reading: the PDF stops offering it.
     if (!r.changed) writeAtomic(join(item.dir, "layout.json"), JSON.stringify(regions));
+    // A read run in the background names its step for the reader's Undo (tablesState).
+    else if (r.step) writeFileSync(tablesFile(lib, item.meta.id, "step"), r.step);
     rmSync(tablesFile(lib, item.meta.id, "error"), { force: true });
     return { ...r, regions: regions.length };
   } catch (e) {
@@ -935,16 +977,20 @@ export async function readTables(lib: Library, ref: string): Promise<Reimported 
 /** Marks a PDF's tables as being read by the run `pid`, until it ends. */
 export function markTablesReading(lib: Library, id: string, pid: number): void {
   mkdirSync(paths.logs(lib), { recursive: true });
+  rmSync(tablesFile(lib, id, "step"), { force: true });
   writeFileSync(tablesFile(lib, id, "reading"), String(pid));
 }
 
-/** Where a PDF's tables stand: being read now, read (its layout.json), or why the last reading failed;
- *  for one with tables or formulas still read as lines, whether the reader is here to read them. */
-export function tablesState(lib: Library, item: Item): { tables?: "reading" | "read"; tables_error?: string; tables_reader?: boolean } {
+/** Where a PDF's tables stand: being read now, read (its layout.json, with the step its Undo takes back), or why
+ *  the last reading failed; for one with tables or formulas still read as lines, whether the reader is here to read them. */
+export function tablesState(lib: Library, item: Item): { tables?: "reading" | "read"; tables_step?: string; tables_error?: string; tables_reader?: boolean } {
   if (item.meta.type !== "pdf") return {};
   const pid = Number(readOr(tablesFile(lib, item.meta.id, "reading")));
   if (pid && alive(pid)) return { tables: "reading" };
-  if (existsSync(join(item.dir, "layout.json"))) return { tables: "read" };
+  if (existsSync(join(item.dir, "layout.json"))) {
+    const step = readOr(tablesFile(lib, item.meta.id, "step"));
+    return step ? { tables: "read", tables_step: step } : { tables: "read" };
+  }
   const error = readOr(tablesFile(lib, item.meta.id, "error"));
   const reader = item.meta.structure?.length ? { tables_reader: !!doclingPath() } : {};
   return error ? { tables_error: error, ...reader } : reader;
@@ -966,18 +1012,22 @@ const alive = (pid: number) => {
   }
 };
 
-/** Puts back the version a reimport replaced, highlights included; run again, it redoes the reimport. */
-export async function undoReimport(lib: Library, ref: string): Promise<Item> {
+/** Puts back the version the reimport `step` replaced, highlights included; run again with that step, it redoes
+ *  it. Without a step it undoes the newest reimport not undone yet, so each call goes one further back. */
+export async function undoReimport(lib: Library, ref: string, step?: string): Promise<Item> {
   const item = findItem(lib, ref);
-  const dir = stash(lib, item.meta.id);
+  const name = step ?? steps(lib, item.meta.id).filter((s) => !existsSync(join(stashes(lib, item.meta.id), s, UNDONE))).at(-1);
+  const dir = join(stashes(lib, item.meta.id), name && isUlid(name) ? name : "-");
   if (!existsSync(join(dir, "doc.md"))) throw new Error("There is no reimport of this source to undo.");
   const saved = JSON.parse(readFileSync(join(dir, "highlights.json"), "utf8")) as Annotation[];
+  const undone = existsSync(join(dir, UNDONE));
   await withLock(paths.lock(lib), () => {
     const tmp = swapFiles(item, dir);
-    // The swap's other side becomes the stash, so the next call redoes.
+    // The swap's other side becomes the stash, so the next call with its step redoes.
     mkdirSync(dir, { recursive: true });
     for (const f of readdirSync(tmp)) keepFile(join(tmp, f), join(dir, f));
     rmSync(tmp, { recursive: true, force: true });
+    if (!undone) writeFileSync(join(dir, UNDONE), "");
   });
   const now = readItemDir(item.dir);
   const current = new Map(latestRevs(annotationRevs(now.dir)).map((a) => [a.id, a]));

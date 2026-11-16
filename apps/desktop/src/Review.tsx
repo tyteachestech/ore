@@ -24,7 +24,7 @@ import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { LapCentre, lapPlan, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useFocusWhileMounted, useLibraryChanges, type Forget, type Notify } from "./util";
+import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useDay, useFocusWhileMounted, useLibraryChanges, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { ExerciseText } from "./ExerciseText";
@@ -207,6 +207,23 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   const [start, setStart] = useState<Today | null>(null);
   /** The local day `before` was read on. */
   const beforeDay = useRef("");
+  /** Past midnight the day's minutes start again: `t` is the new day's Today, read as if just before this session,
+   *  with `add` ms of this session already in it (F184, F365). A skill's level is no day's, so
+   *  the session's level-ups still count from where it started. */
+  const newDay = (t: Today, add: number) => {
+    turnedMs.current = 0;
+    before.current = { ...t, skills: before.current?.skills ?? t.skills, active_ms: t.active_ms - add, met: t.active_ms - add >= t.goal_ms };
+    beforeDay.current = new Date().toLocaleDateString("sv");
+    setStart(before.current);
+    activeMs.current = add;
+    // Yesterday's goal note was yesterday's: today's goal is told when it closes.
+    goalTold.current = false;
+    setGoalSaid(false);
+  };
+  const dayTurned = () => !!before.current && new Date().toLocaleDateString("sv") !== beforeDay.current;
+  /** What was rated since midnight that no new day's start has counted yet (its Today read failed): the next
+   *  `newDay` takes it as this session's, never as none (review of #443). */
+  const turnedMs = useRef(0);
   /** The ratings of this session, newest last, to take back with ⌘Z one after another (Anki's Undo): each
    *  review's ts and the session as it was before it. */
   const [undos, setUndos] = useState<{ card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget; day: string; ms: number }[]>([]);
@@ -313,6 +330,12 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
     const un = quick || PHONE ? null : listen("quiz-closed", () => void reconcile(false));
     return () => (removeEventListener(LIBRARY_BACK, back), void un?.then((f) => f()));
   }, [quick, pick, source]);
+
+  // Midnight with an exercise open: the quick quiz's ring starts the new day at once, not at the next rating.
+  const day = useDay();
+  useEffect(() => {
+    if (dayTurned()) void ore<Today>("today").then((t) => dayTurned() && newDay(t, Math.min(turnedMs.current, t.active_ms)), () => {});
+  }, [day]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A setting changed while the session is open (paused on a source, Settings, then back): the goal it counts
   // toward and the day's new-exercise limit follow the saved ones, as a fresh session would (Codex sweep 4).
@@ -451,6 +474,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       // so Done doesn't show the morning's progress and then push the list down when the goal line appears.
       const today = await ore<Today>("today");
       rememberToday(today);
+      // Left after midnight: the ring is the new day's, which this session added only what it rated since to.
+      if (dayTurned()) newDay(today, Math.min(turnedMs.current, today.active_ms));
       setEnd({ session: receipt, today, before: before.current, next: await next });
     } catch (e) {
       notify(errorText(e), "error");
@@ -653,18 +678,11 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       drafts.delete(card.id);
       // Past midnight the day's minutes start again: read the new day's Today, as if it was read just before this
       // rating, so the goal and the ring count today's minutes, not yesterday's plus these (F184).
-      if (before.current && new Date().toLocaleDateString("sv") !== beforeDay.current) {
+      if (dayTurned()) {
+        const add = turnedMs.current + Math.min(elapsed, ACTIVE_CAP_MS);
         const t = await ore<Today>("today").catch(() => null);
-        if (t) {
-          const add = Math.min(elapsed, ACTIVE_CAP_MS, t.active_ms);
-          before.current = { ...t, active_ms: t.active_ms - add, met: t.active_ms - add >= t.goal_ms };
-          beforeDay.current = new Date().toLocaleDateString("sv");
-          setStart(before.current);
-          activeMs.current = add;
-          // Yesterday's goal note was yesterday's: today's goal is told when it closes.
-          goalTold.current = false;
-          setGoalSaid(false);
-        }
+        if (t) newDay(t, Math.min(add, t.active_ms));
+        else turnedMs.current = add;
       }
       // The day's goal closing (D65) is told by the mole; the session flows on (D246).
       const b = before.current;
@@ -750,6 +768,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       reviewed.current--;
       // A rating from before midnight's rollover: the count is the new day's now, so only its own time comes off.
       activeMs.current = last.day === beforeDay.current ? last.activeMs : Math.max(0, activeMs.current - last.ms);
+      // One rated after midnight that no new day counted yet: it is no longer this session's either.
+      if (turnedMs.current) turnedMs.current = Math.max(0, turnedMs.current - last.ms);
       putOffIds.current = new Set(last.off);
       // D177's one more goes with the rating that earned it.
       wonLast.current = last.won;

@@ -1191,14 +1191,29 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }, [waiting, p.id]);
 
   /** Runs enrich again in the foreground, so a failure shows its reason. */
-  /** The PDF's tables and formulas were read into its text: show it, with the way back. */
-  const tablesRead = (r: { changed: boolean; regions: number }) => {
-    const id = p.id;
+  /** A reimport, or a PDF's tables read into its text, has landed: show it, and its toast's Undo and Redo swap
+   *  exactly that one's `step`, never the newest stash, which may be a later reimport's (run only from the history,
+   *  which says so if it fails). Without a step nothing was kept to undo. */
+  const reimported = (id: string, what: string, step?: string) => {
     p.reload();
     p.onChanged();
-    if (!r.changed) return p.notify("Found no tables or formulas to read in this PDF");
-    const step = () => ore("reimport", id, "--undo").then(() => (p.reload(), p.onChanged()));
-    p.notify("Read the tables and formulas into the text", "info", step, step);
+    const swap = step ? () => ore("reimport", id, "--undo", "--step", step).then(() => (p.reload(), p.onChanged())) : undefined;
+    p.notify(what, "info", swap, swap);
+  };
+  /** What a reimport left out, for its toast: highlights removed, questions kept with their passage gone. */
+  const lostText = (r: { removed?: unknown[]; unplaced?: unknown[] }) => {
+    const n = r.removed?.length ?? 0;
+    const q = r.unplaced?.length ?? 0;
+    const removed = n ? `${n} ${n === 1 ? "highlight is" : "highlights are"} no longer in it, so ${n === 1 ? "it was" : "they were"} removed.` : "";
+    const unplaced = q ? `${q === 1 ? "A question’s passage is" : `${q} questions’ passages are`} no longer in it; ${q === 1 ? "the question is" : "the questions are"} kept.` : "";
+    return [removed, unplaced].filter(Boolean).join(" ").replace(/\.$/, "");
+  };
+
+  /** The PDF's tables and formulas were read into its text: show it, with the way back. */
+  const tablesRead = (r: { changed: boolean; regions: number; step?: string; removed?: unknown[]; unplaced?: unknown[] }) => {
+    if (!r.changed) return (p.reload(), p.onChanged(), p.notify("Found no tables or formulas to read in this PDF"));
+    const lost = lostText(r);
+    reimported(p.id, `Read the tables and formulas into the text${lost ? `. ${lost}` : ""}`, r.step);
   };
 
   const retryEnrich = async () => {
@@ -1766,7 +1781,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   function jumpToHighlight(id: string) {
     const el = scrollRef.current;
     const range = rangeOf(id);
-    if (!el || !range) return;
+    if (!el) return;
+    // Its passage gone from the text (a reimport): say so, never a click that does nothing.
+    if (!range) return void (annOf(id)?.anchor === null && p.notify("The passage it was marked on is no longer in this source.", "error"));
     toThird(range);
     fresh.current = null;
     openPopup(id, range, annOf(id)?.note ?? "");
@@ -3139,17 +3156,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const reimport = async () => {
     if (!doc) return;
     const d = doc;
-    // Run only from the history, which says so if it fails.
-    const swap = () => ore("reimport", d.id, "--undo").then(() => (p.reload(), p.onChanged()));
     p.notify(`Reimporting “${d.title}”…`, "progress");
     try {
-      const r = await ore<{ changed: boolean; removed: unknown[] }>("reimport", d.id);
+      const r = await ore<{ changed: boolean; removed: unknown[]; unplaced?: unknown[]; step?: string }>("reimport", d.id);
       if (!r.changed) return p.notify(`“${d.title}” is already up to date`);
-      p.reload();
-      p.onChanged();
-      const n = r.removed.length;
-      const what = n ? `Reimported. ${n} ${n === 1 ? "highlight is" : "highlights are"} no longer in it, so ${n === 1 ? "it was" : "they were"} removed` : "Reimported with the latest text";
-      p.notify(what, "info", swap, swap);
+      const lost = lostText(r);
+      reimported(d.id, lost ? `Reimported. ${lost}` : "Reimported with the latest text", r.step);
     } catch (e) {
       p.notify(errorText(e, "reimport"), "error");
     }

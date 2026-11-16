@@ -635,6 +635,62 @@ journey("PDF tables: read in the background after adding, Undo puts the lines ba
   await doc.locator("table").getByText("Massed").waitFor({ timeout: 15000 });
 });
 
+journey("reimport twice, then ⌘Z twice: each Undo puts back the version its reimport replaced, with the removed highlight; a question whose passage went says so (F362, F364)", async (page) => {
+  const KETTLE = "The copper kettle whistles before the water boils.";
+  const ASKED = "Questions make learners examine the evidence carefully.";
+  const nb = (md: string) => JSON.stringify({ cells: [{ cell_type: "markdown", metadata: {}, source: md }], metadata: {}, nbformat: 4, nbformat_minor: 5 });
+  const V0 = `# Reimport undo study\n\n## First section\n\nA learner studies birds beside a quiet river.\n\n## Second section\n\n${KETTLE}\n\n${ASKED}\n\nThe last paragraph stays as it is.\n`;
+  const file = join(mkdtempSync(join(tmpdir(), "ore-e2e-nb-")), "reimport-undo-study.ipynb");
+  writeFileSync(file, nb(V0));
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(file);
+  await page.keyboard.press("Enter");
+  const doc = page.locator(".doc");
+  await doc.getByText(KETTLE).waitFor();
+  const item = ((await ore("ls")) as { id: string; title: string; dir: string }[]).find((i) => i.title === "Reimport undo study")!;
+  await ore("highlight", item.id, "--exact", KETTLE, "--intent", "keep", "--note", "Keep this kettle note.");
+  await ore("highlight", item.id, "--exact", ASKED, "--intent", "question", "--note", "How strong is the evidence?");
+  const kept = join(item.dir, "source.ipynb");
+  const reimport = async (md: string, says?: string) => {
+    writeFileSync(kept, nb(md));
+    await page.getByRole("button", { name: "Source actions" }).first().click();
+    await page.getByRole("menuitem", { name: "Reimport" }).click();
+    if (says) await page.locator(".toast", { hasText: says }).waitFor();
+    await settled(page);
+  };
+  await page.reload();
+  await openSource(page, "Reimport undo study");
+  const V1 = V0.replace(`${KETTLE}\n\n${ASKED}\n\n`, "");
+  await reimport(V1, "1 highlight is no longer in it, so it was removed. A question’s passage is no longer in it; the question is kept");
+  await reimport(V1.replace("## First section", "## Updated first section"));
+  await doc.getByText("Updated first section").waitFor();
+
+  // The question is kept, and the way to where it was asked says its passage is gone instead of doing nothing.
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.locator(".qp-row", { hasText: "How strong is the evidence?" }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Show where it was asked" }).click();
+  await page.locator(".toast", { hasText: "The passage it was marked on is no longer in this source." }).waitFor();
+
+  await doc.getByText("The last paragraph stays as it is.").click();
+  await page.keyboard.press("Meta+z");
+  await doc.getByText("First section", { exact: true }).waitFor();
+  await settled(page);
+  if (await doc.getByText(KETTLE).count()) throw new Error("the first ⌘Z went past the second reimport");
+  await page.keyboard.press("Meta+z");
+  await doc.getByText(KETTLE).waitFor();
+  await settled(page);
+  if (await doc.getByText("Updated first section").count()) throw new Error("the second ⌘Z brought back the newer version");
+  const ann = ((await ore("show", item.id, "--annotations")) as { annotations: { exact: string; note?: string; status: string }[] }).annotations.find((a) => a.exact === KETTLE);
+  if (ann?.status === "deleted" || ann?.note !== "Keep this kettle note.") throw new Error(`the removed highlight did not come back with its note: ${JSON.stringify(ann)}`);
+  // Redo replays them in order.
+  await page.keyboard.press("Meta+Shift+z");
+  await until("⇧⌘Z takes the first reimport again", async () => !(await doc.getByText(KETTLE).count()) && (await doc.getByText("First section", { exact: true }).count()) === 1);
+  await settled(page);
+  await page.keyboard.press("Meta+Shift+z");
+  await doc.getByText("Updated first section").waitFor();
+  await settled(page);
+});
+
 journey("cancel an add from its toast: nothing is added, and the link stays in the box", async (page) => {
   // A page that hangs on its picture, which is fetched after the source is written.
   const page$ = `<html><head><title>Slow page</title><meta property="og:image" content="/cover.jpg"></head><body><article><h1>Slow page</h1><p>${"Spacing beats cramming. ".repeat(40)}</p></article></body></html>`;
@@ -12370,6 +12426,100 @@ journey("phone: a session across midnight counts only the new day's minutes towa
   }
   await page.waitForTimeout(1500);
   if (await page.getByText("Goal met").count()) throw new Error("the goal was said met with 6 of today's 10 minutes");
+}, "phone");
+
+journey("phone: a review left after midnight with no rating since shows the new day's minutes in its end ring (F365)", async (page) => {
+  // A session before midnight, then a second rated before it and left after it: the ring's centre kept the minutes
+  // from before the second session, yesterday's, though the new day had none (Codex sweep 10, MONTHS-1).
+  const late = new Date();
+  late.setHours(23, 40, 0, 0);
+  await page.clock.install({ time: late });
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  const rate = async (wait: string) => {
+    await sure.waitFor();
+    await page.clock.fastForward(wait);
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+  };
+  const start = async () => {
+    await tap(page, page.getByRole("button", { name: "Start review" }).first());
+    await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  };
+  await start();
+  await rate("03:00");
+  await rate("03:00");
+  await sure.waitFor();
+  await tap(page, page.getByRole("button", { name: "Leave review" }));
+  await page.locator(".review-end").waitFor();
+  await tap(page, page.locator(".review-foot").getByRole("button", { name: "Done" }));
+  await until("Review is closed", async () => !(await page.locator(".phone-full .review").count()));
+  await start();
+  await rate("02:00");
+  await sure.waitFor();
+  // The next exercise stays open past midnight, and nothing is rated on the new day.
+  await page.clock.fastForward("12:00");
+  await tap(page, page.getByRole("button", { name: "Leave review" }));
+  const centre = page.locator(".review-end .end-lap-n");
+  await centre.waitFor({ timeout: 8000 });
+  const ring = await page.locator(".review-end [aria-label$='minutes today']").first().getAttribute("aria-label");
+  const today = Number(/^(\d+) of/.exec(ring ?? "")?.[1]);
+  await page.waitForTimeout(2500);
+  const shown = Number(/^(\d+)/.exec((await centre.getAttribute("aria-label")) ?? "")?.[1]);
+  if (shown !== today) throw new Error(`the end ring shows ${shown} min, but today has ${today} (the ring's own label: “${ring}”)`);
+}, "phone");
+
+journey("phone: a rating after midnight whose day could not be read still counts on the end ring (review of #443)", async (page) => {
+  // Ratings just after midnight whose read of the new day failed, then leaving: finish took the new day as one
+  // this session added nothing to, so the ring started at the day's whole count and never ran up. (Past the goal,
+  // so the count runs up from the goal however many gems the session cut.)
+  const late = new Date();
+  late.setHours(23, 58, 0, 0);
+  await page.clock.install({ time: late });
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  const rate = async (wait: string) => {
+    await sure.waitFor();
+    await page.clock.fastForward(wait);
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
+  };
+  const fail = (on: boolean) => page.evaluate((on) => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = on ? { today: "The library is busy." } : {}), on);
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  await sure.waitFor();
+  // The new day can't be read at midnight, nor after the ratings that follow it.
+  await fail(true);
+  for (let i = 0; i < 4; i++) await rate("03:00");
+  await sure.waitFor();
+  await fail(false);
+  // Every number the centre shows on its way up, from its first.
+  await page.evaluate(() => {
+    const seen: string[] = ((window as unknown as { __centre: string[] }).__centre = []);
+    new MutationObserver(() => {
+      const n = document.querySelector(".review-end .end-lap-n")?.getAttribute("aria-label");
+      if (n && seen.at(-1) !== n) seen.push(n);
+    }).observe(document.body, { subtree: true, childList: true, attributes: true });
+  });
+  await tap(page, page.getByRole("button", { name: "Leave review" }));
+  const centre = page.locator(".review-end .end-lap-n");
+  await centre.waitFor({ timeout: 8000 });
+  const ring = await page.locator(".review-end [aria-label$='minutes today']").first().getAttribute("aria-label");
+  const today = Number(/^(\d+) of/.exec(ring ?? "")?.[1]);
+  await page.waitForTimeout(2500);
+  const seen = (await page.evaluate(() => (window as unknown as { __centre: string[] }).__centre)).map((l) => Number(/^(\d+)/.exec(l)?.[1]));
+  if (!(today >= 10)) throw new Error(`today has ${today} min, short of the goal the ratings after midnight met (“${ring}”)`);
+  if (!(seen[0]! < today) || seen.at(-1) !== today) throw new Error(`the end ring counted ${seen.join(" → ")}, never up to today's ${today}: the ratings after midnight were taken as none of this session's`);
 }, "phone");
 
 journey("phone: a source added on the phone and a new skill each take ⌘Z (F160)", async (page) => {
