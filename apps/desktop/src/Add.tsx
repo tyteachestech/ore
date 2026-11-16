@@ -83,7 +83,7 @@ function Detected({ list }: { list: Entry[] }) {
  *  fetched or read, any other text becomes a source as written. Its skills are picked in the box, as
  *  labels are in Linear's new-issue box: the open skill is ticked already, Tab reaches the pills, and a
  *  course is filed whole. ↵ adds, ⇧↵ is a new line; files can also be picked (⌘O) or dropped anywhere. */
-export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickFiles, onClose, notify }: {
+export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, following, onPickFiles, onClose, notify }: {
   skill: Skill | null;
   skills: Skill[];
   /** Links already in the library, never offered from the clipboard. */
@@ -92,6 +92,8 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
   onAdd: (list: Entry[], skills: string[], toastError: boolean) => Promise<{ failure: string | null; failed: Entry[]; cancelled: boolean }>;
   /** Follows the feed behind a link (Feed); why it failed, or null. */
   onFollow: (url: string, skills: string[]) => Promise<string | null>;
+  /** Opened by Feed's Follow: it takes one link and follows it, and never saves what is typed as a source. */
+  following?: boolean;
   /** Opens the system's file panel: the files picked, none on Cancel. */
   onPickFiles: () => Promise<string[]>;
   onClose: () => void;
@@ -113,7 +115,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
   // A link or file he just copied in another app: the first row while the field is empty; ↵ adds it.
   const [copied, setCopied] = useState<Entry | null>(null);
   useEffect(() => void takeCopied(have).then(setCopied), []); // eslint-disable-line react-hooks/exhaustive-deps
-  const offer = !value.trim() && !busy && !error ? copied : null;
+  const offer = !value.trim() && !busy && !error && (!following || copied?.kind === "link") ? copied : null;
   // A page's text pasted into the empty box (a ChatGPT answer) goes in as its HTML, images and tables kept.
   const [pasted, setPasted] = useState<Pasted | null>(null);
   const list = withHtml(entries(value), pasted);
@@ -166,7 +168,12 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
   };
 
   /** ↵, or a click on the foot's Add: follows a feed's own link, else adds what is in the box (or the copied one). */
-  const go = () => void (isFeed && !offer ? follow() : submit(offer ? [offer] : list));
+  const go = () => {
+    if (!following) return void (isFeed && !offer ? follow() : submit(offer ? [offer] : list));
+    const link = one ?? (offer?.kind === "link" ? offer.url : null);
+    if (link) void follow(link);
+    else if (list.length || offer) setError("Following takes one link: a blog, a newsletter or a YouTube channel. Paste its link here.");
+  };
 
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
@@ -180,7 +187,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
           value={value}
           readOnly={busy}
           rows={1}
-          placeholder="Paste a link, a file or any text…"
+          placeholder={following ? "Paste the link of a blog, newsletter or YouTube channel…" : "Paste a link, a file or any text…"}
           spellCheck={false}
           autoComplete="off"
           autoCorrect="off"
@@ -222,7 +229,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
             }
           }}
         />
-        {offer && <Copied entry={offer} onAdd={() => void submit([offer])} />}
+        {offer && <Copied entry={offer} onAdd={() => (following ? go() : void submit([offer]))} />}
         <div className="panel-foot">
           {busy ? <span><Working label="Adding…" /></span> : error ? <span id="add-error" className="err" role="alert">{error}</span> : isFeed ? (
             <span className="add-kind">
@@ -258,6 +265,8 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
                 </button>
               </Hint>
             )}
+            {/* Following takes a link only: the ways to bring in a source are left out. */}
+            {!following && <>
             {/* A page that needs his sign-in (Medium, X, Notion) comes in as his browser shows it (D96). */}
             <Hint text="Add the page open in Safari or Chrome">
               <button className="add-file" onClick={() => void submit([{ kind: "tab" }])} disabled={busy}>
@@ -271,9 +280,10 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, onPickF
                 File
               </button>
             </Hint>
+            </>}
             {/* A pointer adds too, not only ↵ (Codex sweep 5). */}
             <button className="add-file" onClick={() => (go(), ref.current?.focus())} disabled={busy || (!list.length && !offer)}>
-              <kbd>↵</kbd> {isFeed ? "Follow" : "Add"}
+              <kbd>↵</kbd> {isFeed || following ? "Follow" : "Add"}
             </button>
           </span>
         </div>

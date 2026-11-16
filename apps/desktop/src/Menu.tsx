@@ -199,7 +199,7 @@ function focusRow(e: Event, button: HTMLButtonElement | null) {
 }
 
 /** The ⋯ button that opens the same actions as right-click; shown on row hover. */
-export function MoreButton({ label, actions, className = "more", icon, hint = "More actions", open, onOpenChange, onPointerDown, align = "end", keepFocus, hoverOnly }: {
+export function MoreButton({ label, actions, className = "more", icon, hint = "More actions", open, onOpenChange, onPointerDown, align = "end", keepFocus, hoverOnly, inRow }: {
   label: string;
   actions: Actions;
   className?: string;
@@ -216,13 +216,15 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
   keepFocus?: boolean;
   /** Shown only while its row is hovered: focus goes back to the row, not to it (`focusRow`). */
   hoverOnly?: boolean;
+  /** In a list's row: no Tab stop of its own (the list is one stop); ⌃↵ on the row opens it (F-new-list-tab-stops). */
+  inRow?: boolean;
 }) {
   const { later, pick, closed } = useLater();
   const self = useRef<HTMLButtonElement>(null);
   // Off screen in a long list (Lite.tsx): the same button as the trigger renders, its menu and hint once it scrolls in.
   const lite = useLite() && !open;
   const button = (
-    <button ref={self} {...(lite && { type: "button", "aria-haspopup": "menu", "aria-expanded": false })} className={className} aria-label={label} data-no-drag onClick={(e) => e.stopPropagation()} onPointerDown={onPointerDown}>
+    <button ref={self} {...(lite && { type: "button", "aria-haspopup": "menu", "aria-expanded": false })} className={className} aria-label={label} tabIndex={inRow ? -1 : undefined} data-no-drag onClick={(e) => e.stopPropagation()} onPointerDown={onPointerDown}>
       {icon ?? <DotsThree size={16} aria-hidden="true" />}
     </button>
   );

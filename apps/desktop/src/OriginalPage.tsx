@@ -7,8 +7,20 @@ import { Hint } from "./Hint";
 import { PHONE } from "./ore";
 import { CaretLeft, CaretRight } from "./icons";
 import { Working } from "./Working";
+import { CMAPS } from "../../../packages/core/src/ingest/pdf-cmaps";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
+
+/** The CMaps a CJK font names instead of carrying, the ones import reads the text with (F284): without them the
+ *  page of a Korean, Japanese or Chinese PDF draws blank (F-new-original-cjk-blank). */
+class CarriedData {
+  constructor(_: unknown) {}
+  async fetch({ kind, filename }: { kind: string; filename: string }): Promise<Uint8Array> {
+    const url = kind === "cMapUrl" ? CMAPS[filename.replace(/\.bcmap$/, "")] : undefined;
+    if (!url) throw new Error(`Unable to load ${kind} data: ${filename}`);
+    return new Uint8Array(await (await fetch(url)).arrayBuffer());
+  }
+}
 
 /** The Original tab (D202): the PDF's own page beside its text, as Preview draws it. `page` is the page being
  *  read, and the tab follows it; ‹ › look at another, until the reading moves to a new page. Loaded only when
@@ -35,7 +47,7 @@ export default function OriginalPage({ file, page }: { file: string; page: numbe
     // The bytes are fetched here: pdf.js only fetches http(s) itself, and the app's files come over `asset:`.
     fetch(convertFileSrc(file))
       .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
-      .then((data) => (task = getDocument({ data })).promise)
+      .then((data) => (task = getDocument({ data, BinaryDataFactory: CarriedData, useWorkerFetch: false, useSystemFonts: true })).promise)
       .then((d) => !gone && setPdf(d))
       .catch(() => !gone && setError(true));
     return () => {

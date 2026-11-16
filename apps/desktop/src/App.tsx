@@ -274,6 +274,9 @@ export function App() {
     if (back) focusQuietly(back);
   };
   const [adding, setAdding] = useState(false);
+  /** Feed's Follow opened the add box: it takes one link and follows it (F-new-follow-saves-text). Ends with the box. */
+  const [following, setFollowing] = useState(false);
+  useEffect(() => void (adding || setFollowing(false)), [adding]);
   const [help, setHelp] = useState(false);
   /** Settings (⌘,) and the section it opens on (undefined: the last one he looked at). */
   const [settings, setSettings] = useState<false | { section?: SettingsSection }>(false);
@@ -1477,6 +1480,12 @@ export function App() {
         e.preventDefault();
         setCursor(`course:${currentLine.item.course!.id}`);
       }
+    } else if (e.key === "Enter" && e.ctrlKey && keyed) {
+      // The Mac's own key for a shortcut menu (⌃↵): the row's ⋯, which is no Tab stop of its own (F-new-list-tab-stops).
+      e.preventDefault();
+      const more = document.getElementById(`row-${lineKey(currentLine)}`)?.querySelector<HTMLElement>(".more");
+      more?.focus({ preventScroll: true });
+      more?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
     } else if (e.key === "Enter" && keyed) {
       e.preventDefault();
       if (currentLine.kind === "course") openSource(lessonFirst(currentLine).id);
@@ -2138,16 +2147,24 @@ export function App() {
             </span>
             {snip ? (
               <span className="snip">{snippet(snip, q)}</span>
-            ) : !lesson && (
-              <span className="row-line">
-                {authorOf(r)}
-                <SkillPicker skills={skills} value={r.skills} title={r.title} onChange={(next, before, k) => void live.current.refile(live.current.sourceFiling(r), next, before, k)} onCreate={(name) => live.current.createSkill(name)} startOpen={pickFor === r.id} onClosed={() => setPickFor(null)}>
+            ) : !lesson && (() => {
+              const by = authorOf(r);
+              const picker = (
+                <SkillPicker inRow skills={skills} value={r.skills} title={r.title} onChange={(next, before, k) => void live.current.refile(live.current.sourceFiling(r), next, before, k)} onCreate={(name) => live.current.createSkill(name)} startOpen={pickFor === r.id} onClosed={() => setPickFor(null)}>
                   {others.length > 0 && skillsOf(others)}
                 </SkillPicker>
-              </span>
-            )}
-            {/* A skill page's rows are Reader's (D130): a third line says what kind it is (its length joins once import records one). */}
-            {!lesson && !snip && <span className="kind-line">{kindLabel(r.type)}</span>}
+              );
+              // No author and no skill to show: the hover + joins the kind line, so no empty line sits
+              // between the title and it (F-new-row-empty-line).
+              const bare = !by && !others.length;
+              return (
+                <>
+                  {!bare && <span className="row-line">{by}{picker}</span>}
+                  {/* A skill page's rows are Reader's (D130): a third line says what kind it is (its length joins once import records one). */}
+                  <span className={`kind-line${bare ? " row-line" : ""}`}>{kindLabel(r.type)}{bare && picker}</span>
+                </>
+              );
+            })()}
           </span>
         )}
         {onSkillPage && mayAnswer.has(r.id) && (
@@ -2159,7 +2176,7 @@ export function App() {
         )}
         {details.includes("type") && <span className="col kind">{kindLabel(r.type)}</span>}
         {detailCols(r, [r.captured_at])}
-        <MoreButton label={pickN > 1 ? `Actions for ${count(pickN, "source")}` : `Actions for ${r.title}`} actions={acts} hoverOnly />
+        <MoreButton label={pickN > 1 ? `Actions for ${count(pickN, "source")}` : `Actions for ${r.title}`} actions={acts} hoverOnly inRow />
       </DragRow>
       </WithMenu>
     );
@@ -2212,7 +2229,7 @@ export function App() {
             </span>
             <span className="row-line">
               {authorOf({ author: c.lessons.find((l) => l.author)?.author, url: c.url ?? c.lessons[0]?.url })}
-              <SkillPicker skills={skills} value={courseSkills(c)} title={c.title} onChange={(next, _, k) => fileCourse(c, k, next.includes(k.id))} onCreate={createSkill} startOpen={!!pickFor && c.lessons.some((l) => l.id === pickFor)} onClosed={() => setPickFor(null)}>
+              <SkillPicker inRow skills={skills} value={courseSkills(c)} title={c.title} onChange={(next, _, k) => fileCourse(c, k, next.includes(k.id))} onCreate={createSkill} startOpen={!!pickFor && c.lessons.some((l) => l.id === pickFor)} onClosed={() => setPickFor(null)}>
                 {others.length > 0 && skillsOf(others)}
               </SkillPicker>
               {/* Closed, it says which lesson a click opens; open, the lessons below say it. */}
@@ -2222,7 +2239,7 @@ export function App() {
         )}
         {details.includes("type") && <span className="col kind">course</span>}
         {detailCols({ url: c.url ?? c.lessons[0]?.url }, c.lessons.map((l) => l.captured_at))}
-        <MoreButton label={`Actions for ${c.title}`} actions={courseActions(c)} hoverOnly />
+        <MoreButton label={`Actions for ${c.title}`} actions={courseActions(c)} hoverOnly inRow />
       </DragRow>
       </WithMenu>
     );
@@ -2456,7 +2473,7 @@ export function App() {
         {(onFeed || feedSplit) && (
           <div className={feedSplit ? "feed-col" : "contents"}>
             <Boundary onBack={goHome}>
-              <Feed skills={skills} tick={feedTick} blocked={overlay} onOpen={openPost} onFollow={() => setAdding(true)} onCreateSkill={createSkill} notify={notify} reading={feedSplit ? feedPost!.url : null} stepOut={feedStep} />
+              <Feed skills={skills} tick={feedTick} blocked={overlay} onOpen={openPost} onFollow={() => (setFollowing(true), setAdding(true))} onCreateSkill={createSkill} notify={notify} reading={feedSplit ? feedPost!.url : null} stepOut={feedStep} />
             </Boundary>
           </div>
         )}
@@ -2675,6 +2692,7 @@ export function App() {
           onCreate={createSkill}
           onAdd={(list, to, toastError) => addSources(list, to, toastError)}
           onFollow={followFeed}
+          following={following}
           onPickFiles={chooseFiles}
           onClose={() => setAdding(false)}
           notify={notify}

@@ -455,7 +455,15 @@ export function titleScore(title: string, query: string): number {
  *  else is the source's own Markdown and stays as written. */
 export function snippet(text: string, query: string): ReactNode {
   const terms = query.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? [];
-  const line = text.replace(/\s+/g, " ").replace(/^[#>*\-\s]+/, "");
+  // What the source's Markdown adds around the words is not why it matched (F-new-snippet-markup): page markers
+  // and other comments (whole, or cut by the snippet's edge), heading and quote marks, code fences, bold and
+  // code ticks. A link's or image's brackets stay, as before.
+  const line = text
+    .replace(/<!--.*?-->|^[^<]*?-->|<!--[^>]*$/gs, " ")
+    .replace(/```[\w-]*|`|\*\*/g, "")
+    .replace(/^[ \t]*(?:#{1,6}|>)[ \t]+/gm, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[#>*\-\s]+/, "");
   const parts = line.split(/\[([^[\]]+)\]/);
   return parts.map((p, i) =>
     i % 2 === 0 ? p : terms.some((t) => p.toLowerCase().startsWith(t)) ? <mark key={i}>{p}</mark> : `[${p}]`,

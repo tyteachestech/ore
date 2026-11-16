@@ -62,7 +62,7 @@ export function SkillChips({ ids, skills }: { ids: string[]; skills: Skill[] }) 
  *  multi-select). Type to filter, click or Enter ticks or unticks a skill and the list stays open, a
  *  name no skill has creates one. With no skills, a quiet + on hover stands where the pills would be.
  *  The caller writes `next` and offers Undo back to `before`. */
-export function SkillPicker({ skills, value, title, onChange, onCreate, startOpen = false, onClosed, returnFocus, children }: {
+export function SkillPicker({ skills, value, title, onChange, onCreate, startOpen = false, onClosed, returnFocus, inRow, children }: {
   skills: Skill[];
   value: string[];
   /** The source's title, for the button's label. */
@@ -74,6 +74,9 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   /** Opens as it appears: on a source just added with no skill, so filing it is the next keystroke. */
   startOpen?: boolean;
   onClosed?: () => void;
+  /** In a list's row: no Tab stop of its own, since the list is one stop and its arrows move through the rows (F-new-list-tab-stops).
+   *  The row's menu (⌃↵, right-click) holds Skills. */
+  inRow?: boolean;
   /** Where focus goes when it closes, instead of back to the pills (the add box's text field, so ↵ adds). */
   returnFocus?: RefObject<HTMLElement | null>;
   /** The pills (or their names); none (on a skill page, the page's own is left out) shows the +. */
@@ -116,6 +119,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
       {...(bare && { type: "button", "aria-haspopup": "dialog", "aria-expanded": false })}
       className={children ? "chips-button" : "chips-add"}
       aria-label={`Skills for ${title}`}
+      tabIndex={inRow ? -1 : undefined}
       data-no-drag
       onClick={stop}
       onKeyDown={(e) => e.key === "Enter" && stop(e)}

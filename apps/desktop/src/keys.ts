@@ -162,6 +162,7 @@ export const BINDINGS: readonly (Binding & { id: KeyId })[] = DEFAULTS;
 export const FIXED: { label: string; group: string; keys: string }[] = [
   { label: "Move through sources", group: "Sources", keys: "↑ ↓" },
   { label: "Open source", group: "Sources", keys: "↵" },
+  { label: "Open a source's actions", group: "Sources", keys: "⌃↵" },
   { label: "Pick a run of sources", group: "Sources", keys: "⇧↑ ⇧↓  ⇧-click" },
   { label: "Pick or unpick one source", group: "Sources", keys: "⌘-click" },
   { label: "Pick every source in the list", group: "Sources", keys: "⌘A" },

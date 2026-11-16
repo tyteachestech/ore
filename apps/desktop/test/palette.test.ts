@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { titleScore, asksQuestion, textHits } from "../src/Palette";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { titleScore, asksQuestion, textHits, snippet } from "../src/Palette";
 
 test("a title matches only when every query word is in it", () => {
   expect(titleScore("Notes on spaced repetition scheduling (FSRS)", "section")).toBe(0);
@@ -59,4 +61,16 @@ test("only a source listed by its title loses its row in “In the text”", () 
   const listed = [{ id: "a", title: "Retrieval practice" }, { id: "b", title: "Make it stick" }];
   const hits = [{ key: "text item a", item: "a", title: "Retrieval practice" }, { key: "text item b", item: "b", title: "Make it stick", at: "find:retrieval" }, { key: "skill notes s", skill: "s", title: "Memory" }];
   expect(textHits(hits, listed, "retrieval").map((h) => h.key)).toEqual(["text item b", "skill notes s"]);
+});
+
+// F-new-snippet-markup (round 7 walk): a PDF's match read "<!-- page 1 --> ### Retrieval practice Testing…",
+// and a book's kept its code fence and quote mark.
+test("a search snippet shows the source's words without its Markdown", () => {
+  const words = (text: string) => renderToStaticMarkup(createElement("p", null, snippet(text, "test")));
+  expect(words("<!-- page 1 -->\n\n### Retrieval practice\n\n[Testing] yourself beats rereading")).toBe("<p>Retrieval practice <mark>Testing</mark> yourself beats rereading</p>");
+  expect(words("return gap * 2.5 if remembered else 1\n```\n\n> [Test] yourself **before** you `look`")).toBe("<p>return gap * 2.5 if remembered else 1 <mark>Test</mark> yourself before you look</p>");
+  // A comment the snippet's edge cut in two goes too, from either end.
+  expect(words("ge 3 --> the [test] came <!-- pa")).toBe("<p>the <mark>test</mark> came </p>");
+  // A link's own brackets stay, and so does a # or > that is part of the words.
+  expect(words("see [the paper](x) on C# and a > b [tests]")).toBe("<p>see [the paper](x) on C# and a &gt; b <mark>tests</mark></p>");
 });
