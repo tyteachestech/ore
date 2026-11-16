@@ -3,7 +3,7 @@
 // phone twin; reading looks are set in the reader's Aa. Every change saves at once, with Undo.
 import * as Switch from "@radix-ui/react-switch";
 import { useEffect, useRef, useState } from "react";
-import { goalOptions, Group, newOptions, PlanField, Row, Seg } from "../Settings";
+import { goalOptions, Group, newOptions, PlanField, REMINDER_TEXT, Row, Seg } from "../Settings";
 import { ore, opt, pullFromMac } from "../ore";
 import { errorText, type Notify } from "../util";
 import { syncState } from "./fs";
@@ -60,20 +60,20 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
             <Row title="Minutes a day" text="Review time that fills the ring on Today.">
               <Seg label="Minutes a day" value={String(review.goal_minutes)} options={goalOptions(review.goal_minutes).map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("goal_minutes", Number(v))} />
             </Row>
-            <Row title="New exercises a day" text="Exercises seen for the first time each day. Reviews are never capped.">
-              <Seg label="New exercises a day" value={String(review.new_per_day)} options={newOptions(review.new_per_day).map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("new_per_day", Number(v))} />
-            </Row>
             <Row title="Weekdays only" text="Weekends never count against your week." htmlFor="weekdays">
               <Switch.Root id="weekdays" className="switch" checked={review.weekdays_only} onCheckedChange={(v) => void set("weekdays_only", v)}>
                 <Switch.Thumb className="switch-thumb" />
               </Switch.Root>
+            </Row>
+            <Row title="New exercises a day" text="Exercises seen for the first time each day. Reviews are never capped.">
+              <Seg label="New exercises a day" value={String(review.new_per_day)} options={newOptions(review.new_per_day).map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("new_per_day", Number(v))} />
             </Row>
           </Group>
           <Group title="Daily plan">
             <Row title="When you review" text="Tie review to something you already do every day.">
               <PlanField plan={review.plan} onSave={(v) => set("plan", v)} />
             </Row>
-            <Row title="Reminder" text="A notification at this time, only on days the goal is still open." htmlFor="reminder">
+            <Row title="Reminder" text={REMINDER_TEXT} htmlFor="reminder">
               <Switch.Root id="reminder" className="switch" checked={!!review.reminder} onCheckedChange={(v) => void remind(v)}>
                 <Switch.Thumb className="switch-thumb" />
               </Switch.Root>

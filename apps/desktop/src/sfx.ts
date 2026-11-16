@@ -6,7 +6,7 @@ import { load, save } from "./util";
    the answer is a pickaxe tick, a recall a gem's shine, a miss a gem chipping, the day's goal a chime; the end screen
    has the cart's roll, the mole's pop and a closing jingle. Nothing plays on undo, Later, an edit or any other key.
    The files are ElevenLabs output, kept out of git and taken from the Mac's sounds folder as the radio's are (D254,
-   vite.config.ts): one that is missing is just silent. Settings › General › Sound turns them off. */
+   vite.config.ts): one that is missing is just silent. Settings › Review › Sound turns them off. */
 
 export const SFX = ["tap", "right", "missed", "goal", "cart", "pop", "done"] as const;
 export type Sfx = (typeof SFX)[number];

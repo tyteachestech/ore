@@ -129,7 +129,7 @@ export async function removeDocling(): Promise<void> {
  *  page on Apple silicon, so it runs in the background after the PDF is added, never while he waits to
  *  open it. Only its tables and display formulas are used: pdf.js reads the prose. */
 export async function runDocling(pdf: string, bin = doclingPath()): Promise<Region[]> {
-  if (!bin) throw new Error("The table and formula reader isn't installed. Get it in Settings › General › Import.");
+  if (!bin) throw new Error("The table and formula reader isn't installed. Get it in Settings › AI.");
   const out = await mkdtemp(join(tmpdir(), "ore-docling-"));
   const models = join(dirname(dirname(bin)), "models");
   try {
