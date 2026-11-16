@@ -191,6 +191,50 @@ export function useToast() {
     }
   });
 
+  // On the iPhone a toast is swiped away, down or to a side, as an iOS banner is (D-new-toast-swipe): one over the
+  // row he wants need not be waited out or closed by its small ×. It follows the finger; let go past 48pt (or with
+  // a flick) it leaves, otherwise it comes back. A wait's toast stays: swiping it away would hide work still going.
+  useEffect(() => {
+    const el = box.current;
+    if (!PHONE || !el) return;
+    let toast: HTMLElement | null = null, x0 = 0, y0 = 0, t0 = 0, dx = 0, dy = 0, axis: "x" | "y" | null = null;
+    const start = (e: TouchEvent) => {
+      toast = e.touches.length === 1 ? (e.target as HTMLElement).closest<HTMLElement>(".toast:not([data-kind='progress'])") : null;
+      [x0, y0, t0, dx, dy, axis] = [e.touches[0]!.clientX, e.touches[0]!.clientY, e.timeStamp, 0, 0, null];
+    };
+    const move = (e: TouchEvent) => {
+      if (!toast) return;
+      [dx, dy] = [e.touches[0]!.clientX - x0, Math.max(0, e.touches[0]!.clientY - y0)];
+      axis ??= Math.max(Math.abs(dx), dy) < 8 ? null : Math.abs(dx) > dy ? "x" : "y";
+      if (!axis) return;
+      // Taken from the page: no scroll under it, and no click on the lift (its own button, the row below).
+      if (e.cancelable) e.preventDefault();
+      toast.style.transition = "none";
+      toast.style.translate = axis === "x" ? `${dx}px 0` : `0 ${dy}px`;
+    };
+    const end = (e: TouchEvent) => {
+      const [it, d] = [toast, axis === "x" ? dx : dy];
+      toast = null;
+      if (!it || !axis) return;
+      const go = e.type === "touchend" && (Math.abs(d) > 48 || Math.abs(d) / Math.max(1, e.timeStamp - t0) > 0.5);
+      it.style.transition = "translate 180ms cubic-bezier(.2, .9, .3, 1), opacity 180ms linear";
+      it.style.translate = !go ? "" : axis === "x" ? `${Math.sign(d) * innerWidth}px 0` : "0 160px";
+      if (!go) return;
+      it.style.opacity = "0";
+      setTimeout(() => drop(Number(it.dataset.id)), 170);
+    };
+    el.addEventListener("touchstart", start, { passive: true });
+    el.addEventListener("touchmove", move, { passive: false });
+    el.addEventListener("touchend", end);
+    el.addEventListener("touchcancel", end);
+    return () => {
+      el.removeEventListener("touchstart", start);
+      el.removeEventListener("touchmove", move);
+      el.removeEventListener("touchend", end);
+      el.removeEventListener("touchcancel", end);
+    };
+  }, [drop]);
+
   // Always mounted, even empty, so VoiceOver reads each toast as it comes: a live region that appears with its words often
   // stays silent. An error is an alert: the nearest live region decides, so it is read once, at once.
   const view = (
@@ -205,7 +249,7 @@ export function useToast() {
     >
       <span className="sr-only">{said}</span>
       {toasts.map((t) => (
-        <div key={t.id} className="toast" data-kind={t.kind} role={t.kind === "error" ? "alert" : undefined}>
+        <div key={t.id} className="toast" data-id={t.id} data-kind={t.kind} role={t.kind === "error" ? "alert" : undefined}>
           {t.kind === "progress" ? <Matrix /> : t.settled && <Sprite rows={t.settled === "ok" ? CHECK : CROSS} className={`toast-mark ${t.settled}`} />}
           <span className={t.done === undefined ? "toast-msg" : "toast-text"}>{t.message}</span>
           {t.done !== undefined && (

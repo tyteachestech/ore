@@ -193,7 +193,7 @@ export function ReadingPill(place: Place) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const close = () => setOpen(false);
-  useSwipeDown(box, close, PHONE && open);
+  useSwipeDown(box, close, PHONE && open, true);
   useEffect(() => {
     if (open) requestAnimationFrame(() => (box.current?.querySelector<HTMLElement>("button.on") ?? box.current?.querySelector<HTMLElement>("button"))?.focus());
   }, [open]);
