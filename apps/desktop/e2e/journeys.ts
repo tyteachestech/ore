@@ -15025,10 +15025,15 @@ journey("All sources: a source with no author and no skill has no empty line bet
 });
 
 journey("Feed: Follow opens a box that takes a link only, and never saves what is typed as a source (F-new-follow-saves-text)", async (page) => {
+  // The empty Feed is where Follow sits: this journey unfollows what an earlier one left.
+  for (const f of ((await ore("feed")) as { feeds: { url: string }[] }).feeds) await ore("feed", "unfollow", f.url);
+  await page.reload();
   await page.getByRole("button", { name: "Feed", exact: true }).click();
   await page.locator(".empty-state").getByRole("button", { name: "Follow" }).click();
-  const box = page.getByRole("dialog", { name: "Add a source" });
-  const field = box.getByLabel("Link, file path or text");
+  const box = page.getByRole("dialog", { name: "Follow a feed" });
+  const field = box.getByLabel("Link", { exact: true });
+  // ⌘O picks no file into a box that takes a link.
+  await page.keyboard.press("Meta+o");
   if (!/blog, newsletter or YouTube channel/.test((await field.getAttribute("placeholder")) ?? "")) throw new Error("the follow box asks for a source, not a feed's link");
   if (await box.getByRole("button", { name: "Browser tab" }).count()) throw new Error("the follow box offers Browser tab, which adds a source");
   await field.fill("not a link at all");
@@ -15040,7 +15045,7 @@ journey("Feed: Follow opens a box that takes a link only, and never saves what i
   await box.waitFor({ state: "detached" });
   // The ordinary add box is itself again.
   await page.getByRole("button", { name: "+ Add" }).click();
-  if (!/any text/.test((await field.getAttribute("placeholder")) ?? "")) throw new Error("+ Add opened the follow box");
+  if (!/any text/.test((await page.getByRole("dialog", { name: "Add a source" }).getByLabel("Link, file path or text").getAttribute("placeholder")) ?? "")) throw new Error("+ Add opened the follow box");
   await page.keyboard.press("Escape");
 });
 

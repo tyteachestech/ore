@@ -119,7 +119,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
   // A page's text pasted into the empty box (a ChatGPT answer) goes in as its HTML, images and tables kept.
   const [pasted, setPasted] = useState<Pasted | null>(null);
   const list = withHtml(entries(value), pasted);
-  const one = list.length === 1 && list[0]!.kind === "link" && !isCourseLink(list[0]!.url) ? list[0]!.url : null;
+  const one = list.length === 1 && list[0]!.kind === "link" && (following || !isCourseLink(list[0]!.url)) ? list[0]!.url : null;
   const feed = useFeedOf(busy ? null : one);
   /** The link is the feed itself: adding it would be refused, so ↵ follows it. */
   const isFeed = !!feed && feed.url === one;
@@ -178,11 +178,11 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Trap>
-      <div className="panel add-box" role="dialog" aria-modal="true" aria-label="Add a source">
+      <div className="panel add-box" role="dialog" aria-modal="true" aria-label={following ? "Follow a feed" : "Add a source"}>
         <Grow
           ref={ref}
           className="panel-input add-input"
-          aria-label="Link, file path or text"
+          aria-label={following ? "Link" : "Link, file path or text"}
           aria-describedby={error ? "add-error" : undefined}
           value={value}
           readOnly={busy}
@@ -201,7 +201,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
             const box = e.currentTarget;
             if (!box.value.trim() || box.selectionEnd - box.selectionStart === box.value.length) setPasted({ text: e.clipboardData.getData("text/plain"), html: pastedHtml(e.clipboardData) });
             // A file copied in Finder pastes only its name: put its path in, as a drop would add it.
-            if (!pastesFiles(e.clipboardData)) return;
+            if (following || !pastesFiles(e.clipboardData)) return;
             e.preventDefault();
             void copiedFiles().then((files) => {
               if (!files.length) return setError("Couldn't read the copied file. Drag it in, or choose it with File.");
@@ -225,13 +225,13 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
               // ⌘O here picks into the box, not past it (the app's ⌘O would close it).
               e.preventDefault();
               e.stopPropagation();
-              void pickFiles();
+              if (!following) void pickFiles();
             }
           }}
         />
         {offer && <Copied entry={offer} onAdd={() => (following ? go() : void submit([offer]))} />}
         <div className="panel-foot">
-          {busy ? <span><Working label="Adding…" /></span> : error ? <span id="add-error" className="err" role="alert">{error}</span> : isFeed ? (
+          {busy ? <span><Working label={following ? "Following…" : "Adding…"} /></span> : error ? <span id="add-error" className="err" role="alert">{error}</span> : isFeed ? (
             <span className="add-kind">
               <Rss size={14} aria-hidden="true" />
               Feed · {feed!.title} · {feedProof(feed!)}
@@ -257,7 +257,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
               </SkillPicker>
             </span>
             {/* A blog, newsletter or channel: its new posts land in the Feed, nothing saved until he keeps one. */}
-            {feed && !isFeed && (
+            {feed && !isFeed && !following && (
               <Hint text={`Follow ${feed.title} (${feedProof(feed)}): new posts show in the Feed`}>
                 <button className="add-file" onClick={() => void follow()} disabled={busy}>
                   <Rss size={13} aria-hidden="true" />

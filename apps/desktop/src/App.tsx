@@ -1486,6 +1486,9 @@ export function App() {
       const more = document.getElementById(`row-${lineKey(currentLine)}`)?.querySelector<HTMLElement>(".more");
       more?.focus({ preventScroll: true });
       more?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+      // No menu came (the row is not drawn in full yet): the keys stay with the list.
+      const list = e.currentTarget as HTMLElement;
+      requestAnimationFrame(() => more?.getAttribute("aria-expanded") !== "true" && document.activeElement === more && list.focus({ preventScroll: true }));
     } else if (e.key === "Enter" && keyed) {
       e.preventDefault();
       if (currentLine.kind === "course") openSource(lessonFirst(currentLine).id);

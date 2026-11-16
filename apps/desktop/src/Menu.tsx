@@ -232,7 +232,7 @@ export function MoreButton({ label, actions, className = "more", icon, hint = "M
   if (PHONE) return <ActionSheet label={label} actions={actions} className={className} icon={icon} open={open} onOpenChange={onOpenChange} onPointerDown={onPointerDown} keepFocus={keepFocus} />;
   return (
     <DropdownMenu.Root modal={false} open={open} onOpenChange={onOpenChange}>
-      <Hint text={hint}>
+      <Hint text={inRow ? <>{hint}<kbd>⌃↵</kbd></> : hint}>
         <DropdownMenu.Trigger asChild>{button}</DropdownMenu.Trigger>
       </Hint>
       <DropdownMenu.Portal>

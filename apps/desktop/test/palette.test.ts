@@ -71,6 +71,8 @@ test("a search snippet shows the source's words without its Markdown", () => {
   expect(words("return gap * 2.5 if remembered else 1\n```\n\n> [Test] yourself **before** you `look`")).toBe("<p>return gap * 2.5 if remembered else 1 <mark>Test</mark> yourself before you look</p>");
   // A comment the snippet's edge cut in two goes too, from either end.
   expect(words("ge 3 --> the [test] came <!-- pa")).toBe("<p>the <mark>test</mark> came </p>");
+  // An arrow in his own words is no cut comment: the words before it stay.
+  expect(words("graph TD; cache --> store, [tested] twice")).toBe("<p>graph TD; cache --&gt; store, <mark>tested</mark> twice</p>");
   // A link's own brackets stay, and so does a # or > that is part of the words.
   expect(words("see [the paper](x) on C# and a > b [tests]")).toBe("<p>see [the paper](x) on C# and a &gt; b <mark>tests</mark></p>");
 });
