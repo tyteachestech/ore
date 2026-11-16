@@ -1424,6 +1424,29 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       cancelAnimationFrame(frame);
     };
   }, [originalShown, ready, shownBody, deck]);
+  /** The passage he clicked while the Original tab shows a PDF: the tab lights where it sits on its page (D-new-original-lit). */
+  const [lit, setLit] = useState<{ page: number; text: string } | null>(null);
+  useEffect(() => {
+    const el = docEl.current;
+    setLit(null);
+    if (!originalShown || !pdf || !ready || !el) return;
+    const onClick = (e: Event) => {
+      // A plain click on words: a drag is a highlight, and a link, a button or a picture has its own click.
+      if (!getSelection()?.isCollapsed || !(e.target instanceof Element) || e.target.closest("a, button, img, input, textarea, [contenteditable]")) return;
+      const block = e.target.closest("p, li, h1, h2, h3, h4, h5, h6, blockquote, td, th, figcaption, pre");
+      const text = block?.textContent?.trim();
+      if (!block || !text || !el.contains(block)) return;
+      // Its page: the last page mark before it (none before page 1's words).
+      let on = 1;
+      for (const m of el.querySelectorAll<HTMLElement>("[data-page]")) {
+        if (!(m.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+        on = Number(m.dataset.page);
+      }
+      setLit({ page: on, text });
+    };
+    el.addEventListener("click", onClick);
+    return () => el.removeEventListener("click", onClick);
+  }, [originalShown, pdf, ready, shownBody]);
 
   /** The chapter block (D115): the sign opens the source note with the chapter's title and three
    *  prompts, the source hidden (D34.4) until he ends it with ⌘↵ (recorded, then feedback) or Esc
@@ -3897,7 +3920,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           bodyRef={sideBody} onBodyMouseDown={sideTab === "note" ? clickBelow(notesField) : undefined}>
           {originalShown && pdf ? (
             <Suspense fallback={null}>
-              <Original file={pdf} page={page} />
+              <Original file={pdf} page={page} lit={lit} />
             </Suspense>
           ) : originalShown && deck ? (
             <Suspense fallback={null}>

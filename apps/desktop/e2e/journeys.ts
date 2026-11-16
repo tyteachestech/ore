@@ -15049,6 +15049,54 @@ journey("Feed: Follow opens a box that takes a link only, and never saves what i
   await page.keyboard.press("Escape");
 });
 
+journey("original: a click on a passage of the text lights where it sits on the PDF's page, and words the page lacks light nothing (D-new-original-lit)", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "textbook.pdf"), "--no-enrich")) as { id: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+    await page.reload();
+    await openSource(page, "Chapter 1: Learning");
+    const show = page.getByRole("button", { name: "Show side panel" });
+    if (await show.count()) await show.click();
+    await page.getByRole("tab", { name: "Original" }).click();
+    const sheet = page.locator(".original canvas");
+    const lit = page.locator(".original-lit");
+    await until("page 1 of the original is drawn", async () => (await sheet.getAttribute("data-page")) === "1", 15000);
+    if (await lit.count()) throw new Error("something is lit before he clicked");
+    // A paragraph on page 3, clicked while page 1 shows: the tab turns to its page and marks it there.
+    const para = page.locator(".doc p", { hasText: "Practice spread over days" }).first();
+    await para.scrollIntoViewIfNeeded();
+    await para.click({ position: { x: 20, y: 8 } });
+    await until("the passage is lit on page 3", async () => (await sheet.getAttribute("data-page")) === "3" && (await lit.count()) > 0, 15000);
+    // The marks sit on the page, over ink: inside the sheet, each a line high, not a box over the whole page.
+    const [paper, bars] = [await sheet.boundingBox(), await lit.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON() as { x: number; y: number; width: number; height: number }))];
+    for (const b of bars) {
+      if (b.x < paper!.x - 1 || b.y < paper!.y - 1 || b.x + b.width > paper!.x + paper!.width + 1 || b.y + b.height > paper!.y + paper!.height + 1) throw new Error("a mark falls off the page");
+      if (b.height > paper!.height / 12 || b.width < 4) throw new Error(`a mark ${Math.round(b.width)}×${Math.round(b.height)} is no line of words`);
+    }
+    // A click is no highlight: nothing was saved, and no popup opened.
+    if (await page.locator(".popup").count()) throw new Error("the click opened the highlight popup");
+    // He turns the page by hand: the mark belongs to page 3 and does not follow.
+    await page.getByRole("button", { name: "Next page" }).click();
+    await until("page 4 shows no mark", async () => (await sheet.getAttribute("data-page")) === "4" && (await lit.count()) === 0, 15000);
+    // Words the page's own text does not hold (the page can't tell where he is): nothing is lit, never a wrong place.
+    await page.evaluate(() => {
+      const p = document.querySelector(".doc p")!;
+      p.textContent = "Zebra quartz vexes the jumping wizard nobody printed here.";
+    });
+    await page.locator(".doc p").first().click({ position: { x: 20, y: 8 } });
+    await until("page 1 shows, with no mark", async () => (await sheet.getAttribute("data-page")) === "1", 15000);
+    await page.waitForTimeout(400);
+    if (await lit.count()) throw new Error("words the page lacks lit something");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.evaluate(([tab, open]) => {
+      tab ? localStorage.setItem("ore.sidetab", tab) : localStorage.removeItem("ore.sidetab");
+      open ? localStorage.setItem("ore.mynotes", open) : localStorage.removeItem("ore.mynotes");
+    }, before);
+    await page.reload();
+  }
+});
+
 journey("original: a Korean PDF's page is drawn with its words, not blank (F379)", async (page) => {
   const made = (await ore("add", join(FIXTURES, "korean.pdf"), "--no-enrich")) as { id: string };
   const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
