@@ -12211,6 +12211,20 @@ journey("phone: a goal changed in Settings shows on Today on the way back, witho
   await until(`Today says of ${want} min`, async () => (await of.innerText()).includes(`of ${want} min`));
 }, "phone");
 
+journey("phone: in Settings each picked choice sits inside its frame, in the Mac's order (F377)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+  await page.locator(".phone-settings .seg").first().waitFor();
+  const out = await page.locator(".phone-settings .seg").evaluateAll((segs) => segs.filter((seg) => {
+    const f = seg.getBoundingClientRect();
+    return [...seg.querySelectorAll(".seg-item")].some((el) => { const r = el.getBoundingClientRect(); return r.top < f.top || r.bottom > f.bottom; });
+  }).map((seg) => seg.getAttribute("aria-label")));
+  if (out.length) throw new Error(`choices stand out of their frame in: ${out.join(", ")}`);
+  const rows = await page.locator(".phone-settings .settings-group").first().locator(".settings-row-text > :first-child").allInnerTexts();
+  if (rows.join(", ") !== "Minutes a day, Weekdays only, New exercises a day") throw new Error(`Daily goal reads ${rows.join(", ")}`);
+  await tap(page, page.locator(".phone-back"));
+}, "phone");
+
 journey("phone: a double tap highlights the paragraph and opens it, a heading and a highlight keep their taps (D224)", async (page) => {
   await phoneSource(page, TESTING);
   await page.waitForTimeout(400);
@@ -14242,13 +14256,64 @@ journey("Settings: each section opens at its top, however far the last one was s
   const settings = page.getByRole("dialog", { name: "Settings" });
   await page.keyboard.press("Meta+Comma");
   await settings.waitFor();
-  await settings.getByRole("tab", { name: "General" }).click();
+  await settings.getByRole("tab", { name: "Review" }).click();
   const main = settings.locator(".settings-main");
   await main.evaluate((el) => (el.scrollTop = el.scrollHeight));
-  await until("General scrolls", () => main.evaluate((el) => el.scrollTop > 0));
+  await until("Review scrolls", () => main.evaluate((el) => el.scrollTop > 0));
+  await settings.getByRole("tab", { name: "Keyboard shortcuts" }).click();
+  await until("Keyboard shortcuts opens at its top", () => main.evaluate((el) => el.scrollTop === 0));
   await settings.getByRole("tab", { name: "Review" }).click();
-  await until("Review opens at its top", () => main.evaluate((el) => el.scrollTop === 0));
-  await settings.getByRole("tab", { name: "General" }).click();
+  await page.keyboard.press("Escape");
+});
+
+journey("Settings: enlarged to 200% the sections run across the top and no choice is cut off (F259)", async (page) => {
+  // A 1280 px window at 200% is 640 px to the page.
+  await page.setViewportSize({ width: 640, height: 400 });
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await page.keyboard.press("Meta+Comma");
+  await settings.waitFor();
+  const tabs = settings.getByRole("tab");
+  const n = await tabs.count();
+  const tops = await tabs.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+  if (new Set(tops).size !== 1) throw new Error(`the sections are not one row across the top: tops ${tops.join(", ")}`);
+  for (let i = 0; i < n; i++) {
+    await tabs.nth(i).click();
+    const name = await tabs.nth(i).innerText();
+    const cut = await settings.locator(".settings-main").evaluate((main) => {
+      const edge = main.getBoundingClientRect().right;
+      return [...main.querySelectorAll(".settings-row-control > *, .settings-row-text")].filter((el) => el.getBoundingClientRect().right > edge + 0.5).map((el) => (el.getAttribute("aria-label") ?? el.textContent ?? "").slice(0, 40));
+    });
+    if (cut.length) throw new Error(`${name}: cut off at the sheet's edge: ${cut.join(" | ")}`);
+  }
+  // In a row, the arrows that move along it change the section.
+  await tabs.nth(0).click();
+  await page.keyboard.press("ArrowRight");
+  await until("→ opens the next section", async () => (await tabs.nth(1).getAttribute("aria-selected")) === "true");
+  await tabs.nth(0).click();
+  await page.keyboard.press("Escape");
+});
+
+journey("Settings: the reading sample follows each choice as it is made (D312)", async (page) => {
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await page.keyboard.press("Meta+Comma");
+  await settings.waitFor();
+  await settings.getByRole("tab", { name: "Reading" }).click();
+  const sample = settings.locator(".settings-sample .doc");
+  const look = () => sample.evaluate((el) => { const c = getComputedStyle(el); return { size: c.fontSize, face: c.fontFamily, lead: c.lineHeight, ink: c.color }; });
+  const was = await look();
+  await settings.getByRole("button", { name: "Bigger text" }).click();
+  await until("the sample's text grows", async () => (await look()).size !== was.size);
+  await settings.getByRole("radio", { name: "Geist" }).click();
+  await until("the sample changes face", async () => (await look()).face !== was.face);
+  await settings.getByRole("radio", { name: "Loose" }).click();
+  await settings.getByRole("radio", { name: "Light" }).click();
+  await until("the sample turns to the light page", async () => (await look()).ink !== was.ink);
+  // Back as it was: the next journey reads on the defaults.
+  await settings.getByRole("radio", { name: "Dark" }).click();
+  await settings.getByRole("radio", { name: "Normal" }).click();
+  await settings.getByRole("radio", { name: "Charter" }).click();
+  await settings.getByRole("button", { name: "Default" }).click();
+  await until("the sample is back", async () => JSON.stringify(await look()) === JSON.stringify(was));
   await page.keyboard.press("Escape");
 });
 

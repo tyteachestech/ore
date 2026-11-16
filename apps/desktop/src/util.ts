@@ -398,3 +398,16 @@ export const missedOf = (marks: (boolean | undefined)[]) => {
 
 /** The reader's Reading for chip: what the number counts, so it reads without a hover (D276). */
 export const readingFor = (n: number) => `Reading for ${count(n, "question")}`;
+
+/** True while the window is narrower than `px`. */
+export function useNarrow(px: number): boolean {
+  const query = `(max-width: ${px - 1}px)`;
+  const [narrow, setNarrow] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const on = () => setNarrow(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, [query]);
+  return narrow;
+}

@@ -1,5 +1,5 @@
 import { popUpShift } from "./pop-up";
-import { CaretUpDown, GearSix, Tick, Keyboard, Minus, Plus, Target, X } from "./icons";
+import { BookOpen, CaretUpDown, GearSix, Tick, Keyboard, Minus, Plus, Sparkle, Target, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { invoke } from "@tauri-apps/api/core";
 import * as Switch from "@radix-ui/react-switch";
@@ -17,7 +17,7 @@ import { setTray, trayOn } from "./quick";
 import { ShortcutEditor } from "./Shortcuts";
 import { setStyleControls, STYLE_CONTROLS, useStyleControls, type StyleControls } from "./draw/quick";
 import { CHIP_LOOKS, chipLook, setChipLook, type ChipLook } from "./Skills";
-import { errorText, load, save, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
+import { errorText, load, save, useFocusWhileMounted, useLibraryChanges, useNarrow, type Notify } from "./util";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setSpacing, setWidth, SIZES, smaller, SPACINGS, useReading, WIDTHS, type Font, type Page, type Spacing, type Width } from "./reading";
 import * as RadioGroup from "@radix-ui/react-radio-group";
 
@@ -28,16 +28,21 @@ type Data = { library: string; ai: Vendor; ai_env: string | null; model: string;
 type Model = { id: string; label: string; description?: string };
 
 const SECTIONS = [
-  { id: "general", label: "General", icon: GearSix },
+  { id: "reading", label: "Reading", icon: BookOpen },
   { id: "review", label: "Review", icon: Target },
+  { id: "ai", label: "AI", icon: Sparkle },
+  { id: "general", label: "General", icon: GearSix },
   { id: "shortcuts", label: "Keyboard shortcuts", icon: Keyboard },
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
 
-const GOALS = [5, 10, 15, 20, 30];
+/** Up to an hour: the daily session runs from 10 minutes to 1 hour (docs/design/daily-session.md). */
+const GOALS = [5, 10, 15, 20, 30, 45, 60];
 /** The choices for Minutes a day: the list, plus the library's own goal when `ore goal` or a hand edit set one off it, so one is always shown picked. */
 export const goalOptions = (now: number) => [...new Set([...GOALS, now])].sort((a, b) => a - b);
 const NEW = [0, 5, 10, 20];
+/** One line for the Mac and the iPhone. */
+export const REMINDER_TEXT = "One notification at this time, only while today’s goal is still open.";
 /** The choices for New exercises a day: the list, plus the library's own value when `ore goal` or a hand edit set one off it, so one is always shown picked. */
 export const newOptions = (now: number) => [...new Set([...NEW, now])].sort((a, b) => a - b);
 const VENDORS: { id: Vendor; label: string }[] = [
@@ -85,7 +90,7 @@ export function useReminderAgent() {
 export type { Section as SettingsSection };
 
 export function Settings({ section: initial, onClose, notify }: { section?: Section; onClose: () => void; notify: Notify }) {
-  const [section, setSection] = useState<Section>(() => initial ?? (SECTIONS.some((s) => s.id === load(LAST)) ? (load(LAST) as Section) : "general"));
+  const [section, setSection] = useState<Section>(() => initial ?? (SECTIONS.some((s) => s.id === load(LAST)) ? (load(LAST) as Section) : "reading"));
   const [data, setData] = useState<Data | null>(null);
   const styleCtl = useStyleControls();
   const sounds = useSounds();
@@ -225,6 +230,8 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     invoke<boolean>("login_item", { on: null }).then((v) => setLogin(!!v), () => {});
   }, []);
   const title = SECTIONS.find((s) => s.id === section)!.label;
+  // Enlarged or in a small window the section list runs across the top (F259): the same width as styles.css.
+  const across = useNarrow(780);
 
   return (
     // A large sheet over the app (ChatGPT's settings): the app shows in the margin around it, and a click there closes it.
@@ -232,7 +239,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
       <div className="titlebar" data-tauri-drag-region />
       <Trap>
       <div className="settings-sheet" ref={ref} tabIndex={-1} role="dialog" aria-modal="true" aria-label="Settings">
-      <Tabs.Root className="settings-tabs" orientation="vertical" value={section} onValueChange={pick}>
+      <Tabs.Root className="settings-tabs" orientation={across ? "horizontal" : "vertical"} value={section} onValueChange={pick}>
         <nav className="settings-side">
           <div className="settings-head">
             <Hint text={<>Close <kbd>Esc</kbd></>}>
@@ -260,12 +267,16 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
             {error && <p className="err">{error}</p>}
             {data?.problems?.map((p) => <p key={p} className="err">skills.yaml in your library: {p}. Fix it in a text editor.</p>)}
 
-            <Tabs.Content value="general" tabIndex={-1}>
-              <Group title="Reading">
-                <Row title="Reading width" text="How wide the text column is in the reader.">
+            <Tabs.Content value="reading" tabIndex={-1}>
+              {/* The reader's own text, so each choice below shows as it is made (Books' and Kindle's Aa do this over the page). */}
+              <div className="settings-sample" aria-hidden="true">
+                <p className="doc">Pulling an idea out of memory changes the memory itself. Each recall makes the next one easier, most of all when it takes some effort.</p>
+              </div>
+              <Group>
+                <Row title="Reading width">
                   <Seg label="Reading width" value={width} options={WIDTHS} onChange={(v) => setWidth(v as Width)} />
                 </Row>
-                <Row title="Text size" text="How big the text is in the reader.">
+                <Row title="Text size">
                   {size !== DEFAULT_SIZE && (
                     <button className="settings-link" onClick={() => setSize(DEFAULT_SIZE)}>
                       Default
@@ -285,29 +296,21 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                     </Hint>
                   </div>
                 </Row>
-                <Row title="Line spacing" text="How much room is between the lines.">
+                <Row title="Line spacing">
                   <Seg label="Line spacing" value={spacing} options={SPACINGS} onChange={(v) => setSpacing(v as Spacing)} />
                 </Row>
-                <Row title="Reading page" text="A light page for reading by day. The rest of the app stays dark.">
+                <Row title="Reading page" text="The rest of the app stays dark.">
                   <Previews label="Reading page" value={page} options={PAGES} onChange={(v) => setPage(v as Page)} render={(o) => <span className="preview-page" data-page={o.id}><i /><i /><i /></span>} />
                 </Row>
-                <Row title="Reading font" text="The face a source's text reads in.">
+                <Row title="Reading font">
                   <Previews label="Reading font" value={font} options={FONTS} onChange={(v) => setFont(v as Font)} render={(o) => <span className="preview-font" data-font={o.id}>Aa</span>} />
                 </Row>
               </Group>
-              <Group title="Skills">
-                <Row title="Skill tags" text="How a source's skills show in lists. Icon only leaves more room for titles.">
-                  <Seg label="Skill tags" value={chips} options={CHIP_LOOKS} onChange={(v) => { setChipLook(v as ChipLook); setChips(v as ChipLook); }} />
-                </Row>
-              </Group>
-              <Group title="Diagrams">
-                <Row title="Style controls" text="Colours and widths in a picker by the pointer (S), or a panel at the canvas's edge whenever something is picked.">
-                  <Seg label="Style controls" value={styleCtl} options={STYLE_CONTROLS} onChange={(v) => setStyleControls(v as StyleControls)} />
-                </Row>
-              </Group>
+            </Tabs.Content>
+
+            <Tabs.Content value="ai" tabIndex={-1}>
               {data && (
-                <>
-                  <Group title="AI">
+                  <Group>
                     <Row
                       title="AI provider"
                       text={data.ai_env ? `Set to ${data.ai_env} by ORE_AI in the app's environment.` : "Drafts exercises and checks answers, using the Claude Code or Codex CLI on this Mac."}
@@ -322,7 +325,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                     </Row>
                     <Row
                       title="Model"
-                      text={data.model_env ? `Set to ${data.model_env} by ORE_AI_MODEL in the app's environment.` : "The model that drafts exercises, writes questions and checks answers."}
+                      text={data.model_env ? `Set to ${data.model_env} by ORE_AI_MODEL in the app's environment.` : undefined}
                     >
                       <SelectMenu
                         label="Model"
@@ -332,13 +335,20 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                         onChange={(v) => void setModel(v)}
                       />
                     </Row>
+                    {!PHONE && <TablesSetting notify={notify} Row={Row} />}
                   </Group>
-                  {!PHONE && (
-                    <Group title="Import">
-                      <TablesSetting notify={notify} Row={Row} />
-                    </Group>
-                  )}
-                  <Group title="Library">
+              )}
+            </Tabs.Content>
+
+            <Tabs.Content value="general" tabIndex={-1}>
+              <Group>
+                <Row title="Skill tags" text="How a source's skills show in lists. Icon only leaves more room for titles.">
+                  <Seg label="Skill tags" value={chips} options={CHIP_LOOKS} onChange={(v) => { setChipLook(v as ChipLook); setChips(v as ChipLook); }} />
+                </Row>
+                <Row title="Style controls" text="Colours and widths in a picker by the pointer (S), or a panel at the canvas's edge whenever something is picked.">
+                  <Seg label="Style controls" value={styleCtl} options={STYLE_CONTROLS} onChange={(v) => setStyleControls(v as StyleControls)} />
+                </Row>
+                {data && (
                     <Row title="Library folder" text="Your sources, notes and exercises, kept as plain files.">
                       <Hint text={data.library}>
                         <span className="settings-path">{home(data.library)}</span>
@@ -347,9 +357,8 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                         Show in Finder
                       </button>
                     </Row>
-                  </Group>
-                </>
-              )}
+                )}
+              </Group>
             </Tabs.Content>
 
             <Tabs.Content value="review" tabIndex={-1}>
@@ -388,7 +397,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                   <Row title="When you review" text="Tie review to something you already do every day.">
                     <PlanField plan={data.review.plan} onSave={(v) => setGoal("plan", "plan", v)} />
                   </Row>
-                  <Row title="Reminder" text="One notification at this time, only while today’s goal is still open.">
+                  <Row title="Reminder" text={REMINDER_TEXT}>
                     <SelectMenu label="Reminder time" value={data.review.reminder} options={REMINDERS} onChange={(t) => void setReminder(t)} />
                   </Row>
                 </Group>
@@ -512,21 +521,23 @@ function QuizShortcut({ notify }: { notify: Notify }) {
   );
 }
 
-export function Group({ title, children }: { title: string; children: ReactNode }) {
+/** `title`: only where a section holds more than one group. */
+export function Group({ title, children }: { title?: string; children: ReactNode }) {
   return (
     <section className="settings-group">
-      <h2>{title}</h2>
+      {title && <h2>{title}</h2>}
       <div className="settings-card">{children}</div>
     </section>
   );
 }
 
-export function Row({ title, text, htmlFor, children }: { title: string; text: string; htmlFor?: string; children: ReactNode }) {
+/** `text`: one line the title can't say, or none. */
+export function Row({ title, text, htmlFor, children }: { title: string; text?: string; htmlFor?: string; children: ReactNode }) {
   return (
     <div className="settings-row">
       <div className="settings-row-text">
         {htmlFor ? <label htmlFor={htmlFor}>{title}</label> : <span>{title}</span>}
-        <p>{text}</p>
+        {text && <p>{text}</p>}
       </div>
       <div className="settings-row-control">{children}</div>
     </div>

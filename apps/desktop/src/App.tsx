@@ -55,7 +55,7 @@ import { kindLabel, passes, type Filter } from "./filters";
 import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
-import { count, errorText, focusQuietly, inOrder as inTurn, keepScroll, keptScrolls, load, save, usable, wakeScreens } from "./util";
+import { count, errorText, focusQuietly, inOrder as inTurn, keepScroll, keptScrolls, load, save, usable, wakeScreens, useNarrow } from "./util";
 import { questionText } from "./Questions";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setSpacing, setWidth, smaller, SPACINGS, useReading, WIDTHS } from "./reading";
@@ -2772,19 +2772,6 @@ function useHistory(view: View, restore: (v: View, by: -1 | 1) => boolean) {
   const forward = useCallback(() => step(1), [step]);
   const { stack, at } = h.current;
   return useMemo(() => ({ back, forward, canBack: at > 0, canForward: at < stack.length - 1 }), [back, forward, at, stack.length]);
-}
-
-/** True while the window is narrower than `px`. */
-function useNarrow(px: number): boolean {
-  const query = `(max-width: ${px - 1}px)`;
-  const [narrow, setNarrow] = useState(() => window.matchMedia(query).matches);
-  useEffect(() => {
-    const m = window.matchMedia(query);
-    const on = () => setNarrow(m.matches);
-    m.addEventListener("change", on);
-    return () => m.removeEventListener("change", on);
-  }, [query]);
-  return narrow;
 }
 
 type PinGap = { index: number; y: number; left: number; width: number };

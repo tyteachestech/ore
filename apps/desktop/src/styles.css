@@ -870,6 +870,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
    the type icons, ≥4.5:1 for --faint). Highlight pseudo-elements get literal colours: WebKit doesn't
    resolve custom properties set below :root inside ::highlight. */
 :root[data-page="light"] .reader-pane,
+:root[data-page="light"] .settings-sample,
 :root[data-page="light"].phone .phone-source:not(:has(.reader.noting)) > .phone-bar,
 :root[data-page="light"].phone .looks-sheet {
   color-scheme: light;
@@ -2713,14 +2714,30 @@ button.home-plan:hover { color: var(--text); }
 .settings-title { display: flex; align-items: center; margin-bottom: 20px; }
 .settings-title h1 { margin: 0; font-size: 24px; font-weight: 650; }
 .settings-group { margin-bottom: 28px; }
+/* The reader's text above its settings: each choice shows here as it is made. It takes the reading page's colours. */
+.settings-sample { margin-bottom: 20px; padding: 20px 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--border); overflow: hidden; }
+.settings-sample .doc { margin: 0 auto; cursor: default; }
+/* Enlarged to 200% or in a small window (F259): the section list runs across the top, as System Settings' does on a phone-width sheet. 780px is `across` in Settings.tsx. */
+@media (max-width: 779px) {
+  .settings-tabs { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .settings-side { display: flex; align-items: center; gap: 4px; padding: 8px; border-right: 0; border-bottom: 1px solid var(--border); overflow: auto hidden; }
+  .settings-head { margin: 0; flex: none; }
+  .settings-head h2 { display: none; }
+  .settings-list { flex-direction: row; }
+  .settings-tab { flex: none; white-space: nowrap; }
+  .settings-tab svg { display: none; }
+  .settings-page { padding: 24px 16px 48px; }
+}
 .settings-group h2 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text); }
 .settings-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;; box-shadow: var(--lift); }
-.settings-row { display: flex; align-items: center; gap: 24px; min-height: 64px; padding: 12px 16px; }
+.settings-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; min-height: 52px; padding: 12px 16px; }
+.settings-row:has(.settings-row-text p) { min-height: 64px; }
 .settings-row + .settings-row { border-top: 1px solid var(--border); }
-.settings-row-text { flex: 1; min-width: 0; }
+/* A control too wide to sit beside 160px of its label drops under it (F259: enlarged, or a small window). */
+.settings-row-text { flex: 1 1 160px; min-width: 0; }
 .settings-row-text > span, .settings-row-text > label { display: block; color: var(--text); font-weight: 500; }
 .settings-row-text p { margin: 2px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; text-wrap: pretty; }
-.settings-row-control { flex: none; display: flex; align-items: center; gap: 10px; max-width: 55%; min-width: 0; }
+.settings-row-control { flex: none; display: flex; align-items: center; gap: 10px; max-width: 100%; min-width: 0; }
 .settings-row-control .seg-item { min-width: 34px; padding: 0 9px; }
 .seg[data-disabled] { opacity: 0.5; }
 .seg-item:disabled { opacity: 0.4; }
@@ -2741,8 +2758,8 @@ button.home-plan:hover { color: var(--text); }
 .settings-select-label { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .settings-select:disabled { opacity: 0.5; }
 .settings-times { max-height: 300px; overflow-y: auto; min-width: 140px; font-variant-numeric: tabular-nums; }
-.settings-plan { display: inline-flex; align-items: center; color: var(--muted); white-space: nowrap; }
-.settings-plan .field { width: 190px; height: 28px; margin: 0 3px 0 6px; padding: 0 8px; color: var(--text); }
+.settings-plan { display: inline-flex; align-items: center; max-width: 100%; color: var(--muted); white-space: nowrap; }
+.settings-plan .field { flex: 0 1 190px; min-width: 0; height: 28px; margin: 0 3px 0 6px; padding: 0 8px; color: var(--text); }
 
 /* Highlight type icons in the left margin (Marks.tsx): the type's colour, muted until hovered. */
 /* The keyboard reading focus (Focus.tsx, Readwise Reader): a quiet wash with a bar at its left edge. */
@@ -3268,12 +3285,14 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* Settings on the phone (iOS Settings): grouped rows; a segmented choice goes under its name, full width. */
 .phone .phone-settings { padding: 8px 16px 40px; }
 .phone .phone-settings h1 { font-size: 30px; margin: 8px 0 20px; }
-.phone .phone-settings .settings-row { gap: 10px 16px; padding: 12px 14px; }
+.phone .phone-settings .settings-row { gap: 10px 16px; padding: 12px 14px; flex-wrap: nowrap; }
+.phone .phone-settings .settings-row-text { flex: 1 1 0%; }
 .phone .phone-settings .settings-row-text > :is(span, label) { font-size: 16px; }
 .phone .phone-settings .settings-row-text p { font-size: 13px; }
 .phone .phone-settings .settings-row:has(.seg) { flex-direction: column; align-items: stretch; }
 .phone .phone-settings .settings-row:has(.seg) .settings-row-control { max-width: none; }
-.phone .phone-settings .seg { flex: 1; display: flex; }
+/* The frame grows with its 44pt choices: at the desktop 32px the picked one stood out of it. */
+.phone .phone-settings .seg { flex: 1; display: flex; height: auto; }
 .phone .phone-settings .seg-item { flex: 1; height: 44px; font-size: 15px; }
 .phone .phone-settings .settings-plan { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .phone .phone-settings .settings-row:has(.settings-plan) { flex-direction: column; align-items: stretch; }

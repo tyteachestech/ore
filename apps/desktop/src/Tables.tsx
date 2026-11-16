@@ -6,7 +6,7 @@ import { Working } from "./Working";
 
 // Tables and display formulas in a PDF (D125): pdf.js reads them as lines of text; Docling, an optional
 // download on the Mac, reads them properly. Offered in the PDF that has them (Tyler, 2026-11-06, option A),
-// and removed from Settings › General › Import.
+// and removed from Settings › AI.
 
 export type TablesState = { installed: boolean };
 type Read = { changed: boolean; regions: number; step?: string; removed?: unknown[]; unplaced?: unknown[] };
@@ -144,7 +144,7 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
   );
 }
 
-/** Settings › General › Import: get the reader before any PDF asks, or take its 2 GB back. `Row` is
+/** Settings › AI: get the reader before any PDF asks, or take its 2 GB back. `Row` is
  *  Settings' own row. */
 export function TablesSetting({ notify, Row }: { notify: (msg: string, kind?: "info" | "error") => void; Row: (p: { title: string; text: string; children: ReactNode }) => ReactNode }) {
   const downloading = useStep();
