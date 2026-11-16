@@ -27,7 +27,7 @@ test("hand fixes are 16x16 sprites of icons in the set", () => {
 // round dots fall the same way on both sides.
 test("symmetric subjects mirror left to right", () => {
   const mirrored = (r: string) => r === [...r].reverse().join("") || (r.endsWith(".") && r.slice(0, 15) === [...r.slice(0, 15)].reverse().join(""));
-  for (const name of ["basketball", "star_2", "user_1", "heart", "bulb", "football", "coin", "target", "headphone", "mortarboard", "cat", "medal", "test_tube", "bus", "mountain", "movie", "magnet", "eyeglass", "chip", "dental", "gift", "airplane", "church", "house", "baseball", "rocket", "guitar", "hashtag", "pray", "bug", "science", "wine"]) {
+  for (const name of ["basketball", "star_2", "user_1", "heart", "bulb", "football", "coin", "target", "headphone", "mortarboard", "cat", "medal", "test_tube", "bus", "mountain", "movie", "magnet", "eyeglass", "chip", "dental", "gift", "airplane", "church", "house", "baseball", "rocket", "guitar", "bookmark", "balance", "computer", "cellphone", "sitemap", "brush_2", "drawing_board", "drum", "disc", "barbell", "american_football", "badminton", "skateboard", "flower", "mushroom", "sun_2", "wave", "butterfly", "bridge", "train", "UFO", "dress", "parfum", "hashtag", "pray", "bug", "science", "wine"]) {
     const rows = FIXES[name];
     expect(rows).toBeDefined();
     for (const r of rows!) expect(mirrored(r) ? "mirrored" : r).toBe("mirrored");
