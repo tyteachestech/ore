@@ -14296,21 +14296,57 @@ journey("highlight: a drag from the text let go in the margin beside it still ma
 });
 
 journey("source note: the format bar shows whole in the side panel, reaching over the page when the panel is narrower than it (F295)", async (page) => {
-  await openSource(page, TESTING);
-  const pm = page.locator(".mynotes .note-editor .ProseMirror").first();
-  await pm.click();
-  await page.keyboard.press("Meta+a");
-  await page.keyboard.type("## Recall beats rereading every time");
-  await page.keyboard.press("Shift+Home");
-  const bar = page.locator(".sel-bar");
-  await bar.waitFor();
-  await until("every part of the bar is in sight", () => bar.evaluate((el) => {
-    const b = el.getBoundingClientRect();
-    if (b.left < 0 || b.right > innerWidth) return false;
-    // What is drawn at the bar's two ends is the bar itself, not a panel over it.
-    return [b.left + 3, b.right - 3].every((x) => el.contains(document.elementFromPoint(x, b.top + b.height / 2)));
-  }));
-  await page.keyboard.press("Meta+z");
+  // The note is put back as it was whatever happens here: a later journey searches its words (F336), and a ⌘Z
+  // takes back only the last run of typing, which on a slow runner was not all of it (CI, F395).
+  const item = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === TESTING)!.id;
+  const { text: was } = (await ore("notes", item)) as { text: string };
+  try {
+    await openSource(page, TESTING);
+    const pm = page.locator(".mynotes .note-editor .ProseMirror").first();
+    await pm.click();
+    await page.keyboard.press("Meta+a");
+    await page.keyboard.type("## Recall beats rereading every time");
+    await page.keyboard.press("Shift+Home");
+    const bar = page.locator(".sel-bar");
+    await bar.waitFor();
+    await until("every part of the bar is in sight", () => bar.evaluate((el) => {
+      const b = el.getBoundingClientRect();
+      if (b.left < 0 || b.right > innerWidth) return false;
+      // What is drawn at the bar's two ends is the bar itself, not a panel over it.
+      return [b.left + 3, b.right - 3].every((x) => el.contains(document.elementFromPoint(x, b.top + b.height / 2)));
+    }));
+  } finally {
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await loaded(page);
+    await ore("notes", item, `--set=${was}`);
+  }
+});
+
+journey("a long source still being drawn leaves the keys in the source note he clicked into (F396)", async (page) => {
+  // Drawn in slices, a long text is ready a second or more after it opens; that moment took the keys to the reader,
+  // so what he typed in the note next (a ⇧Home on CI) went to the source instead.
+  const title = "A long text drawn in slices";
+  const body = Array.from({ length: 20000 }, (_, i) => `Paragraph ${i + 1} of a long text about spacing and retrieval, drawn a slice at a time.`).join("\n\n");
+  const made = (await (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: `# ${title}\n\n${body}\n\nThe last paragraph.` }) })).json()) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, title);
+    const pm = page.locator(".mynotes .note-editor .ProseMirror").first();
+    await pm.click();
+    if (await page.locator(".reader .doc").getByText("The last paragraph.").count()) throw new Error("the text was drawn whole before the click: no slice was left to draw");
+    await page.keyboard.type("Spacing");
+    await page.locator(".reader .doc").getByText("The last paragraph.").waitFor({ state: "attached", timeout: 30_000 });
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    if (!(await pm.evaluate((el) => el.contains(document.activeElement)))) throw new Error("the text being ready took the keys out of the note");
+    await page.keyboard.type(" works");
+    await until("the note has what he typed", async () => ((await ore("notes", made.id)) as { text: string }).text.includes("Spacing works"));
+  } finally {
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    await loaded(page);
+    await ore("archive", made.id).catch(() => {});
+  }
 });
 
 journey("Settings: each section opens at its top, however far the last one was scrolled (F296)", async (page) => {
@@ -14413,15 +14449,14 @@ journey("opening a source: its title stands at once where it will stay, the pane
   if (Math.abs(before.x - after.x) > 1 || Math.abs(before.y - after.y) > 1) throw new Error(`the title moved as the text arrived: ${before.x},${before.y} to ${after.x},${after.y}`);
   // A relaunch: the skills haven't answered, and the sidebar already shows them with their icons. The answer is held
   // until the check, not slowed by a time, so a slow runner's first draw can't outlast it.
-  await page.addInitScript(() => ((window as Slow).__ORE_SLOW = { skills: 60_000 }));
+  // Held before it reaches the bridge (F394): a hold on the answer only starts once the bridge has
+  // answered, and on a slow runner the sidebar was drawn before that, so the check found nothing held.
+  await page.addInitScript(() => ((window as unknown as { __ORE_HOLD?: Record<string, string[]> }).__ORE_HOLD = { skills: ["manual"] }));
   await page.reload();
   await page.locator(".sidebar .side-main .mark").first().waitFor();
   await page.locator(".sidebar .side-item").filter({ hasText: "Learning" }).first().waitFor();
   const held = await page.evaluate(() => (window as unknown as { __ORE_HELD: string[] }).__ORE_HELD);
   if (!held.includes("skills")) throw new Error("the skills answered before the sidebar was checked");
-  // The hold off first: a second `skills` the page sends after the release would otherwise wait out the 60 s and
-  // still be in flight as the journey ends (CI, #442).
-  await page.evaluate(() => delete (window as Slow).__ORE_SLOW);
   await release(page, "skills");
 });
 
@@ -14641,10 +14676,17 @@ journey("⌘K: Tab on a source steps into what can be done with it, typing narro
   await page.keyboard.press("Tab");
   await page.keyboard.type("done");
   await until("typing narrows the actions to the one he means", async () => (await rows.count()) === 1 && (await rows.first().innerText()).includes("Move to Done"));
+  // The move's answer held back: the library already has it done while the page waits, as on a slow runner, where a
+  // ⌘Z in that moment met a history without the move (CI, F393).
+  type Slow = { __ORE_SLOW?: Record<string, number> };
+  await page.evaluate(() => ((window as Slow).__ORE_SLOW = { status: 60_000 }));
   await page.keyboard.press("Enter");
   await page.getByRole("dialog", { name: "Command palette" }).waitFor({ state: "detached" });
   await until("the source is marked done", async () => ((await ore("ls", "--status=done")) as { title: string }[]).some((i) => i.title === TESTING));
+  await until("the move's answer is held", () => isHeld(page, "status"));
   await page.keyboard.press("Meta+z");
+  await page.evaluate(() => delete (window as Slow).__ORE_SLOW);
+  await release(page, "status");
   await until("⌘Z puts it back in To read", async () => !((await ore("ls", "--status=done")) as { title: string }[]).some((i) => i.title === TESTING));
 });
 

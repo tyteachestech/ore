@@ -1257,10 +1257,20 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     }
   }, [ready, p.jumpTo]);
 
+  /** He has clicked somewhere since the source opened: the text drawn after that leaves his focus where he put it. */
+  const clicked = useRef(false);
+  useEffect(() => {
+    const down = () => void (clicked.current = true);
+    addEventListener("pointerdown", down, true);
+    return () => removeEventListener("pointerdown", down, true);
+  }, []);
   useLayoutEffect(() => {
     if (!ready || !scrollRef.current) return;
     const y = Number(load(scrollKey) ?? 0);
     if (y > 0 && !p.jumpTo) scrollRef.current.scrollTop = y;
+    // A long text is drawn in slices, and can be ready a second after it opened: a click into the note meanwhile keeps
+    // the keys there, or what he types next lands in the source (CI, F396).
+    if (clicked.current && document.activeElement && document.activeElement !== document.body) return;
     scrollRef.current.focus({ preventScroll: true });
   }, [ready, scrollKey]);
 
