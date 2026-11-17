@@ -45,3 +45,14 @@ export function aiMath(text: string): string {
       .replace(SINGLE, (_, x: string) => `$$${x}$$`),
   );
 }
+
+/** Where a reply being typed out may stop (D321): never inside a formula, which would show as
+ *  its TeX letter by letter. Cut inside one the whole of `full` holds, it runs on to the formula's end, so the
+ *  formula appears drawn; cut after an opening `$$`, `\[` or `\(` whose close hasn't come, it stops before it. */
+export function wholeFormulas(shown: string, full: string): string {
+  const at = shown.length;
+  for (const m of full.matchAll(/\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\(.+?\\\)/g)) if (m.index < at && at < m.index + m[0].length) return full.slice(0, m.index + m[0].length);
+  for (const m of full.matchAll(SINGLE)) if (m.index < at && at < m.index + m[0].length) return full.slice(0, m.index + m[0].length);
+  const open = Math.max(shown.split("$$").length % 2 === 0 ? shown.lastIndexOf("$$") : -1, shown.lastIndexOf("\\[") > shown.lastIndexOf("\\]") ? shown.lastIndexOf("\\[") : -1, shown.lastIndexOf("\\(") > shown.lastIndexOf("\\)") ? shown.lastIndexOf("\\(") : -1);
+  return open >= 0 ? shown.slice(0, open) : shown;
+}

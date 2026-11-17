@@ -3541,6 +3541,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor .ask-input:has(.field:placeholder-shown:not(:focus))::before { background: var(--faint); animation: none; }
 .tutor .ask-input .field:placeholder-shown { padding-left: 28px; caret-color: transparent; }
 @keyframes block-blink { 50% { opacity: 0; } }
+/* While letters are being typed the block holds still, as a terminal's does; it blinks again when the words wait (D321). */
+.tutor .ask-text.typing.moving > p:last-child::after, .tutor .ask-text.typing.moving > :is(ul, ol):last-child > li:last-child::after { animation: none; }
 @media (prefers-reduced-motion: reduce) { .tutor .ask-text.typing ::after, .tutor .ask-input::before { animation: none !important; } }
 .tutor-at { color: var(--accent); }
 /* The @ list (Claude's and ChatGPT's @): above the field, the same rows as every menu. */
