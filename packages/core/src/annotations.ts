@@ -39,7 +39,7 @@ export const AnnotationSchema = z.object({
   // Apply intent (D148): earlier rounds of the same try, oldest first. "Next time I'll…" closes a round
   // (his plan and how it went move here) and the try is open again with the new plan as its note.
   uses: z.array(z.object({ ts: z.string(), plan: z.string().optional(), reflection: z.string().optional() })).optional(),
-  // Apply intent (D-new-forge): the plan's cue ("When…", the note is what he'll do then), what might get in the
+  // Apply intent (D322): the plan's cue ("When…", the note is what he'll do then), what might get in the
   // way and what he'll do about it, and a ULID from when he last picked it as the one he is trying now (the latest wins).
   when: z.string().optional(),
   obstacle: z.string().optional(),
@@ -79,7 +79,7 @@ export interface HighlightInput {
   note?: string;
   start?: number;
   looked_up?: boolean;
-  /** A try he typed with no passage behind it (D-new-forge): the new highlight is a `point`, with its cue. */
+  /** A try he typed with no passage behind it (D322): the new highlight is a `point`, with its cue. */
   point?: boolean;
   when?: string;
 }
@@ -166,7 +166,7 @@ export function findAnnotation(lib: Library, ref: string): { item: Item; annotat
 }
 
 /** A snippet that only carries a question (typed on a skill page, or captured with Question intent) or
- *  a try he typed in the Forge (D-new-forge): nothing to read, so it lives under Questions or in the Forge
+ *  a try he typed in the Forge (D322): nothing to read, so it lives under Questions or in the Forge
  *  and stays out of the source lists, also once it is deleted (else it would turn up under To read). */
 export function isQuestionOnly(item: Item): boolean {
   if (item.meta.type !== "snippet") return false;

@@ -1705,7 +1705,7 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
   .skill-col { overflow: visible; padding-bottom: 0; }
 }
 .question { padding: 2px 0; }
-/* Tries (D127, D-new-forge). On the skill page: the one he is trying now in one line (a box to check, what he'll do,
+/* Tries (D127, D322). On the skill page: the one he is trying now in one line (a box to check, what he'll do,
    its cue, its stone), the waiting ones as grey stones. The rest is the Forge and each try's own page. */
 .try-check { flex: none; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 4px; border: 1.5px solid var(--muted); color: var(--apply-solid); }
 .try-check:hover { border-color: var(--apply-solid); background: var(--bg-hover); }

@@ -370,7 +370,7 @@ export const itemCommands: Record<string, Command> = {
   },
 
   try: {
-    usage: '<try> [--plan "<I\'ll…>"] [--when "<When…>"] [--if "<what might get in the way, and then>"] [--pick] | --skill s --plan "<I\'ll…>" [--when "<When…>"]   write a try\'s plan, or --pick it as the one he is trying now in its skill; with --skill, a new try with no passage behind it (D-new-forge)',
+    usage: '<try> [--plan "<I\'ll…>"] [--when "<When…>"] [--if "<what might get in the way, and then>"] [--pick] | --skill s --plan "<I\'ll…>" [--when "<When…>"]   write a try\'s plan, or --pick it as the one he is trying now in its skill; with --skill, a new try with no passage behind it (D322)',
     options: { plan: { type: "string" }, when: { type: "string" }, if: { type: "string" }, pick: { type: "boolean" }, skill: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();

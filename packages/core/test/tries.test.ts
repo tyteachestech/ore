@@ -125,7 +125,7 @@ describe("tries: rounds without a write-up, and one card per idea (D148)", () =>
   });
 });
 
-describe("the Forge: one try at a time, a plan with its cue, tries with no passage (D-new-forge)", () => {
+describe("the Forge: one try at a time, a plan with its cue, tries with no passage (D322)", () => {
   test("one open try of a skill is active: the first he marked, then the one he picked last; a try that is his can't be picked", async () => {
     const lib = await tempLibrary();
     const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });

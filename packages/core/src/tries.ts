@@ -8,7 +8,7 @@ import { nowIso, ulid } from "./ids.ts";
 // D127: techniques he plans to try on his own work (Apply-intent highlights). His plan is the note;
 // checking one off records how it went (`reflection`), and enrich then drafts one Explain card from it.
 // D148: "Next time I'll…" closes the round into `uses` and opens the try again with that line as its plan.
-// D-new-forge: one try per skill is the one he is trying now (the one he picked last, else the oldest open);
+// D322: one try per skill is the one he is trying now (the one he picked last, else the oldest open);
 // the rest wait. A plan is "When… I'll…", with what might get in the way. Done means it is his.
 
 export interface TryView extends Annotation {
@@ -69,7 +69,7 @@ export interface PlanInput {
   pick?: boolean;
 }
 
-/** Writes a try's plan, or picks it as the one he is trying now (D-new-forge). */
+/** Writes a try's plan, or picks it as the one he is trying now (D322). */
 export async function planTry(lib: Library, ref: string, input: PlanInput): Promise<{ tried: Annotation; item: Item }> {
   return withLock(paths.lock(lib), () => {
     const { item, annotation } = findAnnotation(lib, ref);

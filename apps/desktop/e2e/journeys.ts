@@ -11638,7 +11638,7 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
   }));
   const check = async (where: string) => { const s = await small(); if (s.length) throw new Error(`taps under 44 pt on ${where}: ${s.join(", ")}`); };
   await check("the skill page");
-  // The Forge and a try's own page are skill pages too (D-new-forge).
+  // The Forge and a try's own page are skill pages too (D322).
   await tap(page, page.locator(".phone-skill .forge-door"));
   await check("the Forge");
   await tap(page, page.getByRole("button", { name: "Add something to try" }));

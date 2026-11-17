@@ -9,7 +9,7 @@ import { ore, opt, type Skill, type Try } from "./ore";
 import { passageText } from "./text";
 import { errorText, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 
-// The apply half of a skill (D-new-forge). An idea he marked to try is a stone: it waits, then it is the one
+// The apply half of a skill (D322). An idea he marked to try is a stone: it waits, then it is the one
 // he is trying now, and each use swells its dots; once it is his it is a tool, a pickaxe beside the skill's
 // goal. One try at a time per skill, picked by him; nothing is dated, counted or owed (D23).
 

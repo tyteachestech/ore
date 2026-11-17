@@ -56,7 +56,7 @@ type Props = {
   onFound: () => void;
   /** The skill's sources, in the view the title names. */
   children: ReactNode;
-  /** Where the page is (D-new-forge): itself, its Forge, or one try's page. */
+  /** Where the page is (D322): itself, its Forge, or one try's page. */
   sub: Sub;
   onSub: (s: Sub) => void;
   /** The iPhone: its note is a screen of its own (Tyler 2026-11-06, B), so the page is one column with this row in the note's place. */
