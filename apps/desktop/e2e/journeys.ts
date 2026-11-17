@@ -10902,7 +10902,9 @@ journey("stacked Undo: each ⌘Z's toast comes to the front and names the source
   await page.keyboard.press("Meta+z");
   await until("the second ⌘Z's toast is in front, naming the one it put back", async () => (await front()) === `Undone: Archived “${before[1]}”`);
   await page.keyboard.press("Meta+z");
-  await until("all three are back", async () => (await titles()).length === before.length);
+  // The held write lands 6 s after this ⌘Z. Its row is back at once, but a list read still on its way from the ⌘Z
+  // before can take it off again until then (F392), so the wait outlasts the hold.
+  await until("all three are back", async () => (await titles()).length === before.length, 15_000);
   await inLibrary(page, before);
 });
 
