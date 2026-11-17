@@ -99,6 +99,7 @@ const useThinking = (id: string) =>
  *  try's page when it is ready. The Mac's AI writes it, so the phone asks for none; a line that fails is left out. */
 export function askMole(id: string, then?: () => void) {
   if (PHONE || thinking.has(id)) return;
+  moleSaid.delete(id); // the last use's line is not this one's
   think(id, true);
   void ore<{ line: { text: string } } | null>("tried", id, "--line")
     .then((r) => r?.line && moleSaid.set(id, r.line.text))
@@ -140,11 +141,12 @@ export function useTries(skill: string, notify: Notify) {
   const step = async (msg: string, run: () => Promise<unknown>, undo: () => Promise<unknown>, kind: "quiet" | "info" = "quiet") => {
     try {
       await run();
-      await reload();
     } catch (e) {
       notify(errorText(e), "error");
       return false;
     }
+    // The write stands even if the re-read fails: he can undo it, and a second Enter must not write it twice.
+    await reload().catch((e) => notify(errorText(e), "error"));
     notify(msg, kind, () => undo().then(reload), () => run().then(reload));
     return true;
   };
