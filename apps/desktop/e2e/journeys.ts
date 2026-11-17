@@ -1244,7 +1244,7 @@ journey("tutor web citation: a page the tutor found on the web is a pill named f
   await page.keyboard.press("Escape");
 });
 
-journey("tutor streaming: the reply shows as it is written (markers wait for the citations), a search says so, and the whole reply replaces it", async (page) => {
+journey("tutor streaming: the reply shows as it is written (markers wait for the citations), a search says so, and the rest is typed in at a steady pace", async (page) => {
   let release = () => {};
   const held = new Promise<void>((r) => (release = r));
   let id = "";
@@ -1271,8 +1271,16 @@ journey("tutor streaming: the reply shows as it is written (markers wait for the
     await tutor.getByText("Spacing beats", { exact: true }).waitFor();
     if (await tutor.getByText("Not this turn's words").count()) throw new Error("another turn's words landed here");
     if (await tutor.getByText("Searching the web…").count()) throw new Error("the wait stayed up under the words");
+    // The rest of the reply is typed in at a steady pace, not dropped in whole (D321).
+    await page.evaluate(() => {
+      const seen: number[] = ((window as any).__typed = []);
+      const box = document.querySelector('[aria-label="Tutor"] .ask-ai.newest .ask-text')!;
+      new MutationObserver(() => seen.push(box.textContent!.length)).observe(box, { subtree: true, childList: true, characterData: true });
+    });
     release();
     await tutor.getByText("Spacing beats cramming over a week.").waitFor();
+    const typed = new Set((await page.evaluate(() => (window as any).__typed as number[])).filter((n) => n > "Spacing beats".length && n < "Spacing beats cramming over a week.".length));
+    if (typed.size < 5) throw new Error(`the rest of the reply landed in ${typed.size + 1} steps, not typed in`);
   } finally {
     release();
     await page.unroute(/\/ore$/);
@@ -10356,6 +10364,8 @@ journey("math in a reply: the tutor and Review's Ask draw an AI's formulas, on t
   });
   const drawn = async (where: string, root: ReturnType<typeof page.locator>) => {
     await root.locator(".katex-display .katex").first().waitFor();
+    // The reply is typed out (D321): its last words come within half a second.
+    await root.getByText("a copy", { exact: false }).waitFor({ timeout: 3000 }).catch(() => {});
     const text = (await root.innerText()).replace(/\s+/g, " ");
     if (/\$\$|\\frac|\^\{/.test(text)) throw new Error(`${where} shows the TeX: ${text}`);
     if (!(await root.locator(".katex").filter({ hasText: "mc" }).count())) throw new Error(`${where} left inline math as text`);

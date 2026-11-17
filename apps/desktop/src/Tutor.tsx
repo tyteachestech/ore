@@ -14,8 +14,9 @@ import { copiedFiles, pastesFiles } from "./copied";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ReactMarkdown from "react-markdown";
 import { mend } from "./mend";
+import { useSteady } from "./steady";
 import { CodeBlock } from "./Code";
-import { aiMath, reply as math } from "./math-md";
+import { aiMath, reply as math, wholeFormulas } from "./math-md";
 import { Evidence } from "./Evidence";
 import { SkillIcon } from "./IconPicker";
 import { Grow } from "./Grow";
@@ -450,6 +451,12 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
   /** His last message while he edits it (D201): the text in its field. */
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const lastTurn = turns[turns.length - 1];
+  // The newest reply typed out at a steady pace (D321): the model sends words in clumps, and a
+  // Codex reply comes whole, so the words on screen run on their own clock, never more than LAG behind.
+  // Its [n] markers wait for the citations, which come with the whole reply; Stop shows what was sent.
+  const sent = !lastTurn || lastTurn.error ? "" : (lastTurn.reply ?? lastTurn.partial ?? "").replace(CUT_MARKS, "");
+  const steady = useSteady(lastTurn?.id, sent, !!lastTurn && lastTurn.reply === undefined && !lastTurn.error);
+  const typing = (t: TutorTurn) => t.id === lastTurn?.id && !t.error && !t.stopped && (t.reply === undefined || !steady.caught);
   const editField = useRef<HTMLTextAreaElement>(null);
   const editingId = editing?.id;
   useEffect(() => {
@@ -540,7 +547,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
     force.current = false;
     if (atEnd) toEnd();
     else if (el.scrollHeight > end.current + 1) setBelow(true); // grew below him, not a change higher up (+ Card)
-  }, [turns]);
+  }, [turns, steady.shown]);
 
   // The reply he was waiting for lands in the chat he is looking at: the mole hops for it (a jolt for an error).
   // Followed by its turn, so opening another chat mid-reply, or a turn that is taken away, is not a landing.
@@ -737,16 +744,15 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
               </p>
             )}
             <div className={`ask-ai${i === turns.length - 1 ? " newest" : ""}`}>
-              <div className={`ask-text${t.reply === undefined && !t.error ? " typing" : ""}`}>
+              <div className={`ask-text${typing(t) ? ` typing${steady.shown && !steady.caught ? " moving" : ""}` : ""}`}>
                 {t.error ? (
                   <p className={t.stopped ? "tutor-stopped" : "err"}>
                     {t.error}{" "}
                     <button className="link" onClick={() => chat.retry(t.id)}>Try again</button>
                   </p>
-                ) : t.reply === undefined && t.partial ? (
-                  // Its [n] markers wait for the citations, which come with the whole reply.
-                  <Answer text={mend(t.partial.replace(CUT_MARKS, ""))} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
-                ) : t.reply === undefined ? (
+                ) : typing(t) && steady.shown ? (
+                  <Answer text={mend(wholeFormulas(steady.shown, sent))} citations={[]} onOpen={onOpen} onLink={chat.openLink} />
+                ) : t.reply === undefined || typing(t) ? (
                   // What it is doing, as far as the stream says (D146): his sources come first (D137), a web search
                   // is reported as it starts and ends, and after one the reply is written from what it found.
                   <Working stage={t.searching ? "search" : t.searched ? "write" : "read"} label={t.searching ? "Searching the web…" : t.searched ? "Writing…" : "Reading your sources…"} slow={t.searching ? "A search takes about 10 seconds." : "A reply takes about 10 seconds."} />

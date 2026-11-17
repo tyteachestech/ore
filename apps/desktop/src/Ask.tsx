@@ -2,7 +2,8 @@ import { ArrowUp, Sparkle, Stop } from "./icons";
 import { Fragment, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { mend } from "./mend";
-import { aiMath, reply as math } from "./math-md";
+import { useSteady } from "./steady";
+import { aiMath, reply as math, wholeFormulas } from "./math-md";
 import { Grow } from "./Grow";
 import { Hint } from "./Hint";
 import { listen } from "@tauri-apps/api/event";
@@ -35,6 +36,8 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
   const applied = (p: Proposal) => same(p.question, card.question) && same(p.answer, card.answer);
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
+  // The reply so far typed out at a steady pace, as the tutor's is (D321).
+  const { shown } = useSteady(chat.job, chat.partial ?? "", true);
 
   useEffect(() => {
     field.current?.focus();
@@ -136,9 +139,9 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
         {busy && (
           <div className="ask-ai">
             <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />
-            {chat.partial ? (
+            {shown ? (
               <div className="ask-text">
-                <ReactMarkdown {...math}>{aiMath(mend(chat.partial))}</ReactMarkdown>
+                <ReactMarkdown {...math}>{aiMath(mend(wholeFormulas(shown, chat.partial ?? "")))}</ReactMarkdown>
               </div>
             ) : (
               <span className="ask-dots" aria-label="Thinking">

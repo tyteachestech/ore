@@ -27,3 +27,19 @@ test("a formula alone in its paragraph is drawn on its own line in a list and a 
   expect(html("| a |\n|---|\n| $$x^2$$ |\n")).not.toContain("katex-display");
   expect(html("$$x^2$$")).toContain("katex-display");
 });
+
+// D321: a reply typed out letter by letter never shows a formula's TeX half written.
+test("a reply being typed out stops outside its formulas", async () => {
+  const { wholeFormulas } = await import("../src/math-md");
+  const full = "The curve: $$\\frac{1}{1+e^{-x}}$$ and inline $E=mc^2$ for $5 a copy.";
+  const cut = (n: number) => wholeFormulas(full.slice(0, n), full);
+  // Inside a formula the whole of it shows; before or after one the cut stays where it is.
+  expect(cut(full.indexOf("frac"))).toBe(full.slice(0, full.indexOf("$$ and") + 2));
+  expect(cut(full.indexOf("mc"))).toBe(full.slice(0, full.indexOf("$ for") + 1));
+  expect(cut(5)).toBe(full.slice(0, 5));
+  // A price is not a formula.
+  expect(cut(full.indexOf("a copy"))).toBe(full.slice(0, full.indexOf("a copy")));
+  // The model hasn't sent the close yet: stop before the opening.
+  expect(wholeFormulas("So $$\\frac{1", "So $$\\frac{1")).toBe("So ");
+  expect(wholeFormulas("So \\(x^", "So \\(x^")).toBe("So ");
+});
