@@ -107,6 +107,9 @@ async function openPhone(): Promise<Page> {
   // asset protocol serves them from the folder.
   await page.addInitScript(`window.__TAURI_INTERNALS__ ??= { convertFileSrc: (p) => "/library-file" + p, transformCallback: () => 0, invoke: () => Promise.reject(new Error("no Tauri here")) }`);
   await page.addInitScript(HYGIENE);
+  // The check-in before a session (D324) asks once a day about a try last touched before today: marked asked on every
+  // load, so a journey that moves the clock meets the session it means to; the check-in's own journeys turn this off.
+  await page.addInitScript(`try { if (!localStorage.getItem("e2e.check-in")) localStorage.setItem("ore.try-checkin", new Date().toLocaleDateString("sv")); } catch {}`);
   await page.goto(url);
   await page.locator(".phone-app").waitFor();
   // Opened means the library is read: a journey that relaunches at once (page.reload) cut the read of
@@ -125,6 +128,9 @@ async function open(url: string, engine: Engine): Promise<Page> {
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
   await page.addInitScript({ path: join(MOCK, "tauri.js") });
   await page.addInitScript(HYGIENE);
+  // The check-in before a session (D324) asks once a day about a try last touched before today: marked asked on every
+  // load, so a journey that moves the clock meets the session it means to; the check-in's own journeys turn this off.
+  await page.addInitScript(`try { if (!localStorage.getItem("e2e.check-in")) localStorage.setItem("ore.try-checkin", new Date().toLocaleDateString("sv")); } catch {}`);
   if (process.env.ORE_E2E_SLOW) await page.addInitScript(`window.__ORE_SLOW = ${process.env.ORE_E2E_SLOW}`);
   if (process.env.ORE_E2E_CPU && engine === "chromium") await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: Number(process.env.ORE_E2E_CPU) });
   await page.goto(url);
@@ -8695,6 +8701,7 @@ journey("review: a day after he last touched what he is trying, a session starts
   // His own try, the one left alone longest: every other one in the works is touched now.
   const mine = (await ore("try", "--skill", "habits", "--plan", "Shoes by the door", "--when", "I lock up at night")) as { id: string };
   try {
+    await page.evaluate(() => localStorage.setItem("e2e.check-in", "1"));
     await Bun.sleep(1100);
     for (const t of (await ore("tries", "--now")) as { id: string }[]) if (t.id !== mine.id) await ore("try", t.id, "--pick");
     await page.reload();
@@ -11730,6 +11737,7 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
 
 journey("phone: the check-in before a session asks about what he is trying, its buttons are 44 pt taps, and Not yet goes on to the first exercise (D324)", async (page) => {
   // The seed's library has something he is trying, last touched before today.
+  await page.evaluate(() => localStorage.setItem("e2e.check-in", "1"));
   await page.clock.install({ time: new Date(Date.now() + 26 * 3600e3) });
   await page.reload();
   await page.locator(".phone-app").waitFor();
