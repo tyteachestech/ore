@@ -24,7 +24,7 @@ Learning makes people anxious, so Ore is calm first. Then satisfying, and a litt
 4. **Colour means something.** See the table below. Never a colour for decoration.
 5. **One main action per view**, in `paper` white.
 6. **Spacing in steps of 2px**, and edges that line up across columns.
-7. **Flat.** No glow, grain or gradient on the page, and only what floats has a shadow. Two exceptions: the lamp glows, and a key pressed to answer has a lip.
+7. **Flat.** No glow, grain or gradient on the page, and only what floats has a shadow. Three exceptions: the lamp glows (amber, running now), a reward glows in its own colour (the day's goal met, a to-do ticked), and a key pressed to answer has a lip.
 8. **Nothing decorative.** Every element is something he needs to see or do to learn.
 
 ## Dots

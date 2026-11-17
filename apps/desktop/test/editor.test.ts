@@ -263,3 +263,21 @@ describe("note editor (D38)", () => {
     expect(await typeInto("Arrays look like", " [] here")).toMatch(/^Arrays look like \\?\[\] here\n$/);
   });
 });
+
+describe("a ticked to-do glows once (the reward glow)", () => {
+  test("ticking a box marks its item; unticking, or a note opening ticked, does not", async () => {
+    const { editor } = await open("- [ ] Look up Chi 1989\n- [x] Compare with Bisra 2018\n");
+    editor.action((ctx) => {
+      const view = ctx.get(core.editorViewCtx);
+      const items: number[] = [];
+      view.state.doc.descendants((n: { type: { name: string } }, p: number) => void (n.type.name === "list_item" && items.push(p)));
+      const glowing = () => view.dom.querySelectorAll("li.ticked").length;
+      expect(glowing()).toBe(0);
+      view.dispatch(view.state.tr.setNodeAttribute(items[1]!, "checked", false));
+      expect(glowing()).toBe(0);
+      view.dispatch(view.state.tr.setNodeAttribute(items[0]!, "checked", true));
+      expect(view.dom.querySelector("li.ticked")?.textContent).toBe("Look up Chi 1989");
+      expect(glowing()).toBe(1);
+    });
+  });
+});
