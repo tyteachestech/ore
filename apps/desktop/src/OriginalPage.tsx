@@ -7,6 +7,7 @@ import { Hint } from "./Hint";
 import { PHONE } from "./ore";
 import { CaretLeft, CaretRight } from "./icons";
 import { Working } from "./Working";
+import { lines, passage, type Box } from "./original-match";
 // The CMaps a CJK font names instead of carrying, the ones import reads the text with (F284): without them the
 // page of a Korean, Japanese or Chinese PDF draws blank (F379).
 import { CarriedData } from "../../../packages/core/src/ingest/pdf-data";
@@ -15,8 +16,10 @@ GlobalWorkerOptions.workerSrc = workerUrl;
 
 /** The Original tab (D202): the PDF's own page beside its text, as Preview draws it. `page` is the page being
  *  read, and the tab follows it; ‹ › look at another, until the reading moves to a new page. Loaded only when
- *  the tab is opened (pdf.js is a chunk of its own). */
-export default function OriginalPage({ file, page }: { file: string; page: number }) {
+ *  the tab is opened (pdf.js is a chunk of its own). `lit` is the passage he clicked in the text: the tab turns
+ *  to its page and marks where it sits there (D315), or marks nothing when the page's own words
+ *  don't hold it (a scan, a formula). */
+export default function OriginalPage({ file, page, lit }: { file: string; page: number; lit?: { page: number; text: string } | null }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [error, setError] = useState(false);
   /** A page he turned to himself; the reading's page takes over again when it changes. */
@@ -29,11 +32,17 @@ export default function OriginalPage({ file, page }: { file: string; page: numbe
   const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => setOwn(null), [page, file]);
+  useEffect(() => void (lit && setOwn(lit.page)), [lit]);
+  const [bars, setBars] = useState<Box[]>([]);
+  /** The page the canvas shows: a turned page keeps the last one's picture until its own is drawn, and the marks wait for it. */
+  const [drawn, setDrawn] = useState(0);
+  const first = useRef<HTMLElement>(null);
   useEffect(() => setSharp(1), [own, page, file]);
   useEffect(() => {
     let gone = false;
     let task: ReturnType<typeof getDocument> | undefined;
     setPdf(null);
+    setDrawn(0);
     setError(false);
     // The bytes are fetched here: pdf.js only fetches http(s) itself, and the app's files come over `asset:`.
     fetch(convertFileSrc(file))
@@ -77,6 +86,7 @@ export default function OriginalPage({ file, page }: { file: string; page: numbe
           c.height = draft.height;
           c.getContext("2d")?.drawImage(draft, 0, 0);
           c.dataset.page = String(shown);
+          setDrawn(shown);
         },
         () => {},
       );
@@ -86,6 +96,34 @@ export default function OriginalPage({ file, page }: { file: string; page: numbe
       task?.cancel();
     };
   }, [pdf, shown, width, sharp]);
+
+  useEffect(() => {
+    setBars([]);
+    if (!pdf || !lit || lit.page !== shown || drawn !== shown) return;
+    let gone = false;
+    void pdf.getPage(shown).then(async (pg) => {
+      const view = pg.getViewport({ scale: 1 });
+      const runs = (await pg.getTextContent()).items.flatMap((it) => ("str" in it ? [it] : []));
+      const found = passage(runs.map((r) => r.str), lit.text);
+      if (gone || !found) return;
+      setBars(lines(runs.slice(found[0], found[1] + 1).map((r) => {
+        // A run's box in the PDF's own units, from its baseline: a little below for descenders.
+        const [x, y] = [r.transform[4] as number, r.transform[5] as number];
+        const [x1, y1] = view.convertToViewportPoint(x, y - r.height * 0.22) as [number, number];
+        const [x2, y2] = view.convertToViewportPoint(x + r.width, y + r.height * 0.82) as [number, number];
+        return { left: (Math.min(x1, x2) / view.width) * 100, top: (Math.min(y1, y2) / view.height) * 100, width: (Math.abs(x2 - x1) / view.width) * 100, height: (Math.abs(y2 - y1) / view.height) * 100 };
+      })));
+    }).catch(() => {});
+    return () => void (gone = true);
+  }, [pdf, shown, lit, drawn]);
+  // The lit passage comes into the panel's view when it is below or above what shows.
+  useEffect(() => void (bars.length && first.current?.scrollIntoView({ block: "nearest" })), [bars]);
+  const sheet = (
+    <div className="original-page">
+      <canvas ref={canvas} role="img" aria-label={`Page ${shown} of the original`} />
+      {bars.map((b, i) => <i key={i} ref={i ? undefined : first} className="original-lit" style={{ left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%` }} />)}
+    </div>
+  );
 
   return (
     <div className="original" ref={box}>
@@ -118,12 +156,10 @@ export default function OriginalPage({ file, page }: { file: string; page: numbe
               onPinchingStop={(r) => setSharp(Math.min(3, Math.max(1, Math.ceil(r.state.scale))))}
             >
               <TransformComponent wrapperStyle={{ width: "100%" }} contentStyle={{ width: "100%" }}>
-                <canvas ref={canvas} role="img" aria-label={`Page ${shown} of the original`} />
+                {sheet}
               </TransformComponent>
             </TransformWrapper>
-          ) : (
-            <canvas ref={canvas} role="img" aria-label={`Page ${shown} of the original`} />
-          )}
+          ) : sheet}
         </>
       )}
     </div>

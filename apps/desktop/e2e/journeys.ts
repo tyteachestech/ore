@@ -4150,6 +4150,8 @@ journey("All sources: a row dragged onto a sidebar skill is filed there, and ⌘
   const ids = await targets.evaluateAll((els) => els.map((el) => el.getAttribute("data-drop-skill")!));
   const k = ids.findIndex((id) => !under.skills.includes(id));
   const name = (await targets.nth(k).innerText()).trim();
+  // Sources earlier journeys left can push the row below the window, where the pointer can't press it.
+  await row.scrollIntoViewIfNeeded();
   const from = (await row.boundingBox())!;
   const to = (await targets.nth(k).boundingBox())!;
   await page.mouse.move(from.x + 60, from.y + from.height / 2);
@@ -15047,6 +15049,153 @@ journey("Feed: Follow opens a box that takes a link only, and never saves what i
   await page.getByRole("button", { name: "+ Add" }).click();
   if (!/any text/.test((await page.getByRole("dialog", { name: "Add a source" }).getByLabel("Link, file path or text").getAttribute("placeholder")) ?? "")) throw new Error("+ Add opened the follow box");
   await page.keyboard.press("Escape");
+});
+
+/** A finger dragged from one point to another in `ms` and lifted (Playwright's touchscreen only taps): touch events
+ *  built in the page, on what was under the finger when it came down, as a browser sends them. */
+async function swipe(page: Page, from: [number, number], to: [number, number], ms = 200, scrolls = false) {
+  await page.evaluate(async ([x0, y0, x1, y1, ms, scrolls]) => {
+    const el = document.elementFromPoint(x0!, y0!)!;
+    const send = (type: string, x: number, y: number) => {
+      const t = { clientX: x, clientY: y, target: el, identifier: 1 };
+      const e = new Event(type, { bubbles: true, cancelable: true });
+      Object.assign(e, { touches: type === "touchend" ? [] : [t], changedTouches: [t] });
+      el.dispatchEvent(e);
+      taken ||= type === "touchmove" && e.defaultPrevented;
+    };
+    // A drag the page did not take for itself ends in the click a browser sends on the lift, unless it scrolled a list (`scrolls`).
+    let taken = !!scrolls;
+    send("touchstart", x0!, y0!);
+    const steps = Math.max(4, Math.round(ms! / 16));
+    for (let i = 1; i <= steps; i++) {
+      await new Promise((r) => setTimeout(r, ms! / steps));
+      send("touchmove", x0! + ((x1! - x0!) * i) / steps, y0! + ((y1! - y0!) * i) / steps);
+    }
+    send("touchend", x1!, y1!);
+    if (!taken) document.elementFromPoint(x1!, y1!)?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX: x1!, clientY: y1! }));
+  }, [...from, ...to, ms, scrolls ? 1 : 0]);
+}
+
+journey("phone: Sections opens low with the text above it, pulls up to the top of the screen when the outline is long, and a pull down brings it back, then closes (D316)", async (page) => {
+  const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
+  const body = Array.from({ length: 30 }, (_, i) => `## Part ${i + 1} of the long book\n\nRetrieval practice is the act of pulling information out of memory. `.repeat(1) + "It works.\n").join("\n");
+  await phoneWith(page, async () => (await createItem({ root: PHONE_LIB }, { type: "article", title: "A book of thirty parts", body })).dir, async () => {
+    await phoneSource(page, "A book of thirty parts");
+    await tap(page, page.locator(".read-pill"));
+    const sheet = page.locator(".sections-sheet");
+    await sheet.waitFor();
+    await Bun.sleep(300);
+    const box = async () => (await sheet.boundingBox())!;
+    const low = await box();
+    // Low: at least half the screen's text still shows above it.
+    if (low.y < 844 * 0.45) throw new Error(`Sections opens ${Math.round(844 - low.y)}pt tall: the text above it is covered`);
+    // A pull up on the list: the sheet grows to the top of the screen, and all thirty parts can be reached.
+    const mid = low.y + low.height / 2;
+    await swipe(page, [195, mid], [195, mid - 200]);
+    await until("the sheet is pulled up under the status bar", async () => { const b = await box(); return b.y < 120 && b.y >= 40; });
+    await Bun.sleep(300);
+    if (Math.abs((await box()).y + (await box()).height - 844) > 1) throw new Error("the pulled-up sheet left the foot of the screen");
+    await sheet.locator(".pick-list").evaluate((l) => l.scrollTo(0, l.scrollHeight));
+    const last = (await sheet.locator(".pick-row").last().boundingBox())!;
+    if (last.y + last.height > 844) throw new Error("the last section is below the screen");
+    // Scrolled down, a pull down scrolls the list back first: the sheet stays.
+    await sheet.locator(".pick-list").evaluate((l) => l.scrollTo(0, 200));
+    await swipe(page, [195, 400], [195, 520], 200, true);
+    if ((await box()).y > 120) throw new Error("a pull on a scrolled list moved the sheet");
+    // At its top, a short pull down brings it back to where it opened; another, long, closes it.
+    await sheet.locator(".pick-list").evaluate((l) => l.scrollTo(0, 0));
+    await swipe(page, [195, 300], [195, 380], 400);
+    await until("the sheet is back at its low height", async () => Math.abs((await box()).y - low.y) < 2);
+    await swipe(page, [195, low.y + 40], [195, low.y + 300]);
+    await sheet.waitFor({ state: "detached" });
+    // A short outline has nothing to pull up to: the sheet keeps its height.
+    await tap(page, page.getByRole("button", { name: "Back" }));
+  });
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".read-pill"));
+  const sheet = page.locator(".sections-sheet");
+  await sheet.waitFor();
+  await Bun.sleep(300);
+  const was = (await sheet.boundingBox())!;
+  await swipe(page, [195, was.y + was.height / 2], [195, was.y + was.height / 2 - 200]);
+  await Bun.sleep(300);
+  if (Math.abs((await sheet.boundingBox())!.y - was.y) > 1) throw new Error("a short outline's sheet grew with nothing more to show");
+}, "phone");
+
+journey("phone: a toast is swiped away, down or to a side; and a small drag leaves it where it was (D317)", async (page) => {
+  await phoneSource(page, TESTING);
+  const toast = page.locator(".toast").filter({ hasText: "Undo" });
+  const raise = async () => {
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: "Skills" }));
+    await tap(page, page.locator(".action-sheet button[aria-checked]").first());
+    await toast.waitFor();
+    if (await page.locator(".action-sheet").count()) await page.touchscreen.tap(195, 40);
+    await page.locator(".action-sheet").waitFor({ state: "detached" });
+    const b = (await toast.boundingBox())!;
+    return [b.x + 30, b.y + b.height / 2] as [number, number];
+  };
+  // A small drag is no swipe: it comes back.
+  let at = await raise();
+  await swipe(page, at, [at[0] + 20, at[1]], 300);
+  await Bun.sleep(300);
+  if (!(await toast.count())) throw new Error("a 20pt drag closed the toast");
+  if (Math.abs((await toast.boundingBox())!.x + 30 - at[0]) > 1) throw new Error("the toast did not come back to its place");
+  // To the side.
+  await swipe(page, at, [at[0] + 120, at[1]]);
+  await toast.waitFor({ state: "detached", timeout: 1500 });
+  // Down.
+  at = await raise();
+  await swipe(page, at, [at[0], at[1] + 70]);
+  await toast.waitFor({ state: "detached", timeout: 1500 });
+}, "phone");
+
+journey("original: a click on a passage of the text lights where it sits on the PDF's page, and words the page lacks light nothing (D315)", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "textbook.pdf"), "--no-enrich")) as { id: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+    await page.reload();
+    await openSource(page, "Chapter 1: Learning");
+    const show = page.getByRole("button", { name: "Show side panel" });
+    if (await show.count()) await show.click();
+    await page.getByRole("tab", { name: "Original" }).click();
+    const sheet = page.locator(".original canvas");
+    const lit = page.locator(".original-lit");
+    await until("page 1 of the original is drawn", async () => (await sheet.getAttribute("data-page")) === "1", 15000);
+    if (await lit.count()) throw new Error("something is lit before he clicked");
+    // A paragraph on page 3, clicked while page 1 shows: the tab turns to its page and marks it there.
+    const para = page.locator(".doc p", { hasText: "Practice spread over days" }).first();
+    await para.scrollIntoViewIfNeeded();
+    await para.click({ position: { x: 20, y: 8 } });
+    await until("the passage is lit on page 3", async () => (await sheet.getAttribute("data-page")) === "3" && (await lit.count()) > 0, 15000);
+    // The marks sit on the page, over ink: inside the sheet, each a line high, not a box over the whole page.
+    const [paper, bars] = [await sheet.boundingBox(), await lit.evaluateAll((els) => els.map((el) => el.getBoundingClientRect().toJSON() as { x: number; y: number; width: number; height: number }))];
+    for (const b of bars) {
+      if (b.x < paper!.x - 1 || b.y < paper!.y - 1 || b.x + b.width > paper!.x + paper!.width + 1 || b.y + b.height > paper!.y + paper!.height + 1) throw new Error("a mark falls off the page");
+      if (b.height > paper!.height / 12 || b.width < 4) throw new Error(`a mark ${Math.round(b.width)}×${Math.round(b.height)} is no line of words`);
+    }
+    // A click is no highlight: nothing was saved, and no popup opened.
+    if (await page.locator(".popup").count()) throw new Error("the click opened the highlight popup");
+    // He turns the page by hand: the mark belongs to page 3 and does not follow.
+    await page.getByRole("button", { name: "Next page" }).click();
+    await until("page 4 shows no mark", async () => (await sheet.getAttribute("data-page")) === "4" && (await lit.count()) === 0, 15000);
+    // Words the page's own text does not hold (the page can't tell where he is): nothing is lit, never a wrong place.
+    await page.evaluate(() => {
+      const p = document.querySelector(".doc p")!;
+      p.textContent = "Zebra quartz vexes the jumping wizard nobody printed here.";
+    });
+    await page.locator(".doc p").first().click({ position: { x: 20, y: 8 } });
+    await until("page 1 shows, with no mark", async () => (await sheet.getAttribute("data-page")) === "1", 15000);
+    await page.waitForTimeout(400);
+    if (await lit.count()) throw new Error("words the page lacks lit something");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.evaluate(([tab, open]) => {
+      tab ? localStorage.setItem("ore.sidetab", tab) : localStorage.removeItem("ore.sidetab");
+      open ? localStorage.setItem("ore.mynotes", open) : localStorage.removeItem("ore.mynotes");
+    }, before);
+    await page.reload();
+  }
 });
 
 journey("original: a Korean PDF's page is drawn with its words, not blank (F379)", async (page) => {
