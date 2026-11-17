@@ -13,7 +13,7 @@ test("the Shortcuts row for ⌘C carries both names its menus use, so a search f
 
 test("Add's field and the empty lists say the same words", () => {
   const words = "Paste a link, a file or any text";
-  expect(src("Add.tsx").includes(`placeholder="${words}…"`)).toBe(true);
+  expect(src("Add.tsx").includes(`"${words}…"`)).toBe(true); // the follow box (Feed's Follow) has its own
   expect(src("App.tsx").includes(words)).toBe(true);
   expect(src("Home.tsx").includes(words)).toBe(true);
 });

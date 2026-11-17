@@ -7,6 +7,9 @@ import { Hint } from "./Hint";
 import { PHONE } from "./ore";
 import { CaretLeft, CaretRight } from "./icons";
 import { Working } from "./Working";
+// The CMaps a CJK font names instead of carrying, the ones import reads the text with (F284): without them the
+// page of a Korean, Japanese or Chinese PDF draws blank (F379).
+import { CarriedData } from "../../../packages/core/src/ingest/pdf-data";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -35,7 +38,7 @@ export default function OriginalPage({ file, page }: { file: string; page: numbe
     // The bytes are fetched here: pdf.js only fetches http(s) itself, and the app's files come over `asset:`.
     fetch(convertFileSrc(file))
       .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
-      .then((data) => (task = getDocument({ data })).promise)
+      .then((data) => (task = getDocument({ data, BinaryDataFactory: CarriedData, useWorkerFetch: false, useSystemFonts: true })).promise)
       .then((d) => !gone && setPdf(d))
       .catch(() => !gone && setError(true));
     return () => {

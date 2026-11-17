@@ -599,6 +599,9 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 /* Add a source (⌘N): paste anything; files dropped on the window */
 .add-input { display: block; min-height: 50px; max-height: 40vh; padding: 14px 16px; line-height: 1.45; }
 .add-box .panel-foot .right { flex: none; align-items: center; }
+/* A refused source says why on a line of its own, at the box's width, over the buttons (F387). */
+.add-box .panel-foot:has(.err) { flex-wrap: wrap; row-gap: 8px; }
+.add-box .panel-foot .err { flex: 0 0 100%; }
 /* The link he just copied, offered as the box's first row (Chrome's "Link you copied"); ↵ adds it. */
 .add-copied { display: flex; align-items: center; gap: 10px; margin: 6px 6px 0; width: calc(100% - 12px); padding: 7px 10px; border-radius: 8px; background: var(--bg-hover); color: var(--muted); text-align: left; min-width: 0; }
 .add-copied:hover { background: var(--bg-active); }
@@ -701,7 +704,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .doc-head .by + .when::before, .doc-head .by + span .when::before, .doc-head .by-add + .when::before, .doc-head .by-add + span .when::before { content: "·"; margin-right: 6px; }
 
 .preq { margin: 0 0 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); max-width: var(--measure); }
-.preq-head { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 28px; margin-left: -4px; padding: 0 4px; color: var(--muted); font-weight: 500; text-align: left; }
+.preq-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; width: 100%; min-height: 28px; margin-left: -4px; padding: 0 4px; color: var(--muted); font-weight: 500; text-align: left; }
 .preq-head:hover { color: var(--text); }
 .preq-head .caret { color: var(--faint); flex: none; transition: transform var(--t-1) ease-out; }
 .preq-head .caret.open { transform: rotate(90deg); }
@@ -2045,6 +2048,10 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .home-today { padding: 20px 22px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); --skill: var(--c-green);; box-shadow: var(--lift); }
 .home-goal { display: flex; align-items: center; gap: 20px; }
 .home-goal-text { flex: 1; min-width: 0; }
+/* A narrow window (F383): the goal's words keep 210px and Start review drops under them, instead of the plan line being cut to "Plan when you r…". */
+:root:not(.phone) .home-goal { flex-wrap: wrap; row-gap: 14px; }
+:root:not(.phone) .home-goal-text { min-width: min(100%, 210px); }
+.home-goal .goal-of { white-space: nowrap; }
 .home-plan { display: block; max-width: 100%; margin: -6px 0 10px; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 13px; text-align: left; border-radius: 4px; }
 button.home-plan:hover { color: var(--text); }
 .home-plan.empty { color: var(--faint); }
@@ -2270,6 +2277,13 @@ button.home-plan:hover { color: var(--text); }
   .review-passage { position: absolute; top: 32px; left: calc(100% + 32px); width: 300px; margin: 0; animation: card-in var(--t-3) ease-out both; }
 }
 .review-rate { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 22px; }
+/* The rating stays in view under a long answer (D314): it sticks 10px above the keys
+   while the answer scrolls behind it, as a dialog's footer does. In a window too narrow for the card to clear
+   the radio (D254), the card starts to the radio's right, so the radio never sits on Again. */
+:root:not(.phone) .review-rate { position: sticky; bottom: -22px; z-index: 1; }
+:root:not(.phone) .quick .review-rate { bottom: -10px; }
+:root:not(.phone) .review-rate::before { content: ""; position: absolute; inset: -14px 0 -10px; z-index: -1; background: linear-gradient(to bottom, transparent, var(--bg) 12px); pointer-events: none; }
+:where(:root:not(.phone)) .review-body:not(.quick *) { padding-left: clamp(24px, calc(816px - 100vw), 76px); }
 .review-rate button {
   height: 44px; border-radius: 12px; font: 700 14px var(--round); color: var(--text); background: var(--bg-raised);
   border: 1px solid var(--border); box-shadow: 0 3px 0 var(--border); transition: background-color var(--t-2);
@@ -2809,6 +2823,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-shell.dragging :is(.phone-root, .phone-scrim, .phone-drawer) { transition: none; }
 .phone-drawer button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 8px; background: none; border: 0; border-radius: 6px; color: var(--text); font: 400 16px var(--font); text-align: left; }
 .phone-drawer button.on, .phone-drawer button:active { background: var(--bg-hover); }
+/* A skill with no icon keeps the icon's 20px, so every name starts on one line, as in the Mac's sidebar (F386). */
+.phone-drawer .skill-icon.dot { margin: 0 6px; }
 .phone-drawer h2 { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--muted); margin: 20px 8px 4px; }
 .phone-icon { justify-content: center; width: 44px; height: 44px; padding: 0; }
 .phone-root > .phone-bar { justify-content: space-between; }

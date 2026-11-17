@@ -14923,6 +14923,197 @@ journey("the mole and the ambience radio never cover the last of a screen: every
 });
 
 let failed = 0;
+// shadcn round 7 (Tyler, 2026-11-16: "1,2,3,5,6,7,8").
+/** A Markdown file to add as a source, written beside the run's library. */
+async function textFile(name: string, text: string) {
+  const path = join(tmpdir(), `ore-e2e-${process.pid}-${name}`);
+  await Bun.write(path, text);
+  return path;
+}
+
+journey("review: under a long answer in a short window the four ratings stay in view, clear of the radio (D314)", async (page) => {
+  const size = page.viewportSize()!;
+  await page.setViewportSize({ width: 720, height: 480 });
+  try {
+    await startReview(page, null);
+    await reveal(page);
+    // A long answer, as an Explain exercise's can be: the mock's are a line each.
+    await page.locator(".review-answer").evaluate((a) => {
+      const p = document.createElement("p");
+      p.textContent = "Rereading builds fluency, and fluency is easy to mistake for knowing. ".repeat(24);
+      a.append(p);
+    });
+    const body = page.locator(".review-body");
+    if (!(await body.evaluate((b) => b.scrollHeight > b.clientHeight + 100))) throw new Error("the answer is not long enough to scroll");
+    const seen = () => page.evaluate(() => {
+      const keys = document.querySelector(".review-keys")!.getBoundingClientRect();
+      const orb = document.querySelector(".radio-orb")!.getBoundingClientRect();
+      return [...document.querySelectorAll(".review-rate button")].map((b) => {
+        const r = b.getBoundingClientRect();
+        const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        return { name: b.textContent, shown: r.top >= 0 && r.bottom <= keys.top && b.contains(top), underOrb: r.left < orb.right && r.bottom > orb.top };
+      });
+    });
+    for (const at of ["top", "end"] as const) {
+      await body.evaluate((b, at) => (b.scrollTop = at === "top" ? 0 : b.scrollHeight), at);
+      const bad = (await seen()).filter((b) => !b.shown || b.underOrb);
+      if (bad.length) throw new Error(`scrolled to the ${at}, a rating is out of view or under the radio: ${JSON.stringify(bad)}`);
+    }
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  } finally {
+    await page.setViewportSize(size);
+  }
+});
+
+journey("add: a refused link says why on a line of its own, as wide as the box (F387)", async (page) => {
+  const gone = Bun.serve({ port: 0, fetch: () => new Response("gone", { status: 404 }) });
+  try {
+    await page.getByRole("button", { name: "+ Add" }).click();
+    const box = page.getByRole("dialog", { name: "Add a source" });
+    await box.getByLabel("Link, file path or text").fill(`http://localhost:${gone.port}/a/long/path/to/an-article-about-spacing-and-memory?utm_source=newsletter`);
+    await page.keyboard.press("Enter");
+    const why = box.getByRole("alert");
+    await why.waitFor();
+    const [err, foot, add] = await Promise.all([why.boundingBox(), box.locator(".panel-foot").boundingBox(), box.getByRole("button", { name: /^↵\s*Add$/ }).boundingBox()]);
+    if (err!.width < foot!.width * 0.85) throw new Error(`the reason is ${Math.round(err!.width)}px wide in a ${Math.round(foot!.width)}px box`);
+    if (add!.y < err!.y + err!.height) throw new Error("the buttons sit beside the reason, not under it");
+    await page.keyboard.press("Escape");
+    await box.waitFor({ state: "detached" });
+  } finally {
+    gone.stop(true);
+  }
+});
+
+journey("All sources: the list is one Tab stop, and ⌃↵ opens the row's actions, Skills among them (F381)", async (page) => {
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  const list = page.locator(".list");
+  await list.locator(".row").first().waitFor();
+  await list.focus();
+  await page.keyboard.press("Tab");
+  const inRow = await page.evaluate(() => document.activeElement?.closest(".list .row")?.textContent?.slice(0, 40) ?? null);
+  if (inRow !== null) throw new Error(`Tab from the list stopped inside a row: ${inRow}`);
+  await list.focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Control+Enter");
+  const menu = page.getByRole("menu");
+  await menu.waitFor();
+  await menu.getByRole("menuitem", { name: "Skills" }).waitFor();
+  await page.keyboard.press("Escape");
+  await menu.waitFor({ state: "detached" });
+  await until("focus is back on the list, so the arrows go on", () => page.evaluate(() => document.activeElement?.classList.contains("list") ?? false));
+});
+
+journey("All sources: a source with no author and no skill has no empty line between its title and its kind (F384)", async (page) => {
+  const made = (await ore("add", await textFile("bare-row.md", "# A bare row\n\nNo author, no skill."), "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: /^All sources/ }).click();
+    const row = page.locator(".list .row").filter({ hasText: "A bare row" }).first();
+    await row.waitFor();
+    const gap = await row.evaluate((r) => r.querySelector(".kind-line")!.getBoundingClientRect().top - r.querySelector(".title")!.getBoundingClientRect().bottom);
+    if (gap > 8) throw new Error(`${Math.round(gap)}px of nothing between the title and the kind`);
+    // The + that files it is still there on hover, now on the kind's line.
+    await row.hover();
+    await row.getByRole("button", { name: "Skills for A bare row" }).click();
+    await page.getByRole("dialog", { name: "Skills" }).waitFor();
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.reload();
+  }
+});
+
+journey("Feed: Follow opens a box that takes a link only, and never saves what is typed as a source (F385)", async (page) => {
+  // The empty Feed is where Follow sits: this journey unfollows what an earlier one left.
+  for (const f of ((await ore("feed")) as { feeds: { url: string }[] }).feeds) await ore("feed", "unfollow", f.url);
+  await page.reload();
+  await page.getByRole("button", { name: "Feed", exact: true }).click();
+  await page.locator(".empty-state").getByRole("button", { name: "Follow" }).click();
+  const box = page.getByRole("dialog", { name: "Follow a feed" });
+  const field = box.getByLabel("Link", { exact: true });
+  // ⌘O picks no file into a box that takes a link.
+  await page.keyboard.press("Meta+o");
+  if (!/blog, newsletter or YouTube channel/.test((await field.getAttribute("placeholder")) ?? "")) throw new Error("the follow box asks for a source, not a feed's link");
+  if (await box.getByRole("button", { name: "Browser tab" }).count()) throw new Error("the follow box offers Browser tab, which adds a source");
+  await field.fill("not a link at all");
+  await page.keyboard.press("Enter");
+  await box.getByRole("alert").filter({ hasText: "Following takes one link" }).waitFor();
+  const saved = ((await ore("ls")) as { title: string }[]).some((i) => /not a link at all/i.test(i.title));
+  if (saved) throw new Error("the typed words were saved as a source");
+  await page.keyboard.press("Escape");
+  await box.waitFor({ state: "detached" });
+  // The ordinary add box is itself again.
+  await page.getByRole("button", { name: "+ Add" }).click();
+  if (!/any text/.test((await page.getByRole("dialog", { name: "Add a source" }).getByLabel("Link, file path or text").getAttribute("placeholder")) ?? "")) throw new Error("+ Add opened the follow box");
+  await page.keyboard.press("Escape");
+});
+
+journey("original: a Korean PDF's page is drawn with its words, not blank (F379)", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "korean.pdf"), "--no-enrich")) as { id: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+    await page.reload();
+    await openSource(page, "기억을 오래 남기는 방법");
+    const show = page.getByRole("button", { name: "Show side panel" });
+    if (await show.count()) await show.click();
+    await page.getByRole("tab", { name: "Original" }).click();
+    const sheet = page.locator(".original canvas");
+    // A page of text has pixels that aren't white (small type draws grey); one whose font found no CMap is white all over.
+    await until("the page has ink", () => sheet.evaluate((c: HTMLCanvasElement) => {
+      if (!c.width) return false;
+      const d = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+      let inked = 0;
+      for (let i = 0; i < d.length; i += 4) if (d[i + 3]! > 0 && d[i]! + d[i + 1]! + d[i + 2]! < 600) inked++;
+      return inked > 300;
+    }), 15000);
+  } finally {
+    await page.evaluate(([tab, notes]) => {
+      for (const [k, v] of [["ore.sidetab", tab], ["ore.mynotes", notes]] as const) v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v);
+    }, before);
+    await ore("archive", made.id).catch(() => {});
+    await page.reload();
+  }
+});
+
+journey("narrow window: Home's plan line is whole with Start review under it, and a source's prequestion head keeps its words together (F383, F382)", async (page) => {
+  const made = (await ore("add", await textFile("narrow-head.md", "# Narrow head\n\nA source added with no enrich has no prequestions yet."), "--no-enrich")) as { id: string };
+  const size = page.viewportSize()!;
+  await page.setViewportSize({ width: 720, height: 480 });
+  try {
+    await page.reload();
+    await page.getByRole("button", { name: "Home", exact: true }).click();
+    const plan = page.locator(".home-plan").first();
+    await plan.waitFor();
+    if (await plan.evaluate((p) => p.scrollWidth > p.clientWidth + 1)) throw new Error(`Home's plan line is cut off: "${await plan.innerText()}"`);
+    await openSource(page, "Narrow head");
+    const head = page.locator(".preq-head");
+    await head.waitFor();
+    // Its label is one line: before, each word of it had a line of its own.
+    const lines = await head.evaluate((h) => {
+      const r = document.createRange();
+      r.selectNodeContents([...h.childNodes].find((n) => n.nodeType === 3)!);
+      return new Set([...r.getClientRects()].map((b) => Math.round(b.top))).size;
+    });
+    if (lines > 1) throw new Error(`"What do you already know?" is on ${lines} lines`);
+  } finally {
+    await page.setViewportSize(size);
+    await ore("archive", made.id).catch(() => {});
+    await page.reload();
+  }
+});
+
+journey("iPhone menu: every skill's name starts on one line, with an icon or without one (F386)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  const rows = page.locator(".phone-drawer section button");
+  await rows.first().waitFor();
+  const at = await rows.evaluateAll((all) => all.map((b) => ({ name: b.textContent, x: Math.round(b.querySelector(".phone-title")!.getBoundingClientRect().left), dot: !!b.querySelector(".skill-icon.dot") })));
+  if (!at.some((r) => r.dot) || !at.some((r) => !r.dot)) throw new Error(`the menu needs a skill with an icon and one without: ${JSON.stringify(at)}`);
+  const off = at.filter((r) => r.x !== at[0]!.x);
+  if (off.length) throw new Error(`names start at ${at[0]!.x}px, but: ${JSON.stringify(off)}`);
+  await tap(page, page.locator(".phone-scrim"));
+}, "phone");
+
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
 for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {

@@ -3,7 +3,7 @@ import * as pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
-import { CMAPS } from "./pdf-cmaps.ts";
+import { CarriedData } from "./pdf-data.ts";
 import { cleanTitle, fileAuthor, lineBreakSpace } from "./check.ts";
 import type { Box, Region } from "./docling.ts";
 import { pageFigures, png } from "./pdf-figures.ts";
@@ -424,20 +424,6 @@ async function pdfMeta(doc: PdfDocument): Promise<{ title?: string; author?: str
   const xmp = meta?.metadata?.get("dc:creator") as string | string[] | undefined;
   const author = info.Author?.trim() || [xmp ?? []].flat().map((a) => String(a).trim()).filter(Boolean).join(", ");
   return { title: info.Title?.trim() || undefined, author: fileAuthor(author) };
-}
-
-/** What pdf.js asks for beyond the file: the CMaps a CJK font names instead of carrying (Codex sweep 4:
- *  a Korean PDF read as only its punctuation without them), from the ones carried in `ore`. */
-class CarriedData {
-  constructor(_: unknown) {}
-  async fetch({ kind, filename }: { kind: string; filename: string }): Promise<Uint8Array> {
-    const path = kind === "cMapUrl" ? CMAPS[filename.replace(/\.bcmap$/, "")] : undefined;
-    if (!path) throw new Error(`Unable to load ${kind} data: ${filename}`);
-    // In `ore` a carried file; on the iPhone (no Bun.file) one of the app's own files, or a small one inlined
-    // as a data URL, decoded here since the phone's CSP lets it fetch only its own files.
-    if (path.startsWith("data:")) return Uint8Array.from(atob(path.slice(path.indexOf(",") + 1)), (c) => c.charCodeAt(0));
-    return new Uint8Array(await (typeof Bun !== "undefined" && typeof Bun.file === "function" ? Bun.file(path) : await fetch(path)).arrayBuffer());
-  }
 }
 
 /** Opens a PDF quietly (pdf.js warns on stdout about any damage it works around), refusing one it

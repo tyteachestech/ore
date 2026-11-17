@@ -12,3 +12,9 @@ declare module "ore-commands" {
 declare module "@pkgjs/parseargs" {
   export function parseArgs(config: { args: string[]; options?: object; allowPositionals?: boolean; strict?: boolean }): { values: Record<string, unknown>; positionals: string[] };
 }
+
+// A pdf.js CMap (packages/core/src/ingest/pdf-cmaps.ts): Vite serves it as a file and hands back its URL.
+declare module "*.bcmap" {
+  const url: string;
+  export default url;
+}

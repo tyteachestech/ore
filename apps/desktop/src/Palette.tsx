@@ -451,11 +451,19 @@ export function titleScore(title: string, query: string): number {
   return score / terms.length + (t.startsWith(terms[0]!) ? 0.5 : 0) + exact;
 }
 
-/** One line of a search snippet: FTS5 brackets the matched words; a bracket around anything
- *  else is the source's own Markdown and stays as written. */
+/** One line of a search snippet: FTS5 brackets the matched words; a bracket around anything else is the
+ *  source's own (a link, an image) and stays. The marks Markdown adds around the words are taken out. */
 export function snippet(text: string, query: string): ReactNode {
   const terms = query.toLowerCase().match(/[\p{L}\p{N}_]+/gu) ?? [];
-  const line = text.replace(/\s+/g, " ").replace(/^[#>*\-\s]+/, "");
+  // What the source's Markdown adds around the words is not why it matched (F380): page markers
+  // and other comments (whole, or a page marker cut by the snippet's edge; an arrow in his own words stays), heading and quote marks, code fences, bold and
+  // code ticks. A link's or image's brackets stay, as before.
+  const line = text
+    .replace(/<!--.*?-->|^[\w ]{0,12}-->|<!--[^>]*$/gs, " ")
+    .replace(/```[\w-]*|`|\*\*/g, "")
+    .replace(/^[ \t]*(?:#{1,6}|>)[ \t]+/gm, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[#>*\-\s]+/, "");
   const parts = line.split(/\[([^[\]]+)\]/);
   return parts.map((p, i) =>
     i % 2 === 0 ? p : terms.some((t) => p.toLowerCase().startsWith(t)) ? <mark key={i}>{p}</mark> : `[${p}]`,
