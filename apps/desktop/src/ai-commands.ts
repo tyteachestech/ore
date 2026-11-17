@@ -5,11 +5,12 @@ const ANSWERS = new Set(["tutor", "ask", "ask-library", "grade", "key-points", "
 /** Commands that call it and write what it made (enrich, remix and the daily catch-up, run in the background). */
 const WRITES = new Set(["enrich", "remix", "catch-up"]);
 
-/** Whether a run answers with what the AI said. Not `check --covered` (his own marks, stored) or a `recall`
- *  without `--feedback` (what he wrote, stored): those call no AI. */
+/** Whether a run answers with what the AI said. Not `check --covered` (his own marks, stored), a `recall`
+ *  without `--feedback` (what he wrote, stored) or a `tried` without `--line`: those call no AI. */
 export function answersWithAi(args: string[]): boolean {
   const [name] = args;
   if (name === "recall") return args.includes("--feedback");
+  if (name === "tried") return args.includes("--line");
   if (name === "check") return !args.some((a) => a === "--covered" || a.startsWith("--covered="));
   return ANSWERS.has(name!);
 }

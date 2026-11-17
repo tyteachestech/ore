@@ -19,6 +19,7 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { afterAnswer, cardQuotes, lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
+import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
 import { endMood, endSays, endTiles, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
@@ -92,7 +93,7 @@ const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id,
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
+function Session({ pick, source, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
   /** Review this source: only its exercises, its new ones included. */
@@ -1894,3 +1895,90 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   );
 }
 
+
+const CHECKED_IN = "ore.try-checkin";
+const dayOf = (ts: string | number | Date) => new Date(ts).toLocaleDateString("sv");
+const asked = () => {
+  try {
+    return localStorage.getItem(CHECKED_IN) === dayOf(Date.now());
+  } catch {
+    return false;
+  }
+};
+
+/** The try to ask about as a session starts (D-new-try-rest): of the ones he is trying now in the skills under review,
+ *  the one he has left alone longest, and only one he last touched before today. Once a day, never in the quick
+ *  quiz or a review of one source. */
+function useCheckIn(pick: string[] | null, source: string | undefined, quick: boolean): [Try | null | undefined, () => void] {
+  const [t, setT] = useState<Try | null | undefined>(() => (quick || source || asked() ? null : undefined));
+  useEffect(() => {
+    if (t !== undefined) return;
+    let live = true;
+    const all = pick ? Promise.all(pick.map((s) => ore<Try[]>("tries", opt("skill", s)))).then((l) => l.flat().filter((x) => x.active)) : ore<Try[]>("tries", "--now");
+    all.then(
+      (ts) => {
+        if (!live) return;
+        const today = dayOf(Date.now());
+        const one = ts.filter((x) => dayOf(x.ts) < today).sort((a, b) => a.ts.localeCompare(b.ts))[0] ?? null;
+        if (one) {
+          try {
+            localStorage.setItem(CHECKED_IN, today);
+          } catch {
+            // Asked again next session: no harm.
+          }
+        }
+        setT(one);
+      },
+      () => live && setT(null), // The session says what is wrong with the library, not this.
+    );
+    return () => {
+      live = false;
+    };
+  }, [t, pick]);
+  return [t, () => setT(null)];
+}
+
+/** Review, with one question first on the days it applies: did he use the thing he is trying? It is asked where he
+ *  reliably is, takes how it went, and one key ("Not yet", Esc) goes past it. */
+export function Review(props: Parameters<typeof Session>[0]) {
+  const [t, pass] = useCheckIn(props.pick, props.source, !!props.quick);
+  if (t === undefined) return <div className="review" aria-label="Review" />;
+  if (!t) return <Session {...props} />;
+  const save = async (text: string, mine: boolean) => {
+    const use = useOf(t, text, mine);
+    try {
+      await use.run();
+    } catch (e) {
+      props.notify(errorText(e), "error");
+      return false;
+    }
+    props.notify(use.msg, "quiet", use.undo, use.run);
+    if (text) askMole(t.id);
+    return true;
+  };
+  return (
+    <Trap>
+    <div className="review" role="dialog" aria-modal="true" aria-label="Did you try it?" data-gives-back="">
+      <div className="review-head" data-tauri-drag-region>
+        <span className="review-head-gap" />
+        <Hint text="Leave review">
+          <button className="quiz-close" aria-label="Leave review" onClick={() => props.onClose()}>
+            <X size={16} weight="bold" aria-hidden="true" />
+          </button>
+        </Hint>
+      </div>
+      <div className="review-body">
+        <div className="checkin" data-try={t.id}>
+          <p className="checkin-ask">Did you try it?</p>
+          <h1 className="checkin-plan">
+            <Stone uses={usesOf(t)} size={18} />
+            <span>{tryLabel(t)}</span>
+          </h1>
+          {t.when && <p className="checkin-when">when {t.when}</p>}
+          <Did t={t} skip="Not yet" onSave={save} onClose={pass} />
+        </div>
+      </div>
+    </div>
+    </Trap>
+  );
+}

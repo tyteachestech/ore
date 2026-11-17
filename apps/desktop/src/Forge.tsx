@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { CaretRight, Plus, Target } from "./icons";
 import { Grow } from "./Grow";
 import { Hint } from "./Hint";
 import { SkillIcon } from "./IconPicker";
 import { keepKeysIn } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
-import { ore, opt, type Skill, type Try } from "./ore";
+import { Mole } from "./Mole";
+import { ore, opt, PHONE, type CardFull, type Skill, type Try } from "./ore";
 import { passageText } from "./text";
 import { errorText, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 
@@ -78,6 +79,45 @@ function Path({ t, fresh }: { t: Try; fresh: boolean }) {
   );
 }
 
+/** Tries the mole is writing a line for, so their page shows him thinking. */
+const thinking = new Set<string>();
+const watching = new Set<() => void>();
+let thinkingNow: readonly string[] = [];
+const think = (id: string, on: boolean) => {
+  if (on) thinking.add(id);
+  else thinking.delete(id);
+  thinkingNow = [...thinking];
+  for (const f of watching) f();
+};
+const useThinking = (id: string) =>
+  useSyncExternalStore(
+    (f) => (watching.add(f), () => void watching.delete(f)),
+    () => thinkingNow,
+  ).includes(id);
+
+/** The mole's one line on the use he just wrote up (D-new-try-rest), asked for in the background: it lands on the
+ *  try's page when it is ready. The Mac's AI writes it, so the phone asks for none; a line that fails is left out. */
+export function askMole(id: string, then?: () => void) {
+  if (PHONE || thinking.has(id)) return;
+  think(id, true);
+  void ore<{ line: { text: string } } | null>("tried", id, "--line")
+    .then((r) => r?.line && moleSaid.set(id, r.line.text))
+    .catch(() => {})
+    .finally(() => (think(id, false), then?.()));
+}
+/** What he just said back, by try, until the library's own copy is read (the last use's line). */
+const moleSaid = new Map<string, string>();
+
+/** Writes a use of a try: how it went, and whether it is his now or stays in the works. With its way back. */
+export const useOf = (t: Pick<Try, "id">, text: string, mine: boolean) => ({
+  msg: `${mine ? "Yours now" : "Used"}${text ? " · an exercise comes from how it went" : ""}`,
+  run: () => ore("tried", t.id, ...(text ? [opt("text", text)] : []), ...(mine ? [] : ["--again"])),
+  undo: async () => {
+    await ore("tried", t.id, "--undo");
+    if (!mine) await ore("tried", t.id, "--undo");
+  },
+});
+
 const flags = (p: { plan?: string; when?: string; obstacle?: string }) => [...(p.plan !== undefined ? [opt("plan", p.plan)] : []), ...(p.when !== undefined ? [opt("when", p.when)] : []), ...(p.obstacle !== undefined ? [opt("if", p.obstacle)] : [])];
 
 /** A skill's tries, read again when the library changes, and every change to one: written, read back, and on
@@ -113,13 +153,12 @@ export function useTries(skill: string, notify: Notify) {
     ts,
     pick: (t: Try) => step("Trying this now", () => ore("try", t.id, "--pick"), () => (active && active.id !== t.id ? ore("try", active.id, "--pick") : Promise.resolve())),
     /** He used it: how it went, and whether it is his now or stays in the works. */
-    did: (t: Try, text: string, mine: boolean) =>
-      mine
-        ? step(`Yours now${text ? " · an exercise comes from how it went" : ""}`, () => ore("tried", t.id, ...(text ? [opt("text", text)] : [])), () => ore("tried", t.id, "--undo"), "info")
-        : step(`Used${text ? " · an exercise comes from how it went" : ""}`, () => ore("tried", t.id, ...(text ? [opt("text", text)] : []), "--again"), async () => {
-            await ore("tried", t.id, "--undo");
-            await ore("tried", t.id, "--undo");
-          }),
+    did: async (t: Try, text: string, mine: boolean) => {
+      const use = useOf(t, text, mine);
+      const ok = await step(use.msg, use.run, use.undo, mine ? "info" : "quiet");
+      if (ok && text) askMole(t.id, () => void reload().catch(() => {}));
+      return ok;
+    },
     plan: (t: Try, p: { plan?: string; when?: string; obstacle?: string }) =>
       step("Plan saved", () => ore("try", t.id, ...flags(p)), () => ore("try", t.id, ...flags({ ...(p.plan !== undefined ? { plan: t.note ?? "" } : {}), ...(p.when !== undefined ? { when: t.when ?? "" } : {}), ...(p.obstacle !== undefined ? { obstacle: t.obstacle ?? "" } : {}) }))),
     /** A tool goes back to being tried. */
@@ -145,7 +184,7 @@ const drafts = new Map<string, string>();
 
 /** "How did it go?" after a use (Linear's inline edit): Enter keeps it in the works, and from the third use
  *  "It's mine" makes it a tool. Esc closes and keeps the draft. */
-function Did({ t, onSave, onClose }: { t: Try; onSave: (text: string, mine: boolean) => Promise<boolean>; onClose: () => void }) {
+export function Did({ t, onSave, onClose, skip }: { t: Try; onSave: (text: string, mine: boolean) => Promise<boolean>; onClose: () => void; /** The check-in: a way on without answering, with its words ("Not yet"); the use is saved with Save. */ skip?: string }) {
   const [v, setV] = useState(() => drafts.get(t.id) ?? "");
   const field = useRef<HTMLTextAreaElement>(null);
   const home = useRef<HTMLElement | null>(null);
@@ -179,11 +218,16 @@ function Did({ t, onSave, onClose }: { t: Try; onSave: (text: string, mine: bool
       />
       <div className="try-did-actions">
         <Hint text="Keep using it: it stays the one you’re trying">
-          <button className="settings-btn" onClick={() => save(false)}>Again</button>
+          <button className="settings-btn" onClick={() => save(false)}>{skip ? "Save" : "Again"}</button>
         </Hint>
         {canMine && (
           <Hint text="You can do this now: it becomes a tool beside your goal">
             <button className="settings-btn" onClick={() => save(true)}>It’s mine</button>
+          </Hint>
+        )}
+        {skip && (
+          <Hint text={<>{skip} <kbd>Esc</kbd></>}>
+            <button className="settings-btn" onClick={onClose}>{skip}</button>
           </Hint>
         )}
       </div>
@@ -415,7 +459,37 @@ export function TryPage({ skill, t, tries, onSub, onPassage }: { skill: Skill; t
     ...(t.point ? [] : [{ id: "passage", label: "Open passage", run: () => onPassage(t) }]),
     { id: "delete", label: "Remove", danger: true, divider: true, run: () => void tries.remove(t).then((ok) => ok && onSub("forge")) },
   ];
-  const rounds = [...(t.uses ?? []), ...(mine ? [{ ts: t.done_at ?? t.ts, plan: t.note, reflection: t.reflection }] : [])];
+  const rounds = [...(t.uses ?? []), ...(mine ? [{ ts: t.done_at ?? t.ts, plan: t.note, reflection: t.reflection, when: t.when, line: t.line }] : [])];
+  const moleThinks = useThinking(t.id);
+  const lineOf = (u: (typeof rounds)[number], i: number) => u.line?.text ?? (i === rounds.length - 1 && u.reflection && !moleThinks ? moleSaid.get(t.id) : undefined);
+  // He nods as a line lands while this page is open; the ones already there stand still.
+  const thought = useRef(false);
+  thought.current ||= moleThinks;
+  const moleSpoke = thought.current && !moleThinks;
+  // After a use he keeps going with, the keys land in When with its words selected: the next use somewhere new
+  // makes it stick wider (varied practice), and typing nothing keeps the cue as it was.
+  const main = useRef<HTMLDivElement>(null);
+  const used = useRef(rounds.length);
+  useEffect(() => {
+    const when = rounds.length > used.current && !mine && !PHONE ? main.current?.querySelector<HTMLTextAreaElement>(".plan-line textarea") : null;
+    when?.focus();
+    when?.select();
+    used.current = rounds.length;
+  }, [rounds.length, mine]);
+  // The exercise review brings back from how it went (D127.3), once it is drafted.
+  const [card, setCard] = useState<CardFull | null>(null);
+  const said = rounds.some((u) => u.reflection);
+  useEffect(() => {
+    let live = true;
+    if (!said) return void setCard(null);
+    ore<CardFull[]>("cards", opt("item", t.item)).then(
+      (cs) => live && setCard(cs.find((c) => c.state !== "retired" && (c.annotation === t.id || c.also?.includes(t.id))) ?? null),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [t.item, t.id, said, t.rev]);
   return (
     <div className="forge try-page" data-color={skill.color} data-try={t.id}>
       <div className="forge-head">
@@ -423,7 +497,7 @@ export function TryPage({ skill, t, tries, onSub, onPassage }: { skill: Skill; t
         <MoreButton label="Try actions" actions={actions} />
       </div>
       <div className="try-cols">
-        <div className="try-main">
+        <div className="try-main" ref={main}>
           <h1 className="try-title">{tryLabel(t)}</h1>
           <Path t={t} fresh={forged} />
           <div className="plan">
@@ -435,11 +509,35 @@ export function TryPage({ skill, t, tries, onSub, onPassage }: { skill: Skill; t
             <section className="forge-band" aria-label="Uses">
               <h2>Uses</h2>
               {rounds.map((u, i) => (
-                <p key={i} className="try-round">
-                  <span>{u.reflection || "Used it"}</span>
-                  <small>{day(u.ts)}</small>
-                </p>
+                <div key={i} className="try-use">
+                  <p className="try-round">
+                    <span>{u.reflection || "Used it"}</span>
+                    <small>{u.when ? `${u.when} · ` : ""}{day(u.ts)}</small>
+                  </p>
+                  {lineOf(u, i) ? (
+                    <p className="try-mole">
+                      <Mole bare size={24} mood={moleSpoke && i === rounds.length - 1 ? "nod" : "idle"} />
+                      <span>{lineOf(u, i)}</span>
+                    </p>
+                  ) : (
+                    moleThinks && i === rounds.length - 1 && (
+                      <p className="try-mole" role="status" aria-label="The mole is thinking">
+                        <Mole bare size={24} mood="thinking" />
+                      </p>
+                    )
+                  )}
+                </div>
               ))}
+            </section>
+          )}
+          {card && (
+            <section className="forge-band" aria-label="Exercise">
+              <h2>Exercise</h2>
+              <Hint text={card.state === "draft" ? "Drafted from how it went: review brings it in as new" : "From how it went: review brings it back"}>
+                <p className="try-round try-card" tabIndex={0}>
+                  <span>{card.question}</span>
+                </p>
+              </Hint>
             </section>
           )}
           {!mine &&

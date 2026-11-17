@@ -7696,7 +7696,7 @@ const ore = (...args: string[]) =>
   });
 
 /** Starts a review of the skills whose row in "What to review" matches `only` (null: every skill). */
-async function startReview(page: Page, only: RegExp | null, keys = false) {
+async function startReview(page: Page, only: RegExp | null, keys = false, first: "question" | "check-in" = "question") {
   const pick = page.getByRole("dialog", { name: "What to review" });
   // Home has the button; `keys` starts it with ⌘R from any other screen.
   if (keys) await page.keyboard.press("Meta+KeyR");
@@ -7708,6 +7708,7 @@ async function startReview(page: Page, only: RegExp | null, keys = false) {
     if ((await row.getAttribute("aria-checked") === "true") !== want) await row.click();
   }
   await page.keyboard.press("Enter");
+  if (first === "check-in") return void (await page.locator(".checkin").waitFor());
   // No question within the wait says what was on screen instead (F142: cause not found).
   await page.locator(".review-q").waitFor().catch(async (e) => {
     const seen = await page.evaluate(() => ({
@@ -8658,6 +8659,78 @@ journey("try it: 4 marks a technique, the Forge makes it the one he is trying, e
   await until("⌘Z puts it back in the works", async () => (await tool.count()) === 0 && (await now.count()) === 1);
   const mine = ((await ore("tries")) as { note?: string; status: string; uses?: unknown[]; reflection?: string }[]).find((t) => t.note === PLAN);
   if (!mine || mine.status !== "open" || mine.uses?.length !== 2 || mine.reflection) throw new Error(`the library kept it as his: ${JSON.stringify(mine)}`);
+});
+
+journey("forge: a use written up keeps its moment, the mole says one line under it, and the keys land in When for a new one (D-new-try-rest)", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: /^Focus & Attention$/ }).first().click();
+  await page.getByRole("button", { name: "Forge" }).click();
+  await page.getByRole("button", { name: "Add something to try" }).click();
+  await page.getByLabel("I’ll…").fill("Phone in the other room");
+  await page.getByLabel("When…").fill("I sit down to write");
+  await page.keyboard.press("Enter");
+  const row = page.locator(".forge-row").filter({ hasText: "Phone in the other room" });
+  await row.locator(".forge-open").click();
+  const id = (await page.locator(".try-page").getAttribute("data-try"))!;
+  try {
+    await page.getByRole("button", { name: "I did it" }).click();
+    await page.getByLabel("How did it go?").fill("Wrote for an hour without checking it.");
+    await page.keyboard.press("Enter");
+    const use = page.locator(".try-use").filter({ hasText: "Wrote for an hour without checking it." });
+    await use.locator("small").filter({ hasText: "I sit down to write" }).waitFor();
+    await use.locator(".try-mole").filter({ hasText: "Cut the rewind to two beats" }).waitFor();
+    // The next use somewhere new: When has the keys with its words selected, so typing replaces them...
+    await until("the keys are in When, its words selected", () => page.evaluate(() => { const f = document.activeElement as HTMLTextAreaElement | null; return !!f?.closest(".plan-line") && f.selectionStart === 0 && f.selectionEnd === f.value.length && f.value === "I sit down to write"; }));
+    await page.keyboard.type("I open my inbox");
+    await page.keyboard.press("Enter");
+    await until("the new cue is saved", async () => ((await ore("tries", "--skill", "focus-attention")) as { id: string; when?: string }[]).find((t) => t.id === id)?.when === "I open my inbox");
+    // ...and the use keeps the moment it happened in.
+    await use.locator("small").filter({ hasText: "I sit down to write" }).waitFor();
+  } finally {
+    await page.locator(".sidebar .side-item").first().click().catch(() => {}); // off the try's page before it goes
+    await ore("annotate", id, "--status", "deleted");
+  }
+});
+
+journey("review: a day after he last touched what he is trying, a session starts by asking if he did it; Not yet goes on, it asks once a day, and what he writes is a use (D-new-try-rest)", async (page) => {
+  // His own try, the one left alone longest: every other one in the works is touched now.
+  const mine = (await ore("try", "--skill", "habits", "--plan", "Shoes by the door", "--when", "I lock up at night")) as { id: string };
+  try {
+    await Bun.sleep(1100);
+    for (const t of (await ore("tries", "--now")) as { id: string }[]) if (t.id !== mine.id) await ore("try", t.id, "--pick");
+    await page.reload();
+    await page.locator(".side-item").first().waitFor();
+    await startReview(page, null);
+    if (await page.locator(".checkin").count()) throw new Error("asked on the day he made the try");
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+    await page.clock.install({ time: new Date(Date.now() + 26 * 3600e3) });
+    await page.reload();
+    await page.locator(".side-item").first().waitFor();
+    await startReview(page, null, false, "check-in");
+    const ask = page.locator(".checkin");
+    await ask.filter({ hasText: "Shoes by the door" }).waitFor();
+    await ask.getByText("when I lock up at night").waitFor();
+    await page.keyboard.press("Escape"); // Not yet
+    await ask.waitFor({ state: "detached" });
+    await page.locator(".review-q").waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+    // Asked once today.
+    await startReview(page, null);
+    if (await page.locator(".checkin").count()) throw new Error("asked a second time the same day");
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+    // A new day: he writes how it went, and it is a use of that try.
+    await page.evaluate(() => localStorage.removeItem("ore.try-checkin"));
+    await startReview(page, null, false, "check-in");
+    await page.getByLabel("How did it go?").fill("Ran before breakfast twice.");
+    await page.keyboard.press("Enter");
+    await ask.waitFor({ state: "detached" });
+    await until("the use is kept on the try", async () => ((await ore("tries", "--skill", "habits")) as { id: string; uses?: { reflection?: string; when?: string }[] }[]).find((t) => t.id === mine.id)?.uses?.[0]?.reflection === "Ran before breakfast twice.");
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("annotate", mine.id, "--status", "deleted");
+  }
 });
 
 journey("forge: a try typed with no passage waits, Try this now swaps it in, and Remove takes it out with Undo", async (page) => {
@@ -11653,6 +11726,22 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
   await tap(page, page.locator(".phone-skill .crumbs button").first());
   await page.locator(".phone-skill .try-now").waitFor();
   await check("the skill page with a try");
+}, "phone");
+
+journey("phone: the check-in before a session asks about what he is trying, its buttons are 44 pt taps, and Not yet goes on to the first exercise (D-new-try-rest)", async (page) => {
+  // The seed's library has something he is trying, last touched before today.
+  await page.clock.install({ time: new Date(Date.now() + 26 * 3600e3) });
+  await page.reload();
+  await page.locator(".phone-app").waitFor();
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const ask = page.locator(".checkin");
+  await ask.waitFor();
+  const small = await page.locator(".review").evaluate((root) => [...root.querySelectorAll<HTMLElement>("button")].map((b) => ({ r: b.getBoundingClientRect(), name: b.getAttribute("aria-label") ?? b.textContent })).filter(({ r }) => r.width < 44 || r.height < 44).map(({ r, name }) => `${name} ${Math.round(r.width)}×${Math.round(r.height)}`));
+  if (small.length) throw new Error(`taps under 44 pt at the check-in: ${small.join(", ")}`);
+  await tap(page, page.getByRole("button", { name: "Not yet" }));
+  await ask.waitFor({ state: "detached" });
+  await page.getByRole("radio", { name: "Think so" }).or(page.locator(".review-q")).first().waitFor();
 }, "phone");
 
 journey("phone: in Review the buttons he taps on every exercise sit at the foot of the screen, and what the last answer won stands above them (F137)", async (page) => {
