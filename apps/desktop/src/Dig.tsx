@@ -21,6 +21,8 @@ const waiting = new Set<() => void>();
 export function askDig(skill: string | null) {
   asked = skill;
   for (const f of waiting) f();
+  // Not taken up at once (the skill's page did not show): forgotten, so it never opens on a later visit.
+  if (skill) setTimeout(() => asked === skill && askDig(null), 5000);
 }
 export const useDigAsked = () =>
   useSyncExternalStore(
@@ -33,7 +35,7 @@ const STATE = { own: "Came on its own", nudge: "Came with a nudge", missed: "Did
 
 /** The Dig (D-new-dig): the skill's goal done from memory over the blurred page; then the mole asks one
  *  or two questions at ideas left out, and the skill's key points show as stones: solid for an idea that
- *  came on its own, half fused for one a question pulled out, loose and grey for one that didn't come,
+ *  came on its own, loose for one a question pulled out, loose and grey for one that didn't come,
  *  which opens its passage. No grade. What he wrote is kept, dated, in the skill note as well. */
 export function DigPopup({ skill, blocked, append, notify, onPassage, onClose }: { skill: Skill; blocked: boolean; append: (t: string, heading: string) => Promise<boolean>; notify: Notify; onPassage: (at: { item: string; id: string }) => void; onClose: () => void }) {
   const keys = useKeymap();
@@ -52,9 +54,13 @@ export function DigPopup({ skill, blocked, append, notify, onPassage, onClose }:
   const step = !dig ? "write" : dig.done_at ? "map" : dig.asks ? "ask" : "read";
   useEffect(() => field.current?.focus(), [step, answers.length]);
 
+  // Closed while a step was still on its way: nothing more is asked of the mole or of him.
+  const gone = useRef(false);
+  useEffect(() => ((gone.current = false), () => void (gone.current = true)), []);
   /** One call to the mole; a null answer (he is not there) is a failure like any other. */
   const mole = (run: () => Promise<Dig | null>) => {
     const go = async () => {
+      if (gone.current) return;
       setFailed(null);
       setBusy("read");
       try {
@@ -79,7 +85,8 @@ export function DigPopup({ skill, blocked, append, notify, onPassage, onClose }:
     if (PHONE) return notify("Saved in your note, under today’s date"), onClose();
     try {
       const d = await ore<Dig>("dig", skill.id, opt("text", t));
-      notify("Dig kept, in your note under today’s date", "quiet", () => ore("dig", skill.id, opt("drop", d.id)));
+      kept.current = d;
+      if (gone.current) return left();
       setDig(d);
       setBusy(null);
       if (!d.done_at) mole(() => ore<Dig | null>("dig", skill.id, "--ask"));
@@ -97,11 +104,19 @@ export function DigPopup({ skill, blocked, append, notify, onPassage, onClose }:
     mole(() => (all.some(Boolean) ? ore<Dig | null>("dig", skill.id, ...all.map((x) => opt("answer", x))) : ore<Dig>("dig", skill.id, "--done")));
   };
 
+  /** The dig he wrote, once it is kept: closing says so, with Undo (not before, so no step runs on a dig taken back). */
+  const kept = useRef<Dig | null>(null);
+  const done = useRef(false);
+  done.current = !!dig?.done_at;
   /** Left partway through the mole's questions: what was not answered didn't come. */
-  const close = () => {
-    if (dig && !dig.done_at && !PHONE) void ore("dig", skill.id, "--done").catch(() => {});
-    onClose();
+  const left = () => {
+    const d = kept.current;
+    if (!d) return;
+    kept.current = null;
+    const end = d.done_at || done.current ? Promise.resolve() : ore("dig", skill.id, "--done").catch(() => {});
+    void end.then(() => notify("Dig kept, in your note under today’s date", "quiet", () => ore("dig", skill.id, opt("drop", d.id))));
   };
+  const close = () => (left(), onClose());
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -185,7 +200,7 @@ export function DigPopup({ skill, blocked, append, notify, onPassage, onClose }:
                       <span>
                         {v.ideas.map((i) => (
                           <Hint key={i.id} text={`${STATE[i.state ?? "missed"]}: “${passageText(i.text)}”`}>
-                            <button className="dig-idea" data-state={i.state ?? "missed"} aria-label={`${STATE[i.state ?? "missed"]}: ${passageText(i.text)}`} onClick={() => (onClose(), onPassage({ item: i.item, id: i.id }))}>
+                            <button className="dig-idea" data-state={i.state ?? "missed"} aria-label={`${STATE[i.state ?? "missed"]}: ${passageText(i.text)}`} onClick={() => (close(), onPassage({ item: i.item, id: i.id }))}>
                               <Stone size={16} uses={i.state === "own" ? 2 : 0} waiting={(i.state ?? "missed") === "missed"} />
                             </button>
                           </Hint>
@@ -196,7 +211,7 @@ export function DigPopup({ skill, blocked, append, notify, onPassage, onClose }:
                 </div>
               )}
               <div className="skill-recall-foot">
-                <button className="pill-btn" autoFocus onClick={onClose}>
+                <button className="pill-btn" autoFocus onClick={close}>
                   Done <kbd>Esc</kbd>
                 </button>
               </div>

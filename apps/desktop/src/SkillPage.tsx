@@ -103,9 +103,9 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
   // A session that ended by offering this skill's dig opens it here.
   const digAsked = useDigAsked();
   useEffect(() => {
-    if (digAsked !== skill.id || !skill.goal) return;
+    if (!digAsked) return;
     askDig(null);
-    setRecalling("goal");
+    if (digAsked === skill.id && skill.goal) setRecalling("goal");
   }, [digAsked, skill.id, skill.goal]);
   // The warm-up stays while he writes his first lines (it would vanish at the first keystroke, as if
   // typing had closed something); it goes once a recall is saved, or on the next visit.
