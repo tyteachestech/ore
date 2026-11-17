@@ -12,6 +12,7 @@ import { calloutSchema, remarkBlocks, toggleSchema, toggleSummarySchema } from "
 import { highlightSchema, remarkColors, stringifyColor, textColorSchema, underlineSchema } from "./colors";
 import { alonePlugin } from "./alone";
 import { blockSelPlugin } from "./blocksel";
+import { tickedPlugin } from "./ticked";
 import { dragSelPlugin } from "./dragsel";
 import { tablePlugin, tableView } from "./tables";
 import { mathBlockSchema, mathInlineSchema, mathRule, remarkNoteMath } from "./math";
@@ -41,6 +42,7 @@ export async function createEditor(root: HTMLElement, markdown: string, onChange
     // Before the keymaps, so selected blocks get their keys first.
     .use(blockSelPlugin)
     .use(dragSelPlugin)
+    .use(tickedPlugin)
     .use(tablePlugin)
     .use(foldPlugin)
     .use(notionKeys)

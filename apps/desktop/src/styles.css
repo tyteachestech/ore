@@ -2248,6 +2248,16 @@ button.home-plan:hover { color: var(--text); }
 .review-end.carted .end-emblem[data-glint]::after { --glint-at: 0ms; }
 @keyframes glint-field { from { opacity: 1; -webkit-mask-position: 100% 0, 0 0; mask-position: 100% 0, 0 0; } to { opacity: 1; -webkit-mask-position: 0% 0, 0 0; mask-position: 0% 0, 0 0; } }
 @media (prefers-reduced-motion: reduce) { .glint circle, .end-emblem[data-glint]::after { animation: none; } }
+/* The reward glow (Tyler 2026-11-17, from the radio's lit pads): a reward lights up the way a playing pad does, in its
+   own colour, never amber (the lamp's, for running). The day's goal met: Home's ring and the end screen's breathe a
+   soft glow, in place; hovering Home's ring lights it the same way. A to-do ticked: its box glows once and settles. */
+.home-goal .ring .dot-ring, .end-ring .ring .dot-ring { transition: filter var(--t-3) var(--ease-out); }
+.home-goal .ring.met .dot-ring, .end-ring .ring.met .dot-ring { animation: goal-glow 3.2s ease-in-out infinite; }
+.home-goal .ring:hover .dot-ring { filter: drop-shadow(0 0 4px rgba(95, 207, 138, 0.6)); }
+@keyframes goal-glow { 0%, 100% { filter: drop-shadow(0 0 2px rgba(95, 207, 138, 0.35)); } 50% { filter: drop-shadow(0 0 6px rgba(95, 207, 138, 0.75)); } }
+.note-editor li.ticked::before { animation: ticked 900ms var(--ease-out); }
+@keyframes ticked { 25% { transform: scale(1.18); box-shadow: 0 0 10px 2px color-mix(in srgb, var(--accent) 70%, transparent); } }
+@media (prefers-reduced-motion: reduce) { .home-goal .ring.met .dot-ring, .end-ring .ring.met .dot-ring { animation: none; filter: drop-shadow(0 0 4px rgba(95, 207, 138, 0.55)); } .note-editor li.ticked::before { animation: none; } }
 
 /* Review (D59): one card centred, the keys at the foot; nothing counts the session on top (D246). */
 .review[hidden] { display: none; }
