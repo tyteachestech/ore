@@ -1711,7 +1711,17 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
 .try-check:hover { border-color: var(--apply-solid); background: var(--bg-hover); }
 .try-check:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .stone { flex: none; color: var(--apply-solid); }
+.stone { overflow: visible; }
 .stone[data-waiting] { color: var(--muted); opacity: 0.6; }
+/* A use strikes the stone (a moment, D185): it jolts back to size on the spring and throws four sparks. */
+.stone .struck { transform-box: fill-box; transform-origin: center; animation: stone-strike var(--t-moment) var(--ease-spring); }
+.stone .spark { opacity: 0; animation: stone-spark var(--t-moment) var(--ease-out); }
+@keyframes stone-strike { from { transform: scale(0.7); } }
+@keyframes stone-spark { from { opacity: 1; transform: none; } to { opacity: 0; transform: translate(var(--dx), var(--dy)); } }
+/* An idea that just became his: the tool lands on the spring. */
+.skill-icon.glyph.tool.forged { animation: tool-forged var(--t-moment) var(--ease-spring); }
+@keyframes tool-forged { from { transform: scale(0.3) rotate(-40deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .stone .struck, .stone .spark, .skill-icon.glyph.tool.forged { animation: none; } }
 .skill-icon.glyph.tool { flex: none; width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; background: var(--apply-solid); }
 .try-now { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; min-height: 36px; }
 .try-now .try-check { margin-left: 6px; }
@@ -1756,9 +1766,17 @@ button.try-stone:hover .stone { opacity: 1; }
 .forge-add { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin: 4px 8px 8px; }
 .forge-add .field, .plan-line .field { height: auto; min-height: 34px; padding: 7px 10px; line-height: 1.45; }
 .try-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 40px; }
-.try-title { display: flex; align-items: center; gap: 12px; margin: 14px 0 18px; font-size: 24px; line-height: 1.25; font-weight: 600; overflow-wrap: anywhere; }
-.try-title > span { display: grid; flex: none; }
-.try-title .skill-icon.glyph.tool { width: 20px; height: 20px; -webkit-mask-size: 20px; mask-size: 20px; }
+.try-title { margin: 14px 0 10px; font-size: 24px; line-height: 1.25; font-weight: 600; overflow-wrap: anywhere; }
+/* The idea's way to being his: three stones, the struck ones green, a dotted line, the tool. */
+.try-path { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 20px; }
+.try-path-rule { width: 28px; border-top: 2px dotted var(--border-strong, var(--border)); }
+.try-path-end { display: grid; opacity: 0.35; }
+.try-path-end[data-reached] { opacity: 1; }
+.try-path-end .skill-icon.glyph.tool { width: 20px; height: 20px; -webkit-mask-size: 20px; mask-size: 20px; }
+.try-path-end:not([data-reached]) .skill-icon.glyph.tool { background: var(--muted); }
+.forge-goal { display: flex; align-items: center; gap: 7px; margin: 14px 0 0; font-size: 14px; color: var(--text-read); }
+.forge-goal svg { flex: none; color: var(--skill, var(--accent)); }
+.try-stone:active .stone, .tool-btn:active .tool { transform: scale(0.92); }
 .plan { display: grid; gap: 8px; }
 .plan-line { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; }
 .plan-line > span { font: 12px var(--mono); color: var(--faint); }

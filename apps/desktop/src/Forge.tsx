@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
-import { CaretRight, Plus } from "./icons";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { CaretRight, Plus, Target } from "./icons";
 import { Grow } from "./Grow";
 import { Hint } from "./Hint";
 import { SkillIcon } from "./IconPicker";
@@ -27,18 +27,56 @@ const MINE_FROM = 2;
 const ROCK = ["..........", "...HHH....", "..HWHHM...", ".HHHHMMMD.", "HHHMMMMDD.", ".MMMMMDDD.", "..MMDDDD..", "....DD...."];
 const DOT: Record<string, number> = { W: 0.5, H: 0.44, M: 0.36, D: 0.25 };
 
-/** A try's stone. Waiting it is grey; the one in use is green and its dots swell with each use until they touch. */
+/** Where a struck stone's sparks land, in its own cells from its centre. */
+const SPARKS = [[-5, -4], [0, -5.5], [5, -4], [6.5, 0.5]] as const;
+
+/** A try's stone. Waiting it is grey; the one in use is green and its dots swell with each use until they touch.
+ *  A use that lands while it is on screen strikes it (the moment of the apply half): it jolts and throws sparks. */
 export function Stone({ uses = 0, waiting = false, size = 14 }: { uses?: number; waiting?: boolean; size?: number }) {
   const swell = Math.min(uses, MINE_FROM) / MINE_FROM;
+  const [hits, setHits] = useState(0);
+  const before = useRef(uses);
+  useEffect(() => {
+    if (uses > before.current) setHits((h) => h + 1);
+    before.current = uses;
+  }, [uses]);
   return (
     <svg className="stone" data-waiting={waiting || undefined} width={size * 1.25} height={size} viewBox="0 0 10 8" fill="currentColor" aria-hidden="true">
-      {ROCK.flatMap((row, y) => [...row].map((t, x) => (t === "." ? null : <circle key={`${x},${y}`} cx={x + 0.5} cy={y + 0.5} r={DOT[t]! + (0.5 - DOT[t]!) * swell} />)))}
+      <g key={hits} className={hits ? "struck" : undefined}>
+        {ROCK.flatMap((row, y) => [...row].map((t, x) => (t === "." ? null : <circle key={`${x},${y}`} cx={x + 0.5} cy={y + 0.5} r={DOT[t]! + (0.5 - DOT[t]!) * swell} />)))}
+      </g>
+      {hits > 0 && SPARKS.map(([dx, dy], i) => <circle key={`${hits}-${i}`} className="spark" cx={5} cy={4} r={0.4} style={{ "--dx": `${dx}px`, "--dy": `${dy}px` } as CSSProperties} />)}
     </svg>
   );
 }
 
 /** A try that is his: a tool. */
-export const Pick = () => <SkillIcon icon="mc:pickax" className="tool" />;
+export const Pick = ({ fresh = false }: { fresh?: boolean }) => <SkillIcon icon="mc:pickax" className={`tool${fresh ? " forged" : ""}`} />;
+
+/** The ids that joined a list while it was on screen (not the ones it opened with): what just became his. */
+function useFresh(ids: string[] | null): Set<string> {
+  const seen = useRef<Set<string> | null>(null);
+  const fresh = useRef(new Set<string>());
+  if (ids && !seen.current) seen.current = new Set(ids);
+  else if (ids && seen.current) for (const id of ids) if (!seen.current.has(id)) (seen.current.add(id), fresh.current.add(id));
+  return fresh.current;
+}
+
+/** How far an idea is from being his: a stone for each of the three uses, struck ones green, then the tool. */
+function Path({ t, fresh }: { t: Try; fresh: boolean }) {
+  const mine = t.status === "done";
+  const n = Math.min(usesOf(t), MINE_FROM + 1);
+  const says = mine ? "Yours" : usedHint(t);
+  return (
+    <Hint text={says}>
+      <div className="try-path" role="img" aria-label={says}>
+        {[0, 1, 2].map((i) => <Stone key={i} size={16} uses={i < n ? MINE_FROM : 0} waiting={i >= n} />)}
+        <span className="try-path-rule" />
+        <span className="try-path-end" data-reached={mine || undefined}><Pick fresh={fresh} /></span>
+      </div>
+    </Hint>
+  );
+}
 
 const flags = (p: { plan?: string; when?: string; obstacle?: string }) => [...(p.plan !== undefined ? [opt("plan", p.plan)] : []), ...(p.when !== undefined ? [opt("when", p.when)] : []), ...(p.obstacle !== undefined ? [opt("if", p.obstacle)] : [])];
 
@@ -207,12 +245,13 @@ export function TryingNow({ tries, onSub, head }: { tries: Tries; onSub: (s: Sub
 /** His tools, beside the skill's goal: the ideas he made his. */
 export function Tools({ tries, onSub }: { tries: Tries; onSub: (s: Sub) => void }) {
   const mine = (tries.ts ?? []).filter((t) => t.status === "done");
+  const fresh = useFresh(tries.ts && mine.map((t) => t.id));
   if (!mine.length) return null;
   return (
     <span className="tools">
       {mine.slice(0, 8).map((t) => (
         <Hint key={t.id} text={`Yours: ${tryLabel(t)}`}>
-          <button className="tool-btn" aria-label={`Yours: ${tryLabel(t)}`} onClick={() => onSub(`try:${t.id}`)}><Pick /></button>
+          <button className="tool-btn" aria-label={`Yours: ${tryLabel(t)}`} onClick={() => onSub(`try:${t.id}`)}><Pick fresh={fresh.has(t.id)} /></button>
         </Hint>
       ))}
     </span>
@@ -293,6 +332,12 @@ export function Forge({ skill, tries, onSub }: { skill: Skill; tries: Tries; onS
           </button>
         </Hint>
       </div>
+      {skill.goal && (
+        <p className="forge-goal">
+          <Target size={15} weight="bold" aria-hidden="true" />
+          <span>{skill.goal}</span>
+        </p>
+      )}
       {tries.ts && !ts.length && !adding && <p className="quiet">Nothing here yet. Mark a technique with Try it (4) while you read, or add one with +.</p>}
       {band("Trying now", now)}
       {band("Waiting", waiting, adding ? <AddTry onAdd={(plan, when) => tries.add(plan, when)} onClose={() => setAdding(false)} /> : undefined)}
@@ -362,6 +407,10 @@ const day = (ts: string) => new Date(ts).toLocaleDateString(undefined, { month: 
 export function TryPage({ skill, t, tries, onSub, onPassage }: { skill: Skill; t: Try; tries: Tries; onSub: (s: Sub) => void; onPassage: (t: Pick<Try, "item" | "id">) => void }) {
   const [did, setDid] = useState(false);
   const mine = t.status === "done";
+  // It became his while this page was open: the tool lands with a pop.
+  const was = useRef(mine);
+  const forged = mine && !was.current;
+  useEffect(() => void (mine || (was.current = false)), [mine]);
   const actions: MenuAction[] = [
     ...(mine ? [{ id: "reopen", label: "Try it again", run: () => void tries.reopen(t) }] : t.active ? [] : [{ id: "pick", label: "Try this now", run: () => void tries.pick(t) }]),
     ...(t.point ? [] : [{ id: "passage", label: "Open passage", run: () => onPassage(t) }]),
@@ -376,12 +425,8 @@ export function TryPage({ skill, t, tries, onSub, onPassage }: { skill: Skill; t
       </div>
       <div className="try-cols">
         <div className="try-main">
-          <h1 className="try-title">
-            <Hint text={mine ? "Yours" : usedHint(t)}>
-              <span role="img" aria-label={mine ? "Yours" : usedHint(t)}>{mine ? <Pick /> : <Stone uses={usesOf(t)} waiting={!t.active} size={20} />}</span>
-            </Hint>
-            {tryLabel(t)}
-          </h1>
+          <h1 className="try-title">{tryLabel(t)}</h1>
+          <Path t={t} fresh={forged} />
           <div className="plan">
             <PlanField label="When" hint="the moment that cues it" value={t.when ?? ""} onSave={(when) => void tries.plan(t, { when })} />
             <PlanField label="I’ll" hint="what you’ll do then" value={t.note ?? ""} onSave={(plan) => void tries.plan(t, { plan })} />
