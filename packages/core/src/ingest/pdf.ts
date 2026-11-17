@@ -103,15 +103,42 @@ function emphasis(s: string): string {
     .replace(/[\uE002\uE003]/g, "*");
 }
 
-/** Text set smaller than the body entirely beside the body's column: a textbook's margin notes
- *  (glossary terms, "see also"), which repeat a word of the text next to them. Two columns of body
- *  text are both the body, so only smaller text outside every column goes. */
-function dropMargins(items: Item[], body: number): Item[] {
+/** Text set smaller than the body entirely beside the body's column: a textbook's margin notes,
+ *  taken out of the lines they sit beside. Two columns of body text are both the body, so only
+ *  smaller text outside every column goes. A note that defines its term (a psychology or biology
+ *  textbook's margin glossary, D319) is kept, in its order, for the page's end; one
+ *  that only repeats a word of the text beside it (AIMA's margin terms) or is too short to say
+ *  anything ("see p. 12") says nothing the text doesn't, and goes. */
+function splitMargins(items: Item[], body: number): { items: Item[]; notes: string[] } {
   const lines = items.filter((i) => i.str.trim().length >= 20 && Math.abs(i.size - body) <= body * 0.1);
-  if (!body || !lines.length) return items;
+  if (!body || !lines.length) return { items, notes: [] };
   const left = Math.min(...lines.map((i) => i.x));
   const right = Math.max(...lines.map((i) => i.end));
-  return items.map((i) => (i.str.trim() && i.size < body * 0.9 && (i.end <= left - 2 || i.x >= right + 2) ? { ...i, str: "" } : i));
+  const beside = (i: Item) => !!i.str.trim() && i.size < body * 0.9 && (i.end <= left - 2 || i.x >= right + 2);
+  // A note's lines follow each other a line apart on one side; a gap or the other side starts the next.
+  const groups: Item[][] = [];
+  let last: Item | undefined;
+  for (const i of items.filter((i) => beside(i) && i.size)) {
+    const same = last && i.x >= right === last.x >= right && Math.abs(i.y - last.y) <= last.size * 1.4;
+    if (same) groups.at(-1)!.push(i);
+    else groups.push([i]);
+    last = i;
+  }
+  const text = items.filter((i) => !beside(i)).map((i) => i.str).join(" ");
+  const norm = (t: string) => plain(t).toLowerCase().replace(/[\s\u00ad]+/g, " ").replace(/[.,;:]$/, "").trim();
+  const said = norm(text);
+  const notes = groups.flatMap((g) => {
+    let note = "";
+    g.forEach((i, k) => {
+      const prev = g[k - 1];
+      if (prev && Math.abs(i.y - prev.y) > 1) note = /\p{L}-$/u.test(plain(note)) && /^\p{Ll}/u.test(i.str) ? note.replace(/-(?=[\uE000-\uE005]*$)/, "") : note.trimEnd() + " ";
+      else if (prev && i.x > prev.end + 0.5 && !/\s$/.test(note)) note += " "; // the space between two runs is an item of its own, left out
+      note += styled(i);
+    });
+    const words = plain(note).trim().split(/\s+/).length;
+    return words < 4 || said.includes(norm(note)) ? [] : [note.trim()];
+  });
+  return { items: items.map((i) => (beside(i) ? { ...i, str: "" } : i)), notes };
 }
 
 const SUPER: Record<string, string> = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "−": "⁻", "-": "⁻", "+": "⁺" };
@@ -606,7 +633,8 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   plainFaces(items);
   const structure = structureOf(items);
   const blocks: string[] = [];
-  const raw = items.map((p, i) => pageLines(swapRegions(dropMargins(p, body), regions.filter((r) => r.page === i + 1), blocks)));
+  const split = items.map((p) => splitMargins(p, body));
+  const raw = split.map((p, i) => pageLines(swapRegions(p.items, regions.filter((r) => r.page === i + 1), blocks)));
   const typical = lineGap(raw);
   const lines = dropRunning(raw, body, typical);
   const words = wordsOf(lines);
@@ -626,6 +654,11 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
     }
   });
   markChapters(paras, outline);
+  // A margin glossary's definitions after the page's text, above its footnotes.
+  paras.forEach((page, i) => {
+    const at = page.findIndex((p) => p.note);
+    page.splice(at < 0 ? page.length : at, 0, ...split[i]!.notes.map((text) => ({ text, note: false })));
+  });
   const shown = new Set(assets.map((a) => a.name));
   const notes = footnotes(paras);
   const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => (isBlock(x.text) ? blocks[Number(x.text.slice(1, -1))]! : notes(x.text, i))), ...kept[i]!.filter((a) => shown.has(a.name)).map((a) => `![](assets/${a.name})`)].join("\n\n")}`);

@@ -59,6 +59,7 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "pdf-hazards", add: join(FIX, "files/hazards.pdf") }, // footnotes, powers, hyphens, running heads
   { name: "pdf-outline", add: join(FIX, "files/outline.pdf") }, // the PDF outline as chapters
   { name: "pdf-textbook", add: join(FIX, "files/textbook.pdf") }, // margin notes, numbered headings, lists
+  { name: "pdf-glossary", add: join(FIX, "files/glossary.pdf") }, // a margin glossary's definitions (make-glossary-pdf.py)
   { name: "pdf-figures", add: join(FIX, "files/figures.pdf") },
   { name: "pdf-scripts", add: join(FIX, "files/scripts.pdf") }, // Russian, Greek, Japanese, Chinese, Arabic
   { name: "pdf-code", add: join(FIX, "files/code.pdf") }, // code blocks and typewriter words (make-code-pdf.py)

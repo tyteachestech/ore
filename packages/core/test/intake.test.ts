@@ -506,6 +506,20 @@ describe("import coverage: files", () => {
     expect(b).toContain("it does not.\n\n1 Ebbinghaus measured the curve on himself in the 1880s, with lists of nonsense syllables.\n\n2 A later replication");
   });
 
+  test("PDF: a textbook's margin glossary keeps each definition, after the page's text; a note that only repeats its term goes", async () => {
+    // glossary.pdf (make-glossary-pdf.py): bold terms in the text, their definitions in small type in
+    // the margin beside them, as biology and psychology textbooks set them (D319, F389).
+    const item = await addSource(await tempLibrary(), file("glossary.pdf"));
+    expect(item.meta.title).toBe("How Plants Make Food");
+    expect(item.meta.author).toBe("Tomas Ferreira");
+    const b = item.body;
+    expect(b).toContain("The process is **photosynthesis**: the leaf takes in water and carbon dioxide"); // the text runs on, no note inside it
+    expect(b).toContain("called **stomata**, which close when the plant is dry.\n\n**photosynthesis** The making of sugar from carbon dioxide and water, powered by light, with oxygen given off.\n\n**stomata** Small openings in a leaf that let gases in and out and that close to save water.\n\n<!-- page 2 -->");
+    expect(b).toContain("light on a leaf.\n\n**phloem** The tissue that carries sugar from the leaves to the parts of a plant that use or store it.");
+    expect(b.match(/chlorophyll/gi)).toHaveLength(1); // the bare repeat says nothing the line doesn't
+    expect(b.match(/^### .+$/gm)).toEqual(["### Light into sugar", "### Where the sugar goes"]);
+  });
+
   test("PDF: its outline (bookmarks) makes the chapters, though the headings are set in the body's size", async () => {
     // outline.pdf (make-outline-pdf.py): three chapters of two pages, each named in the PDF outline.
     const it = await addSource(await tempLibrary(), file("outline.pdf"));
