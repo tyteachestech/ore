@@ -35,9 +35,15 @@ export const AnnotationSchema = z.object({
   answers: z.array(Contribution).optional(), // Question intent only (D75)
   card: z.boolean().optional(), // Question intent: "Answered + card", so enrich drafts a card from his answer
   reflection: z.string().optional(), // Apply intent (D127): how it went, written when he checked it off
+  done_at: z.string().optional(), // Apply intent: when he checked it off (`ts` moves with every later edit)
   // Apply intent (D148): earlier rounds of the same try, oldest first. "Next time I'll…" closes a round
   // (his plan and how it went move here) and the try is open again with the new plan as its note.
   uses: z.array(z.object({ ts: z.string(), plan: z.string().optional(), reflection: z.string().optional() })).optional(),
+  // Apply intent (D322): the plan's cue ("When…", the note is what he'll do then), what might get in the
+  // way and what he'll do about it, and a ULID from when he last picked it as the one he is trying now (the latest wins).
+  when: z.string().optional(),
+  obstacle: z.string().optional(),
+  picked: z.string().optional(),
   // A card or question he typed with nothing selected ("Card here"): `exact` is only the sentence where he
   // was; the note is what counts, and a card is drafted from it and the whole source, with quotes.
   point: z.boolean().optional(),
@@ -73,6 +79,9 @@ export interface HighlightInput {
   note?: string;
   start?: number;
   looked_up?: boolean;
+  /** A try he typed with no passage behind it (D322): the new highlight is a `point`, with its cue. */
+  point?: boolean;
+  when?: string;
 }
 
 // Locate the passage in the body (exact, then whitespace-insensitive; nearest
@@ -106,6 +115,8 @@ export function addHighlight(item: Item, input: HighlightInput): Annotation {
     note: input.note?.trim() || undefined,
     status: "open",
     ...(input.looked_up && { looked_up: true }),
+    ...(input.point && { point: true }),
+    ...(input.when?.trim() && { when: input.when.trim() }),
   };
   append(item, ann);
   return ann;
@@ -154,16 +165,16 @@ export function findAnnotation(lib: Library, ref: string): { item: Item; annotat
   return { item: findItem(lib, hit.dir.slice(-26)), annotation: hit.annotation };
 }
 
-/** A snippet that only carries a question (typed on a skill page, or captured with Question intent):
- *  nothing to read, so it lives under Questions and stays out of the source lists, also once the
- *  question is deleted (else it would turn up under To read). */
+/** A snippet that only carries a question (typed on a skill page, or captured with Question intent) or
+ *  a try he typed in the Forge (D322): nothing to read, so it lives under Questions or in the Forge
+ *  and stays out of the source lists, also once it is deleted (else it would turn up under To read). */
 export function isQuestionOnly(item: Item): boolean {
   if (item.meta.type !== "snippet") return false;
   const all = latestRevs(annotationRevs(item.dir));
-  return all.length > 0 && all.every((a) => a.intent === "question");
+  return all.length > 0 && all.every((a) => a.intent === "question" || (a.intent === "apply" && !!a.point));
 }
 
-export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses" | "looked_up">>;
+export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses" | "looked_up" | "when" | "obstacle" | "picked" | "done_at">>;
 
 // Edits never rewrite history: they append the same id with rev + 1.
 export function reviseAnnotation(item: Item, current: Annotation, patch: AnnotationPatch): Annotation {

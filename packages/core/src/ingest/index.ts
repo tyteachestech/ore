@@ -693,6 +693,9 @@ export interface SnippetInput {
   intent?: Intent;
   note?: string;
   skills?: string[];
+  /** A try typed in the Forge: its one annotation is a `point`, with its cue (`when`). */
+  point?: boolean;
+  when?: string;
 }
 
 // A captured selection: the body is the selection; one annotation covers it.
@@ -703,7 +706,7 @@ export async function addSnippet(lib: Library, s: SnippetInput): Promise<{ item:
   const title = firstLine.length > 80 ? firstLine.slice(0, 77).trimEnd() + "…" : firstLine;
   const item = await createItem(lib, { type: "snippet", title, body, url: s.url, source_app: s.app, skills: s.skills });
   await unarchive(lib, s.skills);
-  const annotation = addHighlight(item, { exact: item.body.trim(), intent: s.intent ?? "keep", note: s.note });
+  const annotation = addHighlight(item, { exact: item.body.trim(), intent: s.intent ?? "keep", note: s.note, point: s.point, when: s.when });
   return { item, annotation };
 }
 
