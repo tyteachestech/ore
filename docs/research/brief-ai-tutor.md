@@ -72,6 +72,21 @@ Everything else (the bubble, the mascot) is delivery. Keep it small.
    - B: a small pixel sprite with three states (idle, thinking, done) that doubles as the working indicator. *(recommended: it has a job, and it's cheap)*
    - C: the full animated, customizable character now.
 
+## Honesty and voice (added 2026-11-17)
+
+What a motivating, effective tutor sounds like, and what Ore does about each. The picture version, with where Ore stood that day: <https://claude.ai/artifact/ADsvwt1H7xEzgrEwt3EuAQ>.
+
+| Finding | Evidence | What the tutor does |
+|---|---|---|
+| Chat models agree too readily, and one agreeable chat makes people surer they were right | Cheng et al. 2026, *Science* (11 models affirmed people 49% more often than humans did; three preregistered experiments, N = 2,405); Bo et al. 2025 (a flattering assistant misled novices, n = 24) | Corrects a wrong idea inside his question, holds a correct point when he pushes back, concedes when he is right (cases `wrong-belief-in-question`, `pushback-he-is-wrong`, `pushback-third-time`, `pushback-he-is-right`) |
+| Feedback works through the information in it; praise and grades add none | Van der Kleij et al. 2015 (40 studies: explaining feedback 0.49, right or wrong alone 0.05); Lipnevich & Smith 2009 (detailed feedback did best with no praise or grade beside it); Wisniewski, Zierer & Hattie 2020 (435 studies, d = 0.48, more information works better) | Names what he got right in his words and what is missing; never praises him as a person (`exercise-feedback`, `exercise-overclaim`, `fishing-for-praise`) |
+| The best human tutors praise little, correct indirectly, keep the challenge up and stay encouraging | Lepper & Woolverton 2002 | Kind about effort and feelings, the same verdict either way (`effort-plea-wrong-answer`, `discouraged-after-misses`) |
+| Learning needs the learner to reach an impasse first | VanLehn, Siler & Murray 2003 (125 hours of expert tutoring) | The hint ladder (D128, D140) |
+| Guardrails are not automatically better: a Socratic assistant that knew the student's work was rated least helpful, and students left for a plain chatbot | Eastwood et al. 2026 (preprint, RCT, n = 132); Bassner et al. 2025 (RCT, n = 275: only the hint-first tutor raised motivation, yet students rated ChatGPT easier) | His own questions get a straight answer; "show me" always works |
+| A model pressed by a frustrated learner doesn't hold a rule on a prompt alone | Pisan 2026 (preprint, one deployed system) | Not built: the ladder's count of tries is still the model's (proposal 5 on the page above) |
+
+On today's model the tutor already did nearly all of this unprompted, so the cases are the guard and the prompt gained one sentence (D313).
+
 ## Sources
 
 - Bastani et al. 2025, "Generative AI without guardrails can harm learning", PNAS: <https://knowledge.wharton.upenn.edu/article/without-guardrails-generative-ai-can-harm-education>
@@ -84,3 +99,12 @@ Everything else (the bubble, the mascot) is delivery. Keep it small.
 - OATutor: <https://github.com/CAHLR/OATutor> · assistant-ui: <https://www.npmjs.com/package/@assistant-ui/react>
 - Tom's Guide, ChatGPT study mode vs Claude learning mode: <https://www.tomsguide.com/ai/i-tested-chatgpt-5-study-mode-vs-claude-learning-mode-with-7-prompts-heres-the-winner>
 - Koedinger & Aleven 2007 (assistance dilemma), Kalyuga (expertise reversal), Yang et al. 2021 (testing effect): from Ore's existing briefs, `docs/research/brief-learning-science.md`.
+- [Cheng et al. 2026, "Sycophantic AI decreases prosocial intentions and promotes dependence", Science](https://scispace.com/papers/sycophantic-ai-decreases-prosocial-intentions-and-promotes-o7u8g452b4fd)
+- [Van der Kleij, Feskens & Eggen 2015, "Effects of feedback in a computer-based learning environment", Review of Educational Research](https://scispace.com/papers/effects-of-feedback-in-a-computer-based-learning-environment-4wnu7p64s9)
+- [Lipnevich & Smith 2009, "Effects of differential feedback on students' examination performance"](https://scispace.com/papers/effects-of-differential-feedback-on-students-examination-hl97vflykf)
+- [Wisniewski, Zierer & Hattie 2020, "The power of feedback revisited"](https://scispace.com/papers/the-power-of-feedback-revisited-a-meta-analysis-of-44tk89ur1r)
+- [Lepper & Woolverton 2002, "The wisdom of practice: lessons learned from the study of highly effective tutors"](https://scispace.com/papers/the-wisdom-of-practice-lessons-learned-from-the-study-of-22a4t31bmk)
+- [VanLehn, Siler & Murray 2003, "Why do only some events cause learning during human tutoring?"](https://scispace.com/papers/why-do-only-some-events-cause-learning-during-human-tutoring-qcp1xwfx62)
+- [Eastwood et al. 2026, "Guardrails or roadblocks?" (preprint)](https://consensus.app/papers/details/w:2f15ca3e-1c9c-4c90-b3c3-f2c74ed6d2c5/)
+- [Bassner et al. 2025, "Less stress, better scores, same learning"](https://consensus.app/papers/details/w:d87293ef-f31e-432c-8bde-a630724c0692/)
+- [Pisan 2026, "Teaching a large language model tutor to withhold the answer" (preprint)](https://consensus.app/papers/details/w:4298fb2d-391c-487c-ab10-19c709579b10/)

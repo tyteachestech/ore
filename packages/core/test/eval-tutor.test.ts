@@ -116,4 +116,22 @@ describe("mining real chats for cases (D295)", () => {
     for (const l of [{ ms: 4000, runs: 1, moved: 0, dropped: 0, searched: false }, { ms: 6000, runs: 2, moved: 1, dropped: 0, searched: true }, { ms: 20000, runs: 2, error: "x" }, "not json"]) appendFileSync(join(lib.root, ".ore/logs/tutor.jsonl"), `${typeof l === "string" ? l : JSON.stringify(l)}\n`);
     expect(waits(lib)).toEqual({ turns: 3, median_s: 6, went_back: 2, mended: 1, searched: 1, failed: 1 });
   });
+  test("a model or prompt his real turns ran on that no full tutor eval has checked is named (D313)", async () => {
+    const { tempLibrary } = await import("./helpers.ts");
+    const { untested } = await import("../eval/mine-tutor.ts");
+    const { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const lib = await tempLibrary();
+    mkdirSync(join(lib.root, ".ore/logs"), { recursive: true });
+    for (const l of [{ model: "claude-sonnet-5-5", prompt: "tutor@16" }, { model: "claude-sonnet-5-5", prompt: "tutor@16" }, { model: "claude-sonnet-6", prompt: "tutor@16" }, { error: "x" }]) appendFileSync(join(lib.root, ".ore/logs/tutor.jsonl"), `${JSON.stringify(l)}\n`);
+    const dir = mkdtempSync(join(tmpdir(), "ore-results-"));
+    const ids = loadTutorCases().map((c) => c.id);
+    const result = (model: string, cases: string[]) => JSON.stringify({ eval: "tutor", runs: [{ model, prompt_version: "tutor@16", cases: cases.map((id) => ({ id })) }] });
+    expect(untested(lib, dir)).toEqual(["claude-sonnet-5-5 tutor@16", "claude-sonnet-6 tutor@16"]);
+    writeFileSync(join(dir, "tutor-2026-11-17.json"), result("claude-sonnet-5-5", ids));
+    writeFileSync(join(dir, "tutor-2026-11-17-2.json"), result("claude-sonnet-6", ids.slice(0, 3))); // a run of a few cases doesn't count
+    writeFileSync(join(dir, "tutor-compare-2026-11-17.json"), "{}");
+    expect(untested(lib, dir)).toEqual(["claude-sonnet-6 tutor@16"]);
+  });
 });

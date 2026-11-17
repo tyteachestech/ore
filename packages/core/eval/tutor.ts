@@ -122,8 +122,7 @@ export function tally(picks: { id: string; pick: Pick }[]) {
 
 /** Blind A/B (skill-creator's comparator): each case answered by today's tutor prompt and by `oldRaw`
  *  (an older tutor.md), then a judge model, shown the two in random order, says which teaches better. */
-export function compareTutor(vendor: Vendor, model: string | undefined, oldRaw: string, runs = 1, concurrency = 4) {
-  const cases = loadTutorCases();
+export function compareTutor(vendor: Vendor, model: string | undefined, oldRaw: string, runs = 1, concurrency = 4, cases = loadTutorCases()) {
   return withVendor(vendor, model, async (root) => {
     const lib = { root };
     const names = await addGolden(lib);
@@ -155,8 +154,7 @@ export function compareTutor(vendor: Vendor, model: string | undefined, oldRaw: 
   });
 }
 
-export function runTutorEval(vendor: Vendor, model?: string, runs = 1, concurrency = 4) {
-  const cases = loadTutorCases();
+export function runTutorEval(vendor: Vendor, model?: string, runs = 1, concurrency = 4, cases = loadTutorCases()) {
   return withVendor(vendor, model, async (root) => {
     const lib = { root };
     const names = await addGolden(lib);
@@ -200,6 +198,12 @@ if (import.meta.main) {
   if (!Number.isInteger(runs) || runs < 1) throw new Error("--runs needs a whole number, 1 or more");
   const against = args.includes("--against") ? args[args.indexOf("--against") + 1] : undefined;
   if (args.includes("--against") && !against) throw new Error("--against needs a git ref or a tutor.md file");
+  // --only a,b: those cases alone, for trying a new case or a prompt line without paying for the set.
+  const only = args.includes("--only") ? [...new Set((args[args.indexOf("--only") + 1] ?? "").split(",").filter(Boolean))] : undefined;
+  if (only && !only.length) throw new Error("--only needs case ids, comma separated");
+  const cases = loadTutorCases().filter((c) => !only || only.includes(c.id));
+  const unknown = (only ?? []).filter((id) => !cases.some((c) => c.id === id));
+  if (unknown.length) throw new Error(`--only: no case ${unknown.join(", ")}`);
   const dir = join(import.meta.dir, "results");
   mkdirSync(dir, { recursive: true });
   if (against) {
@@ -209,7 +213,7 @@ if (import.meta.main) {
     const out_runs = [];
     for (const v of pick) {
       console.error(`Comparing with ${v}${runs > 1 ? `, ${runs} runs` : ""}…`);
-      const r = await compareTutor(v, model, old, runs);
+      const r = await compareTutor(v, model, old, runs, 4, cases);
       for (const c of r.cases.filter((c) => c.pick === "old" || c.error)) console.error(`  ${c.error ? `error ${c.id}: ${c.error}` : `old won ${c.id}: ${c.why}`}`);
       out_runs.push(r);
     }
@@ -222,7 +226,7 @@ if (import.meta.main) {
   const out_runs = [];
   for (const v of pick) {
     console.error(`Tutoring with ${v}${runs > 1 ? `, ${runs} runs` : ""}…`);
-    const r = await runTutorEval(v, model, runs);
+    const r = await runTutorEval(v, model, runs, 4, cases);
     for (const c of r.cases.filter((c) => !c.ok)) console.error(`  miss ${c.id}: ${c.error ?? c.failed.join(", ")} | ${c.reply?.replace(/\s+/g, " ").slice(0, 200)}`);
     if (r.flaky.length) console.error(`  passed only some runs: ${r.flaky.join(", ")}`);
     out_runs.push(r);
