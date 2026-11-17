@@ -25,6 +25,7 @@ items/<yyyy>/<slug>-<id>/
 feeds.yaml                     # feeds he follows (D107), in his order: url, title, site, skills
 feeds/read.<device>.jsonl      # which Feed posts he has read (D107), latest mark per post wins
 skills/<skill-id>/notes.md     # skill note (D41): his writing only, like the source note; images/ beside it
+skills/<skill-id>/digs.json    # the skill's digs (D325), oldest first: id, at, goal, text, ideas[{id (key point), item, source, text, state own|nudge|missed}], asks[{idea, q, answer}], done_at, ai
 cards/<id>.md                  # one review item per file (kind card|prompt)
 cards/<id>.variants.jsonl      # remixed versions of that card (D66), append-only with `rev` like annotations.jsonl
 reviews/<yyyy>-<mm>.<device>.jsonl    # append-only review log, one per device (D78); source of truth for scheduling
@@ -154,9 +155,10 @@ ore annotate <annotation> --note|--intent|--status open|done|deleted | --exact "
 ore scope <item> [--reached N] [--leave-out "text"]   a partway finish (D100): leaves out prequestions answered only past body offset N, and (AI) those his note rules out
 ore questions [--skill s | --item i]  his questions (D47, D75), open first → [{...annotation, item_title, answers, matches, here?}]; status done = answered
 ore answer <q> [--text t [--item i] [--quote q]] [--done|--card] [--remove ts | --edit ts --text t]   add to his answer, or rewrite or remove one piece; --card also drafts a card in the background (D75)
-ore tries [--skill s]   techniques he plans to try (Apply highlights, D127), to try first → [{...annotation, item_title}]; note = his plan, reflection = how it went, uses = earlier rounds (D148)
-ore tried <t> [--text "how it went"] [--next "plan"] [--undo]   check a try off; --text also drafts one Explain card in the background (D127); --next keeps the round in `uses` and opens the try again with that plan (D148); --undo steps back
+ore tries [--skill s | --now]   techniques he plans to try (Apply highlights, D127), to try first → [{...annotation, item_title}]; note = his plan, reflection = how it went, uses = earlier rounds (D148), each with the `when` it was done under and the mole's `line`; --now: only the one he is trying in each skill (D324)
+ore tried <t> [--text "how it went"] [--next "plan"] [--undo]   check a try off; --text also drafts one Explain card in the background (D127); --next keeps the round in `uses` and opens the try again with that plan (D148); --undo steps back; `ore tried <t> --line` (AI, prompt `try-line`) writes the mole's one line on the last written-up use and returns it (D324)
 ore try <t> [--plan "I'll…"] [--when "When…"] [--if "what might get in the way, then…"] [--pick] | --skill s --plan "…" [--when "…"]   a try's plan, or --pick it as the one he is trying now in its skill (`ore tries --skill` marks it `active`; before any pick, the first he marked); --skill adds a try with no passage, its own snippet (D322). `ore tried --again` closes a round and keeps the plan; done means it is his
+ore dig <skill> [--text "…" | --ask | --answer "…"… | --done | --drop <dig>] | --ready [--skill s]…   the Dig (D325): alone → {skill, goal, ideas, ready, last}; --text keeps a dig with the skill's key points as they stand (newest 40; under 2, it is done as written); --ask (AI, prompt `dig`) marks ideas that came and asks at most two questions; --answer (AI) marks which came with that nudge, the rest missed; --done ends it unanswered; --ready → the one skill a session may offer, or null. Ready again after 7, 14, 30, 60, then 90 days; never due
 ore match <source> <q> [--drop]       a source that may answer a question, or "not answered here" (D75)
 ore prequestion <item> <n> --before "<text>" | --after "<text>" [--confidence 1-3]   record a prequestion attempt (n 1-based; confidence only with --after) → {item, n, q, before?, after?, confidence?}
 ore notes <item>                      Source note → {item, text, path, dir} (text "" when absent; path relative to the library; dir its folder, absolute)

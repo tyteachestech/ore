@@ -19,6 +19,7 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { afterAnswer, cardQuotes, lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
+import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
 import { endMood, endSays, endTiles, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
@@ -70,7 +71,7 @@ type Put = { id: string; before: DueEntry[]; after: DueEntry[] | null; off: Set<
 type Rating = 1 | 2 | 3 | 4;
 /** The session receipt, and today before and after it (for the ring and level-ups). */
 /** `next`: the oldest try still to try on his own work (D148), shown once on the end screen; null when none. */
-type End = { session: SessionEnd; today: Today; before: Today | null; next: Try | null };
+type End = { session: SessionEnd; today: Today; before: Today | null; next: Try | null; dig?: { skill: string; goal: string } | null };
 
 /** The remixed version shown, for the CLI calls that act on it (D66). */
 const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : []);
@@ -92,7 +93,7 @@ const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id,
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
+function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
   /** Review this source: only its exercises, its new ones included. */
@@ -105,6 +106,8 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
   leave?: MutableRefObject<(() => Promise<void>) | null>;
   skills: Skill[];
   onOpenSource: (item: string, at?: string) => void;
+  /** Ends the session and opens that skill's Dig. */
+  onDig?: (skill: string) => void;
   onClose: (again?: boolean) => void;
   /** A rating taken back (⌘Z) or given again after Review closed: today's numbers changed. */
   onLogged?: () => void;
@@ -470,13 +473,15 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
       }
       // The try line is a nicety: the end screen never waits on or fails for it.
       const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
+      // So is the dig a finished session may offer (D325): one skill, of the ones he reviewed; the Mac's mole reads it.
+      const dig = quick || source || PHONE ? null : ore<{ skill: string; goal: string } | null>("dig", "--ready", ...(pick ?? []).map((s) => opt("skill", s))).catch(() => null);
       // Home draws the Today it last read until a fresh one lands (F125): hand it this one,
       // so Done doesn't show the morning's progress and then push the list down when the goal line appears.
       const today = await ore<Today>("today");
       rememberToday(today);
       // Left after midnight: the ring is the new day's, which this session added only what it rated since to.
       if (dayTurned()) newDay(today, Math.min(turnedMs.current, today.active_ms));
-      setEnd({ session: receipt, today, before: before.current, next: await next });
+      setEnd({ session: receipt, today, before: before.current, next: await next, dig: await dig });
     } catch (e) {
       notify(errorText(e), "error");
       onClose();
@@ -1223,7 +1228,7 @@ export function Review({ pick, source, skills, onOpenSource, onClose, onLogged, 
             </MoleSays>
           </div>
         )}
-        {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} />}
+        {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} onDig={onDig} />}
 
         {!end && card && entry && (
           <div className="review-card" key={`${card.id}-${done}-${left}`}>
@@ -1683,7 +1688,7 @@ function Tally({ tiles, go, skills, onDone }: { tiles: Tile[]; go: boolean; skil
 
 /** The end of a session (D62): the ring fills by this session's minutes and bursts if it closed
  *  just now, a skill that went up a level says so, and the count is of memories kept, never a score. */
-export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void }) {
+export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void; onDig?: (skill: string) => void }) {
   const { session: s, today: t, before: b } = end;
   const part = (x: Today | null) => (!x ? 0 : x.met ? 1 : x.goal_ms ? x.active_ms / x.goal_ms : 0);
   const closed = t.met && !!b && !b.met;
@@ -1866,6 +1871,18 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
           ))}
         </div>
       )}
+      {/* D325: a skill ready to be explained whole, from memory. One line, never owed: a click opens its Dig. */}
+      {end.dig && onDig && (
+        <Hint text="Explain the whole skill from memory · about 4 minutes">
+          <button className="review-try review-dig" onClick={() => onDig(end.dig!.skill)}>
+            <Stone size={16} uses={2} />
+            <span>
+              <span className="review-try-plan">{end.dig.goal}</span>
+              <span className="review-try-from">Dig · {skills.find((x) => x.id === end.dig!.skill)?.name}</span>
+            </span>
+          </button>
+        </Hint>
+      )}
       {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
       {end.next && (
         <Hint text="To try on your own work · opens the passage">
@@ -1894,3 +1911,90 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
   );
 }
 
+
+const CHECKED_IN = "ore.try-checkin";
+const dayOf = (ts: string | number | Date) => new Date(ts).toLocaleDateString("sv");
+const asked = () => {
+  try {
+    return localStorage.getItem(CHECKED_IN) === dayOf(Date.now());
+  } catch {
+    return false;
+  }
+};
+
+/** The try to ask about as a session starts (D324): of the ones he is trying now in the skills under review,
+ *  the one he has left alone longest, and only one he last touched before today. Once a day, never in the quick
+ *  quiz or a review of one source. */
+function useCheckIn(pick: string[] | null, source: string | undefined, quick: boolean): [Try | null | undefined, () => void] {
+  const [t, setT] = useState<Try | null | undefined>(() => (quick || source || asked() ? null : undefined));
+  useEffect(() => {
+    if (t !== undefined) return;
+    let live = true;
+    const all = pick ? Promise.all(pick.map((s) => ore<Try[]>("tries", opt("skill", s)))).then((l) => l.flat().filter((x) => x.active)) : ore<Try[]>("tries", "--now");
+    all.then(
+      (ts) => {
+        if (!live) return;
+        const today = dayOf(Date.now());
+        const one = ts.filter((x) => dayOf(x.ts) < today).sort((a, b) => a.ts.localeCompare(b.ts))[0] ?? null;
+        if (one) {
+          try {
+            localStorage.setItem(CHECKED_IN, today);
+          } catch {
+            // Asked again next session: no harm.
+          }
+        }
+        setT(one);
+      },
+      () => live && setT(null), // The session says what is wrong with the library, not this.
+    );
+    return () => {
+      live = false;
+    };
+  }, [t, pick]);
+  return [t, () => setT(null)];
+}
+
+/** Review, with one question first on the days it applies: did he use the thing he is trying? It is asked where he
+ *  reliably is, takes how it went, and one key ("Not yet", Esc) goes past it. */
+export function Review(props: Parameters<typeof Session>[0]) {
+  const [t, pass] = useCheckIn(props.pick, props.source, !!props.quick);
+  if (t === undefined) return <div className="review" aria-label="Review" />;
+  if (!t) return <Session {...props} />;
+  const save = async (text: string, mine: boolean) => {
+    const use = useOf(t, text, mine);
+    try {
+      await use.run();
+    } catch (e) {
+      props.notify(errorText(e), "error");
+      return false;
+    }
+    props.notify(use.msg, "quiet", use.undo, use.run);
+    if (text) askMole(t.id);
+    return true;
+  };
+  return (
+    <Trap>
+    <div className="review" role="dialog" aria-modal="true" aria-label="Did you try it?" data-gives-back="">
+      <div className="review-head" data-tauri-drag-region>
+        <span className="review-head-gap" />
+        <Hint text="Leave review">
+          <button className="quiz-close" aria-label="Leave review" onClick={() => props.onClose()}>
+            <X size={16} weight="bold" aria-hidden="true" />
+          </button>
+        </Hint>
+      </div>
+      <div className="review-body">
+        <div className="checkin" data-try={t.id}>
+          <p className="checkin-ask">Did you try it?</p>
+          <h1 className="checkin-plan">
+            <Stone uses={usesOf(t)} size={18} />
+            <span>{tryLabel(t)}</span>
+          </h1>
+          {t.when && <p className="checkin-when">when {t.when}</p>}
+          <Did t={t} skip="Not yet" onSave={save} onClose={pass} />
+        </div>
+      </div>
+    </div>
+    </Trap>
+  );
+}

@@ -57,7 +57,7 @@ export function appendNoteText(current: string, text: string, heading: string, g
 
 // Headings the app and CLI write for recalls and the finish line; every other
 // `## ` block in the source note holds his section lines (D32).
-const RESERVED = /^(Recall|Chapter \d+ recall|Use and connections|Use or dispute|Goal try, \d{4}-\d{2}-\d{2})$/;
+const RESERVED = /^(Recall|Chapter \d+ recall|Use and connections|Use or dispute|(?:Goal try|Dig), \d{4}-\d{2}-\d{2})$/;
 
 // His section lines: the non-empty blocks under `## ` headings that are not reserved.
 export function sectionLines(notes: string): { heading: string; text: string }[] {

@@ -4,6 +4,7 @@ import { listItems, type Item } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 import { nowIso, ulid } from "./ids.ts";
+import { loadSkills } from "./skills.ts";
 
 // D127: techniques he plans to try on his own work (Apply-intent highlights). His plan is the note;
 // checking one off records how it went (`reflection`), and enrich then drafts one Explain card from it.
@@ -53,6 +54,12 @@ export function listTries(lib: Library, opts: { skill?: string } = {}): TryView[
   // The one he picked last; before any pick, the first he marked (ids sort by time).
   const active = open.filter((t) => t.picked).sort((a, b) => b.picked!.localeCompare(a.picked!))[0] ?? open.at(-1);
   return all.map((t) => (t.id === active?.id ? { ...t, active: true } : t));
+}
+
+/** The one try he is trying now in each skill (D322), each once however many skills its source is filed under. */
+export function tryingNow(lib: Library): TryView[] {
+  const seen = new Set<string>();
+  return loadSkills(lib).skills.flatMap((s) => listTries(lib, { skill: s.id }).filter((t) => t.active && !seen.has(t.id) && !!seen.add(t.id)));
 }
 
 /** Every "how it went" he wrote on a try, earlier rounds first: what enrich drafts the card from. */
@@ -117,13 +124,13 @@ export async function markTried(lib: Library, ref: string, input: TriedInput): P
     if (input.undo) {
       const last = annotation.status === "open" && !annotation.reflection ? annotation.uses?.at(-1) : undefined;
       const tried = last
-        ? reviseAnnotation(item, annotation, { status: "done", note: last.plan, reflection: last.reflection, done_at: last.ts, uses: annotation.uses!.slice(0, -1) })
-        : reviseAnnotation(item, annotation, { status: "open", reflection: undefined, done_at: undefined });
+        ? reviseAnnotation(item, annotation, { status: "done", note: last.plan, reflection: last.reflection, line: last.line, done_at: last.ts, uses: annotation.uses!.slice(0, -1) })
+        : reviseAnnotation(item, annotation, { status: "open", reflection: undefined, line: undefined, done_at: undefined });
       return { tried, item, card: false };
     }
     const tried = next || input.again
-      ? reviseAnnotation(item, annotation, { status: "open", note: next ?? annotation.note, reflection: undefined, done_at: undefined, uses: [...(annotation.uses ?? []), { ts: nowIso(), plan: annotation.note, reflection }] })
-      : reviseAnnotation(item, annotation, { status: "done", done_at: annotation.status === "done" ? annotation.done_at : nowIso(), ...(reflection ? { reflection } : {}) });
+      ? reviseAnnotation(item, annotation, { status: "open", note: next ?? annotation.note, reflection: undefined, line: undefined, done_at: undefined, uses: [...(annotation.uses ?? []), { ts: nowIso(), plan: annotation.note, reflection, ...(annotation.when ? { when: annotation.when } : {}), ...(annotation.line && reflection === annotation.reflection ? { line: annotation.line } : {}) }] })
+      : reviseAnnotation(item, annotation, { status: "done", done_at: annotation.status === "done" ? annotation.done_at : nowIso(), ...(reflection ? { reflection, ...(reflection !== annotation.reflection ? { line: undefined } : {}) } : {}) });
     return { tried, item, card: !!reflection };
   });
 }

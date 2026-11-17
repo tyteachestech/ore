@@ -15,10 +15,12 @@ import askLibrary from "./prompts/ask-library.md" with { type: "text" };
 import tutor from "./prompts/tutor.md" with { type: "text" };
 import judge from "./prompts/judge.md" with { type: "text" };
 import compare from "./prompts/compare.md" with { type: "text" };
+import dig from "./prompts/dig.md" with { type: "text" };
+import tryLine from "./prompts/try-line.md" with { type: "text" };
 
-export type PromptName = "enrich" | "grade" | "research" | "explain" | "recall-feedback" | "key-points" | "check" | "chat" | "variant" | "variant-check" | "leave-out" | "ask-library" | "tutor" | "judge" | "compare";
+export type PromptName = "enrich" | "grade" | "research" | "explain" | "recall-feedback" | "key-points" | "check" | "chat" | "variant" | "variant-check" | "leave-out" | "ask-library" | "tutor" | "judge" | "compare" | "try-line" | "dig";
 
-const TEXT: Record<PromptName, string> = { enrich, grade, research, explain, "recall-feedback": recallFeedback, "key-points": keyPoints, check, chat, variant, "variant-check": variantCheck, "leave-out": leaveOut, "ask-library": askLibrary, tutor, judge, compare };
+const TEXT: Record<PromptName, string> = { enrich, grade, research, explain, "recall-feedback": recallFeedback, "key-points": keyPoints, check, chat, variant, "variant-check": variantCheck, "leave-out": leaveOut, "ask-library": askLibrary, tutor, judge, compare, "try-line": tryLine, dig };
 
 const OVERRIDE: Partial<Record<PromptName, string>> = {};
 /** Evals only (`eval:tutor --against`): run `name` with this text, an older version to compare against; no text restores it. */

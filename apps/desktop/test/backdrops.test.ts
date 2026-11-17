@@ -17,6 +17,7 @@ const BARE: Record<string, [number, string]> = {
   "Skills.tsx": [1, "Delete skill's Keep or Archive choice: buttons, no field"],
   "Shortcuts.tsx": [1, "the list of shortcuts: read only"],
   "SkillPage.tsx": [1, "the recall box closes only while it is empty, so typing is never lost"],
+  "Dig.tsx": [1, "the Dig closes on its backdrop only while its first field is empty, as the recall box"],
   "phone/ReadingLooks.tsx": [1, "the reader's Aa: buttons and choices that apply at once, no field"],
   "Diagram.tsx": [1, "the diagram's close() saves the drawing itself before it goes"],
   "draw/Editor.tsx": [5, "the diagram's commands, map, link-to-node and link panels: lists and entry boxes applied with ↵, cancelled like Esc"],

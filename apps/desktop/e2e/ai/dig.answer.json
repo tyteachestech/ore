@@ -1,0 +1,17 @@
+{
+  "id": "01M7NVQ0000000000000000DIG",
+  "at": "2026-11-17T12:00:00.000Z",
+  "goal": "Explain how to study to a new teacher, from memory",
+  "text": "Quiz yourself instead of rereading.",
+  "ideas": [
+    { "id": "idea-1", "item": "item-1", "source": "The Testing Effect: Why Retrieval Beats Rereading", "text": "Effortful retrieval, the kind that feels a little hard, produces larger gains than easy retrieval.", "state": "nudge" },
+    { "id": "idea-2", "item": "item-1", "source": "The Testing Effect: Why Retrieval Beats Rereading", "text": "The advantage only appears after a delay", "state": "own" },
+    { "id": "idea-3", "item": "item-2", "source": "Notes on spaced repetition scheduling (FSRS)", "text": "Space the sessions out.", "state": "missed" }
+  ],
+  "asks": [
+    { "idea": "idea-1", "q": "You quiz yourself. Which quiz does more for you, the easy one or the one that makes you sweat, and why?", "answer": "The hard one, the effort is what builds it." },
+    { "idea": "idea-3", "q": "What if you did all your quizzing in one evening?" }
+  ],
+  "done_at": "2026-11-17T12:04:00.000Z",
+  "ai": { "vendor": "claude", "model": "mock", "prompt_version": "dig@1" }
+}

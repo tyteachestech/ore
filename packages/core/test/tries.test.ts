@@ -4,7 +4,7 @@ import { pendingHighlights } from "../src/ai/enrich.ts";
 import { listCards, writeNewCard } from "../src/cards.ts";
 import { addText } from "../src/ingest/index.ts";
 import { findItem } from "../src/items.ts";
-import { addTry, listTries, markTried, planTry, reflections, useCount } from "../src/tries.ts";
+import { addTry, listTries, markTried, planTry, reflections, tryingNow, useCount } from "../src/tries.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const ARTICLE = "# Openings\n\nOpen on the moment of change, then rewind to how we got there.\n\nKeep the rest.\n";
@@ -190,5 +190,33 @@ describe("the Forge: one try at a time, a plan with its cue, tries with no passa
     expect(tried.rev).toBe(1); // written whole in one go: never a plain snippet for a moment
     await expect(addTry(lib, { skill: "storytelling", plan: "  " })).rejects.toThrow(/needs what/);
     await expect(planTry(lib, tried.id, { plan: "" })).rejects.toThrow(/needs what/);
+  });
+});
+
+describe("the rest of the apply loop: each use keeps its moment, and what he is trying now across skills (D324)", () => {
+  test("a round closed with Again keeps the moment it was used in, so a new cue for the next use leaves the record as it was", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });
+    const a = addHighlight(findItem(lib, src.meta.id), { exact: "Open on the moment of change", intent: "apply", note: "Cold open first" });
+    await planTry(lib, a.id, { when: "outlining a video" });
+    await markTried(lib, a.id, { reflection: "Hooked better.", again: true });
+    await planTry(lib, a.id, { when: "writing a newsletter" });
+    await markTried(lib, a.id, { again: true });
+    const t = listTries(lib, { skill: "storytelling" })[0]!;
+    expect(t.uses!.map((u) => [u.when, u.reflection])).toEqual([["outlining a video", "Hooked better."], ["writing a newsletter", undefined]]);
+    expect(t.when).toBe("writing a newsletter");
+  });
+
+  test("trying now lists each skill's one active try, once, and none for a skill whose tries are all his", async () => {
+    const lib = await tempLibrary();
+    const both = await addText(lib, ARTICLE, { skills: ["storytelling", "ai"] });
+    const a = addHighlight(findItem(lib, both.meta.id), { exact: "Open on the moment of change", intent: "apply" });
+    const b = addHighlight(findItem(lib, both.meta.id), { exact: "Keep the rest.", intent: "apply" });
+    expect(tryingNow(lib).map((t) => t.id)).toEqual([a.id]);
+    await planTry(lib, b.id, { pick: true });
+    expect(tryingNow(lib).map((t) => t.id)).toEqual([b.id]);
+    await markTried(lib, a.id, {});
+    await markTried(lib, b.id, {});
+    expect(tryingNow(lib)).toEqual([]);
   });
 });

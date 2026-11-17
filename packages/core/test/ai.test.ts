@@ -12,9 +12,13 @@ import { enrichError, enrichItem, needsEnrich, pendingHighlights, pendingItems, 
 import { chapterRecallFeedback, recallFeedback } from "../src/ai/recall.ts";
 import { anchorEvidence, checkPrequestion, finishScope, scopeFinish, setCovered, writeKeyPoints } from "../src/ai/check.ts";
 import { addHighlight, addPoint, findAnnotation, readAnnotations, reviseAnnotation } from "../src/annotations.ts";
-import { markTried } from "../src/tries.ts";
+import { markTried, planTry } from "../src/tries.ts";
+import { tryLine } from "../src/ai/tries.ts";
+import { digAnswer, digAsk } from "../src/ai/dig.ts";
+import { readDigs, startDig } from "../src/digs.ts";
+import { setSkillLook } from "../src/skills.ts";
 import { listCards, writeNewCard } from "../src/cards.ts";
-import { addSnippet } from "../src/ingest/index.ts";
+import { addSnippet, addText } from "../src/ingest/index.ts";
 import { sha256 } from "../src/fsutil.ts";
 import { createItem, findItem, setItemStatus, setPrequestionAttempt, updateItemMeta } from "../src/items.ts";
 import { appendNote, setChapterRecall, setNotes, setRecall } from "../src/notes.ts";
@@ -978,3 +982,93 @@ describe("what a claude task may read (D292)", () => {
     expect(claudeTools({ files: [join(`${dir}-link`, "doc.md")], web: true }).allowed[0]).toBe(`Read(/${dir}/doc.md)`);
   });
 });
+
+describe("the mole's line on a use of a try (D324)", () => {
+  const TEXT = "# Openings\n\nOpen on the moment of change, then rewind to how we got there.\n";
+  const inputOf = (call: number) => JSON.parse(readFileSync(join(binDir, "args.jsonl"), "utf8").split("\n")[call]!)[1] as string;
+  test("it reads the last use he wrote up against his plan and earlier rounds, and is kept beside that use with its stamp; a round and a try that is his each keep their own", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, TEXT, { skills: ["storytelling"] });
+    const a = addHighlight(findItem(lib, src.meta.id), { exact: "Open on the moment of change", intent: "apply", note: "Cold open first" });
+    await expect(tryLine(lib, a.id)).rejects.toThrow(/write how it went first/);
+    await planTry(lib, a.id, { when: "outlining a video" });
+    await markTried(lib, a.id, { reflection: "Hooked better; the rewind ran long.", again: true });
+    fakeClaude([{ line: "The hook landed. Cut the rewind to two beats next time." }, { line: "Twice on videos now. Try it on a newsletter." }]);
+    const first = await tryLine(lib, a.id);
+    expect(first.line).toEqual({ text: "The hook landed. Cut the rewind to two beats next time.", ai: { vendor: "claude", model: "claude-fake-1", prompt_version: "try-line@1" } });
+    const sent = JSON.parse(inputOf(0).slice(inputOf(0).indexOf("{"), inputOf(0).lastIndexOf("}") + 1));
+    expect(sent).toMatchObject({ plan: "Cold open first", when: "outlining a video", went: "Hooked better; the rewind ran long.", rounds: [], passage: "Open on the moment of change" });
+    expect(findAnnotation(lib, a.id).annotation.uses![0]!.line!.text).toBe(first.line.text);
+
+    // The third use makes it his: the line is the try's own, and the round's stays.
+    await markTried(lib, a.id, { reflection: "Two beats worked." });
+    await tryLine(lib, a.id);
+    const now = findAnnotation(lib, a.id).annotation;
+    expect([now.uses![0]!.line!.text, now.line!.text]).toEqual([first.line.text, "Twice on videos now. Try it on a newsletter."]);
+    const second = JSON.parse(inputOf(1).slice(inputOf(1).indexOf("{"), inputOf(1).lastIndexOf("}") + 1));
+    expect(second.rounds).toEqual([{ plan: "Cold open first", when: "outlining a video", went: "Hooked better; the rewind ran long." }]);
+    // Put back to try again, what the mole said about a use that no longer stands goes with it.
+    await markTried(lib, a.id, { undo: true });
+    expect(findAnnotation(lib, a.id).annotation.line).toBeUndefined();
+  });
+
+  test("a use written again while the mole was thinking keeps no line for the old words", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, TEXT, { skills: ["storytelling"] });
+    const a = addHighlight(findItem(lib, src.meta.id), { exact: "Open on the moment of change", intent: "apply", note: "Cold open first" });
+    await markTried(lib, a.id, { reflection: "Fine." });
+    fakeClaude([{ line: "What changed because of it?" }]);
+    writeFileSync(join(binDir, "while.js"), `require("child_process").execFileSync("bun", [${JSON.stringify(join(import.meta.dir, "../../cli/src/ore.ts"))}, "tried", ${JSON.stringify(a.id)}, "--text", "It hooked them."], { env: { ...process.env, ORE_LIBRARY: ${JSON.stringify(lib.root)}, ORE_NO_ENRICH: "1" } });`);
+    await expect(tryLine(lib, a.id)).rejects.toThrow(/changed while the mole was thinking/);
+    expect(findAnnotation(lib, a.id).annotation).toMatchObject({ reflection: "It hooked them." });
+    expect(findAnnotation(lib, a.id).annotation.line).toBeUndefined();
+  });
+});
+
+describe("the Dig: the mole reads a skill explained from memory (D325)", () => {
+  const TEXT = "# Learning\n\nTesting yourself beats rereading.\n\nSpace the sessions out.\n\nMix the topics.\n";
+  const sentAt = (call: number) => {
+    const raw = JSON.parse(readFileSync(join(binDir, "args.jsonl"), "utf8").split("\n")[call]!)[1] as string;
+    return JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
+  };
+  async function dug() {
+    const lib = await tempLibrary();
+    const src = await addText(lib, TEXT, { skills: ["learning"] });
+    for (const exact of ["Testing yourself beats rereading.", "Space the sessions out.", "Mix the topics."]) addHighlight(findItem(lib, src.meta.id), { exact, intent: "card" });
+    await setSkillLook(lib, "learning", { goal: "Explain how to study, from memory" });
+    await startDig(lib, "learning", "Quiz yourself instead of rereading.");
+    return lib;
+  }
+
+  test("ideas in what he wrote came on their own; an idea he pulls out after the mole's question came with a nudge; the rest didn't come", async () => {
+    const lib = await dug();
+    // Ideas are numbered newest first: 1 mix, 2 space, 3 testing.
+    fakeClaude([{ came: [3], asks: [{ n: 2, q: "You quiz yourself. When do you do the next one, and why then?" }, { n: 1, q: "What if you have three subjects to study in one evening?" }] }, { came: [2], asks: [] }]);
+    const asked = await digAsk(lib, "learning");
+    expect(sentAt(0)).toMatchObject({ stage: "ask", goal: "Explain how to study, from memory", text: "Quiz yourself instead of rereading.", ideas: [{ n: 1, text: "Mix the topics.", source: "Learning" }, { n: 2 }, { n: 3 }] });
+    expect(asked.ideas.map((i) => i.state)).toEqual([undefined, undefined, "own"]);
+    expect(asked.asks!.map((a) => a.q)).toEqual(["You quiz yourself. When do you do the next one, and why then?", "What if you have three subjects to study in one evening?"]);
+    expect(asked.done_at).toBeUndefined();
+    await expect(digAsk(lib, "learning")).rejects.toThrow(/asked already/);
+
+    // He answers the first and skips the second: only the answered one goes to the mole.
+    const done = await digAnswer(lib, "learning", ["A few days later, when it has started to fade.", ""]);
+    expect(sentAt(1)).toMatchObject({ stage: "check", ideas: [{ n: 2, text: "Space the sessions out." }], asks: [{ n: 2, answer: "A few days later, when it has started to fade." }] });
+    expect(done.ideas.map((i) => i.state)).toEqual(["missed", "nudge", "own"]);
+    expect(done.asks!.map((a) => a.answer)).toEqual(["A few days later, when it has started to fade.", undefined]);
+    expect(done.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "dig@1" });
+    expect(readDigs(lib, "learning")[0]!.done_at).toBeDefined();
+    await expect(digAnswer(lib, "learning", ["More."])).rejects.toThrow(/finished/);
+  });
+
+  test("nothing central left out: no question, and the dig is done; an idea may not be both in his text and asked about", async () => {
+    const lib = await dug();
+    fakeClaude([{ came: [3], asks: [{ n: 3, q: "Why does that work?" }] }, { came: [1, 2, 3], asks: [] }]);
+    const d = await digAsk(lib, "learning");
+    expect(sentAt(1)).toBeDefined(); // asked again after the answer that named idea 3 twice
+    expect(d.ideas.map((i) => i.state)).toEqual(["own", "own", "own"]);
+    expect(d.asks).toEqual([]);
+    expect(d.done_at).toBeDefined();
+  });
+});
+

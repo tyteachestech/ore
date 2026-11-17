@@ -145,6 +145,7 @@ Each type lists what it is for, the evidence, how to write one, and what to avoi
 - **For:** a whole section or source, straight after reading and at goal tries. Not a spaced exercise.
 - **Evidence (Moderately supported, contested):** free recall beat concept mapping on later inference questions [46], though a 2023 paper argues that comparison was confounded [47], and combining the two added nothing [48]. Free recall helps the broad picture and motivation, short answer helps the targeted points [3]; the two together did best [49]. Explaining to an imagined learner gives small to moderate, inconsistent gains [52], and the gain seems to come from the retrieval in it [50]. One study found teaching with the text open beat teaching from memory and neither beat restudy [51].
 - **Write it:** one prompt that names the scope ("everything you remember about X from this chapter") or the audience ("explain X to someone new"). Afterwards, show what he missed against the source's main ideas.
+- **Amended 2026-11-17 (D325):** Tyler chose to offer it per skill on a widening gap, ungraded and never due; the rest of this section stands.
 - **Avoid:** scheduling it as a spaced item (too long, no clean grade); no feedback on what was missed; a scope as wide as a whole book; using it instead of targeted questions, since they do different jobs [3].
 
 ### 10. Multiple choice and true/false
