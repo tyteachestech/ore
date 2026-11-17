@@ -222,7 +222,7 @@ describe("AI adapter", () => {
     expect(readTopic(lib, "agent-workflows")!.meta.status).toBe("active");
     const after = findItem(lib, item.meta.id).meta;
     expect(after.enriched_at).toBeDefined();
-    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@16" });
+    expect(after.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "enrich@17" });
     const cards = listCards(lib);
     expect(cards).toHaveLength(1);
     expect(cards[0]!.meta).toMatchObject({ state: "draft", kind: "prompt", annotation: card.id, topics: ["agent-workflows"], ai: after.ai });
@@ -292,6 +292,23 @@ describe("AI adapter", () => {
     // a highlight made after the plan is weighed next time
     const late = hl("Nobody saw it coming.");
     expect(pendingHighlights(findItem(lib, id), listCards(lib)).map((x) => x.id)).toEqual([late.id]);
+  });
+
+  test("D318: a term he opened Explain on stays a plain highlight, waits for the finish and is sent as looked up", async () => {
+    const lib = await tempLibrary();
+    const id = (await createItem(lib, { type: "article", title: "Agents", body: "Agents use an orchestrator. The orchestrator splits the task into subtasks." })).meta.id;
+    const term = addHighlight(findItem(lib, id), { exact: "orchestrator", intent: "keep", start: 30, looked_up: true });
+    expect(term.looked_up).toBe(true);
+    const other = addHighlight(findItem(lib, id), { exact: "Agents use", intent: "keep" });
+    // Explain on a highlight he already had marks that one; a second lookup changes nothing.
+    const marked = reviseAnnotation(findItem(lib, id), other, { looked_up: true });
+    expect(addHighlight(findItem(lib, id), { exact: "Agents use", intent: "keep", looked_up: true }).rev).toBe(marked.rev);
+    expect(pendingHighlights(findItem(lib, id), listCards(lib))).toEqual([]); // a plain highlight: weighed at the finish
+    await setItemStatus(lib, id, "done");
+    fakeClaude([enrichOut(["Q1?", "Q2?"], [{ ...draft(term.id), content_type: "definition", question: "In agent systems, what is an orchestrator?" }])]);
+    await enrichItem(lib, id);
+    const sent = JSON.parse(inputOf(0).slice(inputOf(0).indexOf("{"), inputOf(0).lastIndexOf("}") + 1));
+    expect(sent.highlights.map((h: { text: string; intent: string; looked_up: boolean }) => [h.text, h.intent, h.looked_up]).sort()).toEqual([["Agents use", "highlight", true], ["orchestrator", "highlight", true]]);
   });
 
   test("D180: on a source he is still reading, plain highlights are planned once it has rested; prequestions wait for the finish", async () => {

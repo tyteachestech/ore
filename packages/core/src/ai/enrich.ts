@@ -212,6 +212,7 @@ async function enrichOnce(lib: Library, ref: string, now: Date): Promise<EnrichR
         context: `${a.prefix}[[${a.exact}]]${a.suffix}`,
         answer: a.intent === "question" ? (a.answers ?? []).map((c) => c.text).join("\n") : null,
         point: a.point ?? false,
+        looked_up: a.looked_up ?? false,
         reflection: a.intent === "apply" ? reflections(a).join("\n") || null : null,
       })),
       open_questions: questions,

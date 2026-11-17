@@ -1906,7 +1906,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }
 
   // D15: a selection becomes a Keep highlight at once; the popup only refines it.
-  function createHighlight(sel: Range, intent: Intent = "keep", aim?: Aim, popupToo = true) {
+  /** Makes the highlight; its id (a stand-in until the write is back), or undefined when there is nothing to highlight. */
+  function createHighlight(sel: Range, intent: Intent = "keep", aim?: Aim, popupToo = true, lookedUp = false): string | undefined {
     const index = idx.current;
     if (!doc || !src || !index) return;
     const range = wholeMath(sel); // a formula is highlighted whole, as it is saved
@@ -1914,6 +1915,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     if (!text.trim()) return;
     const q = sourceQuote(src, doc.body, index, range);
     const args = ["highlight", p.id, opt("exact", q?.exact ?? text.trim()), "--intent", intent];
+    if (lookedUp) args.push("--looked-up");
     // Never without a place: the core saves the match nearest it, not the first one in the source.
     args.push("--start", String(q ? q.start : sourceHint(src, index, range)));
     const tmp = `pending-${Date.now()}`;
@@ -1922,7 +1924,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     pending.current.set(tmp, promise);
     ranges.current.set(tmp, range);
     vein(range, intent);
-    setAnns((l) => [...l, { id: tmp, rev: 0, intent, exact: text, prefix: "", suffix: "", start: 0, end: 0, status: "open" }]);
+    setAnns((l) => [...l, { id: tmp, rev: 0, intent, exact: text, prefix: "", suffix: "", start: 0, end: 0, status: "open", ...(lookedUp && { looked_up: true }) }]);
     if (intent === "card") gather(tmp);
     if (popupToo) {
       openPopup(tmp, range, "", aim);
@@ -1966,6 +1968,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         p.notify(placeError(e), "error");
       },
     );
+    return tmp;
   }
 
   /** A passage chosen with the mouse or the keyboard: inside a highlight he already made, that one opens
@@ -2321,18 +2324,28 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     else closePopup();
   }
 
-  /** Look Up (D83) on a word: from the popup, a fresh, untouched Keep was only a way to point, so it
-   *  goes, as with Start here; a highlight he already had stays. */
+  /** Marks a highlight looked up; quiet, since the Explain popover is what he is looking at. */
+  async function markLookedUp(id: string) {
+    setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, looked_up: true } : a)));
+    try {
+      await annotate(id, "--looked-up");
+    } catch {
+      // Not saved: the highlight is still his, only the plan won't know he looked it up.
+    }
+  }
+
+  /** Explain (D97) on a word: a term he had to look up is one he didn't know, so it stays highlighted,
+   *  marked looked up, and the plan weighs it at the finish (D318). With no highlight there
+   *  (the key on the word under the pointer), it becomes a plain one. */
   function lookUp(range: Range, from: Popup | null) {
     let ann: string | null = null;
     if (from) {
-      const a = annOf(from.id);
-      const drop = sameId(fresh.current, from.id) && a?.intent === "keep" && !a.note && !from.note.trim();
-      if (drop) void remove(false);
-      else {
-        ann = from.id;
-        closePopup();
-      }
+      ann = from.id;
+      closePopup();
+      if (!annOf(from.id)?.looked_up) void realId(from.id).then((id) => markLookedUp(id));
+    } else if (!holderOf(range)) {
+      // Inside a passage he highlighted, no second highlight is stacked on it (the passage is his mark).
+      ann = createHighlight(range, "keep", undefined, false, true) ?? null;
     }
     // Explain is taller than the highlight popup: below the term unless there's room above.
     const at = placeFor(range, 380);
