@@ -473,7 +473,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       }
       // The try line is a nicety: the end screen never waits on or fails for it.
       const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
-      // So is the dig a finished session may offer (D-new-dig): one skill, of the ones he reviewed; the Mac's mole reads it.
+      // So is the dig a finished session may offer (D325): one skill, of the ones he reviewed; the Mac's mole reads it.
       const dig = quick || source || PHONE ? null : ore<{ skill: string; goal: string } | null>("dig", "--ready", ...(pick ?? []).map((s) => opt("skill", s))).catch(() => null);
       // Home draws the Today it last read until a fresh one lands (F125): hand it this one,
       // so Done doesn't show the morning's progress and then push the list down when the goal line appears.
@@ -1871,7 +1871,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
           ))}
         </div>
       )}
-      {/* D-new-dig: a skill ready to be explained whole, from memory. One line, never owed: a click opens its Dig. */}
+      {/* D325: a skill ready to be explained whole, from memory. One line, never owed: a click opens its Dig. */}
       {end.dig && onDig && (
         <Hint text="Explain the whole skill from memory · about 4 minutes">
           <button className="review-try review-dig" onClick={() => onDig(end.dig!.skill)}>

@@ -3914,7 +3914,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .diagram-art svg { max-width: 100%; max-height: 100%; width: auto; height: auto; }
 .diagram-empty { color: var(--muted); font-size: 15px; padding: 0 24px; text-align: center; }
 .kb-bar.moving .kb-btn:not(:disabled) { color: var(--text); }
-/* The Dig (D-new-dig): the mole's question, then the skill's key points as stones, a row per source. */
+/* The Dig (D325): the mole's question, then the skill's key points as stones, a row per source. */
 .review-try + .review-try { margin-top: 2px; }
 .review-dig .stone, .dig .stone:not([data-waiting]) { color: var(--card-solid); }
 .dig-mole { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px; font-size: 16px; line-height: 1.4; }

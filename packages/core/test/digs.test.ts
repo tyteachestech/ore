@@ -19,7 +19,7 @@ async function skillWithIdeas() {
   return { lib, ideas };
 }
 
-describe("the Dig: a skill explained from memory against its key points (D-new-dig)", () => {
+describe("the Dig: a skill explained from memory against its key points (D325)", () => {
   test("a dig keeps what he wrote with the ideas as they stood: the skill's key points, fixed before anything reads it", async () => {
     const { lib, ideas } = await skillWithIdeas();
     expect(digIdeas(lib, "learning").map((i) => i.text).sort()).toEqual(["Mix the topics.", "Space the sessions out.", "Testing yourself beats rereading."]);

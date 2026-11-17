@@ -1025,7 +1025,7 @@ describe("the mole's line on a use of a try (D324)", () => {
   });
 });
 
-describe("the Dig: the mole reads a skill explained from memory (D-new-dig)", () => {
+describe("the Dig: the mole reads a skill explained from memory (D325)", () => {
   const TEXT = "# Learning\n\nTesting yourself beats rereading.\n\nSpace the sessions out.\n\nMix the topics.\n";
   const sentAt = (call: number) => {
     const raw = JSON.parse(readFileSync(join(binDir, "args.jsonl"), "utf8").split("\n")[call]!)[1] as string;

@@ -15,7 +15,7 @@ import { errorText, useFocusWhileMounted, type Notify } from "./util";
 type Idea = { id: string; item: string; source: string; text: string; state?: "own" | "nudge" | "missed" };
 export type Dig = { id: string; at: string; goal: string; text: string; ideas: Idea[]; asks?: { idea: string; q: string; answer?: string }[]; done_at?: string };
 
-/** A skill a finished session asked to dig (D-new-dig): its page opens the Dig when it shows. */
+/** A skill a finished session asked to dig (D325): its page opens the Dig when it shows. */
 let asked: string | null = null;
 const waiting = new Set<() => void>();
 export function askDig(skill: string | null) {
@@ -33,7 +33,7 @@ export const useDigAsked = () =>
 const drafts = new Map<string, string>();
 const STATE = { own: "Came on its own", nudge: "Came with a nudge", missed: "Didn’t come" } as const;
 
-/** The Dig (D-new-dig): the skill's goal done from memory over the blurred page; then the mole asks one
+/** The Dig (D325): the skill's goal done from memory over the blurred page; then the mole asks one
  *  or two questions at ideas left out, and the skill's key points show as stones: solid for an idea that
  *  came on its own, loose for one a question pulled out, loose and grey for one that didn't come,
  *  which opens its passage. No grade. What he wrote is kept, dated, in the skill note as well. */

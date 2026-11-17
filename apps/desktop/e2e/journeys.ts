@@ -8924,7 +8924,7 @@ journey("try it: the end of a review shows the oldest open try, and a click open
   await calls.undoAll(); // the rating, for the journeys after this one
 });
 
-journey("dig: a finished session offers one skill's dig; he explains the goal from memory, answers the mole's question, and its key points show as stones, with nothing graded (D-new-dig)", async (page) => {
+journey("dig: a finished session offers one skill's dig; he explains the goal from memory, answers the mole's question, and its key points show as stones, with nothing graded (D325)", async (page) => {
   const GOAL = "Explain how to study to a new teacher, from memory";
   const calls = oreCalls(page);
   const src = ((await ore("ls", "--skill", "learning")) as { id: string; title: string }[]).find((i) => i.title.startsWith("The Testing Effect"))!;

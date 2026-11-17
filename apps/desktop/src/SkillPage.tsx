@@ -98,7 +98,7 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
     return () => (cancelAnimationFrame(raf), stop());
   }, [loaded, noteScroll]);
   const editor = useRef<NoteEditorHandle>(null);
-  // The closed-book popup: the D41 warm-up, or the Dig at his goal (D-new-dig).
+  // The closed-book popup: the D41 warm-up, or the Dig at his goal (D325).
   const [recalling, setRecalling] = useState<"warm" | "goal" | null>(null);
   // A session that ended by offering this skill's dig opens it here.
   const digAsked = useDigAsked();
@@ -465,7 +465,7 @@ function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skil
 }
 
 const GOAL_TRY = /^## (?:Goal try|Dig), (\d{4}-\d{2}-\d{2})\s*$/gm;
-/** The date of his latest dig at the goal, from the skill note's "Dig, <date>" headings ("Goal try" before D-new-dig). */
+/** The date of his latest dig at the goal, from the skill note's "Dig, <date>" headings ("Goal try" before D325). */
 function lastGoalTry(text: string | null): string | null {
   const all = [...(text ?? "").matchAll(GOAL_TRY)].map((m) => m[1]!).sort();
   return all.at(-1) ?? null;

@@ -20,7 +20,7 @@ export const DigIdea = z.object({
 });
 export type DigIdea = z.infer<typeof DigIdea>;
 
-/** The Dig (D-new-dig): the whole skill explained from memory, the mole's one or two questions at
+/** The Dig (D325): the whole skill explained from memory, the mole's one or two questions at
  *  ideas he left out, and which ideas came. No grade, no card, outside FSRS. */
 export const Dig = z.object({
   id: z.string(),

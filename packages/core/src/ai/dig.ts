@@ -19,7 +19,7 @@ const open = (lib: Library, skill: string): Dig => {
 const skillOf = (lib: Library, skill: string) => ({ name: loadSkills(lib).skills.find((s) => s.id === skill)!.name });
 const numbered = (d: Dig) => d.ideas.map((i, n) => ({ n: n + 1, text: i.text, source: i.source }));
 
-/** The mole reads what he wrote (D-new-dig): which of the skill's ideas are in it, and one or two
+/** The mole reads what he wrote (D325): which of the skill's ideas are in it, and one or two
  *  questions, each at an idea he left out. With nothing left out the dig is done. Never a grade. */
 export async function digAsk(lib: Library, skill: string): Promise<Dig> {
   const d = open(lib, skill);
