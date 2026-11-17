@@ -25,7 +25,8 @@
     "ids": "bun packages/core/scripts/ids.ts",
     "sweep": "bun apps/desktop/scripts/sweep.ts",
     "ship": "bun packages/core/scripts/ship.ts",
-    "phone:install": "bun apps/phone/scripts/install.ts"
+    "phone:install": "bun apps/phone/scripts/install.ts",
+    "auto-update": "bun apps/desktop/scripts/auto-update.ts"
   },
   "devDependencies": {
     "@types/bun": "^1.4.2",
