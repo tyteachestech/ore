@@ -1759,7 +1759,7 @@ button.try-stone:hover .stone { opacity: 1; }
 .forge-row:hover, .forge-row:focus-within { background: var(--bg-hover); }
 .forge-open { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; padding: 9px 8px; border-radius: 8px; text-align: left; }
 .forge-open .try-when { padding-top: 2px; }
-.crumbs svg, .forge-door svg { width: 12px; height: 12px; }
+.crumbs svg, .forge-door svg { width: 16px; height: 16px; }
 .forge-row:not([data-state="now"]) .try-do { color: var(--text-read); }
 .forge-row .forge-pick, .forge-row .more { visibility: hidden; }
 .forge-row:hover :is(.forge-pick, .more), .forge-row:focus-within :is(.forge-pick, .more), .forge-row .more[aria-expanded="true"] { visibility: visible; }
@@ -3350,6 +3350,14 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-skill .question .question-actions { display: none; }
 .phone .phone-skill .question { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .phone .phone-skill :is(.q-check, .try-check)::before { content: ""; position: absolute; inset: -14px; }
+.phone .phone-skill :is(.forge-door, button.try-stone, .tool-btn, .crumbs button, .forge-pick, .forge .more) { position: relative; }
+.phone .phone-skill :is(.forge-door, button.try-stone, .tool-btn, .crumbs button, .forge-pick, .forge .more)::after { content: ""; position: absolute; inset: -13px; }
+/* No hover on a phone: a row's actions always show. */
+.phone .phone-skill .forge-row :is(.forge-pick, .more) { visibility: visible; }
+.phone .phone-skill .forge-head .icon-btn { width: 44px; height: 44px; margin: -9px; }
+.phone .phone-skill .forge { padding: 8px 0 0; }
+.phone .phone-skill :is(.try-line, .forge-open, .try-passage, .try-go, .plan-line) { min-height: 44px; }
+.phone .phone-skill .try-line { align-items: center; }
 /* A course as one row: its title, and under it the lesson a tap goes on with. */
 .phone-sources .phone-two { display: flex; flex-direction: column; gap: 2px; }
 .phone-two > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

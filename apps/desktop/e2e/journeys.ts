@@ -11623,7 +11623,7 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
   await page.locator(".phone-skill .head-tab-btn").first().waitFor();
   // What a finger hits: the control, grown by an unseen ::before or ::after laid over it (the question circles' way).
-  const small = await page.locator(".phone-skill").evaluate((root) => [...root.querySelectorAll<HTMLElement>("button, [role=button], [role=tab]")].flatMap((e) => {
+  const small = () => page.locator(".phone-skill").evaluate((root) => [...root.querySelectorAll<HTMLElement>("button, [role=button], [role=tab]")].flatMap((e) => {
     const r = e.getBoundingClientRect();
     if (!r.width || !r.height) return [];
     let [w, h] = [r.width, r.height];
@@ -11636,7 +11636,23 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
     }
     return w < 44 || h < 44 ? [`${e.getAttribute("aria-label") ?? e.textContent?.trim().slice(0, 20)} ${Math.round(w)}×${Math.round(h)}`] : [];
   }));
-  if (small.length) throw new Error(`taps under 44 pt on the skill page: ${small.join(", ")}`);
+  const check = async (where: string) => { const s = await small(); if (s.length) throw new Error(`taps under 44 pt on ${where}: ${s.join(", ")}`); };
+  await check("the skill page");
+  // The Forge and a try's own page are skill pages too (D-new-forge).
+  await tap(page, page.locator(".phone-skill .forge-door"));
+  await check("the Forge");
+  await tap(page, page.getByRole("button", { name: "Add something to try" }));
+  await check("the Forge, adding");
+  await page.getByLabel("I’ll…").fill("Recall before rereading");
+  await page.keyboard.press("Enter");
+  await page.locator(".phone-skill .forge-row").first().waitFor();
+  await check("the Forge with a try");
+  await tap(page, page.locator(".phone-skill .forge-open").first());
+  await page.locator(".phone-skill .try-path").waitFor();
+  await check("a try's page");
+  await tap(page, page.locator(".phone-skill .crumbs button").first());
+  await page.locator(".phone-skill .try-now").waitFor();
+  await check("the skill page with a try");
 }, "phone");
 
 journey("phone: in Review the buttons he taps on every exercise sit at the foot of the screen, and what the last answer won stands above them (F137)", async (page) => {

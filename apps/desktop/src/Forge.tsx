@@ -227,7 +227,7 @@ export function TryingNow({ tries, onSub, head }: { tries: Tries; onSub: (s: Sub
           {did && <Did t={now} onClose={() => setDid(false)} onSave={(text, mine) => tries.did(now, text, mine)} />}
         </div>
       ) : (
-        <p className="quiet">{ts.length ? "Nothing in the works. Pick the next one in the Forge." : "Mark a technique with Try it (4) while you read, or add one in the Forge."}</p>
+        <p className="quiet">{ts.length ? "Nothing in the works. Pick the next one in the Forge." : "Mark a technique with Try it while you read, or add one in the Forge."}</p>
       )}
       {waiting.length > 0 && (
         <div className="try-stones">
@@ -338,7 +338,7 @@ export function Forge({ skill, tries, onSub }: { skill: Skill; tries: Tries; onS
           <span>{skill.goal}</span>
         </p>
       )}
-      {tries.ts && !ts.length && !adding && <p className="quiet">Nothing here yet. Mark a technique with Try it (4) while you read, or add one with +.</p>}
+      {tries.ts && !ts.length && !adding && <p className="quiet">Nothing here yet. Mark a technique with Try it while you read, or add one with +.</p>}
       {band("Trying now", now)}
       {band("Waiting", waiting, adding ? <AddTry onAdd={(plan, when) => tries.add(plan, when)} onClose={() => setAdding(false)} /> : undefined)}
       {band("Yours", mine)}
