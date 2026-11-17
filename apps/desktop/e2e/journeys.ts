@@ -4150,6 +4150,8 @@ journey("All sources: a row dragged onto a sidebar skill is filed there, and ⌘
   const ids = await targets.evaluateAll((els) => els.map((el) => el.getAttribute("data-drop-skill")!));
   const k = ids.findIndex((id) => !under.skills.includes(id));
   const name = (await targets.nth(k).innerText()).trim();
+  // Sources earlier journeys left can push the row below the window, where the pointer can't press it.
+  await row.scrollIntoViewIfNeeded();
   const from = (await row.boundingBox())!;
   const to = (await targets.nth(k).boundingBox())!;
   await page.mouse.move(from.x + 60, from.y + from.height / 2);
