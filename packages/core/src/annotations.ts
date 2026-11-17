@@ -38,6 +38,11 @@ export const AnnotationSchema = z.object({
   // Apply intent (D148): earlier rounds of the same try, oldest first. "Next time I'll…" closes a round
   // (his plan and how it went move here) and the try is open again with the new plan as its note.
   uses: z.array(z.object({ ts: z.string(), plan: z.string().optional(), reflection: z.string().optional() })).optional(),
+  // Apply intent (D-new-forge): the plan's cue ("When…", the note is what he'll do then), what might get in the
+  // way and what he'll do about it, and a ULID from when he last picked it as the one he is trying now (the latest wins).
+  when: z.string().optional(),
+  obstacle: z.string().optional(),
+  picked: z.string().optional(),
   // A card or question he typed with nothing selected ("Card here"): `exact` is only the sentence where he
   // was; the note is what counts, and a card is drafted from it and the whole source, with quotes.
   point: z.boolean().optional(),
@@ -154,16 +159,16 @@ export function findAnnotation(lib: Library, ref: string): { item: Item; annotat
   return { item: findItem(lib, hit.dir.slice(-26)), annotation: hit.annotation };
 }
 
-/** A snippet that only carries a question (typed on a skill page, or captured with Question intent):
- *  nothing to read, so it lives under Questions and stays out of the source lists, also once the
- *  question is deleted (else it would turn up under To read). */
+/** A snippet that only carries a question (typed on a skill page, or captured with Question intent) or
+ *  a try he typed in the Forge (D-new-forge): nothing to read, so it lives under Questions or in the Forge
+ *  and stays out of the source lists, also once it is deleted (else it would turn up under To read). */
 export function isQuestionOnly(item: Item): boolean {
   if (item.meta.type !== "snippet") return false;
   const all = latestRevs(annotationRevs(item.dir));
-  return all.length > 0 && all.every((a) => a.intent === "question");
+  return all.length > 0 && all.every((a) => a.intent === "question" || (a.intent === "apply" && !!a.point));
 }
 
-export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses" | "looked_up">>;
+export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses" | "looked_up" | "when" | "obstacle" | "picked" | "point">>;
 
 // Edits never rewrite history: they append the same id with rev + 1.
 export function reviseAnnotation(item: Item, current: Annotation, patch: AnnotationPatch): Annotation {

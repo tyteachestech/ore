@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { addHighlight, findAnnotation, readAnnotations } from "../src/annotations.ts";
+import { addHighlight, findAnnotation, isQuestionOnly, readAnnotations } from "../src/annotations.ts";
 import { pendingHighlights } from "../src/ai/enrich.ts";
 import { listCards, writeNewCard } from "../src/cards.ts";
 import { addText } from "../src/ingest/index.ts";
 import { findItem } from "../src/items.ts";
-import { listTries, markTried, reflections } from "../src/tries.ts";
+import { addTry, listTries, markTried, planTry, reflections, useCount } from "../src/tries.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const ARTICLE = "# Openings\n\nOpen on the moment of change, then rewind to how we got there.\n\nKeep the rest.\n";
@@ -122,5 +122,60 @@ describe("tries: rounds without a write-up, and one card per idea (D148)", () =>
     expect(card).toBe(true); // the CLI starts an enrich, which then finds nothing new to draft for this idea
     expect(reflections(tried)).toEqual(["Hooked better.", "Shorter worked."]);
     expect(pendingHighlights(findItem(lib, src.meta.id), cards())).toEqual([]);
+  });
+});
+
+describe("the Forge: one try at a time, a plan with its cue, tries with no passage (D-new-forge)", () => {
+  test("one open try of a skill is active: the first he marked, then the one he picked last; a try that is his can't be picked", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });
+    const it = findItem(lib, src.meta.id);
+    const a = addHighlight(it, { exact: "Open on the moment of change", intent: "apply" });
+    const b = addHighlight(it, { exact: "Keep the rest.", intent: "apply" });
+    const active = () => listTries(lib, { skill: "storytelling" }).filter((t) => t.active).map((t) => t.id);
+    expect(active()).toEqual([a.id]);
+    await planTry(lib, b.id, { pick: true });
+    expect(active()).toEqual([b.id]);
+    await planTry(lib, a.id, { pick: true });
+    expect(active()).toEqual([a.id]);
+    await markTried(lib, a.id, { reflection: "Mine now." });
+    expect(active()).toEqual([b.id]);
+    await expect(planTry(lib, a.id, { pick: true })).rejects.toThrow(/already yours/);
+    expect(listTries(lib).some((t) => t.active)).toBe(false);
+  });
+
+  test("a plan is When, I'll and If; an empty field clears it; the passage's section comes with the try", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });
+    const a = addHighlight(findItem(lib, src.meta.id), { exact: "Open on the moment of change", intent: "apply" });
+    await planTry(lib, a.id, { plan: " cold open first ", when: "I outline a video", obstacle: "short on time, then one line" });
+    const [t] = listTries(lib, { skill: "storytelling" });
+    expect(t).toMatchObject({ note: "cold open first", when: "I outline a video", obstacle: "short on time, then one line", section: "Openings" });
+    await planTry(lib, a.id, { when: "", obstacle: " " });
+    const again = findAnnotation(lib, a.id).annotation;
+    expect([again.note, again.when, again.obstacle]).toEqual(["cold open first", undefined, undefined]);
+  });
+
+  test("uses count the rounds he closed and the last one once it is his", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });
+    const a = addHighlight(findItem(lib, src.meta.id), { exact: "Open on the moment of change", intent: "apply", note: "cold open" });
+    const count = () => useCount(findAnnotation(lib, a.id).annotation);
+    expect(count()).toBe(0);
+    await markTried(lib, a.id, { reflection: "ok", next: "cold open" });
+    await markTried(lib, a.id, { reflection: "better", next: "cold open" });
+    expect(count()).toBe(2);
+    await markTried(lib, a.id, { reflection: "easy" });
+    expect(count()).toBe(3);
+  });
+
+  test("a try typed in the Forge has no passage, is listed in its skill and stays out of the source lists", async () => {
+    const lib = await tempLibrary();
+    const { tried, item } = await addTry(lib, { skill: "storytelling", plan: " Read the script out loud ", when: "a draft is done" });
+    expect(tried).toMatchObject({ intent: "apply", point: true, note: "Read the script out loud", when: "a draft is done", status: "open" });
+    expect(listTries(lib, { skill: "storytelling" }).map((t) => [t.id, t.active, t.section])).toEqual([[tried.id, true, undefined]]);
+    expect(isQuestionOnly(findItem(lib, item.meta.id))).toBe(true);
+    await expect(addTry(lib, { skill: "storytelling", plan: "  " })).rejects.toThrow(/needs what/);
+    await expect(planTry(lib, tried.id, { plan: "" })).rejects.toThrow(/needs what/);
   });
 });

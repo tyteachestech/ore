@@ -19,7 +19,7 @@ import {
   enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
-  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, markTried, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, itemCardSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
+  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, markTried, planTry, addTry, useCount, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, itemCardSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
   type AnchoredAnnotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
@@ -354,9 +354,11 @@ export const itemCommands: Record<string, Command> = {
         ? data
             .map((t) =>
               [
-                `${t.id}  ${t.status === "done" ? "tried " : "to try"}  ${t.item_title}`,
-                `    "${t.exact.replace(/\s+/g, " ")}"`,
+                `${t.id}  ${t.status === "done" ? "yours " : t.active ? "now   " : "to try"}  ${t.item_title}`,
+                ...(t.point ? [] : [`    "${t.exact.replace(/\s+/g, " ")}"`]),
+                ...(t.when ? [`    when: ${t.when}`] : []),
                 ...(t.note ? [`    plan: ${t.note}`] : []),
+                ...(t.obstacle ? [`    if: ${t.obstacle}`] : []),
                 ...(t.uses ?? []).map((u) => `    used: ${u.plan ?? "(no plan)"}${u.reflection ? ` → ${u.reflection}` : ""}`),
                 ...(t.reflection ? [`    how it went: ${t.reflection}`] : []),
               ].join("\n"),
@@ -364,6 +366,22 @@ export const itemCommands: Record<string, Command> = {
             .join("\n")
         : "Nothing to try.";
       return { data, text };
+    },
+  },
+
+  try: {
+    usage: '<try> [--plan "<I\'ll…>"] [--when "<When…>"] [--if "<what might get in the way, and then>"] [--pick] | --skill s --plan "<I\'ll…>" [--when "<When…>"]   write a try\'s plan, or --pick it as the one he is trying now in its skill; with --skill, a new try with no passage behind it (D-new-forge)',
+    options: { plan: { type: "string" }, when: { type: "string" }, if: { type: "string" }, pick: { type: "boolean" }, skill: { type: "string" } },
+    async run([ref], f) {
+      const lib = openLibrary();
+      if (f.skill !== undefined) {
+        if (ref) throw new Error("--skill adds a new try; leave out the try's id");
+        if (!loadSkills(lib).skills.some((s) => s.id === f.skill)) throw new Error(`unknown skill "${f.skill}"`);
+        const { tried } = await addTry(lib, { skill: f.skill as string, plan: need(str(f.plan), "--plan"), when: str(f.when) });
+        return { data: tried, text: `Try ${tried.id}: to try` };
+      }
+      const { tried } = await planTry(lib, need(ref, "<try>"), { plan: f.plan as string | undefined, when: f.when as string | undefined, obstacle: f.if as string | undefined, pick: !!f.pick });
+      return { data: tried, text: `Try ${tried.id}: ${f.pick ? "trying now" : "plan saved"} · used ${useCount(tried)}×` };
     },
   },
 
