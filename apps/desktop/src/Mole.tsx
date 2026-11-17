@@ -57,7 +57,7 @@ export function step(v: State, vel: State, to: State, dt: number) {
   for (const [k, lo, hi] of LIMITS) if (v[k] < lo || v[k] > hi) { v[k] = clamp(v[k], lo, hi); vel[k] = 0; }
 }
 
-export type Mood = "idle" | "peek" | "hole" | "pop" | "thinking" | "happy" | "surprised" | "cheer" | "nod" | "shake" | "wink" | "laugh" | "proud" | "curious" | "sad" | "sleepy" | "set" | "shy" | "wave" | "huff" | "lookdown" | "anxious" | "ecstatic" | "nap" | "doze" | "fall" | "dive";
+export type Mood = "idle" | "peek" | "hole" | "pop" | "thinking" | "happy" | "surprised" | "cheer" | "nod" | "shake" | "wink" | "laugh" | "proud" | "curious" | "sad" | "sleepy" | "set" | "shy" | "wave" | "huff" | "lookdown" | "anxious" | "ecstatic" | "nap" | "doze" | "fall" | "dive" | "hello" | "tip" | "flash" | "peekaboo" | "chuckle" | "dance";
 /** A mood: where each value should settle (`to`), where it starts (`from`), pushes that set it moving (`kick`), timed
  *  changes after (`at`), paws waving until `wave` ms, and when it rests (`end`) or starts over (`loop`).
  *  `still` is the one pose shown under reduced motion or in a hidden window. */
@@ -155,7 +155,36 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
       [985, { to: { legs: 0, arms: 1, tilt: 0, ly: 0, hat: 0 } }]] },
   // Dropping feet first: his arms go straight up over him and his helmet is left behind, feet together.
   dive: { from: { whole: 1, side: 0 }, to: { ...FALL, hat: 1.4, arms: 2, legs: 0, tilt: 0 }, loop: 3000, still: { ...FALL, hat: 1.4, arms: 2, legs: 0 } },
+  /* Friendly moves for when the pointer lands on him (`HOVER`). */
+  // Hello: a wave with a smile, the moustache spread wide.
+  hello: { to: { hx: 0.6, arc: 1, puff: 0.2 }, end: 1500, still: { pawR: 3, hx: 0.6, arc: 1 },
+    at: [...[0, 150, 300, 450, 600, 750].map((ms, i): [number, Beat] => [ms, { to: { pawR: i % 2 ? 2 : 3.6 } }]), [900, { to: { pawR: 0 } }], [1150, { to: { arc: 0, hx: 0, puff: 0 } }]] },
+  // Tips his helmet: a paw up to the brim, the helmet lifted and tipped as his head dips, then set back.
+  tip: { to: { pawR: 4.6, arc: 1 }, end: 1400, still: { hat: 1.5, tilt: 0.24, pawR: 4.6, arc: 1 },
+    at: [[170, { to: { hat: 1.5, tilt: 0.24, top: 0.9, ly: 0.6 } }], [650, { to: { hat: 0, tilt: 0, top: REST.top, ly: 0 } }], [820, { to: { pawR: 0 } }], [1100, { to: { arc: 0 } }]] },
+  // Flashes his lamp twice, a wink on the second: the flare, not the lit lamp, which is his sign for thinking (D263).
+  flash: { to: { arc: 1, lamp: 1 }, end: 1400, still: { arc: 1, lamp: 1 },
+    at: [[230, { to: { lamp: 0 } }], [430, { to: { lamp: 1, wink: 1, twinkle: 1 } }], [800, { to: { lamp: 0, wink: 0, twinkle: 0 } }], [1100, { to: { arc: 0 } }]] },
+  // Peekaboo: down his hole, then up with both paws thrown and a smile.
+  peekaboo: { to: { y: 21 }, kick: { kick: 5 }, end: 1600, still: { arc: 1, pawL: 2, pawR: 2 },
+    at: [[420, { to: { y: 0, arc: 1, tall: 0.6 }, kick: { pawL: THROW, pawR: THROW } }], [560, { kick: { kick: 8 } }], [800, { to: { tall: 0 } }], [1300, { to: { arc: 0 } }]] },
+  // A chuckle: three quick heaves, small beside his belly laugh.
+  chuckle: { to: { arc: 1, mouth: 0.4 }, end: 1500, still: { arc: 1, mouth: 0.8, top: -1, puff: 0.6 },
+    at: [...[80, 420, 760].flatMap((ms): [number, Beat][] => [[ms, { to: { top: -1, hat: 0.4, mouth: 0.8, puff: 0.6 }, kick: { puff: 2 } }], [ms + 170, { to: { top: 0.7, hat: -0.1, mouth: 0.3, puff: 0 } }]]),
+      [1100, { to: { top: REST.top, hat: 0, mouth: 0, arc: 0 } }]] },
+  // A little dance: six sways, a paw up on the side he leans to, his helmet tipping with him.
+  dance: { to: { arc: 1 }, end: 1700, still: { arc: 1, hx: 1.3, pawL: 2.6, tilt: 0.12 },
+    at: [...[0, 1, 2, 3, 4, 5].map((i): [number, Beat] => [i * 220, { to: { hx: i % 2 ? -1.3 : 1.3, pawL: i % 2 ? 0 : 2.6, pawR: i % 2 ? 2.6 : 0, tilt: i % 2 ? -0.12 : 0.12 }, kick: { top: -30 } }]),
+      [1320, { to: { hx: 0, pawL: 0, pawR: 0, tilt: 0 } }], [1450, { to: { arc: 0 } }]] },
 };
+
+/** What he does when the pointer lands on him (D-new-mole-hover-moves, Tyler 2026-11-17: "might as well add them all"). */
+export const HOVER = ["hello", "tip", "wink", "flash", "peekaboo", "chuckle", "dance", "happy", "proud", "shy", "curious", "nod"] as const satisfies readonly Mood[];
+/** One of them for a roll `r` in [0, 1), never the one before. */
+export function hoverMove(last: Mood | null, r: number): (typeof HOVER)[number] {
+  const rest = HOVER.filter((m) => m !== last);
+  return rest[Math.min(rest.length - 1, Math.floor(r * rest.length))]!;
+}
 
 /** The puppet's moving parts: its values, their speeds, where they are headed, and the move playing. */
 export type Puppet = { v: State; vel: State; to: State; move: Move | null; mood: Mood; t0: number; fired: number };
@@ -205,7 +234,7 @@ const between = (lo: number, hi: number) => lo + Math.random() * (hi - lo);
 
 /** The mole, `size` px wide (in its button, the dirt sits low in a square; `bare`, just the sprite; the dome may
  *  rise into the room above it). `mood` plays its move (one that doesn't loop then rests); at rest it blinks every
- *  5 to 9 s and glances to a side every 15 to 20 s. `look` (hover or focus on its button) faces him with a blink.
+ *  5 to 9 s and glances to a side every 15 to 20 s. `look` (focus on its button, or a hover while he is busy) faces him with a blink.
  *  `cue` replays the mood for a new event (another reply landing). Frames run only while it moves. Still under
  *  reduced motion and while the window is hidden (a mood shows its still pose). */
 export function Mole({ size = 40, mood = "idle", cue, look = false, bare = false, signal }: { size?: number; mood?: Mood; cue?: unknown; look?: boolean; bare?: boolean; /** While he thinks, how much is happening right now, 0 to 1: his lamp follows it (D263). */ signal?: () => number }) {

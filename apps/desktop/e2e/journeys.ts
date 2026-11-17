@@ -974,6 +974,36 @@ journey("tutor mole: it sits at the bottom right on every screen, pages keep roo
   await button.waitFor();
 });
 
+journey("tutor mole: the mouse landing on him gets a friendly move that ends, the next one is another, and focus alone gets none (D-new-mole-hover-moves)", async (page) => {
+  const button = page.getByRole("button", { name: "Open the tutor" }), mole = button.locator(".mole");
+  const mood = () => mole.getAttribute("data-mood");
+  const FRIENDLY = ["hello", "tip", "wink", "flash", "peekaboo", "chuckle", "dance", "happy", "proud", "shy", "curious", "nod"];
+  await until("he is up and at rest", async () => (await mood()) === "idle", 8000);
+  // Focus alone faces him, as before: no move.
+  await button.focus();
+  await page.waitForTimeout(200);
+  if ((await mood()) !== "idle") throw new Error(`focus played ${await mood()}`);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const seen: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    await button.hover();
+    await until("a friendly move plays", async () => FRIENDLY.includes((await mood()) ?? ""));
+    seen.push((await mood())!);
+    // Leaving and landing again mid-move starts nothing new.
+    await page.mouse.move(200, 200);
+    await button.hover();
+    if ((await mood()) !== seen[i]) throw new Error(`a second landing cut ${seen[i]} short with ${await mood()}`);
+    await page.mouse.move(200, 200);
+    await until("it ends at rest", async () => (await mood()) === "idle", 6000);
+    await page.waitForTimeout(350);
+  }
+  if (seen[0] === seen[1] || seen[1] === seen[2]) throw new Error(`the same move twice running: ${seen.join(", ")}`);
+  // The click still opens the tutor.
+  await button.click();
+  await page.getByLabel("Message the tutor").waitFor();
+  await page.keyboard.press("Escape");
+});
+
 journey("D254: palette plays and stops ambience; closing the panel keeps the sound, reopening keeps the channel", async (page) => {
   const command = async (name: string) => {
     await page.keyboard.press("Meta+KeyK");
