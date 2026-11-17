@@ -9,7 +9,7 @@ import { lessonsOf, levelProgress, nextLesson, opt, ore, PHONE, touched, type Du
 import * as HoverCard from "@radix-ui/react-hover-card";
 import { flushSync } from "react-dom";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { DotBar, minutes, minutesText, Ring } from "./Ring";
+import { DotBar, ThumbLine, minutes, minutesText, Ring } from "./Ring";
 import { dueSkills, knowsDue, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { archivedOnly, SkillChips, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
@@ -487,7 +487,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                   ) : (
                     <Hint text={`${Math.round(at * 100)}% read`}>
                       {/* The hint needs an element to hold its ref, so the bar sits in a span. */}
-                      <span className="home-meter small"><DotBar className="" share={at} n={10} /></span>
+                      <span className="home-meter small"><DotBar className="" share={at} n={10} /><ThumbLine share={at} /></span>
                     </Hint>
                   )}
                   {/* On hover the ⋯ takes the meter's place, as on every other row (Linear). */}

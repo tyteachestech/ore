@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Cutting, Gem } from "../src/Gem";
-import { DotBar, DotRing, lit } from "../src/Ring";
+import { DotBar, DotRing, lit, ThumbLine } from "../src/Ring";
 
 // D183: one way of drawing. Gems, rings and icons are round dots; no square pixel is left beside them.
 
@@ -27,6 +27,15 @@ test("a bar is whole dots: a sliver of progress lights one, and no dot is ever c
   expect(bar(0.5).match(/class="on"/g)?.length).toBe(5);
   expect(bar(0).includes('class="on"')).toBe(false);
   expect(bar(0.5)).not.toContain("width");
+});
+
+test("how far he has read is one line on the picture, as wide as his share, and no dots (D326)", () => {
+  const line = (share: number) => renderToStaticMarkup(<ThumbLine share={share} />);
+  expect(line(0.62)).toContain("--at:0.62");
+  expect(line(0.62)).not.toContain("<i");
+  // Never wider than the picture, never negative.
+  expect(line(1.4)).toContain("--at:1");
+  expect(line(-1)).toContain("--at:0");
 });
 
 test("a gem is loose dots until it is cut, then solid pixels, and no state glows (D236)", () => {

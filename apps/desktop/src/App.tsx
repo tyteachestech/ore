@@ -1,6 +1,6 @@
 import { ranked } from "./match";
 import { Archive, ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, Folder, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple, X } from "./icons";
-import { DotBar } from "./Ring";
+import { ThumbLine } from "./Ring";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { HeadTabs, type HeadTab } from "./HeadTabs";
 import { PixelBook } from "./PixelIcon";
@@ -2144,12 +2144,12 @@ export function App() {
           <span className="done-mark" aria-hidden="true" />
         ))}
         {!lesson && (() => {
-          // How far he got, as YouTube shows under a thumbnail (Home's Continue reading has the same).
+          // How far he got, as YouTube shows it: a line on the picture's bottom edge (D326).
           const at = r.status === "done" ? 0 : Number(load(`ore.pos.${r.id}`)) || 0;
           return (
             <span className="thumb-at">
               <Thumb item={r} iconSize={16} />
-              {at >= 0.02 && <DotBar className="thumb-bar" share={at} n={12} />}
+              {at >= 0.02 && <ThumbLine share={at} />}
             </span>
           );
         })()}
