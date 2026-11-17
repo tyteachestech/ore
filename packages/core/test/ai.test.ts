@@ -980,7 +980,7 @@ describe("what a claude task may read (D292)", () => {
   });
 });
 
-describe("the mole's line on a use of a try (D-new-try-rest)", () => {
+describe("the mole's line on a use of a try (D324)", () => {
   const TEXT = "# Openings\n\nOpen on the moment of change, then rewind to how we got there.\n";
   const inputOf = (call: number) => JSON.parse(readFileSync(join(binDir, "args.jsonl"), "utf8").split("\n")[call]!)[1] as string;
   test("it reads the last use he wrote up against his plan and earlier rounds, and is kept beside that use with its stamp; a round and a try that is his each keep their own", async () => {

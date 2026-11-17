@@ -8661,7 +8661,7 @@ journey("try it: 4 marks a technique, the Forge makes it the one he is trying, e
   if (!mine || mine.status !== "open" || mine.uses?.length !== 2 || mine.reflection) throw new Error(`the library kept it as his: ${JSON.stringify(mine)}`);
 });
 
-journey("forge: a use written up keeps its moment, the mole says one line under it, and the keys land in When for a new one (D-new-try-rest)", async (page) => {
+journey("forge: a use written up keeps its moment, the mole says one line under it, and the keys land in When for a new one (D324)", async (page) => {
   await page.locator(".sidebar .side-item", { hasText: /^Focus & Attention$/ }).first().click();
   await page.getByRole("button", { name: "Forge" }).click();
   await page.getByRole("button", { name: "Add something to try" }).click();
@@ -8691,7 +8691,7 @@ journey("forge: a use written up keeps its moment, the mole says one line under 
   }
 });
 
-journey("review: a day after he last touched what he is trying, a session starts by asking if he did it; Not yet goes on, it asks once a day, and what he writes is a use (D-new-try-rest)", async (page) => {
+journey("review: a day after he last touched what he is trying, a session starts by asking if he did it; Not yet goes on, it asks once a day, and what he writes is a use (D324)", async (page) => {
   // His own try, the one left alone longest: every other one in the works is touched now.
   const mine = (await ore("try", "--skill", "habits", "--plan", "Shoes by the door", "--when", "I lock up at night")) as { id: string };
   try {
@@ -11728,7 +11728,7 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
   await check("the skill page with a try");
 }, "phone");
 
-journey("phone: the check-in before a session asks about what he is trying, its buttons are 44 pt taps, and Not yet goes on to the first exercise (D-new-try-rest)", async (page) => {
+journey("phone: the check-in before a session asks about what he is trying, its buttons are 44 pt taps, and Not yet goes on to the first exercise (D324)", async (page) => {
   // The seed's library has something he is trying, last touched before today.
   await page.clock.install({ time: new Date(Date.now() + 26 * 3600e3) });
   await page.reload();

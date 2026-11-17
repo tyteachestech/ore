@@ -1906,7 +1906,7 @@ const asked = () => {
   }
 };
 
-/** The try to ask about as a session starts (D-new-try-rest): of the ones he is trying now in the skills under review,
+/** The try to ask about as a session starts (D324): of the ones he is trying now in the skills under review,
  *  the one he has left alone longest, and only one he last touched before today. Once a day, never in the quick
  *  quiz or a review of one source. */
 function useCheckIn(pick: string[] | null, source: string | undefined, quick: boolean): [Try | null | undefined, () => void] {

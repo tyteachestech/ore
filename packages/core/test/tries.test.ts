@@ -193,7 +193,7 @@ describe("the Forge: one try at a time, a plan with its cue, tries with no passa
   });
 });
 
-describe("the rest of the apply loop: each use keeps its moment, and what he is trying now across skills (D-new-try-rest)", () => {
+describe("the rest of the apply loop: each use keeps its moment, and what he is trying now across skills (D324)", () => {
   test("a round closed with Again keeps the moment it was used in, so a new cue for the next use leaves the record as it was", async () => {
     const lib = await tempLibrary();
     const src = await addText(lib, ARTICLE, { skills: ["storytelling"] });

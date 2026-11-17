@@ -8,7 +8,7 @@ import { runAgent } from "./adapter.ts";
 
 export const TryLineOutput = z.strictObject({ line: z.string().min(1).max(300) });
 
-/** The mole's one line on the latest use of a try (D-new-try-rest): what he wrote about how it went, read against
+/** The mole's one line on the latest use of a try (D324): what he wrote about how it went, read against
  *  his plan and the earlier rounds. Stored beside that use; never a grade. */
 export async function tryLine(lib: Library, ref: string): Promise<{ id: string; line: TryLine }> {
   const { item, annotation: a } = findAnnotation(lib, ref);

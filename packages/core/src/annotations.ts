@@ -42,7 +42,7 @@ export const AnnotationSchema = z.object({
   done_at: z.string().optional(), // Apply intent: when he checked it off (`ts` moves with every later edit)
   // Apply intent (D148): earlier rounds of the same try, oldest first. "Next time I'll…" closes a round
   // (his plan and how it went move here) and the try is open again with the new plan as its note.
-  // D-new-try-rest: each round keeps the moment it was used in (`when`, so he can see whether he has tried it
+  // D324: each round keeps the moment it was used in (`when`, so he can see whether he has tried it
   // somewhere new) and the mole's one line on how it went (`line`, AI: never a grade).
   uses: z.array(z.object({ ts: z.string(), plan: z.string().optional(), reflection: z.string().optional(), when: z.string().optional(), line: TryLine.optional() })).optional(),
   line: TryLine.optional(), // Apply intent: the mole's line on `reflection`, the round not yet closed

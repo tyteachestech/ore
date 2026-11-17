@@ -95,7 +95,7 @@ const useThinking = (id: string) =>
     () => thinkingNow,
   ).includes(id);
 
-/** The mole's one line on the use he just wrote up (D-new-try-rest), asked for in the background: it lands on the
+/** The mole's one line on the use he just wrote up (D324), asked for in the background: it lands on the
  *  try's page when it is ready. The Mac's AI writes it, so the phone asks for none; a line that fails is left out. */
 export function askMole(id: string, then?: () => void) {
   if (PHONE || thinking.has(id)) return;

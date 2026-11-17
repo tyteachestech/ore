@@ -1777,7 +1777,7 @@ button.try-stone:hover .stone { opacity: 1; }
 .forge-goal { display: flex; align-items: center; gap: 7px; margin: 14px 0 0; font-size: 14px; color: var(--text-read); }
 .forge-goal svg { flex: none; color: var(--skill, var(--accent)); }
 .try-stone:active .stone, .tool-btn:active .tool { transform: scale(0.92); }
-/* The check-in before a session (D-new-try-rest): one question, the plan, how it went. */
+/* The check-in before a session (D324): one question, the plan, how it went. */
 .checkin { max-width: 560px; margin: 8vh auto 0; }
 .checkin-ask { margin: 0 0 10px; font: 12px var(--mono); color: var(--muted); }
 .checkin-plan { display: flex; align-items: flex-start; gap: 10px; margin: 0; font-size: 24px; line-height: 1.25; font-weight: 600; overflow-wrap: anywhere; }
@@ -1785,7 +1785,7 @@ button.try-stone:hover .stone { opacity: 1; }
 .checkin-when { margin: 6px 0 0; font: 12px var(--mono); color: var(--faint); }
 .checkin .try-did { margin: 22px 0 0; flex-direction: column; align-items: stretch; }
 .checkin .try-did .field { min-height: 72px; }
-/* The mole's line under a use (D-new-try-rest): him, small, and one or two sentences. */
+/* The mole's line under a use (D324): him, small, and one or two sentences. */
 .try-mole { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 8px; padding: 0 8px 0 22px; font-size: 13px; line-height: 1.45; color: var(--muted); }
 .try-mole svg { flex: none; margin-top: -3px; }
 .try-card { margin-left: 0; padding-left: 8px; border-left: 0; border-radius: 8px; }
