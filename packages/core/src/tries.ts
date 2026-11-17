@@ -19,12 +19,17 @@ export interface TryView extends Annotation {
   active?: boolean;
 }
 
-/** The heading above `at` in a source's Markdown. */
+/** The heading above `at` in a source's Markdown; a `#` line inside a fenced code block is a comment, not a heading. */
 function sectionAt(body: string, at: number): string | undefined {
   let found: string | undefined;
-  for (const m of body.matchAll(/^#{1,6}\s+(.+?)\s*#*\s*$/gm)) {
-    if (m.index > at) break;
-    found = m[1];
+  let fence: string | null = null;
+  let pos = 0;
+  for (const line of body.split("\n")) {
+    if (pos > at) break;
+    const f = /^\s{0,3}(`{3,}|~{3,})/.exec(line)?.[1];
+    if (f && (!fence || f.startsWith(fence))) fence = fence ? null : f;
+    else if (!fence) found = /^#{1,6}\s+(.+?)\s*#*\s*$/.exec(line)?.[1] ?? found;
+    pos += line.length + 1;
   }
   return found;
 }
@@ -86,9 +91,8 @@ export async function planTry(lib: Library, ref: string, input: PlanInput): Prom
 export async function addTry(lib: Library, input: { skill: string; plan: string; when?: string }): Promise<{ tried: Annotation; item: Item }> {
   const plan = input.plan.trim();
   if (!plan) throw new Error("a try needs what you'll do");
-  const { item, annotation } = await addSnippet(lib, { text: plan, intent: "apply", note: plan, skills: [input.skill] });
-  const when = input.when?.trim();
-  return { tried: reviseAnnotation(item, annotation, { point: true, ...(when ? { when } : {}) }), item };
+  const { item, annotation } = await addSnippet(lib, { text: plan, intent: "apply", note: plan, skills: [input.skill], point: true, when: input.when });
+  return { tried: annotation, item };
 }
 
 export interface TriedInput {
@@ -113,13 +117,13 @@ export async function markTried(lib: Library, ref: string, input: TriedInput): P
     if (input.undo) {
       const last = annotation.status === "open" && !annotation.reflection ? annotation.uses?.at(-1) : undefined;
       const tried = last
-        ? reviseAnnotation(item, annotation, { status: "done", note: last.plan, reflection: last.reflection, uses: annotation.uses!.slice(0, -1) })
-        : reviseAnnotation(item, annotation, { status: "open", reflection: undefined });
+        ? reviseAnnotation(item, annotation, { status: "done", note: last.plan, reflection: last.reflection, done_at: last.ts, uses: annotation.uses!.slice(0, -1) })
+        : reviseAnnotation(item, annotation, { status: "open", reflection: undefined, done_at: undefined });
       return { tried, item, card: false };
     }
     const tried = next || input.again
-      ? reviseAnnotation(item, annotation, { status: "open", note: next ?? annotation.note, reflection: undefined, uses: [...(annotation.uses ?? []), { ts: nowIso(), plan: annotation.note, reflection }] })
-      : reviseAnnotation(item, annotation, { status: "done", ...(reflection ? { reflection } : {}) });
+      ? reviseAnnotation(item, annotation, { status: "open", note: next ?? annotation.note, reflection: undefined, done_at: undefined, uses: [...(annotation.uses ?? []), { ts: nowIso(), plan: annotation.note, reflection }] })
+      : reviseAnnotation(item, annotation, { status: "done", done_at: annotation.status === "done" ? annotation.done_at : nowIso(), ...(reflection ? { reflection } : {}) });
     return { tried, item, card: !!reflection };
   });
 }

@@ -389,8 +389,7 @@ function PlanField({ label, hint, value, onSave }: { label: string; hint: string
           keepKeysIn(e);
           if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            save();
-            e.currentTarget.blur();
+            e.currentTarget.blur(); // the blur saves, once
           } else if (e.key === "Escape") {
             e.preventDefault();
             setV(value);
@@ -416,7 +415,7 @@ export function TryPage({ skill, t, tries, onSub, onPassage }: { skill: Skill; t
     ...(t.point ? [] : [{ id: "passage", label: "Open passage", run: () => onPassage(t) }]),
     { id: "delete", label: "Remove", danger: true, divider: true, run: () => void tries.remove(t).then((ok) => ok && onSub("forge")) },
   ];
-  const rounds = [...(t.uses ?? []), ...(mine ? [{ ts: t.ts, plan: t.note, reflection: t.reflection }] : [])];
+  const rounds = [...(t.uses ?? []), ...(mine ? [{ ts: t.done_at ?? t.ts, plan: t.note, reflection: t.reflection }] : [])];
   return (
     <div className="forge try-page" data-color={skill.color} data-try={t.id}>
       <div className="forge-head">

@@ -151,6 +151,10 @@ describe("the Forge: one try at a time, a plan with its cue, tries with no passa
     await planTry(lib, a.id, { plan: " cold open first ", when: "I outline a video", obstacle: "short on time, then one line" });
     const [t] = listTries(lib, { skill: "storytelling" });
     expect(t).toMatchObject({ note: "cold open first", when: "I outline a video", obstacle: "short on time, then one line", section: "Openings" });
+    // A `#` line in a code block above the passage is a comment there, never its section.
+    const code = await addText(lib, "# Shell\n\n```sh\n# install first\nmake\n```\n\nRun it twice to be sure.\n", { skills: ["storytelling"] });
+    const c = addHighlight(findItem(lib, code.meta.id), { exact: "Run it twice to be sure.", intent: "apply" });
+    expect(listTries(lib, { skill: "storytelling" }).find((x) => x.id === c.id)?.section).toBe("Shell");
     await planTry(lib, a.id, { when: "", obstacle: " " });
     const again = findAnnotation(lib, a.id).annotation;
     expect([again.note, again.when, again.obstacle]).toEqual(["cold open first", undefined, undefined]);
@@ -168,6 +172,13 @@ describe("the Forge: one try at a time, a plan with its cue, tries with no passa
     expect(count()).toBe(2);
     await markTried(lib, a.id, { reflection: "easy" });
     expect(count()).toBe(3);
+    // The day it became his stays when its plan is edited later.
+    const at = findAnnotation(lib, a.id).annotation.done_at;
+    expect(at).toBeDefined();
+    await planTry(lib, a.id, { when: "first thing" });
+    expect(findAnnotation(lib, a.id).annotation.done_at).toBe(at);
+    await markTried(lib, a.id, { undo: true });
+    expect(findAnnotation(lib, a.id).annotation.done_at).toBeUndefined();
   });
 
   test("a try typed in the Forge has no passage, is listed in its skill and stays out of the source lists", async () => {
@@ -176,6 +187,7 @@ describe("the Forge: one try at a time, a plan with its cue, tries with no passa
     expect(tried).toMatchObject({ intent: "apply", point: true, note: "Read the script out loud", when: "a draft is done", status: "open" });
     expect(listTries(lib, { skill: "storytelling" }).map((t) => [t.id, t.active, t.section])).toEqual([[tried.id, true, undefined]]);
     expect(isQuestionOnly(findItem(lib, item.meta.id))).toBe(true);
+    expect(tried.rev).toBe(1); // written whole in one go: never a plain snippet for a moment
     await expect(addTry(lib, { skill: "storytelling", plan: "  " })).rejects.toThrow(/needs what/);
     await expect(planTry(lib, tried.id, { plan: "" })).rejects.toThrow(/needs what/);
   });

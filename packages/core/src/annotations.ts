@@ -35,6 +35,7 @@ export const AnnotationSchema = z.object({
   answers: z.array(Contribution).optional(), // Question intent only (D75)
   card: z.boolean().optional(), // Question intent: "Answered + card", so enrich drafts a card from his answer
   reflection: z.string().optional(), // Apply intent (D127): how it went, written when he checked it off
+  done_at: z.string().optional(), // Apply intent: when he checked it off (`ts` moves with every later edit)
   // Apply intent (D148): earlier rounds of the same try, oldest first. "Next time I'll…" closes a round
   // (his plan and how it went move here) and the try is open again with the new plan as its note.
   uses: z.array(z.object({ ts: z.string(), plan: z.string().optional(), reflection: z.string().optional() })).optional(),
@@ -78,6 +79,9 @@ export interface HighlightInput {
   note?: string;
   start?: number;
   looked_up?: boolean;
+  /** A try he typed with no passage behind it (D-new-forge): the new highlight is a `point`, with its cue. */
+  point?: boolean;
+  when?: string;
 }
 
 // Locate the passage in the body (exact, then whitespace-insensitive; nearest
@@ -111,6 +115,8 @@ export function addHighlight(item: Item, input: HighlightInput): Annotation {
     note: input.note?.trim() || undefined,
     status: "open",
     ...(input.looked_up && { looked_up: true }),
+    ...(input.point && { point: true }),
+    ...(input.when?.trim() && { when: input.when.trim() }),
   };
   append(item, ann);
   return ann;
@@ -168,7 +174,7 @@ export function isQuestionOnly(item: Item): boolean {
   return all.length > 0 && all.every((a) => a.intent === "question" || (a.intent === "apply" && !!a.point));
 }
 
-export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses" | "looked_up" | "when" | "obstacle" | "picked" | "point">>;
+export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses" | "looked_up" | "when" | "obstacle" | "picked" | "done_at">>;
 
 // Edits never rewrite history: they append the same id with rev + 1.
 export function reviseAnnotation(item: Item, current: Annotation, patch: AnnotationPatch): Annotation {

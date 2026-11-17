@@ -254,7 +254,7 @@ export type Annotation = {
 
 /** `ore tries`: an Apply highlight (D127), a technique he plans to try on his own work; `note` is what
  *  he'll do and `when` its cue; status "done" means it is his. With `--skill`, one open try is `active`. */
-export type Try = Annotation & { item: string; ts: string; item_title: string; when?: string; obstacle?: string; section?: string; active?: boolean };
+export type Try = Annotation & { item: string; ts: string; item_title: string; when?: string; obstacle?: string; section?: string; active?: boolean; done_at?: string };
 
 /** `ore questions`: a Question-intent highlight (D47); status "done" means answered. `answers` is his
  *  answer so far, piece by piece, each naming the source he wrote it from; `matches` the sources that
