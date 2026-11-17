@@ -18,12 +18,13 @@ import { escTaken, Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, GEM_WORD, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
-import { depthText, levelProgress, ore, opt, PHONE, type Question, type Research, type Skill, type SkillStats, type Try } from "./ore";
+import { depthText, levelProgress, ore, opt, PHONE, type Question, type Research, type Skill, type SkillStats } from "./ore";
 import { AnswerBox, AskQuestion, announce, questionText, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
 import { errorText, focusQuietly, load, save, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { Trap } from "./Trap";
+import { Forge, Tools, TryingNow, TryPage, useTries, type Sub } from "./Forge";
 import { passageText } from "./text";
 import { ExerciseText } from "./ExerciseText";
 
@@ -55,6 +56,9 @@ type Props = {
   onFound: () => void;
   /** The skill's sources, in the view the title names. */
   children: ReactNode;
+  /** Where the page is (D-new-forge): itself, its Forge, or one try's page. */
+  sub: Sub;
+  onSub: (s: Sub) => void;
   /** The iPhone: its note is a screen of its own (Tyler 2026-11-06, B), so the page is one column with this row in the note's place. */
   noteRow?: ReactNode;
 };
@@ -62,7 +66,8 @@ type Props = {
 
 /** A skill's page (D46): the D23 stats as chips in the header, then two equal columns that each
  *  scroll on their own, so a long note (D41) never buries his questions (D47) and sources. */
-export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children, noteRow }: Props) {
+export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQuestion, onOpenSource, onAdded, onAddSource, onSkillChanged, importance, onBringBack, notify, findInNote, onFound, children, noteRow, sub, onSub }: Props) {
+  const tries = useTries(skill.id, notify);
   const ref = useMemo(() => ({ skill: skill.id }), [skill.id]);
   const notes = useNotes(ref, notify);
   const keys = useKeymap();
@@ -144,6 +149,15 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
   const [wide, setWide] = useState(false);
   const side = (
     <div className="skill-col side" aria-label={`${skill.name} questions and sources`}>
+      <TryingNow
+        tries={tries}
+        onSub={onSub}
+        head={(action, actions, body) => (
+          <Fold id="tries" title="Trying now" icon={PixelTry} tone="apply" action={action} actions={actions}>
+            {body}
+          </Fold>
+        )}
+      />
       <Fold
         id="sources"
         title="Sources"
@@ -162,10 +176,17 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
       >
         {children}
       </Fold>
-      <Tries skill={skill.id} onPassage={onQuestion} notify={notify} />
       <Questions skill={skill.id} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} notify={notify} />
     </div>
   );
+  const shown = typeof sub === "string" && sub.startsWith("try:") ? tries.ts?.find((t) => t.id === sub.slice(4)) : undefined;
+  // A try's page, or the Forge: also for a try that is gone (removed, or a link from before), once the tries are read.
+  if (sub && (sub === "forge" || tries.ts))
+    return (
+      <div className="skill-page sub" data-color={skill.color}>
+        {shown ? <TryPage skill={skill} t={shown} tries={tries} onSub={onSub} onPassage={onQuestion} /> : <Forge skill={skill} tries={tries} onSub={onSub} />}
+      </div>
+    );
   return (
     <div className="skill-page" data-color={skill.color} ref={pageRef}>
       {find.open && (
@@ -202,7 +223,7 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
               <MoreButton className="skill-importance" label={`Importance: ${levelOf(skill).label}`} hint={`Importance: ${levelOf(skill).label}`} icon={<ImportanceIcon skill={skill} />} actions={importance} align="start" />
             )}
           </div>
-          <Goal skill={skill} lastTry={lastGoalTry(notes.text)} onTry={() => setRecalling("goal")} onChanged={onSkillChanged} notify={notify} />
+          <Goal skill={skill} lastTry={lastGoalTry(notes.text)} onTry={() => setRecalling("goal")} onChanged={onSkillChanged} notify={notify} tools={<Tools tries={tries} onSub={onSub} />} />
         </div>
         {stats && stats.strength.solid + stats.strength.growing + stats.strength.new > 0 && <Strength s={stats} color={skill.color} />}
       </header>
@@ -374,7 +395,7 @@ function useStats(skill: string): SkillStats | null {
 /** His goal for the skill (D101), under its name in place of the why (D63): one thing he could show
  *  he can do. Click to write, Enter or clicking away saves (D211), Esc keeps what was there. Try it opens the
  *  closed-book recall with the goal as its prompt; each try is saved, dated, in the skill note. */
-function Goal({ skill, lastTry, onTry, onChanged, notify }: { skill: Skill; lastTry: string | null; onTry: () => void; onChanged: () => void; notify: Notify }) {
+function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skill; lastTry: string | null; onTry: () => void; onChanged: () => void; notify: Notify; tools: ReactNode }) {
   const [draft, setDraft] = useState<string | null>(null);
   const goalRef = useRef<HTMLButtonElement>(null);
   useFocusBack(draft !== null, goalRef);
@@ -430,6 +451,7 @@ function Goal({ skill, lastTry, onTry, onChanged, notify }: { skill: Skill; last
           </button>
         </Hint>
       )}
+      {tools}
     </div>
   );
 }
@@ -654,237 +676,6 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
       {(find ? true : byStatus && showAnswered) &&
         answered.map((q) => <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />)}
     </Fold>
-  );
-}
-
-/** To try (D127): techniques from his reading he planned to try on his own work. Checking one off asks
- *  how it went, in one line; that reflection becomes one Explain card at the next enrich. A second line,
- *  "Next time I'll…" (D148), keeps the round and puts the try back in To try with that plan. Hidden until
- *  he marks the first one (the reader's popup is where they start), and nothing counts them (D23). */
-function Tries({ skill, onPassage, notify }: { skill: string; onPassage: (t: Pick<Question, "item" | "id">) => void; notify: Notify }) {
-  const [ts, setTs] = useState<Try[] | null>(null);
-  const [showUsed, setShowUsed] = useState(false);
-  const [reflecting, setReflecting] = useState<string | null>(null);
-  // Tries he checked off while here stay in view under Used, so what he wrote doesn't vanish (Things, Todoist).
-  const [recent, setRecent] = useState<string[]>([]);
-  const changes = useLibraryChanges();
-  useEffect(() => {
-    let live = true;
-    ore<Try[]>("tries", opt("skill", skill)).then(
-      (r) => live && setTs(r),
-      (e) => live && notify(errorText(e), "error"),
-    );
-    return () => {
-      live = false;
-    };
-  }, [skill, notify, changes]);
-
-  const put = (id: string, patch: Partial<Try>) => setTs((l) => l && l.map((x) => (x.id === id ? { ...x, ...patch } : x)));
-  /** One change to a try: what the row shows before and after, and the `ore tried` calls (their args
-   *  after the id) that write it and take it back. */
-  type Step = { from: Partial<Try>; to: Partial<Try>; do: string[][]; undo: string[][] };
-  /** Writes `to` at once, then the calls; a failure rolls the row back to `from` with an error toast. */
-  const write = async (t: Try, from: Partial<Try>, to: Partial<Try>, calls: string[][], fromHistory = false) => {
-    put(t.id, to);
-    try {
-      for (const c of calls) await ore("tried", t.id, ...c);
-      return true;
-    } catch (e) {
-      put(t.id, from);
-      // From the history (undo or redo): it puts the step back and says why.
-      if (fromHistory) throw e;
-      notify(errorText(e), "error");
-      return false;
-    }
-  };
-  const change = async (t: Try, step: Step, msg: string) => {
-    if (!(await write(t, step.from, step.to, step.do))) return false;
-    notify(msg, "quiet", () => write(t, step.to, step.from, step.undo, true), () => write(t, step.from, step.to, step.do, true));
-    return true;
-  };
-  /** The calls that take a tried try's reflection from `was` to `now` (none: back to try, then tried again). */
-  const setReflection = (was: string | undefined, now: string | undefined): string[][] => (now ? [[opt("text", now)]] : was ? [["--undo"], []] : []);
-  const check = async (t: Try) => {
-    const done = t.status !== "done";
-    const step: Step = done
-      ? { from: { status: "open", reflection: undefined }, to: { status: "done" }, do: [[]], undo: [["--undo"]] }
-      : { from: { status: "done", reflection: t.reflection }, to: { status: "open", reflection: undefined }, do: [["--undo"]], undo: setReflection(undefined, t.reflection).length ? setReflection(undefined, t.reflection) : [[]] };
-    if (!(await change(t, step, done ? "Tried" : "Back to try"))) return;
-    setReflecting(done ? t.id : null);
-    if (done) setRecent((r) => [...r, t.id]);
-  };
-  /** How it went, and the next plan when he wrote one: the round moves into the record and the try is open
-   *  again with that plan. The draft goes once saved; a failed save opens the box again with every word. */
-  const reflect = async (t: Try, text: string, next: string) => {
-    setReflecting(null);
-    if (!next && (!text || text === t.reflection)) return void drafts.delete(t.id);
-    const step: Step = next
-      ? {
-          from: { status: "done", reflection: t.reflection, note: t.note, uses: t.uses },
-          to: { status: "open", reflection: undefined, note: next, uses: [...(t.uses ?? []), { ts: new Date().toISOString(), plan: t.note, reflection: text || undefined }] },
-          do: [[...(text ? [opt("text", text)] : []), opt("next", next)]],
-          undo: [["--undo"], ...setReflection(text || undefined, t.reflection)],
-        }
-      : { from: { reflection: t.reflection }, to: { reflection: text }, do: setReflection(t.reflection, text), undo: setReflection(text, t.reflection) };
-    const msg = next ? `Next try planned${text ? " · an exercise comes from how it went" : ""}` : "Saved how it went · an exercise comes from it";
-    if (await change(t, step, msg)) drafts.delete(t.id);
-    else setReflecting(t.id);
-  };
-  const remove = async (t: Try) => {
-    let at = -1;
-    const back = () => setTs((l) => l && (l.some((x) => x.id === t.id) ? l : [...l.slice(0, at < 0 ? l.length : at), t, ...l.slice(at < 0 ? l.length : at)]));
-    setTs((l) => {
-      at = l ? l.findIndex((x) => x.id === t.id) : -1;
-      return l && l.filter((x) => x.id !== t.id);
-    });
-    try {
-      await ore("annotate", t.id, "--status", "deleted");
-    } catch (e) {
-      back();
-      return notify(errorText(e), "error");
-    }
-    notify(
-      "Removed",
-      "info",
-      // The list follows the write, so one that fails leaves no row that isn't in the library.
-      () => ore("annotate", t.id, "--status", t.status).then(back),
-      () => ore("annotate", t.id, "--status", "deleted").then(() => setTs((l) => l && l.filter((x) => x.id !== t.id))),
-    );
-  };
-
-  if (!ts?.length) return null;
-  const open = ts.filter((t) => t.status !== "done");
-  // The record of use (D148): every idea he has tried, with each round's plan and how it went. An idea
-  // planned again is in both lists: its next plan above, its rounds so far here.
-  const used = ts.filter((t) => t.status === "done" || t.uses?.length);
-  const row = (t: Try, record = false) => (
-    <TryRow key={`${record ? "used-" : ""}${t.id}`} t={t} record={record} reflecting={reflecting === t.id} onCheck={() => void check(t)} onReflect={(on) => setReflecting(on ? t.id : null)} onSave={(text, next) => void reflect(t, text, next)} onPassage={() => onPassage(t)} onRemove={() => void remove(t)} />
-  );
-  return (
-    <Fold id="tries" title="To try" icon={PixelTry} tone="apply" summary={open.length ? `${open.length} to try` : null} summaryFolded>
-      {open.map((t) => row(t))}
-      {!open.length && <p className="quiet">All tried. Mark a technique with Try it (4) while you read to plan the next one.</p>}
-      {used.length > 0 && (
-        <>
-          <button className="answered-toggle" aria-expanded={showUsed} onClick={() => setShowUsed(!showUsed)}>
-            {showUsed ? "Hide used" : `Used (${used.length})`}
-          </button>
-          {used.filter((t) => showUsed || recent.includes(t.id)).map((t) => row(t, true))}
-        </>
-      )}
-    </Fold>
-  );
-}
-
-/** Unsent "How did it go?" boxes, per try, kept when the box closes. */
-const drafts = new Map<string, { text: string; next: string }>();
-
-/** A try: to try (its plan over the passage, a box to check), or in the record of use (`record`: each
- *  round's plan and how it went; the box only while it is still tried and not planned again). */
-function TryRow({ t, record = false, reflecting, onCheck, onReflect, onSave, onPassage, onRemove }: {
-  t: Try;
-  record?: boolean;
-  reflecting: boolean;
-  onCheck: () => void;
-  onReflect: (on: boolean) => void;
-  onSave: (text: string, next: string) => void;
-  onPassage: () => void;
-  onRemove: () => void;
-}) {
-  const done = t.status === "done";
-  // Planned again: this row is its history, the open row above it is where he acts.
-  const history = record && !done;
-  const actions: MenuAction[] = [
-    { id: "open", label: "Open passage", run: onPassage },
-    ...(history ? [] : [{ id: "check", label: done ? "Not tried yet" : "Mark tried", run: onCheck }]),
-    ...(done ? [{ id: "reflect", label: t.reflection ? "Edit how it went…" : "How did it go…", run: () => onReflect(true) }] : []),
-    { id: "delete", label: "Remove", danger: true, divider: true, run: onRemove },
-  ];
-  return (
-    <WithMenu actions={actions} hold>
-      <div className={`try${done ? " done" : ""}${history ? " history" : ""}`}>
-        {!history && (
-          <Hint text={done ? "Not tried yet" : "Mark tried"}>
-            <button className="try-check" role="checkbox" aria-checked={done} aria-label={done ? "Not tried yet" : "Mark tried"} onClick={onCheck}>
-              {done && <PixelTry size={12} aria-hidden="true" />}
-            </button>
-          </Hint>
-        )}
-        <Hint text="Open this passage">
-          <button className="question-quote try-quote" data-find="" onClick={onPassage}>
-            {!history && t.note && <span className="note">{t.note}</span>}
-            <span className="exact">“{passageText(t.exact)}”</span>
-            <span className="from">{t.item_title}</span>
-          </button>
-        </Hint>
-        {record &&
-          t.uses?.map((u, i) => (
-            <p key={i} className="try-use">
-              {u.plan && <span className="try-use-plan">{u.plan}</span>}
-              {u.reflection && <span className="try-use-went">{u.reflection}</span>}
-            </p>
-          ))}
-        {done && t.reflection && !reflecting && (
-          <Hint text="Edit how it went">
-            <button className="try-reflection" data-find="" onClick={() => onReflect(true)}>{t.reflection}</button>
-          </Hint>
-        )}
-        <div className="question-actions">
-          <MoreButton label="Try actions" actions={actions} />
-        </div>
-        {reflecting && !history && <Reflect id={t.id} initial={t.reflection ?? ""} onSave={onSave} onClose={() => onReflect(false)} />}
-      </div>
-    </WithMenu>
-  );
-}
-
-/** "How did it go?" and "Next time I'll…" (Linear's inline edit): Enter in either saves both, Esc closes
- *  and keeps the draft; a blur keeps the box and what he typed. The second line, when filled, is the
- *  next try's plan (D148). */
-function Reflect({ id, initial, onSave, onClose }: { id: string; initial: string; onSave: (text: string, next: string) => void; onClose: () => void }) {
-  const [v, setV] = useState(() => drafts.get(id)?.text ?? initial);
-  const [next, setNext] = useState(() => drafts.get(id)?.next ?? "");
-  const field = useRef<HTMLTextAreaElement>(null);
-  // Saved or closed, focus goes back to what opened it, else (a menu item, gone) to its try's own row.
-  const row = useRef<HTMLElement | null>(null);
-  useEffect(() => void (row.current = field.current?.closest<HTMLElement>(".try") ?? null), []);
-  useFocusWhileMounted(field, () => (row.current?.isConnected ? row.current.querySelector<HTMLElement>(".try-check, .try-quote") : null));
-  const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
-    keepKeysIn(e); // ⌘Z still reaches the app history
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      onSave(v.trim(), next.trim());
-    } else if (e.key === "Escape") {
-      e.preventDefault();
-      onClose();
-    }
-  };
-  return (
-    <div className="try-reflect">
-      <Grow
-        ref={field}
-        className="field"
-        aria-label="How did it go?"
-        placeholder="How did it go?"
-        value={v}
-        onChange={(e) => {
-          setV(e.target.value);
-          drafts.set(id, { text: e.target.value, next });
-        }}
-        onKeyDown={keys}
-      />
-      <Grow
-        className="field try-next"
-        aria-label="Next time I'll…"
-        placeholder="Next time I'll…"
-        value={next}
-        onChange={(e) => {
-          setNext(e.target.value);
-          drafts.set(id, { text: v, next: e.target.value });
-        }}
-        onKeyDown={keys}
-      />
-    </div>
   );
 }
 

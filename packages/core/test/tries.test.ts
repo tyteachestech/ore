@@ -163,7 +163,8 @@ describe("the Forge: one try at a time, a plan with its cue, tries with no passa
     const count = () => useCount(findAnnotation(lib, a.id).annotation);
     expect(count()).toBe(0);
     await markTried(lib, a.id, { reflection: "ok", next: "cold open" });
-    await markTried(lib, a.id, { reflection: "better", next: "cold open" });
+    await markTried(lib, a.id, { reflection: "better", again: true });
+    expect(findAnnotation(lib, a.id).annotation).toMatchObject({ status: "open", note: "cold open", uses: [{ reflection: "ok" }, { plan: "cold open", reflection: "better" }] });
     expect(count()).toBe(2);
     await markTried(lib, a.id, { reflection: "easy" });
     expect(count()).toBe(3);

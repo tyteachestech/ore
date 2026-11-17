@@ -54,6 +54,7 @@ import { FilterButton, FilterTags } from "./FilterBar";
 import { kindLabel, passes, type Filter } from "./filters";
 import { importanceActions, LEVELS } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
+import type { Sub } from "./Forge";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
 import { count, errorText, focusQuietly, inOrder as inTurn, keepScroll, keptScrolls, load, save, usable, wakeScreens, useNarrow } from "./util";
 import { questionText } from "./Questions";
@@ -187,6 +188,12 @@ export function App() {
   /** Archived sources, for the Archived tab. */
   const [archived, setArchived] = useState<Item[]>([]);
   const [skill, setSkill] = useState<string | null>(() => lastView().skill);
+  /** Where a skill's page is (its Forge, a try's page): kept with its skill, so another skill opens on its own page. */
+  const [subOf, setSubOf] = useState<{ skill: string | null; sub: Sub }>({ skill: null, sub: null });
+  const sub = subOf.skill === skill ? subOf.sub : null;
+  const setSub = useCallback((s: Sub) => setSubOf({ skill: subSkill.current, sub: s }), []);
+  const subSkill = useRef(skill);
+  subSkill.current = skill;
   /** What this list's rows show besides the title (D108), remembered per list: each skill's To read,
    *  Done and Archived, and All sources', keep their own. */
   const detailView = `${skill ?? "all"}/${status}`;
@@ -738,6 +745,7 @@ export function App() {
 
   /** A skill's page (D46): its stats, skill note, questions and sources. */
   const openSkill = useCallback((id: string | null) => {
+    setSub(null);
     setSkillFind(undefined);
     setOpenId(null);
     setFinishing(false);
@@ -1017,7 +1025,7 @@ export function App() {
     setQuery("");
     setFilters([]);
   }, [skill]);
-  const history = useHistory({ openId, skill, status, place, query, filters }, (v, by) => {
+  const history = useHistory({ openId, skill, sub, status, place, query, filters }, (v, by) => {
     if (v.openId && !(items ?? []).some((i) => i.id === v.openId)) return false;
     if (v.skill && !skills.some((s) => s.id === v.skill)) return false;
     if (by < 0 && v.place === "home" && !v.openId && !v.skill) comingBackHome();
@@ -1026,6 +1034,7 @@ export function App() {
     setStatus(v.status);
     setPlace(v.place);
     setSkill(v.skill);
+    setSubOf({ skill: v.skill, sub: v.sub });
     setOpenId(v.openId);
     if (v.openId) setCursor(v.openId);
     listSkill.current = v.skill;
@@ -2573,6 +2582,8 @@ export function App() {
             notify={notify}
             findInNote={skillFind}
             onFound={() => setSkillFind(undefined)}
+            sub={sub}
+            onSub={setSub}
           >
             {list}
           </SkillPage>
@@ -2753,10 +2764,10 @@ export function App() {
 
 type Place = "home" | "sources" | "feed";
 /** `query` and `filters`: the list's search and filter tags as he left that view, kept up to date while he is on it. */
-type View = { openId: string | null; skill: string | null; status: Tab; place: Place; query: string; filters: Filter[] };
+type View = { openId: string | null; skill: string | null; sub: Sub; status: Tab; place: Place; query: string; filters: Filter[] };
 /** A wrapper only where it lays something out: elsewhere the screen stays a child of <main>, which focus-near.ts reads. */
 const Box = ({ on, className, children }: { on: boolean; className: string; children: ReactNode }) => (on ? <div className={className}>{children}</div> : <>{children}</>);
-const sameView = (a: View, b: View) => a.openId === b.openId && a.skill === b.skill && a.status === b.status && a.place === b.place;
+const sameView = (a: View, b: View) => a.openId === b.openId && a.skill === b.skill && a.sub === b.sub && a.status === b.status && a.place === b.place;
 
 /** Back and forward through the views he opened (a source, a skill page, a sources tab), like a
  *  browser. `restore` shows a view, or returns false for one that no longer exists, which is skipped. */
@@ -2772,7 +2783,7 @@ function useHistory(view: View, restore: (v: View, by: -1 | 1) => boolean) {
     const next = [...stack.slice(0, at + 1), view].slice(-100);
     h.current = { stack: next, at: next.length - 1 };
     rerender();
-  }, [view.openId, view.skill, view.status, view.place]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [view.openId, view.skill, view.sub, view.status, view.place]); // eslint-disable-line react-hooks/exhaustive-deps
   // Typing a search or picking a filter is not a step of its own: it updates the view he is on (a browser's replaceState).
   useEffect(() => {
     const { stack, at } = h.current;

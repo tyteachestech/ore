@@ -1705,29 +1705,74 @@ input.skill-goal.editing:focus-visible { border-color: var(--accent); }
   .skill-col { overflow: visible; padding-bottom: 0; }
 }
 .question { padding: 2px 0; }
-/* To try (D127): a check box at the left of each try, the plan over the passage; checking one off asks how it went. */
-.try { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr); padding: 2px 0; }
-.try > :not(.try-check) { grid-column: 2; }
-.try-check { grid-row: 1; align-self: start; margin: 9px 0 0 6px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 4px; border: 1.5px solid var(--muted); color: var(--apply-solid); }
+/* Tries (D127, D-new-forge). On the skill page: the one he is trying now in one line (a box to check, what he'll do,
+   its cue, its stone), the waiting ones as grey stones. The rest is the Forge and each try's own page. */
+.try-check { flex: none; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 4px; border: 1.5px solid var(--muted); color: var(--apply-solid); }
 .try-check:hover { border-color: var(--apply-solid); background: var(--bg-hover); }
 .try-check:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
-.try.done .try-check { border-color: transparent; }
-.try.done .try-check svg { animation: try-pop var(--t-3) var(--ease-spring); }
-@keyframes try-pop { from { transform: scale(0.4); } to { transform: scale(1); } }
-@media (prefers-reduced-motion: reduce) { .try.done .try-check svg { animation: none; } }
-.try-quote.question-quote { padding-left: 8px; }
-.try-quote .note { margin: 0 0 2px; color: var(--text); }
-.try-quote .exact { color: var(--text-read); }
-.try.done .try-quote .note, .try.done .try-quote .exact { color: var(--faint); }
-.try-reflection { display: block; width: 100%; text-align: left; margin: 0 0 4px; padding: 2px 8px 2px 16px; border-left: 2px solid var(--apply-solid); font-size: 13px; color: var(--text-read); line-height: 1.45; }
-.try-reflection:hover { color: var(--text); }
-.try-use { display: flex; flex-wrap: wrap; gap: 0 8px; margin: 0 0 4px; padding: 0 8px 0 16px; border-left: 2px solid var(--apply-solid); font-size: 13px; line-height: 1.45; color: var(--text-read); }
-.try-use-plan { color: var(--faint); }
-.try.history .try-quote .exact { color: var(--faint); }
-.try-reflect { display: grid; gap: 4px; margin: 2px 8px 6px 8px; }
-.try-reflect .field { width: 100%; min-height: 34px; padding: 7px 10px; line-height: 1.45; }
-.skill-col.side .try .question-actions { position: absolute; top: 4px; right: 4px; margin: 0; padding: 2px; border-radius: 6px; background: var(--bg-raised); border: 1px solid var(--border); visibility: hidden; }
-.skill-col.side .try:hover .question-actions, .skill-col.side .try:focus-within .question-actions { visibility: visible; }
+.stone { flex: none; color: var(--apply-solid); }
+.stone[data-waiting] { color: var(--muted); opacity: 0.6; }
+.skill-icon.glyph.tool { flex: none; width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; background: var(--apply-solid); }
+.try-now { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; min-height: 36px; }
+.try-now .try-check { margin-left: 6px; }
+.try-line { display: flex; align-items: baseline; gap: 10px; min-width: 0; padding: 7px 8px; border-radius: 8px; text-align: left; }
+.try-line:hover { background: var(--bg-hover); }
+.try-line:focus-visible, .forge-open:focus-visible, .try-passage:focus-visible, .forge-door:focus-visible, button.try-stone:focus-visible, .tool-btn:focus-visible, .crumbs button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.try-do { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--text); }
+.try-when { flex: 0 1 auto; min-width: 0; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); color: var(--faint); }
+.try-stone { display: grid; place-items: center; padding: 5px 8px; border-radius: 6px; }
+button.try-stone:hover { background: var(--bg-hover); }
+button.try-stone:hover .stone { opacity: 1; }
+.try-stones { display: flex; justify-content: flex-end; flex-wrap: wrap; padding: 2px 0; }
+.try-did { grid-column: 2 / -1; display: flex; align-items: flex-start; gap: 8px; margin: 2px 8px 6px; }
+.try-did .field { flex: 1; height: auto; min-height: 34px; padding: 7px 10px; line-height: 1.45; }
+.try-did-actions { display: flex; gap: 6px; padding-top: 4px; }
+.forge-door { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font: 12px var(--mono); color: var(--muted); }
+.forge-door:hover { background: var(--bg-hover); color: var(--text); }
+.tools { display: inline-flex; margin-left: 2px; }
+.tool-btn { display: grid; padding: 4px; border-radius: 6px; }
+.tool-btn:hover { background: var(--bg-hover); }
+/* The Forge and a try's page: one column of bands, each a label over a rule. */
+.skill-page.sub { display: block; overflow-y: auto; }
+.forge { max-width: 760px; margin: 0 auto; padding: 26px 32px var(--mole-room); }
+.forge.try-page { max-width: 1040px; }
+.forge-head { display: flex; align-items: center; justify-content: space-between; min-height: 28px; }
+.forge > .quiet { margin: 22px 8px; color: var(--faint); }
+.crumbs { display: flex; align-items: center; gap: 4px; min-width: 0; font: 12px var(--mono); color: var(--faint); }
+.crumbs button { padding: 2px 6px; border-radius: 6px; color: var(--muted); }
+.crumbs button:first-child { margin-left: -6px; }
+.crumbs button:hover { background: var(--bg-hover); color: var(--text); }
+.crumbs [aria-current] { padding: 2px 6px; }
+.forge-band { margin-top: 22px; }
+.forge-band h2 { margin: 0 0 6px; padding: 0 8px 6px; border-bottom: 1px solid var(--border); font: 400 12px var(--mono); color: var(--muted); }
+.forge-row { display: flex; align-items: center; gap: 8px; min-height: 38px; padding-right: 6px; border-radius: 8px; }
+.forge-row:hover, .forge-row:focus-within { background: var(--bg-hover); }
+.forge-open { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; padding: 9px 8px; border-radius: 8px; text-align: left; }
+.forge-open .try-when { padding-top: 2px; }
+.crumbs svg, .forge-door svg { width: 12px; height: 12px; }
+.forge-row:not([data-state="now"]) .try-do { color: var(--text-read); }
+.forge-row .forge-pick, .forge-row .more { visibility: hidden; }
+.forge-row:hover :is(.forge-pick, .more), .forge-row:focus-within :is(.forge-pick, .more), .forge-row .more[aria-expanded="true"] { visibility: visible; }
+.forge-add { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin: 4px 8px 8px; }
+.forge-add .field, .plan-line .field { height: auto; min-height: 34px; padding: 7px 10px; line-height: 1.45; }
+.try-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 40px; }
+.try-title { display: flex; align-items: center; gap: 12px; margin: 14px 0 18px; font-size: 24px; line-height: 1.25; font-weight: 600; overflow-wrap: anywhere; }
+.try-title > span { display: grid; flex: none; }
+.try-title .skill-icon.glyph.tool { width: 20px; height: 20px; -webkit-mask-size: 20px; mask-size: 20px; }
+.plan { display: grid; gap: 8px; }
+.plan-line { display: grid; grid-template-columns: 52px minmax(0, 1fr); align-items: center; }
+.plan-line > span { font: 12px var(--mono); color: var(--faint); }
+.try-round { display: grid; gap: 2px; margin: 0 0 8px 8px; padding: 4px 8px 4px 14px; border-left: 2px solid var(--apply-solid); font-size: 14px; line-height: 1.45; color: var(--text-read); }
+.try-round small, .try-passage small { font: 11px var(--mono); color: var(--faint); }
+.try-go { margin-top: 20px; }
+.try-page > .try-cols .try-did { margin: 16px 0 0; }
+.try-passage { display: grid; gap: 4px; width: 100%; margin-left: 8px; padding: 8px 12px 8px 14px; border-left: 2px solid var(--apply-solid); border-radius: 0 8px 8px 0; text-align: left; line-height: 1.45; color: var(--text-read); }
+.try-passage:hover { background: var(--bg-hover); color: var(--text); }
+@media (max-width: 760px) {
+  .forge { padding: 16px 20px var(--mole-room); }
+  .try-cols { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .forge-row .forge-pick { visibility: visible; }
+}
 .question-quote { position: relative; display: block; width: 100%; text-align: left; padding: 7px 8px 7px 34px; border-radius: 8px; }
 /* The same pixel ? as the Questions header, on the first line's midline. */
 .question-quote .question-mark { position: absolute; left: 10px; top: 10px; color: var(--question-solid); }
@@ -3284,8 +3329,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-skill .card-head .icon-btn { width: 44px; height: 44px; margin: -9px -9px -9px 0; }
 .phone .phone-skill :is(.q-check, .try-check) { position: relative; }
 /* A question's and a try's actions are their long press on the phone (Mail's rows): the hover buttons never show. */
-.phone .phone-skill :is(.question, .try) .question-actions { display: none; }
-.phone .phone-skill :is(.question, .try) { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.phone .phone-skill .question .question-actions { display: none; }
+.phone .phone-skill .question { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .phone .phone-skill :is(.q-check, .try-check)::before { content: ""; position: absolute; inset: -14px; }
 /* A course as one row: its title, and under it the lesson a tap goes on with. */
 .phone-sources .phone-two { display: flex; flex-direction: column; gap: 2px; }

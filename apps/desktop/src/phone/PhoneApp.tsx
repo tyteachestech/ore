@@ -11,6 +11,7 @@ import { AddLink, WaitingLinks, macOnly, type Waiting } from "./AddLink";
 import { trackDrag, type Drag } from "./drag";
 import { Home } from "../Home";
 import { HeadTabs, type HeadTab as HeadTabT } from "../HeadTabs";
+import type { Sub } from "../Forge";
 import { ranked } from "../match";
 import { SkillPage } from "../SkillPage";
 import { PhoneSettings } from "./Settings";
@@ -439,6 +440,10 @@ export function PhoneApp() {
   const [course, setCourse] = useState<string | null>(start.course ?? null);
   /** The skill page's sources: To read or Done (D226's tabs), and what its search narrows them to (D203). */
   const [skillTab, setSkillTab] = useState<"toread" | "done">("toread");
+  /** Where the skill's page is: itself, its Forge, or one try's page. Back goes up one. */
+  const [skillSub, setSkillSub] = useState<Sub>(null);
+  useEffect(() => setSkillSub(null), [skill]);
+  const skillBack = () => (skillSub ? setSkillSub(skillSub === "forge" ? null : "forge") : setSkill(null));
   const [skillQuery, setSkillQuery] = useState("");
   const [skillAll, setSkillAll] = useState(false);
   useEffect(() => (setSkillTab("toread"), setSkillQuery(""), setSkillAll(false)), [skill]);
@@ -1063,8 +1068,8 @@ export function PhoneApp() {
       </div>
       {/* A skill's page (D46 in one column), pushed from Today or the drawer; a source opens over it. */}
       {skill && skillOf && (
-        <Screen className="phone-full" onBack={() => setSkill(null)}>
-          <Back label={tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} onClick={() => setSkill(null)} />
+        <Screen className="phone-full" onBack={skillBack}>
+          <Back label={skillSub === "forge" ? skillOf.name : skillSub ? "Forge" : tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} onClick={skillBack} />
           <div className="phone-page phone-skill">
             <SkillPage
               key={skill}
@@ -1083,6 +1088,8 @@ export function PhoneApp() {
               onBringBack={() => menuOf(skillOf).find((a) => a.id === "unarchive")?.run()}
               notify={notify}
               onFound={() => {}}
+              sub={skillSub}
+              onSub={setSkillSub}
               noteRow={
                 <button className="phone-note-row" onClick={() => setSkillNote(true)}>
                   <PixelNote className="card-icon" size={16} aria-hidden="true" />

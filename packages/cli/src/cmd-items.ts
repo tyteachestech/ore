@@ -386,11 +386,11 @@ export const itemCommands: Record<string, Command> = {
   },
 
   tried: {
-    usage: '<try> [--text "<how it went>"] [--next "<plan>"] [--undo]   check off a try (D127); with --text, a card is drafted from how it went in the background; --next "Next time I\'ll…" (D148) keeps the round and opens the try again with that plan; --undo steps back',
-    options: { text: { type: "string" }, next: { type: "string" }, undo: { type: "boolean" } },
+    usage: '<try> [--text "<how it went>"] [--next "<plan>" | --again] [--undo]   check off a try: it is his (D127); with --text, a card is drafted from how it went in the background; --next "Next time I\'ll…" (D148) keeps the round and opens the try again with that plan, --again with the same plan; --undo steps back',
+    options: { text: { type: "string" }, next: { type: "string" }, again: { type: "boolean" }, undo: { type: "boolean" } },
     async run([ref], f) {
       const lib = openLibrary();
-      const { tried, item, card } = await markTried(lib, need(ref, "<try>"), { reflection: str(f.text), next: str(f.next), undo: !!f.undo });
+      const { tried, item, card } = await markTried(lib, need(ref, "<try>"), { reflection: str(f.text), next: str(f.next), again: !!f.again, undo: !!f.undo });
       const enrich = card ? startEnrich(lib, item.meta.id) : "skipped";
       return { data: { ...tried, enrich }, text: `Try ${tried.id}: ${tried.status === "done" ? "tried" : "to try"}${card ? `; card draft ${enrich}` : ""}` };
     },

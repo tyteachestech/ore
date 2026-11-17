@@ -8589,7 +8589,7 @@ journey("review: retiring a card keeps ⌘Z for the ratings before it, and so do
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-journey("try it: 4 marks a technique to try, the skill page checks it off, and how it went is kept through a failed save and after a reload", async (page) => {
+journey("try it: 4 marks a technique, the Forge makes it the one he is trying, each use is kept (through a failed save and a reload), and the third makes it his", async (page) => {
   await openSource(page, TESTING);
   await select(page, "Each successful retrieval changes the memory itself");
   await page.getByRole("dialog", { name: "Highlight" }).waitFor();
@@ -8600,49 +8600,105 @@ journey("try it: 4 marks a technique to try, the skill page checks it off, and h
   await page.keyboard.type("Quiz myself before each edit session");
   await page.keyboard.press("Enter");
   await page.locator(".collected-chip.apply").waitFor();
-  // The plan's save lands before he leaves: a skill page that opens while it is on its way loads the try
-  // without it (it waits for no save it didn't make), and a slow runner got there first.
   await until("the plan is saved", async () => JSON.stringify(await ore("tries")).includes("Quiz myself before each edit session"));
-  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
-  const row = page.locator(".try").filter({ hasText: "Quiz myself before each edit session" });
-  await row.getByRole("checkbox", { name: "Mark tried" }).click();
+  const PLAN = "Quiz myself before each edit session";
+  /** Its page, from the skill page through the Forge. */
+  const openTry = async () => {
+    await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+    await page.getByRole("button", { name: "Forge" }).click();
+    await page.locator(".forge-open").filter({ hasText: PLAN }).click();
+    await page.locator(".try-title").filter({ hasText: PLAN }).waitFor();
+  };
+  await openTry();
+  // Another journey's try may be the one in the works: he picks this one.
+  const pick = page.locator(".try-go", { hasText: "Try this now" });
+  if (await pick.count()) await pick.click();
+  // The plan's cue, written in place: Enter saves it.
+  await page.getByLabel("When").fill("I sit down to edit");
+  await page.keyboard.press("Enter");
+  await until("the cue is saved", async () => ((await ore("tries")) as { note?: string; when?: string }[]).some((t) => t.note === PLAN && t.when === "I sit down to edit"));
+  await page.locator(".try-go", { hasText: "I did it" }).click();
   const field = page.getByLabel("How did it go?");
   await field.fill("Caught two gaps before recording");
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { tried: "The library is read-only." }));
   await page.keyboard.press("Enter");
   await page.locator(".toast[role=alert]").filter({ hasText: "The library is read-only." }).waitFor();
-  await until("the failed save opens the field again with every word", async () => (await field.isVisible()) && (await field.inputValue()) === "Caught two gaps before recording");
+  if (!(await field.isVisible()) || (await field.inputValue()) !== "Caught two gaps before recording") throw new Error("the failed save lost what he wrote");
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
   await field.focus();
   await page.keyboard.press("Enter");
-  const saved = page.locator(".try-reflection", { hasText: "Caught two gaps before recording" });
-  await saved.waitFor();
+  const round = page.locator(".try-round", { hasText: "Caught two gaps before recording" });
+  await round.waitFor();
+  if (await page.getByRole("button", { name: "It’s mine" }).count()) throw new Error("It's mine was offered before the third use");
   await Bun.sleep(500);
   await page.reload();
-  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
-  await page.locator(".answered-toggle", { hasText: "Used" }).click();
-  await saved.waitFor();
-  // D148: "Next time I'll…" plans the next try: the row is back in To try with that plan, and the round so far is its record under Used.
-  await saved.click();
-  await page.getByLabel("Next time I'll…").fill("Quiz myself before writing, too");
-  await page.keyboard.press("Enter");
-  const again = page.locator(".try:not(.history)").filter({ hasText: "Quiz myself before writing, too" });
-  await again.waitFor();
-  await until("focus is back on a try's row", () => page.evaluate(() => !!document.activeElement?.closest(".try")));
-  if ((await again.getByRole("checkbox", { name: "Mark tried" }).count()) !== 1) throw new Error("the re-planned try isn't open again");
-  const record = page.locator(".try.history").filter({ hasText: "Quiz myself before each edit session" });
-  await record.waitFor();
-  if (!(await record.innerText()).includes("Caught two gaps before recording")) throw new Error("the record lost how the first round went");
-  // ⌘Z takes the re-plan back: the round is tried again as it was. (A click first: after a reload the
-  // page has no keyboard focus in headless Chromium until something is clicked.)
+  await openTry();
+  await round.waitFor();
+  // The skill page shows it in one line with its cue; its box asks how it went there too.
+  await page.locator(".crumbs button").first().click();
+  const now = page.locator(".try-now").filter({ hasText: PLAN });
+  await now.waitFor();
+  if (!(await now.innerText()).includes("I sit down to edit")) throw new Error("the line lost its cue");
+  await now.getByRole("checkbox", { name: "I did it" }).click();
+  await page.getByLabel("How did it go?").fill("Faster this time");
+  await page.getByRole("button", { name: "Again" }).click();
+  await page.getByLabel("How did it go?").waitFor({ state: "detached" });
+  await until("the second use is kept", async () => ((await ore("tries")) as { note?: string; uses?: unknown[] }[]).find((t) => t.note === PLAN)?.uses?.length === 2);
+  // The third use: it can be his, and then it is a tool beside the goal.
+  await now.getByRole("checkbox", { name: "I did it" }).click();
+  await page.getByLabel("How did it go?").fill("No notes needed");
+  await page.getByRole("button", { name: "It’s mine" }).click();
+  const tool = page.getByRole("button", { name: `Yours: ${PLAN}` });
+  await tool.waitFor();
+  if (await now.count()) throw new Error("a try that is his is still the one in the works");
+  // ⌘Z takes it back: it is the one he is trying again, with its two uses.
   await page.locator(".skill-page, main").first().click({ position: { x: 2, y: 2 } }).catch(() => {});
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await page.keyboard.press("Meta+z");
-  await until("⌘Z puts the tried round back", async () => (await again.count()) === 0 && (await page.locator(".try.done").filter({ hasText: "Quiz myself before each edit session" }).count()) === 1);
-  await page.waitForTimeout(400);
-  const back = (await ore("tries")) as { note?: string; status: string; uses?: unknown[] }[];
-  const mine = back.find((t) => t.note === "Quiz myself before each edit session");
-  if (!mine || mine.status !== "done" || mine.uses?.length) throw new Error(`the library kept the re-plan: ${JSON.stringify(mine)}`);
+  await until("⌘Z puts it back in the works", async () => (await tool.count()) === 0 && (await now.count()) === 1);
+  const mine = ((await ore("tries")) as { note?: string; status: string; uses?: unknown[]; reflection?: string }[]).find((t) => t.note === PLAN);
+  if (!mine || mine.status !== "open" || mine.uses?.length !== 2 || mine.reflection) throw new Error(`the library kept it as his: ${JSON.stringify(mine)}`);
+});
+
+journey("forge: a try typed with no passage waits, Try this now swaps it in, and Remove takes it out with Undo", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: /^Creativity$/ }).first().click();
+  await page.getByRole("button", { name: "Forge" }).click();
+  await page.getByRole("button", { name: "Add something to try" }).click();
+  await page.getByLabel("I’ll…").fill("Lay out running shoes the night before");
+  await page.getByLabel("When…").fill("I brush my teeth");
+  await page.keyboard.press("Enter");
+  const row = page.locator(".forge-row").filter({ hasText: "Lay out running shoes the night before" });
+  await row.waitFor();
+  await page.getByRole("button", { name: "Add something to try" }).click();
+  await page.getByLabel("I’ll…").fill("Walk before the first coffee");
+  await page.keyboard.press("Enter");
+  const second = page.locator(".forge-row").filter({ hasText: "Walk before the first coffee" });
+  await until("the first he added is the one in the works, the second waits", async () => (await row.getAttribute("data-state")) === "now" && (await second.getAttribute("data-state")) === "waiting");
+  // Neither is a source: the skill's list and All sources don't show them.
+  if (((await ore("ls")) as { title: string }[]).some((i) => /running shoes|first coffee/.test(i.title))) throw new Error("a typed try is listed as a source");
+  await second.hover();
+  await second.getByRole("button", { name: "Try this now" }).click();
+  await until("the pick swaps them", async () => (await second.getAttribute("data-state")) === "now" && (await row.getAttribute("data-state")) === "waiting");
+  // ↓ from a row moves to the next; Enter opens its page; the crumb goes back.
+  await second.locator(".forge-open").focus();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await page.locator(".try-title").filter({ hasText: "Lay out running shoes the night before" }).waitFor();
+  if (await page.locator(".try-from").count()) throw new Error("a typed try shows a passage it never had");
+  await page.locator(".crumbs button", { hasText: "Forge" }).click();
+  await row.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Remove" }).click();
+  await until("the row is gone", async () => (await row.count()) === 0);
+  await page.locator(".toast").filter({ hasText: "Removed" }).getByRole("button", { name: "Undo" }).click();
+  await row.waitFor();
+  // Back steps through the pages like any view: the try's page he came from, the Forge, then the skill.
+  const back = page.getByRole("button", { name: "Back", exact: true }).first();
+  await back.click();
+  await page.locator(".try-title").waitFor();
+  await back.click();
+  await page.locator(".forge-row").first().waitFor();
+  await back.click();
+  await page.locator(".skill-hero").waitFor();
 });
 
 /** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
@@ -8655,8 +8711,8 @@ const release = (page: Page, key: string) => page.evaluate((k) => (window as unk
 const isHeld = (page: Page, key: string) => page.evaluate((k) => (window as unknown as { __ORE_HELD: string[] }).__ORE_HELD.includes(k), key);
 /** Resolves once the page's next `ore <cmd>` has answered. */
 const answered = (page: Page, cmd: string) => page.waitForResponse((r) => r.url().endsWith("/ore") && (JSON.parse(r.request().postData() ?? "{}") as { args?: string[] }).args?.[0] === cmd);
-/** The tries on the skill page whose text has `text`. */
-const tryRows = (page: Page, text: string) => page.locator(".try").filter({ hasText: text });
+/** The tries on the skill page whose text has `text`: the one in the works, or a waiting one's stone. */
+const tryRows = (page: Page, text: string) => page.locator(`.try-now:has-text(${JSON.stringify(text)}), button.try-stone[aria-label*=${JSON.stringify(text)}]`);
 
 journey("try it: a plan written just before the skill page opens shows there once it saves, though the page read its tries first", async (page) => {
   await openSource(page, TESTING);
@@ -8727,7 +8783,7 @@ journey("try it: 4 on the reading focus makes a try that shows on a skill page o
   const shown = (await (await read).json()) as unknown[];
   if (shown.length) throw new Error("the skill page read a try before the one being made");
   await release(page, "highlight");
-  await until("the try shows once it is made", async () => (await page.locator(".try").count()) === 1);
+  await until("the try shows once it is made", async () => (await page.locator(".try-now").count()) === 1);
 });
 
 journey("highlight note: a click on the highlight in the instant its save lands opens it with the note he wrote, and closing it keeps the note", async (page) => {

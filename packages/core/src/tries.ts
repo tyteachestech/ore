@@ -96,6 +96,8 @@ export interface TriedInput {
   reflection?: string;
   /** "Next time I'll…": the round closes into `uses` and the try is open again with this as its plan. */
   next?: string;
+  /** He used it and keeps going: the round closes into `uses` and the try stays open with the same plan. */
+  again?: boolean;
   /** One step back (Undo): a tried try goes back to "to try" and its reflection goes too; a try
    *  re-planned with `next` gets its last round back as it was. Redo sends the step again. */
   undo?: boolean;
@@ -115,8 +117,8 @@ export async function markTried(lib: Library, ref: string, input: TriedInput): P
         : reviseAnnotation(item, annotation, { status: "open", reflection: undefined });
       return { tried, item, card: false };
     }
-    const tried = next
-      ? reviseAnnotation(item, annotation, { status: "open", note: next, reflection: undefined, uses: [...(annotation.uses ?? []), { ts: nowIso(), plan: annotation.note, reflection }] })
+    const tried = next || input.again
+      ? reviseAnnotation(item, annotation, { status: "open", note: next ?? annotation.note, reflection: undefined, uses: [...(annotation.uses ?? []), { ts: nowIso(), plan: annotation.note, reflection }] })
       : reviseAnnotation(item, annotation, { status: "done", ...(reflection ? { reflection } : {}) });
     return { tried, item, card: !!reflection };
   });
