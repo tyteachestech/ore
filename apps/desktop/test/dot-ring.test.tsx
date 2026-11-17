@@ -99,7 +99,7 @@ test("the small marks are round dots too: the sidebar arrow, the tick and cross,
   }
 });
 
-test("nothing glows but the lamp and a reward (D-new-reward-glow): no blurred shadow in a colour elsewhere, and no halo behind a gem", async () => {
+test("nothing glows but the lamp and a reward (D323): no blurred shadow in a colour elsewhere, and no halo behind a gem", async () => {
   const css = (await Bun.file(new URL("../src/styles.css", import.meta.url)).text()) + (await Bun.file(new URL("../src/retro.css", import.meta.url)).text());
   // The reward glow: the day's goal met (Home's ring, the end screen's) and a to-do ticked.
   const reward = /^(\.home-goal \.ring|@keyframes (goal-glow|ticked)|@media \(prefers-reduced-motion: reduce\) \{ \.home-goal \.ring)/;
