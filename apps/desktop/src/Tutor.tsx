@@ -1288,7 +1288,7 @@ export function TutorBubble({ onOpen, said = null, failed = false, thinking = fa
   const [look, setLook] = useState(false);
   // Out of its hole once a launch; thinking while a reply is written; a hop when one lands, a jolt for an error.
   const [first, setFirst] = useState<Mood>(() => (peeked ? "idle" : ((peeked = true), "peek")));
-  // The mouse landing on him while he rests: one friendly move, never the one before, and no new one until it is over (D-new-mole-hover-moves).
+  // The mouse landing on him while he rests: one friendly move, never the one before, and no new one until it is over (D320).
   const [hover, setHover] = useState<{ move: (typeof HOVER)[number]; n: number } | null>(null);
   const play = useRef({ last: null as Mood | null, n: 0, until: first === "peek" ? performance.now() + MOVES.peek.end! : 0, timer: 0 });
   useEffect(() => () => clearTimeout(play.current.timer), []);

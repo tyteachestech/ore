@@ -99,7 +99,7 @@ test("traced: nothing shows through a part above it (fur under the helmet, a lid
 });
 
 // D253: fourteen more emotions on the same puppet, each a move that ends back at rest.
-// D-new-mole-hover-moves: six friendly moves more, for the pointer landing on him.
+// D320: six friendly moves more, for the pointer landing on him.
 const EMOTIONS = ["nod", "shake", "wink", "laugh", "proud", "curious", "sad", "sleepy", "set", "shy", "wave", "huff", "anxious", "ecstatic", "hello", "tip", "flash", "peekaboo", "chuckle", "dance"] as const;
 
 test("traced: each emotion plays, differs from rest while it plays, and settles back to the rest drawing", () => {
@@ -236,7 +236,7 @@ test("waking from his sleep on the cart he is the front view from the first fram
   expect(s.v.whole).toBeGreaterThan(0.5);
 });
 
-test("the pointer landing on him: any of twelve friendly moves, each one that ends, never the same twice running (D-new-mole-hover-moves)", () => {
+test("the pointer landing on him: any of twelve friendly moves, each one that ends, never the same twice running (D320)", () => {
   expect(new Set(HOVER).size).toBe(12);
   for (const m of HOVER) { expect(MOVES[m].end).toBeGreaterThan(0); expect(MOVES[m].end).toBeLessThanOrEqual(2600); expect(MOVES[m].loop).toBeUndefined(); }
   // Every roll gives a move, each move can come up, and the one before never does.

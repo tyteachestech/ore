@@ -178,7 +178,7 @@ export const MOVES: Record<Exclude<Mood, "idle">, Move> = {
       [1320, { to: { hx: 0, pawL: 0, pawR: 0, tilt: 0 } }], [1450, { to: { arc: 0 } }]] },
 };
 
-/** What he does when the pointer lands on him (D-new-mole-hover-moves, Tyler 2026-11-17: "might as well add them all"). */
+/** What he does when the pointer lands on him (D320, Tyler 2026-11-17: "might as well add them all"). */
 export const HOVER = ["hello", "tip", "wink", "flash", "peekaboo", "chuckle", "dance", "happy", "proud", "shy", "curious", "nod"] as const satisfies readonly Mood[];
 /** One of them for a roll `r` in [0, 1), never the one before. */
 export function hoverMove(last: Mood | null, r: number): (typeof HOVER)[number] {

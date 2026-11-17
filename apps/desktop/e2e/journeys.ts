@@ -974,7 +974,7 @@ journey("tutor mole: it sits at the bottom right on every screen, pages keep roo
   await button.waitFor();
 });
 
-journey("tutor mole: the mouse landing on him gets a friendly move that ends, the next one is another, and focus alone gets none (D-new-mole-hover-moves)", async (page) => {
+journey("tutor mole: the mouse landing on him gets a friendly move that ends, the next one is another, and focus alone gets none (D320)", async (page) => {
   const button = page.getByRole("button", { name: "Open the tutor" }), mole = button.locator(".mole");
   const mood = () => mole.getAttribute("data-mood");
   const FRIENDLY = ["hello", "tip", "wink", "flash", "peekaboo", "chuckle", "dance", "happy", "proud", "shy", "curious", "nod"];
