@@ -41,7 +41,7 @@ export const AnnotationSchema = z.object({
   // A card or question he typed with nothing selected ("Card here"): `exact` is only the sentence where he
   // was; the note is what counts, and a card is drafted from it and the whole source, with quotes.
   point: z.boolean().optional(),
-  // He opened Explain on it (D-new-looked-up): a term he didn't know. Enrich weighs it as one, never as a stray word.
+  // He opened Explain on it (D318): a term he didn't know. Enrich weighs it as one, never as a stray word.
   looked_up: z.boolean().optional(),
 });
 export type Annotation = z.infer<typeof AnnotationSchema>;

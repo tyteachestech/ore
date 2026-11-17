@@ -2335,7 +2335,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }
 
   /** Explain (D97) on a word: a term he had to look up is one he didn't know, so it stays highlighted,
-   *  marked looked up, and the plan weighs it at the finish (D-new-looked-up). With no highlight there
+   *  marked looked up, and the plan weighs it at the finish (D318). With no highlight there
    *  (the key on the word under the pointer), it becomes a plain one. */
   function lookUp(range: Range, from: Popup | null) {
     let ann: string | null = null;

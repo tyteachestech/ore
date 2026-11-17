@@ -294,7 +294,7 @@ describe("AI adapter", () => {
     expect(pendingHighlights(findItem(lib, id), listCards(lib)).map((x) => x.id)).toEqual([late.id]);
   });
 
-  test("D-new-looked-up: a term he opened Explain on stays a plain highlight, waits for the finish and is sent as looked up", async () => {
+  test("D318: a term he opened Explain on stays a plain highlight, waits for the finish and is sent as looked up", async () => {
     const lib = await tempLibrary();
     const id = (await createItem(lib, { type: "article", title: "Agents", body: "Agents use an orchestrator. The orchestrator splits the task into subtasks." })).meta.id;
     const term = addHighlight(findItem(lib, id), { exact: "orchestrator", intent: "keep", start: 30, looked_up: true });
