@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { MOVES, REST, advance, puppet, start, type State } from "../src/Mole";
+import { HOVER, MOVES, REST, advance, hoverMove, puppet, start, type State } from "../src/Mole";
 import * as FINE from "../src/mole-fine";
 import { COLS, ROWS, fineDots } from "../src/mole-fine";
 
@@ -99,7 +99,8 @@ test("traced: nothing shows through a part above it (fur under the helmet, a lid
 });
 
 // D253: fourteen more emotions on the same puppet, each a move that ends back at rest.
-const EMOTIONS = ["nod", "shake", "wink", "laugh", "proud", "curious", "sad", "sleepy", "set", "shy", "wave", "huff", "anxious", "ecstatic"] as const;
+// D320: six friendly moves more, for the pointer landing on him.
+const EMOTIONS = ["nod", "shake", "wink", "laugh", "proud", "curious", "sad", "sleepy", "set", "shy", "wave", "huff", "anxious", "ecstatic", "hello", "tip", "flash", "peekaboo", "chuckle", "dance"] as const;
 
 test("traced: each emotion plays, differs from rest while it plays, and settles back to the rest drawing", () => {
   const sig = (d: ReturnType<typeof fineDots>) => d.map(([x, y, r, t]) => `${x.toFixed(1)},${y.toFixed(1)},${r.toFixed(2)},${t}`).sort().join(";");
@@ -233,4 +234,19 @@ test("waking from his sleep on the cart he is the front view from the first fram
   start(s, "fall", 2000);
   expect(s.v.side).toBeLessThan(0.5);
   expect(s.v.whole).toBeGreaterThan(0.5);
+});
+
+test("the pointer landing on him: any of twelve friendly moves, each one that ends, never the same twice running (D320)", () => {
+  expect(new Set(HOVER).size).toBe(12);
+  for (const m of HOVER) { expect(MOVES[m].end).toBeGreaterThan(0); expect(MOVES[m].end).toBeLessThanOrEqual(2600); expect(MOVES[m].loop).toBeUndefined(); }
+  // Every roll gives a move, each move can come up, and the one before never does.
+  const seen = new Set<string>();
+  for (const last of [null, ...HOVER]) for (let r = 0; r < 1; r += 1 / 97) {
+    const m = hoverMove(last, r);
+    expect(HOVER).toContain(m);
+    expect(m).not.toBe(last);
+    seen.add(m);
+  }
+  expect(hoverMove("nod", 0.9999999)).toBe("curious");
+  expect(seen.size).toBe(12);
 });

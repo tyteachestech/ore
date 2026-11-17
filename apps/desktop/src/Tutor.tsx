@@ -6,7 +6,7 @@ import { chatGroups } from "./chat-groups";
 import { askAgain, flip, versionCount, versionShown, type Version } from "./chat-versions";
 import { WithMenu } from "./Menu";
 import { citeRuns, siteName } from "./cite-pills";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
@@ -28,7 +28,8 @@ import { readingAt } from "./Outline";
 import { Working } from "./Working";
 import { mentionMatches, pointedAt, type Mention } from "./mentions";
 import { glow, pulse } from "./Lamp";
-import { Mole, type Mood } from "./Mole";
+import { HOVER, MOVES, Mole, hoverMove, type Mood } from "./Mole";
+import { still } from "./SideCursor";
 
 /** How lately the reply being written gained words: the mole's lamp follows it (the lamp, D263). */
 const writing = () => glow("tutor", 900);
@@ -1286,8 +1287,22 @@ let peeked = false;
 export function TutorBubble({ onOpen, said = null, failed = false, thinking = false, onHush }: { onOpen: () => void; said?: string | null; failed?: boolean; thinking?: boolean; onHush?: () => void }) {
   const [look, setLook] = useState(false);
   // Out of its hole once a launch; thinking while a reply is written; a hop when one lands, a jolt for an error.
-  const [first] = useState<Mood>(() => (peeked ? "idle" : ((peeked = true), "peek")));
-  const mood: Mood = thinking ? "thinking" : said ? (failed ? "surprised" : "happy") : first;
+  const [first, setFirst] = useState<Mood>(() => (peeked ? "idle" : ((peeked = true), "peek")));
+  // The mouse landing on him while he rests: one friendly move, never the one before, and no new one until it is over (D320).
+  const [hover, setHover] = useState<{ move: (typeof HOVER)[number]; n: number } | null>(null);
+  const play = useRef({ last: null as Mood | null, n: 0, until: first === "peek" ? performance.now() + MOVES.peek.end! : 0, timer: 0 });
+  useEffect(() => () => clearTimeout(play.current.timer), []);
+  const greet = (e: ReactPointerEvent) => {
+    const p = play.current, now = performance.now();
+    if (e.pointerType !== "mouse" || thinking || said || now < p.until || still()) return;
+    const move = hoverMove(p.last, Math.random()), ms = MOVES[move].end!;
+    Object.assign(p, { last: move, n: p.n + 1, until: now + ms + 300 });
+    setFirst("idle");
+    setHover({ move, n: p.n });
+    clearTimeout(p.timer);
+    p.timer = window.setTimeout(() => setHover(null), ms);
+  };
+  const mood: Mood = thinking ? "thinking" : said ? (failed ? "surprised" : "happy") : (hover?.move ?? first);
   const mole = useRef<HTMLButtonElement>(null);
   return (
     <>
@@ -1313,12 +1328,12 @@ export function TutorBubble({ onOpen, said = null, failed = false, thinking = fa
           className="tutor-bubble"
           aria-label="Open the tutor"
           onClick={onOpen}
-          onPointerEnter={() => setLook(true)}
+          onPointerEnter={(e) => (setLook(true), greet(e))}
           onPointerLeave={() => setLook(false)}
           onFocus={() => setLook(true)}
           onBlur={() => setLook(false)}
         >
-          <Mole mood={mood} cue={said} look={look || !!said} signal={writing} />
+          <Mole mood={mood} cue={said ?? hover?.n} look={look || !!said} signal={writing} />
         </button>
       </Hint>
     </>

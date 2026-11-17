@@ -974,6 +974,36 @@ journey("tutor mole: it sits at the bottom right on every screen, pages keep roo
   await button.waitFor();
 });
 
+journey("tutor mole: the mouse landing on him gets a friendly move that ends, the next one is another, and focus alone gets none (D320)", async (page) => {
+  const button = page.getByRole("button", { name: "Open the tutor" }), mole = button.locator(".mole");
+  const mood = () => mole.getAttribute("data-mood");
+  const FRIENDLY = ["hello", "tip", "wink", "flash", "peekaboo", "chuckle", "dance", "happy", "proud", "shy", "curious", "nod"];
+  await until("he is up and at rest", async () => (await mood()) === "idle", 8000);
+  // Focus alone faces him, as before: no move.
+  await button.focus();
+  await page.waitForTimeout(200);
+  if ((await mood()) !== "idle") throw new Error(`focus played ${await mood()}`);
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  const seen: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    await button.hover();
+    await until("a friendly move plays", async () => FRIENDLY.includes((await mood()) ?? ""));
+    seen.push((await mood())!);
+    // Leaving and landing again mid-move starts nothing new.
+    await page.mouse.move(200, 200);
+    await button.hover();
+    if ((await mood()) !== seen[i]) throw new Error(`a second landing cut ${seen[i]} short with ${await mood()}`);
+    await page.mouse.move(200, 200);
+    await until("it ends at rest", async () => (await mood()) === "idle", 6000);
+    await page.waitForTimeout(350);
+  }
+  if (seen[0] === seen[1] || seen[1] === seen[2]) throw new Error(`the same move twice running: ${seen.join(", ")}`);
+  // The click still opens the tutor.
+  await button.click();
+  await page.getByLabel("Message the tutor").waitFor();
+  await page.keyboard.press("Escape");
+});
+
 journey("D254: palette plays and stops ambience; closing the panel keeps the sound, reopening keeps the channel", async (page) => {
   const command = async (name: string) => {
     await page.keyboard.press("Meta+KeyK");
@@ -10872,7 +10902,9 @@ journey("stacked Undo: each ⌘Z's toast comes to the front and names the source
   await page.keyboard.press("Meta+z");
   await until("the second ⌘Z's toast is in front, naming the one it put back", async () => (await front()) === `Undone: Archived “${before[1]}”`);
   await page.keyboard.press("Meta+z");
-  await until("all three are back", async () => (await titles()).length === before.length);
+  // The held write lands 6 s after this ⌘Z. Its row is back at once, but a list read still on its way from the ⌘Z
+  // before can take it off again until then (F392), so the wait outlasts the hold.
+  await until("all three are back", async () => (await titles()).length === before.length, 15_000);
   await inLibrary(page, before);
 });
 
@@ -15284,6 +15316,9 @@ journey("iPhone menu: every skill's name starts on one line, with an icon or wit
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   const rows = page.locator(".phone-drawer section button");
   await rows.first().waitFor();
+  // The menu slides in, and WebKit reads each row's place at the moment it is asked: measured mid-slide, rows asked
+  // later sit further in (F391). So measure once it has stopped at the screen's edge.
+  await until("the menu has slid all the way in", () => page.locator(".phone-drawer").evaluate((d) => d.getBoundingClientRect().left === 0));
   const at = await rows.evaluateAll((all) => all.map((b) => ({ name: b.textContent, x: Math.round(b.querySelector(".phone-title")!.getBoundingClientRect().left), dot: !!b.querySelector(".skill-icon.dot") })));
   if (!at.some((r) => r.dot) || !at.some((r) => !r.dot)) throw new Error(`the menu needs a skill with an icon and one without: ${JSON.stringify(at)}`);
   const off = at.filter((r) => r.x !== at[0]!.x);
