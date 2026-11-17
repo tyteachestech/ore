@@ -14,7 +14,7 @@ Never edit a library file by hand: `ore` checks what it writes and keeps the loc
 
 ```
 AGENTS.md                      this file (CLAUDE.md links here)
-skills.yaml                    Tyler's skills: id, name, priority P1 Focus|P2 Normal|P3 Light (new skills start P3), hook; optional archived: true (its cards wait out of review); optional goal (what he could show he can do; tries are `## Goal try, <date>` in the skill note), icon, color, collection
+skills.yaml                    Tyler's skills: id, name, priority P1 Focus|P2 Normal|P3 Light (new skills start P3), hook; optional archived: true (its cards wait out of review); optional goal (what he could show he can do; each dig at it is `## Dig, <date>` in the skill note and a record in skills/<id>/digs.json, `ore dig <skill>`), icon, color, collection
 topics/<slug>.md               frontmatter: id, name, status (active; older research topics are wanted), skills[], aliases[]; body: summary
 items/<yyyy>/<slug>-<id>/
   thumbnail.<ext>              picture shown in lists and the reader (absent for pasted text)

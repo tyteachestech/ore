@@ -48,6 +48,7 @@ import { readGuard } from "./reads";
 import { listenMenu, setMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
+import { askDig } from "./Dig";
 import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
 import { FilterButton, FilterTags } from "./FilterBar";
@@ -2655,6 +2656,11 @@ export function App() {
           onOpenSource={(item, at) => {
             setReviewing((r) => r && { ...r, paused: item });
             openSource(item, at);
+          }}
+          onDig={(id) => {
+            endReview();
+            askDig(id);
+            openSkill(id);
           }}
           onClose={endReview}
           // Started from a sheet (What to review) that is gone now, or with nothing focused: Home's Start review,

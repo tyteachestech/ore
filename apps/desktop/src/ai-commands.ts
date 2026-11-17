@@ -6,11 +6,12 @@ const ANSWERS = new Set(["tutor", "ask", "ask-library", "grade", "key-points", "
 const WRITES = new Set(["enrich", "remix", "catch-up"]);
 
 /** Whether a run answers with what the AI said. Not `check --covered` (his own marks, stored), a `recall`
- *  without `--feedback` (what he wrote, stored) or a `tried` without `--line`: those call no AI. */
+ *  without `--feedback` (what he wrote, stored), a `tried` without `--line` or a `dig` that only keeps or ends one: those call no AI. */
 export function answersWithAi(args: string[]): boolean {
   const [name] = args;
   if (name === "recall") return args.includes("--feedback");
   if (name === "tried") return args.includes("--line");
+  if (name === "dig") return args.some((a) => a === "--ask" || a.startsWith("--answer"));
   if (name === "check") return !args.some((a) => a === "--covered" || a.startsWith("--covered="));
   return ANSWERS.has(name!);
 }

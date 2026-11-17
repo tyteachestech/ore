@@ -71,7 +71,7 @@ type Put = { id: string; before: DueEntry[]; after: DueEntry[] | null; off: Set<
 type Rating = 1 | 2 | 3 | 4;
 /** The session receipt, and today before and after it (for the ring and level-ups). */
 /** `next`: the oldest try still to try on his own work (D148), shown once on the end screen; null when none. */
-type End = { session: SessionEnd; today: Today; before: Today | null; next: Try | null };
+type End = { session: SessionEnd; today: Today; before: Today | null; next: Try | null; dig?: { skill: string; goal: string } | null };
 
 /** The remixed version shown, for the CLI calls that act on it (D66). */
 const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : []);
@@ -93,7 +93,7 @@ const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id,
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-function Session({ pick, source, skills, onOpenSource, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
+function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
   /** Review this source: only its exercises, its new ones included. */
@@ -106,6 +106,8 @@ function Session({ pick, source, skills, onOpenSource, onClose, onLogged, notify
   leave?: MutableRefObject<(() => Promise<void>) | null>;
   skills: Skill[];
   onOpenSource: (item: string, at?: string) => void;
+  /** Ends the session and opens that skill's Dig. */
+  onDig?: (skill: string) => void;
   onClose: (again?: boolean) => void;
   /** A rating taken back (⌘Z) or given again after Review closed: today's numbers changed. */
   onLogged?: () => void;
@@ -471,13 +473,15 @@ function Session({ pick, source, skills, onOpenSource, onClose, onLogged, notify
       }
       // The try line is a nicety: the end screen never waits on or fails for it.
       const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
+      // So is the dig a finished session may offer (D-new-dig): one skill, of the ones he reviewed; the Mac's mole reads it.
+      const dig = quick || source || PHONE ? null : ore<{ skill: string; goal: string } | null>("dig", "--ready", ...(pick ?? []).map((s) => opt("skill", s))).catch(() => null);
       // Home draws the Today it last read until a fresh one lands (F125): hand it this one,
       // so Done doesn't show the morning's progress and then push the list down when the goal line appears.
       const today = await ore<Today>("today");
       rememberToday(today);
       // Left after midnight: the ring is the new day's, which this session added only what it rated since to.
       if (dayTurned()) newDay(today, Math.min(turnedMs.current, today.active_ms));
-      setEnd({ session: receipt, today, before: before.current, next: await next });
+      setEnd({ session: receipt, today, before: before.current, next: await next, dig: await dig });
     } catch (e) {
       notify(errorText(e), "error");
       onClose();
@@ -1224,7 +1228,7 @@ function Session({ pick, source, skills, onOpenSource, onClose, onLogged, notify
             </MoleSays>
           </div>
         )}
-        {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} />}
+        {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} onDig={onDig} />}
 
         {!end && card && entry && (
           <div className="review-card" key={`${card.id}-${done}-${left}`}>
@@ -1684,7 +1688,7 @@ function Tally({ tiles, go, skills, onDone }: { tiles: Tile[]; go: boolean; skil
 
 /** The end of a session (D62): the ring fills by this session's minutes and bursts if it closed
  *  just now, a skill that went up a level says so, and the count is of memories kept, never a score. */
-export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void }) {
+export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void; onDig?: (skill: string) => void }) {
   const { session: s, today: t, before: b } = end;
   const part = (x: Today | null) => (!x ? 0 : x.met ? 1 : x.goal_ms ? x.active_ms / x.goal_ms : 0);
   const closed = t.met && !!b && !b.met;
@@ -1866,6 +1870,18 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry }: { end:
             </Hint>
           ))}
         </div>
+      )}
+      {/* D-new-dig: a skill ready to be explained whole, from memory. One line, never owed: a click opens its Dig. */}
+      {end.dig && onDig && (
+        <Hint text="Explain the whole skill from memory · about 4 minutes">
+          <button className="review-try review-dig" onClick={() => onDig(end.dig!.skill)}>
+            <Stone size={16} uses={2} />
+            <span>
+              <span className="review-try-plan">{end.dig.goal}</span>
+              <span className="review-try-from">Dig · {skills.find((x) => x.id === end.dig!.skill)?.name}</span>
+            </span>
+          </button>
+        </Hint>
       )}
       {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
       {end.next && (

@@ -1,6 +1,5 @@
 import { Archive, CaretRight, Check, Collapse, Expand, Plus, Target, X } from "./icons";
 import { ranked } from "./match";
-import { localDay } from "../../../packages/core/src/ids";
 import { HeadSearch } from "./HeadSearch";
 import { ImportanceIcon, levelOf } from "./importance";
 import { PixelBook, PixelNote, PixelQuestion, PixelTry } from "./PixelIcon";
@@ -27,6 +26,7 @@ import { Trap } from "./Trap";
 import { Forge, Tools, TryingNow, TryPage, useTries, type Sub } from "./Forge";
 import { passageText } from "./text";
 import { ExerciseText } from "./ExerciseText";
+import { askDig, DigPopup, useDigAsked } from "./Dig";
 
 type Props = {
   skill: Skill;
@@ -98,8 +98,15 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
     return () => (cancelAnimationFrame(raf), stop());
   }, [loaded, noteScroll]);
   const editor = useRef<NoteEditorHandle>(null);
-  // The closed-book popup: the D41 warm-up, or a try at his goal (D101).
+  // The closed-book popup: the D41 warm-up, or the Dig at his goal (D-new-dig).
   const [recalling, setRecalling] = useState<"warm" | "goal" | null>(null);
+  // A session that ended by offering this skill's dig opens it here.
+  const digAsked = useDigAsked();
+  useEffect(() => {
+    if (digAsked !== skill.id || !skill.goal) return;
+    askDig(null);
+    setRecalling("goal");
+  }, [digAsked, skill.id, skill.goal]);
   // The warm-up stays while he writes his first lines (it would vanish at the first keystroke, as if
   // typing had closed something); it goes once a recall is saved, or on the next visit.
   const [warmUp, setWarmUp] = useState<boolean | null>(null);
@@ -270,7 +277,8 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
         {side}
       </div>
       )}
-      {recalling && <SkillRecall skill={skill} goal={recalling === "goal" ? skill.goal : undefined} blocked={blocked} append={append} notify={notify} onClose={() => setRecalling(null)} />}
+      {recalling === "warm" && <SkillRecall skill={skill} blocked={blocked} append={append} notify={notify} onClose={() => setRecalling(null)} />}
+      {recalling === "goal" && skill.goal && <DigPopup skill={skill} blocked={blocked} append={append} notify={notify} onPassage={onQuestion} onClose={() => setRecalling(null)} />}
     </div>
   );
 }
@@ -445,9 +453,9 @@ function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skil
         </button>
       </Hint>
       {skill.goal && (
-        <Hint text={lastTry ? `Do it from memory · last try ${shortDate(lastTry)}` : "Do it from memory; your try goes in your note"}>
+        <Hint text={lastTry ? `Do it from memory · last dig ${shortDate(lastTry)}` : "Do it from memory; the mole checks it against your key points"}>
           <button className="pill-btn small" onClick={onTry}>
-            Try it
+            Dig
           </button>
         </Hint>
       )}
@@ -456,8 +464,8 @@ function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skil
   );
 }
 
-const GOAL_TRY = /^## Goal try, (\d{4}-\d{2}-\d{2})\s*$/gm;
-/** The date of his latest try at the goal, from the skill note's "Goal try, <date>" headings. */
+const GOAL_TRY = /^## (?:Goal try|Dig), (\d{4}-\d{2}-\d{2})\s*$/gm;
+/** The date of his latest dig at the goal, from the skill note's "Dig, <date>" headings ("Goal try" before D-new-dig). */
 function lastGoalTry(text: string | null): string | null {
   const all = [...(text ?? "").matchAll(GOAL_TRY)].map((m) => m[1]!).sort();
   return all.at(-1) ?? null;
@@ -865,9 +873,9 @@ const recallDrafts = new Map<string, string>();
 /** D41: a closed-book recall across what he has read, saved as the skill note's first draft. A popup
  *  over the page, which is blurred out of reading range while he writes (D34.4); Close, Esc or a click
  *  outside goes back (D34.5), and a click outside never drops text he has written. */
-function SkillRecall({ skill, goal, blocked, append, notify, onClose }: { skill: Skill; goal?: string; blocked: boolean; append: (t: string, heading: string) => Promise<boolean>; notify: Notify; onClose: () => void }) {
+function SkillRecall({ skill, blocked, append, onClose }: { skill: Skill; blocked: boolean; append: (t: string, heading: string) => Promise<boolean>; notify: Notify; onClose: () => void }) {
   const keys = useKeymap();
-  const key = goal ? `${skill.id} goal` : skill.id;
+  const key = skill.id;
   // Esc or Close keeps what he wrote as a draft for this skill until it is saved (as the finish quiz does).
   const [text, setTextState] = useState(() => recallDrafts.get(key) ?? "");
   const setText = (t: string) => {
@@ -882,9 +890,8 @@ function SkillRecall({ skill, goal, blocked, append, notify, onClose }: { skill:
     const t = text.trim();
     if (!t || saving) return;
     setSaving(true);
-    if (await append(t, goal ? `Goal try, ${localDay(new Date())}` : "Recall")) {
+    if (await append(t, "Recall")) {
       recallDrafts.delete(key);
-      if (goal) notify("Try saved in your note, under today’s date");
       onClose();
     }
     else setSaving(false);
@@ -911,21 +918,21 @@ function SkillRecall({ skill, goal, blocked, append, notify, onClose }: { skill:
       <section className="panel skill-recall" role="dialog" aria-modal="true" aria-labelledby="skill-recall-title">
         <header className="skill-recall-head">
           <SkillChip skill={skill} />
-          <span className="quiet">{goal ? "Your goal, from memory" : "Warm up from memory"}</span>
+          <span className="quiet">Warm up from memory</span>
           <Hint text={<>Close <kbd>Esc</kbd></>}>
             <button className="skill-recall-close" aria-label="Close" onClick={onClose}>
               <X size={14} weight="bold" aria-hidden="true" />
             </button>
           </Hint>
         </header>
-        <h2 id="skill-recall-title">{goal ?? `What do you know about ${skill.name}, across what you’ve read?`}</h2>
+        <h2 id="skill-recall-title">{`What do you know about ${skill.name}, across what you’ve read?`}</h2>
         <Grow ref={field} className="field" value={text} onChange={(e) => setText(e.target.value)} readOnly={saving} spellCheck />
         <div className="skill-recall-foot">
           <button onClick={onClose}>
             Cancel <kbd>Esc</kbd>
           </button>
           <button className="pill-btn" onClick={() => void save()} disabled={!text.trim() || saving}>
-            {saving ? "Saving…" : goal ? "Save try" : "Save as first draft"} <kbd>{label(keys.finish)}</kbd>
+            {saving ? "Saving…" : "Save as first draft"} <kbd>{label(keys.finish)}</kbd>
           </button>
         </div>
       </section>

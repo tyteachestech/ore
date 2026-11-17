@@ -1,5 +1,6 @@
 import { relative } from "node:path";
 import {
+  digAnswer, digAsk, digReady, digState, dropDig, endDig, startDig, type Dig,
   reimportSource,
   undoReimport,
   readTables,
@@ -400,6 +401,43 @@ export const itemCommands: Record<string, Command> = {
       const { tried, item, card } = await markTried(lib, need(ref, "<try>"), { reflection: str(f.text), next: str(f.next), again: !!f.again, undo: !!f.undo });
       const enrich = card ? startEnrich(lib, item.meta.id) : "skipped";
       return { data: { ...tried, enrich }, text: `Try ${tried.id}: ${tried.status === "done" ? "tried" : "to try"}${card ? `; card draft ${enrich}` : ""}` };
+    },
+  },
+
+  dig: {
+    usage: '<skill> [--text "<the skill from memory>" | --ask | --answer "<a>"... | --done | --drop <dig>] | --ready [--skill s]...   the Dig: the whole skill explained from memory against its goal, checked against its key points, outside review\'s schedule. Alone: where the skill stands (its ideas, whether the gap since the last dig has passed, the last dig). --text keeps a dig with the ideas as they stand; --ask (AI) marks the ideas that came and asks one or two questions at ideas left out; --answer (AI, one per question in order, "" skips one) marks which came with that nudge; --done ends it with nothing more answered; --drop takes a dig back. --ready: the one skill a session may offer (of --skill, when given), or null. Never a grade, never due',
+    options: { text: { type: "string" }, ask: { type: "boolean" }, answer: { type: "string", multiple: true }, done: { type: "boolean" }, drop: { type: "string" }, ready: { type: "boolean" }, skill: { type: "string", multiple: true } },
+    async run([skill], f) {
+      const lib = openLibrary();
+      const line = (d: Dig) => `${d.ideas.filter((i) => i.state === "own").length} came on their own, ${d.ideas.filter((i) => i.state === "nudge").length} with a nudge, ${d.ideas.filter((i) => i.state === "missed").length} didn't come`;
+      if (f.ready) {
+        const r = digReady(lib, strs(f.skill));
+        return { data: r, text: r ? `${r.skill}: ${r.goal}` : "Nothing to dig now." };
+      }
+      const id = need(skill, "<skill>");
+      if (f.text !== undefined) {
+        const d = await startDig(lib, id, f.text as string);
+        return { data: d, text: `Dig ${d.id} kept, against ${d.ideas.length} ideas` };
+      }
+      if (f.ask) {
+        const d = await digAsk(lib, id);
+        return { data: d, text: d.asks?.length ? d.asks.map((a) => a.q).join("\n") : line(d) };
+      }
+      if (f.answer !== undefined) {
+        const d = await digAnswer(lib, id, (Array.isArray(f.answer) ? f.answer : [f.answer]) as string[]);
+        return { data: d, text: line(d) };
+      }
+      const st = digState(lib, id);
+      if (f.done || f.drop) {
+        if (f.drop) {
+          await dropDig(lib, id, f.drop as string);
+          return { data: digState(lib, id), text: "Dropped." };
+        }
+        if (!st.last) throw new Error(`no dig for ${id} yet`);
+        const d = await endDig(lib, id, st.last.id);
+        return { data: d, text: line(d) };
+      }
+      return { data: st, text: [`${st.goal ?? "(no goal)"}`, `${st.ideas} ideas · ${st.ready ? "ready to dig" : "resting"}`, ...(st.last ? [`last dig ${st.last.at.slice(0, 10)}: ${line(st.last)}`] : [])].join("\n") };
     },
   },
 

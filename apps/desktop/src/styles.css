@@ -3914,3 +3914,20 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .diagram-art svg { max-width: 100%; max-height: 100%; width: auto; height: auto; }
 .diagram-empty { color: var(--muted); font-size: 15px; padding: 0 24px; text-align: center; }
 .kb-bar.moving .kb-btn:not(:disabled) { color: var(--text); }
+/* The Dig (D-new-dig): the mole's question, then the skill's key points as stones, a row per source. */
+.review-try + .review-try { margin-top: 2px; }
+.review-dig .stone, .dig .stone:not([data-waiting]) { color: var(--card-solid); }
+.dig-mole { display: flex; align-items: center; gap: 10px; margin: 14px 0 12px; font-size: 16px; line-height: 1.4; }
+.dig-mole svg { flex: none; }
+.dig-mole .settings-btn { margin-left: auto; }
+.skill-recall textarea.field.dig-a { min-height: 96px; }
+.dig-map { display: flex; flex-direction: column; gap: 6px; margin: 16px 0 4px; }
+.dig-vein { display: flex; align-items: center; gap: 12px; }
+.dig-vein small { flex: 0 1 40%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12px var(--mono); color: var(--muted); }
+.dig-vein > span { display: flex; flex-wrap: wrap; gap: 2px; }
+.dig-idea { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 6px; }
+.dig-idea:hover { background: var(--bg-hover); }
+.dig-idea:hover .stone { opacity: 1; }
+.dig-idea:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.dig-idea:active .stone { transform: scale(0.92); }
+.phone .dig-idea { width: 44px; height: 44px; }

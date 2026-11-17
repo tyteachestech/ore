@@ -8924,6 +8924,74 @@ journey("try it: the end of a review shows the oldest open try, and a click open
   await calls.undoAll(); // the rating, for the journeys after this one
 });
 
+journey("dig: a finished session offers one skill's dig; he explains the goal from memory, answers the mole's question, and its key points show as stones, with nothing graded (D-new-dig)", async (page) => {
+  const GOAL = "Explain how to study to a new teacher, from memory";
+  const calls = oreCalls(page);
+  const src = ((await ore("ls", "--skill", "learning")) as { id: string; title: string }[]).find((i) => i.title.startsWith("The Testing Effect"))!;
+  const note = ((await ore("notes", "--skill", "learning")) as { text: string }).text;
+  const marks: { id: string }[] = [];
+  for (const exact of ["Effortful retrieval, the kind that feels a little hard, produces larger gains than easy retrieval.", "The advantage only appears after a delay"]) marks.push((await ore("highlight", src.id, "--exact", exact, "--intent", "card")) as { id: string });
+  await ore("skills", "set", "learning", "--goal", GOAL);
+  try {
+    await page.reload();
+    await page.locator(".side-item").first().waitFor();
+    // The end of a session: one line for the one skill ready to dig, and a click opens it on the skill's page.
+    await startReview(page, null);
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await page.waitForTimeout(300);
+    await page.keyboard.press("Escape");
+    const line = page.locator(".review-dig");
+    await line.waitFor();
+    if (!(await line.innerText()).includes(GOAL)) throw new Error(`the end screen offers the wrong dig: ${await line.innerText()}`);
+    await line.click();
+    await page.locator(".review").waitFor({ state: "detached" });
+    const dig = page.getByRole("dialog", { name: GOAL });
+    await dig.waitFor();
+    await calls.undoAll(); // the rating, for the journeys after this one
+
+    // He writes it; the mole reads it and asks at an idea he left out.
+    await dig.getByLabel("What you remember").fill("Quiz yourself instead of rereading.");
+    await page.keyboard.press("Meta+Enter");
+    await dig.getByText("Which quiz does more for you").waitFor();
+    if (await dig.getByLabel("What you remember").count()) throw new Error("what he wrote stayed on screen while the mole asks");
+    await until("the keys are in the answer", () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Your answer"));
+    await page.keyboard.type("The hard one, the effort is what builds it.");
+    await page.keyboard.press("Meta+Enter");
+    await dig.getByText("all your quizzing in one evening").waitFor();
+    await dig.getByRole("button", { name: "Skip" }).click();
+
+    // The skill's ideas, a stone each, a row per source: no number, no grade.
+    const stones = dig.locator(".dig-idea");
+    await stones.first().waitFor();
+    const states = await stones.evaluateAll((all) => all.map((b) => `${b.getAttribute("data-state")} ${b.getAttribute("aria-label")}`));
+    const want = ["nudge Came with a nudge: Effortful retrieval", "own Came on its own: The advantage only appears", "missed Didn’t come: Space the sessions out."];
+    if (states.length !== 3 || want.some((w, i) => !states[i]!.startsWith(w))) throw new Error(`the stones read ${JSON.stringify(states)}`);
+    if ((await dig.locator(".dig-vein").count()) !== 2) throw new Error("the ideas are not a row per source");
+    if (/\d\s*(of|\/|%)/.test(await dig.innerText())) throw new Error(`the dig shows a score: ${await dig.innerText()}`);
+    await stones.nth(2).hover();
+    await page.getByRole("tooltip").filter({ hasText: "Didn’t come" }).waitFor();
+    await page.keyboard.press("Escape");
+    await dig.waitFor({ state: "detached" });
+
+    // Kept: the dig with the skill's ideas as they stood, and his words in the skill note under today's date.
+    const kept = (await ore("dig", "learning")) as { last: { text: string; ideas: { id: string }[] } | null; ready: boolean };
+    if (kept.last?.text !== "Quiz yourself instead of rereading." || kept.ready) throw new Error(`the dig was not kept, or the skill is still ready: ${JSON.stringify(kept)}`);
+    if (marks.some((m) => !kept.last!.ideas.some((i) => i.id === m.id))) throw new Error("the dig was kept without the skill's key points");
+    const now = ((await ore("notes", "--skill", "learning")) as { text: string }).text;
+    if (!/^## Dig, \d{4}-\d{2}-\d{2}$/m.test(now) || !now.includes("Quiz yourself instead of rereading.")) throw new Error("his words are not in the skill note");
+    // The button on the goal says when he last dug.
+    await page.getByRole("button", { name: "Dig", exact: true }).hover();
+    await page.getByRole("tooltip").filter({ hasText: "last dig" }).waitFor();
+  } finally {
+    const last = ((await ore("dig", "learning")) as { last: { id: string } | null }).last;
+    if (last) await ore("dig", "learning", "--drop", last.id);
+    await ore("skills", "set", "learning", "--goal", "");
+    await ore("notes", "--skill", "learning", "--set", note);
+    for (const m of marks) await ore("annotate", m.id, "--status", "deleted").catch(() => {});
+  }
+});
+
 journey("archive a source from its row, then Undo from the toast; VoiceOver hears the toast", async (page) => {
   // The live region is there before the toast, so a screen reader reads the toast when it comes.
   const live = page.locator(".toasts[aria-live=polite]");

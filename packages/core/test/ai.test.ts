@@ -14,6 +14,9 @@ import { anchorEvidence, checkPrequestion, finishScope, scopeFinish, setCovered,
 import { addHighlight, addPoint, findAnnotation, readAnnotations, reviseAnnotation } from "../src/annotations.ts";
 import { markTried, planTry } from "../src/tries.ts";
 import { tryLine } from "../src/ai/tries.ts";
+import { digAnswer, digAsk } from "../src/ai/dig.ts";
+import { readDigs, startDig } from "../src/digs.ts";
+import { setSkillLook } from "../src/skills.ts";
 import { listCards, writeNewCard } from "../src/cards.ts";
 import { addSnippet, addText } from "../src/ingest/index.ts";
 import { sha256 } from "../src/fsutil.ts";
@@ -1021,3 +1024,51 @@ describe("the mole's line on a use of a try (D324)", () => {
     expect(findAnnotation(lib, a.id).annotation.line).toBeUndefined();
   });
 });
+
+describe("the Dig: the mole reads a skill explained from memory (D-new-dig)", () => {
+  const TEXT = "# Learning\n\nTesting yourself beats rereading.\n\nSpace the sessions out.\n\nMix the topics.\n";
+  const sentAt = (call: number) => {
+    const raw = JSON.parse(readFileSync(join(binDir, "args.jsonl"), "utf8").split("\n")[call]!)[1] as string;
+    return JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
+  };
+  async function dug() {
+    const lib = await tempLibrary();
+    const src = await addText(lib, TEXT, { skills: ["learning"] });
+    for (const exact of ["Testing yourself beats rereading.", "Space the sessions out.", "Mix the topics."]) addHighlight(findItem(lib, src.meta.id), { exact, intent: "card" });
+    await setSkillLook(lib, "learning", { goal: "Explain how to study, from memory" });
+    await startDig(lib, "learning", "Quiz yourself instead of rereading.");
+    return lib;
+  }
+
+  test("ideas in what he wrote came on their own; an idea he pulls out after the mole's question came with a nudge; the rest didn't come", async () => {
+    const lib = await dug();
+    // Ideas are numbered newest first: 1 mix, 2 space, 3 testing.
+    fakeClaude([{ came: [3], asks: [{ n: 2, q: "You quiz yourself. When do you do the next one, and why then?" }, { n: 1, q: "What if you have three subjects to study in one evening?" }] }, { came: [2], asks: [] }]);
+    const asked = await digAsk(lib, "learning");
+    expect(sentAt(0)).toMatchObject({ stage: "ask", goal: "Explain how to study, from memory", text: "Quiz yourself instead of rereading.", ideas: [{ n: 1, text: "Mix the topics.", source: "Learning" }, { n: 2 }, { n: 3 }] });
+    expect(asked.ideas.map((i) => i.state)).toEqual([undefined, undefined, "own"]);
+    expect(asked.asks!.map((a) => a.q)).toEqual(["You quiz yourself. When do you do the next one, and why then?", "What if you have three subjects to study in one evening?"]);
+    expect(asked.done_at).toBeUndefined();
+    await expect(digAsk(lib, "learning")).rejects.toThrow(/asked already/);
+
+    // He answers the first and skips the second: only the answered one goes to the mole.
+    const done = await digAnswer(lib, "learning", ["A few days later, when it has started to fade.", ""]);
+    expect(sentAt(1)).toMatchObject({ stage: "check", ideas: [{ n: 2, text: "Space the sessions out." }], asks: [{ n: 2, answer: "A few days later, when it has started to fade." }] });
+    expect(done.ideas.map((i) => i.state)).toEqual(["missed", "nudge", "own"]);
+    expect(done.asks!.map((a) => a.answer)).toEqual(["A few days later, when it has started to fade.", undefined]);
+    expect(done.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "dig@1" });
+    expect(readDigs(lib, "learning")[0]!.done_at).toBeDefined();
+    await expect(digAnswer(lib, "learning", ["More."])).rejects.toThrow(/finished/);
+  });
+
+  test("nothing central left out: no question, and the dig is done; an idea may not be both in his text and asked about", async () => {
+    const lib = await dug();
+    fakeClaude([{ came: [3], asks: [{ n: 3, q: "Why does that work?" }] }, { came: [1, 2, 3], asks: [] }]);
+    const d = await digAsk(lib, "learning");
+    expect(sentAt(1)).toBeDefined(); // asked again after the answer that named idea 3 twice
+    expect(d.ideas.map((i) => i.state)).toEqual(["own", "own", "own"]);
+    expect(d.asks).toEqual([]);
+    expect(d.done_at).toBeDefined();
+  });
+});
+

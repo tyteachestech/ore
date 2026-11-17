@@ -30,7 +30,10 @@ Bun.serve({
     // ORE_MOCK_REAL_AI=1: AI commands run for real (a rehearsal on a copy of a real library; spends usage).
     if (ai && !process.env.ORE_MOCK_REAL_AI) {
       // ORE_MOCK_AI=<dir>: <dir>/<command>.json answers that AI command (after a moment, as the AI would).
-      const canned = process.env.ORE_MOCK_AI && Bun.file(`${process.env.ORE_MOCK_AI}/${args[0]}.json`);
+      // A command with more than one AI step names the step by its flag: dig.ask.json, dig.answer.json.
+      const flag = (args as string[]).find((a) => a.startsWith("--"))?.slice(2).split("=")[0];
+      const stepped = process.env.ORE_MOCK_AI && Bun.file(`${process.env.ORE_MOCK_AI}/${args[0]}.${flag}.json`);
+      const canned = stepped && (await stepped.exists()) ? stepped : process.env.ORE_MOCK_AI && Bun.file(`${process.env.ORE_MOCK_AI}/${args[0]}.json`);
       if (canned && (await canned.exists())) return new Promise((ok) => setTimeout(async () => ok(new Response(await canned.text(), { headers: h })), Number(process.env.ORE_MOCK_DELAY ?? 600)));
       return new Response(JSON.stringify(null), { headers: h });
     }
