@@ -99,9 +99,11 @@ test("the small marks are round dots too: the sidebar arrow, the tick and cross,
   }
 });
 
-test("nothing glows but the lamp: no blurred shadow in a colour, and no halo behind a gem", async () => {
+test("nothing glows but the lamp and a reward (D323): no blurred shadow in a colour elsewhere, and no halo behind a gem", async () => {
   const css = (await Bun.file(new URL("../src/styles.css", import.meta.url)).text()) + (await Bun.file(new URL("../src/retro.css", import.meta.url)).text());
-  const glows = css.split("\n").filter((l) => /drop-shadow\(|box-shadow:[^;]*(?<!0 )\b0 0 [1-9]\d*px (var\(--c-|var\(--skill|color-mix)/.test(l) && !l.includes("--lamp"));
+  // The reward glow: the day's goal met (Home's ring, the end screen's) and a to-do ticked.
+  const reward = /^(\.home-goal \.ring|@keyframes (goal-glow|ticked)|@media \(prefers-reduced-motion: reduce\) \{ \.home-goal \.ring)/;
+  const glows = css.split("\n").filter((l) => /drop-shadow\(|box-shadow:[^;]*(?<!0 )\b0 0 [1-9]\d*px (var\(--c-|var\(--skill|color-mix)/.test(l) && !l.includes("--lamp") && !reward.test(l));
   expect(glows.map((l) => l.slice(0, 40))).toEqual([]);
   expect(/\.gem\[data-polished\][^{]*\{[^}]*gradient/.test(css)).toBe(false);
   expect(/\.quiz-done-badge \{[^}]*box-shadow/.test(css)).toBe(false);
