@@ -15314,6 +15314,9 @@ journey("iPhone menu: every skill's name starts on one line, with an icon or wit
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   const rows = page.locator(".phone-drawer section button");
   await rows.first().waitFor();
+  // The menu slides in, and WebKit reads each row's place at the moment it is asked: measured mid-slide, rows asked
+  // later sit further in (F391). So measure once it has stopped at the screen's edge.
+  await until("the menu has slid all the way in", () => page.locator(".phone-drawer").evaluate((d) => d.getBoundingClientRect().left === 0));
   const at = await rows.evaluateAll((all) => all.map((b) => ({ name: b.textContent, x: Math.round(b.querySelector(".phone-title")!.getBoundingClientRect().left), dot: !!b.querySelector(".skill-icon.dot") })));
   if (!at.some((r) => r.dot) || !at.some((r) => !r.dot)) throw new Error(`the menu needs a skill with an icon and one without: ${JSON.stringify(at)}`);
   const off = at.filter((r) => r.x !== at[0]!.x);
