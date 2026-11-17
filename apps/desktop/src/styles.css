@@ -599,7 +599,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 /* Add a source (⌘N): paste anything; files dropped on the window */
 .add-input { display: block; min-height: 50px; max-height: 40vh; padding: 14px 16px; line-height: 1.45; }
 .add-box .panel-foot .right { flex: none; align-items: center; }
-/* A refused source says why on a line of its own, at the box's width, over the buttons (F378). */
+/* A refused source says why on a line of its own, at the box's width, over the buttons (F387). */
 .add-box .panel-foot:has(.err) { flex-wrap: wrap; row-gap: 8px; }
 .add-box .panel-foot .err { flex: 0 0 100%; }
 /* The link he just copied, offered as the box's first row (Chrome's "Link you copied"); ↵ adds it. */
@@ -2277,7 +2277,7 @@ button.home-plan:hover { color: var(--text); }
   .review-passage { position: absolute; top: 32px; left: calc(100% + 32px); width: 300px; margin: 0; animation: card-in var(--t-3) ease-out both; }
 }
 .review-rate { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 22px; }
-/* The rating stays in view under a long answer (D313): it sticks 10px above the keys
+/* The rating stays in view under a long answer (D314): it sticks 10px above the keys
    while the answer scrolls behind it, as a dialog's footer does. In a window too narrow for the card to clear
    the radio (D254), the card starts to the radio's right, so the radio never sits on Again. */
 :root:not(.phone) .review-rate { position: sticky; bottom: -22px; z-index: 1; }

@@ -14931,7 +14931,7 @@ async function textFile(name: string, text: string) {
   return path;
 }
 
-journey("review: under a long answer in a short window the four ratings stay in view, clear of the radio (D313)", async (page) => {
+journey("review: under a long answer in a short window the four ratings stay in view, clear of the radio (D314)", async (page) => {
   const size = page.viewportSize()!;
   await page.setViewportSize({ width: 720, height: 480 });
   try {
@@ -14966,7 +14966,7 @@ journey("review: under a long answer in a short window the four ratings stay in 
   }
 });
 
-journey("add: a refused link says why on a line of its own, as wide as the box (F378)", async (page) => {
+journey("add: a refused link says why on a line of its own, as wide as the box (F387)", async (page) => {
   const gone = Bun.serve({ port: 0, fetch: () => new Response("gone", { status: 404 }) });
   try {
     await page.getByRole("button", { name: "+ Add" }).click();
