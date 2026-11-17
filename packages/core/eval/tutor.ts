@@ -199,9 +199,11 @@ if (import.meta.main) {
   const against = args.includes("--against") ? args[args.indexOf("--against") + 1] : undefined;
   if (args.includes("--against") && !against) throw new Error("--against needs a git ref or a tutor.md file");
   // --only a,b: those cases alone, for trying a new case or a prompt line without paying for the set.
-  const only = args.includes("--only") ? (args[args.indexOf("--only") + 1] ?? "").split(",").filter(Boolean) : undefined;
+  const only = args.includes("--only") ? [...new Set((args[args.indexOf("--only") + 1] ?? "").split(",").filter(Boolean))] : undefined;
+  if (only && !only.length) throw new Error("--only needs case ids, comma separated");
   const cases = loadTutorCases().filter((c) => !only || only.includes(c.id));
-  if (only && cases.length !== only.length) throw new Error(`--only: no case ${only.filter((id) => !cases.some((c) => c.id === id)).join(", ")}`);
+  const unknown = (only ?? []).filter((id) => !cases.some((c) => c.id === id));
+  if (unknown.length) throw new Error(`--only: no case ${unknown.join(", ")}`);
   const dir = join(import.meta.dir, "results");
   mkdirSync(dir, { recursive: true });
   if (against) {
