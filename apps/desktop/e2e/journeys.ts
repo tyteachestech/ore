@@ -9868,6 +9868,34 @@ journey("explain: ↵ on a focused Retry, Key point or Later does what clicking 
   await learn.waitFor({ state: "detached" });
 });
 
+journey("explain: a term he looked up stays a plain highlight marked looked up, from the popup and from the key", async (page) => {
+  const ore = (args: string[]) => page.evaluate((args) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke("ore", { args }), args);
+  const id = ((await ore(["ls"])) as { id: string; title: string }[]).find((i) => i.title === AGENTS)!.id;
+  const looked = async (exact: string) => ((await ore(["show", id])) as { annotations: { exact: string; intent: string; looked_up?: boolean }[] }).annotations.find((a) => a.exact === exact);
+  await openSource(page, AGENTS);
+  await explain(page, "aggregates");
+  await page.keyboard.press("Escape");
+  await page.getByRole("dialog", { name: "Explain aggregates" }).waitFor({ state: "detached" });
+  await until("the popup's fresh highlight stays, marked looked up", async () => (await looked("aggregates"))?.looked_up === true);
+  if ((await looked("aggregates"))?.intent !== "keep") throw new Error("a looked-up term is a plain highlight");
+  // ⌃⌘D on a word under the pointer, with no highlight there: it becomes one.
+  const word = page.locator(".doc p", { hasText: "Evaluator-optimiser" }).first();
+  const box = await word.evaluate((el) => {
+    const t = [...el.childNodes].find((n) => n.nodeType === 3 && n.textContent!.includes("feedback"))!;
+    const r = document.createRange();
+    const at = t.textContent!.indexOf("feedback");
+    r.setStart(t, at);
+    r.setEnd(t, at + "feedback".length);
+    const b = r.getBoundingClientRect();
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+  });
+  await page.mouse.move(box.x, box.y);
+  await page.keyboard.press("Control+Meta+d");
+  await page.getByRole("dialog", { name: /^Explain feedback/ }).waitFor();
+  await page.keyboard.press("Escape");
+  await until("the word under the pointer is highlighted, marked looked up", async () => (await looked("feedback"))?.looked_up === true);
+});
+
 journey("explain: a reworded question whose save fails is saved by the next ↵, unchanged", async (page) => {
   const ore = (args: string[]) => page.evaluate((args) => (window as unknown as { __TAURI_INTERNALS__: { invoke: (c: string, a: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__.invoke("ore", { args }), args);
   const id = ((await ore(["ls"])) as { id: string; title: string }[]).find((i) => i.title === AGENTS)!.id;

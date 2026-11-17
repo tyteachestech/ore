@@ -265,8 +265,8 @@ export const itemCommands: Record<string, Command> = {
   },
 
   highlight: {
-    usage: '<item> --exact "<text>" --intent keep|card|question|apply [--note n] [--start N] | <item> --at N --note "<line>" [--intent card|question]   --at: a card (or question) from a line he typed with nothing selected, anchored at the sentence around offset N',
-    options: { exact: { type: "string" }, intent: { type: "string" }, note: { type: "string" }, start: { type: "string" }, at: { type: "string" } },
+    usage: '<item> --exact "<text>" --intent keep|card|question|apply [--note n] [--start N] [--looked-up] | <item> --at N --note "<line>" [--intent card|question]   --at: a card (or question) from a line he typed with nothing selected, anchored at the sentence around offset N',
+    options: { exact: { type: "string" }, intent: { type: "string" }, note: { type: "string" }, start: { type: "string" }, at: { type: "string" }, "looked-up": { type: "boolean" } },
     async run([ref], f) {
       const lib = openLibrary();
       const item = findItem(lib, need(ref, "<item>"));
@@ -278,6 +278,7 @@ export const itemCommands: Record<string, Command> = {
           intent: need(oneOf(f.intent, INTENTS, "intent"), "--intent"),
           note: str(f.note),
           start: int(f.start, "start"),
+          looked_up: f["looked-up"] === true,
         });
       const kept = await keptFromFeed(lib, item);
       return { data: { ...a, ...(kept ? { kept_from_feed: true } : {}) }, text: `Highlight ${a.id} (${a.intent}) at ${a.start}-${a.end}${kept ? "\nKept from the Feed as a source" : ""}` };
@@ -285,8 +286,8 @@ export const itemCommands: Record<string, Command> = {
   },
 
   annotate: {
-    usage: '<annotation> [--note n] [--intent i] [--status open|done|deleted] [--exact "<text>" [--start N]]   appends a new rev; deleted hides the highlight; --exact moves its passage (edges dragged)',
-    options: { note: { type: "string" }, intent: { type: "string" }, status: { type: "string" }, exact: { type: "string" }, start: { type: "string" } },
+    usage: '<annotation> [--note n] [--intent i] [--status open|done|deleted] [--exact "<text>" [--start N]] [--looked-up]   appends a new rev; deleted hides the highlight; --exact moves its passage (edges dragged); --looked-up: he opened Explain on it',
+    options: { note: { type: "string" }, intent: { type: "string" }, status: { type: "string" }, exact: { type: "string" }, start: { type: "string" }, "looked-up": { type: "boolean" } },
     async run([ref], f) {
       const lib = openLibrary();
       const found = findAnnotation(lib, need(ref, "<annotation>"));
@@ -297,9 +298,10 @@ export const itemCommands: Record<string, Command> = {
       if (f.note !== undefined) patch.note = str(f.note) || undefined;
       if (f.intent !== undefined) patch.intent = oneOf(f.intent, INTENTS, "intent");
       if (f.status !== undefined) patch.status = oneOf(f.status, AnnotationStatus.options, "status");
+      if (f["looked-up"] && !annotation.looked_up) patch.looked_up = true;
       if (!Object.keys(patch).length) {
-        if (f.exact !== undefined) return { data: annotation, text: `Annotation ${annotation.id} rev ${annotation.rev}` };
-        throw new Error("nothing to change (--note, --intent, --status or --exact)");
+        if (f.exact !== undefined || f["looked-up"]) return { data: annotation, text: `Annotation ${annotation.id} rev ${annotation.rev}` };
+        throw new Error("nothing to change (--note, --intent, --status, --exact or --looked-up)");
       }
       const next = reviseAnnotation(item, annotation, patch);
       return { data: next, text: `Annotation ${next.id} rev ${next.rev}` };

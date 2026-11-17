@@ -244,6 +244,8 @@ export type Annotation = {
   anchor?: { start: number; end: number; method: string } | null;
   /** Card here: a line he typed with nothing selected; `exact` is only the sentence where he was. */
   point?: boolean;
+  /** He opened Explain on it: a term he didn't know, weighed by the plan (D-new-looked-up). */
+  looked_up?: boolean;
   /** Apply (D127): how it went, written when he checked the try off. */
   reflection?: string;
   /** Apply (D148): the rounds before this one, oldest first, each with his plan and how it went. */

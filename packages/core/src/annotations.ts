@@ -41,6 +41,8 @@ export const AnnotationSchema = z.object({
   // A card or question he typed with nothing selected ("Card here"): `exact` is only the sentence where he
   // was; the note is what counts, and a card is drafted from it and the whole source, with quotes.
   point: z.boolean().optional(),
+  // He opened Explain on it (D-new-looked-up): a term he didn't know. Enrich weighs it as one, never as a stray word.
+  looked_up: z.boolean().optional(),
 });
 export type Annotation = z.infer<typeof AnnotationSchema>;
 
@@ -70,6 +72,7 @@ export interface HighlightInput {
   intent: Intent;
   note?: string;
   start?: number;
+  looked_up?: boolean;
 }
 
 // Locate the passage in the body (exact, then whitespace-insensitive; nearest
@@ -83,11 +86,15 @@ export function addHighlight(item: Item, input: HighlightInput): Annotation {
   const live = readAnnotations(item).filter((a) => !a.point);
   const same = live.find((a) => a.start === span.start && a.end === span.end);
   // With a note (a plan, a question) it is that one highlight, revised: the words he typed never vanish.
-  if (same) return input.note?.trim() ? reviseAnnotation(item, same, { intent: input.intent, note: input.note.trim() }) : same;
+  if (same) {
+    const patch: AnnotationPatch = input.note?.trim() ? { intent: input.intent, note: input.note.trim() } : {};
+    if (input.looked_up && !same.looked_up) patch.looked_up = true;
+    return Object.keys(patch).length ? reviseAnnotation(item, same, patch) : same;
+  }
   const edge = live.filter((a) => a.start < span.end && a.end > span.start && !(a.start <= span.start && a.end >= span.end));
   if (edge.length === 1) {
     const a = edge[0]!;
-    return reviseAnnotation(item, a, quoteSelector(item.body, Math.min(a.start, span.start), Math.max(a.end, span.end)));
+    return reviseAnnotation(item, a, { ...quoteSelector(item.body, Math.min(a.start, span.start), Math.max(a.end, span.end)), ...(input.looked_up && { looked_up: true }) });
   }
   const ann: Annotation = {
     id: ulid(),
@@ -98,6 +105,7 @@ export function addHighlight(item: Item, input: HighlightInput): Annotation {
     ...quoteSelector(item.body, span.start, span.end),
     note: input.note?.trim() || undefined,
     status: "open",
+    ...(input.looked_up && { looked_up: true }),
   };
   append(item, ann);
   return ann;
@@ -155,7 +163,7 @@ export function isQuestionOnly(item: Item): boolean {
   return all.length > 0 && all.every((a) => a.intent === "question");
 }
 
-export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses">>;
+export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses" | "looked_up">>;
 
 // Edits never rewrite history: they append the same id with rev + 1.
 export function reviseAnnotation(item: Item, current: Annotation, patch: AnnotationPatch): Annotation {
