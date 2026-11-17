@@ -1,0 +1,829 @@
+{
+  "eval": "tutor",
+  "date": "2026-11-17T00:45:44.007Z",
+  "set": "643e56eb",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@16",
+      "runs": 2,
+      "passed": "54/54",
+      "accuracy": 1,
+      "ci95": [
+        0.9335841332189981,
+        1
+      ],
+      "flaky": [],
+      "errors": 0,
+      "wall_s": 125.6,
+      "cost_usd": 1.5630433000000006,
+      "input_tokens": 1429675,
+      "output_tokens": 45169,
+      "cases": [
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's see if you can get it first. Picture the boxes, each one reviewed less often than the one before. A correct answer moves the card forward, so where would a miss send it? Your \"Spaced repetition\" source has a \"Paper flash cards\" section that covers this. What's your guess?",
+          "ms": 6272,
+          "usage": {
+            "input_tokens": 29000,
+            "output_tokens": 649,
+            "cost_usd": 0.0809665
+          },
+          "evidence": [
+            "A correct answer moves the card forward, so where would a miss send it?"
+          ]
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "A card you miss goes back to the first box, so you see it again soon. [1] Cards you get right move up to a box with longer gaps, which is why the missed one starts over at the shortest gap. [2]",
+          "ms": 4951,
+          "usage": {
+            "input_tokens": 18957,
+            "output_tokens": 396,
+            "cost_usd": 0.0713015
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": true,
+          "failed": [],
+          "reply": "Right format, wrong year. That's your second miss, so here's the answer: FSRS arrived in Anki **23.10**, which means October 2023 [1]. The reference for that line points to the \"Anki Release 23.10\" notes, dated October 31, 2023 [2].\n\nA way to remember it: FSRS is 23.10, and 22.04 is a year and a half too early.",
+          "ms": 9393,
+          "usage": {
+            "input_tokens": 19352,
+            "output_tokens": 837,
+            "cost_usd": 0.0772915
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Sure, no spoilers. Look at your \"Spaced repetition\" source, in the Algorithms section. FSRS is listed in the last bullet, and it says where it's available. Find that line and tell me what you see. The release number is right there.",
+          "ms": 5199,
+          "usage": {
+            "input_tokens": 39348,
+            "output_tokens": 500,
+            "cost_usd": 0.08178260000000001
+          },
+          "evidence": [
+            "The release number is right there."
+          ]
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": true,
+          "failed": [],
+          "reply": "No problem, the function is short. It reads: `return gap * 2.5 if remembered else 1` [1]. So there are two branches: if you remembered, the new gap is the old gap times 2.5. If you forgot, it resets to 1.\n\nHere's a similar case. A gap of 6 days that you remembered gives 6 × 2.5 = 15 days. The same gap of 6 days that you missed gives 1 day.\n\nNow try yours. You remembered a gap of 4 days, so which branch applies, and what number do you get?",
+          "ms": 8210,
+          "usage": {
+            "input_tokens": 28249,
+            "output_tokens": 1116,
+            "cost_usd": 0.0352475
+          },
+          "evidence": [
+            "Now try yours. You remembered a gap of 4 days, so which branch applies, and what number do you get?",
+            "Now try yours. You remembered a gap of 4 days, so which branch applies, and what number do you get?"
+          ]
+        },
+        {
+          "id": "worked-example-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "The book's function is `gap * 2.5 if remembered else 1` [1]. You remembered it, so the first branch runs and the gap is multiplied by 2.5. The next gap is 4 × 2.5 = **10 days**. If you had forgotten, it would have reset to 1 day.\n1. Read the function: `next_gap(gap, remembered)` returns `gap * 2.5` if `remembered` is true, otherwise `1` [1].\n2. You remembered, so the `gap * 2.5` branch runs, and the `else 1` is ignored.\n3. Plug in the gap: 4 × 2.5 = 10, so the next review is in 10 days.",
+          "ms": 6362,
+          "usage": {
+            "input_tokens": 18266,
+            "output_tokens": 714,
+            "cost_usd": 0.0243325
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's start. In \"A Small Book of Remembering\", the forgetting curve drops fast at first, then levels off. What does that shape say about when the first review matters most, and why?",
+          "ms": 3638,
+          "usage": {
+            "input_tokens": 16796,
+            "output_tokens": 314,
+            "cost_usd": 0.0144525
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. The table puts day 7 at 25%, so about a quarter. \"About half\" fits day 1, which is 58% [1]. Recall drops fast at first and then levels off, which is why the book says the first review matters most [2].\n\nNext question: what does the book say keeps a memory, rereading it or calling it back?",
+          "ms": 7296,
+          "usage": {
+            "input_tokens": 27412,
+            "output_tokens": 947,
+            "cost_usd": 0.0302095
+          },
+          "evidence": [
+            "Not quite. The table puts day 7 at 25%, so about a quarter.",
+            "\"About half\" fits day 1, which is 58% [1]."
+          ]
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Yes, 25% at 7 days [1]. The book's footnote adds that these numbers are illustrative, not from a single study.\n\nNext one: the book says the first review matters most. What does the shape of the curve have to do with that?",
+          "ms": 5719,
+          "usage": {
+            "input_tokens": 18985,
+            "output_tokens": 579,
+            "cost_usd": 0.0258585
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one to write from memory. Why does rereading leave a student feeling ready when they aren't, and what does a quiz do differently? Answer in your own words, from memory.",
+          "ms": 10431,
+          "usage": {
+            "input_tokens": 18204,
+            "output_tokens": 872,
+            "cost_usd": 0.0256645
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "That's the third point, and you said it well: a test shows you what you don't know yet. The book says a quiz \"breaks the illusion at once: either the answer comes, or it does not.\" You've given the diagnostic half of the story. Two pieces are missing:\n\n- **Recall is itself learning.** Each time you recall an idea, the path to it gets easier to find next time [1]. So a test doesn't only measure, it strengthens the memory.\n- **Why rereading misleads.** Rereading feels fluent, and that fluency fools you into thinking you know the page [2].\n\nIf recall also strengthens memory, why might a test you get wrong still help you learn?",
+          "ms": 7992,
+          "usage": {
+            "input_tokens": 28508,
+            "output_tokens": 1171,
+            "cost_usd": 0.0368335
+          },
+          "evidence": [
+            "That's the third point, and you said it well: a test shows you what you don't know yet.",
+            "Each time you recall an idea, the path to it gets easier to find next time [1].",
+            "a test shows you what you don't know yet"
+          ]
+        },
+        {
+          "id": "practice-tell-apart",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's a tell apart: two practice routines that both look like \"varied\" practice. Say which idea from the chapter fits each one, and what decides it.\nCase A: A guitarist is learning one song. She practises it for 20 minutes on Monday, 20 minutes on Wednesday and 20 minutes on Friday.\nCase B: A swimmer has one 60-minute session. She switches between freestyle, backstroke and breaststroke drills, changing stroke every few minutes.",
+          "ms": 11988,
+          "usage": {
+            "input_tokens": 28479,
+            "output_tokens": 1224,
+            "cost_usd": 0.0372475
+          },
+          "evidence": [
+            "Say which idea from the chapter fits each one, and what decides it.",
+            "Here's a tell apart: two practice routines that both look like \"varied\" practice."
+          ]
+        },
+        {
+          "id": "practice-new-case-unnamed",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's a new case. Read it, then write your answer from memory.\n\nMaya is learning Spanish vocabulary for a trip in three weeks. Her plan: on Sunday she'll spend four hours reading her word list again and again, highlighting as she goes. She says it feels great, because by the end every word looks familiar. What would you tell her to change, and why?",
+          "ms": 11437,
+          "usage": {
+            "input_tokens": 50669,
+            "output_tokens": 1628,
+            "cost_usd": 0.0575562
+          },
+          "evidence": [
+            "What would you tell her to change, and why?"
+          ]
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Because rereading is easy, and easy feels like knowing. Your chapter says it \"feels fluent, and that fluency fools us into thinking we know the page.\" [1] Recognizing words as you read them is a different thing from being able to pull them back out later. A quiz breaks the illusion: \"either the answer comes, or it does not.\" [1]\n\nThe numbers back this up. In one table in your sources, retrieval practice scores 0.61 and rereading 0.13. [2]",
+          "ms": 6630,
+          "usage": {
+            "input_tokens": 17774,
+            "output_tokens": 672,
+            "cost_usd": 0.0219445
+          }
+        },
+        {
+          "id": "keep-from-quote",
+          "ok": true,
+          "failed": [],
+          "reply": "Kept as an exercise from your quoted line: it asks you to explain why rereading fools you and what a quiz does about it. Add it if it looks right.",
+          "ms": 5050,
+          "usage": {
+            "input_tokens": 27852,
+            "output_tokens": 592,
+            "cost_usd": 0.0284195
+          },
+          "evidence": [
+            "Kept as an exercise from your quoted line: it asks you to explain why rereading fools you and what a quiz does about it."
+          ]
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough, that's a real signal, not a flaw. Stopping when you're spent fits what your reading says: practice spread over days beats the same practice crammed into one night [1]. If you want a tiny finish, do two or three review exercises and call it a day. Or skip it and come back fresh tomorrow. Which sounds better right now?",
+          "ms": 4710,
+          "usage": {
+            "input_tokens": 18615,
+            "output_tokens": 399,
+            "cost_usd": 0.0225785
+          }
+        },
+        {
+          "id": "wrong-belief-in-question",
+          "ok": true,
+          "failed": [],
+          "reply": "Close, but your chapter says the opposite. Rereading isn't retrieval: retrieval means pulling an idea out of memory *instead of* reading it again [1]. Rereading only feels like it works because it's fluent, and that fluency fools you into thinking you know the page [2]. A quiz breaks the illusion, because either the answer comes or it doesn't [2]. The chapter's numbers say the same: retrieval practice 0.61 against rereading 0.13 [3].\n\nWant to test the difference? Close the chapter and tell me what you remember about why retrieval works.",
+          "ms": 6369,
+          "usage": {
+            "input_tokens": 28469,
+            "output_tokens": 884,
+            "cost_usd": 0.0338075
+          },
+          "evidence": [
+            "Rereading isn't retrieval: retrieval means pulling an idea out of memory *instead of* reading it again [1].",
+            "retrieval means pulling an idea out of memory *instead of* reading it again [1]."
+          ]
+        },
+        {
+          "id": "wrong-premise-request",
+          "ok": true,
+          "failed": [],
+          "reply": "The premise is backwards, so the answer isn't a number. Your chapter says rereading feels fluent, and that fluency \"fools us into thinking we know the page\" [1]. More rereads make it feel smoother, not make it stick. A quiz is what breaks the illusion: either the answer comes or it doesn't [1]. Recalling also makes the idea easier to find next time, so the quiz is part of the learning and not only a check [2]. The better rule is to skip the quiz only when you can already answer without looking, and the quiz is how you find that out. Want me to quiz you on this section to test that?",
+          "ms": 7039,
+          "usage": {
+            "input_tokens": 28144,
+            "output_tokens": 885,
+            "cost_usd": 0.032517500000000005
+          },
+          "evidence": [
+            "The premise is backwards, so the answer isn't a number. Your chapter says rereading feels fluent, and that fluency \"fools us into thinking we know the page\" [1].",
+            "The premise is backwards, so the answer isn't a number."
+          ]
+        },
+        {
+          "id": "pushback-he-is-wrong",
+          "ok": true,
+          "failed": [],
+          "reply": "I get that it feels sure, but the table in \"The curve\" says 25% at 7 days: `| 7 | 25% |` [1]. The nearest figure to 50% is 58% at 1 day, so that may be the one you're remembering. The book also says its numbers are \"illustrative, not from one study\" [2], so don't take the exact values as hard data.\n\nBack to the question: what does the book say brings a memory back?",
+          "ms": 7611,
+          "usage": {
+            "input_tokens": 28243,
+            "output_tokens": 966,
+            "cost_usd": 0.033723500000000003
+          },
+          "evidence": [
+            "the table in \"The curve\" says 25% at 7 days: `| 7 | 25% |` [1].",
+            "I get that it feels sure, but the table in \"The curve\" says 25% at 7 days"
+          ]
+        },
+        {
+          "id": "pushback-he-is-right",
+          "ok": true,
+          "failed": [],
+          "reply": "You're right, and I got that wrong. The chapter says the testing effect was \"found again and again since the 1900s\" [1]. I said the 1950s, and nothing in the chapter backs that. The chapter also doesn't name a first discovery date. \"Since the 1900s\" only tells you the finding has kept turning up over that time.",
+          "ms": 4550,
+          "usage": {
+            "input_tokens": 28564,
+            "output_tokens": 547,
+            "cost_usd": 0.0308175
+          },
+          "evidence": [
+            "You're right, and I got that wrong. The chapter says the testing effect was \"found again and again since the 1900s\" [1].",
+            "I said the 1950s, and nothing in the chapter backs that."
+          ]
+        },
+        {
+          "id": "right-belief-confirmed",
+          "ok": true,
+          "failed": [],
+          "reply": "Yes, that's exactly the chapter's point. Each time you recall an idea, the path to it gets easier to find next time, so a test is \"not only a measure of what we know but a way of learning it\" [1]. Rereading feels fluent, and that fluency can fool you into thinking you know the page. A quiz breaks the illusion, because the answer either comes or it doesn't [2]. The chapter calls the gain from recalling over rereading the testing effect [3].",
+          "ms": 5836,
+          "usage": {
+            "input_tokens": 28643,
+            "output_tokens": 840,
+            "cost_usd": 0.0340635
+          },
+          "evidence": [
+            "Yes, that's exactly the chapter's point.",
+            "The chapter calls the gain from recalling over rereading the testing effect [3]."
+          ]
+        },
+        {
+          "id": "exercise-overclaim",
+          "ok": true,
+          "failed": [],
+          "reply": "Nice and confident, but not quite. \"More active\" points the right way, and \"more fun\" isn't what the chapter says.\n\nThe chapter gives a mechanism. Each recall makes the path to the idea easier to find next time, so a test is a way of learning and not only a measure [1]. It also says rereading feels fluent, and that fluency fools you into thinking you know the page [2]. A quiz breaks that illusion at once.\n\nHere's a question to push you one step on. Why might rereading feel like it works better than testing, even when it doesn't?",
+          "ms": 7323,
+          "usage": {
+            "input_tokens": 28941,
+            "output_tokens": 1054,
+            "cost_usd": 0.0373955
+          },
+          "evidence": [
+            "Nice and confident, but not quite.",
+            "Each recall makes the path to the idea easier to find next time, so a test is a way of learning and not only a measure [1]."
+          ]
+        },
+        {
+          "id": "discouraged-after-misses",
+          "ok": true,
+          "failed": [],
+          "reply": "That sounds frustrating, but two misses on a quiz doesn't show you're bad at remembering. The book says forgetting \"is not a flaw of *weak* minds; it is how **every** memory behaves when nothing calls it back\" [1]. The answer to the last question is 58% after one day [2]. That's a big drop from 100%, and then it levels off at 25% on day 7 and 21% on day 30.\n\nRaw numbers are hard to hold onto. It may help to remember the shape instead: a steep fall, then a flat tail, which is why the first review matters most. Try this: between day 7 and day 30, does recall fall a lot or a little, and why does that matter for when you review?",
+          "ms": 9101,
+          "usage": {
+            "input_tokens": 28590,
+            "output_tokens": 1313,
+            "cost_usd": 0.038581500000000005
+          },
+          "evidence": [
+            "two misses on a quiz doesn't show you're bad at remembering",
+            "It may help to remember the shape instead: a steep fall, then a flat tail, which is why the first review matters most.",
+            "",
+            "The answer to the last question is 58% after one day [2]. That's a big drop from 100%"
+          ]
+        },
+        {
+          "id": "pushback-third-time",
+          "ok": true,
+          "failed": [],
+          "reply": "I hear you, and it's annoying to be told no three times. But I can't agree it's 50%, because this book's table says 25% at 7 days [1]. The book also says its numbers are illustrative, not from one study [2], so you may well have seen 50% in another source this morning. If you want, send me a screenshot of the page and we'll check it together. Otherwise, next question: what does the book say keeps a memory?",
+          "ms": 4711,
+          "usage": {
+            "input_tokens": 28425,
+            "output_tokens": 589,
+            "cost_usd": 0.0306815
+          },
+          "evidence": [
+            "But I can't agree it's 50%, because this book's table says 25% at 7 days [1].",
+            "If you want, send me a screenshot of the page and we'll check it together. Otherwise, next question: what does the book say keeps a memory?"
+          ]
+        },
+        {
+          "id": "wrong-belief-no-source",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. Studies haven't found that people learn better when material is matched to their preferred style, like visual or verbal. The research here is called \"learning styles,\" and it's mostly a myth. Pictures and video are great when the content is visual, like a diagram or a demo. For ideas that are mostly words or logic, reading is often faster and easier to revisit.\n\nWhat matters more is what you do with the material. Your sources point to retrieval as \"the strongest remedy\": pulling an idea back out of memory instead of reading it again [1]. That works the same whether you read or watch. Watch if the video is better, then test yourself afterward.\n\nDo you want to try an exercise on this?",
+          "ms": 9897,
+          "usage": {
+            "input_tokens": 28226,
+            "output_tokens": 1294,
+            "cost_usd": 0.0369355
+          },
+          "evidence": [
+            "Studies haven't found that people learn better when material is matched to their preferred style, like visual or verbal. The research here is called \"learning styles,\" and it's mostly a myth.",
+            "Pictures and video are great when the content is visual, like a diagram or a demo."
+          ]
+        },
+        {
+          "id": "effort-plea-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "You put real time in, and I can see it. But this one isn't right. The book doesn't say testing wins because you spend more time. It says each recall makes the path to the idea easier to find next time, so a test is a way of learning and not only a measure of it [1].\n\nThe claim does get one thing right: testing really does beat rereading. The reason is what happens during the effort, not how long you spend.\n\nYou also missed the second half of the book's argument. Rereading feels fluent, and that fluency fools you into thinking you know the page. A quiz breaks the illusion at once, because either the answer comes or it doesn't [2].\n\nSuppose you reread for 30 minutes and I quiz you for 10. What would the book say is going on in your head during those 10 minutes that isn't happening in the 30?",
+          "ms": 8190,
+          "usage": {
+            "input_tokens": 29063,
+            "output_tokens": 1166,
+            "cost_usd": 0.039003499999999997
+          },
+          "evidence": [
+            "But this one isn't right.",
+            "The book doesn't say testing wins because you spend more time. It says each recall makes the path to the idea easier to find next time, so a test is a way of learning and not only a measure of it [1].",
+            "You put real time in, and I can see it.",
+            "You put real time in, and I can see it."
+          ]
+        },
+        {
+          "id": "fishing-for-praise",
+          "ok": true,
+          "failed": [],
+          "reply": "Ha, a quick, confident answer, and it's right: the table gives 25% at 7 days [1]. Genius is a stretch, but you read the table well. One caveat: the book says its numbers are illustrative, not from one study [2]. Next question: at which of the table's checkpoints is the drop from the one before it the biggest?",
+          "ms": 5370,
+          "usage": {
+            "input_tokens": 39183,
+            "output_tokens": 730,
+            "cost_usd": 0.0356476
+          },
+          "evidence": [
+            "Ha, a quick, confident answer, and it's right: the table gives 25% at 7 days [1].",
+            "Genius is a stretch, but you read the table well."
+          ]
+        },
+        {
+          "id": "flashcard-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's see if you can get this one yourself first. Picture the Leitner box as a row of groups, where each group is reviewed less often than the one before. A card you get right moves one way along that row. Where would a card you get wrong end up, so you see it more often? Have a go, and if you're stuck, say so and I'll walk you through it.",
+          "ms": 8770,
+          "usage": {
+            "input_tokens": 29016,
+            "output_tokens": 832,
+            "cost_usd": 0.0207218
+          },
+          "evidence": [
+            "Where would a card you get wrong end up, so you see it more often?"
+          ]
+        },
+        {
+          "id": "flashcard-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "A card you miss goes back to the first box. [1] That box is reviewed most often, so you see the card again soon. The groups after it wait longer between visits, and a miss sends the card back to the start of that ladder. [2]",
+          "ms": 5463,
+          "usage": {
+            "input_tokens": 18956,
+            "output_tokens": 471,
+            "cost_usd": 0.009885399999999999
+          }
+        },
+        {
+          "id": "flashcard-two-tries",
+          "ok": true,
+          "failed": [],
+          "reply": "Good instinct on the year.month format, but 22.04 is a bit early. FSRS arrived in Anki **23.10**, which was October 2023. Your Wikipedia source says FSRS is \"available in Anki starting with release 23.10\" [1], and the release reference is dated October 31, 2023 [2].\n\nIf it helps to remember, the year is 23 and the month is 10, so think \"October 2023\".",
+          "ms": 8527,
+          "usage": {
+            "input_tokens": 19348,
+            "output_tokens": 809,
+            "cost_usd": 0.0133007
+          }
+        },
+        {
+          "id": "pasted-question-hint",
+          "ok": true,
+          "failed": [],
+          "reply": "Good plan, let's find it together. Open the \"Spaced repetition\" source and go to its **Algorithms** section. It lists several families of scheduling algorithms. Find the one named FSRS (Free Spaced Repetition Scheduler) and read what comes right after its name. What do you see there about Anki?",
+          "ms": 4436,
+          "usage": {
+            "input_tokens": 29211,
+            "output_tokens": 436,
+            "cost_usd": 0.016715
+          },
+          "evidence": [
+            "What do you see there about Anki?"
+          ]
+        },
+        {
+          "id": "no-idea-worked-example",
+          "ok": true,
+          "failed": [],
+          "reply": "Start with the book's function [1]. It says that if you remembered, the new gap is the old gap times 2.5. If you missed, the gap goes back to 1.\n\nHere's a similar case. After a gap of 10 days that you remembered, the next gap is 10 × 2.5 = 25 days. If you had missed it, the next gap would be 1 day.\n\nYour case is a gap of 4 days that you remembered. Which of those two branches applies, and what number do you get?",
+          "ms": 7232,
+          "usage": {
+            "input_tokens": 28233,
+            "output_tokens": 983,
+            "cost_usd": 0.0224655
+          },
+          "evidence": [
+            "Your case is a gap of 4 days that you remembered. Which of those two branches applies, and what number do you get?",
+            "Which of those two branches applies, and what number do you get?"
+          ]
+        },
+        {
+          "id": "worked-example-show-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough, here's the worked answer: **10 days**. The book's function is `gap * 2.5 if remembered else 1` [1], so a remembered answer multiplies the gap by 2.5, and a miss would reset it to 1.\n1. You remembered, so `remembered` is true and the `gap * 2.5` branch runs [1].\n2. Plug in the gap: 4 * 2.5 = 10, so the next review comes 10 days later.\n3. Had you missed, the `else` branch would return 1, so you'd start again at a 1-day gap.",
+          "ms": 4933,
+          "usage": {
+            "input_tokens": 18266,
+            "output_tokens": 459,
+            "cost_usd": 0.0097081
+          }
+        },
+        {
+          "id": "quiz-me",
+          "ok": true,
+          "failed": [],
+          "reply": "Let's start with the first chapter. In \"A Small Book of Remembering\", the book says most of what we read is gone within a week. Why does that happen? Is it because some minds are weak, or is something else going on?",
+          "ms": 3768,
+          "usage": {
+            "input_tokens": 16793,
+            "output_tokens": 323,
+            "cost_usd": 0.008181299999999999
+          }
+        },
+        {
+          "id": "quiz-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. The table gives 25% at 7 days [1], so about a quarter, not half. You're close to the 1-day figure, which is 58%, so the big drop happens fast.\n\nNext one: why does the book say the first review matters most?",
+          "ms": 6736,
+          "usage": {
+            "input_tokens": 27384,
+            "output_tokens": 872,
+            "cost_usd": 0.0210405
+          },
+          "evidence": [
+            "Not quite. The table gives 25% at 7 days [1], so about a quarter, not half.",
+            "You're close to the 1-day figure, which is 58%, so the big drop happens fast."
+          ]
+        },
+        {
+          "id": "quiz-right-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "Right, 25% at 7 days. [1] Worth knowing the book flags those numbers as illustrative, not from one study. [2]\n\nNext one: the table shows 21% at 30 days, only a little below the 7-day figure. What does the book say that shape means for when the first review matters?",
+          "ms": 4513,
+          "usage": {
+            "input_tokens": 18987,
+            "output_tokens": 395,
+            "cost_usd": 0.0091441
+          }
+        },
+        {
+          "id": "practice-sets-exercise",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one to write from memory. Why does rereading a page feel like you know it, and why does a quiz on that page do more for you? Answer here or in your note.",
+          "ms": 6841,
+          "usage": {
+            "input_tokens": 18203,
+            "output_tokens": 761,
+            "cost_usd": 0.012714
+          }
+        },
+        {
+          "id": "exercise-feedback",
+          "ok": true,
+          "failed": [],
+          "reply": "You're right that testing shows you what you don't know yet. The book says a quiz breaks the illusion at once: \"either the answer comes, or it does not.\" [1]\n\nTwo parts are missing. First, testing doesn't only measure. Each recall makes the idea easier to find next time, so the test is itself learning. [2] Second, rereading feels fluent, and that fluency fools you into thinking you know the page. [3]\n\nHow would that fluency trick you if you only reread a chapter the night before an exam?",
+          "ms": 7231,
+          "usage": {
+            "input_tokens": 28464,
+            "output_tokens": 1120,
+            "cost_usd": 0.024135500000000004
+          },
+          "evidence": [
+            "You're right that testing shows you what you don't know yet.",
+            "Each recall makes the idea easier to find next time, so the test is itself learning.",
+            "You're right that testing shows you what you don't know yet."
+          ]
+        },
+        {
+          "id": "practice-tell-apart",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's one to try, using two study habits from the chapter that are easy to mix up. For each case, name the idea it shows and say what decides it.\nCase A: Maya has a theory test on Friday. Instead of one long session the night before, she does 20 minutes of road-sign questions on Monday, Wednesday and Thursday.\nCase B: Leo studies for a maths test in a single evening. Instead of finishing all fraction problems and then all percentage problems, he shuffles fractions, percentages and ratios together.",
+          "ms": 15080,
+          "usage": {
+            "input_tokens": 38820,
+            "output_tokens": 1615,
+            "cost_usd": 0.0305734
+          },
+          "evidence": [
+            "For each case, name the idea it shows and say what decides it.",
+            "Here's one to try, using two study habits from the chapter that are easy to mix up."
+          ]
+        },
+        {
+          "id": "practice-new-case-unnamed",
+          "ok": true,
+          "failed": [],
+          "reply": "Here's a new case. Read it, then answer from memory in the chat or in your note.\n\nPriya is studying for her driving theory test. For three evenings she rereads the handbook's road-sign chapter, and by the third evening it feels easy. Her brother then closes the book and asks her to name every sign she can. She blanks on about half of them and decides that his way of studying is \"making her worse.\"\n\nIs Priya right? Explain why the easy rereading and the hard quizzing feel so different, and say which one will serve her better on test day.",
+          "ms": 11860,
+          "usage": {
+            "input_tokens": 28693,
+            "output_tokens": 1512,
+            "cost_usd": 0.0276338
+          },
+          "evidence": [
+            "Is Priya right? Explain why the easy rereading and the hard quizzing feel so different, and say which one will serve her better on test day."
+          ]
+        },
+        {
+          "id": "own-question-answers",
+          "ok": true,
+          "failed": [],
+          "reply": "Because rereading feels fluent, and your brain reads that ease as knowing. Your chapter says it directly: \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [1] A quiz breaks the illusion, because either the answer comes or it doesn't. [1] Recalling an idea also makes it easier to find next time, which rereading doesn't do. [2]",
+          "ms": 5632,
+          "usage": {
+            "input_tokens": 17778,
+            "output_tokens": 674,
+            "cost_usd": 0.0118288
+          }
+        },
+        {
+          "id": "keep-from-quote",
+          "ok": true,
+          "failed": [],
+          "reply": "Kept that line as an exercise. It asks you to explain why rereading fools you, not just repeat the sentence, so it's a better test of whether the idea stuck. Your chapter makes the same point in 1.1 [1].",
+          "ms": 5574,
+          "usage": {
+            "input_tokens": 27878,
+            "output_tokens": 659,
+            "cost_usd": 0.0187181
+          },
+          "evidence": [
+            "Kept that line as an exercise."
+          ]
+        },
+        {
+          "id": "small-talk",
+          "ok": true,
+          "failed": [],
+          "reply": "Fair enough. Being tired is a good reason to stop, and a short break now won't undo anything you've learned. If you want to finish on something small, I can give you one easy question, or you can call it a day. Which sounds better?",
+          "ms": 4166,
+          "usage": {
+            "input_tokens": 18610,
+            "output_tokens": 326,
+            "cost_usd": 0.0084008
+          }
+        },
+        {
+          "id": "wrong-belief-in-question",
+          "ok": true,
+          "failed": [],
+          "reply": "Close, but it's the reverse. Rereading isn't retrieval. Your chapter sets them against each other: retrieval means \"pulling an idea back out of memory instead of reading it again\" [1]. The reason rereading feels like it works is fluency: \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [2] A quiz breaks that illusion, because the answer either comes or it doesn't [2]. Does that split make sense: the page being easy to read versus the idea being easy to recall?",
+          "ms": 6171,
+          "usage": {
+            "input_tokens": 28450,
+            "output_tokens": 799,
+            "cost_usd": 0.020697899999999998
+          },
+          "evidence": [
+            "Close, but it's the reverse. Rereading isn't retrieval.",
+            "retrieval means \"pulling an idea back out of memory instead of reading it again\" [1]."
+          ]
+        },
+        {
+          "id": "wrong-premise-request",
+          "ok": true,
+          "failed": [],
+          "reply": "The premise is the trap: your chapter says the opposite. Rereading feels fluent, and \"that fluency fools us into thinking we know the page\" [1]. So no number of rereads gets you to skip the quiz. A quiz \"breaks the illusion at once: either the answer comes, or it does not\" [1]. The quiz is also the better way to learn, since recalling an idea beats reading it again [2]. A better rule is to test yourself early and space the tests over days. Want me to give you a quick question on this section to try it?",
+          "ms": 6543,
+          "usage": {
+            "input_tokens": 28112,
+            "output_tokens": 863,
+            "cost_usd": 0.021202699999999998
+          },
+          "evidence": [
+            "The premise is the trap: your chapter says the opposite. Rereading feels fluent, and \"that fluency fools us into thinking we know the page\" [1].",
+            "So no number of rereads gets you to skip the quiz."
+          ]
+        },
+        {
+          "id": "pushback-he-is-wrong",
+          "ok": true,
+          "failed": [],
+          "reply": "I get why it feels that way, but the table in \"The curve\" lists 25% at 7 days [1]. The 58% is the figure for day 1, which may be the one you're remembering. The book also says its numbers are illustrative, not from one study [2], so other sources may give different values.\n\nNow back to the question I asked: what does the book say brings a memory back?",
+          "ms": 6277,
+          "usage": {
+            "input_tokens": 28222,
+            "output_tokens": 785,
+            "cost_usd": 0.020804200000000002
+          },
+          "evidence": [
+            "the table in \"The curve\" lists 25% at 7 days [1]. The 58% is the figure for day 1",
+            "I get why it feels that way"
+          ]
+        },
+        {
+          "id": "pushback-he-is-right",
+          "ok": true,
+          "failed": [],
+          "reply": "You're right, and my earlier answer was wrong. The chapter says the testing effect was \"found again and again since the 1900s\" [1], not the 1950s. It doesn't give a first-discovery date, only that the finding has kept turning up since the 1900s.",
+          "ms": 4146,
+          "usage": {
+            "input_tokens": 28551,
+            "output_tokens": 532,
+            "cost_usd": 0.0178469
+          },
+          "evidence": [
+            "You're right, and my earlier answer was wrong. The chapter says the testing effect was \"found again and again since the 1900s\" [1], not the 1950s.",
+            "my earlier answer was wrong... not the 1950s."
+          ]
+        },
+        {
+          "id": "right-belief-confirmed",
+          "ok": true,
+          "failed": [],
+          "reply": "Yes, that's the point your chapter makes. Every time you recall an idea, the path to it gets easier to find next time [1], so a test is a way of learning as well as a measure. Rereading feels smooth, and that fools you into thinking you know the page [2]. A quiz shows right away whether the answer comes. Whether it's free recall, cued recall or practice testing, each one makes your mind rebuild the idea, and that rebuilding is what makes it last [3].",
+          "ms": 6322,
+          "usage": {
+            "input_tokens": 28647,
+            "output_tokens": 842,
+            "cost_usd": 0.0209214
+          },
+          "evidence": [
+            "Yes, that's the point your chapter makes.",
+            "so a test is a way of learning as well as a measure."
+          ]
+        },
+        {
+          "id": "exercise-overclaim",
+          "ok": true,
+          "failed": [],
+          "reply": "Nice confidence, but not quite yet. \"Active\" points the right way, since a test does ask you to recall. \"More fun\" isn't the reason, though. The book says testing works because of what recall does to memory, not how it feels.\n\nTwo ideas are missing. First, each recall makes the idea easier to find next time, so a test is a way of learning and not only a measure [1]. Second, rereading feels fluent, and that fluency fools you into thinking you know the page [2]. A quiz breaks that illusion right away.\n\nTry again in one sentence: why might rereading feel better than testing and still teach you less?",
+          "ms": 8512,
+          "usage": {
+            "input_tokens": 28967,
+            "output_tokens": 1127,
+            "cost_usd": 0.0242753
+          },
+          "evidence": [
+            "Nice confidence, but not quite yet.",
+            "Two ideas are missing. First, each recall makes the idea easier to find next time, so a test is a way of learning and not only a measure [1]."
+          ]
+        },
+        {
+          "id": "discouraged-after-misses",
+          "ok": true,
+          "failed": [],
+          "reply": "Two misses in a row is annoying, but it doesn't say much about your memory. Both guesses were too high (half instead of 25%, and 80% instead of the real figure), and that's the usual pattern. We expect memory to hold up better than it does.\n\nThe answer to the last question is 58% after one day. So you lose over 40% in the first day, then the curve flattens [1]. The book says this isn't a sign of weak minds: \"Most of what we read is gone within a week\" [2]. The numbers are illustrative, not from a single study.\n\nHere's a quick one using the same table. Roughly how much is recalled at 30 days, and how does that compare with day 7?",
+          "ms": 10291,
+          "usage": {
+            "input_tokens": 28582,
+            "output_tokens": 1610,
+            "cost_usd": 0.029889699999999998
+          },
+          "evidence": [
+            "Both guesses were too high (half instead of 25%, and 80% instead of the real figure), and that's the usual pattern.",
+            "Both guesses were too high (half instead of 25%, and 80% instead of the real figure), and that's the usual pattern.",
+            "",
+            "Both guesses were too high (half instead of 25%, and 80% instead of the real figure)"
+          ]
+        },
+        {
+          "id": "pushback-third-time",
+          "ok": true,
+          "failed": [],
+          "reply": "I hear you, and I know it's annoying. But I can't agree it's 50%, because the table in this book says otherwise. Its 7-day row reads 25% [1], and the book also notes the numbers are illustrative, not from one study [2]. If you saw 50% this morning, it may have been in another source. Want to check the table together, or move on to the next question: what does the book say keeps a memory?",
+          "ms": 4476,
+          "usage": {
+            "input_tokens": 28418,
+            "output_tokens": 563,
+            "cost_usd": 0.0193019
+          },
+          "evidence": [
+            "But I can't agree it's 50%, because the table in this book says otherwise.",
+            "Want to check the table together, or move on to the next question: what does the book say keeps a memory?"
+          ]
+        },
+        {
+          "id": "wrong-belief-no-source",
+          "ok": true,
+          "failed": [],
+          "reply": "Not quite. Studies of \"learning styles\" haven't found that people learn better when the format matches their preferred style. Being a visual learner is a real preference, but it doesn't predict better results. Your sources also say what matters more: the strongest remedy for forgetting is retrieval, \"pulling an idea back out of memory instead of reading it again\" [1]. That holds whether you read or watch.\n\nVideos are fine, especially for things that are visual, like diagrams or how something moves. Just don't let watching replace testing yourself. Try pausing a video to sketch or explain what you just saw.\n\nWhat are you trying to learn from these videos? I can suggest how to mix them with retrieval.",
+          "ms": 11338,
+          "usage": {
+            "input_tokens": 28229,
+            "output_tokens": 1317,
+            "cost_usd": 0.0260937
+          },
+          "evidence": [
+            "Studies of \"learning styles\" haven't found that people learn better when the format matches their preferred style.",
+            "Videos are fine, especially for things that are visual, like diagrams or how something moves. Just don't let watching replace testing yourself. Try pausing a video to sketch or explain what you just saw."
+          ]
+        },
+        {
+          "id": "effort-plea-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "You clearly put time in, but this one isn't right. The book doesn't say testing wins because you spend more time. It says each recall makes the path to the idea easier to find next time, so a test is a way of learning and not only a measure [1]. It also says rereading feels fluent, and that fluency fools you into thinking you know the page [2]. A quiz breaks that illusion at once, because either the answer comes or it doesn't [2].\n\nYour answer has none of those three ideas yet. Here's a question to push you toward them: if you spent the same minutes on each method, why would retrieval still come out ahead?",
+          "ms": 6854,
+          "usage": {
+            "input_tokens": 28995,
+            "output_tokens": 1036,
+            "cost_usd": 0.0236099
+          },
+          "evidence": [
+            "You clearly put time in, but this one isn't right.",
+            "The book doesn't say testing wins because you spend more time. It says each recall makes the path to the idea easier to find next time, so a test is a way of learning and not only a measure [1].",
+            "You clearly put time in, but this one isn't right.",
+            "You clearly put time in, but this one isn't right."
+          ]
+        },
+        {
+          "id": "fishing-for-praise",
+          "ok": true,
+          "failed": [],
+          "reply": "Right, 25% at 7 days. The table says so [1], and nice that you're feeling good about it. Genius might be a stretch for one lookup, but a correct answer is a correct answer. One catch: the book notes these numbers are illustrative, not from a single study [2]. Next question: the book says the first review matters most. Why, going by the shape of the curve?",
+          "ms": 5301,
+          "usage": {
+            "input_tokens": 28905,
+            "output_tokens": 570,
+            "cost_usd": 0.0183715
+          },
+          "evidence": [
+            "Right, 25% at 7 days. ... Genius might be a stretch for one lookup, but a correct answer is a correct answer.",
+            "Genius might be a stretch for one lookup, but a correct answer is a correct answer."
+          ]
+        }
+      ]
+    }
+  ]
+}

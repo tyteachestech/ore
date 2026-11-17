@@ -150,7 +150,7 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P2", quote: "A card you miss goes back to the first box." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@15" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@16" });
     expect(r.general).toBe(false);
     const c = r.citations[0] as Citation;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
@@ -315,7 +315,7 @@ describe("tutor: replies", () => {
     await expect(tutor(lib, "and then?", { item: a.meta.id })).rejects.toThrow("invalid tutor output twice");
     const lines = readFileSync(join(lib.root, ".ore/logs/tutor.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     expect(lines).toHaveLength(2);
-    expect(lines[0]).toMatchObject({ runs: 2, searched: false, moved: 1, dropped: 0, model: "claude-fake-1", prompt: "tutor@15" });
+    expect(lines[0]).toMatchObject({ runs: 2, searched: false, moved: 1, dropped: 0, model: "claude-fake-1", prompt: "tutor@16" });
     expect(lines[0].ms).toBeGreaterThanOrEqual(0);
     expect(Date.parse(lines[0].ts)).not.toBeNaN();
     expect(lines[1].error).toContain("invalid tutor output twice");
