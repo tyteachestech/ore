@@ -64,7 +64,7 @@ export function waits(lib: Library) {
 
 /** The models and prompts his real turns ran on that no full run of the tutor eval has checked, as
  *  "model prompt". The `sonnet` alias moves to each new model on its own, so this is how a change shows:
- *  a model the eval's cases have never seen (D-new-tutor-honest-voice). A run of a few cases (`--only`) doesn't count. */
+ *  a model the eval's cases have never seen (D313). A run of a few cases (`--only`) doesn't count. */
 export function untested(lib: Library, dir = join(import.meta.dir, "results")): string[] {
   const file = join(paths.logs(lib), "tutor.jsonl");
   const used = new Set((existsSync(file) ? readFileSync(file, "utf8").split("\n") : []).flatMap((l) => {

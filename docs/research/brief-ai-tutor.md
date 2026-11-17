@@ -85,7 +85,7 @@ What a motivating, effective tutor sounds like, and what Ore does about each. Th
 | Guardrails are not automatically better: a Socratic assistant that knew the student's work was rated least helpful, and students left for a plain chatbot | Eastwood et al. 2026 (preprint, RCT, n = 132); Bassner et al. 2025 (RCT, n = 275: only the hint-first tutor raised motivation, yet students rated ChatGPT easier) | His own questions get a straight answer; "show me" always works |
 | A model pressed by a frustrated learner doesn't hold a rule on a prompt alone | Pisan 2026 (preprint, one deployed system) | Not built: the ladder's count of tries is still the model's (proposal 5 on the page above) |
 
-On today's model the tutor already did nearly all of this unprompted, so the cases are the guard and the prompt gained one sentence (D-new-tutor-honest-voice).
+On today's model the tutor already did nearly all of this unprompted, so the cases are the guard and the prompt gained one sentence (D313).
 
 ## Sources
 

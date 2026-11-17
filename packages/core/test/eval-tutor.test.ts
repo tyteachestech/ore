@@ -116,7 +116,7 @@ describe("mining real chats for cases (D295)", () => {
     for (const l of [{ ms: 4000, runs: 1, moved: 0, dropped: 0, searched: false }, { ms: 6000, runs: 2, moved: 1, dropped: 0, searched: true }, { ms: 20000, runs: 2, error: "x" }, "not json"]) appendFileSync(join(lib.root, ".ore/logs/tutor.jsonl"), `${typeof l === "string" ? l : JSON.stringify(l)}\n`);
     expect(waits(lib)).toEqual({ turns: 3, median_s: 6, went_back: 2, mended: 1, searched: 1, failed: 1 });
   });
-  test("a model or prompt his real turns ran on that no full tutor eval has checked is named (D-new-tutor-honest-voice)", async () => {
+  test("a model or prompt his real turns ran on that no full tutor eval has checked is named (D313)", async () => {
     const { tempLibrary } = await import("./helpers.ts");
     const { untested } = await import("../eval/mine-tutor.ts");
     const { appendFileSync, mkdirSync, mkdtempSync, writeFileSync } = await import("node:fs");

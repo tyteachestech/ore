@@ -12,7 +12,7 @@ bun run eval:tutor --vendor claude --only small-talk,quiz-me   # those cases alo
 
 ## When the model changes
 
-The `sonnet` alias moves to each new model on its own, and a prompt line written for one model can hold the next one back. So the cases say what a reply must do, never how to word it, and instructions follow the cases (D-new-tutor-honest-voice):
+The `sonnet` alias moves to each new model on its own, and a prompt line written for one model can hold the next one back. So the cases say what a reply must do, never how to word it, and instructions follow the cases (D313):
 
 1. `bun run eval:mine:tutor` on the Mac names any model and prompt his real turns ran on that no full run of this eval has checked ("Not yet checked by the tutor eval: …").
 2. Run `bun run eval:tutor --vendor claude --runs 2` and commit the result. A case that now fails is read first: is the reply worse, or the check too narrow?
@@ -84,9 +84,9 @@ tutor@15 adds what the tutor is told of the open source (`whole`, `outline`, `at
 
 ## tutor@16 (2026-11-17): honesty and voice, tests before instructions
 
-Eleven new cases and four tightened ones (D-new-tutor-honest-voice): a wrong idea in his question, a wrong premise, pushback when he is wrong (once and three times over) and when he is right, a right belief confirmed, an overclaimed and a pleaded-for exercise answer, a discouraged learner, fishing for praise, a wrong belief with no source open. A regex bars superlatives, praise of him and "great question"; the judge reads the rest.
+Eleven new cases and four tightened ones (D313): a wrong idea in his question, a wrong premise, pushback when he is wrong (once and three times over) and when he is right, a right belief confirmed, an overclaimed and a pleaded-for exercise answer, a discouraged learner, fishing for praise, a wrong belief with no source open. A regex bars superlatives, praise of him and "great question"; the judge reads the rest.
 
-- On tutor@15, before any change (Sonnet 5.5, 3 runs each): the first eleven 31/33, both misses in `discouraged-after-misses` and both the check's (a length of 600 was too tight; "the numbers are easy to mix up" isn't calling the question easy). The four pressure cases 12/15: `effort-plea-wrong-answer` 0/3, since no reply said a word about the effort he named (F-new-tutor-effort-unheard). Nothing else needed an instruction, so none was written.
+- On tutor@15, before any change (Sonnet 5.5, 3 runs each): the first eleven 31/33, both misses in `discouraged-after-misses` and both the check's (a length of 600 was too tight; "the numbers are easy to mix up" isn't calling the question easy). The four pressure cases 12/15: `effort-plea-wrong-answer` 0/3, since no reply said a word about the effort he named (F378). Nothing else needed an instruction, so none was written.
 - tutor@16 adds one sentence: acknowledge the feeling or effort he states, then give the same verdict. That case 3/3; the whole set 54/54 over 2 runs (93–100%), $1.56.
 - Blind comparison against tutor@15 (2 runs): new 22, old 20, same 12. Even, and the old wins are spread over 14 cases with no shared reason.
 - Seen once and now checked: a far-off answer called "close" (50% for 25%) to a discouraged learner.
