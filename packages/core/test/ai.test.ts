@@ -12,9 +12,10 @@ import { enrichError, enrichItem, needsEnrich, pendingHighlights, pendingItems, 
 import { chapterRecallFeedback, recallFeedback } from "../src/ai/recall.ts";
 import { anchorEvidence, checkPrequestion, finishScope, scopeFinish, setCovered, writeKeyPoints } from "../src/ai/check.ts";
 import { addHighlight, addPoint, findAnnotation, readAnnotations, reviseAnnotation } from "../src/annotations.ts";
-import { markTried } from "../src/tries.ts";
+import { markTried, planTry } from "../src/tries.ts";
+import { tryLine } from "../src/ai/tries.ts";
 import { listCards, writeNewCard } from "../src/cards.ts";
-import { addSnippet } from "../src/ingest/index.ts";
+import { addSnippet, addText } from "../src/ingest/index.ts";
 import { sha256 } from "../src/fsutil.ts";
 import { createItem, findItem, setItemStatus, setPrequestionAttempt, updateItemMeta } from "../src/items.ts";
 import { appendNote, setChapterRecall, setNotes, setRecall } from "../src/notes.ts";
@@ -976,5 +977,47 @@ describe("what a claude task may read (D292)", () => {
     // The rule names the real path: claude refuses a read through a symlink's name (a Mac's /tmp).
     symlinkSync(dir, `${dir}-link`);
     expect(claudeTools({ files: [join(`${dir}-link`, "doc.md")], web: true }).allowed[0]).toBe(`Read(/${dir}/doc.md)`);
+  });
+});
+
+describe("the mole's line on a use of a try (D-new-try-rest)", () => {
+  const TEXT = "# Openings\n\nOpen on the moment of change, then rewind to how we got there.\n";
+  const inputOf = (call: number) => JSON.parse(readFileSync(join(binDir, "args.jsonl"), "utf8").split("\n")[call]!)[1] as string;
+  test("it reads the last use he wrote up against his plan and earlier rounds, and is kept beside that use with its stamp; a round and a try that is his each keep their own", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, TEXT, { skills: ["storytelling"] });
+    const a = addHighlight(findItem(lib, src.meta.id), { exact: "Open on the moment of change", intent: "apply", note: "Cold open first" });
+    await expect(tryLine(lib, a.id)).rejects.toThrow(/write how it went first/);
+    await planTry(lib, a.id, { when: "outlining a video" });
+    await markTried(lib, a.id, { reflection: "Hooked better; the rewind ran long.", again: true });
+    fakeClaude([{ line: "The hook landed. Cut the rewind to two beats next time." }, { line: "Twice on videos now. Try it on a newsletter." }]);
+    const first = await tryLine(lib, a.id);
+    expect(first.line).toEqual({ text: "The hook landed. Cut the rewind to two beats next time.", ai: { vendor: "claude", model: "claude-fake-1", prompt_version: "try-line@1" } });
+    const sent = JSON.parse(inputOf(0).slice(inputOf(0).indexOf("{"), inputOf(0).lastIndexOf("}") + 1));
+    expect(sent).toMatchObject({ plan: "Cold open first", when: "outlining a video", went: "Hooked better; the rewind ran long.", rounds: [], passage: "Open on the moment of change" });
+    expect(findAnnotation(lib, a.id).annotation.uses![0]!.line!.text).toBe(first.line.text);
+
+    // The third use makes it his: the line is the try's own, and the round's stays.
+    await markTried(lib, a.id, { reflection: "Two beats worked." });
+    await tryLine(lib, a.id);
+    const now = findAnnotation(lib, a.id).annotation;
+    expect([now.uses![0]!.line!.text, now.line!.text]).toEqual([first.line.text, "Twice on videos now. Try it on a newsletter."]);
+    const second = JSON.parse(inputOf(1).slice(inputOf(1).indexOf("{"), inputOf(1).lastIndexOf("}") + 1));
+    expect(second.rounds).toEqual([{ plan: "Cold open first", when: "outlining a video", went: "Hooked better; the rewind ran long." }]);
+    // Put back to try again, what the mole said about a use that no longer stands goes with it.
+    await markTried(lib, a.id, { undo: true });
+    expect(findAnnotation(lib, a.id).annotation.line).toBeUndefined();
+  });
+
+  test("a use written again while the mole was thinking keeps no line for the old words", async () => {
+    const lib = await tempLibrary();
+    const src = await addText(lib, TEXT, { skills: ["storytelling"] });
+    const a = addHighlight(findItem(lib, src.meta.id), { exact: "Open on the moment of change", intent: "apply", note: "Cold open first" });
+    await markTried(lib, a.id, { reflection: "Fine." });
+    fakeClaude([{ line: "What changed because of it?" }]);
+    writeFileSync(join(binDir, "while.js"), `require("child_process").execFileSync("bun", [${JSON.stringify(join(import.meta.dir, "../../cli/src/ore.ts"))}, "tried", ${JSON.stringify(a.id)}, "--text", "It hooked them."], { env: { ...process.env, ORE_LIBRARY: ${JSON.stringify(lib.root)}, ORE_NO_ENRICH: "1" } });`);
+    await expect(tryLine(lib, a.id)).rejects.toThrow(/changed while the mole was thinking/);
+    expect(findAnnotation(lib, a.id).annotation).toMatchObject({ reflection: "It hooked them." });
+    expect(findAnnotation(lib, a.id).annotation.line).toBeUndefined();
   });
 });

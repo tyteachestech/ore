@@ -38,6 +38,7 @@ export * from "./topics.ts";
 export * from "./ai/adapter.ts";
 export * from "./ai/models.ts";
 export * from "./ai/enrich.ts";
+export * from "./ai/tries.ts";
 export * from "./catchup.ts";
 export * from "./ai/grade.ts";
 export * from "./ai/chat.ts";

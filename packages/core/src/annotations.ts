@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { appendJsonl, deviceLog, latestRevs, logFiles, readLog, sha256 } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
-import { findItem, itemDirs, updateItemMeta, type Item } from "./items.ts";
+import { AiStamp, findItem, itemDirs, updateItemMeta, type Item } from "./items.ts";
 import type { Library } from "./library.ts";
 import { anchor, locate, quoteSelector, type Anchor } from "./anchoring.ts";
 
@@ -18,6 +18,10 @@ export type AnnotationStatus = z.infer<typeof AnnotationStatus>;
 // (the link between a question and its sources), `quote` the passage he had selected there.
 export const Contribution = z.object({ ts: z.string(), text: z.string().min(1), item: z.string().optional(), quote: z.string().optional() });
 export type Contribution = z.infer<typeof Contribution>;
+
+/** The mole's one line on how a use of a try went (AI, with its stamp). */
+export const TryLine = z.object({ text: z.string(), ai: AiStamp });
+export type TryLine = z.infer<typeof TryLine>;
 
 export const AnnotationSchema = z.object({
   id: z.string(),
@@ -38,7 +42,10 @@ export const AnnotationSchema = z.object({
   done_at: z.string().optional(), // Apply intent: when he checked it off (`ts` moves with every later edit)
   // Apply intent (D148): earlier rounds of the same try, oldest first. "Next time I'll…" closes a round
   // (his plan and how it went move here) and the try is open again with the new plan as its note.
-  uses: z.array(z.object({ ts: z.string(), plan: z.string().optional(), reflection: z.string().optional() })).optional(),
+  // D-new-try-rest: each round keeps the moment it was used in (`when`, so he can see whether he has tried it
+  // somewhere new) and the mole's one line on how it went (`line`, AI: never a grade).
+  uses: z.array(z.object({ ts: z.string(), plan: z.string().optional(), reflection: z.string().optional(), when: z.string().optional(), line: TryLine.optional() })).optional(),
+  line: TryLine.optional(), // Apply intent: the mole's line on `reflection`, the round not yet closed
   // Apply intent (D322): the plan's cue ("When…", the note is what he'll do then), what might get in the
   // way and what he'll do about it, and a ULID from when he last picked it as the one he is trying now (the latest wins).
   when: z.string().optional(),
@@ -174,7 +181,7 @@ export function isQuestionOnly(item: Item): boolean {
   return all.length > 0 && all.every((a) => a.intent === "question" || (a.intent === "apply" && !!a.point));
 }
 
-export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses" | "looked_up" | "when" | "obstacle" | "picked" | "done_at">>;
+export type AnnotationPatch = Partial<Pick<Annotation, "note" | "intent" | "status" | "exact" | "prefix" | "suffix" | "start" | "end" | "answers" | "card" | "reflection" | "uses" | "looked_up" | "when" | "obstacle" | "picked" | "done_at" | "line">>;
 
 // Edits never rewrite history: they append the same id with rev + 1.
 export function reviseAnnotation(item: Item, current: Annotation, patch: AnnotationPatch): Annotation {
