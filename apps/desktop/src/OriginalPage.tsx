@@ -17,7 +17,7 @@ GlobalWorkerOptions.workerSrc = workerUrl;
 /** The Original tab (D202): the PDF's own page beside its text, as Preview draws it. `page` is the page being
  *  read, and the tab follows it; ‹ › look at another, until the reading moves to a new page. Loaded only when
  *  the tab is opened (pdf.js is a chunk of its own). `lit` is the passage he clicked in the text: the tab turns
- *  to its page and marks where it sits there (D-new-original-lit), or marks nothing when the page's own words
+ *  to its page and marks where it sits there (D315), or marks nothing when the page's own words
  *  don't hold it (a scan, a formula). */
 export default function OriginalPage({ file, page, lit }: { file: string; page: number; lit?: { page: number; text: string } | null }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);

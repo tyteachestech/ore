@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { lines, passage } from "../src/original-match";
 
-// D-new-original-lit: the Original tab lights the passage he clicked in the text, found among the page's own runs.
+// D315: the Original tab lights the passage he clicked in the text, found among the page's own runs.
 const page = ["Chapter 1", " ", "Spacing out ses-", "sions beats cram", "ming. The ef", "ﬁ", "cient way is", "to wait.", "x = y + 2", "Spacing again."];
 
 test("a passage is found across the page's runs, however import rejoined its hyphens, spaces and ligatures", () => {

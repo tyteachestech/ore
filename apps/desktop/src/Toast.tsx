@@ -191,7 +191,7 @@ export function useToast() {
     }
   });
 
-  // On the iPhone a toast is swiped away, down or to a side, as an iOS banner is (D-new-toast-swipe): one over the
+  // On the iPhone a toast is swiped away, down or to a side, as an iOS banner is (D317): one over the
   // row he wants need not be waited out or closed by its small ×. It follows the finger; let go past 48pt (or with
   // a flick) it leaves, otherwise it comes back. A wait's toast stays: swiping it away would hide work still going.
   useEffect(() => {

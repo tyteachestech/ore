@@ -13,7 +13,7 @@ export const sheetLayer = (sheet: ReactElement) => (PHONE ? createPortal(sheet, 
 /** The motion tokens (DESIGN.md "Motion"); nothing slides under Reduce Motion. */
 const ease = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "0s" : "var(--t-3) var(--ease-out)");
 
-/** With `pull`, a sheet whose list is longer than it shows also pulls up (D-new-sheet-pull-up), as an iOS sheet goes from its
+/** With `pull`, a sheet whose list is longer than it shows also pulls up (D316), as an iOS sheet goes from its
  *  medium height to its large one: the list grows under the finger to the top of the screen, and from there a
  *  short pull down brings it back, a long one or a flick closes. */
 export function useSwipeDown(ref: RefObject<HTMLElement | null>, onClose: () => void, on: boolean, pull = false) {

@@ -15074,7 +15074,7 @@ async function swipe(page: Page, from: [number, number], to: [number, number], m
   }, [...from, ...to, ms, scrolls ? 1 : 0]);
 }
 
-journey("phone: Sections opens low with the text above it, pulls up to the top of the screen when the outline is long, and a pull down brings it back, then closes (D-new-sheet-pull-up)", async (page) => {
+journey("phone: Sections opens low with the text above it, pulls up to the top of the screen when the outline is long, and a pull down brings it back, then closes (D316)", async (page) => {
   const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
   const body = Array.from({ length: 30 }, (_, i) => `## Part ${i + 1} of the long book\n\nRetrieval practice is the act of pulling information out of memory. `.repeat(1) + "It works.\n").join("\n");
   await phoneWith(page, async () => (await createItem({ root: PHONE_LIB }, { type: "article", title: "A book of thirty parts", body })).dir, async () => {
@@ -15120,7 +15120,7 @@ journey("phone: Sections opens low with the text above it, pulls up to the top o
   if (Math.abs((await sheet.boundingBox())!.y - was.y) > 1) throw new Error("a short outline's sheet grew with nothing more to show");
 }, "phone");
 
-journey("phone: a toast is swiped away, down or to a side; and a small drag leaves it where it was (D-new-toast-swipe)", async (page) => {
+journey("phone: a toast is swiped away, down or to a side; and a small drag leaves it where it was (D317)", async (page) => {
   await phoneSource(page, TESTING);
   const toast = page.locator(".toast").filter({ hasText: "Undo" });
   const raise = async () => {
@@ -15148,7 +15148,7 @@ journey("phone: a toast is swiped away, down or to a side; and a small drag leav
   await toast.waitFor({ state: "detached", timeout: 1500 });
 }, "phone");
 
-journey("original: a click on a passage of the text lights where it sits on the PDF's page, and words the page lacks light nothing (D-new-original-lit)", async (page) => {
+journey("original: a click on a passage of the text lights where it sits on the PDF's page, and words the page lacks light nothing (D315)", async (page) => {
   const made = (await ore("add", join(FIXTURES, "textbook.pdf"), "--no-enrich")) as { id: string };
   const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
   try {

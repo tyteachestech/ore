@@ -1,4 +1,4 @@
-// Where a passage of the text sits among a PDF page's own runs of words (D-new-original-lit), so the Original
+// Where a passage of the text sits among a PDF page's own runs of words (D315), so the Original
 // tab can light it. The approach is Lector's (anaralabs/lector, MIT): match on the page's text layer, with
 // everything but letters and digits dropped, since import rejoins hyphens, spaces and ligatures its own way.
 

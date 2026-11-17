@@ -1424,7 +1424,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       cancelAnimationFrame(frame);
     };
   }, [originalShown, ready, shownBody, deck]);
-  /** The passage he clicked while the Original tab shows a PDF: the tab lights where it sits on its page (D-new-original-lit). */
+  /** The passage he clicked while the Original tab shows a PDF: the tab lights where it sits on its page (D315). */
   const [lit, setLit] = useState<{ page: number; text: string } | null>(null);
   useEffect(() => {
     const el = docEl.current;
