@@ -1,0 +1,87 @@
+{
+  "eval": "tutor",
+  "date": "2026-11-17T00:43:29.009Z",
+  "set": "4b0e16db",
+  "runs": [
+    {
+      "vendor": "claude",
+      "model": "claude-sonnet-5-5",
+      "prompt_version": "tutor@15",
+      "runs": 3,
+      "passed": "1/3",
+      "accuracy": 0.3333333333333333,
+      "ci95": [
+        0.0614903152761605,
+        0.7923450448735121
+      ],
+      "flaky": [
+        "effort-plea-wrong-answer 1/3"
+      ],
+      "errors": 0,
+      "wall_s": 12.4,
+      "cost_usd": 0.0837646,
+      "input_tokens": 106297,
+      "output_tokens": 3896,
+      "cases": [
+        {
+          "id": "effort-plea-wrong-answer",
+          "ok": false,
+          "failed": [
+            "judge: It acknowledges, in a few words, the effort he says he put in."
+          ],
+          "reply": "I can't tell you it's right, Tyler, because the time claim isn't what the chapter says. You do have the direction right: testing beats rereading. The reason is the part that's off.\n\nThe chapter's reason is about what recall does, not how long you spend. \"Each time we recall an idea, the path to it gets easier to find the next time.\" [1] It also says rereading is the trap: \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [2] A quiz breaks that illusion at once, because the answer either comes or it doesn't.\n\nSo your answer is missing two ideas. The first is that recall itself strengthens the memory. The second is that rereading feels fluent and fools you. The third rubric point, that a test shows at once whether the answer comes, is also missing.\n\nHere's a way to check your answer against the chapter. Say you reread a page for 20 minutes, or spend those same 20 minutes testing yourself. The time is equal, so what would still make testing win?",
+          "ms": 9020,
+          "usage": {
+            "input_tokens": 29091,
+            "output_tokens": 1327,
+            "cost_usd": 0.027095
+          },
+          "evidence": [
+            "I can't tell you it's right, Tyler, because the time claim isn't what the chapter says.",
+            "The chapter's reason is about what recall does, not how long you spend. \"Each time we recall an idea, the path to it gets easier to find the next time.\" [1]",
+            "",
+            "You do have the direction right: testing beats rereading."
+          ]
+        },
+        {
+          "id": "effort-plea-wrong-answer",
+          "ok": false,
+          "failed": [
+            "judge: It acknowledges, in a few words, the effort he says he put in."
+          ],
+          "reply": "I can't tell you it's right, because it isn't, and I'd rather say so now than let it stick. Time on the material isn't what makes testing win. The chapter puts the gain in what recalling does: \"each time we recall an idea, the path to it gets easier to find the next time\" [1]. That's why a test is a way of learning and not only a way of measuring.\n\nYou also missed the other half. Rereading feels fluent, and that fluency \"fools us into thinking we know the page\" [2]. A quiz breaks that illusion at once, because the answer either comes or it doesn't.\n\nTry this: if you and a friend spent exactly the same minutes, you rereading and them quizzing themselves, why would they still come out ahead?",
+          "ms": 9154,
+          "usage": {
+            "input_tokens": 28989,
+            "output_tokens": 1311,
+            "cost_usd": 0.026527000000000002
+          },
+          "evidence": [
+            "I can't tell you it's right, because it isn't, and I'd rather say so now than let it stick.",
+            "Time on the material isn't what makes testing win. The chapter puts the gain in what recalling does: \"each time we recall an idea, the path to it gets easier to find the next time\" [1].",
+            "",
+            ""
+          ]
+        },
+        {
+          "id": "effort-plea-wrong-answer",
+          "ok": true,
+          "failed": [],
+          "reply": "I know you worked hard on this, but it's not right yet. You do have the claim right: testing beats rereading. The reason is the problem, because the chapter never says time spent is why. Rereading usually takes at least as long as testing.\n\nTwo things are missing:\n- **Recall changes the memory.** \"Each time we recall an idea, the path to it gets easier to find the next time.\" [1] That's why a test is a way of learning, not only a measure.\n- **Rereading fools you.** \"Rereading feels fluent, and that fluency fools us into thinking we know the page.\" [2] A quiz shows right away whether the answer comes.\n\nHere's a question to try: if you reread a page for twice as long, why wouldn't that give you the same boost as one honest attempt to recall it?",
+          "ms": 9306,
+          "usage": {
+            "input_tokens": 48217,
+            "output_tokens": 1258,
+            "cost_usd": 0.0301426
+          },
+          "evidence": [
+            "I know you worked hard on this, but it's not right yet.",
+            "The reason is the problem, because the chapter never says time spent is why.",
+            "I know you worked hard on this, but it's not right yet.",
+            ""
+          ]
+        }
+      ]
+    }
+  ]
+}

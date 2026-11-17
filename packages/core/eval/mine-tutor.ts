@@ -5,10 +5,11 @@
 // that as a case's `expect` in tutor-cases.json. Then the waits the library's log recorded: how long a reply
 // takes him, and how often one went back to be fixed. Read-only, no AI: `bun run eval:mine:tutor`
 // (ORE_LIBRARY picks the library).
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { listChats, readChat } from "../src/chats.ts";
 import { openLibrary, paths, type Library } from "../src/library.ts";
+import { loadTutorCases } from "./tutor.ts";
 
 type Version = { message?: string; reply?: string; error?: string; stopped?: boolean; item?: string };
 type Turn = Version & { id: string; alts?: Version[] };
@@ -61,11 +62,31 @@ export function waits(lib: Library) {
   };
 }
 
+/** The models and prompts his real turns ran on that no full run of the tutor eval has checked, as
+ *  "model prompt". The `sonnet` alias moves to each new model on its own, so this is how a change shows:
+ *  a model the eval's cases have never seen (D-new-tutor-honest-voice). A run of a few cases (`--only`) doesn't count. */
+export function untested(lib: Library, dir = join(import.meta.dir, "results")): string[] {
+  const file = join(paths.logs(lib), "tutor.jsonl");
+  const used = new Set((existsSync(file) ? readFileSync(file, "utf8").split("\n") : []).flatMap((l) => {
+    try { const x = JSON.parse(l) as { model?: string; prompt?: string }; return x?.model && x.prompt ? [`${x.model} ${x.prompt}`] : []; } catch { return []; }
+  }));
+  const ids = loadTutorCases().map((c) => c.id);
+  for (const f of existsSync(dir) ? readdirSync(dir).filter((f) => /^tutor-\d/.test(f)) : []) {
+    try {
+      const runs = (JSON.parse(readFileSync(join(dir, f), "utf8")) as { runs?: { model: string; prompt_version: string; cases: { id: string }[] }[] }).runs ?? [];
+      for (const r of runs) if (ids.every((id) => r.cases.some((c) => c.id === id))) used.delete(`${r.model} ${r.prompt_version}`);
+    } catch { /* not a result file */ }
+  }
+  return [...used].sort();
+}
+
 if (import.meta.main) {
   const lib = openLibrary();
   const found = candidates(lib);
   const w = waits(lib);
   console.error(`${found.length} tutor turn${found.length === 1 ? "" : "s"} he asked again, reworded, stopped or that failed.`);
   console.error(w.turns ? `${w.turns} logged turns: median wait ${w.median_s} s; ${w.went_back} went back for a second run, ${w.mended} had a citation mended, ${w.searched} searched the web, ${w.failed} failed.` : "No turns logged yet (.ore/logs/tutor.jsonl).");
+  const u = untested(lib);
+  if (u.length) console.error(`Not yet checked by the tutor eval: ${u.join(", ")}. Run \`bun run eval:tutor --vendor claude --runs 2\` (docs/guides/tutor-eval.md, "When the model changes").`);
   console.log(JSON.stringify(found, null, 2));
 }

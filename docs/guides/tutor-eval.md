@@ -7,7 +7,17 @@ bun run eval:tutor                      # Claude and Codex; spends AI usage, nev
 bun run eval:tutor --vendor claude --model claude-haiku-5-5
 bun run eval:tutor --vendor claude --runs 3   # each case three times: one pooled rate, and the cases that passed only some runs
 bun run eval:tutor --vendor claude --against 85e22fb   # blind A/B: today's tutor.md against the one at that commit (or a file)
+bun run eval:tutor --vendor claude --only small-talk,quiz-me   # those cases alone: a new case, or one prompt line
 ```
+
+## When the model changes
+
+The `sonnet` alias moves to each new model on its own, and a prompt line written for one model can hold the next one back. So the cases say what a reply must do, never how to word it, and instructions follow the cases (D-new-tutor-honest-voice):
+
+1. `bun run eval:mine:tutor` on the Mac names any model and prompt his real turns ran on that no full run of this eval has checked ("Not yet checked by the tutor eval: …").
+2. Run `bun run eval:tutor --vendor claude --runs 2` and commit the result. A case that now fails is read first: is the reply worse, or the check too narrow?
+3. Before adding a line to `tutor.md`, run the new case on today's prompt (`--only`). Write the line only when it fails, and keep it to what the reply must do.
+4. To find a line the model no longer needs, delete it in a copy of `tutor.md` and compare (`--against <that file>`, three runs): if nothing loses for the same reason each time, the line can go.
 
 ## New cases from real use
 
@@ -19,7 +29,7 @@ Lists the turns in his saved chats that he asked again, reworded, stopped or tha
 
 ## How it works
 
-- **Set** (`packages/core/eval/tutor-cases.json`): 16 single turns over the golden docs, some with the turns before (`earlier`) and a source open (`reading`). Each lists what its reply must do: be a hint or not, hold or withhold patterns (the answer he is meant to find), set an exercise or not, split a worked answer into steps (D142), ask him something, cite a passage, give no score, not search, stay short.
+- **Set** (`packages/core/eval/tutor-cases.json`): 27 single turns over the golden docs, some with the turns before (`earlier`) and a source open (`reading`). Each lists what its reply must do: be a hint or not, hold or withhold patterns (the answer he is meant to find), set an exercise or not, split a worked answer into steps (D142), ask him something, cite a passage, give no score, not search, stay short.
 - **Checks** are code (`failures` in `eval/tutor.ts`, tested in `test/eval-tutor.test.ts`): the `hint` and `exercise` flags the tutor returns, regexes on the reply, the citation count and whether it searched.
 - **Judge checks** (`judge` in a case) are what a regex can't see: "it doesn't tell him where a missed card goes, in any words". A judge model (`prompts/judge.md`, the same vendor and model as the run) reads the reply against each sentence and returns pass or fail with the reply's own words that decided it, saved as `evidence` beside the case. The idea is the grader in Anthropic's skill-creator evals: assertions about meaning, each with its evidence. It reads the reply as he sees it: its steps written out, and a tell apart's two cases, which the app shows under the reply and not in it (D163; until tutor@13 the judge could not see them, and that case failed on a correct reply).
 - **Runs** (`--runs N`) repeat every case. The rate is pooled over all runs, and a case that passed only some of them is listed: that is noise in the tutor, and one run would have shown it as a pass or a miss.
