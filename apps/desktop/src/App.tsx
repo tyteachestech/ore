@@ -1807,17 +1807,22 @@ export function App() {
   /** Moves a source between To read and Done, with Undo (the finish step stays the way to finish one). */
   const moveSource = useCallback(
     async (item: Item, to: Item["status"], undoable = true) => {
+      const write = ore("status", item.id, ...back(item, to));
+      // On the history at once, as a pin is (F20): a ⌘Z pressed before the write answers (a slow `ore`, CI under
+      // load) must take this move back once it lands, not the step before it.
+      const forget = undoable
+        ? notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => write.then(() => moveSource(item, item.status, false)), () => write.then(() => moveSource(item, to, false)))
+        : undefined;
       try {
-        await ore("status", item.id, ...back(item, to));
-        // The step goes on the history before the lists are read again: a ⌘Z pressed during that read
-        // (slow on a big library, or CI under load) must take this move back, not the one before it.
-        if (undoable) notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => moveSource(item, item.status, false), () => moveSource(item, to, false));
-        await refresh();
+        await write;
       } catch (e) {
+        forget?.();
         // From the history (undo or redo): it puts the step back and says why.
         if (!undoable) throw e;
         notify(errorText(e), "error");
+        return;
       }
+      await refresh();
     },
     [refresh, notify],
   );
