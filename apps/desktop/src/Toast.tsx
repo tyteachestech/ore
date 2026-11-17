@@ -205,8 +205,11 @@ export function useToast() {
     const move = (e: TouchEvent) => {
       if (!toast) return;
       [dx, dy] = [e.touches[0]!.clientX - x0, Math.max(0, e.touches[0]!.clientY - y0)];
-      axis ??= Math.max(Math.abs(dx), dy) < 8 ? null : Math.abs(dx) > dy ? "x" : "y";
-      if (!axis) return;
+      if (!axis) {
+        if (Math.max(Math.abs(dx), dy) < 8) return;
+        axis = Math.abs(dx) > dy ? "x" : "y";
+        hold(); // it does not time out under the finger
+      }
       // Taken from the page: no scroll under it, and no click on the lift (its own button, the row below).
       if (e.cancelable) e.preventDefault();
       toast.style.transition = "none";
@@ -217,11 +220,18 @@ export function useToast() {
       toast = null;
       if (!it || !axis) return;
       const go = e.type === "touchend" && (Math.abs(d) > 48 || Math.abs(d) / Math.max(1, e.timeStamp - t0) > 0.5);
-      it.style.transition = "translate 180ms cubic-bezier(.2, .9, .3, 1), opacity 180ms linear";
+      release();
+      const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      it.style.transition = still ? "none" : "translate var(--t-3) var(--ease-out), opacity var(--t-3) linear";
       it.style.translate = !go ? "" : axis === "x" ? `${Math.sign(d) * innerWidth}px 0` : "0 160px";
-      if (!go) return;
-      it.style.opacity = "0";
-      setTimeout(() => drop(Number(it.dataset.id)), 170);
+      if (go) it.style.opacity = "0";
+      // What he swiped away, by its words: a toast is rewritten in place (an undo that failed), and that news stays.
+      const said = it.textContent;
+      setTimeout(() => {
+        const gone = go && it.isConnected && it.textContent === said;
+        Object.assign(it.style, { transition: "", translate: "", opacity: "" });
+        if (gone) drop(Number(it.dataset.id));
+      }, still ? 0 : 200);
     };
     el.addEventListener("touchstart", start, { passive: true });
     el.addEventListener("touchmove", move, { passive: false });
@@ -233,7 +243,7 @@ export function useToast() {
       el.removeEventListener("touchend", end);
       el.removeEventListener("touchcancel", end);
     };
-  }, [drop]);
+  }, [drop]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Always mounted, even empty, so VoiceOver reads each toast as it comes: a live region that appears with its words often
   // stays silent. An error is an alert: the nearest live region decides, so it is read once, at once.

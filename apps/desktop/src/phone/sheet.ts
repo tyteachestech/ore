@@ -10,12 +10,12 @@ import { PHONE } from "../ore";
  *  above toasts (styles.css). On the Mac it stays where it is. */
 export const sheetLayer = (sheet: ReactElement) => (PHONE ? createPortal(sheet, document.body) : sheet);
 
-const EASE = "220ms cubic-bezier(.2, .9, .3, 1)";
+/** The motion tokens (DESIGN.md "Motion"); nothing slides under Reduce Motion. */
+const ease = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "0s" : "var(--t-3) var(--ease-out)");
 
 /** With `pull`, a sheet whose list is longer than it shows also pulls up (D-new-sheet-pull-up), as an iOS sheet goes from its
  *  medium height to its large one: the list grows under the finger to the top of the screen, and from there a
- *  short pull down brings it back, a long one or a flick closes. A list scrolled down hands the pull to the
- *  sheet once it is back at its top. */
+ *  short pull down brings it back, a long one or a flick closes. */
 export function useSwipeDown(ref: RefObject<HTMLElement | null>, onClose: () => void, on: boolean, pull = false) {
   const close = useRef(onClose);
   close.current = onClose;
@@ -43,8 +43,6 @@ export function useSwipeDown(ref: RefObject<HTMLElement | null>, onClose: () => 
     const move = (e: TouchEvent) => {
       if (!one) return;
       const y = e.touches[0]!.clientY;
-      // The list reached its top mid-pull: the rest of the pull is the sheet's.
-      if (!live && list && list.scrollTop <= 0 && y > y0) [live, y0, t0] = [true, y, e.timeStamp];
       // Up, on a list that holds more than it shows: it grows first, and scrolls once it is full height.
       if (pull && !growing && list && !tall() && y0 - y >= 6 && list.scrollHeight > list.clientHeight + 1 && full > low + 40) {
         growing = true;
@@ -69,8 +67,9 @@ export function useSwipeDown(ref: RefObject<HTMLElement | null>, onClose: () => 
       if (growing && list) {
         growing = false;
         const up = -dy > 40 || (dy < 0 && fast);
-        list.style.transition = `max-height ${EASE}`;
-        list.style.maxHeight = up ? `${full}px` : "";
+        list.style.transition = `max-height ${ease()}`;
+        // Its full height in the screen's own units, so a turned phone or a moved keyboard keeps the sheet's head in reach.
+        list.style.maxHeight = up ? `calc(100dvh - ${window.innerHeight - full}px)` : "";
         list.style.overflowY = "";
         if (up) el.dataset.tall = "true";
         return;
@@ -80,10 +79,10 @@ export function useSwipeDown(ref: RefObject<HTMLElement | null>, onClose: () => 
       // From full height a short pull is back to where it opened; a long one or a flick closes, as from there.
       const go = dy > el.offsetHeight / 4 || fast;
       const shrink = tall() && !go && dy > 40;
-      el.style.transition = `transform ${EASE}`;
+      el.style.transition = `transform ${ease()}`;
       el.style.transform = go ? `translateY(${el.offsetHeight}px)` : "";
       if (shrink && list) {
-        list.style.transition = `max-height ${EASE}`;
+        list.style.transition = `max-height ${ease()}`;
         list.style.maxHeight = "";
         delete el.dataset.tall;
       }

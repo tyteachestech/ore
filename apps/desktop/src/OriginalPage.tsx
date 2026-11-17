@@ -34,12 +34,15 @@ export default function OriginalPage({ file, page, lit }: { file: string; page: 
   useEffect(() => setOwn(null), [page, file]);
   useEffect(() => void (lit && setOwn(lit.page)), [lit]);
   const [bars, setBars] = useState<Box[]>([]);
+  /** The page the canvas shows: a turned page keeps the last one's picture until its own is drawn, and the marks wait for it. */
+  const [drawn, setDrawn] = useState(0);
   const first = useRef<HTMLElement>(null);
   useEffect(() => setSharp(1), [own, page, file]);
   useEffect(() => {
     let gone = false;
     let task: ReturnType<typeof getDocument> | undefined;
     setPdf(null);
+    setDrawn(0);
     setError(false);
     // The bytes are fetched here: pdf.js only fetches http(s) itself, and the app's files come over `asset:`.
     fetch(convertFileSrc(file))
@@ -83,6 +86,7 @@ export default function OriginalPage({ file, page, lit }: { file: string; page: 
           c.height = draft.height;
           c.getContext("2d")?.drawImage(draft, 0, 0);
           c.dataset.page = String(shown);
+          setDrawn(shown);
         },
         () => {},
       );
@@ -95,7 +99,7 @@ export default function OriginalPage({ file, page, lit }: { file: string; page: 
 
   useEffect(() => {
     setBars([]);
-    if (!pdf || !lit || lit.page !== shown) return;
+    if (!pdf || !lit || lit.page !== shown || drawn !== shown) return;
     let gone = false;
     void pdf.getPage(shown).then(async (pg) => {
       const view = pg.getViewport({ scale: 1 });
@@ -111,7 +115,7 @@ export default function OriginalPage({ file, page, lit }: { file: string; page: 
       })));
     }).catch(() => {});
     return () => void (gone = true);
-  }, [pdf, shown, lit]);
+  }, [pdf, shown, lit, drawn]);
   // The lit passage comes into the panel's view when it is below or above what shows.
   useEffect(() => void (bars.length && first.current?.scrollIntoView({ block: "nearest" })), [bars]);
   const sheet = (

@@ -15051,15 +15051,18 @@ journey("Feed: Follow opens a box that takes a link only, and never saves what i
 
 /** A finger dragged from one point to another in `ms` and lifted (Playwright's touchscreen only taps): touch events
  *  built in the page, on what was under the finger when it came down, as a browser sends them. */
-async function swipe(page: Page, from: [number, number], to: [number, number], ms = 200) {
-  await page.evaluate(async ([x0, y0, x1, y1, ms]) => {
+async function swipe(page: Page, from: [number, number], to: [number, number], ms = 200, scrolls = false) {
+  await page.evaluate(async ([x0, y0, x1, y1, ms, scrolls]) => {
     const el = document.elementFromPoint(x0!, y0!)!;
     const send = (type: string, x: number, y: number) => {
       const t = { clientX: x, clientY: y, target: el, identifier: 1 };
       const e = new Event(type, { bubbles: true, cancelable: true });
       Object.assign(e, { touches: type === "touchend" ? [] : [t], changedTouches: [t] });
       el.dispatchEvent(e);
+      taken ||= type === "touchmove" && e.defaultPrevented;
     };
+    // A drag the page did not take for itself ends in the click a browser sends on the lift, unless it scrolled a list (`scrolls`).
+    let taken = !!scrolls;
     send("touchstart", x0!, y0!);
     const steps = Math.max(4, Math.round(ms! / 16));
     for (let i = 1; i <= steps; i++) {
@@ -15067,7 +15070,8 @@ async function swipe(page: Page, from: [number, number], to: [number, number], m
       send("touchmove", x0! + ((x1! - x0!) * i) / steps, y0! + ((y1! - y0!) * i) / steps);
     }
     send("touchend", x1!, y1!);
-  }, [...from, ...to, ms]);
+    if (!taken) document.elementFromPoint(x1!, y1!)?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX: x1!, clientY: y1! }));
+  }, [...from, ...to, ms, scrolls ? 1 : 0]);
 }
 
 journey("phone: Sections opens low with the text above it, pulls up to the top of the screen when the outline is long, and a pull down brings it back, then closes (D-new-sheet-pull-up)", async (page) => {
@@ -15094,7 +15098,7 @@ journey("phone: Sections opens low with the text above it, pulls up to the top o
     if (last.y + last.height > 844) throw new Error("the last section is below the screen");
     // Scrolled down, a pull down scrolls the list back first: the sheet stays.
     await sheet.locator(".pick-list").evaluate((l) => l.scrollTo(0, 200));
-    await swipe(page, [195, 400], [195, 520]);
+    await swipe(page, [195, 400], [195, 520], 200, true);
     if ((await box()).y > 120) throw new Error("a pull on a scrolled list moved the sheet");
     // At its top, a short pull down brings it back to where it opened; another, long, closes it.
     await sheet.locator(".pick-list").evaluate((l) => l.scrollTo(0, 0));

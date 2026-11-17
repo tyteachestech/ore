@@ -12,8 +12,11 @@ test("a passage is found across the page's runs, however import rejoined its hyp
   expect(passage(["Title", "Test yourself often. ", "Test yourself often.", "End"], "Test yourself often. Test yourself often.")).toEqual([1, 2]);
 });
 
-test("a passage whose start import rewrote (a formula) is still found by its middle or end", () => {
-  expect(passage(["Given ", "α²+β²", " the efficient learner waits between each of the sessions and gains."], "Given $\\alpha^2+\\beta^2$ the efficient learner waits between each of the sessions and gains.")).toEqual([0, 2]);
+test("a passage whose start import rewrote (a formula) is found by its middle and end, and never runs into the paragraph before or after", () => {
+  const runs = ["The paragraph before ends here.", "Given ", "α²+β²", " the efficient learner waits between each of the sessions and gains.", "The paragraph after starts here."];
+  expect(passage(runs, "Given alpha squared plus beta squared, written out at length by import, the efficient learner waits between each of the sessions and gains.")).toEqual([3, 3]);
+  expect(passage(runs, "Given the efficient learner waits between each of the sessions and gains.")).toEqual([3, 3]);
+  expect(passage(["Given ", "α²+β²", " the efficient learner waits between each of the sessions and gains."], "Given $\\alpha^2+\\beta^2$ the efficient learner waits between each of the sessions and gains.")).toEqual([2, 2]);
 });
 
 test("words the page lacks, or has twice, light nothing: never a wrong place", () => {
