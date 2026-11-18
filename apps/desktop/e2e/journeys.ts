@@ -7637,7 +7637,7 @@ journey("review sounds: showing the answer ticks and a rating shines, ⌘Z is si
     await sounds(true);
   }
   // The mole has a switch of his own (D-new-mole-voice): off, his pop is silent and the sound effects still play.
-  const play = (id: string) => page.evaluate(async (id) => (await import("/src/sfx.ts")).sfx(id), id);
+  const play = (id: string) => page.evaluate(async (id) => ((await import("/src/sfx.ts" as string)) as { sfx: (id: string) => void }).sfx(id), id);
   const voice = async (on: boolean) => {
     await page.keyboard.press("Meta+Comma");
     const sw = page.getByRole("switch", { name: "Mole’s voice" });
