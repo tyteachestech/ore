@@ -1,55 +1,64 @@
 import { useSyncExternalStore } from "react";
-import { PHONE } from "./ore";
 import { load, save } from "./util";
 
 /* Review's sounds (D277): one short sound on each key moment of a review and nowhere else. Showing
    the answer is a pickaxe tick, a recall a gem's shine, a miss a gem chipping, the day's goal a chime; the end screen
    has the cart's roll, the mole's pop and a closing jingle. Nothing plays on undo, Later, an edit or any other key.
    The files are ElevenLabs output, kept out of git and taken from the Mac's sounds folder as the radio's are (D254,
-   vite.config.ts): one that is missing is just silent. Settings › Review › Sound turns them off. */
+   vite.config.ts): one that is missing is just silent. The iPhone build carries them too. Settings › Review › Sound
+   has a switch for the sound effects and one for the mole. */
 
 export const SFX = ["tap", "right", "missed", "goal", "cart", "pop", "done"] as const;
 export type Sfx = (typeof SFX)[number];
+/** The mole's voice (D330): what he says aloud as he comes up at a session's end, and only on a day worth a word
+ *  (`endVoice` in end-says.ts). Files `vo-<line>.mp3`, kept beside the others. */
+export const VOICE = ["cheer", "happy", "proud", "surprised", "curious"] as const;
+export type MoleLine = (typeof VOICE)[number];
+export type Sound = Sfx | MoleLine;
+/** The mole's own: his voice and the pop as he comes up. Settings turns these off apart from the rest. */
+const moles = (id: Sound) => id === "pop" || (VOICE as readonly string[]).includes(id);
+const file = (id: Sound) => `${(VOICE as readonly string[]).includes(id) ? "vo" : "fx"}-${id}`;
 
-const KEY = "ore.sounds";
-let on = load(KEY) !== "off";
-const subs = new Set<() => void>();
-export const soundsOn = () => on;
-export const useSounds = () => useSyncExternalStore((f) => (subs.add(f), () => void subs.delete(f)), soundsOn);
-export function setSounds(v: boolean) {
-  on = v;
-  save(KEY, v ? "on" : "off");
-  subs.forEach((f) => f());
+/** A switch in Settings, kept on this device. The quick quiz is a window of its own: a change reaches it too. */
+function kept(key: string) {
+  let on = load(key) !== "off";
+  const subs = new Set<() => void>();
+  const tell = () => subs.forEach((f) => f());
+  if (typeof window !== "undefined")
+    window.addEventListener("storage", (e) => {
+      if (e.key !== key) return;
+      on = e.newValue !== "off";
+      tell();
+    });
+  const get = () => on;
+  return { get, use: () => useSyncExternalStore((f) => (subs.add(f), () => void subs.delete(f)), get), set: (v: boolean) => (on = v, save(key, v ? "on" : "off"), tell()) };
 }
-
-// The quick quiz is a window of its own: a change in Settings reaches it too.
-if (typeof window !== "undefined")
-  window.addEventListener("storage", (e) => {
-    if (e.key !== KEY) return;
-    on = e.newValue !== "off";
-    subs.forEach((f) => f());
-  });
+const effects = kept("ore.sounds"), voice = kept("ore.voice");
+export const useSounds = effects.use, setSounds = effects.set;
+export const useVoice = voice.use, setVoice = voice.set;
+const allowed = (id: Sound) => (moles(id) ? voice : effects).get();
 
 /** How loud they play against the files' own level: under the radio and anything else he has on. */
 const LEVEL = 0.6;
 /** `rate` 1 is the file as it is, higher plays it higher; `after` is seconds from now. */
 type Opts = { rate?: number; after?: number };
-type Player = (id: Sfx, o: Required<Opts>) => void;
+type Player = (id: Sound, o: Required<Opts>) => void;
 
 /** The sounds this build has (vite.config.ts): one whose file was not on the Mac at build time is never asked for. */
 declare const __ORE_FX__: string[] | undefined;
-const HAVE = PHONE || typeof __ORE_FX__ === "undefined" || typeof AudioContext !== "function" ? [] : __ORE_FX__;
+const HAVE = typeof __ORE_FX__ === "undefined" || typeof AudioContext !== "function" ? [] : __ORE_FX__;
 let ctx: AudioContext | null = null;
-const buffers = new Map<Sfx, Promise<AudioBuffer | null>>();
+const buffers = new Map<Sound, Promise<AudioBuffer | null>>();
 function audio() {
   ctx ??= new AudioContext();
-  if (ctx.state === "suspended") void ctx.resume();
+  // Not only "suspended": iOS leaves it "interrupted" after a call or a trip to another app.
+  if (ctx.state !== "running") void ctx.resume();
   return ctx;
 }
-function buffer(id: Sfx) {
+function buffer(id: Sound) {
   let b = buffers.get(id);
   if (!b) {
-    b = fetch(`/sounds/fx-${id}.mp3`)
+    b = fetch(`/sounds/${file(id)}.mp3`)
       .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
       .then((a) => audio().decodeAudioData(a))
       .catch(() => null);
@@ -58,14 +67,14 @@ function buffer(id: Sfx) {
   return b;
 }
 const webAudio: Player = (id, { rate, after }) => {
-  if (!HAVE.includes(id)) return; // the iPhone build carries no sound files
+  if (!HAVE.includes(id)) return;
   // Made and woken here, inside his key or click: WebKit leaves a context asleep that was woken outside one.
   audio();
   const due = performance.now() + after * 1000;
   const play = (buf: AudioBuffer | null) => {
     // A sound that loaded too late for its moment is dropped: late, it would land on something else.
     const wait = (due - performance.now()) / 1000;
-    if (!buf || !on || hidden() || wait < -0.3) return;
+    if (!buf || !allowed(id) || hidden() || wait < -0.3) return;
     const c = audio(), src = c.createBufferSource(), gain = c.createGain();
     src.buffer = buf;
     src.playbackRate.value = rate;
@@ -74,9 +83,9 @@ const webAudio: Player = (id, { rate, after }) => {
     const at = c.currentTime + Math.max(0, wait);
     // A quick fade, not a click, where the next sound cuts this one.
     const cut = (t: number) => (gain.gain.setTargetAtTime(0, t, 0.01), src.stop(t + 0.05));
-    src.start(FEEDBACK.includes(id) ? take(at, buf.duration / rate, id === "goal", cut) : at);
+    src.start(feedback(id) ? take(at, buf.duration / rate, id === "goal", cut) : at);
   };
-  if (FEEDBACK.includes(id)) void inOrder(buffer(id), play);
+  if (feedback(id)) void inOrder(buffer(id), play);
   else void buffer(id).then(play);
 };
 
@@ -85,11 +94,12 @@ const hidden = () => typeof document !== "undefined" && document.hidden;
 
 /** The sounds that answer him during a review. At most one plays at a time: rating fast, each new one cuts the one
  *  still playing, so they never pile up (four at once, Codex sweep 5); the goal's chime waits for the rating's sound to end. */
-const FEEDBACK: Sfx[] = ["tap", "right", "missed", "goal"];
-type Voice = { start: number; end: number; cut: (at: number) => void };
+const FEEDBACK: Sound[] = ["tap", "right", "missed", "goal"];
+const feedback = (id: Sound) => FEEDBACK.includes(id);
+type Slot = { start: number; end: number; cut: (at: number) => void };
 /** The tick, recall or miss last placed, and the goal's chime, which may still be waiting its turn. */
-let sounding: Voice | null = null;
-let goal: Voice | null = null;
+let sounding: Slot | null = null;
+let goal: Slot | null = null;
 /** When a feedback sound asked for `at` (audio clock seconds) and lasting `length` starts. A tick, recall or miss
  *  starts at once and cuts whatever is sounding then; the goal (`waits`) starts once the sound before it has ended,
  *  and is never cut while it waits for its turn, only once it is sounding. */
@@ -117,11 +127,14 @@ export const setPlayer = (p: Player | null) => void (player = p ?? webAudio);
 
 /** Reads the files ahead of the first moment, so the first tick isn't late. */
 export function warm() {
-  if (on) for (const id of HAVE) void buffer(id as Sfx);
+  for (const id of HAVE as Sound[]) if (allowed(id)) void buffer(id);
 }
 
-export function sfx(id: Sfx, o: Opts = {}) {
-  if (!on || hidden()) return;
+export function sfx(id: Sound, o: Opts = {}) {
+  // The mole's sounds have no key or click of their own, and WebKit only wakes audio inside one: with the sound
+  // effects off, their moments still wake it for him.
+  if (!allowed(id)) return void (player === webAudio && HAVE.length && voice.get() && audio());
+  if (hidden()) return;
   // The journeys' ear: `window.__ORE_SFX = []` collects what played.
   if (import.meta.env?.DEV) (globalThis as { __ORE_SFX?: string[] }).__ORE_SFX?.push(id);
   player(id, { rate: o.rate ?? 1, after: o.after ?? 0 });

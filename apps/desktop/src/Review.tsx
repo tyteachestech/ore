@@ -10,7 +10,7 @@ import { EndMark } from "./EndMark";
 import { SkillIcon } from "./IconPicker";
 import { Mole, Mound } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
-import { newSession, rated, sfx, warm, type Sfx } from "./sfx";
+import { newSession, rated, sfx, warm, type Sound } from "./sfx";
 import { still } from "./SideCursor";
 import { Hint } from "./Hint";
 import { MoreButton } from "./Menu";
@@ -20,7 +20,7 @@ import { ownsUndo } from "./history";
 import { afterAnswer, cardQuotes, lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { PixelTry } from "./PixelIcon";
 import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
-import { endMood, endSays, endTiles, weeksAgo, type Tile } from "./end-says";
+import { endMood, endSays, endTiles, endVoice, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { LapCentre, lapPlan, overDots, Sparkles, useLap } from "./Lap";
@@ -1725,8 +1725,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
   const full = stage !== "cart";
   // The end screen's sounds (D277): the cart rolling in, the jingle as the ring fills, and the mole's pop as he comes up (260ms into his rise).
   // Each once: an effect can run again for the same moment (React's strict mode runs a mount's twice).
-  const played = useRef(new Set<Sfx>());
-  const once = (id: Sfx, after = 0) => void (!played.current.has(id) && (played.current.add(id), sfx(id, { after })));
+  const played = useRef(new Set<Sound>());
+  const once = (id: Sound, after = 0) => void (!played.current.has(id) && (played.current.add(id), sfx(id, { after })));
   useEffect(() => void (pour && once("cart")), []);
   useEffect(() => void (full && once("done")), [full]);
   useEffect(() => void (risen && !quick && !still() && once("pop", 0.26)), [risen]);
@@ -1773,6 +1773,9 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
   });
   const tiles = endTiles({ session: s, ups: named });
   // His pose is for the line he says (D258).
+  // He says a word aloud as he takes it, on the few days that earn one (D330); the quick quiz has no mole.
+  const aloud = quick ? null : endVoice(said[0], { session: s, closed, napped: nap });
+  useEffect(() => void (settled && aloud && once(aloud, 0.1)), [settled]);
   const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
   // D274: the full end screen's ring holds the day's minutes, and minutes past the goal go round again.
   // Gems the session cut are cut in the ring first (D239), then make way for the minutes; they wait for the

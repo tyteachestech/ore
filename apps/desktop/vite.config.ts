@@ -126,13 +126,15 @@ const textImports: Plugin = {
 // point it at their own tones). Served as /sounds/<id>.mp3 in dev and written into the build when they are there;
 // a channel with no file says so in the app.
 const SOUNDS = process.env.ORE_SOUNDS ?? join(homedir(), "Library/Application Support/Ore/sounds");
-// The `fx-` ones are Review's sounds (src/sfx.ts).
-const SOUND_IDS = ["cave", "rain", "lamp", "deep", "focus", ...["tap", "right", "missed", "goal", "cart", "pop", "done"].map((id) => `fx-${id}`)];
+// The `fx-` ones are Review's sounds and the `vo-` ones the mole's voice (src/sfx.ts): the iPhone build carries
+// those and leaves the radio's loops, which it has no player for.
+const FX_IDS = [...["tap", "right", "missed", "goal", "cart", "pop", "done"].map((id) => `fx-${id}`), ...["cheer", "happy", "proud", "surprised", "curious"].map((id) => `vo-${id}`)];
+const SOUND_IDS = [...(PHONE ? [] : ["cave", "rain", "lamp", "deep", "focus"]), ...FX_IDS];
 const soundFile = (id: string) => join(SOUNDS, `${id}.mp3`);
 const ambienceSounds: Plugin = {
   name: "ambience-sounds",
   // Review's sounds ask only for the files that are here (src/sfx.ts): a build without them asks for none.
-  config: () => ({ define: { __ORE_FX__: JSON.stringify(SOUND_IDS.filter((id) => id.startsWith("fx-") && existsSync(soundFile(id))).map((id) => id.slice(3))) } }),
+  config: () => ({ define: { __ORE_FX__: JSON.stringify(FX_IDS.filter((id) => existsSync(soundFile(id))).map((id) => id.slice(3))) } }),
   configureServer(server) {
     server.middlewares.use("/sounds", (req, res, next) => {
       const id = (req.url ?? "").split("?")[0]!.replace(/^\//, "").replace(/\.mp3$/, "");
@@ -155,7 +157,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     pixelSkillIcons,
-    ...(PHONE ? [] : [ambienceSounds]),
+    ambienceSounds,
     ...(PHONE ? [dynamicType] : []),
     ...(PHONE ? [phoneLibrary, textImports] : []),
   ],

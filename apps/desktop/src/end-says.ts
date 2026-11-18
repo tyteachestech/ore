@@ -1,4 +1,5 @@
 import type { Mood } from "./Mole";
+import { VOICE, type MoleLine } from "./sfx";
 import { depthParts, depthText, longGapText, rescuedWorthSaying, type SessionEnd, type Today } from "./ore";
 
 /** One of the end screen's results (D252): a number, what it counts, and for a rare one what kind. */
@@ -58,6 +59,16 @@ export function endMood(first: Said | undefined, o: { session: SessionEnd; close
   if (rare) return rare === "level" ? "cheer" : rare === "then" ? "curious" : rare === "long" ? (o.napped ? "nod" : "surprised") : "proud";
   if (o.session.kept === 0) return "nod";
   return o.session.cut?.length || o.closed ? "happy" : "nod";
+}
+
+/** What the mole says aloud as he takes that pose (D330), or null: most sessions end without a word from
+ *  him, so the ones that have one stand out. He speaks for a skill's new level, a rare recall (then and now, a long
+ *  gap, memories pulled back in time) and the session that met the day's goal, so at most once a day for the goal.
+ *  An ordinary session and a session of misses are silent, as his nod is. */
+export function endVoice(first: Said | undefined, o: { session: SessionEnd; closed: boolean; napped?: boolean }): MoleLine | null {
+  const mood = endMood(first, o);
+  if (mood === "happy") return o.closed ? "happy" : null;
+  return (VOICE as readonly string[]).includes(mood) ? (mood as MoleLine) : null;
 }
 
 /** The end screen's row of results (D252), three at most, always in this order: memories kept, the

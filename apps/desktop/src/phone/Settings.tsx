@@ -3,7 +3,8 @@
 // phone twin; reading looks are set in the reader's Aa. Every change saves at once, with Undo.
 import * as Switch from "@radix-ui/react-switch";
 import { useEffect, useRef, useState } from "react";
-import { goalOptions, Group, newOptions, PlanField, REMINDER_TEXT, Row, Seg } from "../Settings";
+import { goalOptions, Group, newOptions, PlanField, REMINDER_TEXT, Row, Seg, VOICE_TEXT } from "../Settings";
+import { setSounds, setVoice, useSounds, useVoice } from "../sfx";
 import { ore, opt, pullFromMac } from "../ore";
 import { errorText, type Notify } from "../util";
 import { syncState } from "./fs";
@@ -20,6 +21,7 @@ const FIRST_TIME = "09:00";
 export function PhoneSettings({ reload, onPulled, notify }: { reload: number; onPulled: () => void; notify: Notify }) {
   const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const sounds = useSounds(), voice = useVoice();
   useEffect(() => {
     ore<{ review: Review }>("settings").then((d) => setReview(d.review), (e) => setError(errorText(e)));
   }, [reload]);
@@ -82,6 +84,18 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
           </Group>
         </>
       )}
+      <Group title="Sound">
+        <Row title="Sound effects" text="A short sound when you show an answer, rate it, reach your goal and finish." htmlFor="sounds">
+          <Switch.Root id="sounds" className="switch" checked={sounds} onCheckedChange={setSounds}>
+            <Switch.Thumb className="switch-thumb" />
+          </Switch.Root>
+        </Row>
+        <Row title="Mole’s voice" text={VOICE_TEXT} htmlFor="voice">
+          <Switch.Root id="voice" className="switch" checked={voice} onCheckedChange={setVoice}>
+            <Switch.Thumb className="switch-thumb" />
+          </Switch.Root>
+        </Row>
+      </Group>
       <Group title="iCloud">
         <Sync onPulled={onPulled} />
       </Group>

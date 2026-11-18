@@ -1,13 +1,16 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { inOrder, newSession, rated, setPlayer, setSounds, sfx, SFX, take } from "../src/sfx";
+import { endVoice } from "../src/end-says";
+import type { SessionEnd } from "../src/ore";
+import { inOrder, newSession, rated, setPlayer, setSounds, setVoice, sfx, SFX, take, VOICE } from "../src/sfx";
 
 // Review's sounds (D277): which moment plays what, read off the player in place of the speakers.
 let heard: [string, number][] = [];
 beforeEach(() => {
   heard = [];
   setSounds(true);
+  setVoice(true);
   newSession();
   setPlayer((id, o) => heard.push([id, Math.round(Math.log2(o.rate) * 12)]));
 });
@@ -34,6 +37,7 @@ describe("review sounds", () => {
 
   test("turned off in Settings, nothing plays, and the climb still starts over on a miss", () => {
     setSounds(false);
+    setVoice(false);
     for (const id of SFX) sfx(id);
     rated(3);
     rated(1);
@@ -51,9 +55,41 @@ describe("review sounds", () => {
     expect(review.match(/\brated\(/g)?.length).toBe(1);
   });
 
+  // D330
+  test("the mole's switch silences his voice and his pop and nothing else; the sound effects' switch leaves him be", () => {
+    setVoice(false);
+    for (const id of [...SFX, ...VOICE]) sfx(id);
+    expect(heard.map((h) => h[0])).toEqual(SFX.filter((id) => id !== "pop"));
+    heard = [];
+    setVoice(true);
+    setSounds(false);
+    for (const id of [...SFX, ...VOICE]) sfx(id);
+    expect(heard.map((h) => h[0])).toEqual(["pop", ...VOICE]);
+  });
+
+  test("the mole speaks only at a session's end worth a word: a new level, a rare recall, the day's goal met", () => {
+    const s = (o: Partial<SessionEnd> = {}) => ({ kept: 5, ...o }) as SessionEnd;
+    const voice = (first: Parameters<typeof endVoice>[0], o: Partial<Parameters<typeof endVoice>[1]> = {}) => endVoice(first, { session: s(), closed: false, ...o });
+    expect(voice({ text: "", rare: { kind: "level", skill: "x" } })).toBe("cheer");
+    expect(voice({ text: "", rare: { kind: "then" } })).toBe("curious");
+    expect(voice({ text: "", rare: { kind: "long" } })).toBe("surprised");
+    expect(voice({ text: "", rare: { kind: "rescued" } })).toBe("proud");
+    expect(voice({ text: "", verdict: true }, { closed: true })).toBe("happy");
+    // Silent: an ordinary session, one that only cut gems, a session of misses (even one that met the goal), and
+    // the long gap he nods at after falling off the cart.
+    expect(voice({ text: "", verdict: true })).toBeNull();
+    expect(voice({ text: "", verdict: true }, { session: s({ cut: ["x"] }) })).toBeNull();
+    expect(voice({ text: "", verdict: true }, { session: s({ kept: 0 }), closed: true })).toBeNull();
+    expect(voice({ text: "", rare: { kind: "long" } }, { napped: true })).toBeNull();
+    // One place in Review plays it, as he takes his pose; no other screen has his voice.
+    const review = readFileSync(join(import.meta.dir, "../src/Review.tsx"), "utf8");
+    expect(review.match(/\bendVoice\(/g)?.length).toBe(1);
+    expect(review.match(/once\(aloud\b/g)?.length).toBe(1);
+  });
+
   test("the build takes every sound from the Mac's folder, never from git", () => {
     const config = readFileSync(join(import.meta.dir, "../vite.config.ts"), "utf8");
-    for (const id of SFX) expect(config).toContain(`"${id}"`);
+    for (const id of [...SFX, ...VOICE]) expect(config).toContain(`"${id}"`);
     expect(readFileSync(join(import.meta.dir, "../../../.gitignore"), "utf8")).toContain("apps/desktop/public/sounds/");
   });
 
