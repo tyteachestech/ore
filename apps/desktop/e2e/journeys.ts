@@ -4637,7 +4637,7 @@ journey("Review: Done after the last due exercise leaves focus on a control Home
       await page.getByRole("button", { name: "Good", exact: true }).click();
       await until("the next exercise or the end", async () => app.rated.length === n + 1);
       await page.waitForTimeout(150);
-      // On a slow run neither is drawn yet 150 ms after a rating, and the loop took that gap for the end (F400).
+      // On a slow run neither is drawn yet 150 ms after a rating, and the loop took that gap for the end (F401).
       await until("the next exercise or the end screen is drawn", async () => (await page.locator(".review-q, .review-end").count()) > 0);
     }
     const done = page.locator(".review-foot").getByRole("button", { name: "Done" });
