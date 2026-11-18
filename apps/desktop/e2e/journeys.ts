@@ -7636,6 +7636,27 @@ journey("review sounds: showing the answer ticks and a rating shines, ⌘Z is si
   } finally {
     await sounds(true);
   }
+  // The mole has a switch of his own (D-new-mole-voice): off, his pop is silent and the sound effects still play.
+  const play = (id: string) => page.evaluate(async (id) => (await import("/src/sfx.ts")).sfx(id), id);
+  const voice = async (on: boolean) => {
+    await page.keyboard.press("Meta+Comma");
+    const sw = page.getByRole("switch", { name: "Mole’s voice" });
+    if (((await sw.getAttribute("aria-checked")) === "true") !== on) await sw.click();
+    await until(`Mole’s voice is ${on ? "on" : "off"}`, async () => ((await sw.getAttribute("aria-checked")) === "true") === on);
+    await page.keyboard.press("Escape");
+    await page.getByRole("dialog", { name: "Settings" }).waitFor({ state: "detached" });
+  };
+  await voice(false);
+  try {
+    await play("pop");
+    await play("cheer");
+    await play("done");
+    if ((await heard()) !== "tap right done") throw new Error(`with Mole’s voice off: “${await heard()}”`);
+  } finally {
+    await voice(true);
+  }
+  await play("cheer");
+  if ((await heard()) !== "tap right done cheer") throw new Error(`with Mole’s voice on: “${await heard()}”`);
 });
 
 journey("review: at a session's end the cart tips its ore into the ring and leaves, the mole comes up after, and Reduce Motion skips it (D190)", async (page) => {
