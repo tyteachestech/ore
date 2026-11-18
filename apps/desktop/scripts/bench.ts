@@ -170,8 +170,11 @@ const steps: [string, (page: Page) => Promise<Result>][] = [
       for (let i = 0; i < 5 && (await q.isVisible()); i++) {
         // An Explain card shows its answer on No idea, a Fact card on how sure he is.
         const noIdea = page.getByRole("button", { name: "No idea" });
-        await ((await noIdea.isVisible()) ? noIdea : page.getByRole("radio", { name: "Think so" }).first()).click();
-        await page.getByRole("button", { name: "Good", exact: true }).click();
+        const none = await noIdea.isVisible();
+        await (none ? noIdea : page.getByRole("radio", { name: "Think so" }).first()).click();
+        // Good over No idea waits for a second press (D237), so the ratings stayed up and the step timed out whenever
+        // an Explain card was among the five (F67). Hard is one step over a miss: one press rates it.
+        await page.getByRole("button", { name: none ? "Hard" : "Good", exact: true }).click();
         // The next card (it opens on its answer, so the ratings go), or the end of the session. Not the question's
         // text: the scaled seed repeats questions, so two cards in a row can read the same and the wait never ends.
         await page.getByRole("button", { name: "Good", exact: true }).waitFor({ state: "detached" });
