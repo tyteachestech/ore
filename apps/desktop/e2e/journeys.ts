@@ -15439,6 +15439,45 @@ async function swipe(page: Page, from: [number, number], to: [number, number], m
   }, [...from, ...to, ms, scrolls ? 1 : 0]);
 }
 
+journey("phone: the reader's bars go as he scrolls down, stay away as he scrolls back up, and a single tap on the text brings them back and sends them away (D156)", async (page) => {
+  // Tyler 2026-11-18: the bars came back on every scroll up, over the text he was rereading. Books shows them on a tap.
+  const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
+  const body = Array.from({ length: 30 }, (_, i) => `## Part ${i + 1} of the tapped book\n\nRetrieval practice ${i + 1} is the act of pulling information out of memory. It works.\n`).join("\n");
+  await phoneWith(page, async () => (await createItem({ root: PHONE_LIB }, { type: "article", title: "A book of tapped parts", body })).dir, async () => {
+    await phoneSource(page, "A book of tapped parts");
+    const hidden = () => page.locator(".phone-reader .reader").first().evaluate((r) => r.classList.contains("bars-hidden"));
+    // His finger's scroll: a touchmove on the text, then the text moves (Playwright's touchscreen only taps).
+    const scroll = (by: number) => page.evaluate(async (by) => {
+      const el = document.querySelector(".phone-reader .reader-scroll")!;
+      for (let i = 0; i < 4; i++) {
+        el.dispatchEvent(Object.assign(new Event("touchmove", { bubbles: true }), { touches: [], changedTouches: [] }));
+        el.scrollTop += by / 4;
+        await new Promise((r) => setTimeout(r, 40));
+      }
+    }, by);
+    await Bun.sleep(400);
+    await scroll(600);
+    await until("a scroll down hides the bars", hidden);
+    await scroll(-200);
+    await Bun.sleep(400);
+    if (!(await hidden())) throw new Error("a scroll back up brought the bars over the text");
+    await Bun.sleep(300); // a tap that stops a scroll is no tap
+    const p = await pointAt(page, "practice 12 is", ".phone-reader .doc");
+    await page.touchscreen.tap(p.x, p.y);
+    await until("a single tap brings the bars back", async () => !(await hidden()));
+    await Bun.sleep(400);
+    await page.touchscreen.tap(p.x, p.y);
+    await until("a second single tap sends them away", hidden);
+    await Bun.sleep(400);
+    // A double tap highlights its paragraph and leaves the bars as they were.
+    await page.touchscreen.tap(p.x, p.y);
+    await page.touchscreen.tap(p.x, p.y);
+    await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+    await Bun.sleep(500);
+    if (!(await hidden())) throw new Error("a double tap toggled the bars");
+  });
+}, "phone");
+
 journey("phone: Sections opens low with the text above it, pulls up to the top of the screen when the outline is long, and a pull down brings it back, then closes (D316)", async (page) => {
   const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
   const body = Array.from({ length: 30 }, (_, i) => `## Part ${i + 1} of the long book\n\nRetrieval practice is the act of pulling information out of memory. `.repeat(1) + "It works.\n").join("\n");
