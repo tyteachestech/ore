@@ -906,7 +906,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
         <div className="tutor-perch">
           <span className="tutor-mole"><Mole bare size={36} mood={busy ? "thinking" : landed ? (landed.failed ? "surprised" : "happy") : "idle"} cue={landed?.id} signal={writing} /></span>
         </div>
-        {/* What he pointed the chat at is a row of chips inside the field, over his words (Notion, Fabric; D327).
+        {/* What he pointed the chat at is a row of chips inside the field, over his words (Notion, Fabric; D328).
             A press on the row's bare edge goes to the words, as a field's padding does. */}
         <div
           className="ask-input"

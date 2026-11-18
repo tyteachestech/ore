@@ -299,7 +299,7 @@ const browser = await chromium.launch();
  *  build in WebKit with touch (openPhone). */
 type Engine = "chromium" | "webkit" | "phone";
 let safari: Browser | undefined;
-// A chip's × shows only under the pointer or keyboard focus (D327), so it is pressed as he would: over the chip first.
+// A chip's × shows only under the pointer or keyboard focus (D328), so it is pressed as he would: over the chip first.
 async function unchip(tutor: Locator, name: string) {
   const x = tutor.getByRole("button", { name });
   await tutor.locator(".tutor-chip", { has: tutor.page().getByRole("button", { name }) }).hover();

@@ -3631,7 +3631,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor .field.ask-edit { display: block; align-self: flex-end; width: 80%; border-radius: 14px 14px 4px 14px; }
 .tutor-stopped { margin: 0; color: var(--muted); }
 .tutor-stopped .link { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
-/* What the chat is pointed at (D327): a row of chips inside the field, over his words (Notion, Fabric,
+/* What the chat is pointed at (D328): a row of chips inside the field, over his words (Notion, Fabric,
    Copilot). The frame moves from the textarea to the wrapper so chips and words share one field; every edge stays where
    it was (the textarea's border is now the wrapper's). A chip's × shows on hover or focus, so the name leads. */
 .tutor .ask-input { background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 10px; cursor: text; transition: border-color var(--t-1), box-shadow var(--t-1); }
