@@ -636,7 +636,10 @@ test("on the full end screen the mole never says a number the row under the ring
 // F134
 test("the memory line ends by saying in words when the next review falls for the rating in hand", async () => {
   const { Timeline } = await import("../src/Timeline");
-  const at = (days: number) => new Date(Date.now() + days * 864e5 + 6e4).toISOString();
+  // Days are counted on the calendar, so the dates sit at noon: a minute past now is tomorrow in the day's last
+  // minute, and "21 days" read 22 on a run at 23:59 (F398).
+  const noon = new Date().setHours(12, 0, 0, 0);
+  const at = (days: number) => new Date(noon + days * 864e5).toISOString();
   const history = { reviews: [{ ts: at(-9), rating: 3 }], next: { 1: at(0), 2: at(4), 3: at(21), 4: at(40) } } as never;
   const body = document.createElement("div");
   document.body.appendChild(body);
