@@ -301,7 +301,6 @@ img.thumb { filter: brightness(0.86); }
 .thumb-line::before, .thumb-line::after { content: ""; position: absolute; left: 0; bottom: 0; height: 3px; }
 .thumb-line::before { right: 0; background: rgba(255, 255, 255, 0.3); }
 .thumb-line::after { width: calc(var(--at) * 100%); background: #fff; }
-.home-meter .thumb-line { display: none; }
 .row .col { flex: none; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .row .col.added { width: 11ch; text-align: right; }
 .row .col.site { width: 16ch; }
@@ -2197,7 +2196,6 @@ button.home-plan:hover { color: var(--text); }
 .home-level { display: flex; align-items: center; gap: 8px; }
 .home-lv { flex: none; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .home-meter { flex: 1; height: 6px; border-radius: 4px; background: var(--bg-active); overflow: hidden; }
-.home-meter.small { flex: none; width: 64px; height: 4px; }
 /* A source added and not opened yet, in the meter's place: the section head's quiet label, no colour (it is no intent). */
 .home-new { flex: none; width: 64px; text-align: right; font-size: 12px; color: var(--faint); }
 :root:not(.phone) .home-read:hover .home-new, .home-read:has(.more[aria-expanded="true"]) .home-new { visibility: hidden; }
@@ -2208,7 +2206,9 @@ button.home-plan:hover { color: var(--text); }
 .home-read { display: flex; align-items: center; gap: 12px; height: var(--row); padding: 0 12px; border-radius: var(--radius); text-align: left; color: var(--text); min-width: 0; }
 .home-read:hover { background: var(--bg-hover); }
 .home-read.sel { background: var(--bg-active); }
-/* A row's or tile's ⋯ shows on hover (Linear); on a row it takes the meter's place. */
+/* A row's or tile's ⋯ shows on hover (Linear). A row keeps its room at the right, where New sits on a source not
+   opened yet, so the skill pills never run under it. */
+:root:not(.phone) .home-read:not(:has(.home-new))::after { content: ""; flex: none; width: 24px; }
 .home-read { position: relative; }
 .home-read .more { position: absolute; width: 24px; height: 24px; border-radius: 6px; display: none; place-items: center; color: var(--faint); }
 .home-read .more { right: 12px; top: 50%; transform: translateY(-50%); }
@@ -2219,7 +2219,6 @@ button.home-plan:hover { color: var(--text); }
 .home-skill .more:hover, .home-skill .more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 :root:not(.phone) .home-read:hover .more, .home-read .more:focus-visible, .home-read .more[aria-expanded="true"] { display: grid; }
 .home-read .more:hover, .home-read .more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
-:root:not(.phone) .home-read:hover .home-meter.small, .home-read:has(.more[aria-expanded="true"]) .home-meter.small { visibility: hidden; }
 .home-read:has(.home-open:focus-visible) { box-shadow: inset 0 0 0 1px var(--focus); }
 /* The title comes first: long skill pills give way to it, ending in … (DESIGN: long text). */
 .home-read .chips-button { max-width: 40%; }
@@ -3005,9 +3004,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .home-read .title > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .phone .home-read:has(.course-of) .title { grid-row: 1; align-self: end; }
 .phone .home-read .course-of { grid-area: 2 / 2; max-width: none; align-self: start; }
-.phone .home-read .home-meter.small { grid-area: 1 / 1 / 3 / 2; align-self: end; z-index: 1; position: relative; width: 112px; height: 7px; background: none; border-radius: 0 0 6px 6px; overflow: hidden; }
-.phone .home-read .home-meter .dot-bar { display: none; }
-.phone .home-read .home-meter .thumb-line { display: block; }
+.phone .home-read .thumb-at { grid-area: 1 / 1 / 3 / 2; }
 .phone .home-read .home-new { grid-area: 1 / 1 / 3 / 2; align-self: end; justify-self: start; z-index: 1; width: auto; margin: 0 0 5px 5px; padding: 3px 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.72); color: #fff; font: 500 11px/1 var(--mono); }
 .phone .home-skills { display: flex; flex-direction: column; gap: 0; }
 .phone .home-skill { flex-direction: row; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--border); margin: 0; padding: 0; min-height: 56px; }

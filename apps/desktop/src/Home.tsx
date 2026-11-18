@@ -464,7 +464,14 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 // the skill chips and ⋯ sit beside it. A click anywhere else on the row still opens it.
                 <WithMenu key={i.id} actions={sourceMenu ? () => actionsFor(i) : []} hold>
                 <HomeRow id={i.id} drags={!!onDropOnSkill && renaming !== i.id} className={`home-read${picked.includes(i.id) ? " sel" : ""}`} aria-selected={picked.length ? picked.includes(i.id) : undefined} onClick={(e) => !(e.target as Element).closest("button, a, input, .chips, .more") && clickRow(e, i)}>
-                  <Thumb item={i} iconSize={16} />
+                  {/* How far he is, as a line on the picture's foot (D327); the hint says it in words. */}
+                  {isNew(i) ? (
+                    <span className="thumb-at"><Thumb item={i} iconSize={16} /></span>
+                  ) : (
+                    <Hint text={`${Math.round(at * 100)}% read`}>
+                      <span className="thumb-at"><Thumb item={i} iconSize={16} /><ThumbLine share={at} /></span>
+                    </Hint>
+                  )}
                   {renaming === i.id ? (
                     // Focus goes back to the row once it closes, as after any pick from its menu (keepFocusNear).
                     <TitleField value={i.title} onSave={(t) => onRename!(i, t)} onClose={() => {
@@ -481,16 +488,9 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                       {i.skills.length > 0 && <SkillChips ids={i.skills} skills={skills} />}
                     </SkillPicker>
                   )}
-                  {isNew(i) ? (
-                    // Not opened yet: where the others show how far he is, this one says it is new.
-                    <span className="home-new">New</span>
-                  ) : (
-                    <Hint text={`${Math.round(at * 100)}% read`}>
-                      {/* The hint needs an element to hold its ref, so the bar sits in a span. */}
-                      <span className="home-meter small"><DotBar className="" share={at} n={10} /><ThumbLine share={at} /></span>
-                    </Hint>
-                  )}
-                  {/* On hover the ⋯ takes the meter's place, as on every other row (Linear). */}
+                  {/* Not opened yet: where the others show how far he is, this one says it is new. */}
+                  {isNew(i) && <span className="home-new">New</span>}
+                  {/* The ⋯ shows on hover, as on every other row (Linear). */}
                   {sourceMenu && <MoreButton label="Source actions" actions={() => actionsFor(i)} hoverOnly />}
                 </HomeRow>
                 </WithMenu>

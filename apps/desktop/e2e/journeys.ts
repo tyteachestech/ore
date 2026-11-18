@@ -13275,8 +13275,8 @@ journey("phone: a hover on a Today row or skill shows or hides nothing, so one t
   const row = page.locator(".home-read").first();
   await row.waitFor();
   await row.hover();
-  const read = await row.evaluate((el) => ({ more: getComputedStyle(el.querySelector(".more")!).display, meter: el.querySelector(".home-meter") ? getComputedStyle(el.querySelector(".home-meter")!).visibility : "visible" }));
-  if (read.more !== "none" || read.meter !== "visible") throw new Error(`a hover on a Today row changes it: ⋯ ${read.more}, dots ${read.meter}`);
+  const read = await row.evaluate((el) => ({ more: getComputedStyle(el.querySelector(".more")!).display, meter: el.querySelector(".thumb-line, .home-new") ? getComputedStyle(el.querySelector(".thumb-line, .home-new")!).visibility : "visible" }));
+  if (read.more !== "none" || read.meter !== "visible") throw new Error(`a hover on a Today row changes it: ⋯ ${read.more}, the reading line ${read.meter}`);
   const skill = page.locator(".home-skill").first();
   await skill.hover();
   const more = await skill.evaluate((el) => (el.querySelector(".more") ? getComputedStyle(el.querySelector(".more")!).visibility : "hidden"));
