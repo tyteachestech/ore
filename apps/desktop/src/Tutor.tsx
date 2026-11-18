@@ -902,55 +902,65 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
           </div>
         )}
         {/* The one mole (D186): it peeks over the field's edge, wonders while a reply is written and hops when one lands;
-            the newest bubble's tail points down at it. What he pointed the chat at sits beside it. */}
+            the newest bubble's tail points down at it. */}
         <div className="tutor-perch">
           <span className="tutor-mole"><Mole bare size={36} mood={busy ? "thinking" : landed ? (landed.failed ? "surprised" : "happy") : "idle"} cue={landed?.id} signal={writing} /></span>
-          {chips}
         </div>
-        <div className="ask-input">
-          <Grow
-            ref={field}
-            rows={1}
-            className="field"
-            aria-label="Message the tutor"
-            onPaste={pasteFiles}
-            placeholder={files.length ? "Ask about it…" : turns.length ? "Reply…" : context || scope ? "Ask about this, or @ a source or skill…" : "Ask anything, or @ a source or skill…"}
-            value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              track(e.target.value, e.target.selectionStart);
-            }}
-            onSelect={(e) => at && track(e.currentTarget.value, e.currentTarget.selectionStart)}
-            onKeyDown={(e) => {
-              if (at && !e.nativeEvent.isComposing) {
-                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                  e.preventDefault();
-                  if (matches.length) setPick((p) => (p + (e.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
-                  return;
+        {/* What he pointed the chat at is a row of chips inside the field, over his words (Notion, Fabric; D327).
+            A press on the row's bare edge goes to the words, as a field's padding does. */}
+        <div
+          className="ask-input"
+          onMouseDown={(e) => {
+            const at = e.target as HTMLElement;
+            if (at === e.currentTarget || at.classList.contains("tutor-chips")) { e.preventDefault(); field.current?.focus(); }
+          }}
+        >
+          {chips}
+          <div className="ask-line">
+            <Grow
+              ref={field}
+              rows={1}
+              className="field"
+              aria-label="Message the tutor"
+              onPaste={pasteFiles}
+              placeholder={files.length ? "Ask about it…" : turns.length ? "Reply…" : context || scope ? "Ask about this, or @ a source or skill…" : "Ask anything, or @ a source or skill…"}
+              value={input}
+              onChange={(e) => {
+                setInput(e.target.value);
+                track(e.target.value, e.target.selectionStart);
+              }}
+              onSelect={(e) => at && track(e.currentTarget.value, e.currentTarget.selectionStart)}
+              onKeyDown={(e) => {
+                if (at && !e.nativeEvent.isComposing) {
+                  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    e.preventDefault();
+                    if (matches.length) setPick((p) => (p + (e.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
+                    return;
+                  }
+                  if ((e.key === "Enter" || e.key === "Tab") && matches[pick]) {
+                    e.preventDefault();
+                    choose(matches[pick]!);
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setAt(null);
+                    return;
+                  }
                 }
-                if ((e.key === "Enter" || e.key === "Tab") && matches[pick]) {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
-                  choose(matches[pick]!);
-                  return;
+                  send(input, true);
                 }
-                if (e.key === "Escape") {
+                // ↑ in the empty field edits his last message (Slack, Claude).
+                if (e.key === "ArrowUp" && !input && !files.length && !busy && lastTurn) {
                   e.preventDefault();
-                  e.stopPropagation();
-                  setAt(null);
-                  return;
+                  edit();
                 }
-              }
-              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                send(input, true);
-              }
-              // ↑ in the empty field edits his last message (Slack, Claude).
-              if (e.key === "ArrowUp" && !input && !files.length && !busy && lastTurn) {
-                e.preventDefault();
-                edit();
-              }
-            }}
-          />
+              }}
+            />
+          </div>
           <Hint text="Attach an image, PDF or text file" side="top">
             <button className="icon-btn ask-attach" aria-label="Attach a file" onClick={() => void pickFiles()}>
               <Paperclip size={14} aria-hidden="true" />
