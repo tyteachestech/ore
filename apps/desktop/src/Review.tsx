@@ -1773,7 +1773,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
   });
   const tiles = endTiles({ session: s, ups: named });
   // His pose is for the line he says (D258).
-  // He says a word aloud as he takes it, on the few days that earn one (D-new-mole-voice); the quick quiz has no mole.
+  // He says a word aloud as he takes it, on the few days that earn one (D330); the quick quiz has no mole.
   const aloud = quick ? null : endVoice(said[0], { session: s, closed, napped: nap });
   useEffect(() => void (settled && aloud && once(aloud, 0.1)), [settled]);
   const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });

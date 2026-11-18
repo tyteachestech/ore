@@ -61,7 +61,7 @@ export function endMood(first: Said | undefined, o: { session: SessionEnd; close
   return o.session.cut?.length || o.closed ? "happy" : "nod";
 }
 
-/** What the mole says aloud as he takes that pose (D-new-mole-voice), or null: most sessions end without a word from
+/** What the mole says aloud as he takes that pose (D330), or null: most sessions end without a word from
  *  him, so the ones that have one stand out. He speaks for a skill's new level, a rare recall (then and now, a long
  *  gap, memories pulled back in time) and the session that met the day's goal, so at most once a day for the goal.
  *  An ordinary session and a session of misses are silent, as his nod is. */

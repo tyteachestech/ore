@@ -55,7 +55,7 @@ describe("review sounds", () => {
     expect(review.match(/\brated\(/g)?.length).toBe(1);
   });
 
-  // D-new-mole-voice
+  // D330
   test("the mole's switch silences his voice and his pop and nothing else; the sound effects' switch leaves him be", () => {
     setVoice(false);
     for (const id of [...SFX, ...VOICE]) sfx(id);

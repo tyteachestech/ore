@@ -10,7 +10,7 @@ import { load, save } from "./util";
 
 export const SFX = ["tap", "right", "missed", "goal", "cart", "pop", "done"] as const;
 export type Sfx = (typeof SFX)[number];
-/** The mole's voice (D-new-mole-voice): what he says aloud as he comes up at a session's end, and only on a day worth a word
+/** The mole's voice (D330): what he says aloud as he comes up at a session's end, and only on a day worth a word
  *  (`endVoice` in end-says.ts). Files `vo-<line>.mp3`, kept beside the others. */
 export const VOICE = ["cheer", "happy", "proud", "surprised", "curious"] as const;
 export type MoleLine = (typeof VOICE)[number];
