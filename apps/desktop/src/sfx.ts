@@ -131,7 +131,10 @@ export function warm() {
 }
 
 export function sfx(id: Sound, o: Opts = {}) {
-  if (!allowed(id) || hidden()) return;
+  // The mole's sounds have no key or click of their own, and WebKit only wakes audio inside one: with the sound
+  // effects off, their moments still wake it for him.
+  if (!allowed(id)) return void (player === webAudio && HAVE.length && voice.get() && audio());
+  if (hidden()) return;
   // The journeys' ear: `window.__ORE_SFX = []` collects what played.
   if (import.meta.env?.DEV) (globalThis as { __ORE_SFX?: string[] }).__ORE_SFX?.push(id);
   player(id, { rate: o.rate ?? 1, after: o.after ?? 0 });
