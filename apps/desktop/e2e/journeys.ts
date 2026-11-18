@@ -12444,6 +12444,10 @@ journey("phone: New skill in the drawer names one in place and opens its page; a
   await field.press("Enter");
   await page.locator(".phone-skill h1").filter({ hasText: "Juggling" }).waitFor();
   await tap(page, page.locator(".phone-back").filter({ hasText: "Today" }));
+  await page.locator(".phone-skill").waitFor({ state: "detached" });
+  // Its Back held focus; closed, focus is on the menu button, not <body>. Checked here, not left to the focus watch,
+  // which let it by whenever the next tap came within a quarter second (F399).
+  await until("focus is on the menu button once the new skill's page closes", () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Open menu"));
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await page.locator(".phone-drawer section button").filter({ hasText: "Juggling" }).waitFor();
 }, "phone");
