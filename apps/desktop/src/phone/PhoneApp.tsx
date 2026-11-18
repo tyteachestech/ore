@@ -443,7 +443,14 @@ export function PhoneApp() {
   /** Where the skill's page is: itself, its Forge, or one try's page. Back goes up one. */
   const [skillSub, setSkillSub] = useState<Sub>(null);
   useEffect(() => setSkillSub(null), [skill]);
-  const skillBack = () => (skillSub ? setSkillSub(skillSub === "forge" ? null : "forge") : setSkill(null));
+  const skillBack = () => {
+    if (skillSub) return setSkillSub(skillSub === "forge" ? null : "forge");
+    // A page that held focus (a skill just made puts it on Back) hands it to the menu button as it closes,
+    // not to <body>, where keys have nothing to act on (F399).
+    const held = !!document.activeElement?.closest(".phone-full");
+    flushSync(() => setSkill(null));
+    if (held) document.querySelector<HTMLElement>(".phone-bar [aria-label='Open menu']")?.focus({ preventScroll: true });
+  };
   const [skillQuery, setSkillQuery] = useState("");
   const [skillAll, setSkillAll] = useState(false);
   useEffect(() => (setSkillTab("toread"), setSkillQuery(""), setSkillAll(false)), [skill]);

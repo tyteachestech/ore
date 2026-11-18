@@ -12115,7 +12115,7 @@ journey("phone: every screen's text follows the iPhone's text size, and Start re
   if (Math.abs(body - 20) > 0.1 || Math.abs(larger - 20 * (1 + 0.353 * 0.75)) > 0.2) throw new Error(`the reader's text went from ${body}px to ${larger}px at 1.353`);
 }, "phone");
 
-journey("phone: a long title on Today and in Sources shows on two lines, with the reading dots on the picture's foot, at every text size (F87)", async (page) => {
+journey("phone: a long title on Today and in Sources shows on two lines, with the reading line on the picture's foot, at every text size (F87)", async (page) => {
   // The picture and the reading dots left a Continue reading title about 25 letters, and the lists cut theirs at one line.
   const check = async (where: string, rows: string, title: string) => {
     const bad = await page.locator(rows).evaluateAll((els, title) => els.flatMap((row) => {
@@ -12138,11 +12138,14 @@ journey("phone: a long title on Today and in Sources shows on two lines, with th
   }
   const meter = await page.locator(".home-read").first().evaluate((row) => {
     const pic = row.querySelector(".thumb")!.getBoundingClientRect();
-    const dots = row.querySelector(".home-meter, .home-new")!.getBoundingClientRect();
-    // On the picture, at its foot: the dots take no room of their own, and the picture is as big as the row.
-    return pic.width >= 112 && dots.top >= pic.top && Math.abs(dots.bottom - pic.bottom) <= 6 && dots.left >= pic.left - 1 && dots.right <= pic.right + 1;
+    const line = row.querySelector(".thumb-line, .home-new")!;
+    const at = line.getBoundingClientRect();
+    // On the picture, at its foot: the line takes no room of its own, and the picture is as big as the row.
+    // The line is shown and the dots are not (D326).
+    const shown = getComputedStyle(line).display !== "none" && !(row.querySelector(".dot-bar") && getComputedStyle(row.querySelector(".dot-bar")!).display !== "none");
+    return shown && pic.width >= 112 && at.top >= pic.top && Math.abs(at.bottom - pic.bottom) <= 6 && at.left >= pic.left - 1 && at.right <= pic.right + 1;
   });
-  if (!meter) throw new Error("Today: the reading dots (or New) are not on the foot of a 112 pt picture");
+  if (!meter) throw new Error("Today: the reading line (or New) is not on the foot of a 112 pt picture");
   await page.evaluate(() => document.documentElement.style.setProperty("--type", "1"));
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
@@ -12441,6 +12444,10 @@ journey("phone: New skill in the drawer names one in place and opens its page; a
   await field.press("Enter");
   await page.locator(".phone-skill h1").filter({ hasText: "Juggling" }).waitFor();
   await tap(page, page.locator(".phone-back").filter({ hasText: "Today" }));
+  await page.locator(".phone-skill").waitFor({ state: "detached" });
+  // Its Back held focus; closed, focus is on the menu button, not <body>. Checked here, not left to the focus watch,
+  // which let it by whenever the next tap came within a quarter second (F399).
+  await until("focus is on the menu button once the new skill's page closes", () => page.evaluate(() => document.activeElement?.getAttribute("aria-label") === "Open menu"));
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await page.locator(".phone-drawer section button").filter({ hasText: "Juggling" }).waitFor();
 }, "phone");

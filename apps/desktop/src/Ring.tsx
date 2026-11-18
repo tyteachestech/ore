@@ -28,7 +28,7 @@ export function DotRing({ size, share, ghost = 0, over = 0, step = false }: { si
   );
 }
 
-/** A bar of `n` dots (D184), lit by the same rule as the ring. `className` places it (home-meter, thumb-bar, review-bar). */
+/** A bar of `n` dots (D184), lit by the same rule as the ring. `className` places it (home-meter, review-bar). */
 export function DotBar({ share, n, className }: { share: number; n: number; className: string }) {
   const on = lit(share, n);
   return (
@@ -36,6 +36,12 @@ export function DotBar({ share, n, className }: { share: number; n: number; clas
       {Array.from({ length: n }, (_, i) => <i key={i} className={i < on ? "on" : undefined} />)}
     </span>
   );
+}
+
+/** How far he has read, as a line on the bottom edge of the source's picture (D326, YouTube's watched
+ *  line): a slim dark shade under it keeps it readable on a white page, a gold cover and the blank tile alike. */
+export function ThumbLine({ share }: { share: number }) {
+  return <span className="thumb-line" style={{ "--at": Math.max(0, Math.min(1, share)) } as React.CSSProperties} aria-hidden="true" />;
 }
 
 /** The daily goal as a ring (D60), like Apple Fitness's move ring: it fills from `from` to `value`
