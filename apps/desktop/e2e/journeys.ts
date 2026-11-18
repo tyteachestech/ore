@@ -299,6 +299,13 @@ const browser = await chromium.launch();
  *  build in WebKit with touch (openPhone). */
 type Engine = "chromium" | "webkit" | "phone";
 let safari: Browser | undefined;
+// A chip's × shows only under the pointer or keyboard focus (D328), so it is pressed as he would: over the chip first.
+async function unchip(tutor: Locator, name: string) {
+  const x = tutor.getByRole("button", { name });
+  await tutor.locator(".tutor-chip", { has: tutor.page().getByRole("button", { name }) }).hover();
+  await x.click();
+}
+
 const journeys: [string, (page: Page) => Promise<void>, Engine][] = [];
 const journey = (name: string, run: (page: Page) => Promise<void>, engine: Engine = "chromium") => journeys.push([name, run, engine]);
 
@@ -1424,7 +1431,7 @@ journey("tutor @ carries: a follow-up with no @ keeps the last @s, a new @ repla
   await tutor.getByRole("button", { name: /^Chats/ }).click();
   await page.locator(".tutor-chats [cmdk-item]", { hasText: "Explain @learning spacing" }).first().click();
   await chip(AGENTS).waitFor(); // back with its thread
-  await tutor.getByRole("button", { name: `Leave “${AGENTS}” out` }).click();
+  await unchip(tutor, `Leave “${AGENTS}” out`);
   await until("× drops it", async () => (await chip(AGENTS).count()) === 0);
   if ((await send("And this?")).includes("--source=")) throw new Error("a dropped @ was still sent");
   await page.unroute(/\/ore$/);
@@ -1490,7 +1497,7 @@ journey("tutor skill page: opened on a skill's page it is scoped to that skill, 
     if (skillsIn(palette).join() !== "--skill=learning" || palette.some((a) => a.startsWith("--item="))) throw new Error(`⌘K's ask was not scoped to the skill: ${palette.join(" ")}`);
     if (skillsIn(await send("What else?")).join() !== "--skill=learning") throw new Error("the skill page's skill was not sent");
     // × leaves it out for this page, through a trip Home and back.
-    await tutor.getByRole("button", { name: "Leave “Learning” out" }).click();
+    await unchip(tutor, "Leave “Learning” out");
     await until("× takes the chip away", async () => (await skillChip("Learning").count()) === 0);
     if (skillsIn(await send("And this?")).length) throw new Error("a skill left out was still sent");
     await page.getByRole("button", { name: /^Home/ }).first().click();
@@ -1620,7 +1627,7 @@ journey("tutor attach: the paperclip attaches an image and a text file as chips,
     await attach.click();
     await tutor.locator(".tutor-chip", { hasText: "screenshot.png" }).waitFor();
     await tutor.locator(".tutor-chip", { hasText: "notes.txt" }).waitFor();
-    await tutor.getByRole("button", { name: "Remove “notes.txt”" }).click();
+    await unchip(tutor, "Remove “notes.txt”");
     await until("the removed file's chip goes", async () => (await tutor.locator(".tutor-chip", { hasText: "notes.txt" }).count()) === 0);
     const field = page.getByRole("textbox", { name: "Message the tutor" });
     await field.fill("What is in this picture?");
@@ -1629,7 +1636,7 @@ journey("tutor attach: the paperclip attaches an image and a text file as chips,
     const files = (args: string[]) => JSON.parse((args.find((x) => x.startsWith("--files=")) ?? "--files=[]").slice(8)) as { name: string; path: string }[];
     if (files(sent[0]!).map((f) => f.name).join() !== "screenshot.png" || !/^chats\/files\/[0-9a-f]{16}\.png$/.test(files(sent[0]!)[0]!.path)) throw new Error(`the message went without its file: ${sent[0]!.join(" ")}`);
     await until("his message shows the picture", async () => await tutor.locator(".ask-files img").evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0).catch(() => false));
-    if (await tutor.locator(".tutor-perch .tutor-chip", { hasText: "screenshot.png" }).count()) throw new Error("a sent file stayed attached to the next message");
+    if (await tutor.locator(".ask-input .tutor-chip", { hasText: "screenshot.png" }).count()) throw new Error("a sent file stayed attached to the next message");
     // A follow-up has no file of its own, and the earlier turn's goes along.
     await field.fill("And the colours?");
     await page.keyboard.press("Enter");
