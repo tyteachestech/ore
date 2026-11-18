@@ -18,7 +18,7 @@ Learning makes people anxious, so Ore is calm first. Then satisfying, and a litt
 
 ## Eight rules
 
-1. **One level of boxes.** A section is a label over a hairline. Never a box in a box.
+1. **One level of boxes.** A section is a label set apart by space. Never a box in a box.
 2. **Round dots are the signature.** Icons, gems, rings, bars, small marks, a screen's one hero number and the mole. Words and controls stay smooth. Only a cut gem has square pixels: its dots have fused.
 3. **Three voices of type.** Geist for the interface, OpenTUI Mono for labels and numbers, Charter for a source's own text and nothing else.
 4. **Colour means something.** See the table below. Never a colour for decoration.

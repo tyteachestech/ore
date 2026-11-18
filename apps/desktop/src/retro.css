@@ -86,18 +86,18 @@
 .outline-cursor { position: absolute; top: 0; left: -6px; fill: var(--paper); pointer-events: none; }
 .outline.open .outline-cursor, .outline:focus-within .outline-cursor { visibility: hidden !important; }
 
-/* One level of boxes at most (Tyler, 2026-10-30): page sections are a label over a hairline rule, never framed;
+/* One level of boxes at most (Tyler, 2026-10-30): page sections are a label set apart by space, never framed;
    what sits inside a section is never boxed either. Home's cards stay hairline frames: nothing inside them is. */
 .skill-card { border: 0; border-radius: 0; box-shadow: none; background: transparent; padding: 0; }
 .skill-note { padding: 0; }
 .skill-col { gap: 36px; }
 .skill-card .card-head { box-sizing: content-box; margin-bottom: 14px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
 
-/* Home is an open page (Style rules: one level of boxes): sections are a label over a rule, skills are rows. */
+/* Home is an open page (Style rules: one level of boxes): sections are a label set apart by space (D329), skills are rows. */
 .home-today, .home-cont, .home-skill { border-radius: 0; box-shadow: none; background: transparent; border: 0; }
 .home-today { padding: 20px 0; }
 .home-cont { margin-top: 0; padding: 0; }
-.home-h, .home-cont .home-h { margin: 32px 0 6px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.home-h, .home-cont .home-h { margin: 32px 0 6px; }
 .home-cont .home-h { margin-top: 0; }
 .home-read { margin: 0 -8px; padding: 0 8px; }
 .home-skills { display: flex; flex-direction: column; gap: 0; }
@@ -193,17 +193,17 @@
 .skill-badge, .skill-badge.tinted { box-shadow: none; background: color-mix(in srgb, var(--skill, var(--muted)) 26%, var(--bg)); }
 .skill-badge:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
-/* Settings follows the skill page (Tyler, 2026-10-31): each group is a mono label over a hairline rule and its rows
+/* Settings follows the skill page (Tyler, 2026-10-31): each group is a mono label (no rule under it, D329) and its rows
    sit on the page between hairlines, no rounded card around them. */
 .settings-group { margin-bottom: 36px; }
-.settings-group h2 { margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+.settings-group h2 { margin: 0; padding-bottom: 2px; font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
 .settings-card { background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 .settings-row { padding: 14px 0; }
 .settings-sheet { border: 1px solid var(--border); }
-/* The shortcut list in Settings: groups are mono labels over a rule, the list sits on the page; the search stays a field. */
+/* The shortcut list in Settings: groups are mono labels, the list sits on the page; the search stays a field. */
 .keys-editor.in-page .keys-head { border-radius: 0; }
 .keys-editor.in-page .keys-body { background: transparent; border: 0; border-radius: 0; box-shadow: none; padding: 0; }
-.keys-editor.in-page .keys-body h3 { margin-top: 20px; padding: 0 0 6px; border-bottom: 1px solid var(--border); font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
+.keys-editor.in-page .keys-body h3 { margin-top: 20px; padding: 0 0 6px; font-family: var(--mono); letter-spacing: 0.06em; font-size: 12px; font-weight: 400; color: var(--muted); }
 .keys-editor.in-page .keys-body h3:first-child { margin-top: 0; }
 .keys-editor.in-page .key-row { margin: 0 -8px; border-radius: 0; }
 

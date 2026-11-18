@@ -709,7 +709,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .doc-head .when { color: var(--text-read); font-size: 13px; margin-right: 2px; white-space: nowrap; }
 .doc-head .by + .when::before, .doc-head .by + span .when::before, .doc-head .by-add + .when::before, .doc-head .by-add + span .when::before { content: "·"; margin-right: 6px; }
 
-.preq { margin: 0 0 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); max-width: var(--measure); }
+.preq { margin: 0 0 20px; padding-bottom: 4px; max-width: var(--measure); }
 .preq-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; width: 100%; min-height: 28px; margin-left: -4px; padding: 0 4px; color: var(--muted); font-weight: 500; text-align: left; }
 .preq-head:hover { color: var(--text); }
 .preq-head .caret { color: var(--faint); flex: none; transition: transform var(--t-1) ease-out; }
@@ -729,8 +729,6 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .pdf-tables-err { color: var(--muted); overflow-wrap: anywhere; }
 /* Question rows (Perplexity "Related"): each a sentence to read for; the open one shows its answer line. */
 .preq-body { list-style: none; margin: 4px 0 0; padding: 0; }
-.preq-row { border-top: 1px solid var(--border); }
-.preq-row:first-child { border-top: 0; }
 .preq-q { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 12px; align-items: baseline; width: calc(100% + 12px); padding: 7px 6px; margin: 0 -6px; border-radius: 8px; text-align: left; font-size: 15px; line-height: 1.45; color: var(--text-read); }
 .preq-q:hover { background: var(--bg-hover); }
 .preq-q:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
@@ -1501,7 +1499,7 @@ body.resizing iframe { pointer-events: none; }
 .note-menu-head:first-child { padding-top: 4px; }
 
 /* Linked from (D39) */
-.linked-from { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--border); }
+.linked-from { margin-top: 28px; }
 .linked-from h3 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
 /* Hover peek on a [[link]] or a "Linked from" row (Notion): what it points to, one click opens it. */
 .popover.peek { width: 320px; max-width: calc(100vw - 24px); }
@@ -1748,7 +1746,7 @@ button.try-stone:hover .stone { opacity: 1; }
 .tools { display: inline-flex; margin-left: 2px; }
 .tool-btn { display: grid; padding: 4px; border-radius: 6px; }
 .tool-btn:hover { background: var(--bg-hover); }
-/* The Forge and a try's page: one column of bands, each a label over a rule. */
+/* The Forge and a try's page: one column of bands, each under a label. */
 .skill-page.sub { display: block; overflow-y: auto; }
 .forge { max-width: 760px; margin: 0 auto; padding: 26px 32px var(--mole-room); }
 .forge.try-page { max-width: 1040px; }
@@ -1760,7 +1758,7 @@ button.try-stone:hover .stone { opacity: 1; }
 .crumbs button:hover { background: var(--bg-hover); color: var(--text); }
 .crumbs [aria-current] { padding: 2px 6px; }
 .forge-band { margin-top: 22px; }
-.forge-band h2 { margin: 0 0 6px; padding: 0 8px 6px; border-bottom: 1px solid var(--border); font: 400 12px var(--mono); color: var(--muted); }
+.forge-band h2 { margin: 0 0 6px; padding: 0 8px; font: 400 12px var(--mono); color: var(--muted); }
 .forge-row { display: flex; align-items: center; gap: 8px; min-height: 38px; padding-right: 6px; border-radius: 8px; }
 .forge-row:hover, .forge-row:focus-within { background: var(--bg-hover); }
 .forge-open { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; padding: 9px 8px; border-radius: 8px; text-align: left; }
@@ -1819,7 +1817,6 @@ button.try-stone:hover .stone { opacity: 1; }
    it; its actions appear on hover at the bottom right, Linear-style. */
 .skill-col.side .question { position: relative; display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 0; }
 .skill-col.side .question > :not(.q-check) { grid-column: 2; }
-.skill-col.side .question + .question { box-shadow: inset 0 1px 0 var(--border); }
 .q-check { grid-row: 1; align-self: start; margin: 10px 0 0 6px; width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid var(--question-solid); color: var(--question-solid); }
 .q-check:hover { background: var(--question); }
 .q-check:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
@@ -2945,16 +2942,16 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-back { display: inline-flex; align-items: center; gap: 2px; background: none; border: 0; color: var(--accent); font: 500 17px var(--font); padding: 8px; }
 .phone-sources { padding: 12px 16px 24px; }
 .phone-sources h1 { font-size: 30px; margin: 8px 0 12px; }
-.phone-sources h2 { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--muted); margin: 28px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.phone-sources h2 { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--muted); margin: 36px 0 0; }
 .phone-sources ul { list-style: none; margin: 0; padding: 0; }
 .phone-sources li { position: relative; overflow: hidden; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 /* A source being renamed in place: the row's own shape, the title a field (Finder's Rename). */
-.phone-sources .phone-row-rename { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.phone-sources .phone-row-rename { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 4px 0; }
 .phone-sources .phone-row-rename input { flex: 1; min-width: 0; height: 32px; margin: 0 -6px; padding: 0 6px; border: 0; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: 16px var(--font); color: var(--text); }
 .phone-sources li button[hidden] { display: none; }
 /* A long press opens our menu on these (WithMenu hold), never iOS's own callout. */
 .phone :is(.home-read, .home-skill, .phone-drawer button) { -webkit-touch-callout: none; }
-.phone-sources li button { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 4px 0; background: var(--bg); border: 0; border-bottom: 1px solid var(--border); color: var(--text); text-align: left; font: 16px var(--font); }
+.phone-sources li button { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 4px 0; background: var(--bg); border: 0; color: var(--text); text-align: left; font: 16px var(--font); }
 .phone-swipe { position: absolute; inset: 0; display: flex; align-items: center; color: var(--muted); font: 400 12px var(--mono); }
 .phone-swipe.left { justify-content: flex-end; }
 .phone-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -2981,8 +2978,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .touch-highlight .card svg { color: var(--card-solid); }
 .touch-highlight .question svg { color: var(--question-solid); }
 .touch-highlight .apply svg { color: var(--apply-solid); }
-/* Today on the phone (Tyler's pick of A/B, 2026-10-31): sections are a label over a rule, never framed, and skills
-   are list rows, as in Books and Settings, so a screen shows the day's work and every skill. */
+/* Today on the phone (Tyler's pick of A/B, 2026-10-31): sections are a label, never framed, and skills are list
+   rows, so a screen shows the day's work and every skill. No line under a label or a row (D329):
+   each row's picture or icon marks it, rows sit close and sections far, as Spotify and Books lay out picture lists. */
 .phone .home-today { border: 0; padding: 12px 0 0; }
 /* Start review sits beside the ring on the Mac; a phone is too narrow, so it takes its own full-width row under it. */
 .phone .home-goal { flex-wrap: wrap; row-gap: 16px; }
@@ -2990,13 +2988,13 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .home-cont { border: 0; padding: 0; margin-top: 0; }
 .phone .home-cols { display: block; }
 .phone .home-cols .col-divider { display: none; }
-.phone .home-h, .phone .home-cont .home-h { margin: 32px 0 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
-.phone .home-read { margin: 0; padding: 0; height: 56px; border-bottom: 1px solid var(--border); }
+.phone .home-h, .phone .home-cont .home-h { margin: 36px 0 0; }
+.phone .home-read { margin: 0; padding: 0; height: 56px; }
 /* A title gets the row's whole width beside the picture on two lines (Tyler's pick C, 2026-11-13). The picture is as
    big as a two-line row allows, and how far he is sits on its bottom edge: the line over a slim dark shade
    (D326, after D262's dots), so it reads on a white page and a dark picture alike and takes no
    room of its own. A source not opened yet says New in the same corner. */
-.phone .home-read { display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; align-content: center; height: auto; min-height: 56px; padding: 10px 0; }
+.phone .home-read { display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; align-content: center; height: auto; min-height: 56px; padding: 7px 0; }
 .phone .home-read .thumb { grid-area: 1 / 1 / 3 / 2; width: 112px; height: 63px; }
 .phone .home-read :is(.title, .row-rename) { grid-column: 2; grid-row: 1 / 3; align-self: center; }
 /* The clamp is on the button's text: WebKit draws a clamped <button> whole. */
@@ -3007,8 +3005,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .home-read .thumb-at { grid-area: 1 / 1 / 3 / 2; }
 .phone .home-read .home-new { grid-area: 1 / 1 / 3 / 2; align-self: end; justify-self: start; z-index: 1; width: auto; margin: 0 0 5px 5px; padding: 3px 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.72); color: #fff; font: 500 11px/1 var(--mono); }
 .phone .home-skills { display: flex; flex-direction: column; gap: 0; }
-.phone .home-skill { flex-direction: row; align-items: center; gap: 12px; border: 0; border-bottom: 1px solid var(--border); margin: 0; padding: 0; min-height: 56px; }
-.phone :is(.home-read, .home-skill):last-child { border-bottom: 0; }
+.phone .home-skill { flex-direction: row; align-items: center; gap: 12px; border: 0; margin: 0; padding: 0; min-height: 52px; }
 .phone .home-skill-top { flex: 1; gap: 12px; }
 .phone .home-skill-name { font-size: 17px; font-weight: 500; }
 /* A tap shows on the row it lands on, as in Apple's lists. */
@@ -3038,11 +3035,10 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .phone-bar .phone-back { font-size: 0; }
 .phone .phone-bar .phone-back svg { width: 22px; height: 22px; }
 .phone .phone-source .reader-tools .width-toggle { display: grid; place-items: center; }
-.phone :is(.home-h, .home-cont .home-h, .phone-sources h2) { font: 500 13px var(--mono); letter-spacing: .04em; color: var(--faint); margin-top: 28px; padding-bottom: 8px; }
+.phone :is(.home-h, .home-cont .home-h, .phone-sources h2) { font: 500 13px var(--mono); letter-spacing: .04em; color: var(--faint); margin-top: 36px; padding-bottom: 2px; }
 .phone .home-read { min-height: 60px; }
 .phone .home-read .title { font-size: 17px; }
 .phone .phone-sources li button { min-height: 60px; font-size: 17px; gap: 12px; }
-.phone .home-skill { min-height: 60px; }
 .phone .home-day { font-size: 13px; }
 .phone .home .pill-btn.home-go, .phone .review-pick .pill-btn.home-go { height: 52px; border-radius: 999px; font: 600 17px var(--font); letter-spacing: 0; }
 /* Finish comes straight after the text; the room that lets the end scroll clear of the bars goes under Finish
@@ -3342,7 +3338,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .note-menu-row { height: 44px; font-size: 17px; }
 .phone .mynotes-text { scroll-padding-bottom: 52px; }
 /* The skill's note on the phone: a row at the top of its page (Apple Notes' folder rows), and the note's own screen. */
-.phone .phone-note-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; margin: 0 0 20px; color: var(--text); border-bottom: 1px solid var(--border); }
+.phone .phone-note-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; margin: 0 0 20px; color: var(--text); }
 .phone .phone-note-row .phone-title { flex: 1; text-align: left; font-size: 17px; }
 .phone .phone-note-row > svg:last-child { color: var(--faint); }
 .phone .phone-note-row:active { background: var(--bg-hover); }
@@ -3913,7 +3909,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* Above the keyboard, which the field brings up at once. */
 .phone .overlay:has(.add-link) { padding-bottom: var(--keyboard, 0px); }
 .phone-bar .phone-add { margin-left: auto; }
-.phone-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; padding: 4px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+.phone-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 44px; padding: 4px 0; color: var(--muted); }
 .phone-waiting .phone-error { flex-basis: 100%; order: 3; padding: 0 0 6px; }
 .phone-waiting-note { color: var(--faint); font-size: 13px; }
 .phone-coming { padding-bottom: 0; }
