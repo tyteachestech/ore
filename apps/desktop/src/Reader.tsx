@@ -2702,12 +2702,14 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     lastScroll.current = performance.now();
     if (tip) setTip(null);
     if (PHONE && scrollRef.current && performance.now() - lastTouch.current < 2000) {
-      // The bars go as he scrolls down to read and come back as he scrolls up, and at either end (Books, Obsidian).
-      // Only his finger's scroll: coming back to a saved place or a jump to a passage keeps them.
+      // The bars go as he scrolls down to read and come back at either end; a scroll back up to reread leaves
+      // them away, and a single tap on the text brings them (Books, D156). Only his finger's scroll: coming
+      // back to a saved place or a jump to a passage keeps them.
       const el = scrollRef.current;
       const moved = el.scrollTop - lastTop.current;
       if (Math.abs(moved) > 8) {
-        setBarsHidden(moved > 0 && el.scrollTop > 40 && el.scrollTop + el.clientHeight < el.scrollHeight - 40);
+        if (el.scrollTop <= 40 || el.scrollTop + el.clientHeight >= el.scrollHeight - 40) setBarsHidden(false);
+        else if (moved > 0) setBarsHidden(true);
         lastTop.current = el.scrollTop;
       }
     }
@@ -3069,9 +3071,17 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   // iPhone: a double tap on a paragraph highlights all of it and opens its popup (D224), Remove a tap
   // away. Only on plain text: a link, a figure, a timestamp or a highlight keeps its own single tap, so
   // none of them waits to see if a second comes. A tap that stops a scroll, or one that moves, is no tap.
+  // A single tap on plain text shows or hides the bars (Books, D156), once no second tap has come.
   const tapAt = useRef<{ t: number; x: number; y: number } | null>(null);
   const lastTap = useRef<{ t: number; x: number; y: number } | null>(null);
   const lastScroll = useRef(0);
+  const barsTap = useRef(0);
+  useEffect(() => () => clearTimeout(barsTap.current), []);
+  const plainText = (x: number, y: number) => {
+    const el = docEl.current;
+    const target = document.elementFromPoint(x, y);
+    return !!el && !!target && el.contains(target) && !target.closest("a[href], .ts, button, input, textarea, [contenteditable]") && !zoomable(target, el) && !hitTest(ranges.current, x, y);
+  };
   const onTouchStart = (e: TouchEvent) => {
     const t = e.touches[0]!;
     const now = performance.now();
@@ -3088,14 +3098,16 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const prev = lastTap.current;
     tapAt.current = null;
     const now = performance.now();
+    clearTimeout(barsTap.current);
     if (!s || now - s.t > 300 || !ready) return void (lastTap.current = null);
     lastTap.current = { t: now, x: s.x, y: s.y };
-    if (!prev || now - prev.t > 350 || Math.hypot(s.x - prev.x, s.y - prev.y) > 24 || closedBook) return;
+    if (!prev || now - prev.t > 350 || Math.hypot(s.x - prev.x, s.y - prev.y) > 24 || closedBook) {
+      // A tap that closes the popup or a selection only closes it.
+      if (!closedBook && !popup && window.getSelection()?.isCollapsed !== false && plainText(s.x, s.y)) barsTap.current = window.setTimeout(() => setBarsHidden((h) => !h), 350);
+      return;
+    }
     lastTap.current = null;
-    const el = docEl.current;
-    const target = document.elementFromPoint(s.x, s.y);
-    if (!el || !target || !el.contains(target) || target.closest("a[href], .ts, button, input, textarea, [contenteditable]") || zoomable(target, el)) return;
-    if (hitTest(ranges.current, s.x, s.y)) return;
+    if (!plainText(s.x, s.y)) return;
     const c = document.caretRangeFromPoint(s.x, s.y);
     const r = c && paragraphRange(c.startContainer);
     if (!r) return;
