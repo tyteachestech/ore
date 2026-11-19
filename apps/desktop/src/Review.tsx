@@ -1886,13 +1886,14 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
           </button>
         </Hint>
       )}
-      {/* D148: the one thing left to do away from the screen, now that the session is over. "Try:" and his plan (or the passage), no source and no count: a click opens its passage. */}
+      {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
       {end.next && (
         <Hint text="To try on your own work · opens the passage">
           <button className="review-try" onClick={() => onTry(end.next!)}>
             <PixelTry size={16} aria-hidden="true" />
             <span>
-              Try: <span className="review-try-plan">{end.next.note || `“${passageText(end.next.exact)}”`}</span>
+              <span className="review-try-plan">{end.next.note || `“${passageText(end.next.exact)}”`}</span>
+              <span className="review-try-from">{end.next.item_title}</span>
             </span>
           </button>
         </Hint>

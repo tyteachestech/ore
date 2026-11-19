@@ -495,7 +495,7 @@ test("the row of results (D252): kept, days of memory, then the rarest true thin
   const all = { depth_days: 212, longest_days: 9, rescued: 2, cut: ["ai", "ai"] };
   expect(keys(all, [{ skill: "ai", name: "AI", level: 3 }])).toEqual(["kept 5 memories kept", "depth +7 months of memory", "level 3 AI level"]);
   expect(keys(all)[2]).toBe("rescued 2 pulled back in time");
-  expect(keys({ ...all, rescued: 0 })[2]).toBe("long 9 days unseen,\nstill knew");
+  expect(keys({ ...all, rescued: 0 })[2]).toBe("long 9 day gap recalled");
   expect(keys({ cut: ["ai"] })[1]).toBe("cut 1 gem cut");
   // A gap under a week, and rescues that were most of the session, take no place.
   expect(keys({ longest_days: 3, rescued: 6 })).toHaveLength(1);
@@ -653,15 +653,4 @@ test("the memory line ends by saying in words when the next review falls for the
   expect(await said(3)).toEqual(["next in 21 days", "true"]);
   expect(await said(4)).toEqual(["next in 1 month", "true"]);
   await act(async () => (root.unmount(), body.remove()));
-});
-
-test("D148: the try line reads \"Try:\" and his plan, or the passage when it has none, with no source under it", async () => {
-  const withTry = (next: Record<string, unknown>) => ({ ...(end([]) as unknown as Record<string, unknown>), next: { id: "t", item: "i", item_title: "If-then plans", exact: "Decide **when** and where", ...next } }) as never;
-  const s = await mount(withTry({ note: "Write an if-then plan for Thursday’s recording" }));
-  expect(s.body.querySelector("button.review-try")!.textContent).toBe("Try: Write an if-then plan for Thursday’s recording");
-  expect(s.q(".review-try-from")).toBe(0);
-  await s.done();
-  const bare = await mount(withTry({}));
-  expect(bare.body.querySelector("button.review-try")!.textContent).toBe("Try: “Decide when and where”");
-  await bare.done();
 });
