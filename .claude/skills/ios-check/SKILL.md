@@ -67,6 +67,7 @@ Copy what Apple's own apps do (Books, Notes, Mail) and check against Apple's Hum
 - A screen he opens slides in from the right and Back or the edge swipe slides it out (`Screen` in `PhoneApp.tsx`); a new pushed screen is a `Screen` with a `Back`, never a bare full-screen div.
 - A bottom sheet rises from the foot and a tap outside lets it down (`.sheet`, `letDown` in `phone/sheet.ts`); a new sheet uses both.
 - Nothing just appears where iOS would move it, and nothing moves under Reduce Motion.
+- Haptics (D332): four moments tick (`phone/haptics.ts`) and no others. A new one needs the Apple app that ticks there, named in the decision.
 
 **Scroll**
 - Momentum and rubber band on the content, not on the whole page (fixed bars never bounce away).

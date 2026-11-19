@@ -9,6 +9,7 @@ import { Boundary } from "../Boundary";
 import { FillingLine, useFilling } from "../Filling";
 import { AddLink, WaitingLinks, macOnly, type Waiting } from "./AddLink";
 import { trackDrag, type Drag } from "./drag";
+import { tick } from "./haptics";
 import { Home } from "../Home";
 import { HeadTabs, type HeadTab as HeadTabT } from "../HeadTabs";
 import type { Sub } from "../Forge";
@@ -183,12 +184,12 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
     const main = mainRef.current;
     if (!main) return;
     const MARK = 72;
-    let x0 = 0, y0 = 0, dy = 0, live = false;
+    let x0 = 0, y0 = 0, dy = 0, live = false, past = false;
     const cue = (v: number) => cueRef.current?.style.setProperty("--pull", String(v));
     const start = (e: TouchEvent) => {
       const t = e.touches[0];
       live = e.touches.length === 1 && main.scrollTop <= 1; // A short list has one point to scroll, so iOS gives it its bounce.
-      [x0, y0, dy] = [t?.clientX ?? 0, t?.clientY ?? 0, 0];
+      [x0, y0, dy, past] = [t?.clientX ?? 0, t?.clientY ?? 0, 0, false];
     };
     const move = (e: TouchEvent) => {
       if (!live) return;
@@ -197,6 +198,7 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
       // A swipe sideways (a row, the drawer) or a scroll up is not a pull.
       if (dy < 0 || Math.abs((t?.clientX ?? x0) - x0) > Math.max(10, dy)) return void ((live = false), cue(0));
       cue(Math.min(1, dy / MARK));
+      if (dy >= MARK !== past) (past = dy >= MARK) && tick.mark();
     };
     const end = (e: TouchEvent) => {
       if (live && dy >= MARK && e.type === "touchend") pull.current();
@@ -246,6 +248,8 @@ type RowActions = {
 function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: (id: string) => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const swiped = useRef(false);
+  /** The swipe is past the point where letting go acts. */
+  const past = useRef(false);
   const [side, setSide] = useState<"left" | "right" | null>(null);
   const [renaming, setRenaming] = useState(false);
   const filling = useFilling(item.id);
@@ -261,12 +265,17 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
     begin: (dx) => {
       if (item.archived_at && dx > 0) return false; // Archived: only Restore, to the left.
       swiped.current = true;
+      past.current = false;
       ref.current!.style.transition = "none";
     },
     move: (raw) => {
       const dx = only(raw);
       setSide(dx < 0 ? "left" : "right");
       ref.current!.style.transform = `translateX(${dx}px)`;
+      // A tick as it passes the point where letting go acts, as Mail's rows give.
+      const now = Math.abs(dx) > ref.current!.offsetWidth * 0.4;
+      if (now && !past.current) tick.mark();
+      past.current = now;
     },
     end: (raw, flick, cancelled) => {
       const dx = only(raw);

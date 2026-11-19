@@ -10,6 +10,7 @@ import { nativeMenu } from "./native-menu";
 import { PHONE } from "./ore";
 import { trackDrag } from "./phone/drag";
 import { letDown, sheetLayer, useSwipeDown } from "./phone/sheet";
+import { tick } from "./phone/haptics";
 import { Trap } from "./Trap";
 import { keepFocusNear } from "./focus-near";
 import { menuIcon } from "./menu-icons";
@@ -85,6 +86,7 @@ export function holdMenu(el: HTMLElement, y: number) {
   addEventListener("click", swallow, true);
   addEventListener("touchstart", done, true); // The next touch's click is a real tap,
   const t = setTimeout(done, 800); // and so is a pointer's or a key's once the lift has passed.
+  tick.menu();
   el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }));
 }
 

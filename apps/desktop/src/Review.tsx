@@ -18,6 +18,7 @@ import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { afterAnswer, cardQuotes, lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { tick } from "./phone/haptics";
 import { PixelTry } from "./PixelIcon";
 import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
 import { endMood, endSays, endTiles, endVoice, weeksAgo, type Tile } from "./end-says";
@@ -654,6 +655,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       if (guard !== rating) guardAt.current = Date.now();
       return void setGuard(rating);
     }
+    tick.rate();
     const after = momentFor(card.history, rating as 1 | 2 | 3 | 4, { sure: conf === 3, remix: !!card.variant });
     const color = entry ? skillOf(entry.skills[0] ?? "").color : undefined;
     setBusy(true);

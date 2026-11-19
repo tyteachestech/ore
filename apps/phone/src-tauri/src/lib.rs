@@ -515,6 +515,9 @@ pub fn run() {
         .setup(|app| {
             let _ = APP.set(app.handle().clone());
             hide_keyboard_accessory();
+            // The ticks under a finger (D332): a web view can't make them, iOS's feedback generators do.
+            #[cfg(mobile)]
+            app.handle().plugin(tauri_plugin_haptics::init())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, library_write, http_fetch, can_transcribe, transcribe, undo_state, system_dark, light_bars, share_inbox, share_skills, share_open, player_port])

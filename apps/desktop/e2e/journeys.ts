@@ -15729,6 +15729,67 @@ journey("phone: every page gives at its top and bottom as iOS's own do, a short 
   await check("Review", ".phone-full");
 }, "phone");
 
+journey("phone: the phone ticks under his finger on four moments and no others: a long-press menu opening, a row's swipe passing its mark, a rating, a highlight made (D332)", async (page) => {
+  // The page asks the shell (Tauri's haptics plugin) for each tick; here the asks are written down instead.
+  await page.addInitScript(`window.__ticks = []; window.__TAURI_INTERNALS__ = { ...window.__TAURI_INTERNALS__, invoke: (cmd, args) => (String(cmd).startsWith("plugin:haptics|") ? (window.__ticks.push(String(cmd).split("|")[1] + (args?.style ? ":" + args.style : "")), Promise.resolve(null)) : Promise.reject(new Error("no Tauri here"))) };`);
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  const ticks = () => page.evaluate(() => (window as unknown as { __ticks: string[] }).__ticks.join(" "));
+  const expectTicks = (when: string, want: string) => until(`${when}: the ticks are "${want}"`, async () => (await ticks()) === want).catch(async (e) => { throw new Error(`${(e as Error).message}, not "${await ticks()}"`); });
+  // Opening a screen, the drawer and a sheet are silent, as they are in Apple's apps.
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await page.locator(".phone-sources li button").first().waitFor();
+  await expectTicks("after the drawer and a tab", "");
+  // A long press: one firm tick as the menu opens.
+  await press(page, page.locator(".phone-sources li button").first());
+  await page.getByRole("menu").waitFor();
+  await expectTicks("a long press", "impact_feedback:medium");
+  await page.keyboard.press("Escape");
+  await page.getByRole("menu").waitFor({ state: "detached" });
+  // A rating: one selection tick when it is recorded.
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Today" }));
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const sure = page.getByRole("radio", { name: "Think so" });
+  await sure.waitFor();
+  await slid(page);
+  await tap(page, (await page.locator(".phone-full textarea:visible").count()) ? page.getByRole("button", { name: "No idea" }) : sure);
+  const hard = page.getByRole("button", { name: "Hard", exact: true });
+  await hard.waitFor();
+  await tap(page, hard);
+  await expectTicks("a rating", "impact_feedback:medium selection_feedback");
+  // Out of Review and back to the list.
+  // Leave review ends the session (its end screen), and again closes it.
+  for (let i = 0; i < 2 && (await page.locator(".phone-full").count()); i++) (await tap(page, page.locator(".phone-full").getByRole("button", { name: "Leave review" })), await page.waitForTimeout(800));
+  await page.locator(".phone-full").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await page.locator(".phone-sources li button").nth(1).waitFor();
+  // A highlight: one light tick as it is made (a double tap on a paragraph, D224).
+  await tap(page, page.locator(".phone-sources button").filter({ hasText: TESTING }));
+  await page.locator(".phone-reader .doc").first().waitFor();
+  await slid(page);
+  const para = await pointAt(page, "familiarity is easily", ".phone-reader .doc");
+  await page.waitForTimeout(300);
+  await page.touchscreen.tap(para.x, para.y);
+  await page.touchscreen.tap(para.x, para.y);
+  await page.getByRole("dialog", { name: "Highlight" }).waitFor();
+  await expectTicks("a highlight", "impact_feedback:medium selection_feedback impact_feedback:light");
+  await page.keyboard.press("Escape");
+  await tap(page, page.locator(".phone-full .phone-back"));
+  await page.locator(".phone-full").waitFor({ state: "detached" });
+  // A row's swipe: one light tick as it passes the point where letting go acts, none for a short one.
+  const row = (await page.locator(".phone-sources li button").nth(1).boundingBox())!;
+  const y = row.y + row.height / 2;
+  await swipe(page, [300, y], [240, y], 200);
+  await page.waitForTimeout(300);
+  await expectTicks("a short swipe that springs back", "impact_feedback:medium selection_feedback impact_feedback:light");
+  await swipe(page, [330, y], [100, y], 300);
+  await expectTicks("a swipe past its mark", "impact_feedback:medium selection_feedback impact_feedback:light impact_feedback:light");
+}, "phone");
+
 /** A pushed screen has finished sliding in (D331): measure where things are only after this. */
 function slid(page: Page) {
   return until("the screen has slid in", () => page.evaluate(() => ![...document.querySelectorAll(".phone-full, .phone-shell")].some((el) => el.getAnimations().length)));
