@@ -3151,15 +3151,16 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .review-body:has(> .review-end) { padding-top: 8px; }
 .phone .review-end { min-height: 100%; margin: 0 auto; }
 .phone .review-end > :first-child { margin-top: auto; }
-.phone .review-end .end-emblem { padding-top: 48px; }
-.phone .says.end-says { left: 50%; top: auto; bottom: calc(100% - 40px); max-width: min(320px, 100%); transform: translateX(-50%); transform-origin: 50% 100%; text-align: center; padding: 8px 14px; animation-name: end-says-phone; }
-.phone .says.end-says .says-line { font-size: 15px; }
+.phone .review-end .end-emblem { padding-top: 72px; }
+.phone .says.end-says { left: 50%; top: auto; bottom: calc(100% - 64px); max-width: 100%; transform: translateX(-50%); transform-origin: 50% 100%; text-align: center; padding: 8px 14px; animation-name: end-says-phone; }
+.phone .says.end-says .says-line { font-size: 15px; text-wrap: balance; }
 .phone .says.end-says .says-block { display: none; }
 @keyframes end-says-phone { from { opacity: 0; transform: translate(-50%, 6px) scale(0.96); } }
 /* A result is as wide as its words, so no label breaks while its neighbours don't; only a long skill name wraps. */
 .phone .end-tally { gap: 24px; margin-top: 28px; }
 .phone .end-tally li { width: auto; max-width: 136px; }
 .phone .end-tally:has(> :nth-child(2):last-child) { gap: 40px; }
+.phone .review-end .quiz-faint { margin-top: 24px; }
 .phone .end-emblem ~ .review-try { margin-top: 36px; }
 .phone .review-try { flex-wrap: wrap; justify-content: center; gap: 6px 6px; padding: 6px 8px; text-align: center; font-size: 15px; }
 .phone .review-try { align-items: center; }
@@ -3787,6 +3788,10 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .moment-done { flex: none; height: 24px; padding: 0 10px; border-radius: 999px; color: var(--muted); font-size: 13px; font-weight: 600; }
 .moment-done:hover, .moment-done:focus-visible { background: var(--bg-hover); color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .review-goal { animation: none; } }
+/* On the iPhone the answer buttons stand at the foot, where the Mac's note would cover them (F-new-goal-note-covers-ratings):
+   there it stands at the top, in the page's own margin over the question. */
+.phone .review-goal { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 50px); left: 16px; right: 16px; translate: none; justify-content: center; }
+.phone .review-goal .mole { display: none; }
 .moment-mole { flex: none; align-self: flex-end; display: inline-grid; margin: 0 0 -14px 2px; }
 .moment-gem { flex: none; display: inline-grid; }
 .moment-gem > .gem { grid-area: 1 / 1; }

@@ -12708,6 +12708,47 @@ journey("phone: ⌘Z on a rating after leaving Review puts Today's minutes back 
   await until("Today takes the undone rating back", async () => (await ring.getAttribute("aria-label")) === before, 5000);
 }, "phone");
 
+// F-new-goal-note-covers-ratings
+journey("phone: the mole's note that the goal is met never covers the buttons he answers with", async (page) => {
+  // A goal of five minutes, so it is met with exercises still to come (the seed has few due).
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+  await tap(page, page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "5", exact: true }));
+  await tap(page, page.locator(".phone-back"));
+  await page.locator(".phone-settings").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const note = page.locator(".phone-full .review-goal");
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  const good = page.locator(".phone-full button:visible").filter({ hasText: /^Good/ });
+  /** How far the note reaches into the row of buttons, in px; 0 or less is clear of it. */
+  const over = (row: string) => page.evaluate((sel) => {
+    const n = document.querySelector(".phone-full .review-goal")?.getBoundingClientRect(), r = document.querySelector(`.phone-full ${sel}`)?.getBoundingClientRect();
+    return n && r ? Math.round(Math.min(n.bottom, r.bottom) - Math.max(n.top, r.top)) : 0;
+  }, row);
+  const end = page.locator(".phone-full .review-end");
+  let checked = 0;
+  for (let n = 0; n < 24 && checked < 2; n++) {
+    await sure.or(good).or(end).first().waitFor();
+    if (await end.count()) break;
+    if (await note.isVisible()) {
+      for (const row of ["#review-sure", ".review-rate"]) if ((await over(row)) > 0) throw new Error(`the goal note covers ${row} by ${await over(row)}px`);
+      checked++;
+    }
+    if (await good.count()) {
+      // After No idea a Good wants a second press (D237), so a miss is rated as one.
+      const again = page.locator(".phone-full button:visible").filter({ hasText: /^Again/ });
+      await tap(page, (await page.getByText("No idea", { exact: true }).count()) ? again : good);
+    } else {
+      // Three minutes an exercise (the cap), so the day's five are met in two.
+      await page.evaluate(() => { const real = Date.now; Date.now = () => real() + 181_000; });
+      await tap(page, (await page.locator(".phone-full textarea:visible").count()) ? page.getByRole("button", { name: "No idea" }) : sure);
+    }
+    await page.waitForTimeout(700);
+  }
+  if (!checked) throw new Error("the goal was never met mid-session, so the note never showed");
+}, "phone");
+
 journey("phone: Today starts the new day at midnight without a reload (F172)", async (page) => {
   // Left open overnight, Home kept yesterday's minutes (and "All caught up" with no Start review) until a reload.
   const late = new Date();
