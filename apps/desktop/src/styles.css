@@ -3790,7 +3790,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .moment-done { flex: none; height: 24px; padding: 0 10px; border-radius: 999px; color: var(--muted); font-size: 13px; font-weight: 600; }
 .moment-done:hover, .moment-done:focus-visible { background: var(--bg-hover); color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .review-goal { animation: none; } }
-/* On the iPhone the answer buttons stand at the foot, where the Mac's note would cover them (F-new-goal-note-covers-ratings):
+/* On the iPhone the answer buttons stand at the foot, where the Mac's note would cover them (F411):
    there it stands at the top, in the page's own margin over the question. */
 .phone .review-goal { bottom: auto; top: calc(env(safe-area-inset-top, 0px) + 50px); left: 16px; right: 16px; translate: none; justify-content: center; }
 .phone .review-goal .mole { display: none; }

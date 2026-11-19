@@ -12710,7 +12710,7 @@ journey("phone: ⌘Z on a rating after leaving Review puts Today's minutes back 
   await until("Today takes the undone rating back", async () => (await ring.getAttribute("aria-label")) === before, 5000);
 }, "phone");
 
-// F-new-goal-note-covers-ratings
+// F411
 journey("phone: the mole's note that the goal is met never covers the buttons he answers with", async (page) => {
   // A goal of five minutes, so it is met with exercises still to come (the seed has few due).
   await tap(page, page.getByRole("button", { name: "Open menu" }));
