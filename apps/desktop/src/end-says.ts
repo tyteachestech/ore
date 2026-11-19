@@ -3,7 +3,7 @@ import { VOICE, type MoleLine } from "./sfx";
 import { depthParts, depthText, longGapText, rescuedWorthSaying, type SessionEnd, type Today } from "./ore";
 
 /** One of the end screen's results (D252): a number, what it counts, and for a rare one what kind. */
-export type Tile = { key: "kept" | "depth" | "level" | "rescued" | "long" | "cut"; value: string; label: string; hint?: string; rare?: Said["rare"] };
+export type Tile = { key: "depth" | "cut"; value: string; label: string; hint?: string };
 
 /** A line of the mole's. `rare`: a thing most sessions don't have, which leads and wears its own mark (D247). */
 export type Said = { text: string; hint?: string; verdict?: true; rare?: { kind: "level"; skill: string } | { kind: "then" } | { kind: "long" } | { kind: "rescued" } };
@@ -12,7 +12,7 @@ export type Said = { text: string; hint?: string; verdict?: true; rare?: { kind:
 const SAID_MAX = 3;
 
 /** What the mole says at a session's end (D243), three lines at most (D247). The full end screen has him say
- *  only the first, and never a number that stands in the row under the ring (`endTiles`, `row`); the quick quiz lists them all. The rare things
+ *  only the first, and never a number that stands in the row under the ring (`row`); the quick quiz lists them all. The rare things
  *  lead, rarest first: a skill's new level, a long gap he recalled across, memories pulled back in time. Days
  *  of memory always has its place. What room is left goes to the everyday lines, in an order `roll` (0 to 1,
  *  one per end screen) shuffles: which true line shows varies, never whether something was won (D62). With
@@ -37,8 +37,10 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
   // `row` (the full end screen, F138): its numbers stand in the row under the ring, so he never says one of them
   // again. He keeps a rare thing the row had no room for, and then and now, which is never a number there.
   if (o.row) {
-    const shown = new Set<string>(endTiles(o).map((t) => t.key));
-    rare.splice(0, rare.length, ...rare.filter((l) => !shown.has(l.rare!.kind)));
+    // The session that met the day's goal says so in words. Only two things lead it: a skill's new level, the
+    // rarest thing a session has and small on its line under the ring (Tyler, 2026-11-19: "go" to his saying it
+    // again), and then and now, which points at what stands under the ring.
+    rare.splice(0, rare.length, ...rare.filter((l) => !o.closed || l.rare!.kind === "level" || l.rare!.kind === "then"));
     depth.length = 0;
   }
   const common: Said[] = o.minutesLeft ? [{ text: `${o.minutesLeft} min to today’s goal. Your call.` }] : [];
@@ -71,27 +73,18 @@ export function endVoice(first: Said | undefined, o: { session: SessionEnd; clos
   return (VOICE as readonly string[]).includes(mood) ? (mood as MoleLine) : null;
 }
 
-/** The end screen's row of results (D252), three at most, always in this order: memories kept, the
- *  days of memory they added, then the rarest true thing of the session (a skill's new level, memories pulled
- *  back in time, a long gap recalled across, else the gems cut). A session of misses has none (D62). */
-export function endTiles(o: { session: SessionEnd; ups: { skill?: string; name: string; level: number }[] }): Tile[] {
+/** The end screen's row of results (D252), two at most: the days of memory the session added, then the gems
+ *  it cut. The memories kept stand above the row, skill by skill (`SkillReel`), and a skill's new level on its
+ *  line there. A long gap and memories pulled back in time need a sentence to mean anything, so they are the
+ *  mole's to say (Tyler, 2026-11-19: "as a user idk what 'day gap recalled' means"). A session of misses has none (D62). */
+export function endTiles(o: { session: SessionEnd }): Tile[] {
   const s = o.session;
   if (s.kept === 0) return [];
-  const days = s.depth_days ?? 0, extra = s.depth_extra_days ?? 0, cut = s.cut?.length ?? 0, up = o.ups[0];
+  const days = s.depth_days ?? 0, extra = s.depth_extra_days ?? 0, cut = s.cut?.length ?? 0;
   const { n, unit } = depthParts(days);
-  const third: Tile | null = up
-    ? { key: "level", value: String(up.level), label: `${up.name} level`, rare: { kind: "level", skill: up.skill ?? "" } }
-    : rescuedWorthSaying(s)
-      ? { key: "rescued", value: String(s.rescued), label: "pulled back in time", hint: s.rescued === 1 ? "Due so long you were about to lose it, and you still recalled it" : "Due so long you were about to lose them, and you still recalled them", rare: { kind: "rescued" } }
-      : longGapText(s)
-        ? { key: "long", value: String(s.longest_days), label: "days since you saw one", hint: longGapText(s)!, rare: { kind: "long" } }
-        : cut
-          ? { key: "cut", value: String(cut), label: cut === 1 ? "gem cut" : "gems cut", hint: "Cut: you’d still recall it three weeks from now" }
-          : null;
   return [
-    { key: "kept", value: String(s.kept), label: s.kept === 1 ? "memory kept" : "memories kept" },
     ...(days > 0 ? [{ key: "depth", value: `+${n}`, label: `${unit} of memory`, hint: `How much longer the exercises you passed today will now last, added up (at most 30 days each)${extra > 0 && extra < days ? `; ${depthText(extra)} of it came after today’s goal` : ""}` } satisfies Tile] : []),
-    ...(third ? [third] : []),
+    ...(cut ? [{ key: "cut", value: String(cut), label: cut === 1 ? "gem cut" : "gems cut", hint: "Cut: you’d still recall it three weeks from now" } satisfies Tile] : []),
   ];
 }
 

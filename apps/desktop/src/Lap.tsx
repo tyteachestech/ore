@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Hint } from "./Hint";
-import { SkillIcon } from "./IconPicker";
 import { DotNumber, minutes } from "./Ring";
 import { still } from "./SideCursor";
+import { SkillIcon } from "./IconPicker";
 import type { Skill, Today } from "./ore";
 
 /** The end screen's minutes: where the day stood before this session, where it stands now, and the goal they
@@ -35,7 +35,7 @@ export function lapSteps({ from, to, goal }: Lap): number[] {
 }
 
 /** Counts the minutes up once `go` is set: quick up to the goal, then one beat per minute past it, so each
- *  bonus minute lands on its own (the ring's dots, the number and the "+N" tick together). `hit` counts the
+ *  bonus minute lands on its own (the ring's dots and the number together). `hit` counts the
  *  goal lines crossed on the way, the goal and twice the goal: the ring's two moments. Under Reduce Motion
  *  the end state is there at once and nothing is a moment. */
 export function useLap(plan: Lap, go: boolean): { min: number; hit: number } {
@@ -59,56 +59,56 @@ export function useLap(plan: Lap, go: boolean): { min: number; hit: number } {
   return at;
 }
 
-/** What stands in the end screen's ring: the day's minutes in the ring's own dots; beside "min", what came
- *  after the goal, on a chip in the ring's green (the key to the dots with a white centre); and under them one
- *  line, the skills this session kept memories in, smallest first, one at a time, resting on the one it fed
- *  most. */
-export function LapCentre({ min, goal, kept, skills, run }: { min: number; goal: number; kept: { skill: string; n: number }[]; skills: Skill[]; run: boolean }) {
-  const bonus = goal > 0 ? Math.max(0, min - goal) : 0;
-  // Three at most, so the roll is over in a couple of seconds; `kept` comes most first.
-  const rows = kept.slice(0, 3).reverse();
-  const calm = still();
-  const [row, setRow] = useState(calm ? rows.length - 1 : 0);
-  useEffect(() => {
-    if (!run || calm || row >= rows.length - 1) return;
-    const id = setTimeout(() => setRow((r) => r + 1), 900);
-    return () => clearTimeout(id);
-  }, [run, row]);
-  // A memory filed under no skill is named as the review picker names it.
-  const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
-  const all = kept.map((k) => `${name(k.skill)} ${k.n}`).join(" · ");
+/** What stands in the end screen's ring: the day's minutes in the ring's own dots, over "min", and nothing
+ *  else (Tyler, 2026-11-19: "the wording in the circle feels cramped"). Minutes past the goal are the ring's
+ *  own dots with a white centre; the memories kept are under it, skill by skill (`SkillReel`). */
+export function LapCentre({ min }: { min: number }) {
   return (
     <div className="end-lap">
       <span className="end-lap-n" role="img" aria-label={`${min} ${min === 1 ? "minute" : "minutes"} today`}><DotNumber value={min} height={56} /></span>
-      <span className="end-lap-min">
-        min
-        {bonus > 0 && (
-          <Hint text={`${bonus} ${bonus === 1 ? "minute" : "minutes"} past today’s goal of ${goal}`}>
-            <span className="end-lap-plus" role="img" tabIndex={0} aria-label={`${bonus} ${bonus === 1 ? "minute" : "minutes"} past today’s goal`}><DotNumber value={`+${bonus}`} height={10} /></span>
-          </Hint>
-        )}
-      </span>
-      {rows.length > 0 && run && (
-        <Hint text={`Memories kept this session · ${all}`}>
-          <span className="end-lap-reel" tabIndex={0}>
-            <span className="end-lap-rows" style={{ transform: `translateY(${-row * 24}px)` }}>
-              {rows.map((k, i) => {
-                const s = skills.find((x) => x.id === k.skill);
-                return (
-                  <span key={k.skill} className={i === row ? "end-lap-skill" : undefined} data-color={s?.color} aria-hidden={i !== row || undefined}>
-                    <SkillIcon icon={s?.icon} color={s?.color} dot />
-                    <span>{name(k.skill)}</span>
-                    <b>+{k.n}</b>
-                  </span>
-                );
-              })}
-            </span>
-          </span>
-        </Hint>
-      )}
+      <span className="end-lap-min">min</span>
     </div>
   );
 }
+
+/** Under the end screen's ring: the skills this session kept memories in, one line at a time (Tyler,
+ *  2026-11-19: the reel "below the green circle instead of inside it", and several skills "rotate ... in a
+ *  loop"). A line is the skill, how many memories it kept, and its new level when it went up one. A skill that
+ *  went up leads, then the ones it fed most; three at most, so no line is a long wait. One skill stands still,
+ *  and so does the first under Reduce Motion. A memory filed under no skill is named as the review picker names it. */
+export function SkillReel({ kept, ups, skills, run }: { kept: { skill: string; n: number }[]; ups: { skill?: string; level: number }[]; skills: Skill[]; run: boolean }) {
+  const level = (id: string) => ups.find((u) => u.skill === id)?.level;
+  const all = [...kept.filter((k) => level(k.skill)), ...kept.filter((k) => !level(k.skill))], rows = all.slice(0, 3);
+  const [row, setRow] = useState(0);
+  const loop = run && rows.length > 1 && !still();
+  useEffect(() => {
+    if (!loop) return;
+    const id = setInterval(() => void (document.hidden || setRow((r) => (r + 1) % rows.length)), REEL_MS);
+    return () => clearInterval(id);
+  }, [loop, rows.length]);
+  if (!rows.length) return null;
+  const text = (k: { skill: string; n: number }) => `${skills.find((s) => s.id === k.skill)?.name ?? "No skill"}, ${k.n} kept${level(k.skill) ? `, level ${level(k.skill)}` : ""}`;
+  const k = rows[row] ?? rows[0]!, s = skills.find((x) => x.id === k.skill), said = all.map(text).join(" · ");
+  return (
+    // Its room is held from the start, so the results under it never move when it comes in.
+    <p className="end-reel" data-wait={!run || undefined}>
+      <span className="sr-only">{said}</span>
+      {run && (
+        // Three lines take turns; a session that fed more names them all on hover and focus.
+        <Hint key={k.skill} text={`Memories kept this session · ${said}`} off={all.length <= rows.length}>
+        <span className="end-reel-row" data-color={s?.color} aria-hidden="true" tabIndex={all.length > rows.length ? 0 : undefined}>
+          <SkillIcon icon={s?.icon} color={s?.color} dot />
+          <span className="end-reel-name">{s?.name ?? "No skill"}</span>
+          <b>{k.n} kept</b>
+          {level(k.skill) && <b className="end-reel-level">level {level(k.skill)}</b>}
+        </span>
+        </Hint>
+      )}
+    </p>
+  );
+}
+/** How long a skill's line stands before the next: long enough to read a name, a count and a level. */
+const REEL_MS = 2600;
 
 /** White sparkles over the ring's bonus dots, for as long as the end screen is up: small crosses of dots that
  *  open and fade, only on the stretch past the goal, so they also say how far it went. A few past the goal,

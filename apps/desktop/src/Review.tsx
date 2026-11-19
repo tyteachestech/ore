@@ -7,7 +7,6 @@ import { Grow } from "./Grow";
 import { Ask, NO_ASK, type AskChat } from "./Ask";
 import { Cutting, Gem } from "./Gem";
 import { EndMark } from "./EndMark";
-import { SkillIcon } from "./IconPicker";
 import { Mole, Mound } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
 import { newSession, rated, sfx, warm, type Sound } from "./sfx";
@@ -19,12 +18,11 @@ import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { afterAnswer, cardQuotes, lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { tick } from "./phone/haptics";
-import { PixelTry } from "./PixelIcon";
 import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
 import { endMood, endSays, endTiles, endVoice, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
-import { LapCentre, lapPlan, overDots, Sparkles, useLap } from "./Lap";
+import { LapCentre, lapPlan, SkillReel, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useDay, useFocusWhileMounted, useLibraryChanges, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -72,7 +70,7 @@ type Put = { id: string; before: DueEntry[]; after: DueEntry[] | null; off: Set<
 type Rating = 1 | 2 | 3 | 4;
 /** The session receipt, and today before and after it (for the ring and level-ups). */
 /** `next`: the oldest try still to try on his own work (D148), shown once on the end screen; null when none. */
-type End = { session: SessionEnd; today: Today; before: Today | null; next: Try | null; dig?: { skill: string; goal: string } | null };
+type End = { session: SessionEnd; today: Today; before: Today | null; dig?: { skill: string; goal: string } | null };
 
 /** The remixed version shown, for the CLI calls that act on it (D66). */
 const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.variant)] : []);
@@ -472,8 +470,6 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
         notify(nothingDue(before.current, pick, source));
         return onClose();
       }
-      // The try line is a nicety: the end screen never waits on or fails for it.
-      const next = ore<Try[]>("tries").then((ts) => ts.filter((t) => t.status === "open").at(-1) ?? null, () => null);
       // So is the dig a finished session may offer (D325): one skill, of the ones he reviewed; the Mac's mole reads it.
       const dig = quick || source || PHONE ? null : ore<{ skill: string; goal: string } | null>("dig", "--ready", ...(pick ?? []).map((s) => opt("skill", s))).catch(() => null);
       // Home draws the Today it last read until a fresh one lands (F125): hand it this one,
@@ -482,7 +478,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       rememberToday(today);
       // Left after midnight: the ring is the new day's, which this session added only what it rated since to.
       if (dayTurned()) newDay(today, Math.min(turnedMs.current, today.active_ms));
-      setEnd({ session: receipt, today, before: before.current, next: await next, dig: await dig });
+      setEnd({ session: receipt, today, before: before.current, dig: await dig });
     } catch (e) {
       notify(errorText(e), "error");
       onClose();
@@ -1230,7 +1226,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
             </MoleSays>
           </div>
         )}
-        {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onTry={(t) => (onClose(), onOpenSource(t.item, t.id))} onDig={onDig} />}
+        {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onDig={onDig} />}
 
         {!end && card && entry && (
           <div className="review-card" key={`${card.id}-${done}-${left}`}>
@@ -1654,10 +1650,10 @@ const TALLY_GAP_MS = 320;
 /** How often, when the cart comes, the mole is asleep on it. */
 const NAP_SHARE = 2 / 3;
 
-/** The end screen's row of results (D252, after Duolingo's lesson-complete row): three at most, each a
+/** The end screen's row of results (D252, after Duolingo's lesson-complete row): two at most, each a
  *  mark beside a number in dots (D259) over what it counts, landing one after another once `go`, then still. The number's text
- *  is in the page throughout for a reader. A rare one wears its skill's colour or the won-back gold. */
-function Tally({ tiles, go, skills, onDone }: { tiles: Tile[]; go: boolean; skills: Skill[]; onDone: () => void }) {
+ *  is in the page throughout for a reader. */
+function Tally({ tiles, go, onDone }: { tiles: Tile[]; go: boolean; onDone: () => void }) {
   const [n, setN] = useState(still() ? tiles.length : 0);
   const done = useRef(onDone);
   done.current = onDone;
@@ -1671,10 +1667,9 @@ function Tally({ tiles, go, skills, onDone }: { tiles: Tile[]; go: boolean; skil
   return (
     <ul className="end-tally">
       {tiles.map((t, i) => {
-        const sk = t.rare?.kind === "level" ? skills.find((x) => x.id === (t.rare as { skill: string }).skill) : undefined;
-        const mark = t.key === "level" ? <SkillIcon icon={sk?.icon} color={sk?.color} dot /> : t.key === "rescued" ? <Gem kind="cut" size={32} seam /> : t.key === "cut" ? <Gem kind="cut" size={32} /> : <EndMark kind={t.key === "kept" ? "gem" : t.key === "long" ? "comet" : "calendar"} />;
+        const mark = t.key === "cut" ? <Gem kind="cut" size={32} /> : <EndMark kind="calendar" />;
         const li = (
-          <li key={t.key} data-key={t.key} data-rare={t.rare?.kind} data-color={sk?.color} data-wait={i >= n || undefined} tabIndex={t.hint ? 0 : undefined}>
+          <li key={t.key} data-key={t.key} data-wait={i >= n || undefined} tabIndex={t.hint ? 0 : undefined}>
             <span className="end-tally-pair">
               <span className="end-tally-mark" aria-hidden="true">{mark}</span>
               <b><CountUp value={t.value} go={go && i < n} /><span className="sr-only">{t.value}</span></b>
@@ -1690,7 +1685,7 @@ function Tally({ tiles, go, skills, onDone }: { tiles: Tile[]; go: boolean; skil
 
 /** The end of a session (D62): the ring fills by this session's minutes and bursts if it closed
  *  just now, a skill that went up a level says so, and the count is of memories kept, never a score. */
-export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onTry: (t: Try) => void; onDig?: (skill: string) => void }) {
+export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onDig?: (skill: string) => void }) {
   const { session: s, today: t, before: b } = end;
   const part = (x: Today | null) => (!x ? 0 : x.met ? 1 : x.goal_ms ? x.active_ms / x.goal_ms : 0);
   const closed = t.met && !!b && !b.met;
@@ -1773,7 +1768,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
     session: s, today: t, closed, short, roll, ups: named, plain: quick, napped: nap, row: !quick,
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   });
-  const tiles = endTiles({ session: s, ups: named });
+  const tiles = endTiles({ session: s });
   // His pose is for the line he says (D258).
   // He says a word aloud as he takes it, on the few days that earn one (D330); the quick quiz has no mole.
   const aloud = quick ? null : endVoice(said[0], { session: s, closed, napped: nap });
@@ -1832,10 +1827,11 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
             )}
             <div className="end-ring">
               {ring}
-              {away ? <LapCentre min={lap.min} goal={plan.goal} kept={s.kept_skills ?? []} skills={skills} run={counted && full} /> : cluster}
+              {away ? <LapCentre min={lap.min} /> : cluster}
             </div>
           </div>
-          <Tally tiles={tiles} go={full} skills={skills} onDone={() => setTallied(true)} />
+          <SkillReel kept={s.kept_skills ?? []} ups={named} skills={skills} run={counted && full} />
+          <Tally tiles={tiles} go={full} onDone={() => setTallied(true)} />
           {held}
         </>
       )}
@@ -1884,18 +1880,6 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
             <span>
               <span className="review-try-plan">{end.dig.goal}</span>
               <span className="review-try-from">Dig · {skills.find((x) => x.id === end.dig!.skill)?.name}</span>
-            </span>
-          </button>
-        </Hint>
-      )}
-      {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
-      {end.next && (
-        <Hint text="To try on your own work · opens the passage">
-          <button className="review-try" onClick={() => onTry(end.next!)}>
-            <PixelTry size={16} aria-hidden="true" />
-            <span>
-              <span className="review-try-plan">{end.next.note || `“${passageText(end.next.exact)}”`}</span>
-              <span className="review-try-from">{end.next.item_title}</span>
             </span>
           </button>
         </Hint>

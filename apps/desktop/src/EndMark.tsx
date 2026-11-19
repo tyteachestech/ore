@@ -5,25 +5,6 @@ import type { CSSProperties } from "react";
    line: a digit is how lit that cell is (1 faint to 9 full), and a dot grows and brightens with it, so a face
    in shadow is small dim dots and a face in light is big bright ones. Edit a sprite here by hand. */
 const MARKS = {
-  // Memories kept: a cut gem lit from the top left; every face keeps enough light to hold the outline.
-  gem: [
-    "................",
-    "................",
-    "....1666666.....",
-    "...168999984....",
-    "...6689999744...",
-    "..566799995443..",
-    ".57777888844443.",
-    ".28888655533331.",
-    "..388865543331..",
-    "...4887554332...",
-    "....58855332....",
-    ".....686532.....",
-    "......6643......",
-    "......163.......",
-    ".......1........",
-    "................",
-  ],
   // Days or months of memory: a calendar page whose later days are lit, time gained (an hourglass read as a countdown; Tyler, 2026-11-13).
   calendar: [
     "................",
@@ -43,38 +24,12 @@ const MARKS = {
     "................",
     "................",
   ],
-  // A long gap recalled across: a comet, from far off and still bright, its tail in three streaks.
-  comet: [
-    "................",
-    "................",
-    "............22..",
-    "...........33...",
-    ".........343....",
-    ".......2553.....",
-    "......465332....",
-    "....3676344.....",
-    "...6886354......",
-    "..3999652.......",
-    "..8999941.......",
-    "..999996........",
-    "..799992........",
-    "..17983.........",
-    "................",
-    "................",
-  ],
 } as const;
 export type EndMarkKind = keyof typeof MARKS;
 
-/* The loop (D260): which dots move, and how many ms into the loop each takes its turn. The gem's
-   faces catch a light passing from the top left, the calendar's added days light one by one, and the comet's tail
-   streams off its head. A dot that sits still gets null. The moves themselves are `end-*` in styles.css. */
-const HEAD = { x: 4.5, y: 10.5 };
-function turn(kind: EndMarkKind, x: number, y: number, lit: number, day: number): number | null {
-  if (kind === "gem") return Math.round((x + y / 2) * 90);
-  if (kind === "calendar") return y >= 7 && lit >= 4 ? day * 140 : null;
-  const far = Math.hypot(x - HEAD.x, y - HEAD.y);
-  return far > 3.2 ? Math.round((far - 3) * 85) : null;
-}
+/* The loop (D260): which dots move, and how many ms into the loop each takes its turn: the calendar's added
+   days light one by one. A dot that sits still gets null. The move itself is `end-day` in styles.css. */
+const turn = (y: number, lit: number, day: number): number | null => (y >= 7 && lit >= 4 ? day * 140 : null);
 
 /** A result's mark, `size` px square. Decorative: the words beside it say what it counts. */
 export function EndMark({ kind, size = 48 }: { kind: EndMarkKind; size?: number }) {
@@ -86,8 +41,8 @@ export function EndMark({ kind, size = 48 }: { kind: EndMarkKind; size?: number 
           if (t === ".") return null;
           const a = Number(t) / 9;
           const o = +(0.5 + 0.5 * a).toFixed(2);
-          const at = turn(kind, x, y, Number(t), day);
-          if (kind === "calendar" && at !== null) day++;
+          const at = turn(y, Number(t), day);
+          if (at !== null) day++;
           return (
             <circle
               key={`${x}-${y}`}

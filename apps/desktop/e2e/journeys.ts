@@ -7328,8 +7328,9 @@ journey("review: Later puts the exercise off to the end of the session with noth
     await reveal(page);
     await page.getByRole("button", { name: "Later", exact: true }).click();
     await doneButton.waitFor();
-    const kept = await page.locator('.end-tally [data-key="kept"] .sr-only').textContent();
-    if (kept !== String(total - 1)) throw new Error(`the end screen counts ${kept} kept for ${total - 1} rated`);
+    // The memories kept stand under the ring, skill by skill: a reader's line names them all.
+    const kept = [...((await page.locator(".end-reel .sr-only").textContent()) ?? "").matchAll(/(\d+) kept/g)].reduce((n, m) => n + Number(m[1]), 0);
+    if (kept !== total - 1) throw new Error(`the end screen counts ${kept} kept for ${total - 1} rated`);
     if (logged() !== total - 1) throw new Error(`${logged()} reviews logged for ${total - 1} rated`);
     const lines = reviewLog().slice(log.length).trim().split("\n").length;
     if (lines !== total - 1) throw new Error(`the review log gained ${lines} lines for ${total - 1} rated`);
@@ -8940,18 +8941,19 @@ journey("highlight note: a click on the highlight in the instant its save lands 
   if (mine?.note !== "Ask how sure before checking") throw new Error(`the note was lost: ${JSON.stringify(mine)}`);
 });
 
-journey("try it: the end of a review shows the oldest open try, and a click opens its passage (D148)", async (page) => {
+journey("the end of a review closes the session: no try line even with a try open, and under the ring a line for the skill it fed", async (page) => {
   const calls = oreCalls(page);
   await startReview(page, null);
   await reveal(page);
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await page.waitForTimeout(300);
   await page.keyboard.press("Escape");
-  const line = page.locator(".review-try");
-  await line.waitFor();
-  if (!(await line.innerText()).includes("Outline Thursday's video on the spine before writing")) throw new Error(`the end screen shows the wrong try: ${await line.innerText()}`);
-  await line.click();
-  await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
+  await page.locator(".review-end .end-reel-row").waitFor();
+  if (!/\d+ kept/.test(await page.locator(".end-reel-row").innerText())) throw new Error(`the skill's line reads ${await page.locator(".end-reel-row").innerText()}`);
+  const open = ((await ore("tries")) as { status: string }[]).filter((t) => t.status === "open").length;
+  if (!open) throw new Error("the seed has no open try, so this journey proves nothing");
+  if (await page.locator(".review-try:not(.review-dig)").count()) throw new Error("the end screen shows a try line");
+  await page.keyboard.press("Enter");
   await page.locator(".review").waitFor({ state: "detached" });
   await calls.undoAll(); // the rating, for the journeys after this one
 });
@@ -12708,6 +12710,47 @@ journey("phone: ⌘Z on a rating after leaving Review puts Today's minutes back 
   await until("Today takes the undone rating back", async () => (await ring.getAttribute("aria-label")) === before, 5000);
 }, "phone");
 
+// F411
+journey("phone: the mole's note that the goal is met never covers the buttons he answers with", async (page) => {
+  // A goal of five minutes, so it is met with exercises still to come (the seed has few due).
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+  await tap(page, page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "5", exact: true }));
+  await tap(page, page.locator(".phone-back"));
+  await page.locator(".phone-settings").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  const note = page.locator(".phone-full .review-goal");
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  const good = page.locator(".phone-full button:visible").filter({ hasText: /^Good/ });
+  /** How far the note reaches into the row of buttons, in px; 0 or less is clear of it. */
+  const over = (row: string) => page.evaluate((sel) => {
+    const n = document.querySelector(".phone-full .review-goal")?.getBoundingClientRect(), r = document.querySelector(`.phone-full ${sel}`)?.getBoundingClientRect();
+    return n && r ? Math.round(Math.min(n.bottom, r.bottom) - Math.max(n.top, r.top)) : 0;
+  }, row);
+  const end = page.locator(".phone-full .review-end");
+  let checked = 0;
+  for (let n = 0; n < 24 && checked < 2; n++) {
+    await sure.or(good).or(end).first().waitFor();
+    if (await end.count()) break;
+    if (await note.isVisible()) {
+      for (const row of ["#review-sure", ".review-rate"]) if ((await over(row)) > 0) throw new Error(`the goal note covers ${row} by ${await over(row)}px`);
+      checked++;
+    }
+    if (await good.count()) {
+      // After No idea a Good wants a second press (D237), so a miss is rated as one.
+      const again = page.locator(".phone-full button:visible").filter({ hasText: /^Again/ });
+      await tap(page, (await page.getByText("No idea", { exact: true }).count()) ? again : good);
+    } else {
+      // Three minutes an exercise (the cap), so the day's five are met in two.
+      await page.evaluate(() => { const real = Date.now; Date.now = () => real() + 181_000; });
+      await tap(page, (await page.locator(".phone-full textarea:visible").count()) ? page.getByRole("button", { name: "No idea" }) : sure);
+    }
+    await page.waitForTimeout(700);
+  }
+  if (!checked) throw new Error("the goal was never met mid-session, so the note never showed");
+}, "phone");
+
 journey("phone: Today starts the new day at midnight without a reload (F172)", async (page) => {
   // Left open overnight, Home kept yesterday's minutes (and "All caught up" with no Start review) until a reload.
   const late = new Date();
@@ -15966,13 +16009,25 @@ journey("phone: every field on every screen stays in sight when the keyboard com
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await tap(page, page.getByRole("button", { name: "Exercise actions" }));
   await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
+  // The form opens once the sheet has let go (F412): looked at before that, it had no fields to check, and the
+  // Esc meant to cancel the edit left the session instead.
+  await page.locator(".review-edit textarea").first().waitFor();
   note(...(await coveredFields(page, "Review, Edit exercise")));
   await esc();
-  for (let i = 0; i < 12 && !(await page.locator(".phone-full textarea:visible").count()); i++) {
-    const good = page.locator(".phone-full button:visible").filter({ hasText: /^Good/ });
-    if (!(await good.count())) await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+  await page.locator(".review-edit").waitFor({ state: "detached" });
+  // Each step waits for the exercise it acts on, not a fixed pause.
+  const answer = page.locator(".phone-full textarea:visible");
+  const good = page.locator(".phone-full button:visible").filter({ hasText: /^Good/ });
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  const asked = page.locator(".phone-full .review-q");
+  for (let i = 0; i < 12; i++) {
+    await answer.or(good).or(sure).first().waitFor();
+    if (await answer.count()) break;
+    if (!(await good.count())) await tap(page, sure);
+    await good.waitFor();
+    const was = await asked.innerText();
     await tap(page, good);
-    await Bun.sleep(400);
+    await until("the next exercise", async () => (await answer.count()) > 0 || ((await asked.count()) > 0 && (await asked.innerText()) !== was && !(await good.count())));
   }
   note(...(await coveredFields(page, "Review, Explain")));
   await tap(page, page.getByRole("button", { name: "Leave review" }));
