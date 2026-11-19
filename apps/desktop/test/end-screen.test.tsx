@@ -616,9 +616,10 @@ test("on the full end screen the mole never says a number the row under the ring
   const { endSays, endTiles } = await import("../src/end-says");
   const base = { today: today(true, 600_000) as never, closed: false, short: false, ups: [], minutesLeft: null, row: true };
   const session = (o: Record<string, unknown>) => ({ id: "s", reviews: 8, kept: 5, rescued: 0, ...o }) as never;
-  // A new level stands on its skill's line under the ring, so he gives his verdict instead of saying it again; and never the days of memory.
-  expect(endSays({ ...base, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ depth_days: 30 }) })[0]!.text).toBe("Gneiss work.");
-  expect(endSays({ ...base, closed: true, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ depth_days: 30 }) })[0]!.text).toBe("Goal met. You rock.");
+  // A new level is the rarest thing a session has, so he says it, on the day the goal was met too; and never the days of memory.
+  expect(endSays({ ...base, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ depth_days: 30 }) })[0]!.text).toBe("AI hit level 3.");
+  expect(endSays({ ...base, closed: true, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ depth_days: 30 }) })[0]!.text).toBe("AI hit level 3.");
+  expect(endSays({ ...base, closed: true, session: session({ depth_days: 30 }) })[0]!.text).toBe("Goal met. You rock.");
   // A long gap and memories pulled back are no longer numbers in the row (Tyler, 2026-11-19: "as a user idk what
   // 'day gap recalled' means"), so they are his to say, in a sentence.
   const gap = { ...base, session: session({ depth_days: 30, longest_days: 18 }) };
@@ -628,8 +629,8 @@ test("on the full end screen the mole never says a number the row under the ring
   // The session that met the day's goal says so in words, whatever else was rare.
   expect(endSays({ ...gap, closed: true })[0]!.text).toBe("Goal met. You rock.");
   expect(endSays({ ...base, closed: true, session: session({ rescued: 2 }) })[0]!.text).toBe("Goal met. You rock.");
-  // A rare thing with no place on the screen is still his to say: the level has its line, he says the gap.
-  expect(endSays({ ...base, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ longest_days: 18 }) })[0]!.text).toBe("18 days gone and you still had it.");
+  // The level leads a long gap.
+  expect(endSays({ ...base, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ longest_days: 18 }) })[0]!.text).toBe("AI hit level 3.");
   // Then and now is never in the row.
   expect(endSays({ ...base, closed: true, session: session({ longest_days: 18, then_now: { then_ts: new Date(Date.now() - 28 * 864e5).toISOString() } }) })[0]!.rare?.kind).toBe("then");
 });

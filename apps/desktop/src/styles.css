@@ -2454,7 +2454,8 @@ button.home-plan:hover { color: var(--text); }
 .end-reel-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .end-reel-row b { flex: none; font: 400 12px/1 var(--mono); color: var(--muted); }
 .end-reel-row .end-reel-level { color: var(--skill, var(--text)); }
-.end-reel-row .skill-icon.glyph { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; }
+/* 24px: three device pixels a dot, so the icon is crisp (D170). */
+.end-reel-row .skill-icon.glyph { width: 24px; height: 24px; -webkit-mask-size: 24px; mask-size: 24px; }
 @media (prefers-reduced-motion: reduce) { .end-reel-row { animation: none; } }
 /* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
    Each lands in hard steps, one after another, then is still. */

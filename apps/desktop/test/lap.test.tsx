@@ -141,6 +141,10 @@ test("several skills take turns in a loop; one skill stands still; three lines a
     const one = await mount(<SkillReel kept={kept.slice(0, 1)} ups={[]} skills={skills} run />);
     await act(async () => void jest.advanceTimersByTime(9000));
     expect(one.querySelector(".end-reel-row")!.textContent).toBe("Learning5 kept");
+    // A skill with an icon shows it, in its colour; one without gets its colour's dot.
+    const drawn = await mount(<SkillReel kept={[{ skill: "b", n: 1 }]} ups={[]} skills={[{ id: "b", name: "Biology", color: "green", icon: "mc:leaf" }] as never} run />);
+    expect(drawn.querySelector('.end-reel-row > .skill-icon.glyph[data-color="green"]')).not.toBeNull();
+    expect(one.querySelector(".end-reel-row > .skill-icon.dot")).not.toBeNull();
     // Before the minutes have counted its room is held and nothing is shown.
     const waiting = await mount(<SkillReel kept={kept} ups={[]} skills={skills} run={false} />);
     expect([waiting.querySelectorAll(".end-reel[data-wait]").length, waiting.querySelectorAll(".end-reel-row").length]).toEqual([1, 0]);
