@@ -86,8 +86,6 @@ const DIGITS: Record<string, string[]> = {
   "9": ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
   "+": ["00000", "00100", "00100", "11111", "00100", "00100", "00000"],
   ".": ["00000", "00000", "00000", "00000", "00000", "00000", "00100"],
-  // Minutes ("11m" in the end screen's ring): a lowercase m, five rows tall on the digits' baseline; drawn at half their size.
-  m: ["00000", "00000", "11010", "10101", "10101", "10101", "10101"],
 };
 
 /** A number drawn in the ring's own fat round dots (D242), `height` px tall: a screen's hero number where the dot

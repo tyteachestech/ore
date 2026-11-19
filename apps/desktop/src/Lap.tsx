@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { Hint } from "./Hint";
+import { SkillIcon } from "./IconPicker";
 import { DotNumber, minutes } from "./Ring";
 import { still } from "./SideCursor";
-import type { Today } from "./ore";
+import type { Skill, Today } from "./ore";
 
 /** The end screen's minutes: where the day stood before this session, where it stands now, and the goal they
  *  are measured against (0 when today has none: an off day under Weekdays only). */
@@ -33,7 +35,7 @@ export function lapSteps({ from, to, goal }: Lap): number[] {
 }
 
 /** Counts the minutes up once `go` is set: quick up to the goal, then one beat per minute past it, so each
- *  bonus minute lands on its own (the ring's dots and the number tick together). `hit` counts the
+ *  bonus minute lands on its own (the ring's dots, the number and the "+N" tick together). `hit` counts the
  *  goal lines crossed on the way, the goal and twice the goal: the ring's two moments. Under Reduce Motion
  *  the end state is there at once and nothing is a moment. */
 export function useLap(plan: Lap, go: boolean): { min: number; hit: number } {
@@ -57,14 +59,53 @@ export function useLap(plan: Lap, go: boolean): { min: number; hit: number } {
   return at;
 }
 
-/** What stands in the end screen's ring: the day's minutes in the ring's own dots, centred, and a small "m" in
- *  the same dots hanging off their right on their baseline, so the number stays in the middle whatever its width
- *  ("11m", Tyler 2026-11-19: "the wording in the circle feels cramped"; "making 'm' small and keeping 11 mostly centred"). What came after the goal is the ring's
- *  dots with a white centre, and the memories kept are in the row under it. */
-export function LapCentre({ min }: { min: number }) {
+/** What stands in the end screen's ring: the day's minutes in the ring's own dots; beside "min", what came
+ *  after the goal, on a chip in the ring's green that says so, "+1 past goal" (the key to the dots with a white
+ *  centre); and under them one line, the skills this session kept memories in, "Learning +1 kept", smallest first, one at a time, resting on the one it fed
+ *  most. */
+export function LapCentre({ min, goal, kept, skills, run }: { min: number; goal: number; kept: { skill: string; n: number }[]; skills: Skill[]; run: boolean }) {
+  const bonus = goal > 0 ? Math.max(0, min - goal) : 0;
+  // Three at most, so the roll is over in a couple of seconds; `kept` comes most first.
+  const rows = kept.slice(0, 3).reverse();
+  const calm = still();
+  const [row, setRow] = useState(calm ? rows.length - 1 : 0);
+  useEffect(() => {
+    if (!run || calm || row >= rows.length - 1) return;
+    const id = setTimeout(() => setRow((r) => r + 1), 900);
+    return () => clearTimeout(id);
+  }, [run, row]);
+  // A memory filed under no skill is named as the review picker names it.
+  const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
+  const all = kept.map((k) => `${name(k.skill)} ${k.n}`).join(" · ");
   return (
     <div className="end-lap">
-      <span className="end-lap-n" role="img" aria-label={`${min} ${min === 1 ? "minute" : "minutes"} today`}><DotNumber value={min} height={56} /><span className="end-lap-m"><DotNumber value="m" height={28} /></span></span>
+      <span className="end-lap-n" role="img" aria-label={`${min} ${min === 1 ? "minute" : "minutes"} today`}><DotNumber value={min} height={56} /></span>
+      <span className="end-lap-min">
+        min
+        {bonus > 0 && (
+          <Hint text={`${bonus} ${bonus === 1 ? "minute" : "minutes"} past today’s goal of ${goal}`}>
+            <span className="end-lap-plus" role="img" tabIndex={0} aria-label={`${bonus} ${bonus === 1 ? "minute" : "minutes"} past today’s goal`}><DotNumber value={`+${bonus}`} height={10} />past goal</span>
+          </Hint>
+        )}
+      </span>
+      {rows.length > 0 && run && (
+        <Hint text={`Memories kept this session · ${all}`}>
+          <span className="end-lap-reel" tabIndex={0}>
+            <span className="end-lap-rows" style={{ transform: `translateY(${-row * 24}px)` }}>
+              {rows.map((k, i) => {
+                const s = skills.find((x) => x.id === k.skill);
+                return (
+                  <span key={k.skill} className={i === row ? "end-lap-skill" : undefined} data-color={s?.color} aria-hidden={i !== row || undefined}>
+                    <SkillIcon icon={s?.icon} color={s?.color} dot />
+                    <span>{name(k.skill)}</span>
+                    <b>+{k.n} kept</b>
+                  </span>
+                );
+              })}
+            </span>
+          </span>
+        </Hint>
+      )}
     </div>
   );
 }
