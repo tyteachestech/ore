@@ -15894,6 +15894,143 @@ journey("phone: the long-press menu grows from its row, which stays lit while th
   if (!lit) throw new Error("the row he pressed is not lit while its menu is open");
 }, "phone");
 
+/** Fields a person types in, on whatever is open (not file pickers, switches or choices). */
+const FIELDS = "input:not([type=file],[type=hidden],[type=checkbox],[type=radio],[type=range]):visible, textarea:visible, [contenteditable=true]:visible";
+
+/** iOS's keyboard going away again. */
+const keyboardDown = (page: Page) =>
+  page.evaluate(() => {
+    const vv = window.visualViewport!;
+    delete (vv as unknown as Record<string, unknown>).height;
+    vv.dispatchEvent(new Event("resize"));
+  });
+
+/** Why a focused field is out of sight with a keyboard `kb` tall: under it, above the screen or under a header; "" when in sight. */
+const outOfSight = (f: Locator, kb: number) =>
+  f.evaluate((el, kb) => {
+    const r = el.getBoundingClientRect();
+    const line = Math.min(r.height, 24); // a tall field shows at least its first line
+    if (r.top + line > innerHeight - kb + 0.5) return `under the keyboard (top ${Math.round(r.top)}, keyboard from ${innerHeight - kb})`;
+    if (r.top < 0) return "above the screen";
+    const hit = document.elementFromPoint(r.left + Math.min(20, r.width / 2), r.top + line / 2);
+    return hit && (el.contains(hit) || hit.contains(el)) ? "" : `covered by ${hit?.className || hit?.tagName}`;
+  }, kb);
+
+/** Every field on screen, scrolled to where it sits lowest, tapped, then iOS's keyboard (336 pt, with its bar):
+ *  the ones it covers, or a header covers, as "where › label: why". Then, with the keyboard up, focus moved from
+ *  field to field as iOS's ‹ › does, with no resize to say so. */
+async function coveredFields(page: Page, where: string, kb = 336): Promise<string[]> {
+  const out: string[] = [];
+  const fields = page.locator(FIELDS);
+  const seen: Locator[] = [];
+  const label = (f: Locator) => f.evaluate((el) => el.getAttribute("aria-label") || el.getAttribute("placeholder") || (el as HTMLInputElement).name || el.className);
+  for (let i = 0; i < (await fields.count()); i++) {
+    const f = fields.nth(i);
+    // Off to the side (the note page waiting beside a source) isn't on screen to tap.
+    if (await f.evaluate((el) => { const r = el.getBoundingClientRect(); return r.right <= 0 || r.left >= innerWidth; })) continue;
+    seen.push(f);
+    await f.evaluate((el) => el.scrollIntoView({ block: "end" }));
+    await tap(page, f);
+    await keyboardUp(page, kb);
+    await Bun.sleep(400);
+    const why = await outOfSight(f, kb);
+    if (why) out.push(`${where} › ${await label(f)}: ${why}`);
+    await keyboardDown(page);
+    await f.evaluate((el) => (el as HTMLElement).blur());
+  }
+  if (seen.length > 1) {
+    await tap(page, seen[0]!);
+    await keyboardUp(page, kb);
+    for (const f of seen.slice(1)) {
+      await f.evaluate((el) => (el as HTMLElement).focus());
+      await Bun.sleep(400);
+      const why = await outOfSight(f, kb);
+      if (why) out.push(`${where} › ${await label(f)}, focus moved to it with the keyboard up: ${why}`);
+    }
+    await keyboardDown(page);
+    await seen.at(-1)!.evaluate((el) => (el as HTMLElement).blur());
+  }
+  return out;
+}
+
+journey("phone: every field on every screen stays in sight when the keyboard comes up, also when focus moves with it up (Codex native scout)", async (page) => {
+  const bad: string[] = [];
+  const note = (...l: string[]) => bad.push(...l);
+  const esc = async () => { await page.keyboard.press("Escape"); await Bun.sleep(300); };
+  const back = () => tap(page, page.locator(".phone-back").first());
+  // Settings, with the reminder on so its time shows.
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  note(...(await coveredFields(page, "drawer")));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "New skill" }));
+  note(...(await coveredFields(page, "drawer, New skill")));
+  await esc();
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+  await page.locator(".phone-settings h1").waitFor();
+  const reminder = page.getByRole("switch", { name: "Reminder" });
+  if ((await reminder.getAttribute("aria-checked")) !== "true") await tap(page, reminder);
+  await page.locator(".phone-time").waitFor();
+  note(...(await coveredFields(page, "Settings")));
+  await back();
+  // Search and Add a link.
+  await tap(page, page.getByRole("button", { name: "Search" }));
+  note(...(await coveredFields(page, "Search")));
+  await tap(page, page.locator(".palette-close"));
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  note(...(await coveredFields(page, "Add a link")));
+  await esc();
+  await page.goto(page.url());
+  await page.locator(".phone-app").waitFor();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  // A source: its page, Find, the note, a highlight's note, Finish.
+  await phoneSource(page, TESTING);
+  note(...(await coveredFields(page, "source")));
+  await tap(page, page.locator(".phone-tools > :last-child"));
+  note(...(await coveredFields(page, "source, Find")));
+  await esc();
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
+  note(...(await coveredFields(page, "source, Finish")));
+  await esc();
+  // A highlight's note, from Collected.
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  await tap(page, page.locator("aside.mynotes button").filter({ hasText: "after one week" }));
+  await page.locator(".popup .field").waitFor();
+  note(...(await coveredFields(page, "highlight's note")));
+  await esc();
+  await tap(page, page.getByRole("button", { name: "Back" }));
+  await page.locator(".phone-full").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Today" }));
+  // Review: Edit exercise, then an Explain answer.
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  await page.locator(".review-q").waitFor();
+  await tap(page, page.getByRole("radio", { name: "Think so" }));
+  await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+  await tap(page, page.getByRole("button", { name: "Exercise actions" }));
+  await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
+  note(...(await coveredFields(page, "Review, Edit exercise")));
+  await esc();
+  for (let i = 0; i < 12 && !(await page.locator(".phone-full textarea:visible").count()); i++) {
+    const good = page.locator(".phone-full button:visible").filter({ hasText: /^Good/ });
+    if (!(await good.count())) await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+    await tap(page, good);
+    await Bun.sleep(400);
+  }
+  note(...(await coveredFields(page, "Review, Explain")));
+  await tap(page, page.getByRole("button", { name: "Leave review" }));
+  await tap(page, page.locator(".review-end button").filter({ hasText: /^Done/ }));
+  await page.locator(".phone-full").waitFor({ state: "detached" });
+  // A skill and its note.
+  await tap(page, page.locator(".home-skill").first());
+  await Bun.sleep(600);
+  note(...(await coveredFields(page, "skill")));
+  await tap(page, page.locator(".phone-skill .phone-note-row"));
+  await Bun.sleep(600);
+  note(...(await coveredFields(page, "skill note")));
+  if (bad.length) throw new Error(`fields out of sight with the keyboard up:\n${bad.join("\n")}`);
+}, "phone");
+
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
 for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {
@@ -15939,4 +16076,5 @@ if (!only && shard === shards) {
 stop();
 if (errors.length) console.log(`page errors:\n  ${[...new Set(errors)].join("\n  ")}`);
 process.exit(failed || errors.length ? 1 : 0);
+
 
