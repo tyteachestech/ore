@@ -12439,6 +12439,7 @@ journey("phone: a skill's page is the Mac's in one column, and a course is one r
       await sk.locator(".skill-goal").waitFor();
       await sk.locator(".hero-strength").waitFor();
       await sk.getByText("Does this hold for kids?").waitFor();
+      await slid(page);
       const wide = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".phone-skill *")].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).map((e) => e.className).slice(0, 3));
       if (wide.length) throw new Error(`wider than the screen: ${wide.join(", ")}`);
       // A question's actions are its long press, as a row's are (its hover buttons never show on a phone).
@@ -15727,6 +15728,11 @@ journey("phone: every page gives at its top and bottom as iOS's own do, a short 
   await page.locator(".phone-full .review-body").waitFor();
   await check("Review", ".phone-full");
 }, "phone");
+
+/** A pushed screen has finished sliding in (D331): measure where things are only after this. */
+function slid(page: Page) {
+  return until("the screen has slid in", () => page.evaluate(() => ![...document.querySelectorAll(".phone-full, .phone-shell")].some((el) => el.getAnimations().length)));
+}
 
 /** Notes each full screen as it is added: whether it was sliding in the moment it appeared. */
 const WATCH_PUSHES = `window.__pushes = []; new MutationObserver((all) => { for (const m of all) for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList.contains("phone-full")) window.__pushes.push(n.getAnimations().length > 0); }).observe(document, { childList: true, subtree: true });`;
