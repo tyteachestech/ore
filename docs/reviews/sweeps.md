@@ -70,7 +70,7 @@ When a sweep's triage is done, add a row per tester here.
 | 11-15 | [sweep 9](2026-11-15-codex-sweep-8/) upgrade | Codex | A library written by Ore as of 11-06 (`aa6bc6f`), opened and used by today's | both | 0 (small seed: no media, PDF or chats) | — |
 | 11-15 | [sweep 10](2026-11-15-codex-sweep-10/) months | Codex | 60–90 simulated days of sessions with `page.clock` | both | 1 | #443 |
 | 11-15 | [sweep 11](2026-11-15-codex-sweep-10/) offline | Codex | The Feed over weeks; the Mac offline or on a bad network | both | 2 | #443 |
-| 11-19 | [native scout](2026-11-19-phone-native-feel/) | Codex | How the iPhone app feels next to Apple's own apps (Settings, Files, Safari) in the Simulator: touch, keyboard, edges, type, controls | iPhone | 8 | #PR (keyboard) |
+| 11-19 | [native scout](2026-11-19-phone-native-feel/) | Codex | How the iPhone app feels next to Apple's own apps (Settings, Files, Safari) in the Simulator: touch, keyboard, edges, type, controls | iPhone | 8 | #467 (keyboard) |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
