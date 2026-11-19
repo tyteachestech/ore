@@ -16011,11 +16011,20 @@ journey("phone: every field on every screen stays in sight when the keyboard com
   await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
   note(...(await coveredFields(page, "Review, Edit exercise")));
   await esc();
-  for (let i = 0; i < 12 && !(await page.locator(".phone-full textarea:visible").count()); i++) {
-    const good = page.locator(".phone-full button:visible").filter({ hasText: /^Good/ });
-    if (!(await good.count())) await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+  // Each step waits for the exercise it acts on (F412): a fixed pause let a tap aimed at
+  // the last exercise's Good land on whatever stood there next, which skipped the Explain exercise or pressed Done.
+  const answer = page.locator(".phone-full textarea:visible");
+  const good = page.locator(".phone-full button:visible").filter({ hasText: /^Good/ });
+  const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+  const asked = page.locator(".phone-full .review-q");
+  for (let i = 0; i < 12; i++) {
+    await answer.or(good).or(sure).first().waitFor();
+    if (await answer.count()) break;
+    if (!(await good.count())) await tap(page, sure);
+    await good.waitFor();
+    const was = await asked.innerText();
     await tap(page, good);
-    await Bun.sleep(400);
+    await until("the next exercise", async () => (await answer.count()) > 0 || ((await asked.count()) > 0 && (await asked.innerText()) !== was && !(await good.count())));
   }
   note(...(await coveredFields(page, "Review, Explain")));
   await tap(page, page.getByRole("button", { name: "Leave review" }));
