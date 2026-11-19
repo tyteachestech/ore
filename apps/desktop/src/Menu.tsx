@@ -10,6 +10,7 @@ import { nativeMenu } from "./native-menu";
 import { PHONE } from "./ore";
 import { trackDrag } from "./phone/drag";
 import { letDown, sheetLayer, useSwipeDown } from "./phone/sheet";
+import { tick } from "./phone/haptics";
 import { Trap } from "./Trap";
 import { keepFocusNear } from "./focus-near";
 import { menuIcon } from "./menu-icons";
@@ -85,7 +86,8 @@ export function holdMenu(el: HTMLElement, y: number) {
   addEventListener("click", swallow, true);
   addEventListener("touchstart", done, true); // The next touch's click is a real tap,
   const t = setTimeout(done, 800); // and so is a pointer's or a key's once the lift has passed.
-  el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+  // Radix takes the event when it opens a menu: only then does the phone tick (D332).
+  if (!el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }))) tick.menu();
 }
 
 /** iOS's long-press menu on a WebKit row. WebKit on iOS sends no contextmenu for a press, and Radix's own touch

@@ -56,6 +56,7 @@ import { MARKS, UNDER, paint, unpaint, unpaintAll } from "./paint";
 import { Working } from "./Working";
 import { ReadingLooks } from "./phone/ReadingLooks";
 import { letDown, sheetLayer, useSwipeDown } from "./phone/sheet";
+import { tick } from "./phone/haptics";
 import { Trap } from "./Trap";
 import { edgeTurn } from "./edge-turn";
 
@@ -1934,6 +1935,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     pending.current.set(tmp, promise);
     ranges.current.set(tmp, range);
     vein(range, intent);
+    tick.saved();
     setAnns((l) => [...l, { id: tmp, rev: 0, intent, exact: text, prefix: "", suffix: "", start: 0, end: 0, status: "open", ...(lookedUp && { looked_up: true }) }]);
     if (intent === "card") gather(tmp);
     if (popupToo) {
