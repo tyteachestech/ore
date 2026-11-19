@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Hint } from "./Hint";
 import { DotNumber, minutes } from "./Ring";
 import { still } from "./SideCursor";
 import { SkillIcon } from "./IconPicker";
@@ -34,7 +35,7 @@ export function lapSteps({ from, to, goal }: Lap): number[] {
 }
 
 /** Counts the minutes up once `go` is set: quick up to the goal, then one beat per minute past it, so each
- *  bonus minute lands on its own (the ring's dots, the number and the "+N" tick together). `hit` counts the
+ *  bonus minute lands on its own (the ring's dots and the number together). `hit` counts the
  *  goal lines crossed on the way, the goal and twice the goal: the ring's two moments. Under Reduce Motion
  *  the end state is there at once and nothing is a moment. */
 export function useLap(plan: Lap, go: boolean): { min: number; hit: number } {
@@ -87,18 +88,21 @@ export function SkillReel({ kept, ups, skills, run }: { kept: { skill: string; n
   }, [loop, rows.length]);
   if (!rows.length) return null;
   const text = (k: { skill: string; n: number }) => `${skills.find((s) => s.id === k.skill)?.name ?? "No skill"}, ${k.n} kept${level(k.skill) ? `, level ${level(k.skill)}` : ""}`;
-  const k = rows[row] ?? rows[0]!, s = skills.find((x) => x.id === k.skill);
+  const k = rows[row] ?? rows[0]!, s = skills.find((x) => x.id === k.skill), said = all.map(text).join(" · ");
   return (
     // Its room is held from the start, so the results under it never move when it comes in.
     <p className="end-reel" data-wait={!run || undefined}>
-      <span className="sr-only">{all.map(text).join(" · ")}</span>
+      <span className="sr-only">{said}</span>
       {run && (
-        <span key={k.skill} className="end-reel-row" data-color={s?.color} aria-hidden="true">
+        // Three lines take turns; a session that fed more names them all on hover and focus.
+        <Hint key={k.skill} text={`Memories kept this session · ${said}`} off={all.length <= rows.length}>
+        <span className="end-reel-row" data-color={s?.color} aria-hidden="true" tabIndex={all.length > rows.length ? 0 : undefined}>
           <SkillIcon icon={s?.icon} color={s?.color} dot />
           <span className="end-reel-name">{s?.name ?? "No skill"}</span>
           <b>{k.n} kept</b>
           {level(k.skill) && <b className="end-reel-level">level {level(k.skill)}</b>}
         </span>
+        </Hint>
       )}
     </p>
   );

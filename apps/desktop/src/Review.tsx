@@ -1650,9 +1650,9 @@ const TALLY_GAP_MS = 320;
 /** How often, when the cart comes, the mole is asleep on it. */
 const NAP_SHARE = 2 / 3;
 
-/** The end screen's row of results (D252, after Duolingo's lesson-complete row): three at most, each a
+/** The end screen's row of results (D252, after Duolingo's lesson-complete row): two at most, each a
  *  mark beside a number in dots (D259) over what it counts, landing one after another once `go`, then still. The number's text
- *  is in the page throughout for a reader. A rare one wears its skill's colour or the won-back gold. */
+ *  is in the page throughout for a reader. */
 function Tally({ tiles, go, onDone }: { tiles: Tile[]; go: boolean; onDone: () => void }) {
   const [n, setN] = useState(still() ? tiles.length : 0);
   const done = useRef(onDone);

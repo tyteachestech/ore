@@ -2441,8 +2441,7 @@ button.home-plan:hover { color: var(--text); }
 .end-emblem::before { content: ""; position: absolute; inset: -48px 0 -72px; z-index: -1; pointer-events: none; background-image: radial-gradient(circle, color-mix(in oklab, var(--text) 16%, transparent) 1.1px, transparent 1.6px); background-size: 9px 9px; background-position: center; -webkit-mask-image: radial-gradient(closest-side, #000, transparent); mask-image: radial-gradient(closest-side, #000, transparent); }
 .end-ring { position: relative; display: grid; place-items: center; }
 .end-ring > * { grid-area: 1 / 1; }
-/* What stands in the ring: the day's minutes in its dots, "min" and what came after the goal on a chip in the
-   ring's green, and one line for the skill the session fed most. */
+/* What stands in the ring: the day's minutes in its dots, over "min". */
 .end-lap { display: flex; flex-direction: column; align-items: center; font: 400 12px/1 var(--mono); color: var(--muted); animation: end-lap-in var(--t-4) var(--ease-out); }
 .end-lap-n { display: block; color: var(--text); }
 .end-lap-min { margin-top: 12px; }
@@ -2466,12 +2465,11 @@ button.home-plan:hover { color: var(--text); }
 .end-tally b { display: grid; place-items: center; height: 28px; }
 .end-tally-pair { display: flex; align-items: center; justify-content: center; gap: 10px; height: 48px; }
 .end-tally-mark { display: grid; place-items: center; flex: none; color: var(--text); }
-.end-tally-mark .skill-icon.glyph { width: 40px; height: 40px; -webkit-mask-size: 40px; mask-size: 40px; }
 @keyframes end-tally-in { from { opacity: 0; transform: translateY(-10px); } }
 .end-tally-label { max-width: 100%; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 @media (max-width: 480px) { .end-tally { gap: 8px; } .end-tally-pair { gap: 6px; } .end-tally-mark .end-mark { width: 36px; height: 36px; } }
 /* The marks' loops (D260), each the way the thing itself would move, for as long as the end screen is
-   open: the gem's faces catch a passing light, the calendar's added days light one by one.
+   open: the calendar's added days light one by one.
    A dot's turn is `--at`, its resting light `--o` (EndMark.tsx). Endless loops keep their own time (D185). */
 .end-mark circle { transform-box: fill-box; transform-origin: center; }
 .end-tally li:not([data-wait]) .end-mark[data-kind="calendar"] circle[data-turn] { animation: end-day 4000ms var(--ease-out) var(--at) infinite backwards; }
@@ -2490,6 +2488,7 @@ button.home-plan:hover { color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .mole-mound { animation: none; } }
 /* Two groups: what the session won, then what comes next. */
 .end-emblem ~ .review-try { margin-top: 40px; }
+.end-emblem ~ .review-dig ~ .review-foot { margin-top: 12px; }
 .end-emblem ~ .review-foot { margin-top: 40px; }
 /* The mole speaks (D243) from his speech box (D245), right of his head; it grows out of him once. */
 .says.end-says { position: absolute; left: calc(50% + 62px); top: 12px; z-index: 2; width: max-content; max-width: min(248px, calc(50vw - 78px)); transform-origin: 0 50%; animation: end-says var(--t-4) var(--ease-out); }
@@ -2523,7 +2522,7 @@ button.home-plan:hover { color: var(--text); }
 .review-try:hover { background: var(--bg-hover); }
 .review-try:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .review-try svg { flex: none; align-self: center; }
-/* "To try", then the plan on one line, however long it is: its full text is the passage a click opens. */
+/* The dig's goal on one line, however long it is. */
 .review-try-plan { min-width: 0; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .review-dig > span { min-width: 0; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .review-dig .review-try-plan::after { content: " · "; color: var(--faint); }
@@ -3117,7 +3116,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* Open in source keeps its small look and reaches 44 pt with an unseen margin, as a skill page's controls do. */
 .phone .review-passage figcaption button { position: relative; }
 .phone .review-passage figcaption button::after { content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: max(44px, 100%); transform: translateY(-50%); }
-/* A finger's 44 pt reaches the pick sheet's Select all and the end screen's Try it, without growing what shows (Codex sweep 3, a11y). */
+/* A finger's 44 pt reaches the pick sheet's Select all and the end screen's Dig line, without growing what shows (Codex sweep 3, a11y). */
 .phone :is(.pick-all, .review-try) { position: relative; }
 .phone :is(.pick-all, .review-try)::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: max(44px, 100%); transform: translateY(-50%); }
 /* The rest of a source's small controls at 44pt too. A highlight's note field is a field, so it is that tall. */
@@ -3164,6 +3163,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .end-reel-row b { font-size: 13px; }
 .phone .end-tally { gap: 24px; margin-top: 24px; }
 .phone .end-tally li { width: auto; max-width: 136px; }
+/* Its number runs up from one digit to three: room for three from the start, so the row never slides as it counts. */
+.phone .end-tally li[data-key="depth"] { min-width: 120px; }
 .phone .end-tally:has(> :nth-child(2):last-child) { gap: 40px; }
 .phone .review-end .quiz-faint { margin-top: 24px; }
 .phone .review-end .review-foot { flex-direction: column-reverse; align-self: stretch; gap: 4px; margin-top: auto; padding-top: 32px; }
