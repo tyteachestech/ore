@@ -40,7 +40,7 @@ async function mount(node: React.ReactNode) {
   return body;
 }
 const screen = (before: unknown, now: unknown, session: Record<string, unknown> = {}) =>
-  mount(<EndScreen end={{ session: { id: "s", reviews: 9, kept: 8, rescued: 0, cut: ["ai"], kept_skills: [{ skill: "learning", n: 5 }, { skill: "ai", n: 3 }], ...session }, today: now, before, next: null } as never} skills={skills} onDone={() => {}} onAgain={() => {}} onTry={() => {}} />);
+  mount(<EndScreen end={{ session: { id: "s", reviews: 9, kept: 8, rescued: 0, cut: ["ai"], ...session }, today: now, before, next: null } as never} skills={skills} onDone={() => {}} onAgain={() => {}} onTry={() => {}} />);
 
 test("the plan: minutes run from where the day stood to where it stands, and what is past the goal is the bonus", () => {
   expect(lapPlan(today(4) as never, today(16) as never)).toEqual({ from: 4, to: 16, goal: 10 });
@@ -85,13 +85,15 @@ test("a ring's bonus dots are bigger and carry a white centre; a third lap's are
   expect((await mount(<DotRing size={92} share={1} />)).querySelectorAll(".over, .core").length).toBe(0);
 });
 
-test("sixteen minutes on a ten minute goal: the minutes, what came after the goal, the bonus dots and the top skill", async () => {
+test("sixteen minutes on a ten minute goal: the minutes as one number, and the bonus dots", async () => {
   const body = await screen(today(4), today(16));
   expect(body.querySelector(".end-lap-n")?.getAttribute("aria-label")).toBe("16 minutes today");
-  expect(body.querySelector(".end-lap-plus")?.getAttribute("aria-label")).toBe("6 minutes past today’s goal");
+  // One number in the ring and nothing else: "16" in dots and a small m beside it, no "min", no chip, no skill line.
+  expect(body.querySelectorAll(".end-lap > *").length).toBe(1);
+  expect(body.querySelectorAll(".end-lap-n > svg + .end-lap-m > svg").length).toBe(1);
+  expect(body.querySelector(".end-lap")?.textContent).toBe("");
+  expect(body.querySelectorAll(".end-lap-n circle").length).toBe(10 + 15 + 15);
   expect(body.querySelectorAll(".end-ring circle.core").length).toBe(18);
-  // The skill the session fed most is the one that stays.
-  expect(body.querySelector(".end-lap-skill")?.textContent).toBe("Learning+5 kept");
   // Settled, the gems have made way for the minutes.
   expect(body.querySelectorAll(".end-ring .review-cut").length).toBe(0);
 });
@@ -99,13 +101,10 @@ test("sixteen minutes on a ten minute goal: the minutes, what came after the goa
 test("the goal just met, or not met: minutes, and nothing that says bonus", async () => {
   const met = await screen(today(4), today(10));
   expect(met.querySelector(".end-lap-n")?.getAttribute("aria-label")).toBe("10 minutes today");
-  expect(met.querySelectorAll(".end-lap-plus, .end-ring circle.core, .ring-sparkle").length).toBe(0);
+  expect(met.querySelectorAll(".end-ring circle.core, .ring-sparkle").length).toBe(0);
   const short = await screen(today(0), today(6));
   expect(short.querySelector(".end-lap-n")?.getAttribute("aria-label")).toBe("6 minutes today");
-  expect(short.querySelectorAll(".end-lap-plus, .end-ring circle.core").length).toBe(0);
-  // A session of misses kept nothing, so no skill is named.
-  const missed = await screen(today(0), today(6), { kept: 0, kept_skills: undefined, cut: [] });
-  expect(missed.querySelectorAll(".end-lap-skill").length).toBe(0);
+  expect(short.querySelectorAll(".end-ring circle.core").length).toBe(0);
 });
 
 test("the quick quiz keeps its small ring: no minutes in it", async () => {

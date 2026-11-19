@@ -1830,7 +1830,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
             )}
             <div className="end-ring">
               {ring}
-              {away ? <LapCentre min={lap.min} goal={plan.goal} kept={s.kept_skills ?? []} skills={skills} run={counted && full} /> : cluster}
+              {away ? <LapCentre min={lap.min} /> : cluster}
             </div>
           </div>
           <Tally tiles={tiles} go={full} skills={skills} onDone={() => setTallied(true)} />
