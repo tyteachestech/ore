@@ -6,7 +6,7 @@ import { SkillIcon } from "./IconPicker";
 import { is } from "./keys";
 import { Trap } from "./Trap";
 import { PHONE, type Skill, type Today } from "./ore";
-import { sheetLayer, useSwipeDown } from "./phone/sheet";
+import { letDown, sheetLayer, useSwipeDown } from "./phone/sheet";
 import { load, save } from "./util";
 import { NO_SKILL } from "../../../packages/core/src/no-skill";
 import { localDay } from "../../../packages/core/src/ids";
@@ -113,7 +113,7 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
   };
 
   return sheetLayer(
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && letDown(box.current, onClose)}>
       <Trap>
       <div ref={box} className="panel review-pick" role="dialog" aria-modal="true" aria-label="What to review" tabIndex={-1} onKeyDown={onKey}>
         <div className="review-pick-head">

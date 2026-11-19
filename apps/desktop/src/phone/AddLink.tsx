@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { Trap } from "../Trap";
 import { ore, queuePicked } from "../ore";
 import { errorText } from "../util";
-import { sheetLayer, useSwipeDown } from "./sheet";
+import { letDown, sheetLayer, useSwipeDown } from "./sheet";
 
 /** What the importers read from a file (FILE_TYPES in the core, less video, which needs the Mac's tools to hear). */
 const PICKED = "image/*,.pdf,.epub,.md,.markdown,.txt,.html,.htm,.docx,.pptx,.rtf,.xlsx,.csv,.tsv,.ipynb,.srt,.vtt,.mp3,.m4a,.wav";
@@ -51,7 +51,7 @@ export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: 
     }
   };
   return sheetLayer(
-    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && letDown(box.current, onClose)}>
       <Trap>
         <form ref={box} noValidate className="panel sheet add-link" role="dialog" aria-modal="true" aria-label="Add a link" onSubmit={(e) => (e.preventDefault(), void add())} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onClose())}>
           <input

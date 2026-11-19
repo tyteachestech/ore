@@ -4,7 +4,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Archive, BookOpen, CaretLeft, CaretRight, Check, GearSix, GraduationCap, House, MagnifyingGlass, Plus, SidebarSimple } from "../icons";
 import { flushSync } from "react-dom";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
 import { FillingLine, useFilling } from "../Filling";
 import { AddLink, WaitingLinks, macOnly, type Waiting } from "./AddLink";
@@ -44,15 +44,63 @@ function useHorizontalDrag(ref: RefObject<HTMLElement | null>, drag: Drag) {
   useEffect(() => (ref.current ? trackDrag(ref.current, () => now.current) : undefined), [ref]);
 }
 
-/** iOS's edge swipes. From the left edge the screen moves with the finger; let go past a third of
+/** How far left the screen underneath sits while another covers it, as a share of its width (iOS's push). */
+const UNDER = -30;
+/** He has touched the screen since launch: a screen that opens after that slides in; the one a relaunch puts back is just there. */
+let inHand = false;
+addEventListener("pointerdown", () => (inHand = true), { capture: true, once: true });
+const token = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+/** One slide on the motion tokens (DESIGN.md "Motion": what slides in). Nothing under Reduce Motion. */
+function slide(el: Element | null | undefined, from: string, to: string) {
+  if (!el?.animate || matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
+  return el.animate([{ transform: from }, { transform: to }], { duration: parseFloat(token("--t-4")) || 300, easing: token("--ease-out") || "ease-out" });
+}
+/** Slides a pushed screen away, then runs what closes it: Back does (and Review's Done), as the edge swipe does. */
+const Pop = createContext<(done: () => void) => void>((done) => done());
+
+/** A pushed screen, as iOS pushes one (D331): it slides in from the right while the screen
+ *  under it moves a little left, and slides back out on Back. iOS's edge swipes: from the left edge the screen
+ *  moves with the finger; let go past a third of
  *  the way (or with a flick) and it slides off and goes back, otherwise it springs back. A screen
  *  with a second page (a source and its note, `.reader`) pages instead: from the right edge to the
  *  note, and from the left edge back to the source, each keeping its scroll. */
-function Screen({ onBack, onForward, className, children }: { onBack: () => void; onForward?: (open: boolean) => void; className: string; children: ReactNode }) {
+function Screen({ onBack, onForward, stay, className, children }: { onBack: () => void; onForward?: (open: boolean) => void; /** Back is a step inside this screen (a skill's Forge back to the skill): the screen stays. */ stay?: boolean; className: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const edge = useRef<"left" | "right">("left");
   const strip = useRef<HTMLElement | null>(null);
   const clamp = (dx: number) => (edge.current === "left" ? Math.max(0, dx) : Math.min(0, dx));
+  /** The screen under this one: the pushed screen before it, or the tabs. */
+  const under = () => {
+    let el = ref.current?.previousElementSibling;
+    while (el && !el.matches(".phone-full, .phone-shell")) el = el.previousElementSibling;
+    return el as HTMLElement | null | undefined;
+  };
+  /** Where the screen under sits when this one has come `dx` px back off it. */
+  const underAt = (dx: number) => `translateX(${UNDER * (1 - dx / (ref.current?.clientWidth || 1))}%)`;
+  useLayoutEffect(() => {
+    if (!inHand) return;
+    slide(ref.current, "translateX(100%)", "none");
+    slide(under(), "none", underAt(0));
+  }, []);
+  /** Off to the right from `dx`, the screen under coming back with it; then `done` takes it away. Once: a second
+   *  Back or swipe while it goes is the same leaving. */
+  const leaving = useRef(false);
+  const leave = useCallback((done: () => void, dx = 0) => {
+    const el = ref.current;
+    if (leaving.current) return;
+    const going = el && slide(el, `translateX(${dx}px)`, "translateX(100%)");
+    if (!el || !going) return done();
+    leaving.current = true;
+    slide(under(), underAt(dx), "none");
+    // Held off screen until React takes it away; put back if it is still here (a close that was refused).
+    el.style.transform = "translateX(100%)";
+    const gone = () => {
+      done();
+      setTimeout(() => ((leaving.current = false), el.isConnected && (el.style.transform = "")), 100);
+    };
+    // A slide that was cut short still closes.
+    going.finished.then(gone, gone);
+  }, []);
   useHorizontalDrag(ref, {
     accept: (t) => {
       const pages = onForward ? ref.current?.querySelector<HTMLElement>(".reader") : null;
@@ -66,15 +114,16 @@ function Screen({ onBack, onForward, className, children }: { onBack: () => void
     begin: (dx) => {
       if (!clamp(dx)) return false;
       if (strip.current) strip.current.classList.add("dragging");
-      else ref.current!.style.transition = "none";
       window.getSelection()?.removeAllRanges();
       // The keyboard goes as the swipe starts, as in iOS.
       (document.activeElement as HTMLElement | null)?.blur();
     },
     move: (raw) => {
       const dx = clamp(raw);
-      if (strip.current) strip.current.style.setProperty("--drag", `${dx}px`);
-      else ref.current!.style.transform = `translateX(${dx}px)`;
+      if (strip.current) return strip.current.style.setProperty("--drag", `${dx}px`);
+      ref.current!.style.transform = `translateX(${dx}px)`;
+      const below = under();
+      if (below) [below.style.transition, below.style.transform] = ["none", underAt(dx)];
     },
     end: (raw, flick, cancelled) => {
       const el = ref.current!;
@@ -88,15 +137,23 @@ function Screen({ onBack, onForward, className, children }: { onBack: () => void
         if (go) onForward?.(edge.current === "right");
         return;
       }
-      el.style.transition = "transform 250ms cubic-bezier(.2, .9, .3, 1)";
-      el.style.transform = go ? `translateX(${el.clientWidth}px)` : "";
-      if (go) setTimeout(onBack, 200);
+      // From where the finger let go: on out, or back into place.
+      const below = under();
+      if (below) [below.style.transition, below.style.transform] = ["", ""];
+      el.style.transform = "";
+      if (go && !stay) return leave(onBack, dx);
+      // Back into place: let go too soon, or Back here is a step inside this screen.
+      slide(el, `translateX(${dx}px)`, "none");
+      slide(below, underAt(dx), underAt(0));
+      if (go) onBack();
     },
   });
   return (
-    <div className={className} ref={ref}>
-      {children}
-    </div>
+    <Pop.Provider value={leave}>
+      <div className={className} ref={ref}>
+        {children}
+      </div>
+    </Pop.Provider>
   );
 }
 
@@ -130,7 +187,7 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
     const cue = (v: number) => cueRef.current?.style.setProperty("--pull", String(v));
     const start = (e: TouchEvent) => {
       const t = e.touches[0];
-      live = e.touches.length === 1 && main.scrollTop <= 0;
+      live = e.touches.length === 1 && main.scrollTop <= 1; // A short list has one point to scroll, so iOS gives it its bounce.
       [x0, y0, dy] = [t?.clientX ?? 0, t?.clientY ?? 0, 0];
     };
     const move = (e: TouchEvent) => {
@@ -398,13 +455,17 @@ function NewSkill({ skills, onDone }: { skills: Skill[]; onDone: (made: Skill | 
   );
 }
 
-const Back = ({ label, onClick }: { label: string; onClick: () => void }) => (
-  <header className="phone-bar">
-    <button className="phone-back" onClick={onClick}>
-      <CaretLeft size={16} aria-hidden="true" /> {label}
-    </button>
-  </header>
-);
+/** Back slides its screen away, then closes it. `stay`: this Back is a step inside the screen (the note back to its source). */
+function Back({ label, onClick, stay }: { label: string; onClick: () => void; stay?: boolean }) {
+  const pop = useContext(Pop);
+  return (
+    <header className="phone-bar">
+      <button className="phone-back" onClick={() => (stay ? onClick() : pop(onClick))}>
+        <CaretLeft size={16} aria-hidden="true" /> {label}
+      </button>
+    </header>
+  );
+}
 
 export function PhoneApp() {
   const [start] = useState(loadPlace);
@@ -881,7 +942,7 @@ export function PhoneApp() {
     ) : openId && (startKnown || openId !== start.openId) ? (
       <Screen className="phone-full phone-reader phone-source" onBack={() => setOpenId(null)} onForward={setNoting}>
         {/* From the note, Back returns to the source, as the left-edge swipe does. */}
-        <Back label={noting ? "Source" : "Back"} onClick={() => (noting ? setNoting(false) : setOpenId(null))} />
+        <Back label={noting ? "Source" : "Back"} stay={noting} onClick={() => (noting ? setNoting(false) : setOpenId(null))} />
         <Boundary onBack={() => setOpenId(null)}>
           <Reader
             key={openId}
@@ -1075,8 +1136,8 @@ export function PhoneApp() {
       </div>
       {/* A skill's page (D46 in one column), pushed from Today or the drawer; a source opens over it. */}
       {skill && skillOf && (
-        <Screen className="phone-full" onBack={skillBack}>
-          <Back label={skillSub === "forge" ? skillOf.name : skillSub ? "Forge" : tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} onClick={skillBack} />
+        <Screen className="phone-full" onBack={skillBack} stay={!!skillSub}>
+          <Back label={skillSub === "forge" ? skillOf.name : skillSub ? "Forge" : tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} stay={!!skillSub} onClick={skillBack} />
           <div className="phone-page phone-skill">
             <SkillPage
               key={skill}

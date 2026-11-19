@@ -9,7 +9,7 @@ import { useLite } from "./Lite";
 import { nativeMenu } from "./native-menu";
 import { PHONE } from "./ore";
 import { trackDrag } from "./phone/drag";
-import { sheetLayer, useSwipeDown } from "./phone/sheet";
+import { letDown, sheetLayer, useSwipeDown } from "./phone/sheet";
 import { Trap } from "./Trap";
 import { keepFocusNear } from "./focus-near";
 import { menuIcon } from "./menu-icons";
@@ -369,7 +369,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
         {icon ?? <DotsThree size={16} aria-hidden="true" />}
       </button>
       {open && sheetLayer(
-        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && letDown(box.current, close)}>
           <Trap>
             <div ref={box} className="panel sheet action-sheet" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); dismiss.current(); } }}>
               <div className="sheet-steps" style={{ height }}>

@@ -145,7 +145,7 @@ async function open(url: string, engine: Engine): Promise<Page> {
 //   page behind, where Esc no longer closes the dialog and Enter runs what is under it.
 // - A menu, popover or popup that floats (fixed, or a Radix popper) lies inside the window: one placed at the caret
 //   or pointer with no room for it ran off the bottom (the note's / menu, 2026-11-10). Checked two frames after the
-//   page changes or resizes, and as the journey ends; one still being placed (Radix's first frame) or animating is
+//   page changes or resizes, and as the journey ends; one still being placed (Radix's first frame) or animating (or on a screen that is) is
 //   looked at again. An absolute one counts only where he can see it cut by the window, not when it has scrolled
 //   out of its panel with its text.
 // - Focus never falls to <body> when the control holding it leaves the page (a row archived, a field, dialog or menu
@@ -165,12 +165,14 @@ const HYGIENE = `(() => {
   };
   const POPUPS = '[role="menu"], [role="listbox"], [role="dialog"], [role="toolbar"], .popover, .note-menu, .sel-bar, .tutor-sel, .tutor-mention';
   // The floating ones on screen, each with whether it is still being placed (Radix's first frame) or animating.
+  // Animating: itself, or the screen it is on (a phone screen sliding in carries its dialog with it).
+  const moving = (el) => { for (let a = el; a; a = a.parentElement) if (a.getAnimations().some((x) => x.playState === "running")) return true; return false; };
   const floating = () => [...document.querySelectorAll(POPUPS)].flatMap((el) => {
     const css = getComputedStyle(el);
     const wrap = el.parentElement?.hasAttribute("data-radix-popper-content-wrapper") ? el.parentElement : null;
     if (!(css.position === "fixed" || wrap || (css.position === "absolute" && el.matches(".popover, .sel-bar, .tutor-sel, .tutor-mention")))) return [];
     if (css.visibility === "hidden" || css.display === "none" || el.closest('[aria-hidden="true"], [inert], [data-state="closed"]')) return [];
-    return [{ el, css, busy: !!(wrap && /-200%/.test(wrap.style.transform)) || el.getAnimations().some((a) => a.playState === "running") }];
+    return [{ el, css, busy: !!(wrap && /-200%/.test(wrap.style.transform)) || moving(el) }];
   });
   // The part of its box he sees: cut by each ancestor that clips, up to the fixed layer it is in. A popup
   // scrolled out of its panel with the text it belongs to is not cut by the window; one cut at the window's
@@ -12437,6 +12439,7 @@ journey("phone: a skill's page is the Mac's in one column, and a course is one r
       await sk.locator(".skill-goal").waitFor();
       await sk.locator(".hero-strength").waitFor();
       await sk.getByText("Does this hold for kids?").waitFor();
+      await slid(page);
       const wide = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>(".phone-skill *")].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).map((e) => e.className).slice(0, 3));
       if (wide.length) throw new Error(`wider than the screen: ${wide.join(", ")}`);
       // A question's actions are its long press, as a row's are (its hover buttons never show on a phone).
@@ -15689,6 +15692,102 @@ journey("iPhone menu: every skill's name starts on one line, with an icon or wit
   const off = at.filter((r) => r.x !== at[0]!.x);
   if (off.length) throw new Error(`names start at ${at[0]!.x}px, but: ${JSON.stringify(off)}`);
   await tap(page, page.locator(".phone-scrim"));
+}, "phone");
+
+// —— the iPhone's native feel (D331, F402) ——
+
+/** Every scroller on screen a finger could move: whether iOS would let it give at its ends (the rubber band), and
+ *  whether it scrolls at all. iOS only bounces a scroller that has somewhere to go. */
+const scrollers = (page: Page, within: string) =>
+  page.evaluate((within) =>
+    [...document.querySelectorAll<HTMLElement>(`${within}, ${within} *`)]
+      .filter((el) => /auto|scroll/.test(getComputedStyle(el).overflowY) && el.clientHeight > 200 && el.checkVisibility())
+      .map((el) => ({ name: el.className.toString().split(" ")[0]!, gives: getComputedStyle(el).overscrollBehaviorY !== "none", scrolls: el.scrollHeight > el.clientHeight })), within);
+
+journey("phone: every page gives at its top and bottom as iOS's own do, a short one too (F402)", async (page) => {
+  // The Mac's "no overscroll" rule reached the phone's reader and Review, and a list shorter than the screen had
+  // nowhere to go, so iOS gave it no rubber band at all.
+  const check = async (where: string, within: string) => {
+    await until(`${where} has a page to scroll`, async () => (await scrollers(page, within)).length > 0);
+    const stiff = (await scrollers(page, within)).filter((s) => !s.gives || (/^(phone-page|review-body)$/.test(s.name) && !s.scrolls));
+    if (stiff.length) throw new Error(`${where}: no rubber band on ${stiff.map((s) => `${s.name}${s.gives ? " (nowhere to scroll)" : " (overscroll off)"}`).join(", ")}`);
+  };
+  await check("Today", ".phone-root");
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Archive" }));
+  await check("Archive, a list shorter than the screen", ".phone-root");
+  await phoneSource(page, TESTING);
+  await check("A source", ".phone-source");
+  await tap(page, page.locator(".phone-full .phone-back"));
+  await page.locator(".phone-full").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Today" }));
+  await tap(page, page.getByRole("button", { name: /^Start review/ }));
+  const go = page.locator(".review-pick .home-go");
+  if (await go.count()) await tap(page, go);
+  await page.locator(".phone-full .review-body").waitFor();
+  await check("Review", ".phone-full");
+}, "phone");
+
+/** A pushed screen has finished sliding in (D331): measure where things are only after this. */
+function slid(page: Page) {
+  return until("the screen has slid in", () => page.evaluate(() => ![...document.querySelectorAll(".phone-full, .phone-shell")].some((el) => el.getAnimations().length)));
+}
+
+/** Notes each full screen as it is added: whether it was sliding in the moment it appeared. */
+const WATCH_PUSHES = `window.__pushes = []; new MutationObserver((all) => { for (const m of all) for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList.contains("phone-full")) window.__pushes.push(n.getAnimations().length > 0); }).observe(document, { childList: true, subtree: true });`;
+const pushes = (page: Page) => page.evaluate(() => (window as unknown as { __pushes: boolean[] }).__pushes);
+
+journey("phone: a screen he opens slides in from the right and Back slides it away; the one he left open is just there at launch (D331)", async (page) => {
+  await page.addInitScript(WATCH_PUSHES);
+  await page.reload();
+  await page.locator(".phone-opening").waitFor({ state: "detached" });
+  await tap(page, page.locator(".home-read .home-open").first());
+  await page.locator(".phone-source .doc").first().waitFor();
+  if (String(await pushes(page)) !== "true") throw new Error(`a source opened with a tap did not slide in: ${await pushes(page)}`);
+  await until("the slide has ended", () => page.evaluate(() => !document.querySelector(".phone-full")!.getAnimations().length && !document.querySelector(".phone-shell")!.getAnimations().length));
+  // Back: the screen is still there, on its way out, then gone, and Today is back where it was.
+  await tap(page, page.locator(".phone-full .phone-back"));
+  const leaving = await page.evaluate(() => document.querySelector(".phone-full")?.getAnimations().length ?? 0);
+  if (!leaving) throw new Error("Back took the source away at once, with no slide out");
+  await page.locator(".phone-full").waitFor({ state: "detached" });
+  await until("Today is back in place", () => page.evaluate(() => { const s = document.querySelector<HTMLElement>(".phone-shell")!; return !s.getAnimations().length && s.getBoundingClientRect().x === 0; }));
+  // Relaunched on a source: no slide, it is where he left it.
+  await tap(page, page.locator(".home-read .home-open").first());
+  await page.locator(".phone-source .doc").first().waitFor();
+  await Bun.sleep(600); // The place is saved.
+  await page.reload();
+  await page.locator(".phone-source .doc").first().waitFor();
+  if (String(await pushes(page)) !== "false") throw new Error(`the source he left open slid in at launch: ${await pushes(page)}`);
+  if (await page.evaluate(() => document.querySelector(".phone-full")!.getBoundingClientRect().x) !== 0) throw new Error("the restored source is not in place");
+}, "phone");
+
+journey("phone: a sheet rises from the foot of the screen and a tap outside lets it down (D331)", async (page) => {
+  await phoneSource(page, TESTING);
+  await page.evaluate(() => new MutationObserver((all) => { for (const m of all) for (const n of m.addedNodes) if (n instanceof HTMLElement && n.querySelector(".sheet")) (window as unknown as { __rose: string }).__rose = n.querySelector(".sheet")!.getAnimations().map((a) => (a as CSSAnimation).animationName).join(); }).observe(document.body, { childList: true }));
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  const sheet = page.locator(".action-sheet");
+  await sheet.waitFor();
+  const rose = await page.evaluate(() => (window as unknown as { __rose: string }).__rose);
+  if (rose !== "sheet-up") throw new Error(`the ⋯ sheet did not rise (animations: "${rose}")`);
+  await until("the sheet is up", async () => { const b = (await sheet.boundingBox())!; return Math.abs(b.y + b.height - 844) < 1; });
+  await page.touchscreen.tap(195, 120);
+  await Bun.sleep(60);
+  const going = await page.evaluate(() => { const s = document.querySelector<HTMLElement>(".action-sheet"); return !!s && s.style.transform.startsWith("translateY"); });
+  if (!going) throw new Error("a tap outside took the sheet away at once, with no slide down");
+  await sheet.waitFor({ state: "detached" });
+}, "phone");
+
+journey("phone: the long-press menu grows from its row, which stays lit while the menu is open (D331)", async (page) => {
+  const row = page.locator(".home-read").first();
+  await row.waitFor();
+  await press(page, row, 520);
+  // Read while it is still growing: the press has only just ended.
+  const grew = await page.evaluate(() => document.querySelector(".menu-list")?.getAnimations().map((a) => (a as CSSAnimation).animationName).join() ?? "no menu");
+  await page.getByRole("menu").waitFor();
+  if (grew !== "menu-grow") throw new Error(`the long-press menu did not grow from its row (animations: "${grew}")`);
+  const lit = await row.evaluate((el) => { const at = el.closest("[data-menu-row]") ?? el; return getComputedStyle(at).backgroundColor !== getComputedStyle(document.body).backgroundColor && getComputedStyle(at).backgroundColor !== "rgba(0, 0, 0, 0)"; });
+  if (!lit) throw new Error("the row he pressed is not lit while its menu is open");
 }, "phone");
 
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);

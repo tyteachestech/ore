@@ -13,6 +13,23 @@ export const sheetLayer = (sheet: ReactElement) => (PHONE ? createPortal(sheet, 
 /** The motion tokens (DESIGN.md "Motion"); nothing slides under Reduce Motion. */
 const ease = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "0s" : "var(--t-3) var(--ease-out)");
 
+/** Lets a bottom sheet down the way it came (D331): it slides off the foot of the screen from
+ *  where it is, the dimming clears with it, and then it closes. On the Mac, and under Reduce Motion, it closes at once. */
+export function letDown(el: HTMLElement | null, close: () => void) {
+  if (!PHONE || !el || matchMedia("(prefers-reduced-motion: reduce)").matches) return close();
+  // Once: a second tap on the dimmed page while it goes is the same closing.
+  if (el.dataset.going) return;
+  el.dataset.going = "true";
+  el.style.transition = `transform ${ease()}`;
+  el.style.transform = `translateY(${el.offsetHeight}px)`;
+  const veil = el.closest<HTMLElement>(".overlay");
+  if (veil) {
+    veil.style.transition = `background-color ${ease()}`;
+    veil.style.backgroundColor = "transparent";
+  }
+  setTimeout(close, 180);
+}
+
 /** With `pull`, a sheet whose list is longer than it shows also pulls up (D316), as an iOS sheet goes from its
  *  medium height to its large one: the list grows under the finger to the top of the screen, and from there a
  *  short pull down brings it back, a long one or a flick closes. */
@@ -79,14 +96,16 @@ export function useSwipeDown(ref: RefObject<HTMLElement | null>, onClose: () => 
       // From full height a short pull is back to where it opened; a long one or a flick closes, as from there.
       const go = dy > el.offsetHeight / 4 || fast;
       const shrink = tall() && !go && dy > 40;
-      el.style.transition = `transform ${ease()}`;
-      el.style.transform = go ? `translateY(${el.offsetHeight}px)` : "";
+      if (!go) {
+        el.style.transition = `transform ${ease()}`;
+        el.style.transform = "";
+      }
       if (shrink && list) {
         list.style.transition = `max-height ${ease()}`;
         list.style.maxHeight = "";
         delete el.dataset.tall;
       }
-      if (go) setTimeout(() => close.current(), 180);
+      if (go) letDown(el, () => close.current());
     };
     el.addEventListener("touchstart", start, { passive: true });
     el.addEventListener("touchmove", move, { passive: false });
