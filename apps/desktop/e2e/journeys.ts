@@ -16009,10 +16009,13 @@ journey("phone: every field on every screen stays in sight when the keyboard com
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await tap(page, page.getByRole("button", { name: "Exercise actions" }));
   await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
+  // The form opens once the sheet has let go (F412): looked at before that, it had no fields to check, and the
+  // Esc meant to cancel the edit left the session instead.
+  await page.locator(".review-edit textarea").first().waitFor();
   note(...(await coveredFields(page, "Review, Edit exercise")));
   await esc();
-  // Each step waits for the exercise it acts on (F412): a fixed pause let a tap aimed at
-  // the last exercise's Good land on whatever stood there next, which skipped the Explain exercise or pressed Done.
+  await page.locator(".review-edit").waitFor({ state: "detached" });
+  // Each step waits for the exercise it acts on, not a fixed pause.
   const answer = page.locator(".phone-full textarea:visible");
   const good = page.locator(".phone-full button:visible").filter({ hasText: /^Good/ });
   const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
