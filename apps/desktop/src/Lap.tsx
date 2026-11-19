@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { DotNumber, minutes } from "./Ring";
 import { still } from "./SideCursor";
-import type { Today } from "./ore";
+import { SkillIcon } from "./IconPicker";
+import type { Skill, Today } from "./ore";
 
 /** The end screen's minutes: where the day stood before this session, where it stands now, and the goal they
  *  are measured against (0 when today has none: an off day under Weekdays only). */
@@ -59,7 +60,7 @@ export function useLap(plan: Lap, go: boolean): { min: number; hit: number } {
 
 /** What stands in the end screen's ring: the day's minutes in the ring's own dots, over "min", and nothing
  *  else (Tyler, 2026-11-19: "the wording in the circle feels cramped"). Minutes past the goal are the ring's
- *  own dots with a white centre; the memories kept are in the row under it. */
+ *  own dots with a white centre; the memories kept are under it, skill by skill (`SkillReel`). */
 export function LapCentre({ min }: { min: number }) {
   return (
     <div className="end-lap">
@@ -68,6 +69,42 @@ export function LapCentre({ min }: { min: number }) {
     </div>
   );
 }
+
+/** Under the end screen's ring: the skills this session kept memories in, one line at a time (Tyler,
+ *  2026-11-19: the reel "below the green circle instead of inside it", and several skills "rotate ... in a
+ *  loop"). A line is the skill, how many memories it kept, and its new level when it went up one. A skill that
+ *  went up leads, then the ones it fed most; three at most, so no line is a long wait. One skill stands still,
+ *  and so does the first under Reduce Motion. A memory filed under no skill is named as the review picker names it. */
+export function SkillReel({ kept, ups, skills, run }: { kept: { skill: string; n: number }[]; ups: { skill?: string; level: number }[]; skills: Skill[]; run: boolean }) {
+  const level = (id: string) => ups.find((u) => u.skill === id)?.level;
+  const all = [...kept.filter((k) => level(k.skill)), ...kept.filter((k) => !level(k.skill))], rows = all.slice(0, 3);
+  const [row, setRow] = useState(0);
+  const loop = run && rows.length > 1 && !still();
+  useEffect(() => {
+    if (!loop) return;
+    const id = setInterval(() => void (document.hidden || setRow((r) => (r + 1) % rows.length)), REEL_MS);
+    return () => clearInterval(id);
+  }, [loop, rows.length]);
+  if (!rows.length) return null;
+  const text = (k: { skill: string; n: number }) => `${skills.find((s) => s.id === k.skill)?.name ?? "No skill"}, ${k.n} kept${level(k.skill) ? `, level ${level(k.skill)}` : ""}`;
+  const k = rows[row] ?? rows[0]!, s = skills.find((x) => x.id === k.skill);
+  return (
+    // Its room is held from the start, so the results under it never move when it comes in.
+    <p className="end-reel" data-wait={!run || undefined}>
+      <span className="sr-only">{all.map(text).join(" · ")}</span>
+      {run && (
+        <span key={k.skill} className="end-reel-row" data-color={s?.color} aria-hidden="true">
+          <SkillIcon icon={s?.icon} color={s?.color} dot />
+          <span className="end-reel-name">{s?.name ?? "No skill"}</span>
+          <b>{k.n} kept</b>
+          {level(k.skill) && <b className="end-reel-level">level {level(k.skill)}</b>}
+        </span>
+      )}
+    </p>
+  );
+}
+/** How long a skill's line stands before the next: long enough to read a name, a count and a level. */
+const REEL_MS = 2600;
 
 /** White sparkles over the ring's bonus dots, for as long as the end screen is up: small crosses of dots that
  *  open and fade, only on the stretch past the goal, so they also say how far it went. A few past the goal,

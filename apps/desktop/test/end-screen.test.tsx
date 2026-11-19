@@ -22,7 +22,7 @@ const { CartTip } = await import("../src/CartTip");
 const { TooltipProvider } = await import("@radix-ui/react-tooltip");
 
 const today = (met: boolean, active_ms: number) => ({ goal_minutes: 10, goal_ms: 600_000, active_ms, met, counts: true, caught_up: false, new_waiting: 0, skills: [] });
-const end = (cut: string[], before = today(false, 0), now = today(true, 600_000)) => ({ session: { id: "s", reviews: 5, kept: 5, rescued: 0, cut }, today: now, before, next: null }) as never;
+const end = (cut: string[], before = today(false, 0), now = today(true, 600_000)) => ({ session: { id: "s", reviews: 5, kept: 5, rescued: 0, cut }, today: now, before }) as never;
 const skills = [{ id: "ai", name: "AI", color: "purple", icon: "ai" }] as never;
 const wait = (ms: number) => act(() => new Promise<void>((r) => setTimeout(r, ms)));
 // A test that fails before it unmounts must not leave its screen (and its timers) running under the next file's
@@ -42,7 +42,7 @@ async function mount(e: never, roll = 0) {
   const random = Math.random;
   Math.random = () => roll;
   try {
-    await act(async () => root.render(<TooltipProvider><EndScreen end={e} skills={skills} onDone={() => {}} onAgain={() => {}} onTry={() => {}} /></TooltipProvider>));
+    await act(async () => root.render(<TooltipProvider><EndScreen end={e} skills={skills} onDone={() => {}} onAgain={() => {}} /></TooltipProvider>));
   } finally {
     Math.random = random;
   }
@@ -286,7 +286,7 @@ test("the mole says one line at a session's end: typed out a letter at a time wi
   jest.useRealTimers();
   // Under the emblem nothing of Ore's is left but the row of results (D252).
   expect(flat.q(".review-end > p, .review-end > .end-lines")).toBe(0);
-  expect(flat.q(".review-end > .end-tally > li")).toBe(2);
+  expect(flat.q(".review-end > .end-tally > li")).toBe(1);
   expect(flat.q(".review-end h2")).toBe(0);
   await flat.done();
 });
@@ -306,18 +306,16 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   expect(first.q(".end-lap")).toBe(0);
   await first.done();
   reduce = true;
-  // One row, three at most, in one order: kept, the days they added, then the rarest thing (here the gems cut).
+  // One row, two at most, in one order: the days the session added, then the gems it cut.
   const row = [...s.body.querySelectorAll(".end-emblem + .end-tally > li")];
-  expect(row.map((li) => li.getAttribute("data-key"))).toEqual(["kept", "depth", "cut"]);
+  expect(row.map((li) => li.getAttribute("data-key"))).toEqual(["depth", "cut"]);
   // Each number is drawn in dots, and its text is the true number for a reader and for a test.
-  expect(row.map((li) => li.querySelectorAll("b .dot-number circle").length > 5)).toEqual([true, true, true]);
-  expect(row.map((li) => li.textContent)).toEqual(["5memories kept", "+41days of memory", "2gems cut"]);
-  // Each result's mark is a shaded dot object on the number's own line (D259): a gem for memories kept, a calendar for the days added.
-  expect(row.map((li) => li.querySelector(".end-tally-pair > .end-tally-mark + b") !== null)).toEqual([true, true, true]);
-  expect(row.slice(0, 2).map((li) => li.querySelector(".end-mark")?.getAttribute("data-kind"))).toEqual(["gem", "calendar"]);
-  expect(s.q('.end-tally [data-key="kept"] .end-mark circle')).toBeGreaterThan(60);
-  // The marks loop, each its own way (D260): every dot of the gem takes a turn, and only the calendar's days.
-  expect(s.q('.end-tally [data-key="kept"] .end-mark circle:not([data-turn])')).toBe(0);
+  expect(row.map((li) => li.querySelectorAll("b .dot-number circle").length > 5)).toEqual([true, true]);
+  expect(row.map((li) => li.textContent)).toEqual(["+41days of memory", "2gems cut"]);
+  // Each result's mark stands on the number's own line (D259): a calendar for the days added, a cut gem for the gems.
+  expect(row.map((li) => li.querySelector(".end-tally-pair > .end-tally-mark + b") !== null)).toEqual([true, true]);
+  expect(row[0]!.querySelector(".end-mark")?.getAttribute("data-kind")).toBe("calendar");
+  // The calendar loops (D260): only its added days take a turn.
   expect(s.q('.end-tally .end-mark[data-kind="calendar"] circle[data-turn]')).toBe(15);
   // The count is said once, and nothing rare is dressed as rare.
   expect(s.q(".review-kept")).toBe(0);
@@ -328,15 +326,15 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   // With no gem cut the ring holds the minutes alone, and the row has what there is.
   const none = await mount(end([]));
   expect(none.q(".end-ring > :not(.ring):not(.end-lap)")).toBe(0);
-  expect([...none.body.querySelectorAll(".end-tally > li")].map((li) => li.textContent)).toEqual(["5memories kept"]);
+  expect(none.q(".end-tally")).toBe(0);
   await none.done();
-  // A new level takes the third place and wears its skill's colour.
+  // A new level stands on its skill's line under the ring, in the skill's colour, never in the row.
   const up = end(["ai"], { ...today(false, 0), skills: [{ skill: "ai", level: 1 }] } as never, { ...today(true, 600_000), skills: [{ skill: "ai", level: 2 }] } as never) as unknown as { session: Record<string, unknown> };
-  Object.assign(up.session, { rescued: 2, depth_days: 400 });
+  Object.assign(up.session, { rescued: 2, depth_days: 400, kept_skills: [{ skill: "ai", n: 5 }] });
   const u = await mount(up as never);
-  const third = u.body.querySelector(".end-tally > li:nth-child(3)")!;
-  expect([third.getAttribute("data-key"), third.getAttribute("data-rare"), third.getAttribute("data-color"), third.textContent]).toEqual(["level", "level", "purple", "2AI level"]);
-  expect(u.body.querySelector('.end-tally [data-key="depth"]')!.textContent).toBe("+13months of memory");
+  const reel = u.body.querySelector(".end-emblem + .end-reel + .end-tally")!.previousElementSibling!.querySelector(".end-reel-row")!;
+  expect([reel.getAttribute("data-color"), reel.textContent]).toEqual(["purple", "AI5 keptlevel 2"]);
+  expect([...u.body.querySelectorAll(".end-tally > li")].map((li) => li.textContent)).toEqual(["+13months of memory", "1gem cut"]);
   await u.done();
   const back = end([]) as unknown as { session: Record<string, unknown> };
   Object.assign(back.session, { rescued: 2 });
@@ -355,13 +353,13 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   const body = document.createElement("div");
   document.body.appendChild(body);
   const root = createRoot(body);
-  await act(async () => root.render(<TooltipProvider><EndScreen quick end={end(["ai"])} skills={skills} onDone={() => {}} onAgain={() => {}} onTry={() => {}} /></TooltipProvider>));
+  await act(async () => root.render(<TooltipProvider><EndScreen quick end={end(["ai"])} skills={skills} onDone={() => {}} onAgain={() => {}} /></TooltipProvider>));
   expect(body.querySelectorAll(".end-emblem").length).toBe(0);
   expect(body.querySelectorAll(".review-end > .review-cut").length).toBe(1);
   expect(body.querySelectorAll(".review-kept").length).toBe(1);
   // Its title says what was done, never a cheer.
   expect(body.querySelector("h2")!.textContent).toBe("Goal met");
-  await act(async () => root.render(<TooltipProvider><EndScreen quick end={end(["ai"], today(true, 600_000))} skills={skills} onDone={() => {}} onAgain={() => {}} onTry={() => {}} /></TooltipProvider>));
+  await act(async () => root.render(<TooltipProvider><EndScreen quick end={end(["ai"], today(true, 600_000))} skills={skills} onDone={() => {}} onAgain={() => {}} /></TooltipProvider>));
   expect(body.querySelector("h2")!.textContent).toBe("5 answered");
   await act(async () => (root.unmount(), body.remove()));
   reduce = false;
@@ -469,50 +467,48 @@ test("the results land one after another and count up, and the mole speaks once 
   Object.assign(e.session, { depth_days: 41 });
   const s = await mount(e as never);
   const waiting = () => s.q(".end-tally > li[data-wait]");
-  // All three hold their place from the start, so nothing under them moves as they land.
-  expect(s.q(".end-tally > li")).toBe(3);
-  await act(async () => void jest.advanceTimersByTime(1));
-  expect(waiting()).toBe(2);
-  await act(async () => void jest.advanceTimersByTime(320));
+  // A result holds its place from the start, so nothing under it moves as it lands.
+  expect(s.q(".end-tally > li")).toBe(1);
   expect(waiting()).toBe(1);
-  await act(async () => void jest.advanceTimersByTime(320));
+  await act(async () => void jest.advanceTimersByTime(1));
   expect(waiting()).toBe(0);
   // A number runs up from nothing in the dots; its text is the true number throughout.
-  expect(s.body.querySelector('.end-tally [data-key="kept"] .sr-only')!.textContent).toBe("5");
+  expect(s.body.querySelector('.end-tally [data-key="depth"] .sr-only')!.textContent).toBe("+41");
+  const early = s.q('.end-tally [data-key="depth"] .dot-number circle');
   for (let i = 0; i < 60; i++) await act(async () => void jest.advanceTimersByTime(16));
-  // A 5 in the ring's dots is 17 of them.
-  expect(s.q('.end-tally [data-key="kept"] .dot-number circle')).toBe(17);
+  expect(s.q('.end-tally [data-key="depth"] .dot-number circle')).toBeGreaterThan(early);
   jest.useRealTimers();
   await s.done();
 });
 
-test("the row of results (D252): kept, days of memory, then the rarest true thing; a session of misses has none", async () => {
+test("the row of results (D252): days of memory, then the gems cut; a session of misses has none", async () => {
   const { endTiles } = await import("../src/end-says");
   const session = (o: Record<string, unknown>) => ({ id: "s", reviews: 8, kept: 5, rescued: 0, ...o }) as never;
-  const keys = (o: Record<string, unknown>, ups: { skill?: string; name: string; level: number }[] = []) => endTiles({ session: session(o), ups }).map((t) => `${t.key} ${t.value} ${t.label}`);
-  expect(keys({})).toEqual(["kept 5 memories kept"]);
-  expect(keys({ kept: 1, depth_days: 1 })).toEqual(["kept 1 memory kept", "depth +1 day of memory"]);
-  // The third place goes to a thing he can see elsewhere in the app: a new level over the gems cut. A long gap
-  // and memories pulled back in time take no place: a number can't say them (Tyler, 2026-11-19).
+  const keys = (o: Record<string, unknown>) => endTiles({ session: session(o) }).map((t) => `${t.key} ${t.value} ${t.label}`);
+  // The memories kept are said above the row, skill by skill, so the row never counts them again.
+  expect(keys({})).toEqual([]);
+  expect(keys({ kept: 1, depth_days: 1 })).toEqual(["depth +1 day of memory"]);
+  // A long gap and memories pulled back in time take no place: a number can't say them (Tyler, 2026-11-19).
   const all = { depth_days: 212, longest_days: 9, rescued: 2, cut: ["ai", "ai"] };
-  expect(keys(all, [{ skill: "ai", name: "AI", level: 3 }])).toEqual(["kept 5 memories kept", "depth +7 months of memory", "level 3 AI level"]);
-  expect(keys(all)[2]).toBe("cut 2 gems cut");
-  expect(keys({ ...all, cut: [] })).toHaveLength(2);
-  expect(keys({ cut: ["ai"] })[1]).toBe("cut 1 gem cut");
+  expect(keys(all)).toEqual(["depth +7 months of memory", "cut 2 gems cut"]);
+  expect(keys({ ...all, cut: [] })).toHaveLength(1);
+  expect(keys({ cut: ["ai"] })).toEqual(["cut 1 gem cut"]);
   // The one number that needs explaining keeps its hint, and says what came after the goal (D246).
-  const depth = endTiles({ session: session({ depth_days: 41, depth_extra_days: 12 }), ups: [] })[1]!;
+  const depth = endTiles({ session: session({ depth_days: 41, depth_extra_days: 12 }) })[0]!;
   expect(depth.hint).toContain("added up");
   expect(depth.hint).toContain("12 days of it came after today’s goal");
-  expect(endTiles({ session: session({ kept: 0, depth_days: 9 }), ups: [{ name: "AI", level: 3 }] })).toEqual([]);
+  expect(endTiles({ session: session({ kept: 0, depth_days: 9 }) })).toEqual([]);
   // Years keep their fraction.
-  expect(endTiles({ session: session({ depth_days: 900 }), ups: [] })[1]).toMatchObject({ value: "+2.5", label: "years of memory" });
+  expect(endTiles({ session: session({ depth_days: 900 }) })[0]).toMatchObject({ value: "+2.5", label: "years of memory" });
 });
 
 test("the glint (D257): a light crosses the ring and the field behind it only when this session closed the goal, and each number once it has landed; Reduce Motion plays none", async () => {
   reduce = true;
   try {
     // The goal closed in this session: the ring, the field and the numbers all carry it.
-    const closed = await mount(end([]));
+    const days = end([]) as unknown as { session: Record<string, unknown> };
+    Object.assign(days.session, { depth_days: 41 });
+    const closed = await mount(days as never);
     expect(closed.q(".ring.glint")).toBe(1);
     expect(closed.q(".end-emblem[data-glint]")).toBe(1);
     expect(closed.q(".end-tally .dot-number.glint")).toBe(closed.q(".end-tally .dot-number"));
@@ -552,7 +548,9 @@ test("D252: the mole starts typing only after the last result lands (F106)", asy
 
 test("D252: a caught-up session still names the new exercises held until tomorrow under the results", async () => {
   reduce = true;
-  const s = await mount(end([], today(true, 600_000), { ...today(true, 600_000), caught_up: true, new_waiting: 7 }));
+  const e = end([], today(true, 600_000), { ...today(true, 600_000), caught_up: true, new_waiting: 7 }) as unknown as { session: Record<string, unknown> };
+  Object.assign(e.session, { depth_days: 9 });
+  const s = await mount(e as never);
   expect(s.body.querySelector(".end-tally + .quiz-faint")?.textContent).toContain("7");
   expect(s.body.querySelector(".end-tally + .quiz-faint")?.textContent).toMatch(/new|tomorrow/i);
   await s.done();
@@ -563,7 +561,7 @@ test("D255: the quick quiz never rides the cart even with ore and a gem", async 
   const body = document.createElement("div"); document.body.append(body);
   const root = createRoot(body);
   try {
-    await act(async () => root.render(<TooltipProvider><EndScreen quick end={end(["ai"])} skills={skills} onDone={() => {}} onAgain={() => {}} onTry={() => {}} /></TooltipProvider>));
+    await act(async () => root.render(<TooltipProvider><EndScreen quick end={end(["ai"])} skills={skills} onDone={() => {}} onAgain={() => {}} /></TooltipProvider>));
     expect(body.querySelectorAll(".cart-tip, .cart-mole, .review-mole")).toHaveLength(0);
     expect(body.querySelectorAll(".review-cut .gem")).toHaveLength(1);
   } finally { await act(async () => root.unmount()); body.remove(); }
@@ -593,10 +591,8 @@ test("D257: each result glints only after its own count finishes, in landing ord
       for (const key of glints) if (!first.has(key)) first.set(key, now);
       if (now < 600) expect(glints).toEqual([]);
     }
-    expect([...first.keys()]).toEqual(["kept", "depth", "level"]);
-    expect(first.get("kept")!).toBeGreaterThanOrEqual(600);
-    expect(first.get("depth")! - first.get("kept")!).toBeGreaterThanOrEqual(300);
-    expect(first.get("level")! - first.get("depth")!).toBeGreaterThanOrEqual(300);
+    expect([...first.keys()]).toEqual(["depth"]);
+    expect(first.get("depth")!).toBeGreaterThanOrEqual(600);
     expect(s.q(".ring.glint, .end-emblem[data-glint]")).toBe(0); // goal was met before this session
     await s.done();
   } finally {
@@ -620,18 +616,19 @@ test("on the full end screen the mole never says a number the row under the ring
   const { endSays, endTiles } = await import("../src/end-says");
   const base = { today: today(true, 600_000) as never, closed: false, short: false, ups: [], minutesLeft: null, row: true };
   const session = (o: Record<string, unknown>) => ({ id: "s", reviews: 8, kept: 5, rescued: 0, ...o }) as never;
-  // A new level is the row's third number, so he gives his verdict instead of saying it again; and never the days of memory.
+  // A new level stands on its skill's line under the ring, so he gives his verdict instead of saying it again; and never the days of memory.
+  expect(endSays({ ...base, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ depth_days: 30 }) })[0]!.text).toBe("Gneiss work.");
   expect(endSays({ ...base, closed: true, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ depth_days: 30 }) })[0]!.text).toBe("Goal met. You rock.");
   // A long gap and memories pulled back are no longer numbers in the row (Tyler, 2026-11-19: "as a user idk what
   // 'day gap recalled' means"), so they are his to say, in a sentence.
   const gap = { ...base, session: session({ depth_days: 30, longest_days: 18 }) };
-  expect(endTiles(gap).map((t) => t.key)).toEqual(["kept", "depth"]);
+  expect(endTiles(gap).map((t) => t.key)).toEqual(["depth"]);
   expect(endSays(gap)[0]!.text).toBe("18 days gone and you still had it.");
   expect(endSays({ ...base, session: session({ rescued: 2 }) })[0]!.text).toBe("2 pulled back just before you’d have lost them.");
   // The session that met the day's goal says so in words, whatever else was rare.
   expect(endSays({ ...gap, closed: true })[0]!.text).toBe("Goal met. You rock.");
   expect(endSays({ ...base, closed: true, session: session({ rescued: 2 }) })[0]!.text).toBe("Goal met. You rock.");
-  // A rare thing the row has no room for is still his to say: the row shows the level, he says the gap.
+  // A rare thing with no place on the screen is still his to say: the level has its line, he says the gap.
   expect(endSays({ ...base, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ longest_days: 18 }) })[0]!.text).toBe("18 days gone and you still had it.");
   // Then and now is never in the row.
   expect(endSays({ ...base, closed: true, session: session({ longest_days: 18, then_now: { then_ts: new Date(Date.now() - 28 * 864e5).toISOString() } }) })[0]!.rare?.kind).toBe("then");
@@ -658,15 +655,15 @@ test("the memory line ends by saying in words when the next review falls for the
   await act(async () => (root.unmount(), body.remove()));
 });
 
-// Tyler, 2026-11-19, of the unlabelled line: "i cant tell if its telling me what to do or something i already did".
-test("the try on the end screen says it is still to do: a label, then the plan, and no source title", async () => {
+// Tyler, 2026-11-19, of the try line: "i cant tell if its telling me what to do or something i already did", then
+// "run it" to taking it off: the end screen closes the session, and a try has its own place on the skill page.
+test("the end screen has no try line, even with a try open", async () => {
   reduce = true;
   const e = end([]) as unknown as Record<string, unknown>;
   e.next = { id: "t", item: "i", note: "Write an if-then plan for Thursday's recording", exact: "x", item_title: "If-then plans" };
   const s = await mount(e as never);
-  const line = s.body.querySelector(".review-try")!;
-  expect([...line.querySelectorAll("span")].map((x) => x.textContent)).toEqual(["To try", "Write an if-then plan for Thursday's recording"]);
-  expect(line.textContent).not.toContain("If-then plans");
+  expect(s.q(".review-try")).toBe(0);
+  expect(s.body.textContent).not.toContain("if-then plan");
   await s.done();
   reduce = false;
 });

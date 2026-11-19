@@ -7328,8 +7328,9 @@ journey("review: Later puts the exercise off to the end of the session with noth
     await reveal(page);
     await page.getByRole("button", { name: "Later", exact: true }).click();
     await doneButton.waitFor();
-    const kept = await page.locator('.end-tally [data-key="kept"] .sr-only').textContent();
-    if (kept !== String(total - 1)) throw new Error(`the end screen counts ${kept} kept for ${total - 1} rated`);
+    // The memories kept stand under the ring, skill by skill: a reader's line names them all.
+    const kept = [...((await page.locator(".end-reel .sr-only").textContent()) ?? "").matchAll(/(\d+) kept/g)].reduce((n, m) => n + Number(m[1]), 0);
+    if (kept !== total - 1) throw new Error(`the end screen counts ${kept} kept for ${total - 1} rated`);
     if (logged() !== total - 1) throw new Error(`${logged()} reviews logged for ${total - 1} rated`);
     const lines = reviewLog().slice(log.length).trim().split("\n").length;
     if (lines !== total - 1) throw new Error(`the review log gained ${lines} lines for ${total - 1} rated`);
@@ -8940,18 +8941,19 @@ journey("highlight note: a click on the highlight in the instant its save lands 
   if (mine?.note !== "Ask how sure before checking") throw new Error(`the note was lost: ${JSON.stringify(mine)}`);
 });
 
-journey("try it: the end of a review shows the oldest open try, and a click opens its passage (D148)", async (page) => {
+journey("the end of a review closes the session: no try line even with a try open, and under the ring a line for the skill it fed", async (page) => {
   const calls = oreCalls(page);
   await startReview(page, null);
   await reveal(page);
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await page.waitForTimeout(300);
   await page.keyboard.press("Escape");
-  const line = page.locator(".review-try");
-  await line.waitFor();
-  if (!(await line.innerText()).includes("Outline Thursday's video on the spine before writing")) throw new Error(`the end screen shows the wrong try: ${await line.innerText()}`);
-  await line.click();
-  await page.locator(".doc-head").filter({ hasText: "The Story Spine" }).waitFor();
+  await page.locator(".review-end .end-reel-row").waitFor();
+  if (!/\d+ kept/.test(await page.locator(".end-reel-row").innerText())) throw new Error(`the skill's line reads ${await page.locator(".end-reel-row").innerText()}`);
+  const open = ((await ore("tries")) as { status: string }[]).filter((t) => t.status === "open").length;
+  if (!open) throw new Error("the seed has no open try, so this journey proves nothing");
+  if (await page.locator(".review-try:not(.review-dig)").count()) throw new Error("the end screen shows a try line");
+  await page.keyboard.press("Enter");
   await page.locator(".review").waitFor({ state: "detached" });
   await calls.undoAll(); // the rating, for the journeys after this one
 });

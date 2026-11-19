@@ -2448,6 +2448,14 @@ button.home-plan:hover { color: var(--text); }
 .end-lap-min { margin-top: 12px; }
 @keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .end-lap { animation: none; } }
+/* Under the ring: the skills the session fed, one line at a time (`SkillReel`). */
+.end-reel { height: 24px; margin: 16px 0 0; max-width: 100%; font: 400 14px/24px var(--font); color: var(--text); }
+.end-reel-row { display: flex; align-items: center; justify-content: center; gap: 8px; height: 24px; white-space: nowrap; animation: end-lap-in var(--t-4) var(--ease-out); }
+.end-reel-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.end-reel-row b { flex: none; font: 400 12px/1 var(--mono); color: var(--muted); }
+.end-reel-row .end-reel-level { color: var(--skill, var(--text)); }
+.end-reel-row .skill-icon.glyph { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; }
+@media (prefers-reduced-motion: reduce) { .end-reel-row { animation: none; } }
 /* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
    Each lands in hard steps, one after another, then is still. */
 .end-tally { list-style: none; display: flex; justify-content: center; gap: 16px; margin: 20px 0 0; padding: 0; }
@@ -2458,8 +2466,6 @@ button.home-plan:hover { color: var(--text); }
 .end-tally-pair { display: flex; align-items: center; justify-content: center; gap: 10px; height: 48px; }
 .end-tally-mark { display: grid; place-items: center; flex: none; color: var(--text); }
 .end-tally-mark .skill-icon.glyph { width: 40px; height: 40px; -webkit-mask-size: 40px; mask-size: 40px; }
-.end-tally li[data-rare="level"] .dot-number circle { fill: var(--skill, var(--text)); }
-.end-tally li[data-rare="rescued"] .dot-number circle { fill: var(--seam); }
 @keyframes end-tally-in { from { opacity: 0; transform: translateY(-10px); } }
 .end-tally-label { max-width: 100%; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 @media (max-width: 480px) { .end-tally { gap: 8px; } .end-tally-pair { gap: 6px; } .end-tally-mark .end-mark { width: 36px; height: 36px; } }
@@ -2467,9 +2473,7 @@ button.home-plan:hover { color: var(--text); }
    open: the gem's faces catch a passing light, the calendar's added days light one by one.
    A dot's turn is `--at`, its resting light `--o` (EndMark.tsx). Endless loops keep their own time (D185). */
 .end-mark circle { transform-box: fill-box; transform-origin: center; }
-.end-tally li:not([data-wait]) .end-mark[data-kind="gem"] circle { animation: end-facet 3600ms var(--ease-in-out) var(--at) infinite; }
 .end-tally li:not([data-wait]) .end-mark[data-kind="calendar"] circle[data-turn] { animation: end-day 4000ms var(--ease-out) var(--at) infinite backwards; }
-@keyframes end-facet { 0%, 16%, 100% { transform: scale(1); opacity: var(--o); } 7% { transform: scale(1.4); opacity: 1; } }
 @keyframes end-day { 0% { transform: scale(0.45); opacity: 0.5; } 6% { transform: scale(1.35); opacity: 1; } 12%, 100% { transform: scale(1); opacity: var(--o); } }
 @media (prefers-reduced-motion: reduce) { .end-tally li, .end-tally .end-mark circle { animation: none !important; } }
 .end-ring > .review-cut { position: relative; flex-wrap: wrap; align-items: center; max-width: 160px; gap: 6px 8px; margin: 0; }
@@ -2485,7 +2489,6 @@ button.home-plan:hover { color: var(--text); }
 @media (prefers-reduced-motion: reduce) { .mole-mound { animation: none; } }
 /* Two groups: what the session won, then what comes next. */
 .end-emblem ~ .review-try { margin-top: 40px; }
-.end-emblem ~ .review-try ~ .review-foot { margin-top: 12px; }
 .end-emblem ~ .review-foot { margin-top: 40px; }
 /* The mole speaks (D243) from his speech box (D245), right of his head; it grows out of him once. */
 .says.end-says { position: absolute; left: calc(50% + 62px); top: 12px; z-index: 2; width: max-content; max-width: min(248px, calc(50vw - 78px)); transform-origin: 0 50%; animation: end-says var(--t-4) var(--ease-out); }
@@ -2520,7 +2523,6 @@ button.home-plan:hover { color: var(--text); }
 .review-try:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .review-try svg { flex: none; align-self: center; }
 /* "To try", then the plan on one line, however long it is: its full text is the passage a click opens. */
-.review-try-label { flex: none; font: 400 12px/1 var(--mono); color: var(--muted); }
 .review-try-plan { min-width: 0; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .review-dig > span { min-width: 0; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .review-dig .review-try-plan::after { content: " · "; color: var(--faint); }
@@ -3157,14 +3159,12 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .says.end-says .says-block { display: none; }
 @keyframes end-says-phone { from { opacity: 0; transform: translate(-50%, 6px) scale(0.96); } }
 /* A result is as wide as its words, so no label breaks while its neighbours don't; only a long skill name wraps. */
-.phone .end-tally { gap: 24px; margin-top: 28px; }
+.phone .end-reel { margin-top: 20px; font-size: 16px; }
+.phone .end-reel-row b { font-size: 13px; }
+.phone .end-tally { gap: 24px; margin-top: 24px; }
 .phone .end-tally li { width: auto; max-width: 136px; }
 .phone .end-tally:has(> :nth-child(2):last-child) { gap: 40px; }
 .phone .review-end .quiz-faint { margin-top: 24px; }
-.phone .end-emblem ~ .review-try { margin-top: 36px; }
-.phone .review-try { flex-wrap: wrap; justify-content: center; gap: 6px 6px; padding: 6px 8px; text-align: center; font-size: 15px; }
-.phone .review-try { align-items: center; }
-.phone .review-try-plan { flex: 0 0 100%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .phone .review-end .review-foot { flex-direction: column-reverse; align-self: stretch; gap: 4px; margin-top: auto; padding-top: 32px; }
 .phone .review-end .review-foot .pill-btn.quiz-go { width: 100%; height: 52px; justify-content: center; border-radius: 999px; font: 600 17px var(--font); letter-spacing: 0; }
 .phone .review-end .review-foot .quiz-ghost { height: 44px; font-size: 15px; }
