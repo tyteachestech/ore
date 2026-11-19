@@ -370,7 +370,6 @@ function Rows({ lines, row, onOpen }: { lines: Line[]; row: RowActions; onOpen: 
 }
 
 /** A list row's in-place Rename field: Today's (Home's rows) and the lists'. styles.css pads the page under it. */
-const RENAMING = ".home-read, .phone-row-rename";
 
 /** Sources by To read and Done, as one list; `flat`: as given, no sections or courses (Archive, a course's lessons). */
 function SourceList({ title, items, onOpen, row, head, flat, empty = "Nothing here yet. Add a link with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; flat?: boolean; empty?: string }) {
@@ -689,11 +688,12 @@ export function PhoneApp() {
     const vv = window.visualViewport;
     if (!vv) return;
     let full = innerHeight;
+    let kb = 0;
     const fit = () => {
       // Against the full screen: with some fields iOS also shrinks innerHeight, while fixed screens still
       // lay out on the whole screen (portrait only, so its height doesn't change).
       full = Math.max(full, innerHeight);
-      const kb = Math.max(0, Math.round(full - vv.height));
+      kb = Math.max(0, Math.round(full - vv.height));
       document.documentElement.style.setProperty("--keyboard", `${kb}px`);
       if (!kb) return;
       document.querySelector(".phone-full .review-foot")?.scrollIntoView({ block: "end" });
@@ -701,15 +701,13 @@ export function PhoneApp() {
       if (!(field instanceof HTMLElement)) return;
       // ...but never past the field he is typing in: Edit exercise's question sat above the foot, under the head.
       if (field.closest(".phone-full .review-body")) return field.scrollIntoView({ block: "nearest" });
-      // A field in the reader (a prequestion, a highlight's note) or the drawer (New skill, with its refusal
-      // under it) stays in sight above the keyboard. Sheets and Review lift themselves by --keyboard.
+      // The drawer's New skill keeps its refusal under it in sight too.
       if (field.closest(".phone-drawer")) return (field.closest("form") ?? field).scrollIntoView({ block: "nearest" });
-      // A row renamed in place (Today, Sources, a skill's list) may sit where the keyboard comes up.
-      if (field.closest(RENAMING)) return field.scrollIntoView({ block: "nearest" });
-      if (!field.closest(".phone-reader")) return;
-      if (!field.isContentEditable) return field.scrollIntoView({ block: "nearest" });
       // The source note is one tall editor: bring the caret, not the editor, into view, once the screen has shrunk.
-      requestAnimationFrame(keepCaret);
+      if (field.isContentEditable) return void (field.closest(".phone-reader") && requestAnimationFrame(keepCaret));
+      // Every other field, wherever it is (Settings' daily plan sat under the keyboard while a list of screens was kept
+      // here): the page gives the keyboard room at its foot (styles.css), sheets and Review lift themselves by it.
+      field.scrollIntoView({ block: "nearest" });
     };
     // iOS reveals the caret just above its own keyboard, which leaves it under the note's keyboard bar: as he
     // types past it, scroll the note so the line he is writing stays above the bar (Notes keeps it in sight).
@@ -735,6 +733,9 @@ export function PhoneApp() {
       if (below > 0) box.scrollTop += below;
     };
     const typed = () => requestAnimationFrame(keepCaret);
+    // Focus moved with the keyboard up (iOS's ‹ ›, a tap on the next field) resizes nothing.
+    const focused = () => kb && requestAnimationFrame(fit);
+    document.addEventListener("focusin", focused);
     vv.addEventListener("resize", fit);
     vv.addEventListener("scroll", fit);
     document.addEventListener("selectionchange", typed);
@@ -742,6 +743,7 @@ export function PhoneApp() {
       vv.removeEventListener("resize", fit);
       vv.removeEventListener("scroll", fit);
       document.removeEventListener("selectionchange", typed);
+      document.removeEventListener("focusin", focused);
     };
   }, []);
 

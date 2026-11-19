@@ -2930,8 +2930,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .overlay .panel .panel-foot:not(:has(.err)) { display: none; }
 .phone .overlay .panel .panel-foot .right { display: none; }
 .phone-page { overflow-y: auto; padding-top: env(safe-area-inset-top, 0px); }
-/* A row being renamed in place can be scrolled above the keyboard (PhoneApp's RENAMING). */
-.phone-root .phone-page:has(.home-read input:focus, .phone-row-rename input:focus) { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--keyboard, 0px)); scroll-padding-bottom: var(--keyboard, 0px); }
+/* Any field on a page (a row renamed in place, Settings' daily plan) can be scrolled above the keyboard (PhoneApp's fit). */
+.phone .phone-page:has(:is(input, textarea, select):focus) { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--keyboard, 0px)); scroll-padding-bottom: var(--keyboard, 0px); }
 /* The status bar sits over content that scrolls under it, as in Apple's apps: a bar behind it keeps the clock readable. */
 .phone-app::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 5; }
 .phone-full { position: fixed; inset: 0; z-index: 20; background: var(--bg); box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5); display: flex; flex-direction: column; padding-top: env(safe-area-inset-top, 0px); }
