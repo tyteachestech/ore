@@ -64,7 +64,7 @@ const Pop = createContext<(done: () => void) => void>((done) => done());
  *  the way (or with a flick) and it slides off and goes back, otherwise it springs back. A screen
  *  with a second page (a source and its note, `.reader`) pages instead: from the right edge to the
  *  note, and from the left edge back to the source, each keeping its scroll. */
-function Screen({ onBack, onForward, className, children }: { onBack: () => void; onForward?: (open: boolean) => void; className: string; children: ReactNode }) {
+function Screen({ onBack, onForward, stay, className, children }: { onBack: () => void; onForward?: (open: boolean) => void; /** Back is a step inside this screen (a skill's Forge back to the skill): the screen stays. */ stay?: boolean; className: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const edge = useRef<"left" | "right">("left");
   const strip = useRef<HTMLElement | null>(null);
@@ -82,18 +82,24 @@ function Screen({ onBack, onForward, className, children }: { onBack: () => void
     slide(ref.current, "translateX(100%)", "none");
     slide(under(), "none", underAt(0));
   }, []);
-  /** Off to the right from `dx`, the screen under coming back with it; then `done` takes it away. */
+  /** Off to the right from `dx`, the screen under coming back with it; then `done` takes it away. Once: a second
+   *  Back or swipe while it goes is the same leaving. */
+  const leaving = useRef(false);
   const leave = useCallback((done: () => void, dx = 0) => {
     const el = ref.current;
+    if (leaving.current) return;
     const going = el && slide(el, `translateX(${dx}px)`, "translateX(100%)");
     if (!el || !going) return done();
+    leaving.current = true;
     slide(under(), underAt(dx), "none");
     // Held off screen until React takes it away; put back if it is still here (a close that was refused).
     el.style.transform = "translateX(100%)";
-    going.onfinish = () => {
+    const gone = () => {
       done();
-      setTimeout(() => el.isConnected && (el.style.transform = ""), 100);
+      setTimeout(() => ((leaving.current = false), el.isConnected && (el.style.transform = "")), 100);
     };
+    // A slide that was cut short still closes.
+    going.finished.then(gone, gone);
   }, []);
   useHorizontalDrag(ref, {
     accept: (t) => {
@@ -135,9 +141,11 @@ function Screen({ onBack, onForward, className, children }: { onBack: () => void
       const below = under();
       if (below) [below.style.transition, below.style.transform] = ["", ""];
       el.style.transform = "";
-      if (go) return leave(onBack, dx);
+      if (go && !stay) return leave(onBack, dx);
+      // Back into place: let go too soon, or Back here is a step inside this screen.
       slide(el, `translateX(${dx}px)`, "none");
       slide(below, underAt(dx), underAt(0));
+      if (go) onBack();
     },
   });
   return (
@@ -1128,7 +1136,7 @@ export function PhoneApp() {
       </div>
       {/* A skill's page (D46 in one column), pushed from Today or the drawer; a source opens over it. */}
       {skill && skillOf && (
-        <Screen className="phone-full" onBack={skillBack}>
+        <Screen className="phone-full" onBack={skillBack} stay={!!skillSub}>
           <Back label={skillSub === "forge" ? skillOf.name : skillSub ? "Forge" : tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} stay={!!skillSub} onClick={skillBack} />
           <div className="phone-page phone-skill">
             <SkillPage

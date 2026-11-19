@@ -17,6 +17,9 @@ const ease = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "0s
  *  where it is, the dimming clears with it, and then it closes. On the Mac, and under Reduce Motion, it closes at once. */
 export function letDown(el: HTMLElement | null, close: () => void) {
   if (!PHONE || !el || matchMedia("(prefers-reduced-motion: reduce)").matches) return close();
+  // Once: a second tap on the dimmed page while it goes is the same closing.
+  if (el.dataset.going) return;
+  el.dataset.going = "true";
   el.style.transition = `transform ${ease()}`;
   el.style.transform = `translateY(${el.offsetHeight}px)`;
   const veil = el.closest<HTMLElement>(".overlay");
