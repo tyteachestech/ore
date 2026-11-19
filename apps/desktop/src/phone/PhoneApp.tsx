@@ -58,7 +58,7 @@ function slide(el: Element | null | undefined, from: string, to: string) {
 /** Slides a pushed screen away, then runs what closes it: Back does (and Review's Done), as the edge swipe does. */
 const Pop = createContext<(done: () => void) => void>((done) => done());
 
-/** A pushed screen, as iOS pushes one (D-new-phone-native-feel): it slides in from the right while the screen
+/** A pushed screen, as iOS pushes one (D331): it slides in from the right while the screen
  *  under it moves a little left, and slides back out on Back. iOS's edge swipes: from the left edge the screen
  *  moves with the finger; let go past a third of
  *  the way (or with a flick) and it slides off and goes back, otherwise it springs back. A screen

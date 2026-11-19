@@ -13,7 +13,7 @@ export const sheetLayer = (sheet: ReactElement) => (PHONE ? createPortal(sheet, 
 /** The motion tokens (DESIGN.md "Motion"); nothing slides under Reduce Motion. */
 const ease = () => (matchMedia("(prefers-reduced-motion: reduce)").matches ? "0s" : "var(--t-3) var(--ease-out)");
 
-/** Lets a bottom sheet down the way it came (D-new-phone-native-feel): it slides off the foot of the screen from
+/** Lets a bottom sheet down the way it came (D331): it slides off the foot of the screen from
  *  where it is, the dimming clears with it, and then it closes. On the Mac, and under Reduce Motion, it closes at once. */
 export function letDown(el: HTMLElement | null, close: () => void) {
   if (!PHONE || !el || matchMedia("(prefers-reduced-motion: reduce)").matches) return close();

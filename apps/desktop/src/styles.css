@@ -3856,7 +3856,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .action-sheet .menu-caret { color: var(--faint); }
 @media (prefers-reduced-motion: reduce) { .action-sheet .sheet-steps { transition: none; } }
 
-/* The iPhone's own feel (D-new-phone-native-feel): what Books, Notes and Mail do under a finger.
+/* The iPhone's own feel (D331): what Books, Notes and Mail do under a finger.
    1. Every page gives at its top and bottom (the rubber band, iOS's own physics). The Mac's "no overscroll" rule is
       lifted here, and a page shorter than the screen is given one point to scroll, since iOS only bounces a scroller
       that has somewhere to go. The bars are outside the scrollers, so they never move. */

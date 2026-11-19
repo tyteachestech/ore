@@ -15693,7 +15693,7 @@ journey("iPhone menu: every skill's name starts on one line, with an icon or wit
   await tap(page, page.locator(".phone-scrim"));
 }, "phone");
 
-// —— the iPhone's native feel (D-new-phone-native-feel, F-new-phone-not-native) ——
+// —— the iPhone's native feel (D331, F402) ——
 
 /** Every scroller on screen a finger could move: whether iOS would let it give at its ends (the rubber band), and
  *  whether it scrolls at all. iOS only bounces a scroller that has somewhere to go. */
@@ -15703,7 +15703,7 @@ const scrollers = (page: Page, within: string) =>
       .filter((el) => /auto|scroll/.test(getComputedStyle(el).overflowY) && el.clientHeight > 200 && el.checkVisibility())
       .map((el) => ({ name: el.className.toString().split(" ")[0]!, gives: getComputedStyle(el).overscrollBehaviorY !== "none", scrolls: el.scrollHeight > el.clientHeight })), within);
 
-journey("phone: every page gives at its top and bottom as iOS's own do, a short one too (F-new-phone-not-native)", async (page) => {
+journey("phone: every page gives at its top and bottom as iOS's own do, a short one too (F402)", async (page) => {
   // The Mac's "no overscroll" rule reached the phone's reader and Review, and a list shorter than the screen had
   // nowhere to go, so iOS gave it no rubber band at all.
   const check = async (where: string, within: string) => {
@@ -15732,7 +15732,7 @@ journey("phone: every page gives at its top and bottom as iOS's own do, a short 
 const WATCH_PUSHES = `window.__pushes = []; new MutationObserver((all) => { for (const m of all) for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList.contains("phone-full")) window.__pushes.push(n.getAnimations().length > 0); }).observe(document, { childList: true, subtree: true });`;
 const pushes = (page: Page) => page.evaluate(() => (window as unknown as { __pushes: boolean[] }).__pushes);
 
-journey("phone: a screen he opens slides in from the right and Back slides it away; the one he left open is just there at launch (D-new-phone-native-feel)", async (page) => {
+journey("phone: a screen he opens slides in from the right and Back slides it away; the one he left open is just there at launch (D331)", async (page) => {
   await page.addInitScript(WATCH_PUSHES);
   await page.reload();
   await page.locator(".phone-opening").waitFor({ state: "detached" });
@@ -15756,7 +15756,7 @@ journey("phone: a screen he opens slides in from the right and Back slides it aw
   if (await page.evaluate(() => document.querySelector(".phone-full")!.getBoundingClientRect().x) !== 0) throw new Error("the restored source is not in place");
 }, "phone");
 
-journey("phone: a sheet rises from the foot of the screen and a tap outside lets it down (D-new-phone-native-feel)", async (page) => {
+journey("phone: a sheet rises from the foot of the screen and a tap outside lets it down (D331)", async (page) => {
   await phoneSource(page, TESTING);
   await page.evaluate(() => new MutationObserver((all) => { for (const m of all) for (const n of m.addedNodes) if (n instanceof HTMLElement && n.querySelector(".sheet")) (window as unknown as { __rose: string }).__rose = n.querySelector(".sheet")!.getAnimations().map((a) => (a as CSSAnimation).animationName).join(); }).observe(document.body, { childList: true }));
   await tap(page, page.getByRole("button", { name: "Source actions" }));
@@ -15772,7 +15772,7 @@ journey("phone: a sheet rises from the foot of the screen and a tap outside lets
   await sheet.waitFor({ state: "detached" });
 }, "phone");
 
-journey("phone: the long-press menu grows from its row, which stays lit while the menu is open (D-new-phone-native-feel)", async (page) => {
+journey("phone: the long-press menu grows from its row, which stays lit while the menu is open (D331)", async (page) => {
   const row = page.locator(".home-read").first();
   await row.waitFor();
   await press(page, row, 520);
