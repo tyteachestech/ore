@@ -43,37 +43,14 @@ const MARKS = {
     "................",
     "................",
   ],
-  // A long gap recalled across: a comet, from far off and still bright, its tail in three streaks.
-  comet: [
-    "................",
-    "................",
-    "............22..",
-    "...........33...",
-    ".........343....",
-    ".......2553.....",
-    "......465332....",
-    "....3676344.....",
-    "...6886354......",
-    "..3999652.......",
-    "..8999941.......",
-    "..999996........",
-    "..799992........",
-    "..17983.........",
-    "................",
-    "................",
-  ],
 } as const;
 export type EndMarkKind = keyof typeof MARKS;
 
 /* The loop (D260): which dots move, and how many ms into the loop each takes its turn. The gem's
-   faces catch a light passing from the top left, the calendar's added days light one by one, and the comet's tail
-   streams off its head. A dot that sits still gets null. The moves themselves are `end-*` in styles.css. */
-const HEAD = { x: 4.5, y: 10.5 };
+   faces catch a light passing from the top left, and the calendar's added days light one by one. A dot that sits still gets null. The moves themselves are `end-*` in styles.css. */
 function turn(kind: EndMarkKind, x: number, y: number, lit: number, day: number): number | null {
   if (kind === "gem") return Math.round((x + y / 2) * 90);
-  if (kind === "calendar") return y >= 7 && lit >= 4 ? day * 140 : null;
-  const far = Math.hypot(x - HEAD.x, y - HEAD.y);
-  return far > 3.2 ? Math.round((far - 3) * 85) : null;
+  return y >= 7 && lit >= 4 ? day * 140 : null;
 }
 
 /** A result's mark, `size` px square. Decorative: the words beside it say what it counts. */

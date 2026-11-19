@@ -330,7 +330,7 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   expect(none.q(".end-ring > :not(.ring):not(.end-lap)")).toBe(0);
   expect([...none.body.querySelectorAll(".end-tally > li")].map((li) => li.textContent)).toEqual(["5memories kept"]);
   await none.done();
-  // The rarest thing takes the third place and wears its own colour: a new level its skill's, a memory pulled back the gold.
+  // A new level takes the third place and wears its skill's colour.
   const up = end(["ai"], { ...today(false, 0), skills: [{ skill: "ai", level: 1 }] } as never, { ...today(true, 600_000), skills: [{ skill: "ai", level: 2 }] } as never) as unknown as { session: Record<string, unknown> };
   Object.assign(up.session, { rescued: 2, depth_days: 400 });
   const u = await mount(up as never);
@@ -341,7 +341,9 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   const back = end([]) as unknown as { session: Record<string, unknown> };
   Object.assign(back.session, { rescued: 2 });
   const b = await mount(back as never);
-  expect(b.body.querySelector('.end-tally [data-rare="rescued"]')!.textContent).toBe("2pulled back in time");
+  // Memories pulled back in time need a sentence, so they are never a number in the row; this session met the day's goal, so the mole says that.
+  expect(b.q('.end-tally [data-rare="rescued"]')).toBe(0);
+  expect(b.body.querySelector(".end-says")!.textContent).toContain("Goal met.");
   await b.done();
   // A session of misses has no count to stand anywhere: the mole says why it was worth it (D62).
   const missed = end([]) as unknown as { session: Record<string, unknown> };
@@ -425,7 +427,7 @@ test("what the mole says at a session's end (D243): the verdict, then only what 
 test("a rare line leads the mole's lines, in words alone: no icon in his speech box (D247 as amended)", async () => {
   jest.useFakeTimers();
   const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
-  // The row under the ring shows the two pulled back, so the rare thing left for him to say is the long gap (F138).
+  // The rarest thing a number can't say is his to say: here the long gap.
   Object.assign(e.session, { depth_days: 41, rescued: 2, longest_days: 18 });
   const s = await mount(e as never);
   await act(async () => void jest.advanceTimersByTime(560));
@@ -463,8 +465,8 @@ test("then and now: his answer from weeks ago over today's, under the ring, and 
 test("the results land one after another and count up, and the mole speaks once the last is in (D252)", async () => {
   jest.useFakeTimers();
   // No cart (the goal was met before), so the row starts at once.
-  const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
-  Object.assign(e.session, { depth_days: 41, rescued: 2 });
+  const e = end([], { ...today(true, 600_000), skills: [{ skill: "ai", level: 1 }] } as never, { ...today(true, 600_000), skills: [{ skill: "ai", level: 2 }] } as never) as unknown as { session: Record<string, unknown> };
+  Object.assign(e.session, { depth_days: 41 });
   const s = await mount(e as never);
   const waiting = () => s.q(".end-tally > li[data-wait]");
   // All three hold their place from the start, so nothing under them moves as they land.
@@ -490,22 +492,20 @@ test("the row of results (D252): kept, days of memory, then the rarest true thin
   const keys = (o: Record<string, unknown>, ups: { skill?: string; name: string; level: number }[] = []) => endTiles({ session: session(o), ups }).map((t) => `${t.key} ${t.value} ${t.label}`);
   expect(keys({})).toEqual(["kept 5 memories kept"]);
   expect(keys({ kept: 1, depth_days: 1 })).toEqual(["kept 1 memory kept", "depth +1 day of memory"]);
-  // The third place goes to one thing: a level over a rescue over a long gap over the gems cut.
+  // The third place goes to a thing he can see elsewhere in the app: a new level over the gems cut. A long gap
+  // and memories pulled back in time take no place: a number can't say them (Tyler, 2026-11-19).
   const all = { depth_days: 212, longest_days: 9, rescued: 2, cut: ["ai", "ai"] };
   expect(keys(all, [{ skill: "ai", name: "AI", level: 3 }])).toEqual(["kept 5 memories kept", "depth +7 months of memory", "level 3 AI level"]);
-  expect(keys(all)[2]).toBe("rescued 2 pulled back in time");
-  expect(keys({ ...all, rescued: 0 })[2]).toBe("long 9 days since you saw one");
+  expect(keys(all)[2]).toBe("cut 2 gems cut");
+  expect(keys({ ...all, cut: [] })).toHaveLength(2);
   expect(keys({ cut: ["ai"] })[1]).toBe("cut 1 gem cut");
-  // A gap under a week, and rescues that were most of the session, take no place.
-  expect(keys({ longest_days: 3, rescued: 6 })).toHaveLength(1);
   // The one number that needs explaining keeps its hint, and says what came after the goal (D246).
   const depth = endTiles({ session: session({ depth_days: 41, depth_extra_days: 12 }), ups: [] })[1]!;
   expect(depth.hint).toContain("added up");
   expect(depth.hint).toContain("12 days of it came after today’s goal");
   expect(endTiles({ session: session({ kept: 0, depth_days: 9 }), ups: [{ name: "AI", level: 3 }] })).toEqual([]);
-  // Years keep their fraction, and one pulled back is "it".
+  // Years keep their fraction.
   expect(endTiles({ session: session({ depth_days: 900 }), ups: [] })[1]).toMatchObject({ value: "+2.5", label: "years of memory" });
-  expect(endTiles({ session: session({ rescued: 1 }), ups: [] })[1]!.hint).toContain("lose it");
 });
 
 test("the glint (D257): a light crosses the ring and the field behind it only when this session closed the goal, and each number once it has landed; Reduce Motion plays none", async () => {
@@ -579,8 +579,8 @@ test("D257: each result glints only after its own count finishes, in landing ord
   globalThis.requestAnimationFrame = (fn) => (frames.set(++id, fn), id);
   globalThis.cancelAnimationFrame = (n) => void frames.delete(n);
   try {
-    const e = end([], today(true, 600_000)) as unknown as { session: Record<string, unknown> };
-    Object.assign(e.session, { depth_days: 41, rescued: 2 });
+    const e = end([], { ...today(true, 600_000), skills: [{ skill: "ai", level: 1 }] } as never, { ...today(true, 600_000), skills: [{ skill: "ai", level: 2 }] } as never) as unknown as { session: Record<string, unknown> };
+    Object.assign(e.session, { depth_days: 41 });
     const s = await mount(e as never);
     const first = new Map<string, number>();
     for (now = 0; now <= 2000; now += 16) {
@@ -593,10 +593,10 @@ test("D257: each result glints only after its own count finishes, in landing ord
       for (const key of glints) if (!first.has(key)) first.set(key, now);
       if (now < 600) expect(glints).toEqual([]);
     }
-    expect([...first.keys()]).toEqual(["kept", "depth", "rescued"]);
+    expect([...first.keys()]).toEqual(["kept", "depth", "level"]);
     expect(first.get("kept")!).toBeGreaterThanOrEqual(600);
     expect(first.get("depth")! - first.get("kept")!).toBeGreaterThanOrEqual(300);
-    expect(first.get("rescued")! - first.get("depth")!).toBeGreaterThanOrEqual(300);
+    expect(first.get("level")! - first.get("depth")!).toBeGreaterThanOrEqual(300);
     expect(s.q(".ring.glint, .end-emblem[data-glint]")).toBe(0); // goal was met before this session
     await s.done();
   } finally {
@@ -620,17 +620,21 @@ test("on the full end screen the mole never says a number the row under the ring
   const { endSays, endTiles } = await import("../src/end-says");
   const base = { today: today(true, 600_000) as never, closed: false, short: false, ups: [], minutesLeft: null, row: true };
   const session = (o: Record<string, unknown>) => ({ id: "s", reviews: 8, kept: 5, rescued: 0, ...o }) as never;
-  // A long gap is the row's third number, so he gives his verdict instead of saying it again.
-  const gap = { ...base, session: session({ depth_days: 30, longest_days: 18 }) };
-  expect(endTiles(gap).map((t) => t.key)).toEqual(["kept", "depth", "long"]);
-  expect(endSays(gap)[0]!.text).toBe("Gneiss work.");
-  // The same for a new level and for memories pulled back, and never the days of memory.
+  // A new level is the row's third number, so he gives his verdict instead of saying it again; and never the days of memory.
   expect(endSays({ ...base, closed: true, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ depth_days: 30 }) })[0]!.text).toBe("Goal met. You rock.");
-  expect(endSays({ ...base, session: session({ rescued: 2 }) }).map((l) => l.text)).toEqual(["Gneiss work."]);
+  // A long gap and memories pulled back are no longer numbers in the row (Tyler, 2026-11-19: "as a user idk what
+  // 'day gap recalled' means"), so they are his to say, in a sentence.
+  const gap = { ...base, session: session({ depth_days: 30, longest_days: 18 }) };
+  expect(endTiles(gap).map((t) => t.key)).toEqual(["kept", "depth"]);
+  expect(endSays(gap)[0]!.text).toBe("18 days gone and you still had it.");
+  expect(endSays({ ...base, session: session({ rescued: 2 }) })[0]!.text).toBe("2 pulled back just before you’d have lost them.");
+  // The session that met the day's goal says so in words, whatever else was rare.
+  expect(endSays({ ...gap, closed: true })[0]!.text).toBe("Goal met. You rock.");
+  expect(endSays({ ...base, closed: true, session: session({ rescued: 2 }) })[0]!.text).toBe("Goal met. You rock.");
   // A rare thing the row has no room for is still his to say: the row shows the level, he says the gap.
   expect(endSays({ ...base, ups: [{ skill: "ai", name: "AI", level: 3 }], session: session({ longest_days: 18 }) })[0]!.text).toBe("18 days gone and you still had it.");
   // Then and now is never in the row.
-  expect(endSays({ ...base, session: session({ longest_days: 18, then_now: { then_ts: new Date(Date.now() - 28 * 864e5).toISOString() } }) })[0]!.rare?.kind).toBe("then");
+  expect(endSays({ ...base, closed: true, session: session({ longest_days: 18, then_now: { then_ts: new Date(Date.now() - 28 * 864e5).toISOString() } }) })[0]!.rare?.kind).toBe("then");
 });
 
 // F134
@@ -652,4 +656,17 @@ test("the memory line ends by saying in words when the next review falls for the
   expect(await said(3)).toEqual(["next in 21 days", "true"]);
   expect(await said(4)).toEqual(["next in 1 month", "true"]);
   await act(async () => (root.unmount(), body.remove()));
+});
+
+// Tyler, 2026-11-19, of the unlabelled line: "i cant tell if its telling me what to do or something i already did".
+test("the try on the end screen says it is still to do: a label, then the plan, and no source title", async () => {
+  reduce = true;
+  const e = end([]) as unknown as Record<string, unknown>;
+  e.next = { id: "t", item: "i", note: "Write an if-then plan for Thursday's recording", exact: "x", item_title: "If-then plans" };
+  const s = await mount(e as never);
+  const line = s.body.querySelector(".review-try")!;
+  expect([...line.querySelectorAll("span")].map((x) => x.textContent)).toEqual(["To try", "Write an if-then plan for Thursday's recording"]);
+  expect(line.textContent).not.toContain("If-then plans");
+  await s.done();
+  reduce = false;
 });

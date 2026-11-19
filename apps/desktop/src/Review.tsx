@@ -1672,7 +1672,7 @@ function Tally({ tiles, go, skills, onDone }: { tiles: Tile[]; go: boolean; skil
     <ul className="end-tally">
       {tiles.map((t, i) => {
         const sk = t.rare?.kind === "level" ? skills.find((x) => x.id === (t.rare as { skill: string }).skill) : undefined;
-        const mark = t.key === "level" ? <SkillIcon icon={sk?.icon} color={sk?.color} dot /> : t.key === "rescued" ? <Gem kind="cut" size={32} seam /> : t.key === "cut" ? <Gem kind="cut" size={32} /> : <EndMark kind={t.key === "kept" ? "gem" : t.key === "long" ? "comet" : "calendar"} />;
+        const mark = t.key === "level" ? <SkillIcon icon={sk?.icon} color={sk?.color} dot /> : t.key === "cut" ? <Gem kind="cut" size={32} /> : <EndMark kind={t.key === "kept" ? "gem" : "calendar"} />;
         const li = (
           <li key={t.key} data-key={t.key} data-rare={t.rare?.kind} data-color={sk?.color} data-wait={i >= n || undefined} tabIndex={t.hint ? 0 : undefined}>
             <span className="end-tally-pair">
@@ -1832,7 +1832,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
             )}
             <div className="end-ring">
               {ring}
-              {away ? <LapCentre min={lap.min} goal={plan.goal} kept={s.kept_skills ?? []} skills={skills} run={counted && full} /> : cluster}
+              {away ? <LapCentre min={lap.min} /> : cluster}
             </div>
           </div>
           <Tally tiles={tiles} go={full} skills={skills} onDone={() => setTallied(true)} />
@@ -1888,15 +1888,14 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
           </button>
         </Hint>
       )}
-      {/* D148: the one thing left to do away from the screen, now that the session is over. One line, no count: a click opens its passage. */}
+      {/* D148: the one thing left to do away from the screen, now that the session is over, under a label that says
+          it is still to do. No count: a click opens its passage. */}
       {end.next && (
         <Hint text="To try on your own work · opens the passage">
           <button className="review-try" onClick={() => onTry(end.next!)}>
             <PixelTry size={16} aria-hidden="true" />
-            <span>
-              <span className="review-try-plan">{end.next.note || `“${passageText(end.next.exact)}”`}</span>
-              <span className="review-try-from">{end.next.item_title}</span>
-            </span>
+            <span className="review-try-label">To try</span>
+            <span className="review-try-plan">{end.next.note || `“${passageText(end.next.exact)}”`}</span>
           </button>
         </Hint>
       )}

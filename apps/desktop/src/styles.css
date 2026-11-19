@@ -2445,19 +2445,9 @@ button.home-plan:hover { color: var(--text); }
    ring's green, and one line for the skill the session fed most. */
 .end-lap { display: flex; flex-direction: column; align-items: center; font: 400 12px/1 var(--mono); color: var(--muted); animation: end-lap-in var(--t-4) var(--ease-out); }
 .end-lap-n { display: block; color: var(--text); }
-.end-lap-min { display: flex; align-items: center; justify-content: center; height: 20px; margin-top: 10px; }
-.end-lap-plus { display: grid; place-items: center; height: 20px; padding: 0 7px; margin-left: 7px; border-radius: 10px; background: var(--c-green); color: #0f2a19; animation: end-plus-in var(--t-4) var(--ease-out); }
-.end-lap .end-lap-plus .dot-number circle { fill: #0f2a19; }
-.end-lap-plus:focus-visible, .end-lap-reel:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
-.end-lap-reel { display: block; height: 24px; margin-top: 8px; overflow: hidden; border-radius: 6px; animation: end-lap-in var(--t-4) var(--ease-out); }
-.end-lap-rows { display: flex; flex-direction: column; transition: transform var(--t-4) var(--ease-out); }
-.end-lap-rows > span { display: flex; align-items: center; justify-content: center; gap: 6px; height: 24px; max-width: 150px; color: var(--text); white-space: nowrap; }
-.end-lap-rows > span > span:not(.skill-icon) { overflow: hidden; text-overflow: ellipsis; }
-.end-lap-rows .skill-icon.glyph { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; }
-.end-lap-rows b { font-weight: 500; color: var(--skill, var(--text)); }
+.end-lap-min { margin-top: 12px; }
 @keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
-@keyframes end-plus-in { from { opacity: 0; max-width: 0; padding: 0; margin-left: 0; } to { max-width: 48px; } }
-@media (prefers-reduced-motion: reduce) { .end-lap, .end-lap-reel, .end-lap-plus { animation: none; } .end-lap-rows { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .end-lap { animation: none; } }
 /* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
    Each lands in hard steps, one after another, then is still. */
 .end-tally { list-style: none; display: flex; justify-content: center; gap: 16px; margin: 20px 0 0; padding: 0; }
@@ -2474,17 +2464,13 @@ button.home-plan:hover { color: var(--text); }
 .end-tally-label { max-width: 100%; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 @media (max-width: 480px) { .end-tally { gap: 8px; } .end-tally-pair { gap: 6px; } .end-tally-mark .end-mark { width: 36px; height: 36px; } }
 /* The marks' loops (D260), each the way the thing itself would move, for as long as the end screen is
-   open: the gem's faces catch a passing light, the calendar's added days light one by one, the comet's tail streams off
-   its head. A dot's turn is `--at`, its resting light `--o` (EndMark.tsx). Endless loops keep their own time (D185). */
+   open: the gem's faces catch a passing light, the calendar's added days light one by one.
+   A dot's turn is `--at`, its resting light `--o` (EndMark.tsx). Endless loops keep their own time (D185). */
 .end-mark circle { transform-box: fill-box; transform-origin: center; }
 .end-tally li:not([data-wait]) .end-mark[data-kind="gem"] circle { animation: end-facet 3600ms var(--ease-in-out) var(--at) infinite; }
 .end-tally li:not([data-wait]) .end-mark[data-kind="calendar"] circle[data-turn] { animation: end-day 4000ms var(--ease-out) var(--at) infinite backwards; }
-.end-tally li:not([data-wait]) .end-mark[data-kind="comet"] circle[data-turn] { animation: end-stream 1500ms linear var(--at) infinite backwards; }
-.end-tally li:not([data-wait]) .end-mark[data-kind="comet"] circle:not([data-turn]) { animation: end-head 3000ms var(--ease-in-out) infinite; }
 @keyframes end-facet { 0%, 16%, 100% { transform: scale(1); opacity: var(--o); } 7% { transform: scale(1.4); opacity: 1; } }
 @keyframes end-day { 0% { transform: scale(0.45); opacity: 0.5; } 6% { transform: scale(1.35); opacity: 1; } 12%, 100% { transform: scale(1); opacity: var(--o); } }
-@keyframes end-stream { 0%, 55%, 100% { transform: scale(0.8); opacity: calc(var(--o) * 0.75); } 22% { transform: scale(1.5); opacity: 1; } }
-@keyframes end-head { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 @media (prefers-reduced-motion: reduce) { .end-tally li, .end-tally .end-mark circle { animation: none !important; } }
 .end-ring > .review-cut { position: relative; flex-wrap: wrap; align-items: center; max-width: 160px; gap: 6px 8px; margin: 0; }
 /* The mole comes up out of a mound of dirt that stands just clear of the ring: its bonus dots are bigger (Tyler, 2026-11-14, D274). */
@@ -2533,10 +2519,11 @@ button.home-plan:hover { color: var(--text); }
 .review-try:hover { background: var(--bg-hover); }
 .review-try:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .review-try svg { flex: none; align-self: center; }
-/* One line, however long the plan is: its full text is the passage a click opens. */
-.review-try > span { min-width: 0; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.review-try-plan { color: var(--text); }
-.review-try-plan::after { content: " · "; color: var(--faint); }
+/* "To try", then the plan on one line, however long it is: its full text is the passage a click opens. */
+.review-try-label { flex: none; font: 400 12px/1 var(--mono); color: var(--muted); }
+.review-try-plan { min-width: 0; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.review-dig > span { min-width: 0; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.review-dig .review-try-plan::after { content: " · "; color: var(--faint); }
 .review-try-from { color: var(--faint); font-size: 12px; }
 .review-cut { display: flex; align-items: flex-start; justify-content: center; gap: 10px; margin: 16px 0 2px; }
 .review-cut > span { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; animation: gem-in var(--t-4) var(--ease-spring) both; }
@@ -3157,6 +3144,29 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .review { --foot: max(32px, calc(env(safe-area-inset-bottom, 0px) + 16px)); }
 .phone .review-body { padding-bottom: var(--foot); }
 .phone .review-card { min-height: 100%; }
+/* The iPhone's end screen (Tyler, 2026-11-19): what the session won stands in the middle of the space over the
+   buttons, and the buttons at the foot, under his thumb, Done as wide as the screen with Keep going under it
+   (Apple's own sheets). The mole's line is the screen's one sentence, so it stands over him, centred and whole,
+   where the Mac's box beside his head had 118px to wrap in. */
+.phone .review-body:has(> .review-end) { padding-top: 8px; }
+.phone .review-end { min-height: 100%; margin: 0 auto; }
+.phone .review-end > :first-child { margin-top: auto; }
+.phone .review-end .end-emblem { padding-top: 48px; }
+.phone .says.end-says { left: 50%; top: auto; bottom: calc(100% - 40px); max-width: min(320px, 100%); transform: translateX(-50%); transform-origin: 50% 100%; text-align: center; padding: 8px 14px; animation-name: end-says-phone; }
+.phone .says.end-says .says-line { font-size: 15px; }
+.phone .says.end-says .says-block { display: none; }
+@keyframes end-says-phone { from { opacity: 0; transform: translate(-50%, 6px) scale(0.96); } }
+/* A result is as wide as its words, so no label breaks while its neighbours don't; only a long skill name wraps. */
+.phone .end-tally { gap: 24px; margin-top: 28px; }
+.phone .end-tally li { width: auto; max-width: 136px; }
+.phone .end-tally:has(> :nth-child(2):last-child) { gap: 40px; }
+.phone .end-emblem ~ .review-try { margin-top: 36px; }
+.phone .review-try { flex-wrap: wrap; justify-content: center; gap: 6px 6px; padding: 6px 8px; text-align: center; font-size: 15px; }
+.phone .review-try { align-items: center; }
+.phone .review-try-plan { flex: 0 0 100%; white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.phone .review-end .review-foot { flex-direction: column-reverse; align-self: stretch; gap: 4px; margin-top: auto; padding-top: 32px; }
+.phone .review-end .review-foot .pill-btn.quiz-go { width: 100%; height: 52px; justify-content: center; border-radius: 999px; font: 600 17px var(--font); letter-spacing: 0; }
+.phone .review-end .review-foot .quiz-ghost { height: 44px; font-size: 15px; }
 .phone .review-card:not(:has(textarea)) > #review-sure, .phone .review-card > .review-memory, .phone .review-card > :not(.review-memory) + .review-rate { margin-top: auto; }
 .phone .review-card > .review-passage, .phone .review-card > .review-answer { margin-bottom: 24px; }
 /* What the last answer won shows over the next exercise, so it stands clear above the buttons at the foot (F137). */

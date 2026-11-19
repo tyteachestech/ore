@@ -85,13 +85,13 @@ test("a ring's bonus dots are bigger and carry a white centre; a third lap's are
   expect((await mount(<DotRing size={92} share={1} />)).querySelectorAll(".over, .core").length).toBe(0);
 });
 
-test("sixteen minutes on a ten minute goal: the minutes, what came after the goal, the bonus dots and the top skill", async () => {
+test("sixteen minutes on a ten minute goal: the ring holds the minutes alone, and the bonus is its dots", async () => {
   const body = await screen(today(4), today(16));
   expect(body.querySelector(".end-lap-n")?.getAttribute("aria-label")).toBe("16 minutes today");
-  expect(body.querySelector(".end-lap-plus")?.getAttribute("aria-label")).toBe("6 minutes past today’s goal");
+  // Nothing else stands in the ring (Tyler, 2026-11-19: "the wording in the circle feels cramped"): the minutes and "min".
+  expect(body.querySelector(".end-lap")?.textContent).toBe("min");
+  expect(body.querySelectorAll(".end-lap > *").length).toBe(2);
   expect(body.querySelectorAll(".end-ring circle.core").length).toBe(18);
-  // The skill the session fed most is the one that stays.
-  expect(body.querySelector(".end-lap-skill")?.textContent).toBe("Learning+5");
   // Settled, the gems have made way for the minutes.
   expect(body.querySelectorAll(".end-ring .review-cut").length).toBe(0);
 });
@@ -99,13 +99,10 @@ test("sixteen minutes on a ten minute goal: the minutes, what came after the goa
 test("the goal just met, or not met: minutes, and nothing that says bonus", async () => {
   const met = await screen(today(4), today(10));
   expect(met.querySelector(".end-lap-n")?.getAttribute("aria-label")).toBe("10 minutes today");
-  expect(met.querySelectorAll(".end-lap-plus, .end-ring circle.core, .ring-sparkle").length).toBe(0);
+  expect(met.querySelectorAll(".end-ring circle.core, .ring-sparkle").length).toBe(0);
   const short = await screen(today(0), today(6));
   expect(short.querySelector(".end-lap-n")?.getAttribute("aria-label")).toBe("6 minutes today");
-  expect(short.querySelectorAll(".end-lap-plus, .end-ring circle.core").length).toBe(0);
-  // A session of misses kept nothing, so no skill is named.
-  const missed = await screen(today(0), today(6), { kept: 0, kept_skills: undefined, cut: [] });
-  expect(missed.querySelectorAll(".end-lap-skill").length).toBe(0);
+  expect(short.querySelectorAll(".end-ring circle.core").length).toBe(0);
 });
 
 test("the quick quiz keeps its small ring: no minutes in it", async () => {
