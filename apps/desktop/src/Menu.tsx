@@ -9,7 +9,8 @@ import { useLite } from "./Lite";
 import { nativeMenu } from "./native-menu";
 import { PHONE } from "./ore";
 import { trackDrag } from "./phone/drag";
-import { sheetLayer, useSwipeDown } from "./phone/sheet";
+import { letDown, sheetLayer, useSwipeDown } from "./phone/sheet";
+import { tick } from "./phone/haptics";
 import { Trap } from "./Trap";
 import { keepFocusNear } from "./focus-near";
 import { menuIcon } from "./menu-icons";
@@ -85,7 +86,8 @@ export function holdMenu(el: HTMLElement, y: number) {
   addEventListener("click", swallow, true);
   addEventListener("touchstart", done, true); // The next touch's click is a real tap,
   const t = setTimeout(done, 800); // and so is a pointer's or a key's once the lift has passed.
-  el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }));
+  // Radix takes the event when it opens a menu: only then does the phone tick (D332).
+  if (!el.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: x, clientY: y }))) tick.menu();
 }
 
 /** iOS's long-press menu on a WebKit row. WebKit on iOS sends no contextmenu for a press, and Radix's own touch
@@ -369,7 +371,7 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
         {icon ?? <DotsThree size={16} aria-hidden="true" />}
       </button>
       {open && sheetLayer(
-        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && letDown(box.current, close)}>
           <Trap>
             <div ref={box} className="panel sheet action-sheet" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); dismiss.current(); } }}>
               <div className="sheet-steps" style={{ height }}>

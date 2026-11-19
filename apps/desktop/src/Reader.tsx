@@ -55,7 +55,8 @@ import { TablesLine } from "./Tables";
 import { MARKS, UNDER, paint, unpaint, unpaintAll } from "./paint";
 import { Working } from "./Working";
 import { ReadingLooks } from "./phone/ReadingLooks";
-import { sheetLayer, useSwipeDown } from "./phone/sheet";
+import { letDown, sheetLayer, useSwipeDown } from "./phone/sheet";
+import { tick } from "./phone/haptics";
 import { Trap } from "./Trap";
 import { edgeTurn } from "./edge-turn";
 
@@ -1934,6 +1935,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     pending.current.set(tmp, promise);
     ranges.current.set(tmp, range);
     vein(range, intent);
+    tick.saved();
     setAnns((l) => [...l, { id: tmp, rev: 0, intent, exact: text, prefix: "", suffix: "", start: 0, end: 0, status: "open", ...(lookedUp && { looked_up: true }) }]);
     if (intent === "card") gather(tmp);
     if (popupToo) {
@@ -4133,7 +4135,7 @@ function PhoneReadingFor({ qs, onOpen }: { qs: NonNullable<Doc["prequestions"]>;
         <PixelQuestion size={14} aria-hidden="true" />
       </button>
       {open && sheetLayer(
-        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && letDown(box.current, close)}>
           <Trap>
             <div ref={box} className="panel sheet reading-for-sheet" role="dialog" aria-modal="true" aria-label="What you’re reading for" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } }}>
               <h2>Reading for</h2>

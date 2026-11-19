@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { Arrow, ARROW_H, playHop, still } from "./SideCursor";
 import { PHONE } from "./ore";
 import { Trap } from "./Trap";
-import { sheetLayer, useSwipeDown } from "./phone/sheet";
+import { letDown, sheetLayer, useSwipeDown } from "./phone/sheet";
 
 /** Most lines the collapsed outline shows; deeper levels drop out until it fits. */
 const MAX_LINES = 40;
@@ -46,7 +46,7 @@ function useReadingPlace({ scroll, doc, ready }: Place) {
     const update = () => {
       frame = 0;
       const max = el.scrollHeight - el.clientHeight;
-      setProgress(max > 0 ? Math.min(1, el.scrollTop / max) : 1);
+      setProgress(max > 0 ? Math.max(0, Math.min(1, el.scrollTop / max)) : 1); // The rubber band takes scrollTop past both ends on the iPhone.
       const edge = el.getBoundingClientRect().top + READ_LINE;
       let now = -1;
       for (const [i, h] of headings.entries()) {
@@ -210,7 +210,7 @@ export function ReadingPill(place: Place) {
         {name && <span key={current} className="read-pill-name">{name}</span>}
       </button>
       {open && sheetLayer(
-        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+        <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && letDown(box.current, close)}>
           <Trap>
             <div ref={box} className="panel sheet sections-sheet" role="dialog" aria-modal="true" aria-label="Sections" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } }}>
               <h2>Sections</h2>

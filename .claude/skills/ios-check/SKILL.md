@@ -63,8 +63,15 @@ Copy what Apple's own apps do (Books, Notes, Mail) and check against Apple's Hum
 - Bottom sheets for lists and options, the iOS way: full width, above the keyboard, close on tap outside and swipe down.
 - One layer at a time: opening one closes the other.
 
+**Motion** (D331)
+- A screen he opens slides in from the right and Back or the edge swipe slides it out (`Screen` in `PhoneApp.tsx`); a new pushed screen is a `Screen` with a `Back`, never a bare full-screen div.
+- A bottom sheet rises from the foot and a tap outside lets it down (`.sheet`, `letDown` in `phone/sheet.ts`); a new sheet uses both.
+- Nothing just appears where iOS would move it, and nothing moves under Reduce Motion.
+- Haptics (D332): four moments tick (`phone/haptics.ts`) and no others. A new one needs the Apple app that ticks there, named in the decision.
+
 **Scroll**
 - Momentum and rubber band on the content, not on the whole page (fixed bars never bounce away).
+- Every scrolling page gives at both ends, a page shorter than the screen too (D331): a new scroller under `.phone` never carries `overscroll-behavior: none`, and iOS only bounces one that has somewhere to go.
 - No scroll trapped in a nested scroller; no horizontal page scroll.
 
 **Text selection**

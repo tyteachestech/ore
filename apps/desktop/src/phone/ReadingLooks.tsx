@@ -6,7 +6,7 @@ import { CircleHalf } from "../icons";
 import { FONTS, PAGES, pageShown, setFont, setPage, setSpacing, setWidth, SIZES, SPACINGS, WIDTHS, bigger, smaller, useReading } from "../reading";
 import { lightBars } from "./appearance";
 import { Trap } from "../Trap";
-import { sheetLayer, useSwipeDown } from "./sheet";
+import { letDown, sheetLayer, useSwipeDown } from "./sheet";
 
 /** Three short lines: how far apart (spacing) or how wide (margins) each step sets the text. */
 const Lines = ({ gap, width }: { gap: number; width: number }) => (
@@ -56,7 +56,7 @@ export function ReadingLooks() {
         Aa
       </button>
       {open && sheetLayer(
-        <div className="overlay looks-overlay" onMouseDown={(e) => e.target === e.currentTarget && close()}>
+        <div className="overlay looks-overlay" onMouseDown={(e) => e.target === e.currentTarget && letDown(box.current, close)}>
           <Trap>
             <div ref={box} className="panel sheet looks-sheet" role="dialog" aria-modal="true" aria-label="Text and page" tabIndex={-1} onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } }}>
               <div className="looks-size" role="group" aria-label={`Text size, ${size}`}>

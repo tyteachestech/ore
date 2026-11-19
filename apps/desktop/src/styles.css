@@ -3856,6 +3856,26 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .action-sheet .menu-caret { color: var(--faint); }
 @media (prefers-reduced-motion: reduce) { .action-sheet .sheet-steps { transition: none; } }
 
+/* The iPhone's own feel (D331): what Books, Notes and Mail do under a finger.
+   1. Every page gives at its top and bottom (the rubber band, iOS's own physics). The Mac's "no overscroll" rule is
+      lifted here, and a page shorter than the screen is given one point to scroll, since iOS only bounces a scroller
+      that has somewhere to go. The bars are outside the scrollers, so they never move. */
+.phone :is(.list, .reader-scroll, .mynotes-text, .skill-col, .quiz, .home, .review-body, .settings-main) { overscroll-behavior: auto; }
+.phone-page::before, .phone .review-body::before { content: ""; float: left; width: 0; height: calc(100% + 1px); }
+/* No grey flash on a tap: each row and button shows its own pressed state. */
+.phone { -webkit-tap-highlight-color: transparent; }
+/* 2. A bottom sheet rises from the foot of the screen as the page behind it dims (phone/sheet.ts lets it down). */
+.phone :is(.sheet, .review-pick, .menu-sub) { animation: sheet-up var(--t-4) var(--ease-out); }
+.phone .overlay:has(.sheet, .review-pick) { animation: dim-in var(--t-4) var(--ease-out); }
+@keyframes sheet-up { from { transform: translateY(100%); } }
+@keyframes dim-in { from { background-color: transparent; } }
+/* 3. The long-press menu grows out of the row he pressed, which stays lit while its menu is open (iOS's context
+      menu; D280's 4% is a pointer's distance, too faint under a thumb). */
+:root.phone .popover.menu-list[data-state="open"]:not(.menu-sub) { animation: menu-grow var(--t-3) var(--ease-out); }
+@keyframes menu-grow { from { opacity: 0; transform: scale(0.8); } }
+.phone [data-menu-row][data-state="open"] { background: var(--bg-hover); }
+@media (prefers-reduced-motion: reduce) { .phone :is(.sheet, .review-pick, .menu-sub), .phone .overlay:has(.sheet, .review-pick), :root.phone .popover.menu-list[data-state="open"] { animation: none; } }
+
 /* Pixel burst (D153, Burst.tsx): 14 4px squares fly out from the finished badge's edge in the skill's colour, in
    six hard frames over 600ms once the badge has popped, once. None under reduced motion. */
 .quiz-done-badge { position: relative; }
