@@ -1826,7 +1826,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onTry, onDig }:
             <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}{up && <Mound />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
             {settled && (
-              <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />
+              <MoleSays className="end-says" quick lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />
             )}
             <div className="end-ring">
               {ring}

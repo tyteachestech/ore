@@ -60,8 +60,8 @@ export function useLap(plan: Lap, go: boolean): { min: number; hit: number } {
 }
 
 /** What stands in the end screen's ring: the day's minutes in the ring's own dots; beside "min", what came
- *  after the goal, on a chip in the ring's green (the key to the dots with a white centre); and under them one
- *  line, the skills this session kept memories in, smallest first, one at a time, resting on the one it fed
+ *  after the goal, on a chip in the ring's green that says so, "+1 past goal" (the key to the dots with a white
+ *  centre); and under them one line, the skills this session kept memories in, "Learning +1 kept", smallest first, one at a time, resting on the one it fed
  *  most. */
 export function LapCentre({ min, goal, kept, skills, run }: { min: number; goal: number; kept: { skill: string; n: number }[]; skills: Skill[]; run: boolean }) {
   const bonus = goal > 0 ? Math.max(0, min - goal) : 0;
@@ -84,7 +84,7 @@ export function LapCentre({ min, goal, kept, skills, run }: { min: number; goal:
         min
         {bonus > 0 && (
           <Hint text={`${bonus} ${bonus === 1 ? "minute" : "minutes"} past today’s goal of ${goal}`}>
-            <span className="end-lap-plus" role="img" tabIndex={0} aria-label={`${bonus} ${bonus === 1 ? "minute" : "minutes"} past today’s goal`}><DotNumber value={`+${bonus}`} height={10} /></span>
+            <span className="end-lap-plus" role="img" tabIndex={0} aria-label={`${bonus} ${bonus === 1 ? "minute" : "minutes"} past today’s goal`}><DotNumber value={`+${bonus}`} height={10} />past goal</span>
           </Hint>
         )}
       </span>
@@ -98,7 +98,7 @@ export function LapCentre({ min, goal, kept, skills, run }: { min: number; goal:
                   <span key={k.skill} className={i === row ? "end-lap-skill" : undefined} data-color={s?.color} aria-hidden={i !== row || undefined}>
                     <SkillIcon icon={s?.icon} color={s?.color} dot />
                     <span>{name(k.skill)}</span>
-                    <b>+{k.n}</b>
+                    <b>+{k.n} kept</b>
                   </span>
                 );
               })}

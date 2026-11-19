@@ -268,7 +268,8 @@ test("the mole says one line at a session's end: typed out a letter at a time wi
   expect(line()!.textContent).toBe("Gneiss work.");
   expect(typed()).toBe("");
   expect(s.q(".says[data-typing] .says-line > .says-block + .says-rest")).toBe(1);
-  for (let i = 0; i < 4; i++) await act(async () => void jest.advanceTimersByTime(28));
+  // On the end screen a letter lands every 16 ms (`--stagger`), so the verdict is read within a second of his coming up.
+  for (let i = 0; i < 4; i++) await act(async () => void jest.advanceTimersByTime(16));
   expect(typed()).toBe("Gnei");
   expect(s.body.querySelector(".says-rest")!.textContent).toBe("ss work.");
   for (let i = 0; i < 40 && s.q(".says[data-typing]"); i++) await act(async () => void jest.advanceTimersByTime(28));
@@ -494,7 +495,7 @@ test("the row of results (D252): kept, days of memory, then the rarest true thin
   const all = { depth_days: 212, longest_days: 9, rescued: 2, cut: ["ai", "ai"] };
   expect(keys(all, [{ skill: "ai", name: "AI", level: 3 }])).toEqual(["kept 5 memories kept", "depth +7 months of memory", "level 3 AI level"]);
   expect(keys(all)[2]).toBe("rescued 2 pulled back in time");
-  expect(keys({ ...all, rescued: 0 })[2]).toBe("long 9 days since you saw one");
+  expect(keys({ ...all, rescued: 0 })[2]).toBe("long 9 day gap recalled");
   expect(keys({ cut: ["ai"] })[1]).toBe("cut 1 gem cut");
   // A gap under a week, and rescues that were most of the session, take no place.
   expect(keys({ longest_days: 3, rescued: 6 })).toHaveLength(1);

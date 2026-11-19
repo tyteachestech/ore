@@ -91,7 +91,7 @@ test("sixteen minutes on a ten minute goal: the minutes, what came after the goa
   expect(body.querySelector(".end-lap-plus")?.getAttribute("aria-label")).toBe("6 minutes past today’s goal");
   expect(body.querySelectorAll(".end-ring circle.core").length).toBe(18);
   // The skill the session fed most is the one that stays.
-  expect(body.querySelector(".end-lap-skill")?.textContent).toBe("Learning+5");
+  expect(body.querySelector(".end-lap-skill")?.textContent).toBe("Learning+5 kept");
   // Settled, the gems have made way for the minutes.
   expect(body.querySelectorAll(".end-ring .review-cut").length).toBe(0);
 });

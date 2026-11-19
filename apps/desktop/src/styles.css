@@ -2446,15 +2446,15 @@ button.home-plan:hover { color: var(--text); }
 .end-lap { display: flex; flex-direction: column; align-items: center; font: 400 12px/1 var(--mono); color: var(--muted); animation: end-lap-in var(--t-4) var(--ease-out); }
 .end-lap-n { display: block; color: var(--text); }
 .end-lap-min { display: flex; align-items: center; justify-content: center; height: 20px; margin-top: 10px; }
-.end-lap-plus { display: grid; place-items: center; height: 20px; padding: 0 7px; margin-left: 7px; border-radius: 10px; background: var(--c-green); color: #0f2a19; animation: end-plus-in var(--t-4) var(--ease-out); }
+.end-lap-plus { display: flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; font-weight: 500; white-space: nowrap; margin-left: 7px; border-radius: 10px; background: var(--c-green); color: #0f2a19; animation: end-plus-in var(--t-4) var(--ease-out); }
 .end-lap .end-lap-plus .dot-number circle { fill: #0f2a19; }
 .end-lap-plus:focus-visible, .end-lap-reel:focus-visible { outline: 2px solid var(--focus); outline-offset: 3px; }
 .end-lap-reel { display: block; height: 24px; margin-top: 8px; overflow: hidden; border-radius: 6px; animation: end-lap-in var(--t-4) var(--ease-out); }
 .end-lap-rows { display: flex; flex-direction: column; transition: transform var(--t-4) var(--ease-out); }
-.end-lap-rows > span { display: flex; align-items: center; justify-content: center; gap: 6px; height: 24px; max-width: 150px; color: var(--text); white-space: nowrap; }
+.end-lap-rows > span { display: flex; align-items: center; justify-content: center; gap: 6px; height: 24px; max-width: 170px; color: var(--text); white-space: nowrap; }
 .end-lap-rows > span > span:not(.skill-icon) { overflow: hidden; text-overflow: ellipsis; }
 .end-lap-rows .skill-icon.glyph { width: 16px; height: 16px; -webkit-mask-size: 16px; mask-size: 16px; }
-.end-lap-rows b { font-weight: 500; color: var(--skill, var(--text)); }
+.end-lap-rows b { flex: none; font-weight: 500; color: var(--skill, var(--text)); }
 @keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
 @keyframes end-plus-in { from { opacity: 0; max-width: 0; padding: 0; margin-left: 0; } to { max-width: 48px; } }
 @media (prefers-reduced-motion: reduce) { .end-lap, .end-lap-reel, .end-lap-plus { animation: none; } .end-lap-rows { transition: none; } }
@@ -2532,9 +2532,10 @@ button.home-plan:hover { color: var(--text); }
 .review-try { display: flex; align-items: baseline; gap: 8px; max-width: 100%; margin: 18px 0 0; padding: 6px 12px 6px 10px; border-radius: 8px; color: var(--apply-solid); font-size: 14px; line-height: 1.4; text-align: left; }
 .review-try:hover { background: var(--bg-hover); }
 .review-try:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
-.review-try svg { flex: none; align-self: center; }
-/* One line, however long the plan is: its full text is the passage a click opens. */
-.review-try > span { min-width: 0; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The mark sits on the first line's midline (a 14px/1.4 line is 20px tall, the mark 16). */
+.review-try svg { flex: none; align-self: flex-start; margin-top: 2px; }
+/* The plan is shown whole, on as many lines as it takes (F-new-try-line-cut): it is the one thing left to do. */
+.review-try > span { min-width: 0; color: var(--faint); overflow-wrap: anywhere; }
 .review-try-plan { color: var(--text); }
 .review-try-plan::after { content: " · "; color: var(--faint); }
 .review-try-from { color: var(--faint); font-size: 12px; }
@@ -3156,6 +3157,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
    answer is out. A typed answer keeps its buttons under the field, which the keyboard already lifts to the thumb. */
 .phone .review { --foot: max(32px, calc(env(safe-area-inset-bottom, 0px) + 16px)); }
 .phone .review-body { padding-bottom: var(--foot); }
+/* The session's end stands in the middle of the screen, top to bottom, with no empty band over it; one too tall to fit starts at the top and scrolls. */
+.phone .review-body:has(> .review-end) { display: flex; flex-direction: column; padding-top: 0; }
+.phone .review-body > .review-end { width: 100%; margin: auto; }
 .phone .review-card { min-height: 100%; }
 .phone .review-card:not(:has(textarea)) > #review-sure, .phone .review-card > .review-memory, .phone .review-card > :not(.review-memory) + .review-rate { margin-top: auto; }
 .phone .review-card > .review-passage, .phone .review-card > .review-answer { margin-bottom: 24px; }

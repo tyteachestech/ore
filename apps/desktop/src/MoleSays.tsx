@@ -4,14 +4,17 @@ import { still } from "./SideCursor";
 
 /** One letter of the mole's speech, and how long a full line holds before the next. */
 const TYPE_MS = 28;
+/** A motion token's milliseconds (DESIGN.md "Motion"), or `fallback` where no stylesheet is loaded. */
+const token = (name: string, fallback: number) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || fallback;
 export const HOLD_MS = 2600;
 
 /** The mole's speech box (D245): a hairline outlined box (D266). His lines, one at a time, typed out letter by
  *  letter in the mono with his block cursor (D186) at the words' end; a full line holds, then the next is typed.
  *  The pointer or the keyboard on the box holds the line. The whole line is in the page from its first letter
  *  (the letters to come are only unseen), so it never rewraps and a reader hears it whole. Under Reduce Motion
- *  a line stands at once and the block doesn't blink. Words only: no icon leads a line (Tyler, 2026-11-14). Children: a small action. */
-export function MoleSays({ lines, run = true, className = "", children }: { lines: { text: string; hint?: string }[]; run?: boolean; className?: string; children?: React.ReactNode }) {
+ *  a line stands at once and the block doesn't blink. Words only: no icon leads a line (Tyler, 2026-11-14). Children: a small action.
+ *  `quick` (the end screen): a letter every `--stagger` and a `--t-1` breath, so his verdict is read within a second of his coming up. */
+export function MoleSays({ lines, run = true, quick, className = "", children }: { lines: { text: string; hint?: string }[]; run?: boolean; quick?: boolean; className?: string; children?: React.ReactNode }) {
   const [at, setAt] = useState(0);
   const [typed, setTyped] = useState(0);
   // The pointer and the keyboard each hold it on their own: leaving with one never lets go for the other.
@@ -24,7 +27,8 @@ export function MoleSays({ lines, run = true, className = "", children }: { line
   useEffect(() => {
     if (!run || done) return;
     // A breath after a sentence's end or a comma, as a game's text box takes.
-    const id = setTimeout(() => setTyped(n + 1), /[.,!?]/.test(text[n - 1] ?? "") ? TYPE_MS * 8 : TYPE_MS);
+    const letter = quick ? token("--stagger", 16) : TYPE_MS, breath = quick ? token("--t-1", 100) : TYPE_MS * 8;
+    const id = setTimeout(() => setTyped(n + 1), /[.,!?]/.test(text[n - 1] ?? "") ? breath : letter);
     return () => clearTimeout(id);
   }, [run, done, n, text]);
   useEffect(() => {
