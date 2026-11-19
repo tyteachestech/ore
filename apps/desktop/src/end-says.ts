@@ -84,7 +84,7 @@ export function endTiles(o: { session: SessionEnd; ups: { skill?: string; name: 
     : rescuedWorthSaying(s)
       ? { key: "rescued", value: String(s.rescued), label: "pulled back in time", hint: s.rescued === 1 ? "Due so long you were about to lose it, and you still recalled it" : "Due so long you were about to lose them, and you still recalled them", rare: { kind: "rescued" } }
       : longGapText(s)
-        ? { key: "long", value: String(s.longest_days), label: "day gap recalled", hint: longGapText(s)!, rare: { kind: "long" } }
+        ? { key: "long", value: String(s.longest_days), label: "days unseen,\nstill knew", hint: longGapText(s)!, rare: { kind: "long" } }
         : cut
           ? { key: "cut", value: String(cut), label: cut === 1 ? "gem cut" : "gems cut", hint: "Cut: you’d still recall it three weeks from now" }
           : null;
