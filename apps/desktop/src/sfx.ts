@@ -21,9 +21,11 @@ export type Sound = Sfx | MoleLine;
 const moles = (id: Sound) => id === "pop" || (VOICE as readonly string[]).includes(id);
 const file = (id: Sound) => `${(VOICE as readonly string[]).includes(id) ? "vo" : "fx"}-${id}`;
 
-/** A switch in Settings, kept on this device. The quick quiz is a window of its own: a change reaches it too. */
-function kept(key: string) {
-  let on = load(key) !== "off";
+/** A switch in Settings, kept on this device. The quick quiz is a window of its own: a change reaches it too.
+ *  Never set, it starts as `was` is: Mole's voice came in after Sound effects, which had his pop, so someone who had
+ *  turned that off doesn't start hearing him. */
+function kept(key: string, was?: string) {
+  let on = (load(key) ?? (was ? load(was) : null)) !== "off";
   const subs = new Set<() => void>();
   const tell = () => subs.forEach((f) => f());
   if (typeof window !== "undefined")
@@ -35,7 +37,7 @@ function kept(key: string) {
   const get = () => on;
   return { get, use: () => useSyncExternalStore((f) => (subs.add(f), () => void subs.delete(f)), get), set: (v: boolean) => (on = v, save(key, v ? "on" : "off"), tell()) };
 }
-const effects = kept("ore.sounds"), voice = kept("ore.voice");
+const effects = kept("ore.sounds"), voice = kept("ore.voice", "ore.sounds");
 export const useSounds = effects.use, setSounds = effects.set;
 export const useVoice = voice.use, setVoice = voice.set;
 const allowed = (id: Sound) => (moles(id) ? voice : effects).get();

@@ -20,7 +20,7 @@ g.cancelAnimationFrame = (id: number) => clearTimeout(id);
 const { createRoot } = await import("react-dom/client");
 const { EndScreen } = await import("../src/Review");
 const { DotRing } = await import("../src/Ring");
-const { lapPlan, overDots, lapSteps, SkillRows } = await import("../src/Lap");
+const { lapPlan, overDots, lapSteps, lapTickUp, SkillRows } = await import("../src/Lap");
 const { TooltipProvider } = await import("@radix-ui/react-tooltip");
 
 const today = (active_min: number, o: Record<string, unknown> = {}) => ({ goal_minutes: 10, goal_ms: 600_000, active_ms: active_min * 60_000, met: active_min >= 10, counts: true, caught_up: false, new_waiting: 0, skills: [], ...o });
@@ -194,3 +194,10 @@ test("the end screen's sounds are layered: the minutes tick as they count, each 
   // The jingle still plays on its own, and takes its turn as before.
   expect(heard).toContain("done0");
 }, 15000);
+
+test("the minutes' ticks climb a semitone each step the count shows, up to an octave, also in a long session that skips minutes (D336)", () => {
+  for (const plan of [{ from: 0, to: 8, goal: 10 }, { from: 0, to: 66, goal: 20 }, { from: 12, to: 90, goal: 30 }]) {
+    const ups = lapSteps(plan).slice(1).map((m) => lapTickUp(plan, m));
+    expect(ups).toEqual(ups.map((_, i) => Math.min(12, i + 1)));
+  }
+});
