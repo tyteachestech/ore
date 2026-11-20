@@ -22,7 +22,7 @@ import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
 import { endMood, endSays, endTiles, endVoice, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
-import { LapCentre, lapPlan, SkillRows, overDots, Sparkles, useLap } from "./Lap";
+import { LapCentre, lapPlan, lapTickUp, SkillRows, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useDay, useFocusWhileMounted, useLibraryChanges, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -1835,7 +1835,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   }, [counted, full]);
   const rowed = wait ? rowsIn : counted && full;
   // Each minute the count takes ticks, a little higher each time, up to an octave.
-  useEffect(() => void (!quick && !calm && full && away && lap.min > plan.from && layer("tap", { up: Math.min(12, lap.min - plan.from), level: 0.35 })), [lap.min]);
+  useEffect(() => void (!quick && !calm && full && away && lap.min > plan.from && layer("tap", { up: lapTickUp(plan, lap.min), level: 0.35 })), [lap.min]);
   // Each skill's row lands on a shine, a step up the scale each; a skill that went up a level rings the goal's chime under its own.
   const rang = useRef(false);
   useEffect(() => {

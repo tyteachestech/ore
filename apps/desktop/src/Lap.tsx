@@ -34,6 +34,10 @@ export function lapSteps({ from, to, goal }: Lap): number[] {
   return all.filter((m, i) => i % stride === 0 || m === to || (goal > 0 && (m === goal || m === 2 * goal)));
 }
 
+/** How many semitones up the tick for minute `min` plays (D336: a semitone higher each, up to an octave): by the
+ *  steps the count has shown, not the minutes, since a long session skips some. */
+export const lapTickUp = (plan: Lap, min: number) => Math.min(12, Math.max(0, lapSteps(plan).indexOf(min)));
+
 /** Counts the minutes up once `go` is set: quick up to the goal, then one beat per minute past it, so each
  *  bonus minute lands on its own (the ring's dots and the number together). `hit` counts the
  *  goal lines crossed on the way, the goal and twice the goal: the ring's two moments. Under Reduce Motion
