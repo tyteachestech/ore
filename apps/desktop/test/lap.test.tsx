@@ -3,7 +3,7 @@ import { Window } from "happy-dom";
 import { act } from "react";
 
 // The ring's bonus lap on the end screen: minutes past the day's goal keep going round as dots with a white
-// centre, the minutes stand alone in the ring's middle, and under the ring one line at a time names the skills
+// centre, the minutes stand alone in the ring's middle, and under the ring a row each names the skills
 // the session kept memories in.
 const w = new Window();
 for (const k of ["window", "document", "HTMLElement", "Node", "MutationObserver", "getComputedStyle", "navigator"] as const) {
@@ -20,7 +20,7 @@ g.cancelAnimationFrame = (id: number) => clearTimeout(id);
 const { createRoot } = await import("react-dom/client");
 const { EndScreen } = await import("../src/Review");
 const { DotRing } = await import("../src/Ring");
-const { lapPlan, overDots, lapSteps, SkillReel } = await import("../src/Lap");
+const { lapPlan, overDots, lapSteps, SkillRows } = await import("../src/Lap");
 const { TooltipProvider } = await import("@radix-ui/react-tooltip");
 
 const today = (active_min: number, o: Record<string, unknown> = {}) => ({ goal_minutes: 10, goal_ms: 600_000, active_ms: active_min * 60_000, met: active_min >= 10, counts: true, caught_up: false, new_waiting: 0, skills: [], ...o });
@@ -110,46 +110,47 @@ test("the quick quiz keeps its small ring: no minutes in it", async () => {
   expect(body.querySelectorAll(".end-lap, circle.core").length).toBe(0);
 });
 
-// Tyler, 2026-11-19: the reel "below the green circle instead of inside it", and several skills "rotate ... in a loop".
-test("under the ring: each skill the session fed on a line of its own, with what it kept and its new level", async () => {
-  const body = await screen(today(4, { skills: [{ skill: "ai", level: 1 }] }), today(16, { skills: [{ skill: "ai", level: 2 }] }));
+// Tyler, 2026-11-20: the one small line was "very underwhelming. It almost looks like a subtitle rather than the reward".
+const str = (skill: string, solid: number, level: number) => ({ skill, solid, peak: solid, level, next_level_at: 5 * (level + 1) ** 2 });
+test("under the ring: each skill the session fed has a row, with what it kept, its level and the way to the next", async () => {
+  // AI went from 18 solid (level 1) to 20 (level 2); Learning from 50 to 57, on level 3 (45 to 80).
+  const body = await screen(today(4, { skills: [str("ai", 18, 1), str("learning", 50, 3)] }), today(16, { skills: [str("ai", 20, 2), str("learning", 57, 3)] }));
   // Under the ring, never in it, and above the row of results.
-  expect(body.querySelectorAll(".end-ring .end-reel").length).toBe(0);
-  expect(body.querySelectorAll(".end-emblem + .end-reel").length).toBe(1);
-  // Reduce Motion: one line, standing still. The skill that went up a level leads.
-  const row = body.querySelector(".end-reel-row")!;
-  expect([row.getAttribute("data-color"), row.textContent]).toEqual(["purple", "AI3 keptlevel 2"]);
-  // A reader gets every line at once.
-  expect(body.querySelector(".end-reel .sr-only")!.textContent).toBe("AI, 3 kept, level 2 · Learning, 5 kept");
+  expect(body.querySelectorAll(".end-ring .end-skills").length).toBe(0);
+  expect(body.querySelectorAll(".end-emblem + .end-skills + .end-tally").length).toBe(1);
+  const rows = [...body.querySelectorAll(".end-skill")];
+  const dots = (r: Element) => [r.querySelectorAll(".end-skill-bar i[data-on]").length, r.querySelectorAll(".end-skill-bar i[data-new]").length, r.querySelectorAll(".end-skill-bar i").length];
+  // The skill that went up a level leads: the level it filled, full, the dots this session lit in its colour.
+  expect([rows[0]!.getAttribute("data-color"), rows[0]!.hasAttribute("data-up"), rows[0]!.textContent]).toEqual(["purple", true, "AILevel 1 → 2"]);
+  expect(dots(rows[0]!)).toEqual([9, 1, 10]);
+  // One that stayed on its level says the level all the same, and how far along it is.
+  expect([rows[1]!.hasAttribute("data-up"), rows[1]!.textContent]).toEqual([false, "LearningLevel 3"]);
+  expect(dots(rows[1]!)).toEqual([1, 2, 10]);
+  // A reader gets every row at once.
+  expect(body.querySelector(".end-skills .sr-only")!.textContent).toBe("AI, 3 kept, level 2 · Learning, 5 kept");
   // The row under it never counts the memories again.
   expect(body.querySelector(".end-tally")?.textContent ?? "").not.toContain("kept");
-  // A session of misses has no line.
-  expect((await screen(today(0), today(6), { kept: 0, kept_skills: [], cut: [] })).querySelectorAll(".end-reel").length).toBe(0);
+  // A session of misses has no rows.
+  expect((await screen(today(0), today(6), { kept: 0, kept_skills: [], cut: [] })).querySelectorAll(".end-skills").length).toBe(0);
 });
 
-test("several skills take turns in a loop; one skill stands still; three lines at most", async () => {
-  reduce = false;
-  jest.useFakeTimers();
-  try {
-    const kept = [{ skill: "learning", n: 5 }, { skill: "ai", n: 3 }, { skill: "x", n: 2 }, { skill: "y", n: 1 }];
-    const body = await mount(<SkillReel kept={kept} ups={[]} skills={skills} run />);
-    const line = () => body.querySelector(".end-reel-row")!.textContent;
-    const seen = [line()];
-    for (let i = 0; i < 4; i++) { await act(async () => void jest.advanceTimersByTime(2600)); seen.push(line()); }
-    // Most fed first, round and back to the start; a memory filed under no known skill is named as the picker names it.
-    expect(seen).toEqual(["Learning5 kept", "AI3 kept", "No skill2 kept", "Learning5 kept", "AI3 kept"]);
-    const one = await mount(<SkillReel kept={kept.slice(0, 1)} ups={[]} skills={skills} run />);
-    await act(async () => void jest.advanceTimersByTime(9000));
-    expect(one.querySelector(".end-reel-row")!.textContent).toBe("Learning5 kept");
-    // A skill with an icon shows it, in its colour; one without gets its colour's dot.
-    const drawn = await mount(<SkillReel kept={[{ skill: "b", n: 1 }]} ups={[]} skills={[{ id: "b", name: "Biology", color: "green", icon: "mc:leaf" }] as never} run />);
-    expect(drawn.querySelector('.end-reel-row > .skill-icon.glyph[data-color="green"]')).not.toBeNull();
-    expect(one.querySelector(".end-reel-row > .skill-icon.dot")).not.toBeNull();
-    // Before the minutes have counted its room is held and nothing is shown.
-    const waiting = await mount(<SkillReel kept={kept} ups={[]} skills={skills} run={false} />);
-    expect([waiting.querySelectorAll(".end-reel[data-wait]").length, waiting.querySelectorAll(".end-reel-row").length]).toEqual([1, 0]);
-  } finally {
-    jest.useRealTimers();
-    reduce = true;
-  }
+test("three rows at most, most fed first; no skill has no level; its room is held until the minutes have counted", async () => {
+  const kept = [{ skill: "learning", n: 5 }, { skill: "ai", n: 3 }, { skill: "x", n: 2 }, { skill: "y", n: 1 }];
+  const now = [str("learning", 50, 3), str("ai", 6, 1)] as never;
+  const body = await mount(<SkillRows kept={kept} was={now} now={now} skills={skills} run />);
+  // A memory filed under no known skill is named as the picker names it, with its colour's dot and no bar.
+  expect([...body.querySelectorAll(".end-skill")].map((r) => r.textContent)).toEqual(["LearningLevel 3", "AILevel 1", "No skill"]);
+  expect(body.querySelectorAll(".end-skill:nth-of-type(3) .end-skill-bar, .end-skill:nth-of-type(3) > .skill-icon.glyph").length).toBe(0);
+  // Nothing gained on the way to the next level lights no new dot.
+  expect(body.querySelectorAll(".end-skill-bar i[data-new]").length).toBe(0);
+  // The fourth is counted, and a reader hears them all.
+  expect(body.querySelector(".end-skills-more")!.textContent).toBe("and 1 more skill");
+  expect(body.querySelector(".end-skills .sr-only")!.textContent).toBe("Learning, 5 kept · AI, 3 kept · No skill, 2 kept · No skill, 1 kept");
+  // A skill with an icon shows it, in its colour.
+  const drawn = await mount(<SkillRows kept={[{ skill: "b", n: 1 }]} was={[]} now={[]} skills={[{ id: "b", name: "Biology", color: "green", icon: "mc:leaf" }] as never} run />);
+  expect(drawn.querySelector('.end-skill > .skill-icon.glyph[data-color="green"]')).not.toBeNull();
+  expect(drawn.querySelectorAll(".end-skills-more").length).toBe(0);
+  // Before the minutes have counted its room is held and nothing is seen.
+  const waiting = await mount(<SkillRows kept={kept} was={now} now={now} skills={skills} run={false} />);
+  expect([waiting.querySelectorAll(".end-skills[data-wait]").length, waiting.querySelectorAll(".end-skill").length]).toEqual([1, 3]);
 });

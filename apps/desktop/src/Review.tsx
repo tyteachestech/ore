@@ -22,7 +22,7 @@ import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
 import { endMood, endSays, endTiles, endVoice, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
-import { LapCentre, lapPlan, SkillReel, overDots, Sparkles, useLap } from "./Lap";
+import { LapCentre, lapPlan, SkillRows, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useDay, useFocusWhileMounted, useLibraryChanges, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -1841,7 +1841,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
               {away ? <LapCentre min={lap.min} /> : cluster}
             </div>
           </div>
-          <SkillReel kept={s.kept_skills ?? []} ups={named} skills={skills} run={counted && full} />
+          <SkillRows kept={s.kept_skills ?? []} was={b?.skills ?? []} now={t.skills} skills={skills} run={counted && full} />
           <Tally tiles={tiles} go={full} onDone={() => setTallied(true)} />
           {held}
         </>

@@ -328,12 +328,12 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   expect(none.q(".end-ring > :not(.ring):not(.end-lap)")).toBe(0);
   expect(none.q(".end-tally")).toBe(0);
   await none.done();
-  // A new level stands on its skill's line under the ring, in the skill's colour, never in the row.
-  const up = end(["ai"], { ...today(false, 0), skills: [{ skill: "ai", level: 1 }] } as never, { ...today(true, 600_000), skills: [{ skill: "ai", level: 2 }] } as never) as unknown as { session: Record<string, unknown> };
+  // A new level stands on its skill's row under the ring, in the skill's colour, never in the row of results.
+  const up = end(["ai"], { ...today(false, 0), skills: [{ skill: "ai", level: 1, solid: 19, next_level_at: 20 }] } as never, { ...today(true, 600_000), skills: [{ skill: "ai", level: 2, solid: 20, next_level_at: 45 }] } as never) as unknown as { session: Record<string, unknown> };
   Object.assign(up.session, { rescued: 2, depth_days: 400, kept_skills: [{ skill: "ai", n: 5 }] });
   const u = await mount(up as never);
-  const reel = u.body.querySelector(".end-emblem + .end-reel + .end-tally")!.previousElementSibling!.querySelector(".end-reel-row")!;
-  expect([reel.getAttribute("data-color"), reel.textContent]).toEqual(["purple", "AI5 keptlevel 2"]);
+  const reel = u.body.querySelector(".end-emblem + .end-skills + .end-tally")!.previousElementSibling!.querySelector(".end-skill[data-up]")!;
+  expect([reel.getAttribute("data-color"), reel.textContent]).toEqual(["purple", "AILevel 1 → 2"]);
   expect([...u.body.querySelectorAll(".end-tally > li")].map((li) => li.textContent)).toEqual(["+13months of memory", "1gem cut"]);
   await u.done();
   const back = end([]) as unknown as { session: Record<string, unknown> };
