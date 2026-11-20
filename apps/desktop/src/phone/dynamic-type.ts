@@ -19,6 +19,20 @@ export function scaleFontSizes(css: string): string {
     .replace(/\bfont\s*:[^;}]+/g, (decl) => (TYPED.test(decl) ? decl : decl.replace(/(\d*\.?\d+px)(\/(\d*\.?\d+px))?/, (_, size, _s, lh) => `${scaled(size)}${lh ? `/${scaled(lh)}` : ""}`)));
 }
 
+/** iOS's Bold Text (F409) as the app's CSS: each weight goes one step heavier when --bold is 1, as iOS's own text
+ *  does (regular to semibold, semibold to bold, bold to heavy). The weight is known here, so each step is written
+ *  out; the phone sets --bold from Accessibility › Display & Text Size › Bold Text (appearance.ts). */
+const KEYWORD: Record<string, number> = { normal: 400, bold: 700 };
+const heavier = (w: number) => `calc(${w} + var(--bold, 0) * ${Math.min(900, w + 200, Math.max(w + 100, 700)) - w})`;
+const BOLDED = /var\(--bold/;
+
+export function boldFontWeights(css: string): string {
+  return css
+    .replace(/(font-weight\s*:\s*)(\d{3}|normal|bold)\b/g, (_, prop, w) => prop + heavier(KEYWORD[w] ?? Number(w)))
+    // The shorthand: its weight, or the regular one it sets when it names none (`font: 12px var(--mono)`).
+    .replace(/(\bfont\s*:\s*)(?:(\d{3})\s+)?(?=(?:italic\s+)?[\d.]+px)/g, (m, prop, w) => (BOLDED.test(m) ? m : `${prop}${heavier(w ? Number(w) : 400)} `));
+}
+
 /** The largest scale: the first accessibility size (28pt). The screens' bars, buttons and rows hold text up to
  *  there; past it words break inside a title and buttons clip theirs, so the larger accessibility sizes read as it. */
 export const MAX_TYPE = 28 / 17;

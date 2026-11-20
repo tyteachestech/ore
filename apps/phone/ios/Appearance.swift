@@ -21,3 +21,9 @@ public func oreLightBars(_ light: Bool) {
     }
   }
 }
+
+/// Accessibility › Display & Text Size › Bold Text (F409): the web view's text doesn't follow it, so the app asks.
+@_cdecl("ore_bold_text")
+public func oreBoldText() -> Bool {
+  onMain { UIAccessibility.isBoldTextEnabled }
+}

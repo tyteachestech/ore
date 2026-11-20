@@ -325,6 +325,15 @@ fn system_dark() -> bool {
     true
 }
 
+/// Whether Bold Text is on in the iPhone's Accessibility settings (Appearance.swift, F409).
+#[tauri::command]
+fn bold_text() -> bool {
+    #[cfg(target_os = "ios")]
+    return unsafe { ore_bold_text() };
+    #[cfg(not(target_os = "ios"))]
+    false
+}
+
 /// A light reading page is showing: the status bar's text turns dark over it (Appearance.swift).
 #[tauri::command]
 fn light_bars(light: bool) {
@@ -338,6 +347,7 @@ fn light_bars(light: bool) {
 extern "C" {
     fn ore_system_dark() -> bool;
     fn ore_light_bars(light: bool);
+    fn ore_bold_text() -> bool;
     fn ore_undo_state(undo: *const std::ffi::c_char, redo: *const std::ffi::c_char, field: bool);
     fn ore_can_transcribe() -> bool;
     fn ore_transcribe(path: *const std::ffi::c_char, language: *const std::ffi::c_char, ok: *mut bool, progress: Option<extern "C" fn(f64, f64)>) -> *mut std::ffi::c_char;
@@ -520,7 +530,7 @@ pub fn run() {
             app.handle().plugin(tauri_plugin_haptics::init())?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, library_write, http_fetch, can_transcribe, transcribe, undo_state, system_dark, light_bars, share_inbox, share_skills, share_open, player_port])
+        .invoke_handler(tauri::generate_handler![library_dir, library_scan, library_read, library_bytes, library_apply, library_write, http_fetch, can_transcribe, transcribe, undo_state, system_dark, light_bars, bold_text, share_inbox, share_skills, share_open, player_port])
         .run(tauri::generate_context!())
         .expect("error while running Ore");
 }

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { MAX_TYPE, scaleFontSizes, typeScale } from "../src/phone/dynamic-type";
+import { boldFontWeights, MAX_TYPE, scaleFontSizes, typeScale } from "../src/phone/dynamic-type";
 
 // F70: the phone app follows the iPhone's text size. Its CSS sizes text times --type, set from iOS's body size.
 describe("the iPhone's text size", () => {
@@ -54,6 +54,30 @@ describe("the iPhone's text size", () => {
       expect(letters(1, phone)).toBeGreaterThan(30);
       expect(letters(1, phone)).toBeLessThan(40);
       expect(letters(MAX_TYPE, phone)).toBeGreaterThan(25);
+    }
+  });
+});
+
+// F409: Bold Text in iOS Settings made the clock bolder and none of Ore's text. The CSS now steps each weight up.
+describe("the iPhone's Bold Text", () => {
+  test("each weight goes one step heavier under --bold, as iOS's text does: regular to semibold, semibold to bold", () => {
+    expect(boldFontWeights(".a { font-weight: 400 } .b { font-weight: 600 } .c { font-weight: bold } .d { font-weight: 800 }")).toBe(
+      ".a { font-weight: calc(400 + var(--bold, 0) * 200) } .b { font-weight: calc(600 + var(--bold, 0) * 100) } .c { font-weight: calc(700 + var(--bold, 0) * 100) } .d { font-weight: calc(800 + var(--bold, 0) * 100) }",
+    );
+    // A shorthand with no weight sets the regular one, so it steps up too; `inherit` follows its parent.
+    expect(boldFontWeights(".b { font: 13px/1.45 var(--font) } .c { font: 600 17px var(--font) } .i { font: inherit }")).toBe(
+      ".b { font: calc(400 + var(--bold, 0) * 200) 13px/1.45 var(--font) } .c { font: calc(600 + var(--bold, 0) * 100) 17px var(--font) } .i { font: inherit }",
+    );
+  });
+
+  test("the app's own CSS has no fixed weight left over, and the size step still reads it", () => {
+    for (const f of ["styles.css", "retro.css"]) {
+      const out = boldFontWeights(readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8"));
+      const fixed = [...out.matchAll(/font-weight\s*:\s*([^;}]*)/g)].map((m) => m[1]!.trim()).filter((v) => !v.includes("var(--bold") && !/^(inherit|bolder|lighter|var\()/.test(v));
+      const shorthand = [...out.matchAll(/\bfont\s*:\s*([^;}]*\dpx[^;}]*)/g)].map((m) => m[1]!).filter((v) => !v.includes("var(--bold"));
+      expect({ f, fixed, shorthand }).toEqual({ f, fixed: [], shorthand: [] });
+      expect(boldFontWeights(out)).toBe(out);
+      expect(scaleFontSizes(out)).toContain("var(--type, 1)");
     }
   });
 });

@@ -7,7 +7,12 @@ import { setSystemDark } from "../reading";
 
 export function followAppearance(): void {
   if (!isTauri()) return;
-  const ask = () => void invoke<boolean>("system_dark").then(setSystemDark, () => {});
+  const ask = () => {
+    void invoke<boolean>("system_dark").then(setSystemDark, () => {});
+    // Bold Text (F409): the CSS weighs every weight one step heavier under --bold (dynamic-type.ts). It is set in
+    // the Settings app, so a return to Ore is when it can have changed.
+    void invoke<boolean>("bold_text").then((b) => document.documentElement.style.setProperty("--bold", b ? "1" : "0"), () => {});
+  };
   ask();
   document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && ask());
   setInterval(ask, 60_000);

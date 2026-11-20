@@ -16118,6 +16118,19 @@ journey("phone: Settings' big title scrolls up into a small one in the bar, and 
   await until("back at the top, it goes", async () => !(await shown()));
 }, "phone");
 
+journey("phone: Bold Text in iOS makes Ore's text heavier, a row's words and a title alike (F409)", async (page) => {
+  // Only the clock got bolder: the web view's text doesn't follow it, so the app sets --bold from what iOS says.
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+  const weights = () => page.evaluate(() => [".phone-settings h1", ".phone-settings .settings-row-text, .phone-settings p"].map((q) => Number(getComputedStyle(document.querySelector(q)!).fontWeight)));
+  const [title, words] = await weights();
+  await page.evaluate(() => document.documentElement.style.setProperty("--bold", "1"));
+  const [boldTitle, boldWords] = await weights();
+  if (!(boldWords! >= words! + 100 && boldTitle! > title!)) throw new Error(`under Bold Text the words weigh ${words} → ${boldWords}, the title ${title} → ${boldTitle}`);
+  await page.evaluate(() => document.documentElement.style.setProperty("--bold", "0"));
+  if ((await weights())[1] !== words) throw new Error("Bold Text turned off left the text heavy");
+}, "phone");
+
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
 for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {
