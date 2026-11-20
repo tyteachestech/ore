@@ -10,7 +10,7 @@ Ore is a Mac-first, AI-first, local-files personal learning app: capture anythin
 - `docs/WORKFLOW.md` — merging, reinstalling the app on Tyler's Mac, parallel threads.
 
 ## Rules are defaults (Tyler, 2026-11-13)
-Tyler makes many of these rules and decisions in the moment. When good evidence says one is wrong for the case at hand, raise the rule instead of designing around it: name the rule, the evidence and what you would do instead, and he decides whether it bends, changes or goes. A rule changes only with his yes.
+Tyler makes many of these rules and decisions in the moment. When good evidence says one is wrong for the case at hand, raise the rule instead of designing around it: name the rule, the evidence and what you would do instead, and he decides whether it bends, changes or goes. A rule changes only with his yes. A new rule says why it exists and what would reopen it; a one-off fix is a test, not a rule (how decisions are written: the top of `docs/DECISIONS.md`, 2026-11-20).
 
 ## Talking to Tyler
 Name the thing in plain words: the screen, what it does now, what he does next. A finding, decision or PR number only follows as a link or in brackets, never in place of the words.

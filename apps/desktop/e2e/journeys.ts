@@ -13257,6 +13257,8 @@ journey("phone: a bottom sheet covers the reader's bar, the pill and a toast", a
   // Source actions opened under the reader's floating bar, which hid part of its last rows (Archive).
   await phoneSource(page, TESTING);
   const check = async (what: string) => {
+    // The sheet rises for 300ms (D331): a fixed wait of the same length can sample it still moving under load (it did on #475).
+    await until("the sheet has risen", () => page.evaluate(() => ![...document.querySelectorAll('[role="dialog"].sheet, [role="dialog"].review-pick, .overlay')].some((el) => el.getAnimations().some((x) => x.playState === "running"))));
     const covered = await coveredRows(page);
     if (covered.length) throw new Error(`${what}: rows under something else: ${covered.join("; ")}`);
   };
