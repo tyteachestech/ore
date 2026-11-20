@@ -6,7 +6,9 @@
 @font-face { font-family: "Geist"; src: url("./fonts/Geist-Regular.woff2") format("woff2"); font-weight: 400; font-display: block; }
 @font-face { font-family: "Geist"; src: url("./fonts/Geist-Medium.woff2") format("woff2"); font-weight: 500; font-display: block; }
 @font-face { font-family: "Geist"; src: url("./fonts/Geist-SemiBold.woff2") format("woff2"); font-weight: 600; font-display: block; }
-@font-face { font-family: "Geist"; src: url("./fonts/Geist-Bold.woff2") format("woff2"); font-weight: 700 900; font-display: block; }
+@font-face { font-family: "Geist"; src: url("./fonts/Geist-Bold.woff2") format("woff2"); font-weight: 700; font-display: block; }
+/* Geist Black (geist 1.5.1, OFL): only iOS's Bold Text reaches past 700 (dynamic-type.ts), so a bold title gets heavier too. */
+@font-face { font-family: "Geist"; src: url("./fonts/Geist-Black.woff2") format("woff2"); font-weight: 800 900; font-display: block; }
 @font-face { font-family: "Geist Mono"; src: url("./fonts/GeistMono-Regular.woff2") format("woff2"); font-weight: 400; font-display: block; }
 @font-face { font-family: "Geist Mono"; src: url("./fonts/GeistMono-Medium.woff2") format("woff2"); font-weight: 500 900; font-display: block; }
 /* OpenTUI Mono (Iosevka build, OFL, no reserved name): its Latin subset; anything outside it falls back to Geist Mono. */
