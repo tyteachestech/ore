@@ -20,14 +20,14 @@ const FIRST_TIME = "09:00";
 /** A switch as iOS's: a tap flips it, and so does sliding the knob, which follows the finger past the track's
  *  ends (Radix's switch only takes a click, so a slide that ended off the track did nothing). */
 function PhoneSwitch({ id, checked, onCheckedChange }: { id: string; checked: boolean; onCheckedChange: (v: boolean) => void }) {
-  const drag = useRef<{ x: number; moved: boolean } | null>(null);
-  const on = useRef(checked);
-  on.current = checked;
+  // `on`: where the knob is while the finger is down; saved once, on the lift.
+  const drag = useRef<{ x: number; moved: boolean; on?: boolean } | null>(null);
+  const [knob, setKnob] = useState<boolean | null>(null);
   return (
     <Switch.Root
       id={id}
       className="switch"
-      checked={checked}
+      checked={knob ?? checked}
       onCheckedChange={onCheckedChange}
       onPointerDown={(e) => {
         drag.current = { x: e.clientX, moved: false };
@@ -43,10 +43,18 @@ function PhoneSwitch({ id, checked, onCheckedChange }: { id: string; checked: bo
         if (Math.abs(dx) < 8) return;
         d.moved = true;
         // The knob goes where the finger goes, at once, as iOS's does.
-        if (dx > 0 !== on.current) onCheckedChange((on.current = dx > 0));
+        setKnob((d.on = dx > 0));
       }}
-      onPointerUp={() => void setTimeout(() => (drag.current = null), 400)}
-      onPointerCancel={() => (drag.current = null)}
+      onPointerUp={() => {
+        const on = drag.current?.on;
+        if (on !== undefined && on !== checked) onCheckedChange(on);
+        setKnob(null);
+        setTimeout(() => (drag.current = null), 400);
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        setKnob(null);
+      }}
       // A slide already set it: the click its lift sends doesn't flip it back.
       onClick={(e) => drag.current?.moved && e.preventDefault()}
     >

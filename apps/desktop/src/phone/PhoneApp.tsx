@@ -369,8 +369,6 @@ function Rows({ lines, row, onOpen }: { lines: Line[]; row: RowActions; onOpen: 
   );
 }
 
-/** A list row's in-place Rename field: Today's (Home's rows) and the lists'. styles.css pads the page under it. */
-
 /** Sources by To read and Done, as one list; `flat`: as given, no sections or courses (Archive, a course's lessons). */
 function SourceList({ title, items, onOpen, row, head, flat, empty = "Nothing here yet. Add a link with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; flat?: boolean; empty?: string }) {
   // Pinned first, in the order they were pinned, as on the Mac's lists; then the latest touched.

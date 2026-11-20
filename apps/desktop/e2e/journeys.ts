@@ -16070,6 +16070,8 @@ journey("phone: a switch's knob slid off its track flips it, and a slide that en
       const at = (type: string, x: number) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 7, pointerType: "touch", isPrimary: true, clientX: x, clientY: y }));
       at("pointerdown", r.left + r.width * (from as number));
       for (let i = 1; i <= 6; i++) at("pointermove", r.left + r.width * ((from as number) + (((to as number) - (from as number)) * i) / 6));
+      // Back and forth once on the way, as a finger may: one save, at the lift, not one per pass.
+      if (Math.abs((to as number) - (from as number)) > 1) for (const f of [from, to]) at("pointermove", r.left + r.width * (f as number));
       at("pointerup", r.left + r.width * (to as number));
       // A lift on the track also sends a click; off it, none.
       if (click) el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
