@@ -58,6 +58,7 @@ describe("shortcut hints", () => {
 // that can't is listed here, by file and aria-label, with the reason.
 const ICON_ONLY_OK: Record<string, string> = {
   "Palette.tsx Close": "phone only (PHONE): a touch screen has no hover",
+  "Palette.tsx Clear": "phone only (PHONE): a touch screen has no hover",
   "Reader.tsx Find in source": "phone only (PHONE): a touch screen has no hover",
   "Reader.tsx readingFor(qs.length)": "phone only (PHONE): a touch screen has no hover",
   "IconPicker.tsx label(icon)": "one of hundreds of cells in the icon grid; the filter field names them, and a tooltip each would cost the grid its speed",
