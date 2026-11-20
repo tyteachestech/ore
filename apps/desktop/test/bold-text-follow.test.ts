@@ -1,4 +1,4 @@
-import { expect, mock, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { boldFontWeights } from "../src/phone/dynamic-type";
 
@@ -7,20 +7,20 @@ import { boldFontWeights } from "../src/phone/dynamic-type";
 test("Bold Text turned on in the Settings app shows in Ore once it is back, not one return later", async () => {
   // Back from the Settings app, the first answer is still the old setting; iOS hands over the new one a moment later.
   let bold = false;
-  const real = await import("@tauri-apps/api/core");
-  mock.module("@tauri-apps/api/core", () => ({ ...real, isTauri: () => true, invoke: async (cmd: string) => (cmd === "bold_text" ? bold : false) }));
-  mock.module("../src/reading", () => ({ setSystemDark: () => {} }));
   const root = { style: new Map<string, string>() };
-  const doc = Object.assign(new EventTarget(), { visibilityState: "visible", documentElement: { style: { setProperty: (k: string, v: string) => root.style.set(k, v) } } });
+  const doc = Object.assign(new EventTarget(), { visibilityState: "visible", documentElement: { dataset: {}, style: { setProperty: (k: string, v: string) => root.style.set(k, v) } } });
+  const was = (globalThis as any).document;
   (globalThis as any).document = doc;
-  const { followAppearance } = await import("../src/phone/appearance?bold-follow");
-  followAppearance();
+  const { followAppearance } = await import("../src/phone/appearance");
+  // Only Bold Text answers here; the light/dark question is left unanswered.
+  followAppearance((async (cmd: string) => (cmd === "bold_text" ? bold : Promise.reject())) as never, true);
   await Bun.sleep(10);
   expect(root.style.get("--bold")).toBe("0");
   doc.dispatchEvent(new Event("visibilitychange")); // asked at once: still the old answer
   await Bun.sleep(10);
   bold = true; // iOS's new setting arrives
   await Bun.sleep(2000);
+  (globalThis as any).document = was;
   expect(root.style.get("--bold")).toBe("1");
 });
 
