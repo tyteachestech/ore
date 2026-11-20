@@ -118,7 +118,10 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     save(CLOSED, JSON.stringify(next));
   };
   const toggle = (name: string) => setClosedSaved(closed.includes(name) ? closed.filter((n) => n !== name) : [...closed, name]);
-  const isOpen = (g: Group) => !closed.includes(g.name) || adding === g.collection;
+  // Beside collections, the skills in none have no header (Tyler, 2026-11-20): they sit at the top like
+  // Notion's loose pages, so there is nothing to fold them with and they are always open.
+  const bare = (g: Group) => !g.collection && shown.some((x) => x.collection);
+  const isOpen = (g: Group) => bare(g) || !closed.includes(g.name) || adding === g.collection;
 
   const groupOf = (list: Group[], id: UniqueIdentifier) =>
     isGroup(id) ? list.findIndex((g) => groupId(g.collection) === id) : list.findIndex((g) => g.skills.some((s) => s.id === id));
@@ -291,6 +294,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
             <Fragment key={g.collection}>
             <Section
               group={g}
+              bare={bare(g)}
               open={isOpen(g)}
               target={active !== null && !isGroup(active) && groupOf(shown, active) === shown.indexOf(g) && groupOf(groups, active) !== groups.findIndex((x) => x.collection === g.collection)}
               renaming={renaming === g.collection && !!g.collection}
@@ -361,8 +365,10 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
 
 /** A sidebar section: a collection, or the skills in none. The whole section drags by its header to
  *  reorder collections; while a skill from elsewhere hovers it, it lights up (Notion). */
-function Section({ group, open, target, renaming, menu, onToggle, onAdd, taken, onRename, onCancelRename, children }: {
+function Section({ group, bare, open, target, renaming, menu, onToggle, onAdd, taken, onRename, onCancelRename, children }: {
   group: Group;
+  /** No header: the skills in no collection, when there are collections under them. */
+  bare: boolean;
   open: boolean;
   target: boolean;
   renaming: boolean;
@@ -389,10 +395,10 @@ function Section({ group, open, target, renaming, menu, onToggle, onAdd, taken, 
       ref={setNodeRef}
       role="group"
       aria-label={group.name}
-      className={`side-section${target ? " drop-on" : ""}${isDragging ? " slot" : ""}`}
+      className={`side-section${bare ? " bare" : ""}${target ? " drop-on" : ""}${isDragging ? " slot" : ""}`}
       style={{ transform: CSS.Translate.toString(transform), transition }}
     >
-      <WithMenu actions={menu}>
+      {!bare && <WithMenu actions={menu}>
         <div className="side-head" ref={setActivatorNodeRef} {...a11y} {...listeners}>
           {renaming ? (
             <RenameField value={group.collection} taken={taken} onSave={onRename} onCancel={onCancelRename} />
@@ -413,7 +419,7 @@ function Section({ group, open, target, renaming, menu, onToggle, onAdd, taken, 
             </span>
           )}
         </div>
-      </WithMenu>
+      </WithMenu>}
       {children}
     </div>
   );

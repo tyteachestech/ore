@@ -2768,6 +2768,7 @@ button.home-plan:hover { color: var(--text); }
 /* Dragging a skill between sidebar sections */
 /* Drag to move (Dia, Arc): the row lifts under the pointer, its slot stays open where it will land
    and the other rows slide aside; a collection lights up while a skill from elsewhere is over it. */
+.side-section.bare { margin-top: 10px; }
 .side-section { border-radius: 8px; transition: background-color var(--t-1) ease, box-shadow var(--t-1) ease; }
 .side-section.drop-on { background: color-mix(in srgb, var(--accent) 8%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
 .side-item.slot, .side-section.slot { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }

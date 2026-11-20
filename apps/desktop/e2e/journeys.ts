@@ -9707,8 +9707,8 @@ journey("sidebar: closing a hover-only ⋯ or + gives focus to its row, and ⇧�
   await until("Home's tile ⋯ gives focus to its tile's name", () => tile.locator(".home-open").evaluate((el) => el === document.activeElement));
 });
 
-journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
-  const plus = page.getByRole("button", { name: "New skill", exact: true });
+journey("sidebar: a header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
+  const plus = page.getByRole("button", { name: /^New skill in / }).first();
   await plus.hover();
   // A click's checks, without the click: an aria-disabled ancestor makes it "not enabled".
   await plus.click({ trial: true, timeout: 2000 });

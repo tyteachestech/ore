@@ -63,6 +63,8 @@ describe("sidebar: the New skill field", () => {
     const sections = [...div.querySelectorAll(".side-section")];
     expect(sections.indexOf(field(div)!.closest(".side-section")!)).toBe(0);
     expect(sections[0]!.getAttribute("aria-label")).toBe("Other");
+    // No heading over them: the new row is simply the first thing under All sources.
+    expect(sections[0]!.querySelector(".side-head")).toBeNull();
     unmount();
   });
 
