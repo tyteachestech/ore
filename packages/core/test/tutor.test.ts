@@ -484,7 +484,7 @@ const after = (argv: string[], flag: string) => (argv.includes(flag) ? argv[argv
 
 // D338: a chat is one session of the vendor's own program, as Review's "Ask about this" always was (D61).
 // Before, every message started a new run and sent the open source and the last 3,000 words again (D293).
-describe("tutor: a chat he had elsewhere (D-new-chat-import)", () => {
+describe("tutor: a chat he had elsewhere (D339)", () => {
   test("it goes whole where another source its length would go in parts: it is the history the tutor carries on from", async () => {
     const lib = await tempLibrary();
     const body = Array.from({ length: 400 }, (_, i) => `## Question ${i + 1}\n\n${"A reply about boxes of cards and when each comes back. ".repeat(4)}`).join("\n\n");

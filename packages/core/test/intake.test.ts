@@ -1085,7 +1085,10 @@ describe("import coverage: from the browser tab", () => {
     const html = web("chat-claude.html");
     const lib = await tempLibrary();
     const item = await addTab(lib, { tab: { browser: "Chrome", url, title: "Claude", html, text: "Claude" } });
-    expect(item.meta).toMatchObject({ type: "article", title: "PI feedback knowledge elaboration", author: "Claude", published: "2026-11-15", chat: "claude", url });
+    // Its day is the first message's where he is (03:01 UTC on the 15th is the evening of the 14th in California).
+    const first = new Date("2026-11-15T03:01:45.002Z");
+    const day = `${first.getFullYear()}-${first.getMonth() + 1}-${String(first.getDate()).padStart(2, "0")}`;
+    expect(item.meta).toMatchObject({ type: "article", title: "PI feedback knowledge elaboration", author: "Claude", published: day, chat: "claude", url });
     // His three messages, a heading each.
     expect(item.body.match(/^## .+/gm)).toEqual(["## habit session: pause evidence drill of PI pattern's knowledge. where claude recall guess in to focus", "## Card, so this is index that the chunk prompt's retrieval fact test up to $15,000 and no mind?", "## Step"]);
     // The replies, from the first to the last, with their lists and tables.
@@ -1097,6 +1100,7 @@ describe("import coverage: from the browser tab", () => {
     // its "Ran 5 agents" lines and its notices are not what was said.
     expect(item.body.match(/^\*An interactive visual was here\. The shared copy of the chat leaves it out\.\*$/gm)!.length).toBeGreaterThanOrEqual(1);
     expect(item.body).toContain("*An interactive quiz was here (“PI schedule: the learn idea”).");
+    expect(item.body).toContain("up to $15,000 and no mind?\n\n*A file was attached here. The shared copy of the chat leaves it out.*");
     expect(item.body).not.toMatch(/hidden when shared|days ago|Claude responded:|You said:/);
     expect(html).toContain("Cue 5 drill, lesson check, reading a spaced");
     expect(item.body).not.toContain("Cue 5 drill, lesson check");
@@ -1113,6 +1117,23 @@ describe("import coverage: from the browser tab", () => {
     expect(heading).toBe("## I think I need to start even earlier than this because, in my head, if one person hits another then the one who was hit…");
     expect(quoted).toBe(`> ${long}\n>\n> Is that right?`);
     expect(reply).toBe("Not quite.");
+    // A reply's own headings sit under the question, never beside it; its code is kept as written; a message that
+    // opens with code or a list is named by its first words; a file he attached is said, as is a message that was only one.
+    const turn = (inner: string, file = false) => `<div data-cds="UserMessage">${file ? '<div data-cds="MessageAttachments" data-find-omitted=""><h4>Files hidden when shared</h4></div>' : ""}${inner}</div>`;
+    const said = (inner: string) => `<div data-testid="user-message">${inner}</div>`;
+    const answer = (inner: string) => `<div data-testid="assistant-message"><div data-cds="Prose">${inner}</div></div>`;
+    const more = chatMarkdown(`<span>T</span><div data-testid="transcript-list">${[
+      turn(said("<pre><code>const a = 1;</code></pre><p>why is this slow?</p>")),
+      answer("<h1>Big</h1><h2>Why</h2><p>ok</p><ul><li>one</li><li>two</li></ul><pre><code>-   x\n1.   y\n# not a heading</code></pre>"),
+      turn(said("<ul><li>first thing</li><li>second</li></ul>"), true),
+      answer("<p>Both.</p>"),
+      turn("", true),
+      answer("<p>Read it.</p>"),
+    ].join("")}<time datetime="2026-11-16T12:00:00.000Z">x</time></div>`)!.markdown;
+    expect(more.match(/^#{1,6} .+/gm)).toEqual(["## why is this slow?", "### Big", "#### Why", "# not a heading", "## first thing", "## An attached file"]);
+    expect(more).toContain("- one\n- two\n\n```\n-   x\n1.   y\n# not a heading\n```");
+    expect(more).toContain("## first thing\n\n> -   first thing\n> -   second\n\n*A file was attached here. The shared copy of the chat leaves it out.*\n\nBoth.");
+    expect(more).toContain("## An attached file\n\n*A file was attached here. The shared copy of the chat leaves it out.*\n\nRead it.");
     // A page that only looks like one (no turns) is not a chat.
     expect(chatMarkdown('<div data-testid="transcript-list"></div>')).toBeNull();
   });

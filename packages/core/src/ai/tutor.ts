@@ -100,7 +100,7 @@ export const WHOLE_WORDS = 15_000;
 /** How much of a chat goes whole when it is handed to a new session, in words (about 40k tokens): past it the
  *  oldest turns shrink to what he asked. */
 const EARLIER_WORDS = 30_000;
-/** How long a source can be and still go whole. A chat he had elsewhere (D-new-chat-import) is the history the tutor
+/** How long a source can be and still go whole. A chat he had elsewhere (D339) is the history the tutor
  *  carries on from, so it goes as a chat handed over does. */
 const wholeUpTo = (it: Item) => (it.meta.chat ? EARLIER_WORDS : WHOLE_WORDS);
 /** A session this large (tokens in front of the model) is left for a new one started from the saved turns: the

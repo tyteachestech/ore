@@ -86,7 +86,7 @@ export const ItemMetaSchema = z.object({
   owed_error: z.string().optional(),
   captured_at: z.string(),
   source_app: z.string().optional(),
-  // A chat he had with an AI, brought in from its shared page (D-new-chat-import): he has read it, since he was in
+  // A chat he had with an AI, brought in from its shared page (D339): he has read it, since he was in
   // it, so nothing is asked before it and the tutor carries on from where it stops.
   chat: z.enum(["claude"]).optional(),
   text_sha256: z.string(),
