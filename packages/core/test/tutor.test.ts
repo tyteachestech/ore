@@ -25,9 +25,13 @@ const n = Number(fs.readFileSync(dir + "/count", "utf8"));
 fs.writeFileSync(dir + "/count", String(n + 1));
 fs.appendFileSync(dir + "/msgs.jsonl", JSON.stringify(process.argv[process.argv.indexOf("-p") + 1]) + "\\n");
 fs.writeFileSync(dir + "/argv.json", JSON.stringify(process.argv));
+fs.appendFileSync(dir + "/argvs.jsonl", JSON.stringify(process.argv) + "\\n");
 fs.writeFileSync(dir + "/cwd", process.cwd());
 // An entry { web: [events…], out } first prints those stream-json events (what its web search returned).
 const q = JSON.parse(fs.readFileSync(dir + "/queue.json", "utf8"))[n];
+// An entry { fail } is a run the program refuses, as claude 2.1.329 does a session it doesn't have: the reason
+// on stderr, a result event that says only that it failed, exit 1.
+if (q?.fail) { console.error(q.fail); console.log(JSON.stringify({ type: "result", subtype: "error_during_execution", is_error: true })); process.exit(1); }
 for (const e of q?.web ?? []) console.log(JSON.stringify(e));
 console.log(JSON.stringify({ type: "result", is_error: false, structured_output: q?.web ? q.out : q, modelUsage: { "claude-fake-1": { outputTokens: 5 } } }));
 `);
@@ -150,7 +154,7 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P2", quote: "A card you miss goes back to the first box." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@16" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@17" });
     expect(r.general).toBe(false);
     const c = r.citations[0] as Citation;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
@@ -262,22 +266,23 @@ describe("tutor: replies", () => {
   });
 
   // F264: only the last six turns reached the tutor, so a long chat lost what he had said he was after.
-  test("a long chat keeps its start: earlier turns go by size, never fewer than six, and what he asked before those in a line each (D293)", async () => {
+  test("a chat handed over whole keeps every turn, his words and the replies; only past 30,000 words do the oldest shrink to what he asked, a line each (D-new-tutor-sessions)", async () => {
     const { lib } = await library();
     const out = { reply: "On it.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null };
-    const short = Array.from({ length: 20 }, (_, i) => ({ message: `question ${i + 1}`, reply: `answer ${i + 1}` }));
-    fakeClaude([out, out]);
-    await tutor(lib, "and now?", { earlier: short });
-    const first = sent()[0] as unknown as { earlier: unknown[]; before?: string[] };
-    expect(first.earlier).toEqual(short); // twenty short turns all fit
-    expect(first.before).toBeUndefined();
     const long = Array.from({ length: 20 }, (_, i) => ({ message: i ? `question ${i + 1}` : `I'm learning this for my exam on Friday. ${"So ".repeat(80)}`, reply: `answer ${i + 1} ${"word ".repeat(600)}` }));
+    fakeClaude([out, out]);
     await tutor(lib, "and now?", { earlier: long });
+    const first = sent()[0] as unknown as { earlier: unknown[]; before?: string[] };
+    expect(first.earlier).toEqual(long); // 12,000 words: all of it, where 3,000 used to be the cut
+    expect(first.before).toBeUndefined();
+    // Short words: the whole message is one argument, and Linux caps one at 128 KB.
+    const huge = long.map((t, i) => ({ ...t, reply: `answer ${i + 1} ${"a ".repeat(2000)}` }));
+    await tutor(lib, "and now?", { earlier: huge });
     const second = sent()[1] as unknown as { earlier: { message: string }[]; before: string[] };
-    expect(second.earlier.map((t) => t.message)).toEqual(long.slice(-6).map((t) => t.message));
-    expect(second.before).toHaveLength(14);
-    expect(second.before[0]).toBe(`${long[0]!.message.slice(0, 120).trimEnd()}…`);
-    expect(second.before[13]).toBe("question 14");
+    expect(second.earlier.map((t) => t.message)).toEqual(huge.slice(-14).map((t) => t.message));
+    expect(second.before).toHaveLength(6);
+    expect(second.before[0]).toBe(`${huge[0]!.message.slice(0, 120).trimEnd()}…`);
+    expect(second.before[5]).toBe("question 6");
   });
 
   test("it is told where he is, what he marked and what he last missed, so \"this part\" and Practice aim there (D294)", async () => {
@@ -315,7 +320,7 @@ describe("tutor: replies", () => {
     await expect(tutor(lib, "and then?", { item: a.meta.id })).rejects.toThrow("invalid tutor output twice");
     const lines = readFileSync(join(lib.root, ".ore/logs/tutor.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     expect(lines).toHaveLength(2);
-    expect(lines[0]).toMatchObject({ runs: 2, searched: false, moved: 1, dropped: 0, model: "claude-fake-1", prompt: "tutor@16" });
+    expect(lines[0]).toMatchObject({ runs: 2, searched: false, moved: 1, dropped: 0, model: "claude-fake-1", prompt: "tutor@17" });
     expect(lines[0].ms).toBeGreaterThanOrEqual(0);
     expect(Date.parse(lines[0].ts)).not.toBeNaN();
     expect(lines[1].error).toContain("invalid tutor output twice");
@@ -468,6 +473,164 @@ describe("tutor: the web", () => {
     // Only the web tools: it is given its passages, so file tools would be input it never uses.
     expect(args[args.indexOf("--tools") + 1]).toBe("WebSearch,WebFetch");
     expect(args).toContain("stream-json");
+  });
+});
+
+/** Each run's arguments, in order. */
+const argvs = (): string[][] => readFileSync(join(binDir, "argvs.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+const after = (argv: string[], flag: string) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : undefined);
+
+// D-new-tutor-sessions: a chat is one session of the vendor's own program, as Review's "Ask about this" always was (D61).
+// Before, every message started a new run and sent the open source and the last 3,000 words again (D293).
+describe("tutor: one session per chat (D-new-tutor-sessions)", () => {
+  const T1 = { message: "What happens to a missed card?", reply: "Yes." };
+
+  test("the first message starts a session; the next resumes it and sends only what is new: no source again, no earlier turns", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK, OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    await tutor(lib, "And a right one?", { chat: "c1", item: a.meta.id, earlier: [T1] });
+    const [one, two] = argvs();
+    const id = after(one!, "--session-id");
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(one).not.toContain("--no-session-persistence");
+    expect(after(two!, "--resume")).toBe(id);
+    expect(two).not.toContain("--session-id");
+    expect(sent()[0]!.passages.some((p) => p.source === "Flashcard boxes")).toBe(true);
+    const next = sent()[1] as unknown as Partial<Sent>;
+    expect(next.message).toBe("And a right one?");
+    expect(next.earlier).toBeUndefined();
+    expect(next.reading).toBeUndefined();
+    expect((next.passages ?? []).some((p) => p.source === "Flashcard boxes")).toBe(false);
+  });
+
+  test("a passage sent in an earlier message keeps its number, so a later reply can cite it; new ones count on", async () => {
+    const { lib, a, c } = await library();
+    fakeClaude([OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    const first = sent()[0]!.passages.map((p) => p.id);
+    fakeClaude([{ ...OK, reply: "Back to box one [1]. Knead it [2].", citations: [{ passage: "P2", quote: "A card you miss goes back to the first box." }, { passage: `P${first.length + 1}`, quote: "Knead the dough for ten minutes." }] }]);
+    const r = await tutor(lib, "And how long do I knead dough?", { chat: "c1", item: a.meta.id, earlier: [T1] });
+    const more = sent().at(-1)!.passages;
+    expect(more.map((p) => p.source)).toEqual(["Bread"]);
+    expect(more[0]!.id).toBe(`P${first.length + 1}`);
+    expect(r.citations.map((x) => (x as Citation).item)).toEqual([a.meta.id, c.meta.id]);
+    expect(r.general).toBe(false);
+  });
+
+  test("a passage whose source was edited since is sent again as it now reads, under a new number", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK, OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    const n = sent()[0]!.passages.length;
+    const file = join(a.dir, "doc.md");
+    writeFileSync(file, readFileSync(file, "utf8").replace("goes back to the first box", "goes back to box one"));
+    await tutor(lib, "And a right one?", { chat: "c1", item: a.meta.id, earlier: [T1] });
+    const again = sent()[1]!.passages.filter((p) => p.source === "Flashcard boxes");
+    expect(again.map((p) => p.text).join(" ")).toContain("goes back to box one");
+    expect(again.every((p) => Number(p.id.slice(1)) > n)).toBe(true);
+  });
+
+  test("where he is goes again only when it moved", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK, OK, OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id, at: "Boxes" });
+    await tutor(lib, "two", { chat: "c1", item: a.meta.id, at: "Boxes", earlier: [T1] });
+    await tutor(lib, "three", { chat: "c1", item: a.meta.id, at: "The Leitner system", earlier: [T1, { message: "two", reply: "Yes." }] });
+    expect(sent()[0]!.reading).toMatchObject({ title: "Flashcard boxes", whole: true, at: "Boxes" });
+    expect(sent()[1]!.reading).toBeUndefined();
+    expect(sent()[2]!.reading).toEqual({ title: "Flashcard boxes", at: "The Leitner system" } as never);
+  });
+
+  test("a chat with no session here (another Mac's, or an old one) starts one from its saved turns, whole, with the source", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK]);
+    await tutor(lib, "And a right one?", { chat: "c2", item: a.meta.id, earlier: [T1] });
+    expect(after(argvs()[0]!, "--session-id")).toBeTruthy();
+    expect(sent()[0]!.earlier).toEqual([T1]);
+    expect(sent()[0]!.passages.some((p) => p.source === "Flashcard boxes")).toBe(true);
+  });
+
+  test("an edited message or Try again, where the saved turns no longer end as the session does, starts a new session from the saved turns", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK, OK, OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    await tutor(lib, "And a right one?", { chat: "c1", item: a.meta.id, earlier: [T1] });
+    await tutor(lib, "And a right one, in a word?", { chat: "c1", item: a.meta.id, earlier: [T1] });
+    const [one, , three] = argvs();
+    expect(after(three!, "--session-id")).toBeTruthy();
+    expect(after(three!, "--session-id")).not.toBe(after(one!, "--session-id"));
+    expect(sent()[2]!.earlier).toEqual([T1]);
+  });
+
+  test("a session the program no longer has is started again from the saved turns, in the same call", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK, { fail: "No conversation found with session ID: 0" }, { ...OK, reply: "Less often." }]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    const r = await tutor(lib, "And a right one?", { chat: "c1", item: a.meta.id, earlier: [T1] });
+    expect(r.reply).toBe("Less often.");
+    const [, two, three] = argvs();
+    expect(after(two!, "--resume")).toBeTruthy();
+    expect(after(three!, "--session-id")).toBeTruthy();
+    expect(sent()[2]!.earlier).toEqual([T1]);
+  });
+
+  test("a message that failed leaves no half turn behind: the next one starts a new session", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK, { fail: "overloaded" }, OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    await expect(tutor(lib, "And a right one?", { chat: "c1", item: a.meta.id, earlier: [T1] })).rejects.toThrow("overloaded");
+    await tutor(lib, "And a right one?", { chat: "c1", item: a.meta.id, earlier: [T1] });
+    expect(after(argvs()[2]!, "--session-id")).toBeTruthy();
+  });
+
+  test("a reply that goes back to fix goes back in the same session, with the reason alone", async () => {
+    const { lib, a } = await library();
+    fakeClaude([{ ...OK, reply: "See [1]." }, OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    const [one, two] = argvs();
+    expect(after(two!, "--resume")).toBe(after(one!, "--session-id"));
+    const again = readFileSync(join(binDir, "msgs.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as string)[1]!;
+    expect(again).toContain("marker [1] has no citation");
+    expect(again).not.toContain("Task input");
+  });
+
+  test("a web page an earlier message's search returned can be cited again", async () => {
+    const { lib } = await library();
+    const cite = { ...OK, reply: "He published it in 1885 [1].", citations: [{ passage: BRIT.url, quote: "published in 1885" }] };
+    fakeClaude([{ web: searched([BRIT], "Ebbinghaus published in 1885."), out: cite }, { web: [], out: cite }]);
+    const first = { message: "When did Ebbinghaus publish?", reply: cite.reply };
+    await tutor(lib, first.message, { chat: "c1" });
+    const r = await tutor(lib, "Which page said so?", { chat: "c1", earlier: [first] });
+    expect(r.citations[0]).toMatchObject({ url: BRIT.url, title: BRIT.title });
+  });
+
+  test("with no chat named (an agent's one-off, the eval) nothing is kept: no session, everything sent", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK]);
+    await tutor(lib, "And a right one?", { item: a.meta.id, earlier: [T1] });
+    expect(argvs()[0]).toContain("--no-session-persistence");
+    expect(sent()[0]!.earlier).toEqual([T1]);
+  });
+
+  test("on Codex the chat is a thread, picked up with `exec resume`", async () => {
+    const { lib, a } = await library();
+    writeFileSync(join(binDir, "codex"), `#!/usr/bin/env bun
+const fs = require("fs");
+fs.appendFileSync(${JSON.stringify(join(binDir, "argvs.jsonl"))}, JSON.stringify(process.argv) + "\\n");
+console.log(JSON.stringify({ type: "thread.started", thread_id: "th-1" }));
+fs.writeFileSync(process.argv[process.argv.indexOf("-o") + 1], ${JSON.stringify(JSON.stringify(OK))});
+`);
+    chmodSync(join(binDir, "codex"), 0o755);
+    process.env.ORE_AI = "codex";
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    await tutor(lib, "And a right one?", { chat: "c1", item: a.meta.id, earlier: [T1] });
+    const [one, two] = argvs();
+    expect(one).not.toContain("--ephemeral");
+    expect(one).not.toContain("resume");
+    expect(two!.slice(two!.indexOf("resume"), two!.indexOf("resume") + 2)).toEqual(["resume", "th-1"]);
+    expect(two!.at(-1)).not.toContain("<instructions>");
+    expect(two!.at(-1)).not.toContain("Flashcard boxes");
   });
 });
 

@@ -110,8 +110,8 @@ export const aiCommands: Record<string, Command> = {
   },
 
   tutor: {
-    usage: '"<message>" [--item <source> [--at <heading>]] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--files <json>] [--stream <id>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), else from the web (cited by URL) or general knowledge, hints instead of answers on practice; --item is the source being read (--at the heading of the section on screen), --source and --skill what he @-mentioned, --earlier is [{message, reply, exercise?, files?}] (a turn that set an exercise carries it, so feedback judges against its card), --files is what he attached to this message, [{name, path}] as `ore chat --attach` returned them (D189), --stream <id> writes the reply as it comes as {"progress": {stream, reply}} lines on stderr (and {stream, searching} when a web search starts or ends)',
-    options: { item: { type: "string" }, at: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" }, files: { type: "string" }, stream: { type: "string" } },
+    usage: '"<message>" [--item <source> [--at <heading>]] [--source <source>]… [--skill <skill>]… [--earlier <json>] [--chat <id>] [--files <json>] [--stream <id>]   The tutor (D128): one chat turn, from your sources with citations (start/end in each doc.md), else from the web (cited by URL) or general knowledge, hints instead of answers on practice; --item is the source being read (--at the heading of the section on screen), --source and --skill what he @-mentioned, --earlier is [{message, reply, exercise?, files?}] (a turn that set an exercise carries it, so feedback judges against its card), --chat is the saved chat this turn belongs to (`ore chat`): its turns run as one session of claude or codex, so only what is new is sent, and --earlier, still the whole chat, starts a new session when this Mac has none for it (D-new-tutor-sessions); with no --chat nothing is kept, --files is what he attached to this message, [{name, path}] as `ore chat --attach` returned them (D189), --stream <id> writes the reply as it comes as {"progress": {stream, reply}} lines on stderr (and {stream, searching} when a web search starts or ends)',
+    options: { item: { type: "string" }, at: { type: "string" }, source: { type: "string", multiple: true }, skill: { type: "string", multiple: true }, earlier: { type: "string" }, chat: { type: "string" }, files: { type: "string" }, stream: { type: "string" } },
     async run(words, f) {
       const lib = openLibrary();
       let earlier: TutorTurn[] = [];
@@ -126,7 +126,7 @@ export const aiCommands: Record<string, Command> = {
       if (str(f.files)) {
         try { files = JSON.parse(str(f.files)!); } catch { throw new Error("--files must be JSON: [{name, path}]"); }
       }
-      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, files, item: str(f.item), at: str(f.at), sources: strs(f.source), skills: strs(f.skill), onProgress });
+      const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, files, chat: str(f.chat), item: str(f.item), at: str(f.at), sources: strs(f.source), skills: strs(f.skill), onProgress });
       const text = [withSteps(r), ...(r.exercise?.cases ?? []).map((c, i) => `  ${"AB"[i]}: ${c}`), ...r.marks.map((m) => `  ${m.covered ? "got" : "missed"}: ${m.point}${m.quote ? ` (“${m.quote}”)` : ""}`), ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => ("url" in c ? `  [${c.n}] ${c.title || c.site}: "${c.text}" ${c.url}` : `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`))].join("\n");
       return { data: r, text };
     },

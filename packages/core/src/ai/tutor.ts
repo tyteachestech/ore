@@ -1,4 +1,6 @@
-import { appendFileSync, mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { appendFileSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { hostname } from "node:os";
 import { dirname, join } from "node:path";
 import { z } from "zod";
 import { locate } from "../anchoring.ts";
@@ -9,11 +11,12 @@ import { blankProblem, cardTextProblem, ContentType, hideBlanks, listCards, writ
 import { readReviews } from "../reviews.ts";
 import { chatFilePath } from "../chats.ts";
 import { getDiagram, sceneOutline } from "../diagrams.ts";
+import { writeAtomic } from "../fsutil.ts";
 import { withLock } from "../lock.ts";
 import { paths } from "../library.ts";
 import { loadSkills } from "../skills.ts";
 import type { Library } from "../library.ts";
-import { aiStampFor, isWebUrl, partialReply, runAgent, samePage, type Usage } from "./adapter.ts";
+import { aiStampFor, chooseVendor, isWebUrl, partialReply, runAgent, samePage, type Usage } from "./adapter.ts";
 export { partialReply };
 import { nearestSentence, PASSAGES, passageCitation, plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
 import { quoteIn } from "./grade.ts";
@@ -94,8 +97,42 @@ export interface TutorFocus { item?: string; sources?: string[]; skills?: string
 /** The source he has open goes to the tutor whole up to this many words (about 20k tokens a turn, D290):
  *  "Summarize this", "What's this about?" and Practice share no words with it, and got its opening alone. */
 export const WHOLE_WORDS = 15_000;
-/** How much of the chat so far goes with each message, in words (about 4k tokens). */
-const EARLIER_WORDS = 3_000;
+/** How much of a chat goes whole when it is handed to a new session, in words (about 40k tokens): past it the
+ *  oldest turns shrink to what he asked. */
+const EARLIER_WORDS = 30_000;
+/** A session this large (tokens in front of the model) is left for a new one started from the saved turns: the
+ *  source and the turns go again, word for word, and the web searches' bulk stays behind. The vendor's program would
+ *  otherwise sum the oldest part up at its own limit, passages and all, and a quote from one could no longer be exact. */
+const SESSION_ROOM = 150_000;
+
+// D-new-tutor-sessions: a chat is one session of the vendor's own program, as Review's "Ask about this" is (D61),
+// so the model keeps every turn, its own replies and the source it was given once. What this Mac's session has
+// been sent is kept beside it, in .ore/tutor/<chat>.json: disposable, like the session itself. The chat's file
+// stays the record (D172), and a chat with no session to pick up starts one from it.
+const TutorState = z.object({
+  host: z.string(),
+  vendor: z.string(),
+  session: z.string(),
+  /** What he has asked in it, as one key: saved turns that end otherwise (an edit, Try again, another Mac) don't match. */
+  turns: z.string(),
+  passages: z.array(z.object({ id: z.string(), item: z.string(), title: z.string(), heading: z.string(), text: z.string(), start: z.number(), end: z.number() })),
+  reading: z.record(z.string(), z.unknown()).nullable(),
+  missed: z.array(z.string()),
+  /** The pages its web searches have returned so far. */
+  web: z.array(z.object({ url: z.string(), title: z.string() })),
+  context: z.number(),
+});
+type TutorState = z.infer<typeof TutorState>;
+const stateFile = (lib: Library, chat: string) => {
+  if (!/^[A-Za-z0-9-]{1,40}$/.test(chat)) throw new Error(`no chat "${chat}"`);
+  return paths.tutorSession(lib, chat);
+};
+const readState = (lib: Library, chat: string): TutorState | null => {
+  try { return TutorState.parse(JSON.parse(readFileSync(stateFile(lib, chat), "utf8"))); } catch { return null; }
+};
+const turnsKey = (messages: string[]) => createHash("sha256").update(JSON.stringify(messages.map((x) => x.trim()))).digest("hex");
+/** The vendor's words for a session it no longer has (cleared, or made on another Mac). */
+const SESSION_GONE = /no conversation found|(session|thread|conversation|rollout)\b.*\bnot found|no (such )?(session|thread|rollout)/i;
 const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
 /** What the tutor is told of the open source: whether its passages hold all of it (its headings when they
@@ -162,154 +199,211 @@ export type TutorProgress = { reply: string } | { searching: boolean } | { ai: A
  *  which lists titles JSON-escaped (a title with "quotes" in it reads \"quotes\" there). */
 const pageWords = (page: { title: string; text: string }) => `${page.title}\n${page.text}`;
 
-/** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. */
-export async function tutor(lib: Library, message: string, { earlier = [], files = [], onProgress, ...focus }: { earlier?: TutorTurn[]; files?: { name: string; path: string }[]; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
+/** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. `chat`: the
+ *  saved chat this turn belongs to, which makes it a turn of that chat's session (D-new-tutor-sessions); with none
+ *  (an agent's one-off, the eval) nothing is kept and everything is sent. */
+export async function tutor(lib: Library, message: string, { earlier = [], files = [], chat, onProgress, ...focus }: { earlier?: TutorTurn[]; files?: { name: string; path: string }[]; chat?: string; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
   const m = withDiagrams(lib, focus.item, message.trim());
   if (!m) throw new Error("message is empty");
-  // Files attached to this message and to the recent ones (D189): the agent reads them from chats/files/, so a
-  // follow-up about "the second chart" still has the picture. `attached` names each by its path.
-  // A file gone from an earlier turn (deleted, or not synced to this Mac yet) is left out; one missing from this message is an error.
-  const filesOf = (fs: { name: string; path: string }[] = [], strict = false) => fs.flatMap((f) => {
-    try { return [{ name: String(f.name), file: chatFilePath(lib, String(f.path)) }]; } catch (e) { if (strict) throw e; return []; }
-  });
-  const attached = filesOf(files, true);
-  // Earlier turns go by size, newest first (D293): a chat of short turns goes whole, long replies push
-  // the oldest out, and never fewer than six go. Of the turns left out, what he asked stays, a line each, so a long
-  // chat still knows what it set out to do. Only the last six turns' files are read again.
   // Turns come as JSON from the app or an agent: one with no reply (or no message) is an empty one.
   earlier = earlier.map((t) => ({ ...t, message: String(t.message ?? ""), reply: String(t.reply ?? "") }));
-  let from = earlier.length;
-  for (let words = 0; from > 0; from--) {
-    words += wordCount(earlier[from - 1]!.message) + wordCount(earlier[from - 1]!.reply);
-    if (words > EARLIER_WORDS && earlier.length - from >= 6) break;
-  }
-  const before = earlier.slice(0, from).slice(-30).map((t) => cut(t.message, 120));
-  const recent = earlier.slice(from).map(({ message, reply, files }, i, all) => { const a = i >= all.length - 6 ? filesOf(files) : []; return { message, reply, ...(a.length ? { attached: a } : {}) }; });
-  const toRead = [...new Set([...recent.flatMap((t) => t.attached ?? []), ...attached].map((f) => f.file))];
-  // The exercise he is answering: the last one set, however long ago, with the card committed then.
-  const open = earlier.flatMap((t) => { const e = Exercise.safeParse(t.exercise); return e.success ? [e.data] : []; }).at(-1);
-  const reading = focus.item ? readingOf(lib, focus.item, focus.at) : undefined;
-  const missedBefore = missedIn(lib, focus);
-  const skillNames = new Map(loadSkills(lib).skills.map((s) => [s.id, s.name]));
-  for (const s of focus.skills ?? []) if (!skillNames.has(s)) throw new Error(`no skill "${s}"`);
-  const pointed = [...(focus.sources ?? []).map((id) => findItem(lib, id).meta.title), ...(focus.skills ?? []).map((s) => `the skill ${skillNames.get(s)}`)];
-  const passages = tutorPassages(lib, [...recent.slice(-2).map((t) => t.message), m].join(" "), focus);
-  let last = 0;
-  // First, who is answering: a reply he stops part way is kept with it, as a whole one is.
-  onProgress?.({ ai: aiStampFor(lib, "tutor") });
-  const byId = new Map(passages.map((p) => [p.id, p]));
-  // What the check mended in the reply that was kept (a retry starts the count over).
-  let repaired = { moved: 0, dropped: 0 };
-  // Each turn leaves a line in the library's logs (D295): how long he waited, for the first words and
-  // for the whole reply, whether it went back, what was mended, or why it failed. Never what was said.
+  const vendor = chooseVendor(lib);
+  const saved = chat ? readState(lib, chat) : null;
+  const live = saved && saved.host === hostname() && saved.vendor === vendor && saved.turns === turnsKey(earlier.map((t) => t.message)) && saved.context < SESSION_ROOM ? saved : null;
+  // What is kept goes before the run and comes back with its reply: a turn that fails, or that he stops, leaves
+  // half of itself in the session, so the next one starts a new session from the saved turns.
+  if (chat) rmSync(stateFile(lib, chat), { force: true });
   const started = Date.now();
-  let firstWords: number | undefined;
-  const log = (line: object) => {
-    try {
-      mkdirSync(paths.logs(lib), { recursive: true });
-      appendFileSync(join(paths.logs(lib), "tutor.jsonl"), `${JSON.stringify({ ts: new Date(started).toISOString(), ms: Date.now() - started, ...(firstWords !== undefined ? { first_ms: firstWords } : {}), ...line })}\n`);
-    } catch { /* a log is a nicety: the reply still goes */ }
-  };
-  const { data, ai, usage, web, runs } = await runAgent(lib, {
-    prompt: "tutor",
-    // With a file to read it starts in chats/files, not the library: what sits in its folder it may read (D292).
-    cwd: toRead.length ? dirname(toRead[0]!) : lib.root,
-    web: true,
-    ...(toRead.length ? { files: toRead } : {}),
-    onProgress: onProgress && ((p) => {
-      if ("searching" in p) return onProgress(p);
-      if (!p.partial) return (last = 0), onProgress({ reply: "" });
-      // A few updates a second read as smooth; reading the whole JSON again on every token would not be.
-      if (Date.now() - last < 50) return;
-      const reply = partialReply(p.partial);
-      if (reply) (last = Date.now()), (firstWords ??= last - started), onProgress({ reply });
-    }),
-    schema: TutorOutput,
-    input: { message: m, ...(attached.length ? { attached } : {}), ...(before.length ? { before } : {}), earlier: recent, ...(open ? { exercise: { heading: open.heading, card: open.card } } : {}), ...(reading ? { reading } : {}), ...(missedBefore.length ? { missed: missedBefore } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
-    check: (d, seen) => {
-      repaired = { moved: 0, dropped: 0 };
-      // A citation that fails is mended here, never a reason to write the reply again (D291): a quote a
-      // few words off moves to the sentence that says it; one with no such sentence, or naming a passage that
-      // wasn't given, goes with its marker, and the reply is then marked as not all from his sources.
-      const mend = (c: (typeof d.citations)[number], text: string | undefined) => {
-        if (text === undefined) return false;
-        if (locate(text, c.quote)) return true;
-        const near = nearestSentence(text, c.quote);
-        if (!near || !locate(text, near)) return false;
-        c.quote = near;
-        repaired.moved++;
-        return true;
-      };
-      // A web page is held to more: a link the search never returned is a made-up source, so it goes back to fix.
-      for (const c of d.citations) {
-        if (!isWebUrl(c.passage)) continue;
-        if (!URL.canParse(c.passage.trim())) return `${c.passage} is not a link`;
-        // Claude reports the text its searches returned, so a web citation is checked as a passage is; codex
-        // reports each result's snippet alone, which a quote from the page itself would fail.
-        if (!seen || seen.snippets) continue;
-        const page = seen.pages.find((p) => samePage(p.url, c.passage));
-        // The retry is a fresh run that can't see this one's results, so the reason lists them.
-        const returned = seen.pages.slice(0, 8).map((p) => p.url).join(", ") || "none: search first";
-        if (!page) return `${c.passage} is not a page your web search returned (it returned ${returned}): cite one of those, or a passage`;
-        if (!mend(c, pageWords(page))) return `the quote "${c.quote}" is not in what the web search returned for ${page.url}: copy its exact words`;
-      }
-      const keep = d.citations.map((c) => isWebUrl(c.passage) || mend(c, byId.get(c.passage)?.text));
-      if (keep.includes(false)) {
-        repaired.dropped += keep.filter((k) => !k).length;
-        const cited = (n: number) => n >= 1 && n <= keep.length;
-        const renumber = (text: string) => eachMarker(text, cited, (all, n) => {
-          const i = n - 1;
-          if (i < 0 || i >= keep.length) return all;
-          return keep[i] ? `${all.startsWith(" ") ? " " : ""}[${keep.slice(0, i + 1).filter(Boolean).length}]` : "";
-        });
-        d.reply = renumber(d.reply);
-        d.steps = d.steps.map(renumber);
-        d.citations = d.citations.filter((_, i) => keep[i]);
-        d.general = true;
-      }
-      // A glued [n] counts only when citation n exists, so it never fails this (markers.ts).
-      const top = Math.max(0, ...[d.reply, ...d.steps].flatMap((t) => markerNumbers(t, (n) => n >= 1 && n <= d.citations.length)));
-      if (d.steps.length === 1 || d.steps.length > 6) return "steps: give 2 to 6 steps, or [] when the reply isn't a worked answer";
-      if (d.steps.length && (d.hint || d.exercise)) return "steps are a worked answer: not with a hint or an exercise";
-      if (top > d.citations.length) return `marker [${top}] has no citation`;
-      if (d.card && d.card.kind === "prompt" && !d.card.rubric.length) return "a prompt card needs 2 to 4 rubric points";
-      if (d.exercise && d.card) return "an exercise is for him to answer: propose no card with it";
-      if (d.exercise) {
-        if (!d.exercise.heading.trim().endsWith("?")) return "exercise.heading: the task as a short question";
-        if (d.exercise.card.kind !== "prompt" || d.exercise.card.rubric.length < 2 || d.exercise.card.rubric.length > 4) return "exercise.card: a prompt card with 2 to 4 rubric points";
-        const problem = cardTextProblem(d.exercise.card);
-        if (problem) return `exercise.card: ${problem}`;
-        if (d.exercise.cases && d.exercise.cases.length !== 2) return "exercise.cases: a tell apart's two cases, each in full; null for any other kind";
-      }
-      if (d.covered.length) {
-        if (!open) return "covered: [] when there is no open exercise";
-        if (d.covered.length !== open.card.rubric.length) return `covered: one boolean per rubric point (${open.card.rubric.length})`;
-        if (d.evidence.length !== d.covered.length) return `evidence: one per rubric point (${d.covered.length}), "" where not covered`;
-      }
-      if (!d.card) return null;
-      d.card.question = hideBlanks(d.card.question); // what the + Exercise chip shows, before it is kept
-      return cardTextProblem(d.card) ?? blankProblem(d.card);
-    },
-  }).catch((e: unknown) => { log({ error: String((e as Error)?.message ?? e).slice(0, 300) }); throw e; });
-  log({ runs, searched: web?.searched ?? false, ...repaired, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, model: ai.model, prompt: ai.prompt_version });
-  const citations: (Citation | WebCitation)[] = data.citations.map((c, i) => {
-    if (isWebUrl(c.passage)) {
-      const page = web?.pages.find((p) => samePage(p.url, c.passage));
-      const url = page?.url ?? c.passage.trim();
-      const at = page ? locate(pageWords(page), c.quote) : null;
-      const quote = at ? pageWords(page!).slice(at.start, at.end) : c.quote;
-      // A fetched page has no title of its own here: "" (the app shows its site alone).
-      return { n: i + 1, url, title: page?.title ?? "", site: new URL(url).hostname.replace(/^www\./, ""), quote, text: plainText(quote) };
+  /** `st`: the session to pick up, which has the turns so far and what was sent with them; null to send it all. */
+  const once = async (st: TutorState | null) => {
+    // Files attached to this message and to the recent ones (D189): the agent reads them from chats/files/, so a
+    // follow-up about "the second chart" still has the picture. `attached` names each by its path.
+    // A file gone from an earlier turn (deleted, or not synced to this Mac yet) is left out; one missing from this message is an error.
+    const filesOf = (fs: { name: string; path: string }[] = [], strict = false) => fs.flatMap((f) => {
+      try { return [{ name: String(f.name), file: chatFilePath(lib, String(f.path)) }]; } catch (e) { if (strict) throw e; return []; }
+    });
+    const attached = filesOf(files, true);
+    // A session has the turns so far. Handed to a new one, they go whole, newest first, up to EARLIER_WORDS and
+    // never fewer than six; of any left out, what he asked stays, a line each, so the chat still knows what it set
+    // out to do. Only the last six turns' files are read again.
+    let from = st ? 0 : earlier.length;
+    for (let words = 0; from > 0; from--) {
+      words += wordCount(earlier[from - 1]!.message) + wordCount(earlier[from - 1]!.reply);
+      if (words > EARLIER_WORDS && earlier.length - from >= 6) break;
     }
-    return passageCitation(byId.get(c.passage)!, c.quote, i + 1);
-  });
-  // Feedback that found a point missing offers the exercise's own card (D158), never one the model wrote after his answer.
-  const missed = !!open && data.covered.length > 0 && data.covered.some((c) => !c);
-  const card = missed ? open.card : data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null;
-  // Each point of the committed card with its mark and the words of his that earned it (D162), as Review's
-  // check shows them (D141): a quote is kept only for a covered point and only when it is in what he wrote.
-  const marks = open && data.covered.length ? open.card.rubric.map((point, i) => ({ point, covered: data.covered[i]!, quote: data.covered[i] ? quoteIn(message.trim(), data.evidence[i] ?? "") : "" })) : [];
-  return { message: m, title: earlier.length ? "" : data.title.trim().slice(0, 80), reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card, marks, repaired, ai, usage: usage as Usage };
+    const before = earlier.slice(0, from).slice(-30).map((t) => cut(t.message, 120));
+    const recent = (st ? [] : earlier.slice(from)).map(({ message, reply, files }, i, all) => { const a = i >= all.length - 6 ? filesOf(files) : []; return { message, reply, ...(a.length ? { attached: a } : {}) }; });
+    const toRead = [...new Set([...recent.flatMap((t) => t.attached ?? []), ...attached].map((f) => f.file))];
+    // The exercise he is answering: the last one set, however long ago, with the card committed then.
+    const open = earlier.flatMap((t) => { const e = Exercise.safeParse(t.exercise); return e.success ? [e.data] : []; }).at(-1);
+    // What a session was told stays told: of the open source, where he is and what he marked go again only as
+    // they change (a source he has since closed as null), and the exercises he last missed when that list does.
+    const nowReading = focus.item ? (readingOf(lib, focus.item, focus.at) as Record<string, unknown>) : null;
+    const was = st?.reading ?? null;
+    let reading: Record<string, unknown> | null | undefined = nowReading ?? (was ? null : undefined);
+    if (was && nowReading && was.title === nowReading.title) {
+      const changed = Object.keys(nowReading).filter((k) => k !== "title" && JSON.stringify(nowReading[k]) !== JSON.stringify(was[k]));
+      reading = changed.length ? { title: nowReading.title, ...Object.fromEntries(changed.map((k) => [k, nowReading[k]])) } : undefined;
+    }
+    const missedNow = missedIn(lib, focus);
+    const missedBefore = st && JSON.stringify(st.missed) === JSON.stringify(missedNow) ? [] : missedNow;
+    const skillNames = new Map(loadSkills(lib).skills.map((s) => [s.id, s.name]));
+    for (const s of focus.skills ?? []) if (!skillNames.has(s)) throw new Error(`no skill "${s}"`);
+    const pointed = [...(focus.sources ?? []).map((id) => findItem(lib, id).meta.title), ...(focus.skills ?? []).map((s) => `the skill ${skillNames.get(s)}`)];
+    // A passage keeps the number it was first sent under for the whole chat, so a later reply can cite it; only
+    // the ones the session hasn't seen go with this message, numbered on from there.
+    // One whose source has changed under it since (an edit, a reimport) is no longer where it says: it stays
+    // counted and is sent again, as it now reads, under a new number.
+    const sent = st?.passages ?? [];
+    const bodies = new Map<string, string>();
+    const bodyOf = (item: string) => { if (!bodies.has(item)) { try { bodies.set(item, findItem(lib, item).body); } catch { bodies.set(item, ""); } } return bodies.get(item)!; };
+    const known = sent.filter((p) => bodyOf(p.item).slice(p.start, p.end) === p.text);
+    const passages = tutorPassages(lib, [...earlier.slice(-2).map((t) => t.message), m].join(" "), focus)
+      .filter((p) => !known.some((k) => k.item === p.item && k.start === p.start && k.end === p.end && k.text === p.text))
+      .map((p, i) => ({ ...p, id: `P${sent.length + i + 1}` }));
+    const oldWeb = st?.web ?? [];
+    let last = 0;
+    // First, who is answering: a reply he stops part way is kept with it, as a whole one is.
+    onProgress?.({ ai: aiStampFor(lib, "tutor") });
+    const byId = new Map([...known, ...passages].map((p) => [p.id, p]));
+    // What the check mended in the reply that was kept (a retry starts the count over).
+    let repaired = { moved: 0, dropped: 0 };
+    // Each turn leaves a line in the library's logs (D295): how long he waited, for the first words and
+    // for the whole reply, whether it went back, what was mended, or why it failed. Never what was said.
+    let firstWords: number | undefined;
+    const log = (line: object) => {
+      try {
+        mkdirSync(paths.logs(lib), { recursive: true });
+        appendFileSync(join(paths.logs(lib), "tutor.jsonl"), `${JSON.stringify({ ts: new Date(started).toISOString(), ms: Date.now() - started, ...(firstWords !== undefined ? { first_ms: firstWords } : {}), ...line })}\n`);
+      } catch { /* a log is a nicety: the reply still goes */ }
+    };
+    // A session is found again from the folder it started in, so a chat's every turn starts in the same one.
+    const home = join(paths.chats(lib), "files");
+    if (chat) mkdirSync(home, { recursive: true });
+    const { data, ai, usage, web, runs, session } = await runAgent(lib, {
+      prompt: "tutor",
+      // With a file to read it starts in chats/files, not the library: what sits in its folder it may read (D292).
+      cwd: chat ? home : toRead.length ? dirname(toRead[0]!) : lib.root,
+      ...(chat ? { session: { id: st?.session } } : {}),
+      web: true,
+      ...(toRead.length ? { files: toRead } : {}),
+      onProgress: onProgress && ((p) => {
+        if ("searching" in p) return onProgress(p);
+        if (!p.partial) return (last = 0), onProgress({ reply: "" });
+        // A few updates a second read as smooth; reading the whole JSON again on every token would not be.
+        if (Date.now() - last < 50) return;
+        const reply = partialReply(p.partial);
+        if (reply) (last = Date.now()), (firstWords ??= last - started), onProgress({ reply });
+      }),
+      schema: TutorOutput,
+      input: { message: m, ...(attached.length ? { attached } : {}), ...(before.length ? { before } : {}), ...(st ? {} : { earlier: recent }), ...(open ? { exercise: { heading: open.heading, card: open.card } } : {}), ...(reading !== undefined ? { reading } : {}), ...(missedBefore.length ? { missed: missedBefore } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
+      check: (d, seen) => {
+        repaired = { moved: 0, dropped: 0 };
+        // A citation that fails is mended here, never a reason to write the reply again (D291): a quote a
+        // few words off moves to the sentence that says it; one with no such sentence, or naming a passage that
+        // wasn't given, goes with its marker, and the reply is then marked as not all from his sources.
+        const mend = (c: (typeof d.citations)[number], text: string | undefined) => {
+          if (text === undefined) return false;
+          if (locate(text, c.quote)) return true;
+          const near = nearestSentence(text, c.quote);
+          if (!near || !locate(text, near)) return false;
+          c.quote = near;
+          repaired.moved++;
+          return true;
+        };
+        // A web page is held to more: a link the search never returned is a made-up source, so it goes back to fix.
+        for (const c of d.citations) {
+          if (!isWebUrl(c.passage)) continue;
+          if (!URL.canParse(c.passage.trim())) return `${c.passage} is not a link`;
+          // Claude reports the text its searches returned, so a web citation is checked as a passage is; codex
+          // reports each result's snippet alone, which a quote from the page itself would fail.
+          if (!seen || seen.snippets) continue;
+          const page = seen.pages.find((p) => samePage(p.url, c.passage));
+          // A page an earlier message's search returned is still in the session: its link holds, and its text isn't kept to check a quote against.
+          if (!page && oldWeb.some((p) => samePage(p.url, c.passage))) continue;
+          // The retry is a fresh run that can't see this one's results, so the reason lists them.
+          const returned = seen.pages.slice(0, 8).map((p) => p.url).join(", ") || "none: search first";
+          if (!page) return `${c.passage} is not a page your web search returned (it returned ${returned}): cite one of those, or a passage`;
+          if (!mend(c, pageWords(page))) return `the quote "${c.quote}" is not in what the web search returned for ${page.url}: copy its exact words`;
+        }
+        const keep = d.citations.map((c) => isWebUrl(c.passage) || mend(c, byId.get(c.passage)?.text));
+        if (keep.includes(false)) {
+          repaired.dropped += keep.filter((k) => !k).length;
+          const cited = (n: number) => n >= 1 && n <= keep.length;
+          const renumber = (text: string) => eachMarker(text, cited, (all, n) => {
+            const i = n - 1;
+            if (i < 0 || i >= keep.length) return all;
+            return keep[i] ? `${all.startsWith(" ") ? " " : ""}[${keep.slice(0, i + 1).filter(Boolean).length}]` : "";
+          });
+          d.reply = renumber(d.reply);
+          d.steps = d.steps.map(renumber);
+          d.citations = d.citations.filter((_, i) => keep[i]);
+          d.general = true;
+        }
+        // A glued [n] counts only when citation n exists, so it never fails this (markers.ts).
+        const top = Math.max(0, ...[d.reply, ...d.steps].flatMap((t) => markerNumbers(t, (n) => n >= 1 && n <= d.citations.length)));
+        if (d.steps.length === 1 || d.steps.length > 6) return "steps: give 2 to 6 steps, or [] when the reply isn't a worked answer";
+        if (d.steps.length && (d.hint || d.exercise)) return "steps are a worked answer: not with a hint or an exercise";
+        if (top > d.citations.length) return `marker [${top}] has no citation`;
+        if (d.card && d.card.kind === "prompt" && !d.card.rubric.length) return "a prompt card needs 2 to 4 rubric points";
+        if (d.exercise && d.card) return "an exercise is for him to answer: propose no card with it";
+        if (d.exercise) {
+          if (!d.exercise.heading.trim().endsWith("?")) return "exercise.heading: the task as a short question";
+          if (d.exercise.card.kind !== "prompt" || d.exercise.card.rubric.length < 2 || d.exercise.card.rubric.length > 4) return "exercise.card: a prompt card with 2 to 4 rubric points";
+          const problem = cardTextProblem(d.exercise.card);
+          if (problem) return `exercise.card: ${problem}`;
+          if (d.exercise.cases && d.exercise.cases.length !== 2) return "exercise.cases: a tell apart's two cases, each in full; null for any other kind";
+        }
+        if (d.covered.length) {
+          if (!open) return "covered: [] when there is no open exercise";
+          if (d.covered.length !== open.card.rubric.length) return `covered: one boolean per rubric point (${open.card.rubric.length})`;
+          if (d.evidence.length !== d.covered.length) return `evidence: one per rubric point (${d.covered.length}), "" where not covered`;
+        }
+        if (!d.card) return null;
+        d.card.question = hideBlanks(d.card.question); // what the + Exercise chip shows, before it is kept
+        return cardTextProblem(d.card) ?? blankProblem(d.card);
+      },
+    }).catch((e: unknown) => {
+      // A session that is gone is no failure of this turn: it runs again in a new one, and that run leaves the line.
+      const why = String((e as Error)?.message ?? e);
+      if (!(st && SESSION_GONE.test(why))) log({ error: why.slice(0, 300) });
+      throw e;
+    });
+    log({ runs, searched: web?.searched ?? false, ...repaired, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, model: ai.model, prompt: ai.prompt_version });
+    const citations: (Citation | WebCitation)[] = data.citations.map((c, i) => {
+      if (isWebUrl(c.passage)) {
+        const page = web?.pages.find((p) => samePage(p.url, c.passage));
+        const old = page ? undefined : oldWeb.find((p) => samePage(p.url, c.passage));
+        const url = page?.url ?? old?.url ?? c.passage.trim();
+        const at = page ? locate(pageWords(page), c.quote) : null;
+        const quote = at ? pageWords(page!).slice(at.start, at.end) : c.quote;
+        // A fetched page has no title of its own here: "" (the app shows its site alone).
+        return { n: i + 1, url, title: page?.title ?? old?.title ?? "", site: new URL(url).hostname.replace(/^www\./, ""), quote, text: plainText(quote) };
+      }
+      return passageCitation(byId.get(c.passage)!, c.quote, i + 1);
+    });
+    if (chat && session) {
+      const pages = [...oldWeb, ...(web?.pages ?? []).filter((p) => !oldWeb.some((o) => samePage(o.url, p.url))).map(({ url, title }) => ({ url, title }))];
+      const next: TutorState = { host: hostname(), vendor, session, turns: turnsKey([...earlier.map((t) => t.message), message]), passages: [...sent, ...passages], reading: nowReading, missed: missedNow, web: pages, context: usage.context_tokens ?? usage.input_tokens };
+      mkdirSync(dirname(stateFile(lib, chat)), { recursive: true });
+      writeAtomic(stateFile(lib, chat), JSON.stringify(next));
+    }
+    // Feedback that found a point missing offers the exercise's own card (D158), never one the model wrote after his answer.
+    const missed = !!open && data.covered.length > 0 && data.covered.some((c) => !c);
+    const card = missed ? open.card : data.card ? { ...data.card, rubric: data.card.kind === "card" ? [] : data.card.rubric } : null;
+    // Each point of the committed card with its mark and the words of his that earned it (D162), as Review's
+    // check shows them (D141): a quote is kept only for a covered point and only when it is in what he wrote.
+    const marks = open && data.covered.length ? open.card.rubric.map((point, i) => ({ point, covered: data.covered[i]!, quote: data.covered[i] ? quoteIn(message.trim(), data.evidence[i] ?? "") : "" })) : [];
+    return { message: m, title: earlier.length ? "" : data.title.trim().slice(0, 80), reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card, marks, repaired, ai, usage: usage as Usage };
+  };
+  if (!live) return once(null);
+  try {
+    return await once(live);
+  } catch (e) {
+    // The program no longer has that session (it clears old ones): the saved turns start another.
+    if (!SESSION_GONE.test(String((e as Error)?.message ?? e))) throw e;
+    return once(null);
+  }
 }
 
 /** Keeps a card the tutor proposed (D128, D9: it goes into review like any draft). It belongs to the

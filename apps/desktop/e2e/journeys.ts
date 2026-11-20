@@ -1646,6 +1646,9 @@ journey("tutor attach: the paperclip attaches an image and a text file as chips,
     if (sent[1]!.some((x) => x.startsWith("--files="))) throw new Error("the follow-up carried a file it wasn't given");
     const earlier = JSON.parse(sent[1]!.find((x) => x.startsWith("--earlier="))!.slice(10)) as { files?: { name: string }[] }[];
     if (earlier[0]?.files?.[0]?.name !== "screenshot.png") throw new Error("the earlier turn's file was not sent with the follow-up");
+    // Both turns name the chat they belong to, so the second picks up the first's session (D-new-tutor-sessions).
+    const chatOf = (args: string[]) => args.find((x) => x.startsWith("--chat="));
+    if (!chatOf(sent[0]!) || chatOf(sent[0]!) !== chatOf(sent[1]!)) throw new Error(`the follow-up didn't name the chat its first message did: ${chatOf(sent[0]!)} then ${chatOf(sent[1]!)}`);
   } finally {
     await page.unroute(/\/ore$/);
   }

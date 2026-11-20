@@ -128,6 +128,8 @@ export async function deleteChat(lib: Library, id: string): Promise<Chat> {
   return withLock(paths.lock(lib), () => {
     const c = readChat(lib, id);
     rmSync(file(lib, id));
+    // What its session was sent goes too; brought back by Undo, the chat starts a new one from its turns.
+    rmSync(paths.tutorSession(lib, id), { force: true });
     return c;
   });
 }
