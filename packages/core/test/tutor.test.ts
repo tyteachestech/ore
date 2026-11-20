@@ -575,6 +575,46 @@ describe("tutor: one session per chat (D338)", () => {
     expect(sent()[2]!.earlier).toEqual([T1]);
   });
 
+  test("a reply he swapped for another version, or a worked answer he has seen part of, is not what the session wrote: a new session starts from what is on screen", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK, OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    const shown = { message: T1.message, reply: "An older version of the reply." };
+    await tutor(lib, "Why did you say that?", { chat: "c1", item: a.meta.id, earlier: [shown] });
+    expect(after(argvs()[1]!, "--session-id")).toBeTruthy();
+    expect(sent()[1]!.earlier).toEqual([shown]);
+  });
+
+  test("what is no longer so is said: no section on screen goes as null, and a source with the same title is still another source", async () => {
+    const { lib, a } = await library();
+    const twin = await createItem(lib, { type: "article", title: "Flashcard boxes", body: "A different text about boxes of cards." });
+    fakeClaude([OK, OK, OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id, at: "Boxes" });
+    await tutor(lib, "two", { chat: "c1", item: a.meta.id, earlier: [T1] });
+    await tutor(lib, "three", { chat: "c1", item: twin.meta.id, earlier: [T1, { message: "two", reply: "Yes." }] });
+    expect(sent()[1]!.reading).toEqual({ title: "Flashcard boxes", at: null } as never);
+    expect(sent()[2]!.reading).toMatchObject({ title: "Flashcard boxes", whole: true });
+  });
+
+  test("a message refused before it runs (an attached file that isn't here) leaves the session as it was", async () => {
+    const { lib, a } = await library();
+    fakeClaude([OK, OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    await expect(tutor(lib, "And this?", { chat: "c1", item: a.meta.id, earlier: [T1], files: [{ name: "x.png", path: "gone.png" }] })).rejects.toThrow();
+    await tutor(lib, "And a right one?", { chat: "c1", item: a.meta.id, earlier: [T1] });
+    expect(argvs()).toHaveLength(2);
+    expect(after(argvs()[1]!, "--resume")).toBeTruthy();
+  });
+
+  test("a reply refused twice is a failure, never a lost session, whatever words its reason quotes", async () => {
+    const { lib, a } = await library();
+    const bad = { ...OK, reply: "See [1].", citations: [{ passage: "http://session not found", quote: "x" }] };
+    fakeClaude([OK, bad, bad, OK]);
+    await tutor(lib, T1.message, { chat: "c1", item: a.meta.id });
+    await expect(tutor(lib, "And a right one?", { chat: "c1", item: a.meta.id, earlier: [T1] })).rejects.toThrow("twice");
+    expect(argvs()).toHaveLength(3);
+  });
+
   test("a message that failed leaves no half turn behind: the next one starts a new session", async () => {
     const { lib, a } = await library();
     fakeClaude([OK, { fail: "overloaded" }, OK]);

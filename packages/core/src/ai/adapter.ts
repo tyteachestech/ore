@@ -72,7 +72,7 @@ const claudeUsage = (o: ClaudeOut): Usage => ({
   input_tokens: tokensIn(o.usage),
   output_tokens: o.usage?.output_tokens ?? 0,
   ...(typeof o.total_cost_usd === "number" ? { cost_usd: o.total_cost_usd } : {}),
-  ...(o.usage ? { context_tokens: tokensIn(o.usage.iterations?.at(-1) ?? o.usage) } : {}),
+  ...(o.usage?.iterations?.length ? { context_tokens: tokensIn(o.usage.iterations.at(-1)) } : {}),
 });
 
 /** Token counts from codex's `--json` events (`turn.completed` carries each turn's usage). */

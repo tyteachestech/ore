@@ -118,6 +118,8 @@ const TutorState = z.object({
   passages: z.array(z.object({ id: z.string(), item: z.string(), title: z.string(), heading: z.string(), text: z.string(), start: z.number(), end: z.number() })),
   reading: z.record(z.string(), z.unknown()).nullable(),
   missed: z.array(z.string()),
+  /** The source that was open. */
+  item: z.string().nullable(),
   /** The pages its web searches have returned so far. */
   web: z.array(z.object({ url: z.string(), title: z.string() })),
   context: z.number(),
@@ -130,9 +132,12 @@ const stateFile = (lib: Library, chat: string) => {
 const readState = (lib: Library, chat: string): TutorState | null => {
   try { return TutorState.parse(JSON.parse(readFileSync(stateFile(lib, chat), "utf8"))); } catch { return null; }
 };
-const turnsKey = (messages: string[]) => createHash("sha256").update(JSON.stringify(messages.map((x) => x.trim()))).digest("hex");
+/** The chat as the session knows it: every turn, his words and the reply. A turn he edited, a reply he swapped for
+ *  another version, or a worked answer of which he has seen only some steps (the app hands over the steps shown,
+ *  the session wrote them all) no longer matches, and the chat starts a new session from what is on screen. */
+const turnsKey = (turns: { message: string; reply: string }[]) => createHash("sha256").update(JSON.stringify(turns.map((t) => [t.message.trim(), t.reply.trim()]))).digest("hex");
 /** The vendor's words for a session it no longer has (cleared, or made on another Mac). */
-const SESSION_GONE = /no conversation found|(session|thread|conversation|rollout)\b.*\bnot found|no (such )?(session|thread|rollout)/i;
+const SESSION_GONE = /^(claude: |(claude|codex) failed \(exit \d+\): ).*(no conversation found|(session|thread|conversation|rollout)\b.*\bnot found|no (such )?(session|thread|rollout))/i;
 const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
 /** What the tutor is told of the open source: whether its passages hold all of it (its headings when they
@@ -209,10 +214,8 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
   earlier = earlier.map((t) => ({ ...t, message: String(t.message ?? ""), reply: String(t.reply ?? "") }));
   const vendor = chooseVendor(lib);
   const saved = chat ? readState(lib, chat) : null;
-  const live = saved && saved.host === hostname() && saved.vendor === vendor && saved.turns === turnsKey(earlier.map((t) => t.message)) && saved.context < SESSION_ROOM ? saved : null;
-  // What is kept goes before the run and comes back with its reply: a turn that fails, or that he stops, leaves
-  // half of itself in the session, so the next one starts a new session from the saved turns.
-  if (chat) rmSync(stateFile(lib, chat), { force: true });
+  const live = saved && saved.host === hostname() && saved.vendor === vendor && saved.turns === turnsKey(earlier) && saved.context < SESSION_ROOM ? saved : null;
+  if (chat) stateFile(lib, chat); // a chat id that is no file name is refused before anything runs
   const started = Date.now();
   /** `st`: the session to pick up, which has the turns so far and what was sent with them; null to send it all. */
   const once = async (st: TutorState | null) => {
@@ -241,12 +244,14 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
     const nowReading = focus.item ? (readingOf(lib, focus.item, focus.at) as Record<string, unknown>) : null;
     const was = st?.reading ?? null;
     let reading: Record<string, unknown> | null | undefined = nowReading ?? (was ? null : undefined);
-    if (was && nowReading && was.title === nowReading.title) {
-      const changed = Object.keys(nowReading).filter((k) => k !== "title" && JSON.stringify(nowReading[k]) !== JSON.stringify(was[k]));
-      reading = changed.length ? { title: nowReading.title, ...Object.fromEntries(changed.map((k) => [k, nowReading[k]])) } : undefined;
+    if (was && nowReading && st?.item === focus.item) {
+      // A part that is no longer so (he scrolled above the first heading, removed his highlights) goes as null.
+      const changed = [...new Set([...Object.keys(was), ...Object.keys(nowReading)])].filter((k) => k !== "title" && JSON.stringify(nowReading[k]) !== JSON.stringify(was[k]));
+      reading = changed.length ? { title: nowReading.title, ...Object.fromEntries(changed.map((k) => [k, nowReading[k] ?? null])) } : undefined;
     }
     const missedNow = missedIn(lib, focus);
-    const missedBefore = st && JSON.stringify(st.missed) === JSON.stringify(missedNow) ? [] : missedNow;
+    // To a session the list goes when it changed, empty too (he has since got them right); to a new one when there is any.
+    const missedBefore = st ? (JSON.stringify(st.missed) === JSON.stringify(missedNow) ? undefined : missedNow) : missedNow.length ? missedNow : undefined;
     const skillNames = new Map(loadSkills(lib).skills.map((s) => [s.id, s.name]));
     for (const s of focus.skills ?? []) if (!skillNames.has(s)) throw new Error(`no skill "${s}"`);
     const pointed = [...(focus.sources ?? []).map((id) => findItem(lib, id).meta.title), ...(focus.skills ?? []).map((s) => `the skill ${skillNames.get(s)}`)];
@@ -280,6 +285,9 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
     // A session is found again from the folder it started in, so a chat's every turn starts in the same one.
     const home = join(paths.chats(lib), "files");
     if (chat) mkdirSync(home, { recursive: true });
+    // What is kept goes before the run and comes back with its reply: a turn that fails, or that he stops, leaves
+    // half of itself in the session, so the next one starts a new session from the saved turns.
+    if (chat) rmSync(stateFile(lib, chat), { force: true });
     const { data, ai, usage, web, runs, session } = await runAgent(lib, {
       prompt: "tutor",
       // With a file to read it starts in chats/files, not the library: what sits in its folder it may read (D292).
@@ -296,7 +304,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
         if (reply) (last = Date.now()), (firstWords ??= last - started), onProgress({ reply });
       }),
       schema: TutorOutput,
-      input: { message: m, ...(attached.length ? { attached } : {}), ...(before.length ? { before } : {}), ...(st ? {} : { earlier: recent }), ...(open ? { exercise: { heading: open.heading, card: open.card } } : {}), ...(reading !== undefined ? { reading } : {}), ...(missedBefore.length ? { missed: missedBefore } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
+      input: { message: m, ...(attached.length ? { attached } : {}), ...(before.length ? { before } : {}), ...(st ? {} : { earlier: recent }), ...(open ? { exercise: { heading: open.heading, card: open.card } } : {}), ...(reading !== undefined ? { reading } : {}), ...(missedBefore ? { missed: missedBefore } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
       check: (d, seen) => {
         repaired = { moved: 0, dropped: 0 };
         // A citation that fails is mended here, never a reason to write the reply again (D291): a quote a
@@ -384,7 +392,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
     });
     if (chat && session) {
       const pages = [...oldWeb, ...(web?.pages ?? []).filter((p) => !oldWeb.some((o) => samePage(o.url, p.url))).map(({ url, title }) => ({ url, title }))];
-      const next: TutorState = { host: hostname(), vendor, session, turns: turnsKey([...earlier.map((t) => t.message), message]), passages: [...sent, ...passages], reading: nowReading, missed: missedNow, web: pages, context: usage.context_tokens ?? usage.input_tokens };
+      const next: TutorState = { host: hostname(), vendor, session, turns: turnsKey([...earlier, { message, reply: data.reply }]), passages: [...sent, ...passages], item: focus.item ?? null, reading: nowReading, missed: missedNow, web: pages, context: usage.context_tokens ?? 0 };
       mkdirSync(dirname(stateFile(lib, chat)), { recursive: true });
       writeAtomic(stateFile(lib, chat), JSON.stringify(next));
     }

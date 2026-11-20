@@ -1,5 +1,5 @@
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { basename, extname, join, relative, resolve, sep } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { visible, writeAtomic } from "./fsutil.ts";
 import { nowIso } from "./ids.ts";
@@ -130,6 +130,9 @@ export async function deleteChat(lib: Library, id: string): Promise<Chat> {
     rmSync(file(lib, id));
     // What its session was sent goes too; brought back by Undo, the chat starts a new one from its turns.
     rmSync(paths.tutorSession(lib, id), { force: true });
+    // So does any left with no chat: one deleted on another Mac, or written back by a reply that landed after its delete.
+    const kept = dirname(paths.tutorSession(lib, id));
+    try { for (const f of readdirSync(kept)) if (!existsSync(file(lib, f.replace(/\.json$/, "")))) rmSync(join(kept, f), { force: true }); } catch { /* none kept yet */ }
     return c;
   });
 }
