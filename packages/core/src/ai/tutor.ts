@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 import { locate } from "../anchoring.ts";
 import { eachMarker, markerNumbers } from "../markers.ts";
-import { findItem, listItems, type AiStamp } from "../items.ts";
+import { findItem, listItems, type AiStamp, type Item } from "../items.ts";
 import { readAnnotations } from "../annotations.ts";
 import { blankProblem, cardTextProblem, ContentType, hideBlanks, listCards, writeNewCard, type Card } from "../cards.ts";
 import { readReviews } from "../reviews.ts";
@@ -100,6 +100,9 @@ export const WHOLE_WORDS = 15_000;
 /** How much of a chat goes whole when it is handed to a new session, in words (about 40k tokens): past it the
  *  oldest turns shrink to what he asked. */
 const EARLIER_WORDS = 30_000;
+/** How long a source can be and still go whole. A chat he had elsewhere (D339) is the history the tutor
+ *  carries on from, so it goes as a chat handed over does. */
+const wholeUpTo = (it: Item) => (it.meta.chat ? EARLIER_WORDS : WHOLE_WORDS);
 /** A session this large (tokens in front of the model) is left for a new one started from the saved turns: the
  *  source and the turns go again, word for word, and the web searches' bulk stays behind. The vendor's program would
  *  otherwise sum the oldest part up at its own limit, passages and all, and a quote from one could no longer be exact. */
@@ -147,7 +150,7 @@ export function readingOf(lib: Library, item: string, at?: string) {
   const it = findItem(lib, item);
   const marked = readAnnotations(it).filter((a) => (a.intent === "keep" || a.intent === "card") && !a.point).slice(0, 40)
     .map((a) => ({ text: cut(plainText(a.exact), 300), ...(a.intent === "card" ? { key: true } : {}), ...(a.note?.trim() ? { note: cut(a.note.trim(), 200) } : {}) }));
-  const whole = wordCount(it.body) <= WHOLE_WORDS;
+  const whole = wordCount(it.body) <= wholeUpTo(it);
   // Headings only: a `# comment` inside a code block is not one.
   const outline = whole ? undefined : [...it.body.replace(/^(```|~~~)[\s\S]*?^\1.*$/gm, "").matchAll(/^#{1,6}[ \t]+(.+)$/gm)].map((m) => m[1]!.replace(/\\/g, "").trim()).slice(0, 80);
   return { title: it.meta.title, whole, ...(outline ? { outline } : {}), ...(at?.trim() ? { at: at.trim() } : {}), ...(marked.length ? { marked } : {}) };
@@ -177,7 +180,7 @@ export function tutorPassages(lib: Library, query: string, focus: TutorFocus = {
   for (const id of focused) {
     const it = findItem(lib, id);
     const all = () => splitPassages(it.body).map((p) => ({ ...p, id: "", item: it.meta.id, title: it.meta.title }));
-    if (id === focus.item && wordCount(it.body) <= WHOLE_WORDS) {
+    if (id === focus.item && wordCount(it.body) <= wholeUpTo(it)) {
       whole = true;
       here.push(...all());
       continue;

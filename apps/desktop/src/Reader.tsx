@@ -3296,7 +3296,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   /** The open source's actions, Readwise Reader's document menu: ⋯ at the top right, right-click on
    *  the title, and ⌘K, each with its shortcut. */
   // D179: once he is reading, the prequestions fold away at the top; the toolbar keeps them in reach.
-  const readingFor = !!doc && !doc.preview && doc.status !== "done" && !!doc.prequestions?.length && (doc.status === "reading" || anns.length > 0);
+  const readingFor = !!doc && !doc.preview && !(doc.chat && !PHONE) && doc.status !== "done" && !!doc.prequestions?.length && (doc.status === "reading" || anns.length > 0);
   const actions: MenuAction[] = !doc
     ? []
     : [
@@ -3730,7 +3730,22 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
               )}
             </div>
           )}
-          {!doc.preview && (!PHONE || !!doc.prequestions?.length) && (!!doc.body.trim() || !!doc.prequestions?.length) && <Prequestions key={doc.prequestions?.length ?? 0} doc={doc} waiting={waiting || retrying} onRetry={gaveUp && !retrying ? () => void retryEnrich() : undefined} notify={p.notify} ask={preqAsk} onKept={(i, text) => setDoc((cur) => cur && { ...cur, prequestions: cur.prequestions?.map((q, j) => (j === i ? { ...q, before: text || undefined } : q)) })} />}
+          {/* A chat he had elsewhere (D339): he has read it, so nothing is asked before it. Its first step
+              is what he remembers of it, closed-book, before he carries it on. */}
+          {doc.chat && !PHONE && doc.status !== "done" && !p.finishing && (
+            <section className="preq">
+              <div className="preq-head failed">
+                What do you remember from this chat?
+                <Hint text="Recall it from memory, then finish" keys="finish-source">
+                  <button className="preq-retry" onClick={() => p.setFinishing(true)}>
+                    Recall
+                  </button>
+                </Hint>
+              </div>
+            </section>
+          )}
+          {/* For a chat only when its questions couldn't be written, which this block says and offers again: the finish asks them. */}
+          {!(doc.chat && !PHONE && !(gaveUp && !doc.prequestions?.length)) && !doc.preview && (!PHONE || !!doc.prequestions?.length) && (!!doc.body.trim() || !!doc.prequestions?.length) && <Prequestions key={doc.prequestions?.length ?? 0} doc={doc} waiting={waiting || retrying} onRetry={gaveUp && !retrying ? () => void retryEnrich() : undefined} notify={p.notify} ask={preqAsk} onKept={(i, text) => setDoc((cur) => cur && { ...cur, prequestions: cur.prequestions?.map((q, j) => (j === i ? { ...q, before: text || undefined } : q)) })} />}
           {away === "up" && !video && (
             <div className="follow-up">
               <BackToCurrent dir="up" onClick={follow} />
@@ -4055,7 +4070,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         <Finish
           doc={doc}
           skills={p.skills}
-          reached={Number(load(`ore.reached.${p.id}`)) || undefined}
+          // A chat he had elsewhere he was in to its end, however far he has scrolled it here.
+          reached={doc.chat ? undefined : Number(load(`ore.reached.${p.id}`)) || undefined}
           blocked={p.blocked}
           setReveal={setReveal}
           keyPoint={passage ? { on: passageKey, toggle: keyPassage } : undefined}

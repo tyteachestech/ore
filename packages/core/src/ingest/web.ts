@@ -3,7 +3,7 @@ import { Defuddle } from "defuddle/node";
 import { parseHTML } from "linkedom";
 import { cleanAuthor, cleanDate, escapeMarkdown, flattenRuby, FROM_TAB } from "./check.ts";
 import { td } from "./markdown.ts";
-import { notionMarkdown } from "./rendered.ts";
+import { chatMarkdown, notionMarkdown } from "./rendered.ts";
 import { youtubeId } from "./youtube.ts";
 
 export interface WebDoc {
@@ -11,6 +11,8 @@ export interface WebDoc {
   author?: string;
   published?: string;
   markdown: string;
+  /** A chat he had with an AI, shared from its app: whose it is. */
+  chat?: "claude";
 }
 
 /** An embedded player's page: YouTube, Vimeo or Loom, else null. */
@@ -362,6 +364,9 @@ const ZWJ = "\u200d";
 const HELD_ZWJ = "\uf8f0";
 
 async function readHtml(html: string, url: string, min: number): Promise<WebDoc> {
+  // A chat shared from Claude, as the browser drew it.
+  const chat = chatMarkdown(html);
+  if (chat) return { title: chat.title || url, author: "Claude", published: chat.published, markdown: chat.markdown, chat: "claude" };
   // A Notion page as the browser drew it (added from the tab, or reimported from its copy).
   const notion = notionMarkdown(html, url);
   if (notion) {
