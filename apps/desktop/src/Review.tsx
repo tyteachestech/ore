@@ -1629,8 +1629,13 @@ function EndLines({ run, children }: { run: boolean; children: React.ReactNode }
 }
 
 /** A result's number in the ring's dots, running up from nothing once `go` (D252); whole at once under Reduce Motion. */
-function CountUp({ value, go }: { value: string; go: boolean }) {
+/** A result's number `k` of the way up (0 to 1): its sign and unit stay, the digits run. */
+export function countText(value: string, k: number) {
   const m = /^(\D*)(\d+(?:\.(\d+))?)$/.exec(value);
+  // A frame's clock can read just before the count began (F413): never below nothing, a "-0" a dot wider.
+  return m ? `${m[1]}${(Number(m[2]) * Math.min(1, Math.max(0, k))).toFixed(m[3]?.length ?? 0)}` : value;
+}
+function CountUp({ value, go }: { value: string; go: boolean }) {
   const [k, setK] = useState(still() ? 1 : 0);
   useEffect(() => {
     if (!go || still()) return;
@@ -1642,7 +1647,13 @@ function CountUp({ value, go }: { value: string; go: boolean }) {
     });
     return () => cancelAnimationFrame(frame);
   }, [go]);
-  return <DotNumber value={m ? `${m[1]}${(Number(m[2]) * k).toFixed(m[3]?.length ?? 0)}` : value} height={28} glint={go && k >= 1} />;
+  return (
+    // The final number holds the room from the start, so a count that gains a digit never shifts the row.
+    <span className="count-up">
+      <span className="count-size"><DotNumber value={value} height={28} /></span>
+      <DotNumber value={countText(value, k)} height={28} glint={go && k >= 1} />
+    </span>
+  );
 }
 
 /** How long after one result the next lands. */
