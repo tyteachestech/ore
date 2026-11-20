@@ -89,6 +89,9 @@
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
 html { background: var(--bg); overscroll-behavior: none; }
+/* The browser's own bold (headings, <b>, <strong>) written out, so Bold Text steps it up too on the iPhone (F409);
+   as low as a rule can be, so the app's own weights win. */
+:where(.phone) :is(h1, h2, h3, h4, h5, h6, b, strong, th) { font-weight: bold; }
 body {
   background: var(--bg);
   color: var(--text);
