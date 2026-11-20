@@ -9,7 +9,7 @@ import { Cutting, Gem } from "./Gem";
 import { EndMark } from "./EndMark";
 import { Mole, Mound } from "./Mole";
 import { CartTip, oreFor } from "./CartTip";
-import { newSession, rated, sfx, warm, type Sound } from "./sfx";
+import { layer, newSession, rated, sfx, warm, type Sound } from "./sfx";
 import { still } from "./SideCursor";
 import { Hint } from "./Hint";
 import { MoreButton } from "./Menu";
@@ -1650,12 +1650,15 @@ function CountUp({ value, go }: { value: string; go: boolean }) {
   return (
     // The final number holds the room from the start, so a count that gains a digit never shifts the row.
     <span className="count-up">
-      <span className="count-size"><DotNumber value={value} height={28} /></span>
-      <DotNumber value={countText(value, k)} height={28} glint={go && k >= 1} />
+      <span className="count-size"><DotNumber value={value} height={28} trim /></span>
+      <DotNumber value={countText(value, k)} height={28} glint={go && k >= 1} trim />
     </span>
   );
 }
 
+/** The end screen's run of notes, in semitones above the recall's shine: a skill's row each (three at most), then a
+ *  result each, climbing a major scale so the screen ends higher than it began. */
+const END_NOTES = [0, 2, 4, 7, 9];
 /** How long after one result the next lands. */
 const TALLY_GAP_MS = 320;
 /** How often, when the cart comes, the mole is asleep on it. */
@@ -1671,7 +1674,11 @@ function Tally({ tiles, go, onDone }: { tiles: Tile[]; go: boolean; onDone: () =
   useEffect(() => {
     if (!go) return;
     if (n >= tiles.length) return done.current();
-    const id = setTimeout(() => setN((x) => x + 1), n ? TALLY_GAP_MS : 0);
+    const id = setTimeout(() => {
+      // A result lands with a tick, and its count ends on a shine, each a step above the one before (END_NOTES).
+      if (!still()) (layer("tap", { up: 7, level: 0.5 }), layer("right", { up: END_NOTES[3 + n] ?? 12, after: 0.6, level: 0.4 }));
+      setN((x) => x + 1);
+    }, n ? TALLY_GAP_MS : 0);
     return () => clearTimeout(id);
   }, [go, n, tiles.length]);
   if (!tiles.length) return null;
@@ -1731,7 +1738,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     return () => clearTimeout(id);
   }, [risen]);
   const full = stage !== "cart";
-  // The end screen's sounds (D277): the cart rolling in, the jingle as the ring fills, and the mole's pop as he comes up (260ms into his rise).
+  // The end screen's sounds: the cart rolling in, the jingle as the ring fills, and the mole's pop as he comes up (260ms into his rise).
+  // Over them, a layer for each thing that lands (D336): a minute counted, a skill's row, a result, his letters.
   // Each once: an effect can run again for the same moment (React's strict mode runs a mount's twice).
   const played = useRef(new Set<Sound>());
   const once = (id: Sound, after = 0) => void (!played.current.has(id) && (played.current.add(id), sfx(id, { after })));
@@ -1826,6 +1834,16 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     return () => clearTimeout(id);
   }, [counted, full]);
   const rowed = wait ? rowsIn : counted && full;
+  // Each minute the count takes ticks, a little higher each time, up to an octave.
+  useEffect(() => void (!quick && !calm && full && away && lap.min > plan.from && layer("tap", { up: Math.min(12, lap.min - plan.from), level: 0.35 })), [lap.min]);
+  // Each skill's row lands on a shine, a step up the scale each; a skill that went up a level rings the goal's chime under its own.
+  const rang = useRef(false);
+  useEffect(() => {
+    if (!counted || !full || !wait || rang.current) return;
+    rang.current = true;
+    for (let i = 0; i < rowsN; i++) layer("right", { up: END_NOTES[i], after: i * 0.15, level: 0.7 });
+    if ((s.kept_skills ?? []).some((k) => ups.some((u) => u.skill === k.skill))) layer("goal", { after: 0.1, level: 0.45 });
+  }, [counted, full]);
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
   return (
@@ -1846,7 +1864,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           <div className="end-emblem" data-glint={(closed && full) || undefined}>
             <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}{up && <Mound />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
-            {speaks && <MoleSays className="end-says" lines={said.slice(0, 1)} />}
+            {speaks && <MoleSays className="end-says" lines={said.slice(0, 1)} blip={!aloud} />}
             <div className="end-ring">
               {ring}
               {away ? <LapCentre min={lap.min} /> : cluster}

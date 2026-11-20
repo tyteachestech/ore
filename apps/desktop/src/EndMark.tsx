@@ -25,17 +25,20 @@ const MARKS = {
     "................",
   ],
 } as const;
+/* The cells a sprite's dots stand in (x, y, wide, high): the mark's box ends where its dots do, so it sits beside its
+   number and over its label by what is seen, not by the sprite's empty margin. */
+const BOX: Record<keyof typeof MARKS, [number, number, number, number]> = { calendar: [3, 1, 11, 13] };
 export type EndMarkKind = keyof typeof MARKS;
 
 /* The loop (D260): which dots move, and how many ms into the loop each takes its turn: the calendar's added
    days light one by one. A dot that sits still gets null. The move itself is `end-day` in styles.css. */
 const turn = (y: number, lit: number, day: number): number | null => (y >= 7 && lit >= 4 ? day * 140 : null);
 
-/** A result's mark, `size` px square. Decorative: the words beside it say what it counts. */
-export function EndMark({ kind, size = 48 }: { kind: EndMarkKind; size?: number }) {
+/** A result's mark, drawn as a `size` px square sprite and boxed to its dots. Decorative: the words beside it say what it counts. */
+export function EndMark({ kind, size = 36 }: { kind: EndMarkKind; size?: number }) {
   let day = 0;
   return (
-    <svg className="end-mark" data-kind={kind} width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+    <svg className="end-mark" data-kind={kind} width={(size * BOX[kind][2]) / 16} height={(size * BOX[kind][3]) / 16} viewBox={BOX[kind].join(" ")} fill="currentColor" aria-hidden="true">
       {MARKS[kind].flatMap((row, y) =>
         [...row].map((t, x) => {
           if (t === ".") return null;

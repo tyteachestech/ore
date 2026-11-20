@@ -65,7 +65,7 @@ export function useLap(plan: Lap, go: boolean): { min: number; hit: number } {
 export function LapCentre({ min }: { min: number }) {
   return (
     <div className="end-lap">
-      <span className="end-lap-n" role="img" aria-label={`${min} ${min === 1 ? "minute" : "minutes"} today`}><DotNumber value={min} height={56} /></span>
+      <span className="end-lap-n" role="img" aria-label={`${min} ${min === 1 ? "minute" : "minutes"} today`}><DotNumber value={min} height={56} trim /></span>
       <span className="end-lap-min">min</span>
     </div>
   );
