@@ -669,7 +669,7 @@ test("the end screen has no try line, even with a try open", async () => {
   reduce = false;
 });
 
-// F-new-count-minus
+// F413
 test("a result's number never shows a minus on its first frame, and holds its final width as it runs up", async () => {
   const { countText } = await import("../src/Review");
   // The first frame's clock can read just before the count began.

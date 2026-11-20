@@ -1632,7 +1632,7 @@ function EndLines({ run, children }: { run: boolean; children: React.ReactNode }
 /** A result's number `k` of the way up (0 to 1): its sign and unit stay, the digits run. */
 export function countText(value: string, k: number) {
   const m = /^(\D*)(\d+(?:\.(\d+))?)$/.exec(value);
-  // A frame's clock can read just before the count began (F-new-count-minus): never below nothing, a "-0" a dot wider.
+  // A frame's clock can read just before the count began (F413): never below nothing, a "-0" a dot wider.
   return m ? `${m[1]}${(Number(m[2]) * Math.min(1, Math.max(0, k))).toFixed(m[3]?.length ?? 0)}` : value;
 }
 function CountUp({ value, go }: { value: string; go: boolean }) {
