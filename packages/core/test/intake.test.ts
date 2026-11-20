@@ -1086,11 +1086,8 @@ describe("import coverage: from the browser tab", () => {
     const lib = await tempLibrary();
     const item = await addTab(lib, { tab: { browser: "Chrome", url, title: "Claude", html, text: "Claude" } });
     expect(item.meta).toMatchObject({ type: "article", title: "PI feedback knowledge elaboration", author: "Claude", published: "2026-11-15", chat: "claude", url });
-    // His three messages, a heading each (a long one cut at a word); the one the heading cut follows in full, quoted.
-    const headings = item.body.match(/^## .+/gm)!;
-    expect(headings).toHaveLength(3);
-    expect(headings[0]).toBe("## habit session: pause evidence drill of PI pattern's knowledge. where claude recall guess…");
-    expect(item.body).toContain("> habit session: pause evidence drill of PI pattern's knowledge. where claude recall guess in to focus");
+    // His three messages, a heading each.
+    expect(item.body.match(/^## .+/gm)).toEqual(["## habit session: pause evidence drill of PI pattern's knowledge. where claude recall guess in to focus", "## Card, so this is index that the chunk prompt's retrieval fact test up to $15,000 and no mind?", "## Step"]);
     // The replies, from the first to the last, with their lists and tables.
     expect(item.body).toContain("I'll teacher where PI answer drill the mind habit and recall");
     expect(item.body).toContain("- Pattern and chunk interleaving\n- Interval schedule and review example");
@@ -1104,6 +1101,20 @@ describe("import coverage: from the browser tab", () => {
     expect(html).toContain("Cue 5 drill, lesson check, reading a spaced");
     expect(item.body).not.toContain("Cue 5 drill, lesson check");
     expect((await reimportSource(lib, item.meta.id, { local: true })).changed).toBe(false);
+  });
+
+  test("a long message in a shared chat is a heading cut at a word, then the message in full, quoted", async () => {
+    const { chatMarkdown } = await import("../src/ingest/rendered.ts");
+    const long = `I think I need to start even earlier than this because, in my head, if one person hits another then ${"the one who was hit is paid by the other. ".repeat(3)}`.trim();
+    const page = `<span>Insurance basics</span><div data-testid="transcript-list"><div data-testid="user-message"><p>${long}</p><p>Is that right?</p></div><time datetime="2026-11-16T10:00:00.000Z">4 days ago</time><div data-testid="assistant-message"><h3 data-find-omitted="">Claude responded: Not quite.</h3><div data-cds="Prose"><p>Not quite.</p></div></div></div>`;
+    const chat = chatMarkdown(page)!;
+    expect(chat).toMatchObject({ title: "Insurance basics", published: "2026-11-16" });
+    const [heading, quoted, reply] = chat.markdown.trim().split("\n\n");
+    expect(heading).toBe("## I think I need to start even earlier than this because, in my head, if one person hits another then the one who was hit…");
+    expect(quoted).toBe(`> ${long}\n>\n> Is that right?`);
+    expect(reply).toBe("Not quite.");
+    // A page that only looks like one (no turns) is not a chat.
+    expect(chatMarkdown('<div data-testid="transcript-list"></div>')).toBeNull();
   });
 
   test("a shared chat's link on its own is a page built in the browser: it says to add it from the browser", async () => {

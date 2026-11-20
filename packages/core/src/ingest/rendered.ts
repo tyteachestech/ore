@@ -108,11 +108,11 @@ export function notionMarkdown(html: string, url: string): string | null {
 
 const CHAT_TURN = '[data-testid="user-message"], [data-testid="assistant-message"]';
 const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
-/** A heading's worth of a message: its first line, cut at a word near 90 characters. */
+/** A heading's worth of a message: its first line, whole up to 120 characters, else cut at a word. */
 function asHeading(message: string): string {
   const first = oneLine(message.split("\n").find((l) => l.trim()) ?? "");
-  if (first.length <= 90) return first;
-  return `${first.slice(0, 90).replace(/\s+\S*$/, "")}…`;
+  if (first.length <= 120) return first;
+  return `${first.slice(0, 120).replace(/\s+\S*$/, "")}…`;
 }
 
 /** What a reply showed that the shared copy leaves out, said in its place so the text around it still reads

@@ -23,7 +23,9 @@ const fs = require("fs");
 const dir = ${JSON.stringify(binDir)};
 const n = Number(fs.readFileSync(dir + "/count", "utf8"));
 fs.writeFileSync(dir + "/count", String(n + 1));
-fs.appendFileSync(dir + "/msgs.jsonl", JSON.stringify(process.argv[process.argv.indexOf("-p") + 1]) + "\\n");
+// A long message comes on stdin, as the real one takes it; a short one is the argument after -p.
+const arg = process.argv[process.argv.indexOf("-p") + 1];
+fs.appendFileSync(dir + "/msgs.jsonl", JSON.stringify(arg.startsWith("--") ? fs.readFileSync(0, "utf8") : arg) + "\\n");
 fs.writeFileSync(dir + "/argv.json", JSON.stringify(process.argv));
 fs.appendFileSync(dir + "/argvs.jsonl", JSON.stringify(process.argv) + "\\n");
 fs.writeFileSync(dir + "/cwd", process.cwd());
@@ -482,6 +484,26 @@ const after = (argv: string[], flag: string) => (argv.includes(flag) ? argv[argv
 
 // D338: a chat is one session of the vendor's own program, as Review's "Ask about this" always was (D61).
 // Before, every message started a new run and sent the open source and the last 3,000 words again (D293).
+describe("tutor: a chat he had elsewhere (D-new-chat-import)", () => {
+  test("it goes whole where another source its length would go in parts: it is the history the tutor carries on from", async () => {
+    const lib = await tempLibrary();
+    const body = Array.from({ length: 400 }, (_, i) => `## Question ${i + 1}\n\n${"A reply about boxes of cards and when each comes back. ".repeat(4)}`).join("\n\n");
+    const chat = await createItem(lib, { type: "article", title: "A chat", body, chat: "claude" });
+    const long = await createItem(lib, { type: "article", title: "A long read", body });
+    expect(body.split(/\s+/).length).toBeGreaterThan(15_000);
+    const { readingOf } = await import("../src/ai/tutor.ts");
+    expect(readingOf(lib, chat.meta.id).whole).toBe(true);
+    expect(readingOf(lib, long.meta.id).whole).toBe(false);
+    fakeClaude([OK]);
+    await tutor(lib, "Where did we stop?", { item: chat.meta.id });
+    const own = sent()[0]!.passages.filter((p) => p.source === "A chat");
+    // From its first turn to its last, and long enough that it went in on stdin (F421).
+    expect(own.map((p) => p.heading)).toContain("Question 1");
+    expect(own.map((p) => p.heading)).toContain("Question 400");
+    expect(argvs()[0]!.some((a) => a.includes("Where did we stop?"))).toBe(false);
+  });
+});
+
 describe("tutor: one session per chat (D338)", () => {
   const T1 = { message: "What happens to a missed card?", reply: "Yes." };
 

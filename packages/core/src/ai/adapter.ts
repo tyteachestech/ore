@@ -123,11 +123,14 @@ function userMessage(input: unknown, files: string[]): string {
 
 const TIMEOUT_MS = 15 * 60_000;
 
+/** Past this a message is piped to claude, not passed as an argument. */
+const ARG_BYTES = 64_000;
+
 interface Exec { stdout: string; stderr: string; code: number; timedOut: boolean }
 
 /** Runs a vendor CLI; `onLine` sees each line of its stdout as it comes (a stream-json run's events). */
-async function exec(cmd: string[], cwd: string, onLine?: (line: string) => void): Promise<Exec> {
-  const proc = Bun.spawn(cmd, { cwd, stdin: "ignore", stdout: "pipe", stderr: "pipe" });
+async function exec(cmd: string[], cwd: string, onLine?: (line: string) => void, input?: string): Promise<Exec> {
+  const proc = Bun.spawn(cmd, { cwd, stdin: input === undefined ? "ignore" : new TextEncoder().encode(input), stdout: "pipe", stderr: "pipe" });
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; proc.kill(); }, TIMEOUT_MS);
   const read = async () => {
@@ -261,8 +264,11 @@ async function runClaude(system: string, message: string, schema: object, task: 
   const { tools, allowed } = claudeTools(task);
   const session = task.session ? (resume ?? crypto.randomUUID()) : undefined;
   // A web task streams its events, so the pages its searches returned can be checked against its citations.
+  // A long message (a whole chat handed over, a long source) goes in on stdin: as an argument it is refused by the
+  // system past its limit for one (128 KB on Linux; about 1 MB for all of them on a Mac), before claude ever runs (F421).
+  const piped = Buffer.byteLength(message) > ARG_BYTES;
   const cmd = [
-    bin, "-p", message,
+    bin, "-p", ...(piped ? [] : [message]),
     "--output-format", task.web ? "stream-json" : "json", ...(task.web ? ["--verbose"] : []), ...(task.web && task.onProgress ? ["--include-partial-messages"] : []),
     "--json-schema", JSON.stringify(schema),
     "--system-prompt", system,
@@ -277,7 +283,7 @@ async function runClaude(system: string, message: string, schema: object, task: 
   // A run (the first, or a retry after a failed check) starts the answer over.
   task.onProgress?.({ partial: "" });
   const onLine = task.web && task.onProgress ? (l: string) => { const p = streamProgress(l, state); if (p) task.onProgress!(p); } : undefined;
-  const r = await exec(cmd, task.cwd, onLine);
+  const r = await exec(cmd, task.cwd, onLine, piped ? message : undefined);
   const events = task.web ? streamEvents(r.stdout) : undefined;
   const out = claudeResult(r, events);
   // The model that wrote the most is the one that ran, except on a web task, where the search's own
