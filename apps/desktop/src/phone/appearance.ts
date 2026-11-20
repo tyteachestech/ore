@@ -14,7 +14,12 @@ export function followAppearance(): void {
     void invoke<boolean>("bold_text").then((b) => document.documentElement.style.setProperty("--bold", b ? "1" : "0"), () => {});
   };
   ask();
-  document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && ask());
+  // Back from the Settings app, iOS's first answer is still the old Bold Text (Codex verify 2026-11-20): ask again a moment later.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    ask();
+    setTimeout(ask, 1000);
+  });
   setInterval(ask, 60_000);
 }
 
