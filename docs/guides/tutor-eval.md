@@ -91,3 +91,7 @@ Eleven new cases and four tightened ones (D313): a wrong idea in his question, a
 - Blind comparison against tutor@15 (2 runs): new 22, old 20, same 12. Even, and the old wins are spread over 14 cases with no shared reason.
 - Seen once and now checked: a far-off answer called "close" (50% for 25%) to a discouraged learner.
 
+
+## tutor@17 (2026-11-20): one session per chat
+
+tutor@17 changes no teaching instruction: only the description of what a message carries (the conversation is above in the session; `earlier`, `before`, the whole source and old passages arrive only when a chat is handed over). The set, which runs each case as a single message with no session: 53/54 over 2 runs (90–100%), $1.63. The one miss is `discouraged-after-misses` on one run of two ("your guesses were reasonable"), the case that has swung before. What a session changes is measured apart, in D338: on a 43-turn chat the session recalled its own early replies and the old way did not.

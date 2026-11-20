@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { afterAll, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createElement } from "react";
@@ -7,6 +7,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 // convertFileSrc, as the app's asset protocol answers it.
 (globalThis as Record<string, unknown>).window = { __TAURI_INTERNALS__: { convertFileSrc: (p: string) => `asset://${p}` } };
 const { ExerciseText } = await import("../src/ExerciseText");
+// The stand-in is this file's alone: left behind, the next file to load a module that listens on `window` breaks on it (F422).
+afterAll(() => void delete (globalThis as Record<string, unknown>).window);
 const html = (text: string, inline = false, dir: string | null = "/lib/items/agents") => renderToStaticMarkup(createElement(ExerciseText, { text, dir: dir ?? undefined, inline }));
 
 // F333: an exercise's question and answer were drawn as plain text, so its formulas,
