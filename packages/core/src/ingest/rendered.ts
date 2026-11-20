@@ -100,3 +100,63 @@ export function notionMarkdown(html: string, url: string): string | null {
   const body = out.join("\n\n").trim();
   return body ? body + "\n" : null;
 }
+
+// A chat shared from Claude (claude.ai/share/…), as the browser drew it (D-new-chat-import): the page is built in
+// the browser, so it comes from the tab. What he asked is the outline, a heading each; under it his message in
+// full when the heading cut it, then the reply. Only the reply's own prose is read: the page's buttons, its
+// "Ran 5 agents" lines and its widgets are not what was said.
+
+const CHAT_TURN = '[data-testid="user-message"], [data-testid="assistant-message"]';
+const oneLine = (s: string) => s.replace(/\s+/g, " ").trim();
+/** A heading's worth of a message: its first line, cut at a word near 90 characters. */
+function asHeading(message: string): string {
+  const first = oneLine(message.split("\n").find((l) => l.trim()) ?? "");
+  if (first.length <= 90) return first;
+  return `${first.slice(0, 90).replace(/\s+\S*$/, "")}…`;
+}
+
+/** What a reply showed that the shared copy leaves out, said in its place so the text around it still reads
+ *  ("Here's how a typical negotiation spreads out" with nothing after it would not). */
+function leftOut(widget: El): string | null {
+  if (widget.querySelector('[data-testid="tool-status-pill"]')) return null;
+  const text = oneLine(widget.textContent ?? "");
+  if (/visual hidden when shared/i.test(text)) return "*An interactive visual was here. The shared copy of the chat leaves it out.*";
+  const quiz = widget.querySelector('[role="group"]');
+  if (quiz) {
+    const name = oneLine(quiz.querySelector("span")?.textContent ?? "");
+    return `*An interactive quiz was here${name ? ` (“${name}”)` : ""}. The shared copy of the chat leaves it out.*`;
+  }
+  return null;
+}
+
+/** A shared Claude chat as Markdown with its title and first day, or null when the HTML isn't one. */
+export function chatMarkdown(html: string): { title?: string; published?: string; markdown: string } | null {
+  if (!html.includes('data-testid="transcript-list"')) return null;
+  const { document } = parseHTML(html);
+  const list = document.querySelector('[data-testid="transcript-list"]');
+  const turns = [...(list?.querySelectorAll(CHAT_TURN) ?? [])] as El[];
+  if (!list || !turns.some((t) => t.getAttribute("data-testid") === "user-message") || !turns.some((t) => t.getAttribute("data-testid") === "assistant-message")) return null;
+  const out: string[] = [];
+  for (const t of turns) {
+    if (t.getAttribute("data-testid") === "user-message") {
+      const message = td.turndown(t as unknown as HTMLElement).trim();
+      if (!message) continue;
+      const heading = asHeading(message);
+      out.push(`## ${heading}`);
+      if (oneLine(message) !== heading) out.push(message.split("\n").map((l) => `> ${l}`.trimEnd()).join("\n"));
+      continue;
+    }
+    // In the order the reply shows them: its prose, and a line where a widget stood.
+    for (const part of t.querySelectorAll('[data-cds="Prose"], [data-find-omitted]') as unknown as El[]) {
+      if (part.parentElement?.closest("[data-find-omitted]")) continue;
+      if (part.tagName === "H3") continue; // "Claude responded: …", for screen readers
+      // Turndown pads a list's marker to four columns; the library's lists have one space.
+      const md = part.getAttribute("data-cds") === "Prose" ? td.turndown(part as unknown as HTMLElement).trim().replace(/^(\s*(?:-|\d+\.)) {2,}/gm, "$1 ") : leftOut(part);
+      if (md) out.push(md);
+    }
+  }
+  if (out.length < 2) return null;
+  const title = oneLine(list.previousElementSibling?.textContent ?? "") || undefined;
+  const published = document.querySelector("time[datetime]")?.getAttribute("datetime")?.slice(0, 10);
+  return { title, published, markdown: `${out.join("\n\n")}\n` };
+}

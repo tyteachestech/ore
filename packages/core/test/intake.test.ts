@@ -1079,6 +1079,39 @@ describe("import coverage: from the browser tab", () => {
     expect((await reimportSource(lib, item.meta.id, { local: true })).changed).toBe(false);
   });
 
+  test("a chat shared from Claude comes in from the tab: what he asked is the outline, each reply under it", async () => {
+    serve({});
+    const url = "https://claude.ai/share/154d0ddf-0000-4000-8000-3c9f11227b75";
+    const html = web("chat-claude.html");
+    const lib = await tempLibrary();
+    const item = await addTab(lib, { tab: { browser: "Chrome", url, title: "Claude", html, text: "Claude" } });
+    expect(item.meta).toMatchObject({ type: "article", title: "PI feedback knowledge elaboration", author: "Claude", published: "2026-11-15", chat: "claude", url });
+    // His three messages, a heading each (a long one cut at a word); the one the heading cut follows in full, quoted.
+    const headings = item.body.match(/^## .+/gm)!;
+    expect(headings).toHaveLength(3);
+    expect(headings[0]).toBe("## habit session: pause evidence drill of PI pattern's knowledge. where claude recall guess…");
+    expect(item.body).toContain("> habit session: pause evidence drill of PI pattern's knowledge. where claude recall guess in to focus");
+    // The replies, from the first to the last, with their lists and tables.
+    expect(item.body).toContain("I'll teacher where PI answer drill the mind habit and recall");
+    expect(item.body).toContain("- Pattern and chunk interleaving\n- Interval schedule and review example");
+    expect(item.body).toContain("| Attention | $15,000 |");
+    expect(item.body.trimEnd()).toEndWith("card you chunk a index drill or a schedule, and deck?");
+    // Where a reply showed a visual or a quiz the shared copy leaves out, a line says so; the page's own buttons,
+    // its "Ran 5 agents" lines and its notices are not what was said.
+    expect(item.body.match(/^\*An interactive visual was here\. The shared copy of the chat leaves it out\.\*$/gm)!.length).toBeGreaterThanOrEqual(1);
+    expect(item.body).toContain("*An interactive quiz was here (“PI schedule: the learn idea”).");
+    expect(item.body).not.toMatch(/hidden when shared|days ago|Claude responded:|You said:/);
+    expect(html).toContain("Cue 5 drill, lesson check, reading a spaced");
+    expect(item.body).not.toContain("Cue 5 drill, lesson check");
+    expect((await reimportSource(lib, item.meta.id, { local: true })).changed).toBe(false);
+  });
+
+  test("a shared chat's link on its own is a page built in the browser: it says to add it from the browser", async () => {
+    const url = "https://claude.ai/share/154d0ddf-0000-4000-8000-3c9f11227b75";
+    serve({ [url]: { body: "<!doctype html><html><head></head><body><div id=\"root\"></div><p>Claude</p></body></html>", type: HTML } });
+    await expect(addSource(await tempLibrary(), url)).rejects.toThrow(/almost no text on claude\.ai.*add it from the browser/s);
+  });
+
   test("a tab still showing a sign-in says to sign in there (F109)", async () => {
     serve({});
     const url = "https://x.com/karpathy/status/1";

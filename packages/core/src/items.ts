@@ -86,6 +86,9 @@ export const ItemMetaSchema = z.object({
   owed_error: z.string().optional(),
   captured_at: z.string(),
   source_app: z.string().optional(),
+  // A chat he had with an AI, brought in from its shared page (D-new-chat-import): he has read it, since he was in
+  // it, so nothing is asked before it and the tutor carries on from where it stops.
+  chat: z.enum(["claude"]).optional(),
   text_sha256: z.string(),
   status: ItemStatus,
   finished_at: z.string().optional(),
@@ -135,6 +138,7 @@ export interface NewItem {
   author?: string;
   published?: string;
   source_app?: string;
+  chat?: "claude";
   skills?: string[];
   course?: CourseRef;
   source?: { ext: string; data: string | Uint8Array };
@@ -174,6 +178,7 @@ export async function createItem(lib: Library, input: NewItem): Promise<Item> {
     owed: input.owed,
     captured_at: nowIso(now),
     source_app: input.source_app,
+    chat: input.chat,
     text_sha256: sha256(body),
     status: "inbox",
     skills: input.skills ?? [],
