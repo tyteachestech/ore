@@ -1,9 +1,11 @@
 import { useSyncExternalStore } from "react";
 import { load, save } from "./util";
 
-/* Review's sounds (D277): one short sound on each key moment of a review and nowhere else. Showing
-   the answer is a pickaxe tick, a recall a gem's shine, a miss a gem chipping, the day's goal a chime; the end screen
-   has the cart's roll, the mole's pop and a closing jingle. Nothing plays on undo, Later, an edit or any other key.
+/* Review's sounds (D336, which replaced D277's "one sound on each key moment and nowhere else"):
+   as satisfying as the apps whose sounds reward, and layered where that is better. Showing the answer is a pickaxe
+   tick, a recall a gem's shine, a miss a gem chipping, the day's goal a chime; the end screen has the cart's roll,
+   the mole's pop and a closing jingle, and over them a layer for each thing that lands (`layer`): the minutes
+   counting, each skill's row, each result, the mole's letters.
    The files are ElevenLabs output, kept out of git and taken from the Mac's sounds folder as the radio's are (D254,
    vite.config.ts): one that is missing is just silent. The iPhone build carries them too. Settings › Review › Sound
    has a switch for the sound effects and one for the mole. */
@@ -40,8 +42,9 @@ const allowed = (id: Sound) => (moles(id) ? voice : effects).get();
 
 /** How loud they play against the files' own level: under the radio and anything else he has on. */
 const LEVEL = 0.6;
-/** `rate` 1 is the file as it is, higher plays it higher; `after` is seconds from now. */
-type Opts = { rate?: number; after?: number };
+/** `rate` 1 is the file as it is, higher plays it higher; `after` is seconds from now; `level` is how loud against a
+ *  sound on its own; `over` plays it over whatever is sounding (`layer`). */
+type Opts = { rate?: number; after?: number; level?: number; over?: boolean };
 type Player = (id: Sound, o: Required<Opts>) => void;
 
 /** The sounds this build has (vite.config.ts): one whose file was not on the Mac at build time is never asked for. */
@@ -66,11 +69,11 @@ function buffer(id: Sound) {
   }
   return b;
 }
-const webAudio: Player = (id, { rate, after }) => {
+const webAudio: Player = (id, { rate, after, level, over }) => {
   if (!HAVE.includes(id)) return;
   // Made and woken here, inside his key or click: WebKit leaves a context asleep that was woken outside one.
   audio();
-  const due = performance.now() + after * 1000;
+  const due = performance.now() + after * 1000, turns = feedback(id) && !over;
   const play = (buf: AudioBuffer | null) => {
     // A sound that loaded too late for its moment is dropped: late, it would land on something else.
     const wait = (due - performance.now()) / 1000;
@@ -78,14 +81,14 @@ const webAudio: Player = (id, { rate, after }) => {
     const c = audio(), src = c.createBufferSource(), gain = c.createGain();
     src.buffer = buf;
     src.playbackRate.value = rate;
-    gain.gain.value = LEVEL;
+    gain.gain.value = LEVEL * level;
     src.connect(gain).connect(c.destination);
     const at = c.currentTime + Math.max(0, wait);
     // A quick fade, not a click, where the next sound cuts this one.
     const cut = (t: number) => (gain.gain.setTargetAtTime(0, t, 0.01), src.stop(t + 0.05));
-    src.start(feedback(id) ? take(at, buf.duration / rate, id === "goal", cut) : at);
+    src.start(turns ? take(at, buf.duration / rate, id === "goal", cut) : at);
   };
-  if (feedback(id)) void inOrder(buffer(id), play);
+  if (turns) void inOrder(buffer(id), play);
   else void buffer(id).then(play);
 };
 
@@ -137,8 +140,12 @@ export function sfx(id: Sound, o: Opts = {}) {
   if (hidden()) return;
   // The journeys' ear: `window.__ORE_SFX = []` collects what played.
   if (import.meta.env?.DEV) (globalThis as { __ORE_SFX?: string[] }).__ORE_SFX?.push(id);
-  player(id, { rate: o.rate ?? 1, after: o.after ?? 0 });
+  player(id, { rate: o.rate ?? 1, after: o.after ?? 0, level: o.level ?? 1, over: !!o.over });
 }
+
+/** A layer on a reward screen: a sound over the ones already sounding. It cuts nothing and nothing cuts it, so a run
+ *  of them rings together (a review's own sounds take turns, `take`). `up` is semitones above the file. */
+export const layer = (id: Sfx, { up = 0, after = 0, level = 1 }: { up?: number; after?: number; level?: number } = {}) => sfx(id, { rate: 2 ** (up / 12), after, level, over: true });
 
 /** Recalls in a row this session: each plays the shine a semitone higher, up to four (Duolingo's run of right
  *  answers). Heard only, never counted or shown (D23). */

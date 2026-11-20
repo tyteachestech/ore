@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Hint } from "./Hint";
+import { layer } from "./sfx";
 import { still } from "./SideCursor";
 
 /** One letter of the mole's speech, and how long a full line holds before the next. */
@@ -10,8 +11,9 @@ export const HOLD_MS = 2600;
  *  letter in the mono with his block cursor (D186) at the words' end; a full line holds, then the next is typed.
  *  The pointer or the keyboard on the box holds the line. The whole line is in the page from its first letter
  *  (the letters to come are only unseen), so it never rewraps and a reader hears it whole. Under Reduce Motion
- *  a line stands at once and the block doesn't blink. Words only: no icon leads a line (Tyler, 2026-11-14). Children: a small action. */
-export function MoleSays({ lines, run = true, className = "", children }: { lines: { text: string; hint?: string }[]; run?: boolean; className?: string; children?: React.ReactNode }) {
+ *  a line stands at once and the block doesn't blink. Words only: no icon leads a line (Tyler, 2026-11-14). Children: a small action.
+ *  `blip`: his letters tick as they are typed, a soft one every third, as a game's text box does (the end screen, when he says nothing aloud). */
+export function MoleSays({ lines, run = true, blip, className = "", children }: { lines: { text: string; hint?: string }[]; run?: boolean; blip?: boolean; className?: string; children?: React.ReactNode }) {
   const [at, setAt] = useState(0);
   const [typed, setTyped] = useState(0);
   // The pointer and the keyboard each hold it on their own: leaving with one never lets go for the other.
@@ -24,9 +26,12 @@ export function MoleSays({ lines, run = true, className = "", children }: { line
   useEffect(() => {
     if (!run || done) return;
     // A breath after a sentence's end or a comma, as a game's text box takes.
-    const id = setTimeout(() => setTyped(n + 1), /[.,!?]/.test(text[n - 1] ?? "") ? TYPE_MS * 8 : TYPE_MS);
+    const id = setTimeout(() => {
+      if (blip && n % 3 === 0 && /\S/.test(text[n] ?? "")) layer("tap", { up: 12, level: 0.18 });
+      setTyped(n + 1);
+    }, /[.,!?]/.test(text[n - 1] ?? "") ? TYPE_MS * 8 : TYPE_MS);
     return () => clearTimeout(id);
-  }, [run, done, n, text]);
+  }, [run, done, n, text, blip]);
   useEffect(() => {
     if (!run || !done || over || within || lines.length < 2) return;
     const id = setTimeout(() => (setAt((i) => i + 1), setTyped(0)), HOLD_MS);

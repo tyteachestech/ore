@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { endVoice } from "../src/end-says";
 import type { SessionEnd } from "../src/ore";
-import { inOrder, newSession, rated, setPlayer, setSounds, setVoice, sfx, SFX, take, VOICE } from "../src/sfx";
+import { inOrder, layer, newSession, rated, setPlayer, setSounds, setVoice, sfx, SFX, take, VOICE } from "../src/sfx";
 
-// Review's sounds (D277): which moment plays what, read off the player in place of the speakers.
+// Review's sounds (D277, then D336): which moment plays what, read off the player in place of the speakers.
 let heard: [string, number][] = [];
 beforeEach(() => {
   heard = [];
@@ -47,12 +47,24 @@ describe("review sounds", () => {
     expect(heard).toEqual([["right", 0]]);
   });
 
-  test("only the key moments have a sound: none for undo, Later or an edit", () => {
+  test("a review's own sounds are these; undo, Later and an edit stay silent", () => {
     expect([...SFX]).toEqual(["tap", "right", "missed", "goal", "cart", "pop", "done"]);
     const review = readFileSync(join(import.meta.dir, "../src/Review.tsx"), "utf8");
     // Every call in Review, by the sound it plays.
     expect([...review.matchAll(/\b(?:sfx|once)\("(\w+)"/g)].map((m) => m[1]).sort()).toEqual(["cart", "done", "goal", "pop", "tap", "tap", "tap"]);
     expect(review.match(/\brated\(/g)?.length).toBe(1);
+  });
+
+  // D336: Tyler, 2026-11-20, "layered sound effects can be much better, so definitely should not limit that".
+  test("a layer plays over what is sounding, higher by its semitones, and the sound effects' switch silences it", () => {
+    const got: unknown[] = [];
+    setPlayer((id, o) => got.push([id, Math.round(Math.log2(o.rate) * 12), o.level, o.over]));
+    sfx("right");
+    layer("right", { up: 4, level: 0.5 });
+    expect(got).toEqual([["right", 0, 1, false], ["right", 4, 0.5, true]]);
+    setSounds(false);
+    layer("tap");
+    expect(got.length).toBe(2);
   });
 
   // D330

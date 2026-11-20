@@ -155,3 +155,42 @@ test("three rows at most, most fed first; no skill has no level; its room is hel
   const waiting = await mount(<SkillRows kept={kept} was={now} now={now} skills={skills} run={false} />);
   expect([waiting.querySelectorAll(".end-skills[data-wait]").length, waiting.querySelectorAll(".end-skill").length]).toEqual([1, 3]);
 });
+
+// Tyler, 2026-11-20: "the alignment is off in some parts of the reward screen".
+test("the ring's minutes and a result's mark are boxed to their dots, so what is centred is centred by eye", async () => {
+  const body = await screen(today(4), today(14), { depth_days: 41 });
+  // "14": a 1 has an empty column at its left and a 4 none at its right; untrimmed it stood half a dot right.
+  expect(body.querySelector(".end-lap-n svg")?.getAttribute("viewBox")).toBe("1 0 10 7");
+  // The calendar's sprite has three empty columns at its left and two at its right.
+  expect(body.querySelector(".end-tally .end-mark")?.getAttribute("viewBox")).toBe("3 1 11 13");
+  expect(body.querySelector(".end-tally .dot-number")?.getAttribute("viewBox")).toBe("0 0 16 7");
+  // "+41" ends in a 1, with an empty column at its right.
+  // A skill's level keeps its full cell, so "Level" stands in one column down the rows whatever the figure.
+  expect(body.querySelector(".end-skill .dot-number")?.getAttribute("viewBox") ?? "0 0 5 7").toBe("0 0 5 7");
+  const css = (await import("node:fs")).readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  // On the iPhone the rows and the results are as wide as Done, and the results stand in equal columns.
+  expect(css).toContain(".phone .end-skills { max-width: none; }");
+  expect(css).toMatch(/\.phone \.end-tally \{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax\(0, 1fr\);[^}]*width: 100%;/);
+});
+
+// D336
+test("the end screen's sounds are layered: the minutes tick as they count, each row lands a step higher, each result after them", async () => {
+  const { setPlayer, setSounds } = await import("../src/sfx");
+  const heard: string[] = [];
+  setSounds(true);
+  setPlayer((id, o) => heard.push(`${id}${o.over ? "+" : ""}${Math.round(Math.log2(o.rate) * 12)}`));
+  reduce = false;
+  const now = today(16, { skills: [{ skill: "ai", level: 3, solid: 45, next_level_at: 80 }, { skill: "learning", level: 1, solid: 9, next_level_at: 20 }] });
+  const was = today(4, { skills: [{ skill: "ai", level: 2, solid: 40, next_level_at: 45 }, { skill: "learning", level: 1, solid: 6, next_level_at: 20 }] });
+  const body = await screen(was, now, { depth_days: 41 });
+  for (let i = 0; i < 80 && !body.querySelector(".end-tally li:last-child:not([data-wait])"); i++) await act(async () => void (await new Promise((r) => setTimeout(r, 100))));
+  setPlayer(null);
+  const layers = heard.filter((h) => h.includes("+"));
+  // The minutes: a tick each, climbing.
+  expect(layers.filter((h) => h.startsWith("tap+")).slice(0, 3)).toEqual(["tap+1", "tap+2", "tap+3"]);
+  // Two rows a step apart, the level-up's chime under them, then the results' shines above both.
+  const rest = layers.filter((h) => !/^tap\+([1-9]|1[0-2])$/.test(h) || h === "tap+7");
+  expect(rest.slice(rest.indexOf("right+0"))).toEqual(["right+0", "right+2", "goal+0", "tap+7", "right+7", "tap+7", "right+9"]);
+  // The jingle still plays on its own, and takes its turn as before.
+  expect(heard).toContain("done0");
+}, 15000);

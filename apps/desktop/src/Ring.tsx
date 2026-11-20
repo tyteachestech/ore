@@ -90,12 +90,18 @@ const DIGITS: Record<string, string[]> = {
 
 /** A number drawn in the ring's own fat round dots (D242), `height` px tall: a screen's hero number where the dot
  *  face's one-dot stroke is too thin to carry it. Decorative: the caller says the number in text beside it.
- *  `glint`: a light crosses its dots once, as the number lands (D257). */
-export function DotNumber({ value, height, glint }: { value: number | string; height: number; glint?: boolean }) {
+ *  `glint`: a light crosses its dots once, as the number lands (D257). `trim`: no empty column at either end. */
+export function DotNumber({ value, height, glint, trim }: { value: number | string; height: number; glint?: boolean; trim?: boolean }) {
   const chars = [...(typeof value === "string" ? value : String(Math.max(0, Math.round(value))))];
-  const w = chars.length * 6 - 1;
+  // `trim`: the box ends where the dots do, so a number that is centred is centred by what is seen ("14" stood
+  // half a dot right of its ring: a 1 has an empty column at its left, a 4 none at its right).
+  const edge = (ch: string | undefined, last?: boolean) => {
+    const cols = [0, 1, 2, 3, 4].filter((x) => (DIGITS[ch ?? ""] ?? []).some((row) => row[x] === "1"));
+    return !trim || !cols.length ? 0 : last ? 4 - cols[cols.length - 1]! : cols[0]!;
+  };
+  const x0 = edge(chars[0]), w = chars.length * 6 - 1 - x0 - edge(chars[chars.length - 1], true);
   return (
-    <svg className={`dot-number${glint ? " glint" : ""}`} width={(height * w) / 7} height={height} viewBox={`0 0 ${w} 7`} aria-hidden="true">
+    <svg className={`dot-number${glint ? " glint" : ""}`} width={(height * w) / 7} height={height} viewBox={`${x0} 0 ${w} 7`} aria-hidden="true">
       {chars.flatMap((ch, k) => (DIGITS[ch] ?? []).flatMap((row, y) => [...row].map((on, x) => (on === "1" ? <circle key={`${k}-${x}-${y}`} cx={k * 6 + x + 0.5} cy={y + 0.5} r={0.46} style={glint ? ({ "--i": k * 6 + x + y * 0.6 } as React.CSSProperties) : undefined} /> : null))))}
     </svg>
   );
