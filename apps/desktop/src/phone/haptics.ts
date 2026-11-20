@@ -1,6 +1,6 @@
 // The iPhone's ticks under a finger (D332). A web view can't make them, so each one asks the shell
 // (Tauri's haptics plugin, iOS's own feedback generators), which follow the phone's System Haptics switch.
-// Four moments and no others, each where Apple's apps tick: a tick on everything is a tick that means nothing.
+// Four moments for now, each where Apple's apps tick (D332). Add one where they tick too, but not more: a tick on everything is a tick that means nothing.
 // Nothing happens on the Mac or in a browser.
 import { PHONE } from "../ore";
 
