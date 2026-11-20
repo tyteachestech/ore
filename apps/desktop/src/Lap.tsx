@@ -114,7 +114,7 @@ export function SkillRows({ kept, was, now, skills, run }: { kept: { skill: stri
         );
       })}
       {/* Three rows at most; a session that fed more says how many, and names them all on hover and focus. */}
-      {more > 0 && <Hint text={`Memories kept this session · ${said}`}><span className="end-skills-more" tabIndex={0} aria-hidden="true">and {more} more {more === 1 ? "skill" : "skills"}</span></Hint>}
+      {more > 0 && <Hint text={`Memories kept this session · ${said}`}><span className="end-skills-more" tabIndex={0}>and {more} more {more === 1 ? "skill" : "skills"}</span></Hint>}
     </div>
   );
 }
