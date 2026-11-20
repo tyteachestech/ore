@@ -4869,7 +4869,8 @@ journey("sidebar: New collection “Other” names a skill among the ungrouped o
   await page.getByRole("option", { name: "Add a skill to “Other”" }).waitFor();
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
-  await until("one Other heading", async () => (await page.locator(".side-label-text").allInnerTexts()).filter((t) => /^other$/i.test(t)).length === 1);
+  // The skills in no collection are one group with no heading (Tyler, 2026-11-20), so no collection is headed Other.
+  await until("one Other group, with no heading", async () => (await page.locator('.sidebar [role=group][aria-label="Other"]').count()) === 1 && !(await page.locator(".side-label-text").allInnerTexts()).some((t) => /^other$/i.test(t)));
 });
 
 journey("a row's ⋯ menu in a short window stays inside it, scrolling, as its right-click twin does", async (page) => {
