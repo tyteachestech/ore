@@ -266,7 +266,7 @@ describe("tutor: replies", () => {
   });
 
   // F264: only the last six turns reached the tutor, so a long chat lost what he had said he was after.
-  test("a chat handed over whole keeps every turn, his words and the replies; only past 30,000 words do the oldest shrink to what he asked, a line each (D-new-tutor-sessions)", async () => {
+  test("a chat handed over whole keeps every turn, his words and the replies; only past 30,000 words do the oldest shrink to what he asked, a line each (D338)", async () => {
     const { lib } = await library();
     const out = { reply: "On it.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null };
     const long = Array.from({ length: 20 }, (_, i) => ({ message: i ? `question ${i + 1}` : `I'm learning this for my exam on Friday. ${"So ".repeat(80)}`, reply: `answer ${i + 1} ${"word ".repeat(600)}` }));
@@ -480,9 +480,9 @@ describe("tutor: the web", () => {
 const argvs = (): string[][] => readFileSync(join(binDir, "argvs.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
 const after = (argv: string[], flag: string) => (argv.includes(flag) ? argv[argv.indexOf(flag) + 1] : undefined);
 
-// D-new-tutor-sessions: a chat is one session of the vendor's own program, as Review's "Ask about this" always was (D61).
+// D338: a chat is one session of the vendor's own program, as Review's "Ask about this" always was (D61).
 // Before, every message started a new run and sent the open source and the last 3,000 words again (D293).
-describe("tutor: one session per chat (D-new-tutor-sessions)", () => {
+describe("tutor: one session per chat (D338)", () => {
   const T1 = { message: "What happens to a missed card?", reply: "Yes." };
 
   test("the first message starts a session; the next resumes it and sends only what is new: no source again, no earlier turns", async () => {

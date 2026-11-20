@@ -20,7 +20,7 @@ export interface AgentTask<T> {
   /** While it runs (claude web tasks): the answer's JSON so far ("" as a run starts over), and a web search starting or done. */
   onProgress?: (p: StreamProgress) => void;
   cwd: string;
-  /** Run as one turn of a conversation the vendor's own program keeps (D-new-tutor-sessions): with an `id`, that
+  /** Run as one turn of a conversation the vendor's own program keeps (D338): with an `id`, that
    *  session is picked up and `input` is only what is new; with none, one is started. The result names it. */
   session?: { id?: string };
 }

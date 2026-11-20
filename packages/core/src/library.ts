@@ -47,7 +47,7 @@ export const paths = {
   inbox: (l: Library) => join(l.root, "inbox"),
   chats: (l: Library) => join(l.root, "chats"),
   chat: (l: Library, id: string) => join(l.root, "chats", `${id}.json`),
-  /** What this Mac's tutor session for a chat has been sent (D-new-tutor-sessions): disposable. */
+  /** What this Mac's tutor session for a chat has been sent (D338): disposable. */
   tutorSession: (l: Library, id: string) => join(l.root, ".ore", "tutor", `${id}.json`),
   index: (l: Library) => join(l.root, ".index", "library.sqlite"),
   lock: (l: Library) => join(l.root, ".ore", "lock"),

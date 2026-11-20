@@ -105,7 +105,7 @@ const EARLIER_WORDS = 30_000;
  *  otherwise sum the oldest part up at its own limit, passages and all, and a quote from one could no longer be exact. */
 const SESSION_ROOM = 150_000;
 
-// D-new-tutor-sessions: a chat is one session of the vendor's own program, as Review's "Ask about this" is (D61),
+// D338: a chat is one session of the vendor's own program, as Review's "Ask about this" is (D61),
 // so the model keeps every turn, its own replies and the source it was given once. What this Mac's session has
 // been sent is kept beside it, in .ore/tutor/<chat>.json: disposable, like the session itself. The chat's file
 // stays the record (D172), and a chat with no session to pick up starts one from it.
@@ -200,7 +200,7 @@ export type TutorProgress = { reply: string } | { searching: boolean } | { ai: A
 const pageWords = (page: { title: string; text: string }) => `${page.title}\n${page.text}`;
 
 /** One turn of the tutor. `earlier` is the conversation so far; `item` the source he is reading. `chat`: the
- *  saved chat this turn belongs to, which makes it a turn of that chat's session (D-new-tutor-sessions); with none
+ *  saved chat this turn belongs to, which makes it a turn of that chat's session (D338); with none
  *  (an agent's one-off, the eval) nothing is kept and everything is sent. */
 export async function tutor(lib: Library, message: string, { earlier = [], files = [], chat, onProgress, ...focus }: { earlier?: TutorTurn[]; files?: { name: string; path: string }[]; chat?: string; onProgress?: (p: TutorProgress) => void } & TutorFocus = {}) {
   const m = withDiagrams(lib, focus.item, message.trim());
