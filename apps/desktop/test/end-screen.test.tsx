@@ -511,7 +511,7 @@ test("the glint (D257): a light crosses the ring and the field behind it only wh
     const closed = await mount(days as never);
     expect(closed.q(".ring.glint")).toBe(1);
     expect(closed.q(".end-emblem[data-glint]")).toBe(1);
-    expect(closed.q(".end-tally .dot-number.glint")).toBe(closed.q(".end-tally .dot-number"));
+    expect(closed.q(".end-tally .dot-number.glint")).toBe(closed.q(".end-tally .count-up > .dot-number"));
     expect(closed.q(".end-tally .dot-number")).toBeGreaterThan(0);
     await closed.done();
     // The goal was already met before it: the numbers still land, but the ring and the field stay still.
@@ -667,4 +667,23 @@ test("the end screen has no try line, even with a try open", async () => {
   expect(s.body.textContent).not.toContain("if-then plan");
   await s.done();
   reduce = false;
+});
+
+// F-new-count-minus
+test("a result's number never shows a minus on its first frame, and holds its final width as it runs up", async () => {
+  const { countText } = await import("../src/Review");
+  // The first frame's clock can read just before the count began.
+  expect(countText("+3", -0.004)).toBe("+0");
+  expect(countText("+3", 1.2)).toBe("+3");
+  expect(countText("2.5", 0.5)).toBe("1.3");
+  jest.useFakeTimers();
+  const e = end([], today(true, 600_000) as never, today(true, 600_000) as never) as unknown as { session: Record<string, unknown> };
+  Object.assign(e.session, { depth_days: 12 });
+  const s = await mount(e as never);
+  await act(async () => void jest.advanceTimersByTime(1));
+  // "+0" on its way to "+12": the room is the final number's from the start, so the row never shifts.
+  const sized = s.body.querySelector('.end-tally [data-key="depth"] .count-size .dot-number')!;
+  expect(sized.getAttribute("viewBox")).toBe("0 0 17 7");
+  jest.useRealTimers();
+  await s.done();
 });

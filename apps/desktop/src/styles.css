@@ -2463,6 +2463,9 @@ button.home-plan:hover { color: var(--text); }
 .end-tally li[data-wait] { visibility: hidden; animation: none; }
 .end-tally li:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 .end-tally b { display: grid; place-items: center; height: 28px; }
+.count-up { display: inline-grid; }
+.count-up > * { grid-area: 1 / 1; justify-self: start; }
+.count-size { visibility: hidden; }
 .end-tally-pair { display: flex; align-items: center; justify-content: center; gap: 10px; height: 48px; }
 .end-tally-mark { display: grid; place-items: center; flex: none; color: var(--text); }
 @keyframes end-tally-in { from { opacity: 0; transform: translateY(-10px); } }
