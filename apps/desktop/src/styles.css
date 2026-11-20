@@ -2450,22 +2450,22 @@ button.home-plan:hover { color: var(--text); }
 /* Under the ring: the skills the session fed, a row each (`SkillRows`). */
 .end-skills { display: grid; gap: 16px; width: 100%; max-width: 340px; margin: 24px auto 0; text-align: left; }
 .end-skills[data-wait] { visibility: hidden; }
-.end-skill { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; align-items: center; animation: end-lap-in var(--t-4) var(--ease-out) calc(var(--i) * 90ms) both; }
+.end-skill { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; align-items: center; animation: end-lap-in var(--t-4) var(--ease-out) calc(var(--i) * 150ms) both; }
 .end-skills[data-wait] .end-skill, .end-skills[data-wait] .end-skill-bar i { animation: none; }
 .end-skill > .skill-icon { grid-row: 1 / span 2; justify-self: center; }
 .end-skill > .skill-icon.glyph { width: 28px; height: 28px; -webkit-mask-size: 28px; mask-size: 28px; }
 .end-skill > .skill-icon.dot { width: 8px; height: 8px; }
 .end-skill-name { grid-column: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 14px/20px var(--font); color: var(--text); }
-.end-skill > b { grid-column: 3; grid-row: 1 / span 2; display: grid; color: var(--text); }
-.end-skill[data-up] > b { color: var(--skill, var(--text)); }
+.end-skill > b { grid-column: 3; grid-row: 1 / span 2; display: flex; align-items: center; gap: 8px; font: 400 12px/1 var(--mono); color: var(--muted); }
+.end-skill > b .dot-number { color: var(--text); }
+.end-skill[data-up] > b, .end-skill[data-up] > b .dot-number { color: var(--skill, var(--text)); }
 .end-skill-level { grid-column: 2; display: flex; align-items: center; gap: 10px; font: 400 12px/1 var(--mono); color: var(--muted); white-space: nowrap; }
-.end-skill[data-up] .end-skill-level { color: var(--skill, var(--text)); }
 .end-skill-bar { display: flex; gap: 4px; }
-.end-skill-bar i { width: 6px; height: 6px; border-radius: 50%; background: var(--bg-active); }
+.end-skill-bar i { width: 8px; height: 8px; border-radius: 50%; background: color-mix(in oklab, var(--text) 20%, transparent); }
 .end-skill-bar i[data-on] { background: var(--muted); }
 /* The dots this session lit come on one by one, once the row is in. */
-.end-skill-bar i[data-new] { background: var(--skill, var(--text)); animation: end-skill-dot var(--t-3) var(--ease-out) calc(var(--t-4) + var(--i) * 90ms + var(--d) * 60ms) backwards; }
-@keyframes end-skill-dot { from { background: var(--bg-active); transform: scale(0.4); } }
+.end-skill-bar i[data-new] { background: var(--skill, var(--text)); animation: end-skill-dot var(--t-3) var(--ease-out) calc(var(--t-4) + var(--i) * 150ms + var(--d) * 60ms) backwards; }
+@keyframes end-skill-dot { from { background: color-mix(in oklab, var(--text) 20%, transparent); transform: scale(0.4); } }
 .end-skills-more { justify-self: center; font: 400 12px/1.3 var(--mono); color: var(--muted); border-radius: 4px; }
 .end-skills-more:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) { .end-skill, .end-skill-bar i { animation: none !important; } }

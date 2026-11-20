@@ -120,11 +120,12 @@ test("under the ring: each skill the session fed has a row, with what it kept, i
   expect(body.querySelectorAll(".end-emblem + .end-skills + .end-tally").length).toBe(1);
   const rows = [...body.querySelectorAll(".end-skill")];
   const dots = (r: Element) => [r.querySelectorAll(".end-skill-bar i[data-on]").length, r.querySelectorAll(".end-skill-bar i[data-new]").length, r.querySelectorAll(".end-skill-bar i").length];
-  // The skill that went up a level leads: the level it filled, full, the dots this session lit in its colour.
-  expect([rows[0]!.getAttribute("data-color"), rows[0]!.hasAttribute("data-up"), rows[0]!.textContent]).toEqual(["purple", true, "AILevel 1 → 2"]);
-  expect(dots(rows[0]!)).toEqual([9, 1, 10]);
+  // The skill that went up a level leads: its new level is the row's figure, and the bar it filled is all in its colour.
+  expect([rows[0]!.getAttribute("data-color"), rows[0]!.hasAttribute("data-up"), rows[0]!.textContent]).toEqual(["purple", true, "AILevel 3 kept"]);
+  expect(rows[0]!.querySelectorAll("b > .dot-number").length).toBe(1);
+  expect(dots(rows[0]!)).toEqual([0, 10, 10]);
   // One that stayed on its level says the level all the same, and how far along it is.
-  expect([rows[1]!.hasAttribute("data-up"), rows[1]!.textContent]).toEqual([false, "LearningLevel 3"]);
+  expect([rows[1]!.hasAttribute("data-up"), rows[1]!.textContent]).toEqual([false, "LearningLevel 5 kept"]);
   expect(dots(rows[1]!)).toEqual([1, 2, 10]);
   // A reader gets every row at once.
   expect(body.querySelector(".end-skills .sr-only")!.textContent).toBe("AI, 3 kept, level 2 · Learning, 5 kept");
@@ -139,8 +140,8 @@ test("three rows at most, most fed first; no skill has no level; its room is hel
   const now = [str("learning", 50, 3), str("ai", 6, 1)] as never;
   const body = await mount(<SkillRows kept={kept} was={now} now={now} skills={skills} run />);
   // A memory filed under no known skill is named as the picker names it, with its colour's dot and no bar.
-  expect([...body.querySelectorAll(".end-skill")].map((r) => r.textContent)).toEqual(["LearningLevel 3", "AILevel 1", "No skill"]);
-  expect(body.querySelectorAll(".end-skill:nth-of-type(3) .end-skill-bar, .end-skill:nth-of-type(3) > .skill-icon.glyph").length).toBe(0);
+  expect([...body.querySelectorAll(".end-skill")].map((r) => r.textContent)).toEqual(["LearningLevel 5 kept", "AILevel 3 kept", "No skill2 kept"]);
+  expect(body.querySelectorAll(".end-skill:nth-of-type(3) .end-skill-bar, .end-skill:nth-of-type(3) > .skill-icon.glyph, .end-skill:nth-of-type(3) > b").length).toBe(0);
   // Nothing gained on the way to the next level lights no new dot.
   expect(body.querySelectorAll(".end-skill-bar i[data-new]").length).toBe(0);
   // The fourth is counted, and a reader hears them all.

@@ -73,9 +73,11 @@ export function LapCentre({ min }: { min: number }) {
 
 /** Under the end screen's ring: the skills this session kept memories in, a row each (Tyler, 2026-11-20, of
  *  the one small line that took turns: "very underwhelming. It almost looks like a subtitle rather than the
- *  reward"). A row is the skill, the memories it kept as a figure of dots, and its level with the way to the
- *  next one: ten dots, the ones this session lit in the skill's colour. Every row has its level, so a level
- *  never looks like something only one skill has; a skill that went up shows the level it filled, "Level 2 → 3".
+ *  reward"). A row is the skill, its level as a figure of dots at the right, and under the name the way to the
+ *  next level beside the memories it kept: ten dots, the ones this session lit in the skill's colour. Every row
+ *  has its level, so a level never looks like something only one skill has; a skill that went up has its new
+ *  level and the whole bar it filled in its colour (an independent critic, 2026-11-20: the level-up was "the
+ *  quietest thing in its own row" and "+9" had no unit).
  *  One that went up leads, then the ones fed most, three at most. A memory filed under no skill is named as the
  *  review picker names it, and has no level. `was` and `now` are each skill's strength before and after. */
 export function SkillRows({ kept, was, now, skills, run }: { kept: { skill: string; n: number }[]; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
@@ -88,7 +90,7 @@ export function SkillRows({ kept, was, now, skills, run }: { kept: { skill: stri
     if (!k || !b) return null;
     // A skill that went up filled the level it was on: the bar is that level's, full.
     const from = Math.round(levelProgress(b).share * BAR), to = up(id) ? BAR : Math.round(levelProgress(k).share * BAR);
-    return { from: Math.min(from, to), to, text: up(id) ? `Level ${b.level} → ${k.level}` : `Level ${k.level}`, said: up(id) ? `level ${k.level}` : "" };
+    return { from: up(id) ? 0 : Math.min(from, to), to, n: k.level, said: up(id) ? `level ${k.level}` : "" };
   };
   const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
   const said = all.map((k) => [name(k.skill), `${k.n} kept`, level(k.skill)?.said].filter(Boolean).join(", ")).join(" · ");
@@ -103,13 +105,11 @@ export function SkillRows({ kept, was, now, skills, run }: { kept: { skill: stri
           <div key={k.skill} className="end-skill" data-color={s?.color} data-up={up(k.skill) || undefined} aria-hidden="true" style={{ "--i": i } as React.CSSProperties}>
             <SkillIcon icon={s?.icon} color={s?.color} dot />
             <span className="end-skill-name">{name(k.skill)}</span>
-            <b><DotNumber value={`+${k.n}`} height={24} /></b>
-            {lv && (
-              <span className="end-skill-level">
-                <span className="end-skill-bar">{Array.from({ length: BAR }, (_, d) => <i key={d} data-on={d < lv.from || undefined} data-new={(d >= lv.from && d < lv.to) || undefined} style={{ "--d": d - lv.from } as React.CSSProperties} />)}</span>
-                {lv.text}
-              </span>
-            )}
+            {lv && <b>Level <DotNumber value={lv.n} height={24} /></b>}
+            <span className="end-skill-level">
+              {lv && <span className="end-skill-bar">{Array.from({ length: BAR }, (_, d) => <i key={d} data-on={d < lv.from || undefined} data-new={(d >= lv.from && d < lv.to) || undefined} style={{ "--d": d - lv.from } as React.CSSProperties} />)}</span>}
+              {k.n} kept
+            </span>
           </div>
         );
       })}

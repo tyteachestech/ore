@@ -1780,6 +1780,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   });
   const tiles = endTiles({ session: s });
+  // The skills' rows land first, one at a time, and the row of results after them.
+  const [rowsIn, setRowsIn] = useState(false);
   // His pose is for the line he says (D258).
   // He says a word aloud as he takes it, on the few days that earn one (D330); the quick quiz has no mole.
   const aloud = quick ? null : endVoice(said[0], { session: s, closed, napped: nap });
@@ -1813,6 +1815,14 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         {counted && <Sparkles over={over} n={ringDots(END_RING)} />}
       </Ring>
     );
+  const rowsN = Math.min(3, s.kept_skills?.length ?? 0);
+  const wait = !calm && rowsN > 0;
+  useEffect(() => {
+    if (!counted || !full || !wait) return;
+    const id = setTimeout(() => setRowsIn(true), 300 + rowsN * 150);
+    return () => clearTimeout(id);
+  }, [counted, full]);
+  const rowed = wait ? rowsIn : counted && full;
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
   return (
@@ -1842,7 +1852,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
             </div>
           </div>
           <SkillRows kept={s.kept_skills ?? []} was={b?.skills ?? []} now={t.skills} skills={skills} run={counted && full} />
-          <Tally tiles={tiles} go={full} onDone={() => setTallied(true)} />
+          <Tally tiles={tiles} go={rowed} onDone={() => setTallied(true)} />
           {held}
         </>
       )}
