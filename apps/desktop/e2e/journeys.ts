@@ -16104,6 +16104,9 @@ journey("phone: a light page is light up behind the clock, not a dark strip over
   // The web view's own page shows behind the clock and past the top in a rubber band; it was the app's dark.
   const [html, body, doc] = await page.evaluate(() => [document.documentElement, document.body, document.querySelector(".phone-source .reader-pane")!].map((e) => getComputedStyle(e).backgroundColor));
   if (html !== doc || body !== doc) throw new Error(`under a light page (${doc}) the web view's page is ${html} / ${body}`);
+  // The strip the source paints over the safe area, under the clock, was the app's dark on top of all that (Codex verify 2026-11-20).
+  const strip = await page.evaluate(() => getComputedStyle(document.querySelector(".phone-source")!, "::before").backgroundColor);
+  if (strip !== doc) throw new Error(`under a light page (${doc}) the strip behind the clock is ${strip}`);
   await tap(page, page.getByRole("button", { name: "Back", exact: true }).first());
   await until("back on Today, the page under it is the app's dark again", async () => (await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)) !== doc);
 }, "phone");
