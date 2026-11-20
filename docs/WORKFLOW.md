@@ -16,7 +16,7 @@ The one home for merging, reinstalling and parallel work. Project instructions a
 
 ## The Mac session
 - A Remote Control session goes offline when the Mac sleeps, and its messages wait until it wakes (2026-11-13: offline 30 min until Tyler wrote). Tyler keeps "Prevent automatic sleeping on power adapter when the display is off" on (System Settings › Battery › Options). When a session comes back after a gap, check `pmset -g log | grep -E "Sleep|Wake"` before blaming anything else.
-- Never ask for computer use on the Mac: its approval prompt never reaches Tyler (it was denied twice with no prompt shown). For a hands-on pass of the app, write the prompt to `/mnt/project-files/ai-user-testing/` and Tyler runs it himself in Codex or ChatGPT.
+- Computer use on the Mac: on 2026-11-13 its approval prompt never reached Tyler (denied twice, no prompt shown). Threads now link to his computer with its own computer-use tools (2026-11-20), so ask once when a hands-on pass needs it; if the prompt doesn't reach him, write the pass to `/mnt/project-files/ai-user-testing/` and he runs it himself in Codex or ChatGPT.
 
 ## Parallel threads
 - `~/Developer/ore` stays on `master`: the installed app carries a CLI compiled from it at install (D30), run against his real library. Build branches in a worktree (`git worktree add ../ore-<topic>`), never by checking one out there.

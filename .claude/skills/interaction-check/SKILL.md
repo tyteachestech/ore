@@ -11,7 +11,7 @@ the rest of this file is how to run them and the detail behind them.
 
 ## Rules
 - Full lifecycle for every object he sees (skill, collection, source, highlight, card, question, note, diagram): create, open, rename, move or re-file, reorder where the order is his, delete or archive. A missing one is a bug unless a decision rules it out; list any you skip in the PR.
-- Three ways to every action: a visible control (hover ⋯ on rows, Linear-style), the right-click menu (same actions as ⋯, destructive last), and a key or ⌘K. ⌘K follows what is open (a source, a skill page), never what is selected in a list (D178, Tyler 2026-11-10): a row's actions are on its ⋯, its right-click and its keys.
+- Three ways to every action: a visible control (the row's hover ⋯, Linear-style, which holds them all; a button of its own only for an action he uses often, so rows don't fill with controls, per the purpose rule), the right-click menu (same actions as ⋯, destructive last), and a key or ⌘K. ⌘K follows what is open (a source, a skill page), never what is selected in a list (D178, Tyler 2026-11-10): a row's actions are on its ⋯, its right-click and its keys.
 - Create in place: the new object appears where it lives, selected, name field focused; Enter commits, Esc drops it.
 - Rename inline on the title and from its menu ("Rename…", or the "Edit…" dialog when one holds the name and the rest); Enter saves, Esc restores. One menu item per dialog: never two items that open the same dialog.
 - Delete or any destructive step acts at once and shows a toast with Undo; it goes on the app history, so ⌘Z takes back a run of steps and ⇧⌘Z redoes them (pass `redo` to `notify`). No "Are you sure?" unless undo is impossible. Every other change he makes (create, rename, type, pin, reorder, edit) goes on that history too, without a toast: `notify(msg, "quiet", undo, redo)`. A change ⌘Z can't take back is a bug.
@@ -137,7 +137,7 @@ deletes item folders (SPEC "References stay valid"), so "delete" for a source me
 `deleted` status the UI hides, never `rm`.
 
 **Three ways in.** Every action on an object is reachable from (a) a visible control (a hover-revealed
-⋯ or button on the row, Linear-style), (b) the right-click menu, which lists the same actions as ⋯
+⋯ on the row, Linear-style; its own button only for an action used often), (b) the right-click menu, which lists the same actions as ⋯
 in the same order with destructive ones last and red, and (c) ⌘K when the object is open (D178: never for a row that is only selected).
 Frequent actions get a shortcut shown through `<Hint keys=…>`. Use Radix `ContextMenu` and
 `DropdownMenu` (Linear and Raycast's menu behavior: arrows, type-ahead, Esc), never a hand-rolled menu.
