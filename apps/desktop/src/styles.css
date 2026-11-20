@@ -3094,7 +3094,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .looks-pair > button { display: block; padding: 0; }
 .looks-pair > button > .looks-tile { width: 100%; }
 /* A light page on the phone takes the strip under the status bar and the Back bar with it, until he swipes to the note. */
-:root[data-page="light"].phone .phone-source:not(:has(.reader.noting)) { background: #fbfbfa; }
+:root[data-page="light"].phone .phone-source:not(:has(.reader.noting)), :root[data-page="light"].phone .phone-source:not(:has(.reader.noting))::before { background: #fbfbfa; }
 /* The page under the web view (a rubber band past the top, behind the clock) is light too, or a dark strip shows above a light page (F405). */
 :root[data-page="light"].phone:has(.phone-source):not(:has(.reader.noting)), :root[data-page="light"].phone:has(.phone-source):not(:has(.reader.noting)) body { background: #fbfbfa; }
 /* No dimming: the text above the sheet is what he judges each tap by. */
