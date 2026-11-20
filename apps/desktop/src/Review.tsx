@@ -22,7 +22,7 @@ import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
 import { endMood, endSays, endTiles, endVoice, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
-import { LapCentre, lapPlan, SkillReel, overDots, Sparkles, useLap } from "./Lap";
+import { LapCentre, lapPlan, SkillRows, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useDay, useFocusWhileMounted, useLibraryChanges, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -1780,10 +1780,15 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     minutesLeft: !t.met && t.counts ? minutesText(Math.max(0, t.goal_ms - t.active_ms)) : null,
   });
   const tiles = endTiles({ session: s });
+  // The skills' rows land first, one at a time, and the row of results after them.
+  const [rowsIn, setRowsIn] = useState(false);
   // His pose is for the line he says (D258).
   // He says a word aloud as he takes it, on the few days that earn one (D330); the quick quiz has no mole.
   const aloud = quick ? null : endVoice(said[0], { session: s, closed, napped: nap });
-  useEffect(() => void (settled && aloud && once(aloud, 0.1)), [settled]);
+  // His box comes up as he starts to speak, never before (Tyler, 2026-11-20: "the text box pops up for a long
+  // time before he speaks"): once he has settled and the results are in. His voice goes with it.
+  const speaks = settled && stage === "done" && (tallied || tiles.length === 0);
+  useEffect(() => void (speaks && aloud && once(aloud, 0.1)), [speaks]);
   const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
   // D274: the full end screen's ring holds the day's minutes, and minutes past the goal go round again.
   // Gems the session cut are cut in the ring first (D239), then make way for the minutes; they wait for the
@@ -1813,6 +1818,14 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         {counted && <Sparkles over={over} n={ringDots(END_RING)} />}
       </Ring>
     );
+  const rowsN = Math.min(3, s.kept_skills?.length ?? 0);
+  const wait = !calm && rowsN > 0;
+  useEffect(() => {
+    if (!counted || !full || !wait) return;
+    const id = setTimeout(() => setRowsIn(true), 300 + rowsN * 150);
+    return () => clearTimeout(id);
+  }, [counted, full]);
+  const rowed = wait ? rowsIn : counted && full;
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
   return (
@@ -1833,16 +1846,14 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           <div className="end-emblem" data-glint={(closed && full) || undefined}>
             <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}{up && <Mound />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
-            {settled && (
-              <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />
-            )}
+            {speaks && <MoleSays className="end-says" lines={said.slice(0, 1)} />}
             <div className="end-ring">
               {ring}
               {away ? <LapCentre min={lap.min} /> : cluster}
             </div>
           </div>
-          <SkillReel kept={s.kept_skills ?? []} ups={named} skills={skills} run={counted && full} />
-          <Tally tiles={tiles} go={full} onDone={() => setTallied(true)} />
+          <SkillRows kept={s.kept_skills ?? []} was={b?.skills ?? []} now={t.skills} skills={skills} run={counted && full} />
+          <Tally tiles={tiles} go={rowed} onDone={() => setTallied(true)} />
           {held}
         </>
       )}

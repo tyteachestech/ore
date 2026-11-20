@@ -3,7 +3,7 @@ import { Hint } from "./Hint";
 import { DotNumber, minutes } from "./Ring";
 import { still } from "./SideCursor";
 import { SkillIcon } from "./IconPicker";
-import type { Skill, Today } from "./ore";
+import { levelProgress, type Skill, type Today } from "./ore";
 
 /** The end screen's minutes: where the day stood before this session, where it stands now, and the goal they
  *  are measured against (0 when today has none: an off day under Weekdays only). */
@@ -61,7 +61,7 @@ export function useLap(plan: Lap, go: boolean): { min: number; hit: number } {
 
 /** What stands in the end screen's ring: the day's minutes in the ring's own dots, over "min", and nothing
  *  else (Tyler, 2026-11-19: "the wording in the circle feels cramped"). Minutes past the goal are the ring's
- *  own dots with a white centre; the memories kept are under it, skill by skill (`SkillReel`). */
+ *  own dots with a white centre; the memories kept are under it, skill by skill (`SkillRows`). */
 export function LapCentre({ min }: { min: number }) {
   return (
     <div className="end-lap">
@@ -71,44 +71,56 @@ export function LapCentre({ min }: { min: number }) {
   );
 }
 
-/** Under the end screen's ring: the skills this session kept memories in, one line at a time (Tyler,
- *  2026-11-19: the reel "below the green circle instead of inside it", and several skills "rotate ... in a
- *  loop"). A line is the skill, how many memories it kept, and its new level when it went up one. A skill that
- *  went up leads, then the ones it fed most; three at most, so no line is a long wait. One skill stands still,
- *  and so does the first under Reduce Motion. A memory filed under no skill is named as the review picker names it. */
-export function SkillReel({ kept, ups, skills, run }: { kept: { skill: string; n: number }[]; ups: { skill?: string; level: number }[]; skills: Skill[]; run: boolean }) {
-  const level = (id: string) => ups.find((u) => u.skill === id)?.level;
-  const all = [...kept.filter((k) => level(k.skill)), ...kept.filter((k) => !level(k.skill))], rows = all.slice(0, 3);
-  const [row, setRow] = useState(0);
-  const loop = run && rows.length > 1 && !still();
-  useEffect(() => {
-    if (!loop) return;
-    const id = setInterval(() => void (document.hidden || setRow((r) => (r + 1) % rows.length)), REEL_MS);
-    return () => clearInterval(id);
-  }, [loop, rows.length]);
+/** Under the end screen's ring: the skills this session kept memories in, a row each (Tyler, 2026-11-20, of
+ *  the one small line that took turns: "very underwhelming. It almost looks like a subtitle rather than the
+ *  reward"). A row is the skill, its level as a figure of dots at the right, and under the name the way to the
+ *  next level beside the memories it kept: ten dots, the ones this session lit in the skill's colour. Every row
+ *  has its level, so a level never looks like something only one skill has; a skill that went up has its new
+ *  level and the whole bar it filled in its colour (an independent critic, 2026-11-20: the level-up was "the
+ *  quietest thing in its own row" and "+9" had no unit).
+ *  One that went up leads, then the ones fed most, three at most. A memory filed under no skill is named as the
+ *  review picker names it, and has no level. `was` and `now` are each skill's strength before and after. */
+export function SkillRows({ kept, was, now, skills, run }: { kept: { skill: string; n: number }[]; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
+  const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
+  const up = (id: string) => (of(now, id)?.level ?? 0) > (of(was, id)?.level ?? of(now, id)?.level ?? 0);
+  const all = [...kept.filter((k) => up(k.skill)), ...kept.filter((k) => !up(k.skill))], rows = all.slice(0, REEL_ROWS);
   if (!rows.length) return null;
-  const text = (k: { skill: string; n: number }) => `${skills.find((s) => s.id === k.skill)?.name ?? "No skill"}, ${k.n} kept${level(k.skill) ? `, level ${level(k.skill)}` : ""}`;
-  const k = rows[row] ?? rows[0]!, s = skills.find((x) => x.id === k.skill), said = all.map(text).join(" · ");
+  const level = (id: string) => {
+    const k = of(now, id), b = of(was, id) ?? k;
+    if (!k || !b) return null;
+    // A skill that went up filled the level it was on: the bar is that level's, full.
+    const from = Math.round(levelProgress(b).share * BAR), to = up(id) ? BAR : Math.round(levelProgress(k).share * BAR);
+    return { from: up(id) ? 0 : Math.min(from, to), to, n: k.level, said: up(id) ? `level ${k.level}` : "" };
+  };
+  const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
+  const said = all.map((k) => [name(k.skill), `${k.n} kept`, level(k.skill)?.said].filter(Boolean).join(", ")).join(" · ");
+  const more = all.length - rows.length;
   return (
     // Its room is held from the start, so the results under it never move when it comes in.
-    <p className="end-reel" data-wait={!run || undefined}>
+    <div className="end-skills" data-wait={!run || undefined}>
       <span className="sr-only">{said}</span>
-      {run && (
-        // Three lines take turns; a session that fed more names them all on hover and focus.
-        <Hint key={k.skill} text={`Memories kept this session · ${said}`} off={all.length <= rows.length}>
-        <span className="end-reel-row" data-color={s?.color} aria-hidden="true" tabIndex={all.length > rows.length ? 0 : undefined}>
-          <SkillIcon icon={s?.icon} color={s?.color} dot />
-          <span className="end-reel-name">{s?.name ?? "No skill"}</span>
-          <b>{k.n} kept</b>
-          {level(k.skill) && <b className="end-reel-level">level {level(k.skill)}</b>}
-        </span>
-        </Hint>
-      )}
-    </p>
+      {rows.map((k, i) => {
+        const s = skills.find((x) => x.id === k.skill), lv = level(k.skill);
+        return (
+          <div key={k.skill} className="end-skill" data-color={s?.color} data-up={up(k.skill) || undefined} aria-hidden="true" style={{ "--i": i } as React.CSSProperties}>
+            <SkillIcon icon={s?.icon} color={s?.color} dot />
+            <span className="end-skill-name">{name(k.skill)}</span>
+            {lv && <b>Level <DotNumber value={lv.n} height={24} /></b>}
+            <span className="end-skill-level">
+              {lv && <span className="end-skill-bar">{Array.from({ length: BAR }, (_, d) => <i key={d} data-on={d < lv.from || undefined} data-new={(d >= lv.from && d < lv.to) || undefined} style={{ "--d": d - lv.from } as React.CSSProperties} />)}</span>}
+              {k.n} kept
+            </span>
+          </div>
+        );
+      })}
+      {/* Three rows at most; a session that fed more says how many, and names them all on hover and focus. */}
+      {more > 0 && <Hint text={`Memories kept this session · ${said}`}><span className="end-skills-more" tabIndex={0}>and {more} more {more === 1 ? "skill" : "skills"}</span></Hint>}
+    </div>
   );
 }
-/** How long a skill's line stands before the next: long enough to read a name, a count and a level. */
-const REEL_MS = 2600;
+const REEL_ROWS = 3;
+/** The dots in a row's bar to the next level. */
+const BAR = 10;
 
 /** White sparkles over the ring's bonus dots, for as long as the end screen is up: small crosses of dots that
  *  open and fade, only on the stretch past the goal, so they also say how far it went. A few past the goal,

@@ -7329,7 +7329,7 @@ journey("review: Later puts the exercise off to the end of the session with noth
     await page.getByRole("button", { name: "Later", exact: true }).click();
     await doneButton.waitFor();
     // The memories kept stand under the ring, skill by skill: a reader's line names them all.
-    const kept = [...((await page.locator(".end-reel .sr-only").textContent()) ?? "").matchAll(/(\d+) kept/g)].reduce((n, m) => n + Number(m[1]), 0);
+    const kept = [...((await page.locator(".end-skills .sr-only").textContent()) ?? "").matchAll(/(\d+) kept/g)].reduce((n, m) => n + Number(m[1]), 0);
     if (kept !== total - 1) throw new Error(`the end screen counts ${kept} kept for ${total - 1} rated`);
     if (logged() !== total - 1) throw new Error(`${logged()} reviews logged for ${total - 1} rated`);
     const lines = reviewLog().slice(log.length).trim().split("\n").length;
@@ -8948,8 +8948,8 @@ journey("the end of a review closes the session: no try line even with a try ope
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await page.waitForTimeout(300);
   await page.keyboard.press("Escape");
-  await page.locator(".review-end .end-reel-row").waitFor();
-  if (!/\d+ kept/.test(await page.locator(".end-reel-row").innerText())) throw new Error(`the skill's line reads ${await page.locator(".end-reel-row").innerText()}`);
+  await page.locator(".review-end .end-skill").first().waitFor();
+  if (!/\d+ kept/.test((await page.locator(".end-skills .sr-only").textContent()) ?? "")) throw new Error(`the skills' rows read ${await page.locator(".end-skills .sr-only").textContent()}`);
   const open = ((await ore("tries")) as { status: string }[]).filter((t) => t.status === "open").length;
   if (!open) throw new Error("the seed has no open try, so this journey proves nothing");
   if (await page.locator(".review-try:not(.review-dig)").count()) throw new Error("the end screen shows a try line");

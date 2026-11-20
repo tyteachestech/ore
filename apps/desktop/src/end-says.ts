@@ -74,8 +74,8 @@ export function endVoice(first: Said | undefined, o: { session: SessionEnd; clos
 }
 
 /** The end screen's row of results (D252), two at most: the days of memory the session added, then the gems
- *  it cut. The memories kept stand above the row, skill by skill (`SkillReel`), and a skill's new level on its
- *  line there. A long gap and memories pulled back in time need a sentence to mean anything, so they are the
+ *  it cut. The memories kept stand above the row, skill by skill (`SkillRows`), and a skill's level on its
+ *  row there. A long gap and memories pulled back in time need a sentence to mean anything, so they are the
  *  mole's to say (Tyler, 2026-11-19: "as a user idk what 'day gap recalled' means"). A session of misses has none (D62). */
 export function endTiles(o: { session: SessionEnd }): Tile[] {
   const s = o.session;
