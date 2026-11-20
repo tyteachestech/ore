@@ -4274,7 +4274,8 @@ journey("the skill picker is named, and says which skills are ticked apart from 
 
 journey("a highlight saved without a toast is still read out (Codex sweep 3, a11y)", async (page) => {
   await openSource(page, TESTING);
-  await select(page, "Free recall, short-answer questions");
+  // A passage no other journey highlights: on one already kept, the selection opens its note and "h" types there.
+  await select(page, "check answers after each attempt");
   await page.keyboard.press("h");
   await until("the live region says it was highlighted", async () => (await page.locator(".toasts .sr-only").innerText()).trim() === "Highlighted");
   await page.keyboard.press("Meta+z");
