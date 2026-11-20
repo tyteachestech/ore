@@ -2476,8 +2476,10 @@ button.home-plan:hover { color: var(--text); }
 .end-tally li[data-wait] { visibility: hidden; animation: none; }
 .end-tally li:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 .end-tally b { display: grid; place-items: center; height: 28px; }
-.count-up { display: inline-grid; }
-.count-up > * { grid-area: 1 / 1; justify-self: start; }
+/* The final number alone sizes the box; the running one lies over it from its left edge, so a value on the way that
+   is a dot wider than the last (a "10" on the way to "11", boxed to its dots) never moves the row. */
+.count-up { display: inline-grid; position: relative; }
+.count-up > .dot-number { position: absolute; left: 0; top: 0; }
 .count-size { visibility: hidden; }
 .end-tally-pair { display: flex; align-items: center; justify-content: center; gap: 10px; height: 48px; }
 .end-tally-mark { display: grid; place-items: center; flex: none; color: var(--text); }
