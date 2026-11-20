@@ -950,6 +950,7 @@ export function App() {
   const feedSplit = !PHONE && !!openId && place === "feed" && feedPost?.id === openId;
   const autoHide = feedSplit || (!!openId && (sideShown || tutorDocked) && narrow);
   const [showAnyway, setShowAnyway] = useState(false);
+  const [newSkill, setNewSkill] = useState(0);
   useEffect(() => setShowAnyway(false), [autoHide]);
   const collapsed = hideSidebar || (autoHide && !showAnyway);
   // A right-hand panel gives back what the shown sidebar takes past 216 (D193).
@@ -2451,6 +2452,7 @@ export function App() {
         drop={dropping ? (dropping.skill ?? "") : (rowDrag?.skill ?? homeDrop ?? undefined)}
         onOpen={openSkill}
         menu={skillMenu}
+        newSkill={newSkill}
         onCreated={(s) => {
           reloadSkills();
           madeSkill(s);
@@ -2701,6 +2703,10 @@ export function App() {
           onOpen={openSource}
           onAsk={(q) => openTutor(q)}
           sourceActions={paletteSourceActions}
+          onNewSkill={() => {
+            if (collapsed) toggleSidebar();
+            setNewSkill((n) => n + 1);
+          }}
           onCreated={(s) => {
             reloadSkills();
             madeSkill(s);

@@ -46,7 +46,7 @@ const SETTLE: DropAnimation = { duration: 180, easing: "cubic-bezier(0.2, 0, 0, 
  *  where it will land and the other rows slide aside; a skill drops into, out of and within any
  *  collection. Icons sit bare (Dia, Notion); the open skill's row takes its color, as Dia tints a space,
  *  and holds a fainter tint while one of its sources is open. */
-export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hidden, peek, drop, onPointer, onOpen, menu, onCreated, onArrange, onDeleteCollection }: {
+export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hidden, peek, drop, onPointer, onOpen, menu, onCreated, newSkill: asked, onArrange, onDeleteCollection }: {
   skills: Skill[];
   skill: string | null;
   /** A source is open: the selected row is where it sits, so it takes a quieter tint than its own page. */
@@ -66,6 +66,8 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   /** A skill's actions, on right-click and its ⋯. */
   menu: (s: Skill) => MenuAction[];
   onCreated: (s: Skill) => void;
+  /** Counts up each time the command palette's New skill… is run: the name field opens at the top. */
+  newSkill?: number;
   /** A new sidebar layout: a skill or collection moved, or a collection renamed. `step` names a step
    *  taken from a menu or a name field, which gets a toast with Undo (a drag shows its result in place). */
   onArrange: (layout: SkillLayout, step?: string) => void;
@@ -75,7 +77,12 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const sensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 4 } }));
   // D173: archived skills leave the list for a folded Archived group at the bottom; every layout written
   // puts them back in their collections (`arrange`), so a drag or rename never loses one.
-  const groups = useMemo(() => skillGroups(skills.filter((s) => !s.archived)), [skills]);
+  // The skills in no collection come first here (D36 as amended 2026-11-20): a new skill is named at the
+  // top, in sight however long the list is, and dragged from there into its collection.
+  const groups = useMemo(() => {
+    const all = skillGroups(skills.filter((s) => !s.archived));
+    return [...all.filter((g) => !g.collection), ...all.filter((g) => g.collection)];
+  }, [skills]);
   const archived = skills.filter((s) => s.archived);
   const [archivedOpen, setArchivedOpen] = useState(() => load(ARCHIVED_OPEN) === "1");
   const arrange = (layout: SkillLayout, step?: string, renamed?: { from: string; to: string }) => {
@@ -103,8 +110,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   const marked = skills.some((s) => s.icon || s.color);
   const base = draft ?? groups;
   const freshGroup = fresh !== null && !base.some((g) => g.collection === fresh) ? { name: fresh || UNGROUPED, collection: fresh, skills: [] } : null;
-  const last = base.length - (base.at(-1)?.collection ? 0 : 1);
-  const shown = freshGroup ? (fresh ? [...base.slice(0, last), freshGroup, ...base.slice(last)] : [...base, freshGroup]) : base;
+  const shown = freshGroup ? (fresh ? [...base, freshGroup] : [freshGroup, ...base]) : base;
   const named = groups.filter((g) => g.collection);
 
   const setClosedSaved = (next: string[]) => {
@@ -152,7 +158,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     if (isGroup(a.id)) {
       const from = groupOf(next, a.id);
       const to = groupOf(next, over.id);
-      // The ungrouped skills always come last.
+      // The ungrouped skills always come first.
       if (from >= 0 && to >= 0 && next[to]!.collection) next = arrayMove(next, from, to);
     } else if (!isGroup(over.id)) {
       const g = groupOf(next, a.id);
@@ -195,6 +201,9 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
     if (!groups.some((g) => !g.collection)) setFresh("");
     setAdding("");
   };
+  useEffect(() => {
+    if (asked) newSkill();
+  }, [asked]);
   // Right-click on the sidebar around the rows, as on Finder's or Notion's sidebar.
   const spaceMenu: MenuAction[] = [
     { id: "new-skill", label: "New skill", run: newSkill },
@@ -280,7 +289,6 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
         <SortableContext items={shown.map((g) => groupId(g.collection))} strategy={verticalListSortingStrategy}>
           {shown.map((g) => (
             <Fragment key={g.collection}>
-            {naming && !g.collection && namingField}
             <Section
               group={g}
               open={isOpen(g)}
@@ -314,7 +322,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
             </Section>
             </Fragment>
           ))}
-          {naming && !shown.some((g) => !g.collection) && namingField}
+          {naming && namingField}
         </SortableContext>
         {archived.length > 0 && (
           <div role="group" aria-label="Archived" className="side-section side-archived">
@@ -467,6 +475,7 @@ const TOOLS = ".side-tool, .side-more";
  *  focused, keeps tabindex 0 and the rest -1, so Tab goes on to the content. ↑↓ (and Home, End) move
  *  between items, → reaches the row's own ⋯ and + tools, ← comes back; on a collection's name → and ← open
  *  and close it, and ← on a skill goes up to its collection (a tree's keys). Fields (a new name) keep their keys. */
+const LABEL = "button.side-label";
 function useRoving(nav: RefObject<HTMLElement | null>) {
   const last = useRef<HTMLElement | null>(null);
   const apply = () => {
@@ -481,12 +490,16 @@ function useRoving(nav: RefObject<HTMLElement | null>) {
   useEffect(apply);
   // A collection renamed, or its rename undone, is drawn again under its new name (its key is its name): the item
   // that had focus is gone with focus on <body>, so the one drawn in its place takes it.
+  // "In its place" is counted among its own kind, collection names or rows, and stops at the last one: a
+  // deleted collection's skills join the ungrouped ones above it, which would shift a count over both.
   const held = useRef<{ el: HTMLElement; at: number } | null>(null);
+  const kind = (el: HTMLElement) => [...nav.current!.querySelectorAll<HTMLElement>(ITEMS)].filter((x) => x.matches(LABEL) === el.matches(LABEL));
   useLayoutEffect(() => {
     const h = held.current;
     if (!h || h.el.isConnected || (document.activeElement && document.activeElement !== document.body)) return;
     held.current = null;
-    const now = nav.current?.querySelectorAll<HTMLElement>(ITEMS)[h.at];
+    const kin = nav.current ? kind(h.el) : [];
+    const now = kin[Math.min(h.at, kin.length - 1)];
     if (now) focusQuietly(now);
   });
   // Only while focus is still there: a press or focus anywhere outside the sidebar lets it go.
@@ -498,7 +511,7 @@ function useRoving(nav: RefObject<HTMLElement | null>) {
   }, [nav]);
   const onFocus = (e: FocusEvent<HTMLElement>) => {
     const t = e.target as HTMLElement;
-    held.current = t.matches(ITEMS) ? { el: t, at: [...nav.current!.querySelectorAll(ITEMS)].indexOf(t) } : null;
+    held.current = t.matches(ITEMS) ? { el: t, at: kind(t).indexOf(t) } : null;
     if (!t.matches(`${ITEMS}, ${TOOLS}`)) return;
     // The stop is the row's item, so ⇧Tab back from the content lands on it, not on a hover-only ⋯.
     last.current = t.matches(ITEMS) ? t : t.closest(".side-item, .side-head")?.querySelector<HTMLElement>(ITEMS) ?? t;

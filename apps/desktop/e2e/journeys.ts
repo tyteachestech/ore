@@ -4839,6 +4839,20 @@ journey("⋯ menus by keyboard: Edit author… and New skill open their field wi
   await page.keyboard.press("Escape");
 });
 
+// Tyler, 2026-11-20: ⌘K's New skill… filed the skill under the collection of the page he was on.
+journey("⌘K: New skill… opens the sidebar's name field at the top, in no collection, with the caret in it", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("New skill");
+  await page.keyboard.press("Enter");
+  const name = '[aria-label="New skill name"]';
+  await until("the new skill field has the caret", () => hasCaret(page, name));
+  const first = page.locator(".sidebar .side-section").first();
+  if ((await first.getAttribute("aria-label")) !== "Other") throw new Error("the skills in no collection are not at the top");
+  await first.locator(name).waitFor();
+  if (await page.getByRole("dialog", { name: "Command palette" }).count()) throw new Error("the palette stayed open");
+  await page.keyboard.press("Escape");
+});
+
 journey("sidebar: New collection “Other” names a skill among the ungrouped ones, in the sidebar and in ⌘K", async (page) => {
   const box = (await page.locator(".sidebar").boundingBox())!;
   await page.mouse.click(box.x + box.width / 2, box.y + box.height - 20, { button: "right" });
