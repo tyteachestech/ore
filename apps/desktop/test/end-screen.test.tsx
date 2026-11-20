@@ -262,7 +262,11 @@ test("the mole says one line at a session's end: typed out a letter at a time wi
   // He speaks once he has come up and the results have landed.
   expect(s.q(".end-says")).toBe(0);
   // Step through the row as well as the mole: each React effect schedules the next result.
-  for (let i = 0; i < 28; i++) await act(async () => void jest.advanceTimersByTime(20));
+  // His box is never up empty, waiting for him (Tyler, 2026-11-20): while a result is still to land there is no box.
+  for (let i = 0; i < 28; i++) {
+    await act(async () => void jest.advanceTimersByTime(20));
+    if (s.q(".end-tally li[data-wait]")) expect(s.q(".end-says")).toBe(0);
+  }
   // The verdict first, and the whole line is in the page from its first letter: only the typed part shows,
   // the rest holds its place unseen, the block between them.
   expect(line()!.textContent).toBe("Gneiss work.");

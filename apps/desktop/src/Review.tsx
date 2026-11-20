@@ -1785,7 +1785,10 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   // His pose is for the line he says (D258).
   // He says a word aloud as he takes it, on the few days that earn one (D330); the quick quiz has no mole.
   const aloud = quick ? null : endVoice(said[0], { session: s, closed, napped: nap });
-  useEffect(() => void (settled && aloud && once(aloud, 0.1)), [settled]);
+  // His box comes up as he starts to speak, never before (Tyler, 2026-11-20: "the text box pops up for a long
+  // time before he speaks"): once he has settled and the results are in. His voice goes with it.
+  const speaks = settled && stage === "done" && (tallied || tiles.length === 0);
+  useEffect(() => void (speaks && aloud && once(aloud, 0.1)), [speaks]);
   const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
   // D274: the full end screen's ring holds the day's minutes, and minutes past the goal go round again.
   // Gems the session cut are cut in the ring first (D239), then make way for the minutes; they wait for the
@@ -1843,9 +1846,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           <div className="end-emblem" data-glint={(closed && full) || undefined}>
             <span className="review-mole">{up && <Mole bare size={96} mood={mood} />}{up && <Mound />}</span>
             {/* D243, D252: the mole says one line, the rarest true thing or his verdict; the numbers are the row's. */}
-            {settled && (
-              <MoleSays className="end-says" lines={said.slice(0, 1)} run={stage === "done" && (tallied || tiles.length === 0)} />
-            )}
+            {speaks && <MoleSays className="end-says" lines={said.slice(0, 1)} />}
             <div className="end-ring">
               {ring}
               {away ? <LapCentre min={lap.min} /> : cluster}
