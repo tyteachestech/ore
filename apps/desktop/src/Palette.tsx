@@ -364,7 +364,24 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
             placeholder={placeholder}
             spellCheck={false}
             autoComplete="off"
+            enterKeyHint={PHONE ? "search" : undefined}
           />
+          {/* iOS's search fields clear in place with an ⓧ inside the field; the × beside it leaves (Settings, Files). */}
+          {PHONE && q && (
+            <button
+              className="palette-clear"
+              aria-label="Clear"
+              // Keeps the keyboard up: the field keeps its focus (a pointerdown's default can't be stopped without losing the click).
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                setQ("");
+                setError(null);
+                inputRef.current?.focus();
+              }}
+            >
+              <X size={10} aria-hidden="true" />
+            </button>
+          )}
           {/* The phone has no Esc to leave with, and the sheet fills the screen. */}
           {PHONE && (
             <button className="palette-close" aria-label="Close" onClick={onClose}>

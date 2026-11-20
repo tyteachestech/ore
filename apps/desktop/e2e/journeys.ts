@@ -16043,6 +16043,78 @@ journey("phone: every field on every screen stays in sight when the keyboard com
   if (bad.length) throw new Error(`fields out of sight with the keyboard up:\n${bad.join("\n")}`);
 }, "phone");
 
+journey("phone: Search's ⓧ clears what he typed and keeps Search open with the keyboard up, × leaves, and the keyboard's key says Search (Codex native scout)", async (page) => {
+  // The only × beside the field closed Search, and the keyboard showed Return (Settings, Files: a clear button in the field, a Search key).
+  await tap(page, page.getByRole("button", { name: "Search" }));
+  const field = page.locator("[cmdk-input]");
+  if ((await field.getAttribute("enterkeyhint")) !== "search") throw new Error("the keyboard's key doesn't say Search");
+  if (await page.getByRole("button", { name: "Clear" }).count()) throw new Error("Clear shows with nothing typed");
+  await field.fill("agents");
+  await tap(page, page.getByRole("button", { name: "Clear" }));
+  await until("the field is cleared", async () => (await field.inputValue()) === "");
+  if (!(await field.evaluate((el) => el === document.activeElement))) throw new Error("clearing took the keyboard away");
+  await tap(page, page.getByRole("button", { name: "Close" }));
+  await field.waitFor({ state: "detached" });
+}, "phone");
+
+journey("phone: a switch's knob slid off its track flips it, and a slide that ends on it doesn't flip it back (Codex native scout)", async (page) => {
+  // Radix's switch took only a click: a slide that ended past the track's end left it as it was (iOS's flips).
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+  const sw = page.getByRole("switch", { name: "Weekdays only" });
+  const state = () => sw.getAttribute("aria-checked");
+  const slide = (from: number, to: number, click: boolean) =>
+    sw.evaluate((el, [from, to, click]) => {
+      const r = el.getBoundingClientRect();
+      const y = r.top + r.height / 2;
+      const at = (type: string, x: number) => el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 7, pointerType: "touch", isPrimary: true, clientX: x, clientY: y }));
+      at("pointerdown", r.left + r.width * (from as number));
+      for (let i = 1; i <= 6; i++) at("pointermove", r.left + r.width * ((from as number) + (((to as number) - (from as number)) * i) / 6));
+      at("pointerup", r.left + r.width * (to as number));
+      // A lift on the track also sends a click; off it, none.
+      if (click) el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    }, [from, to, click] as const);
+  const was = await state();
+  if (was === "true") await tap(page, sw);
+  await until("starts off", async () => (await state()) === "false");
+  await slide(0.25, 0.9, true); // across the track, lifted on it
+  await until("a slide right turns it on, and the lift's click doesn't turn it off again", async () => (await state()) === "true");
+  await Bun.sleep(500);
+  if ((await state()) !== "true") throw new Error("the lift's click flipped it back off");
+  await slide(0.75, -1.5, false); // left and off the track's end, as a thumb does
+  await until("a slide left past the track turns it off", async () => (await state()) === "false");
+  await Bun.sleep(500);
+  await tap(page, sw);
+  await until("a tap still flips it", async () => (await state()) === "true");
+}, "phone");
+
+journey("phone: a light page is light up behind the clock, not a dark strip over it (Codex native scout)", async (page) => {
+  await page.evaluate(() => localStorage.setItem("ore.page", "light"));
+  await page.reload();
+  await page.locator(".phone-app").waitFor();
+  await phoneSource(page, TESTING);
+  // The web view's own page shows behind the clock and past the top in a rubber band; it was the app's dark.
+  const [html, body, doc] = await page.evaluate(() => [document.documentElement, document.body, document.querySelector(".phone-source .reader-pane")!].map((e) => getComputedStyle(e).backgroundColor));
+  if (html !== doc || body !== doc) throw new Error(`under a light page (${doc}) the web view's page is ${html} / ${body}`);
+  await tap(page, page.getByRole("button", { name: "Back", exact: true }).first());
+  await until("back on Today, the page under it is the app's dark again", async () => (await page.evaluate(() => getComputedStyle(document.documentElement).backgroundColor)) !== doc);
+}, "phone");
+
+journey("phone: Settings' big title scrolls up into a small one in the bar, and comes back down (Codex native scout)", async (page) => {
+  // Scrolled, only Back was left in the bar (iOS's Settings keeps a small centred title).
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Settings" }));
+  const small = page.locator(".phone-full .phone-bar-title");
+  await small.waitFor({ state: "attached" });
+  const shown = async () => (await small.evaluate((el) => getComputedStyle(el).opacity)) === "1" && (await small.textContent()) === "Settings";
+  await Bun.sleep(400);
+  if (await shown()) throw new Error("the small title shows with the big one still in sight");
+  await page.locator(".phone-settings").evaluate((el) => el.scrollTo({ top: el.scrollHeight }));
+  await until("scrolled, the small title shows in the bar", shown);
+  await page.locator(".phone-settings").evaluate((el) => el.scrollTo({ top: 0 }));
+  await until("back at the top, it goes", async () => !(await shown()));
+}, "phone");
+
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
 for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {

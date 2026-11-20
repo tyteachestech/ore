@@ -18,7 +18,7 @@ const BUNDLE = "com.tylerpoelking.ore.phone";
 /** What shapes the generated Xcode project: the files ios:init reads, and the names of the Swift files it adds. */
 export function inputsStamp(read: (path: string) => string, list: (dir: string) => string[]): string {
   const h = createHash("sha256");
-  for (const f of ["scripts/share-target.ts", "src-tauri/Entitlements.ios.plist", "src-tauri/tauri.conf.json", "src-tauri/Cargo.toml", "package.json"])
+  for (const f of ["scripts/share-target.ts", "scripts/launch-screen.ts", "src-tauri/Entitlements.ios.plist", "src-tauri/tauri.conf.json", "src-tauri/Cargo.toml", "package.json"])
     h.update(`${f}\n${read(f)}\n`);
   for (const d of ["ios", "share"]) h.update(`${d}: ${list(d).sort().join(",")}\n`);
   return h.digest("hex");

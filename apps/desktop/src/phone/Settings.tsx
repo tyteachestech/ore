@@ -17,6 +17,44 @@ const NAME: Record<Key, string> = { goal_minutes: "Minutes a day", weekdays_only
 /** A reminder turned on starts here; the wheel changes it. */
 const FIRST_TIME = "09:00";
 
+/** A switch as iOS's: a tap flips it, and so does sliding the knob, which follows the finger past the track's
+ *  ends (Radix's switch only takes a click, so a slide that ended off the track did nothing). */
+function PhoneSwitch({ id, checked, onCheckedChange }: { id: string; checked: boolean; onCheckedChange: (v: boolean) => void }) {
+  const drag = useRef<{ x: number; moved: boolean } | null>(null);
+  const on = useRef(checked);
+  on.current = checked;
+  return (
+    <Switch.Root
+      id={id}
+      className="switch"
+      checked={checked}
+      onCheckedChange={onCheckedChange}
+      onPointerDown={(e) => {
+        drag.current = { x: e.clientX, moved: false };
+        // Its lift comes back here when the finger ends off the track (a made-up pointer has nothing to capture).
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {}
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d) return;
+        const dx = e.clientX - d.x;
+        if (Math.abs(dx) < 8) return;
+        d.moved = true;
+        // The knob goes where the finger goes, at once, as iOS's does.
+        if (dx > 0 !== on.current) onCheckedChange((on.current = dx > 0));
+      }}
+      onPointerUp={() => void setTimeout(() => (drag.current = null), 400)}
+      onPointerCancel={() => (drag.current = null)}
+      // A slide already set it: the click its lift sends doesn't flip it back.
+      onClick={(e) => drag.current?.moved && e.preventDefault()}
+    >
+      <Switch.Thumb className="switch-thumb" />
+    </Switch.Root>
+  );
+}
+
 /** `reload`: the Mac's changes came in, read again; `onPulled`: Check now brought some. */
 export function PhoneSettings({ reload, onPulled, notify }: { reload: number; onPulled: () => void; notify: Notify }) {
   const [review, setReview] = useState<Review | null>(null);
@@ -63,9 +101,7 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
               <Seg label="Minutes a day" value={String(review.goal_minutes)} options={goalOptions(review.goal_minutes).map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("goal_minutes", Number(v))} />
             </Row>
             <Row title="Weekdays only" text="Weekends never count against your week." htmlFor="weekdays">
-              <Switch.Root id="weekdays" className="switch" checked={review.weekdays_only} onCheckedChange={(v) => void set("weekdays_only", v)}>
-                <Switch.Thumb className="switch-thumb" />
-              </Switch.Root>
+              <PhoneSwitch id="weekdays" checked={review.weekdays_only} onCheckedChange={(v) => void set("weekdays_only", v)} />
             </Row>
             <Row title="New exercises a day" text="Exercises seen for the first time each day. Reviews are never capped.">
               <Seg label="New exercises a day" value={String(review.new_per_day)} options={newOptions(review.new_per_day).map((m) => ({ id: String(m), label: String(m) }))} onChange={(v) => void set("new_per_day", Number(v))} />
@@ -76,9 +112,7 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
               <PlanField plan={review.plan} onSave={(v) => set("plan", v)} />
             </Row>
             <Row title="Reminder" text={REMINDER_TEXT} htmlFor="reminder">
-              <Switch.Root id="reminder" className="switch" checked={!!review.reminder} onCheckedChange={(v) => void remind(v)}>
-                <Switch.Thumb className="switch-thumb" />
-              </Switch.Root>
+              <PhoneSwitch id="reminder" checked={!!review.reminder} onCheckedChange={(v) => void remind(v)} />
             </Row>
             {review.reminder && <ReminderTime value={review.reminder} onSave={(t) => void set("reminder", t)} />}
           </Group>
@@ -86,14 +120,10 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
       )}
       <Group title="Sound">
         <Row title="Sound effects" text="A short sound when you show an answer, rate it, reach your goal and finish." htmlFor="sounds">
-          <Switch.Root id="sounds" className="switch" checked={sounds} onCheckedChange={setSounds}>
-            <Switch.Thumb className="switch-thumb" />
-          </Switch.Root>
+          <PhoneSwitch id="sounds" checked={sounds} onCheckedChange={setSounds} />
         </Row>
         <Row title="Mole’s voice" text={VOICE_TEXT} htmlFor="voice">
-          <Switch.Root id="voice" className="switch" checked={voice} onCheckedChange={setVoice}>
-            <Switch.Thumb className="switch-thumb" />
-          </Switch.Root>
+          <PhoneSwitch id="voice" checked={voice} onCheckedChange={setVoice} />
         </Row>
       </Group>
       <Group title="iCloud">
