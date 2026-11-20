@@ -20,13 +20,17 @@ export interface AgentTask<T> {
   /** While it runs (claude web tasks): the answer's JSON so far ("" as a run starts over), and a web search starting or done. */
   onProgress?: (p: StreamProgress) => void;
   cwd: string;
+  /** Run as one turn of a conversation the vendor's own program keeps (D338): with an `id`, that
+   *  session is picked up and `input` is only what is new; with none, one is started. The result names it. */
+  session?: { id?: string };
 }
 
-/** What one run passes to the vendor's CLI. */
-interface RunOpts { model?: string }
+/** What one run passes to the vendor's CLI. `resume`: the session to pick up (the task's own, or the one a first
+ *  attempt started). */
+interface RunOpts { model?: string; resume?: string }
 
 /** What a run spent, as the vendor reports it: claude gives a dollar figure, codex only tokens. */
-export interface Usage { input_tokens: number; output_tokens: number; cost_usd?: number }
+export interface Usage { input_tokens: number; output_tokens: number; cost_usd?: number; /** How much the model had in front of it on the run's last call: what a session has grown to. */ context_tokens?: number }
 
 export interface AgentResult<T> {
   data: T;
@@ -36,6 +40,8 @@ export interface AgentResult<T> {
   runs: number;
   /** What its web searches and fetches returned (claude: the pages' text; codex: each result's snippet). */
   web?: WebSeen;
+  /** The session it ran in, for a task given `session`: pass it back to carry the conversation on. */
+  session?: string;
 }
 
 /** The pages a run's web searches and fetches returned, each with the text it came back in, so a web
@@ -48,19 +54,25 @@ interface RawRun {
   model: string;
   usage: Usage;
   web?: WebSeen;
+  session?: string;
 }
 
 export const addUsage = (a: Usage, b: Usage): Usage => ({
   input_tokens: a.input_tokens + b.input_tokens,
   output_tokens: a.output_tokens + b.output_tokens,
   ...(a.cost_usd !== undefined || b.cost_usd !== undefined ? { cost_usd: (a.cost_usd ?? 0) + (b.cost_usd ?? 0) } : {}),
+  ...(b.context_tokens !== undefined || a.context_tokens !== undefined ? { context_tokens: b.context_tokens ?? a.context_tokens } : {}),
 });
 
-type ClaudeOut = { total_cost_usd?: number; usage?: { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number } };
+type ClaudeTokens = { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
+type ClaudeOut = { total_cost_usd?: number; usage?: ClaudeTokens & { iterations?: ClaudeTokens[] } };
+const tokensIn = (u?: ClaudeTokens) => (u?.input_tokens ?? 0) + (u?.cache_creation_input_tokens ?? 0) + (u?.cache_read_input_tokens ?? 0);
+// A run that used a tool calls the model more than once and `usage` sums the calls: the last one's input is the session's size.
 const claudeUsage = (o: ClaudeOut): Usage => ({
-  input_tokens: (o.usage?.input_tokens ?? 0) + (o.usage?.cache_creation_input_tokens ?? 0) + (o.usage?.cache_read_input_tokens ?? 0),
+  input_tokens: tokensIn(o.usage),
   output_tokens: o.usage?.output_tokens ?? 0,
   ...(typeof o.total_cost_usd === "number" ? { cost_usd: o.total_cost_usd } : {}),
+  ...(o.usage?.iterations?.length ? { context_tokens: tokensIn(o.usage.iterations.at(-1)) } : {}),
 });
 
 /** Token counts from codex's `--json` events (`turn.completed` carries each turn's usage). */
@@ -220,7 +232,8 @@ function claudeResult(r: Exec, events?: StreamEvent[]) {
   if (!out) throw vendorFailure("claude", { ...r, stdout: "" });
   if (r.timedOut) throw vendorFailure("claude", r);
   if (out.is_error) {
-    const msg = out.result ?? "unknown error";
+    // A run refused before it starts (a session it doesn't have) says why on stderr alone.
+    const msg = out.result ?? (r.stderr.trim().split("\n").pop()?.trim() || "unknown error");
     throw new Error(`claude: ${msg}${signInHint("claude", msg)}`);
   }
   return out;
@@ -242,10 +255,11 @@ export function claudeTools(task: Pick<AgentTask<unknown>, "files" | "web">): { 
 }
 
 // claude -p with a system prompt, structured output and only the tools the task needs.
-async function runClaude(system: string, message: string, schema: object, task: AgentTask<unknown>, { model }: RunOpts): Promise<RawRun> {
+async function runClaude(system: string, message: string, schema: object, task: AgentTask<unknown>, { model, resume }: RunOpts): Promise<RawRun> {
   const bin = Bun.which("claude", { PATH: process.env.PATH ?? "" });
   if (!bin) throw new Error("Claude Code isn’t installed (no `claude` on PATH). Install it, or pick Codex in Settings → AI.");
   const { tools, allowed } = claudeTools(task);
+  const session = task.session ? (resume ?? crypto.randomUUID()) : undefined;
   // A web task streams its events, so the pages its searches returned can be checked against its citations.
   const cmd = [
     bin, "-p", message,
@@ -256,7 +270,7 @@ async function runClaude(system: string, message: string, schema: object, task: 
     ...(allowed.length ? ["--allowedTools", ...allowed] : []),
     "--permission-mode", "dontAsk",
     ...CLAUDE_BARE,
-    "--no-session-persistence",
+    ...(session ? (resume ? ["--resume", session] : ["--session-id", session]) : ["--no-session-persistence"]),
     ...(model ? ["--model", model] : []),
   ];
   const state = { json: "" };
@@ -270,7 +284,9 @@ async function runClaude(system: string, message: string, schema: object, task: 
   // helper model can write more: its stream's `system init` event names the model it ran on.
   const usage = Object.entries(out.modelUsage ?? {}).sort((a, b) => (b[1].outputTokens ?? 0) - (a[1].outputTokens ?? 0));
   const ran = events?.find((e) => e.type === "system" && e.subtype === "init" && typeof e.model === "string")?.model as string | undefined;
-  return { output: out.structured_output ?? out.result, model: ran ?? usage[0]?.[0] ?? model ?? "claude-default", usage: claudeUsage(out), ...(events ? { web: webSeen(events) } : {}) };
+  // A session picked up again reports what the whole session has cost so far, not this run: no figure is better than that one.
+  const { cost_usd, ...tokens } = claudeUsage(out);
+  return { output: out.structured_output ?? out.result, model: ran ?? usage[0]?.[0] ?? model ?? "claude-default", usage: resume ? tokens : { ...tokens, ...(cost_usd !== undefined ? { cost_usd } : {}) }, ...(events ? { web: webSeen(events) } : {}), ...(session ? { session } : {}) };
 }
 
 type StreamEvent = { type?: string; subtype?: string; model?: unknown; message?: { content?: unknown }; tool_use_result?: unknown; [k: string]: unknown };
@@ -374,8 +390,15 @@ function codexConfiguredModel(): string | undefined {
   return top.match(/^model\s*=\s*"([^"]+)"/m)?.[1];
 }
 
+/** The thread a `codex exec --json` run started, which `exec resume` picks up. */
+const codexThread = (stdout: string): string | undefined => {
+  for (const line of stdout.split("\n")) {
+    try { const e = JSON.parse(line) as { type?: string; thread_id?: unknown }; if (e.type === "thread.started" && typeof e.thread_id === "string") return e.thread_id; } catch { /* not an event line */ }
+  }
+};
+
 // codex exec has no system-prompt flag: instructions go first in the message.
-async function runCodex(system: string, message: string, schema: object, task: AgentTask<unknown>, { model }: RunOpts): Promise<RawRun> {
+async function runCodex(system: string, message: string, schema: object, task: AgentTask<unknown>, { model, resume }: RunOpts): Promise<RawRun> {
   const bin = Bun.which("codex", { PATH: process.env.PATH ?? "" });
   if (!bin) throw new Error("Codex isn’t installed (no `codex` on PATH). Install it, or pick Claude in Settings → AI.");
   const dir = mkdtempSync(join(tmpdir(), "ore-codex-"));
@@ -385,15 +408,18 @@ async function runCodex(system: string, message: string, schema: object, task: A
   const cmd = [
     bin, ...(task.web ? ["--search"] : []), "exec",
     "--json", "--output-schema", schemaPath, "-o", outPath,
-    "--skip-git-repo-check", "--ephemeral", "-s", "read-only", "-C", task.cwd,
+    "--skip-git-repo-check", ...(task.session ? [] : ["--ephemeral"]), "-s", "read-only", "-C", task.cwd,
     ...(model ? ["-m", model] : []),
-    `<instructions>\n${system}\n</instructions>\n\n${message}`,
+    // A thread picked up again already holds the instructions (as `runChatTurn` resumes one, D61).
+    ...(resume ? ["resume", resume, message] : [`<instructions>\n${system}\n</instructions>\n\n${message}`]),
   ];
   // The schema and last message are scratch files: one folder per run, removed when it ends.
   try {
     const r = await exec(cmd, task.cwd, task.web && task.onProgress ? (l) => { const p = codexProgress(l); if (p) task.onProgress!(p); } : undefined);
     if (r.code !== 0 || !existsSync(outPath)) throw vendorFailure("codex", r);
-    return { output: readFileSync(outPath, "utf8"), model: model ?? codexConfiguredModel() ?? "codex-default", usage: codexUsage(r.stdout), ...(task.web ? { web: codexWebSeen(r.stdout) } : {}) };
+    const session = task.session ? (resume ?? codexThread(r.stdout)) : undefined;
+    if (task.session && !session) throw new Error("codex did not report a thread id");
+    return { output: readFileSync(outPath, "utf8"), model: model ?? codexConfiguredModel() ?? "codex-default", usage: codexUsage(r.stdout), ...(task.web ? { web: codexWebSeen(r.stdout) } : {}), ...(session ? { session } : {}) };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -419,7 +445,7 @@ export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<Age
   const prompt = loadPrompt(task.prompt);
   const schema = vendorSchema(task.schema);
   const run = vendor === "claude" ? runClaude : runCodex;
-  const opts = { model: aiModel(lib, vendor) };
+  const opts: RunOpts = { model: aiModel(lib, vendor), resume: task.session?.id };
   let message = userMessage(task.input, task.files ?? []);
   let lastError = "";
   let usage: Usage = { input_tokens: 0, output_tokens: 0 };
@@ -429,16 +455,18 @@ export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<Age
   for (let attempt = 1; attempt <= 2; attempt++) {
     const raw = await run(prompt.text, message, schema, task as AgentTask<unknown>, opts);
     usage = addUsage(usage, raw.usage);
+    opts.resume = raw.session ?? opts.resume;
     if (raw.web) web = web ? { ...raw.web, searched: web.searched || raw.web.searched, pages: [...web.pages, ...raw.web.pages.filter((p) => !web!.pages.some((q) => samePage(q.url, p.url)))] } : raw.web;
     try {
       const parsed = task.schema.safeParse(parseOutput(raw.output));
       if (!parsed.success) throw new Error(parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "));
       const problem = task.check?.(parsed.data, web);
       if (problem) throw new Error(problem);
-      return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage, runs: attempt, ...(web ? { web } : {}) };
+      return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage, runs: attempt, ...(web ? { web } : {}), ...(raw.session ? { session: raw.session } : {}) };
     } catch (e) {
       lastError = (e as Error).message;
-      message = `${userMessage(task.input, task.files ?? [])}\n\nYour previous output was invalid: ${lastError}\nReturn only JSON that matches the schema.`;
+      // In a session the task is already there: only the reason goes back.
+      message = `${task.session ? "" : `${userMessage(task.input, task.files ?? [])}\n\n`}Your previous output was invalid: ${lastError}\nReturn only JSON that matches the schema.`;
     }
   }
   throw new Error(`${vendor} returned invalid ${task.prompt} output twice: ${lastError}`);
@@ -501,8 +529,7 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
   try {
     const r = await exec(cmd, a.cwd);
     if (r.code !== 0 || !existsSync(outPath)) throw vendorFailure("codex", r);
-    const started = r.stdout.split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } }).find((e) => e?.type === "thread.started");
-    const session = a.session ?? started?.thread_id;
+    const session = a.session ?? codexThread(r.stdout);
     if (!session) throw new Error("codex did not report a thread id");
     return { vendor, output: readFileSync(outPath, "utf8"), model: model ?? codexConfiguredModel() ?? "codex-default", session };
   } finally {
