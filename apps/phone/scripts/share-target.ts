@@ -6,6 +6,7 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { DARK, darkLaunch } from "./launch-screen";
 
 const gen = resolve(import.meta.dir, "../src-tauri/gen/apple");
 const yml = join(gen, "project.yml");
@@ -56,6 +57,18 @@ ${ent("      ")}
         ARCHS: [arm64]
 `;
   writeFileSync(yml, p);
+}
+// The launch screen is the window's dark (#121212, tauri.conf.json), not iOS's system background: the app is held
+// dark, so a white launch screen flashed before the first frame (Codex native scout). In the storyboard itself, so
+// it shows before any code runs; iOS keeps an old launch screen until the app is deleted or the phone restarts.
+const launch = join(gen, "LaunchScreen.storyboard");
+try {
+  const was = readFileSync(launch, "utf8");
+  const dark = darkLaunch(was);
+  if (!dark.includes(DARK)) console.warn(`share-target: no background colour in ${launch}; the launch screen may flash white`);
+  writeFileSync(launch, dark);
+} catch {
+  console.warn(`share-target: no ${launch}; the launch screen may flash white`);
 }
 const r = spawnSync("xcodegen", ["generate", "--quiet"], { cwd: gen, stdio: "inherit" });
 process.exit(r.status ?? 1);

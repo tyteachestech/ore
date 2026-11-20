@@ -369,8 +369,6 @@ function Rows({ lines, row, onOpen }: { lines: Line[]; row: RowActions; onOpen: 
   );
 }
 
-/** A list row's in-place Rename field: Today's (Home's rows) and the lists'. styles.css pads the page under it. */
-
 /** Sources by To read and Done, as one list; `flat`: as given, no sections or courses (Archive, a course's lessons). */
 function SourceList({ title, items, onOpen, row, head, flat, empty = "Nothing here yet. Add a link with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; flat?: boolean; empty?: string }) {
   // Pinned first, in the order they were pinned, as on the Mac's lists; then the latest touched.
@@ -463,14 +461,30 @@ function NewSkill({ skills, onDone }: { skills: Skill[]; onDone: (made: Skill | 
   );
 }
 
-/** Back slides its screen away, then closes it. `stay`: this Back is a step inside the screen (the note back to its source). */
-function Back({ label, onClick, stay }: { label: string; onClick: () => void; stay?: boolean }) {
+/** Back slides its screen away, then closes it. `stay`: this Back is a step inside the screen (the note back to its source).
+ *  `title`: the screen's name, shown small in the bar once its big title has scrolled up under it (iOS's large title). */
+function Back({ label, onClick, stay, title }: { label: string; onClick: () => void; stay?: boolean; title?: string }) {
   const pop = useContext(Pop);
+  const bar = useRef<HTMLElement>(null);
+  const [small, setSmall] = useState(false);
+  useEffect(() => {
+    const big = title ? bar.current?.parentElement?.querySelector("h1") : null;
+    if (!big || !bar.current) return void setSmall(false);
+    const top = bar.current.getBoundingClientRect().bottom;
+    const watch = new IntersectionObserver(([e]) => setSmall(!!e && !e.isIntersecting && e.boundingClientRect.top < top), { rootMargin: `-${Math.round(top)}px 0px 0px 0px` });
+    watch.observe(big);
+    return () => watch.disconnect();
+  }, [title]);
   return (
-    <header className="phone-bar">
+    <header className="phone-bar" ref={bar}>
       <button className="phone-back" onClick={() => (stay ? onClick() : pop(onClick))}>
         <CaretLeft size={16} aria-hidden="true" /> {label}
       </button>
+      {title && (
+        <span className="phone-bar-title" data-shown={small || undefined} aria-hidden={!small}>
+          {title}
+        </span>
+      )}
     </header>
   );
 }
@@ -1213,7 +1227,7 @@ export function PhoneApp() {
       {/* A course's lessons in order, pushed over the list its row was in; a lesson opens over it. */}
       {courseOf.length > 0 && (
         <Screen className="phone-full" onBack={() => setCourse(null)}>
-          <Back label={skillOf?.name ?? (tab === "today" ? "Today" : "Sources")} onClick={() => setCourse(null)} />
+          <Back label={skillOf?.name ?? (tab === "today" ? "Today" : "Sources")} title={courseOf[0]!.course!.title} onClick={() => setCourse(null)} />
           <div className="phone-page">
             <SourceList title={courseOf[0]!.course!.title} items={courseOf} onOpen={open} row={row} flat />
           </div>
@@ -1221,7 +1235,7 @@ export function PhoneApp() {
       )}
       {settings && (
         <Screen className="phone-full" onBack={() => setSettings(false)}>
-          <Back label={tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} onClick={() => setSettings(false)} />
+          <Back label={tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} title="Settings" onClick={() => setSettings(false)} />
           <PhoneSettings reload={tick} onPulled={pulled} notify={notify} />
         </Screen>
       )}

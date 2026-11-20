@@ -910,6 +910,8 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
   background: var(--bg);
   color: var(--text);
 }
+/* On the iPhone the strip behind the clock is the source screen's own top: light with the page, as Books' is,
+   not a dark band over it (Codex native scout). */
 /* The window's title bar strip over the page turns light with it, as Books' toolbar does. */
 :root[data-page="light"] .reader-pane::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: var(--titlebar); background: var(--bg); pointer-events: none; }
 :root[data-page="light"] .reader-pane .doc a { border-bottom-color: rgba(59, 85, 212, 0.35); }
@@ -2245,6 +2247,7 @@ button.home-plan:hover { color: var(--text); }
 .switch { position: relative; width: 32px; height: 18px; flex: none; border-radius: 999px; background: var(--bg-active); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4); transition: background-color var(--t-2); }
 .switch[data-state="checked"] { background: var(--c-green); }
 .switch:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+.phone .switch { touch-action: pan-y; }
 .switch-thumb { display: block; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); transform: translateX(2px); transition: transform var(--t-3) var(--ease-out); }
 @media (prefers-reduced-motion: reduce) { .switch-thumb { transition: none; } }
 .switch-thumb[data-state="checked"] { transform: translateX(16px); }
@@ -2934,6 +2937,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .overlay .panel:has(.palette-field) { display: flex; flex-direction: column-reverse; width: 100%; background: none; border: 0; border-radius: 0; box-shadow: none; }
 .phone .palette-field { display: flex; align-items: center; gap: 4px; padding: 8px 8px max(8px, calc(env(safe-area-inset-bottom, 0px) - var(--keyboard, 0px))); border-top: 1px solid var(--border); }
 .phone .palette-field .panel-input { flex: 1; min-width: 0; height: 44px; padding: 0 8px; border: 0; font-size: 16px; }
+.phone .palette-clear { display: grid; place-items: center; flex: none; width: 44px; height: 44px; margin-left: -8px; background: none; border: 0; color: var(--bg); }
+.phone .palette-clear svg { box-sizing: content-box; padding: 3px; border-radius: 50%; background: var(--muted); }
 .phone .palette-close { display: grid; place-items: center; flex: none; width: 44px; height: 44px; background: none; border: 0; color: var(--muted); }
 .phone .overlay .panel [cmdk-list] { flex: 1; min-height: 0; max-height: none; }
 .phone .overlay .panel [cmdk-item] { min-height: 44px; height: auto; font-size: 16px; }
@@ -3041,6 +3046,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
    rows (pictures keep their own shape: a square would crop them, Tyler); section heads are small grey mono, as the drawer's group labels; the main
    button is a full-width 52 pt capsule. */
 .phone .phone-bar { padding: 0 12px; gap: 8px; }
+/* A pushed screen's name in its bar, once its big title has scrolled up under it (iOS's large title collapsing). */
+.phone-bar-title { position: absolute; left: 96px; right: 96px; text-align: center; font-size: 17px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0; transition: opacity var(--t-2) var(--ease-out); pointer-events: none; }
+.phone-bar-title[data-shown] { opacity: 1; }
 .phone .phone-bar .phone-back, .phone .phone-source .reader-tools .width-toggle { width: 44px; height: 44px; padding: 0; justify-content: center; border-radius: 999px; background: var(--bg-hover); }
 .phone .phone-bar .phone-back { font-size: 0; }
 .phone .phone-bar .phone-back svg { width: 22px; height: 22px; }
@@ -3084,6 +3092,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .looks-pair > button > .looks-tile { width: 100%; }
 /* A light page on the phone takes the strip under the status bar and the Back bar with it, until he swipes to the note. */
 :root[data-page="light"].phone .phone-source:not(:has(.reader.noting)) { background: #fbfbfa; }
+/* The page under the web view (a rubber band past the top, behind the clock) is light too, or a dark strip shows above a light page (F405). */
+:root[data-page="light"].phone:has(.phone-source):not(:has(.reader.noting)), :root[data-page="light"].phone:has(.phone-source):not(:has(.reader.noting)) body { background: #fbfbfa; }
 /* No dimming: the text above the sheet is what he judges each tap by. */
 .phone .overlay.looks-overlay { background: transparent; }
 .looks-size { display: grid; grid-template-columns: 1fr 1fr; height: 52px; border-radius: 12px; background: var(--bg-hover); overflow: hidden; }
