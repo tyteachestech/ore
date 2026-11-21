@@ -4123,6 +4123,8 @@ journey("sidebar: a collection renamed from its menu keeps focus on its name; de
   await label(/^Craft$/i).waitFor();
   const heads = (await page.locator(".side-head .side-label-text").allInnerTexts()).map((t) => t.trim());
   const next = heads[heads.findIndex((t) => /^craft$/i.test(t)) + 1]!;
+  const rows = async () => (await page.locator(".sidebar div.side-item .label").allInnerTexts()).map((t) => t.trim());
+  const before = await rows();
   await label(/^Craft$/i).click({ button: "right" });
   await page.getByRole("menuitem", { name: "Delete collection" }).click();
   try {
@@ -4134,8 +4136,10 @@ journey("sidebar: a collection renamed from its menu keeps focus on its name; de
     await page.keyboard.press("Meta+z");
     await label(/^Craft$/i).waitFor();
   }
-  await page.waitForLoadState("networkidle"); // the Undo's write has landed and the sidebar read it back
-  const skills = (await page.locator(".sidebar div.side-item .label").allInnerTexts()).map((t) => t.trim());
+  // The Undo's write has landed and the sidebar read it back: Craft's skills, which sat at the top with no
+  // collection while it was gone, are in it again. A menu opened on a row still on its way back closes under the click.
+  await until("the skills are back in their order", async () => (await rows()).join("|") === before.join("|"));
+  const skills = await rows();
   await page.locator(".sidebar div.side-item").first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Archive skill" }).click();
   try {
@@ -4871,6 +4875,20 @@ journey("⋯ menus by keyboard: Edit author… and New skill open their field wi
   await page.keyboard.press("Escape");
 });
 
+// Tyler, 2026-11-20: ⌘K's New skill… filed the skill under the collection of the page he was on.
+journey("⌘K: New skill… opens the sidebar's name field at the top, in no collection, with the caret in it", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("New skill");
+  await page.keyboard.press("Enter");
+  const name = '[aria-label="New skill name"]';
+  await until("the new skill field has the caret", () => hasCaret(page, name));
+  const first = page.locator(".sidebar .side-section").first();
+  if ((await first.getAttribute("aria-label")) !== "Other") throw new Error("the skills in no collection are not at the top");
+  await first.locator(name).waitFor();
+  if (await page.getByRole("dialog", { name: "Command palette" }).count()) throw new Error("the palette stayed open");
+  await page.keyboard.press("Escape");
+});
+
 journey("sidebar: New collection “Other” names a skill among the ungrouped ones, in the sidebar and in ⌘K", async (page) => {
   const box = (await page.locator(".sidebar").boundingBox())!;
   await page.mouse.click(box.x + box.width / 2, box.y + box.height - 20, { button: "right" });
@@ -4887,7 +4905,8 @@ journey("sidebar: New collection “Other” names a skill among the ungrouped o
   await page.getByRole("option", { name: "Add a skill to “Other”" }).waitFor();
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
-  await until("one Other heading", async () => (await page.locator(".side-label-text").allInnerTexts()).filter((t) => /^other$/i.test(t)).length === 1);
+  // The skills in no collection are one group with no heading (Tyler, 2026-11-20), so no collection is headed Other.
+  await until("one Other group, with no heading", async () => (await page.locator('.sidebar [role=group][aria-label="Other"]').count()) === 1 && !(await page.locator(".side-label-text").allInnerTexts()).some((t) => /^other$/i.test(t)));
 });
 
 journey("a row's ⋯ menu in a short window stays inside it, scrolling, as its right-click twin does", async (page) => {
@@ -9725,8 +9744,8 @@ journey("sidebar: closing a hover-only ⋯ or + gives focus to its row, and ⇧�
   await until("Home's tile ⋯ gives focus to its tile's name", () => tile.locator(".home-open").evaluate((el) => el === document.activeElement));
 });
 
-journey("sidebar: the Skills header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
-  const plus = page.getByRole("button", { name: "New skill", exact: true });
+journey("sidebar: a header's New skill and toggle are enabled buttons, not dimmed by the drag handle", async (page) => {
+  const plus = page.getByRole("button", { name: /^New skill in / }).first();
   await plus.hover();
   // A click's checks, without the click: an aria-disabled ancestor makes it "not enabled".
   await plus.click({ trial: true, timeout: 2000 });

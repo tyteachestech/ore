@@ -202,6 +202,8 @@ kbd {
 .side-rename { margin: 0 6px; padding: 0 4px; height: 24px; border-radius: 6px; background: var(--bg-hover); font-size: 12px; font-weight: 500; }
 .side-taken { position: absolute; top: calc(100% + 2px); left: 6px; right: 6px; z-index: 2; padding: 4px 8px; border-radius: 6px; background: var(--bg-raised); border: 1px solid var(--border); font-size: 12px; color: var(--error); }
 .side-input { flex: 1; min-width: 0; height: 22px; padding: 0; background: none; border: 0; color: var(--text); }
+/* A new skill's name is typed straight into its row, as Reader's view name is: the lit row and the caret say where he is, so no ring is drawn inside it. */
+.side-new .side-input:focus-visible { outline: none; }
 .side-input::placeholder { color: var(--faint); }
 .side-new-foot { padding: 3px 10px 6px; color: var(--faint); font-size: 11px; }
 .side-new-foot.err { color: var(--error); }
@@ -2777,6 +2779,7 @@ button.home-plan:hover { color: var(--text); }
 /* Dragging a skill between sidebar sections */
 /* Drag to move (Dia, Arc): the row lifts under the pointer, its slot stays open where it will land
    and the other rows slide aside; a collection lights up while a skill from elsewhere is over it. */
+.side-section.bare { margin-top: 10px; }
 .side-section { border-radius: 8px; transition: background-color var(--t-1) ease, box-shadow var(--t-1) ease; }
 .side-section.drop-on { background: color-mix(in srgb, var(--accent) 8%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
 .side-item.slot, .side-section.slot { background: color-mix(in srgb, var(--accent) 12%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 30%, transparent); }

@@ -33,6 +33,9 @@ type Props = {
   sourceActions?: (id: string) => Action[];
   /** A skill made from the palette (New skill, New collection). */
   onCreated: (s: Skill) => void;
+  /** New skill… on the Mac: the sidebar's own name field opens at its top, so the palette guesses no
+   *  collection for it. Left out on the phone, which names the skill here. */
+  onNewSkill?: () => void;
   onClose: () => void;
   /** Over Review (controls-08): leaves it as Esc does before an action runs, as if he had closed it first. */
   leave?: () => Promise<void> | undefined;
@@ -68,7 +71,7 @@ export const textHits = <H extends Pick<Hit, "item">>(hits: H[], listed: Pick<It
 
 /** ⌘K: recent sources, actions, skills, sources and courses by title, then sources whose text matches
  *  (`ore search`, SQLite FTS5) in their own group below. */
-export function Palette({ actions, recent, items, skills, skill, onSkill, onSkillNote, onOpen, onAsk, sourceActions, onCreated, onClose, leave }: Props) {
+export function Palette({ actions, recent, items, skills, skill, onSkill, onSkillNote, onOpen, onAsk, sourceActions, onCreated, onNewSkill, onClose, leave }: Props) {
   const [q, setQ] = useState("");
   const [page, setPage] = useState<Page | null>(null);
   const byRecent = useMemo(() => [...items].sort((a, b) => touched(b).localeCompare(touched(a))), [items]);
@@ -166,7 +169,6 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
     return { heading, score: scored[0]?.s ?? 0, rows: scored.map((x) => x.row) };
   };
 
-  const current = skills.find((s) => s.id === skill);
   const collections = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
   let groups: Group[];
   if (page?.kind === "source") {
@@ -236,7 +238,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
         "Actions",
         [
           ...actions.filter((a) => query || !a.typed).map((a) => ({ value: a.label, label: a.label, keywords: a.keywords, extra: a.hint && <kbd>{a.hint}</kbd>, run: a.run })),
-          { value: "New skill…", label: "New skill…", keywords: ["add skill", "create skill"], run: () => open({ kind: "skill", collection: current?.collection ?? "" }) },
+          { value: "New skill…", label: "New skill…", keywords: ["add skill", "create skill"], run: () => (onNewSkill ? void run(onNewSkill) : open({ kind: "skill", collection: "" })) },
           { value: "New collection…", label: "New collection…", keywords: ["section", "group", "folder", "create collection"], run: () => open({ kind: "collection" }) },
         ],
       ),

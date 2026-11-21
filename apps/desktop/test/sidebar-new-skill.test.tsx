@@ -20,13 +20,13 @@ function mount(skills: Skill[]) {
   const div = document.createElement("div");
   document.body.append(div);
   const root = createRoot(div);
-  const el = (skills: Skill[]): ReactElement => (
+  const el = (skills: Skill[], newSkill = 0): ReactElement => (
     <HintProvider>
-      <Sidebar skills={skills} skill={null} within={false} home onHome={() => {}} feed={false} onFeed={() => {}} hidden={false} peek={false} onPointer={() => {}} onOpen={() => {}} menu={() => []} onCreated={() => {}} onArrange={() => {}} onDeleteCollection={() => {}} />
+      <Sidebar newSkill={newSkill} skills={skills} skill={null} within={false} home onHome={() => {}} feed={false} onFeed={() => {}} hidden={false} peek={false} onPointer={() => {}} onOpen={() => {}} menu={() => []} onCreated={() => {}} onArrange={() => {}} onDeleteCollection={() => {}} />
     </HintProvider>
   );
   act(() => root.render(el(skills)));
-  return { div, render: (skills: Skill[]) => act(() => root.render(el(skills))), unmount: () => act(() => root.unmount()) };
+  return { div, render: (skills: Skill[], newSkill = 0) => act(() => root.render(el(skills, newSkill))), unmount: () => act(() => root.unmount()) };
 }
 
 const field = (div: HTMLElement) => div.querySelector<HTMLInputElement>('input[aria-label="New skill name"]');
@@ -50,6 +50,27 @@ describe("sidebar: the New skill field", () => {
     const { div, unmount } = mount([skill("a", "Craft"), skill("b")]);
     act(() => div.querySelector<HTMLButtonElement>('button[aria-label="New skill in Craft"]')!.click());
     expect(field(div)!.closest(".side-section")?.getAttribute("aria-label")).toBe("Craft");
+    unmount();
+  });
+
+  // Tyler, 2026-11-20: ⌘K's New skill… put the skill in the collection of the page he was on. It now
+  // opens this field at the top, in no collection, for him to drag where it belongs.
+  test("the command palette's New skill… opens it at the top of the list, in no collection", () => {
+    const skills = [skill("a", "Craft"), skill("b", "Life")];
+    const { div, render, unmount } = mount(skills);
+    expect(field(div)).toBeNull();
+    render(skills, 1);
+    const sections = [...div.querySelectorAll(".side-section")];
+    expect(sections.indexOf(field(div)!.closest(".side-section")!)).toBe(0);
+    expect(sections[0]!.getAttribute("aria-label")).toBe("Other");
+    // No heading over them: the new row is simply the first thing under All sources.
+    expect(sections[0]!.querySelector(".side-head")).toBeNull();
+    unmount();
+  });
+
+  test("the skills in no collection sit above the collections", () => {
+    const { div, unmount } = mount([skill("a", "Craft"), skill("b")]);
+    expect([...div.querySelectorAll(".side-section")].map((x) => x.getAttribute("aria-label"))).toEqual(["Other", "Craft"]);
     unmount();
   });
 });
