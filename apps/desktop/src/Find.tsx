@@ -153,12 +153,14 @@ function show(all: Range[], on: Range | undefined) {
 
 /** The find bar at the top right of the source. `roots` lists what it searches, left to right;
  *  `within` is watched so typing in the note or the source finishing loading updates the count. */
-export function FindBar({ roots, scope, within, query, onQuery, focus, onClose, onJump }: {
+export function FindBar({ roots, scope, within, query, near, onQuery, focus, onClose, onJump }: {
   roots: () => (HTMLElement | null | undefined)[];
   /** What `roots` covers, named in the field (D219): "source", "source and note" or "note". */
   scope: string;
   within: HTMLElement | null;
   query: string;
+  /** A passage the query was found in (a search result's): the first match is the one in it, not the first in view. */
+  near?: string;
   onQuery: (q: string) => void;
   /** Bumped by ⌘F while the bar is open: focus the field again and select what is in it. */
   focus: number;
@@ -181,12 +183,15 @@ export function FindBar({ roots, scope, within, query, onQuery, focus, onClose, 
 
   // A new query starts at the first match he can see, or the next one below it, as a browser does.
   useEffect(() => {
-    const rs = search(roots().filter((r): r is HTMLElement => !!r), query);
+    const all = roots().filter((r): r is HTMLElement => !!r);
+    const rs = search(all, query);
     let i = 0;
     const first = rs[0] && scrollerOf(rs[0].startContainer);
     if (first) {
       const top = viewOf(first).top;
-      const j = rs.findIndex((r) => r.getBoundingClientRect().bottom > top);
+      // From a search result: the match in the passage the result showed (F-new-search-landing).
+      const passage = near ? search(all, near)[0] : undefined;
+      const j = passage ? rs.findIndex((r) => r.compareBoundaryPoints(Range.START_TO_START, passage) >= 0) : rs.findIndex((r) => r.getBoundingClientRect().bottom > top);
       if (j >= 0) i = j;
     }
     setFound(rs);
@@ -195,7 +200,7 @@ export function FindBar({ roots, scope, within, query, onQuery, focus, onClose, 
       onJump?.();
       reveal(rs[i]!);
     }
-  }, [query]);
+  }, [query, near]);
 
   // The text changed under it (the note typed in, the book still mounting): count again, same place.
   useEffect(() => {

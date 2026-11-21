@@ -104,6 +104,9 @@
 .home-read { margin: 0 -8px; padding: 0 8px; }
 .home-skills { display: flex; flex-direction: column; gap: 0; }
 .home-skill { flex-direction: row; align-items: center; height: var(--row); margin: 0 -8px; padding: 0 8px; }
+/* A row as a source row is: 8px corners, and keyboard focus the same 2px ring inside its edge (round 8, pick 6). */
+.home-skill { border-radius: var(--radius); }
+.home-skill:has(.home-open:focus-visible) { box-shadow: inset 0 0 0 2px var(--focus); }
 .home-skill-top { flex: 1; }
 
 /* Labels: section and card titles, sidebar groups, metadata. */

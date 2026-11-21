@@ -468,7 +468,7 @@ img.thumb { filter: brightness(0.86); }
 .skill-edit-head .skill-name button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .skill-name button:hover { background: var(--bg-hover); }
 .skill-name input { width: 100%; background: var(--bg-raised); border-color: var(--border); outline: none; }
-.skill-name input:focus-visible { border-color: var(--accent); }
+.skill-name input:focus-visible { border-color: var(--focus); }
 .icon-button { flex: none; width: 44px; height: 44px; border-radius: 10px; display: grid; place-items: center; font-size: 28px; background: var(--bg-hover); border: 1px solid transparent; }
 .icon-button:hover, .icon-button[aria-expanded="true"] { background: var(--bg-active); }
 .icon-button:focus-visible { outline: none; border-color: var(--focus); }
@@ -534,7 +534,7 @@ img.thumb { filter: brightness(0.86); }
 .picker-grid { display: grid; grid-template-columns: repeat(12, 1fr); }
 .picker-cell { height: 31px; display: grid; place-items: center; border-radius: 6px; font-size: 20px; line-height: 1; }
 .picker-cell:hover, .picker-cell[data-active] { background: var(--bg-hover); }
-.picker-cell:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
+.picker-cell:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus); }
 .picker-note { display: block; padding: 24px 12px; color: var(--muted); text-align: center; }
 .keys-head { display: flex; align-items: center; gap: 4px; height: 50px; padding: 0 12px 0 16px; border-bottom: 1px solid var(--border); }
 .keys-head h2 { font-size: 15px; font-weight: 600; margin: 0; }
@@ -725,7 +725,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .preq-head.failed:hover { color: var(--muted); }
 .preq-retry { flex: none; color: var(--accent); font-weight: 600; padding: 2px 6px; border-radius: 6px; }
 .preq-retry:hover { background: var(--bg-hover); }
-.preq-retry:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.preq-retry:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .preq-why { margin: 2px 0 0; color: var(--faint); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 /* A PDF's tables and formulas read as plain text (D125): one quiet line under the title, its offer to read them properly. */
 .pdf-tables, .page-text { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin: 14px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
@@ -738,7 +738,7 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 .preq-body { list-style: none; margin: 4px 0 0; padding: 0; }
 .preq-q { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 12px; align-items: baseline; width: calc(100% + 12px); padding: 7px 6px; margin: 0 -6px; border-radius: 8px; text-align: left; font-size: 15px; line-height: 1.45; color: var(--text-read); }
 .preq-q:hover { background: var(--bg-hover); }
-.preq-q:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
+.preq-q:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus); }
 .preq-icon { align-self: start; margin-top: 2px; color: var(--question-solid); }
 .preq-row.done .preq-icon { color: var(--c-green); }
 .preq-said { grid-column: 2; margin-top: 2px; color: var(--muted); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
@@ -1537,7 +1537,7 @@ body.resizing iframe { pointer-events: none; }
 .skill-name-row > .skill-name button { margin-left: 0; }
 .skill-importance { flex: none; width: 28px; height: 28px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); }
 .skill-importance:hover, .skill-importance[aria-expanded="true"] { color: var(--text); background: var(--bg-hover); }
-.skill-importance:focus-visible, .skill-unarchive:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.skill-importance:focus-visible, .skill-unarchive:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .skill-unarchive { flex: none; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 6px; color: var(--muted); font-size: 13px; }
 .skill-unarchive:hover { color: var(--text); background: var(--bg-hover); }
 .skill-cols { flex: 1; min-height: 0; display: grid; padding: 0 32px; }
@@ -1635,7 +1635,7 @@ button.skill-goal:hover { background: var(--bg-hover); color: var(--text); }
 .skill-goal.empty svg { color: var(--faint); }
 .skill-goal-edit { display: flex; align-items: flex-end; gap: 8px; margin: 4px 0 0 -6px; }
 textarea.skill-goal.editing { display: block; flex: 0 1 560px; min-width: 0; min-height: 26px; max-height: 120px; resize: none; background: var(--bg-raised); border: 1px solid var(--border); color: var(--text); outline: none; font-family: inherit; }
-textarea.skill-goal.editing:focus-visible { border-color: var(--accent); }
+textarea.skill-goal.editing:focus-visible { border-color: var(--focus); }
 /* Letters left, only near the limit. */
 .skill-goal-left { flex: none; padding-bottom: 4px; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
 .skill-goal-left.none { color: var(--error); }
@@ -1981,7 +1981,7 @@ button.try-stone:hover .stone { opacity: 1; }
 .quiz-mark.wait::after { content: ""; width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--bg-active); }
 .quiz-point { flex: 1; min-width: 0; padding: 6px 8px 6px 2px; text-align: left; color: var(--text); line-height: 1.4; border-radius: 6px; }
 .quiz-point:hover:not(:disabled) { color: color-mix(in srgb, var(--c-orange) 60%, white); }
-.quiz-point:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--focus); }
+.quiz-point:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--focus); }
 .quiz-point:disabled { color: var(--muted); }
 .quiz-none { display: block; color: var(--faint); font-size: 12px; }
 .quiz-stepper { margin-top: 14px; display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--muted);; box-shadow: var(--lift); }
@@ -2079,7 +2079,7 @@ button.try-stone:hover .stone { opacity: 1; }
 .draw-tool.quiet[aria-pressed="true"] { background: none; color: var(--text); }
 .draw-tool.quiet[aria-pressed="true"]:hover { background: var(--bg-hover); }
 .draw-tool:disabled { opacity: 0.35; }
-.draw-tool:focus-visible, .draw-seg:focus-visible, .draw-swatch:focus-visible { outline: 1px solid var(--paper); outline-offset: -1px; }
+.draw-tool:focus-visible, .draw-seg:focus-visible, .draw-swatch:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 .draw-tool.wide { padding: 0 8px; }
 .draw-tool.zoom-pct { min-width: 48px; font-variant-numeric: tabular-nums; }
 .draw-style { top: 52px; left: 10px; flex-direction: column; align-items: stretch; gap: 8px; padding: 10px; width: 196px; }
@@ -2235,7 +2235,7 @@ button.home-plan:hover { color: var(--text); }
 .home-skill .more:hover, .home-skill .more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
 :root:not(.phone) .home-read:hover .more, .home-read .more:focus-visible, .home-read .more[aria-expanded="true"] { display: grid; }
 .home-read .more:hover, .home-read .more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
-.home-read:has(.home-open:focus-visible) { box-shadow: inset 0 0 0 1px var(--focus); }
+.home-read:has(.home-open:focus-visible) { box-shadow: inset 0 0 0 2px var(--focus); }
 /* The title comes first: long skill pills give way to it, ending in … (DESIGN: long text). */
 .home-read .chips-button { max-width: 40%; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
@@ -3566,7 +3566,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .tutor-head { position: absolute; top: 7px; right: 12px; z-index: 6; display: flex; gap: 2px; }
 .tutor-down { position: sticky; bottom: 4px; align-self: center; margin-top: -10px; display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-raised); color: var(--muted); font-size: 12px; box-shadow: var(--lift); }
 .tutor-down:hover { color: var(--text); background: var(--bg-hover); }
-.tutor-down:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--focus); }
+.tutor-down:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .tutor-turns { position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 8px 16px 4px; display: flex; flex-direction: column; gap: 18px; }
 /* Words he selected in a reply (D164): a small toolbar just above them, as the reader's highlight popup sits. */
 .tutor-sel { position: absolute; z-index: 5; transform: translate(-50%, calc(-100% - 6px)); display: flex; gap: 2px; padding: 3px; border-radius: 9px; border: 1px solid var(--border); background: var(--bg-raised); box-shadow: var(--lift); }
