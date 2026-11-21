@@ -100,9 +100,10 @@ export type Trigger = { kind: "link" | "slash" | "date"; query: string; /** Char
 export function menuTrigger(before: string): Trigger | null {
   const link = before.match(/\[\[([^[\]\n]{0,40})$/);
   if (link) return { kind: "link", query: link[1]!, typed: link[0].length };
-  // Words after the slash take single spaces, as Notion's do ("/heading 2"); "/ " and a double space close it,
-  // and the note closes it at a space once no row answers, so "/etc folder" stays prose.
-  const slash = before.match(/(?:^|[\s￼])\/((?:[a-z0-9#]+(?: [a-z0-9#]+)* ?)?)$/i);
+  // Words after the slash take single spaces, as Notion's do ("/heading 2"), and a hyphen or a dot inside
+  // them ("/to-do", "/1.", F435); "/ " and a double space close it, and the note closes it
+  // once no row answers a query with a space or such a mark in it, so "/etc folder" stays prose.
+  const slash = before.match(/(?:^|[\s￼])\/((?:[a-z0-9#][a-z0-9#.-]*(?: [a-z0-9#][a-z0-9#.-]*)* ?)?)$/i);
   if (slash && slash[1]!.length <= 24) return { kind: "slash", query: slash[1]!, typed: slash[1]!.length + 1 };
   // @ at the start of a word: Notion's dates (an email address has a letter before it).
   const date = before.match(/(?:^|[\s([{])@([a-z0-9 -]{0,16})$/i);

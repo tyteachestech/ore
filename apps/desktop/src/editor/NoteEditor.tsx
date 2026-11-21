@@ -919,7 +919,7 @@ function menuPlugin(live: Live, setMenu: (m: Menu | null) => void, setIndex: (n:
     if (from === live.current.dismissed.at) return show(null);
     const m: Menu = { kind, query, from, to: $from.pos };
     // A / whose words reach a space with no block answering them is prose (Notion): "/etc folder".
-    if (kind === "slash" && query.includes(" ") && !live.current.rowsFor(m).length) return show(null);
+    if (kind === "slash" && /[ .-]/.test(query) && !live.current.rowsFor(m).length) return show(null);
     show(m);
   };
   return $prose(

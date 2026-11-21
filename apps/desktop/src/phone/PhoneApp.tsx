@@ -25,7 +25,7 @@ import { PixelBook, PixelNote } from "../PixelIcon";
 import type { LinkTarget, NoteEditorHandle } from "../editor/NoteEditor";
 import { holdMenu, WithMenu, type MenuAction } from "../Menu";
 import { Palette } from "../Palette";
-import { SkillEditor, skillGroups, skillMade } from "../Skills";
+import { SkillEditor, sidebarGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
 import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, shareOpen, shareSkills, type CardSkills, type Item, type Skill, touched } from "../ore";
@@ -427,7 +427,7 @@ function NewSkill({ skills, onDone }: { skills: Skill[]; onDone: (made: Skill | 
   // The drawer's last rows sit where the keyboard comes up: the field, and its refusal once shown, stay above it.
   const form = useRef<HTMLFormElement>(null);
   // In braces: an effect may return only its clean-up, and a browser whose scrollIntoView answers with a promise
-  // (Chromium does) had React call that promise as one, which took the whole app down (F-new-effect-return).
+  // (Chromium does) had React call that promise as one, which took the whole app down (F444).
   useLayoutEffect(() => {
     form.current?.scrollIntoView({ block: "nearest" });
   }, [error]);
@@ -1116,9 +1116,10 @@ export function PhoneApp() {
             <Archive size={16} aria-hidden="true" />
             <span className="phone-title">Archive</span>
           </button>
-          {skillGroups(skills.filter((s) => !s.archived)).map((g) => (
-            <section key={g.collection}>
-              <h2>{g.name}</h2>
+          {/* The Mac sidebar's order (sidebarGroups): the skills in no collection first, with no heading beside collections. */}
+          {sidebarGroups(skills).map((g) => (
+            <section key={g.collection} className={g.bare ? "bare" : undefined}>
+              {!g.bare && <h2>{g.name}</h2>}
               {g.skills.map((s) => (
                 <WithMenu key={s.id} actions={() => menuOf(s)} hold>
                   <button onClick={() => (setSkill(s.id), setDrawer(false))}>

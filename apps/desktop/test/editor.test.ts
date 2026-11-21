@@ -176,6 +176,16 @@ describe("note editor (D38)", () => {
     expect(m("Divider", ["hr"], "etc folder")).toBe(false);
   });
 
+  test("F435: / keeps its menu through a hyphen or a dot in a block's name (/to-do, /1.), as Notion does", async () => {
+    expect(ed.menuTrigger("/to-do")).toEqual({ kind: "slash", query: "to-do", typed: 6 });
+    expect(ed.menuTrigger("/to-")).toEqual({ kind: "slash", query: "to-", typed: 4 });
+    expect(ed.menuTrigger("Text /1.")).toEqual({ kind: "slash", query: "1.", typed: 3 });
+    expect(ed.slashMatch("To-do list", ["todo"], "to-do")).toBe(true);
+    // A word must start it: "/-" and "/." are prose.
+    expect(ed.menuTrigger("/-")).toBeNull();
+    expect(ed.menuTrigger("/.")).toBeNull();
+  });
+
   test("/ finds a block by part of its name or by the name Notion takes for it (/h1, /#, /todo, /hr)", async () => {
     const m = ed.slashMatch;
     expect(m("Heading 1", ["h1", "#"], "h1")).toBe(true);

@@ -231,6 +231,8 @@ kbd {
 .side-item:has(> .side-main:focus-visible) .side-more { opacity: 1; }
 .side-head:has(> .side-label:focus-visible) .side-head-tools { opacity: 1; }
 .side-more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
+/* While the ⋯ shows, the name gives it room (Notion, Linear): it drew over the end of a long one (F438). */
+.side-item:is(:hover, :has(> .side-main:focus-visible), :has(> .side-more:is(:focus-visible, [aria-expanded="true"]))):has(> .side-more) > .side-main { padding-right: 30px; }
 
 /* Skill icons: an emoji, a Phosphor glyph masked and filled with the skill color, or a color dot. */
 .skill-icon { display: inline-block; flex: none; width: 1em; height: 1em; line-height: 1; vertical-align: -0.125em; }
@@ -593,7 +595,7 @@ img.thumb { filter: brightness(0.86); }
 .pick-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
 body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 /* The tutor's field sits at the window's foot, where a toast and the pick bar land: with the tutor open they stand
-   in the room left of it, never over what he is typing (F-new-toast-tutor). A floating tutor is 400px wide, 16px
+   in the room left of it, never over what he is typing (F445). A floating tutor is 400px wide, 16px
    in from the right; a docked one is --tutor-w. The window is never under 720px, which leaves them 256px. */
 body:has(aside.tutor.float) :is(.toasts, .pick-bar) { left: calc((100vw - 432px) / 2); }
 body:has(aside.tutor.float) .toasts { max-width: min(70vw, calc(100vw - 464px)); }
@@ -1427,11 +1429,12 @@ body.resizing iframe { pointer-events: none; }
 .note-editor blockquote { border-left: 2px solid var(--border); padding-left: 12px; margin-left: 0; color: var(--muted); }
 .note-editor code { font-family: var(--mono); font-size: 0.86em; background: var(--bg-raised); border-radius: 4px; padding: 1px 4px; }
 /* Tables (GFM): a grid in the note's text; wider than the note, it scrolls in place, faded at the edge
-   with more to see. The room right of and under it holds the + that adds a column or a row. */
-.note-table { overflow-x: auto; margin: 0 0 0.7em; padding: 0 18px 18px 0; --fade-l: 0px; --fade-r: 0px; mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent); }
+   with more to see. A column is 120px at least where three fit, and a third of a narrower note (the side
+   panel), so a new three-column table starts whole (F440). The room right of and under it holds the + that adds a column or a row. */
+.note-table { container-type: inline-size; overflow-x: auto; margin: 0 0 0.7em; padding: 0 18px 18px 0; --fade-l: 0px; --fade-r: 0px; mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent); }
 .note-table.more-left { --fade-l: 32px; } .note-table.more-right { --fade-r: 32px; }
 .note-table table { border-collapse: collapse; font-size: 0.93em; }
-.note-table th, .note-table td { border: 1px solid var(--border); padding: 6px 10px; min-width: 120px; text-align: left; vertical-align: top; }
+.note-table th, .note-table td { border: 1px solid var(--border); padding: 6px 10px; min-width: clamp(72px, calc(100cqi / 3 - 1px), 120px); text-align: left; vertical-align: top; }
 .note-table th { color: var(--muted); font-weight: 600; background: var(--bg-raised); }
 .note-table :is(th, td) > p { margin: 0; }
 .note-table .selectedCell { background: color-mix(in srgb, var(--accent) 12%, transparent); }
@@ -1637,8 +1640,12 @@ body:has(.hint) .full-text { display: none; }
 button.skill-goal:hover { background: var(--bg-hover); color: var(--text); }
 .skill-goal.empty { color: var(--faint); }
 .skill-goal.empty svg { color: var(--faint); }
-input.skill-goal.editing { display: block; width: min(100%, 560px); height: 24px; margin: 4px 0 0 -6px; background: var(--bg-raised); border: 1px solid var(--border); color: var(--text); outline: none; }
-input.skill-goal.editing:focus-visible { border-color: var(--accent); }
+.skill-goal-edit { display: flex; align-items: flex-end; gap: 8px; margin: 4px 0 0 -6px; }
+textarea.skill-goal.editing { display: block; flex: 0 1 560px; min-width: 0; min-height: 26px; max-height: 120px; resize: none; background: var(--bg-raised); border: 1px solid var(--border); color: var(--text); outline: none; font-family: inherit; }
+textarea.skill-goal.editing:focus-visible { border-color: var(--accent); }
+/* Letters left, only near the limit. */
+.skill-goal-left { flex: none; padding-bottom: 4px; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.skill-goal-left.none { color: var(--error); }
 .pill-btn.small { height: 24px; padding: 0 11px; font-size: 13px; }
 /* Strength (D62, D63): solid memories, the solid / growing / new split, growth, what he can explain. */
 .strength { display: flex; flex-direction: column; gap: 12px; padding: 2px 6px 4px; }
@@ -2179,8 +2186,10 @@ button.home-plan:hover { color: var(--text); }
 .pick-row:focus-visible { outline: none; background: var(--bg-hover); box-shadow: inset 0 0 0 2px var(--focus); }
 .pick-icon { flex: none; display: grid; place-items: center; width: 20px; font-size: 16px; }
 .pick-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-.pick-gems { flex: none; display: flex; gap: 14px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+/* Two fixed columns, so the gems and their numbers line up down the list whatever each row holds (F439). */
+.pick-gems { flex: none; display: grid; grid-template-columns: repeat(2, calc(22px + 2ch)); gap: 14px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .pick-gems > span { display: inline-flex; align-items: center; gap: 6px; }
+.pick-gems > .loose { grid-column: 2; }
 .pick-row[aria-checked="false"] .name, .pick-row[aria-checked="false"] .pick-icon { opacity: 0.55; }
 .pick-box {
   flex: none; display: grid; place-items: center; width: 24px; height: 22px; border-radius: 8px; margin-bottom: 2px;
@@ -2205,6 +2214,10 @@ button.home-plan:hover { color: var(--text); }
 .home-skill .mark.tile { background: color-mix(in srgb, var(--skill) 17%, transparent); }
 .home-skill-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-level { display: flex; align-items: center; gap: 8px; }
+/* The ring, the cut count and the gems near cut each keep a column, so they line up down Home whether a
+   number has one digit or two, and whether a row has gems near cut at all (F439). */
+.home-level:has(.home-solid) { display: grid; grid-template-columns: 26px auto minmax(40px, auto); }
+.home-level .home-solid { min-width: 2ch; text-align: right; }
 .home-lv { flex: none; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
 .home-meter { flex: 1; height: 6px; border-radius: 4px; background: var(--bg-active); overflow: hidden; }
 /* A source added and not opened yet, in the meter's place: the section head's quiet label, no colour (it is no intent). */
@@ -2749,6 +2762,8 @@ button.home-plan:hover { color: var(--text); }
 /* Sticky edges sit inside the scroller's padding, so the sidebar's strip reaches past its foot room to the window's foot. */
 .sidebar.fade-more::after { bottom: calc(-1 * var(--mole-room)); height: 56px; margin: -56px -8px 0; }
 .menu-list.fade-more { --fade-pad: 4px; }
+/* What to review is a flex column: its strip keeps its height there. */
+.pick-list.fade-more::after { flex: none; }
 [cmdk-list].fade-more { --fade-pad: 6px; }
 /* A menu's list has 4px of padding, so its fade reaches only that far (a 6px one scrolled it sideways). */
 .popover.menu [cmdk-list].fade-more { --fade-pad: 4px; }
@@ -2963,6 +2978,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone-drawer button.on, .phone-drawer button:active { background: var(--bg-hover); }
 /* A skill with no icon keeps the icon's 20px, so every name starts on one line, as in the Mac's sidebar (F386). */
 .phone-drawer .skill-icon.dot { margin: 0 6px; }
+/* The skills in no collection have no heading (as the Mac's sidebar): space alone sets them off from Archive. */
+.phone-drawer section.bare { margin-top: 12px; }
 .phone-drawer h2 { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--muted); margin: 20px 8px 4px; }
 .phone-icon { justify-content: center; width: 44px; height: 44px; padding: 0; }
 .phone-root > .phone-bar { justify-content: space-between; }

@@ -16,7 +16,7 @@ import { isOther, tidyCollection } from "../../../packages/core/src/collection-n
 import { SkillIcon } from "./IconPicker";
 import { useSideCursor } from "./SideCursor";
 import { ore, opt, type Skill } from "./ore";
-import { layoutOf, skillGroups, UNGROUPED, type SkillLayout } from "./Skills";
+import { layoutOf, sidebarGroups, skillGroups, UNGROUPED, type SkillLayout } from "./Skills";
 import { errorText, load, save } from "./util";
 import { focusQuietly } from "./focus-near";
 
@@ -79,10 +79,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   // puts them back in their collections (`arrange`), so a drag or rename never loses one.
   // The skills in no collection come first here (D36 as amended 2026-11-20): a new skill is named at the
   // top, in sight however long the list is, and dragged from there into its collection.
-  const groups = useMemo(() => {
-    const all = skillGroups(skills.filter((s) => !s.archived));
-    return [...all.filter((g) => !g.collection), ...all.filter((g) => g.collection)];
-  }, [skills]);
+  const groups = useMemo((): Group[] => sidebarGroups(skills).map(({ bare: _, ...g }) => g), [skills]);
   const archived = skills.filter((s) => s.archived);
   const [archivedOpen, setArchivedOpen] = useState(() => load(ARCHIVED_OPEN) === "1");
   const arrange = (layout: SkillLayout, step?: string, renamed?: { from: string; to: string }) => {
