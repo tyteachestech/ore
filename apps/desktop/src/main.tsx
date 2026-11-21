@@ -6,7 +6,8 @@ import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { PHONE } from "./ore";
-import { PhoneApp } from "./phone/PhoneApp";
+import { PhoneApp, PLACE } from "./phone/PhoneApp";
+import { Boundary } from "./Boundary";
 import { HintProvider } from "./Hint";
 import { trackInput } from "./input-mode";
 import { installGlide } from "./pill-glide";
@@ -28,12 +29,23 @@ function PopoverSurface() {
   return null;
 }
 
+/** The way back from a crash nothing else caught: the app starts again. The phone reopens where it was left
+ *  (its saved place), which may be the screen that broke, so there it starts on Today. */
+const startOver = () => {
+  try {
+    if (PHONE) localStorage.removeItem(PLACE);
+  } catch {}
+  location.reload();
+};
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <PopoverSurface />
     <HintProvider>
       {/* The same page serves the quick quiz window (D76). */}
-      {PHONE ? <PhoneApp /> : getCurrentWindow().label === "quiz" ? <QuickQuiz /> : <App />}
+      <Boundary what="Ore" action={PHONE ? "Back to Today" : "Reload"} onBack={startOver}>
+        {PHONE ? <PhoneApp /> : getCurrentWindow().label === "quiz" ? <QuickQuiz /> : <App />}
+      </Boundary>
     </HintProvider>
   </StrictMode>,
 );

@@ -592,6 +592,11 @@ img.thumb { filter: brightness(0.86); }
 .pick-bar .pick-x { padding: 0; width: 28px; justify-content: center; }
 .pick-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
 body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
+/* The tutor's field sits at the window's foot, where a toast and the pick bar land: with the tutor open they stand
+   in the room left of it, never over what he is typing (F-new-toast-tutor). A floating tutor is 400px wide, 16px
+   in from the right; a docked one is --tutor-w. The window is never under 720px, which leaves them 256px. */
+body:has(.tutor.float) :is(.toasts, .pick-bar) { left: calc((100vw - 432px) / 2); max-width: min(70vw, calc(100vw - 464px)); }
+body:has(.tutor:not(.float)) :is(.toasts, .pick-bar) { left: calc((100vw - var(--tutor-w, 0px)) / 2); max-width: min(70vw, calc(100vw - var(--tutor-w, 0px) - 32px)); }
 @keyframes pick-in { from { opacity: 0; transform: translate(-50%, 4px) scale(0.97); } }
 @media (prefers-reduced-motion: reduce) { .pick-bar { animation: none; } }
 .toast:has(.toast-bar) { overflow: hidden; min-width: 300px; }
@@ -3312,6 +3317,8 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .phone-app:has(.phone-source .reader:not(:is(.noting, .dragging)) .read-pill) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--audio-bar)); }
 .phone .phone-app:has(.phone-source .reader:not(:is(.bars-hidden, .dragging, .noting)) .phone-tools) .toasts { bottom: calc(env(safe-area-inset-bottom, 0px) + 46px + var(--tools-lift) + var(--audio-bar)); }
 /* Toast buttons are finger-sized on the phone, without growing the toast. */
+/* The last-resort crash screen (main.tsx): its one way back is a 44pt tap. */
+.phone .boundary .pill-btn { min-height: 44px; }
 .phone .toast-undo { min-height: 44px; margin: -12px -8px -12px 0; padding: 0 8px; display: inline-flex; align-items: center; }
 .phone .toast-x { width: 44px; height: 44px; margin: -12px -14px -12px -8px; }
 .phone .reader:is(.bars-hidden, .dragging, .noting) .phone-tools { transform: translate(-50%, calc(100% + 24px + env(safe-area-inset-bottom, 0px))); opacity: 0; pointer-events: none; }

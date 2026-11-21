@@ -16228,6 +16228,47 @@ journey("phone: Bold Text in iOS makes Ore's text heavier, a row's words and a t
   if ((await weights())[1] !== words) throw new Error("Bold Text turned off left the text heavy");
 }, "phone");
 
+// F-new-crash-blank: a crash outside a screen's own boundary (a sheet, the sidebar, the phone outside Review) left
+// the window blank for good, with nothing to press. Settings is made to crash by an answer missing its fields.
+journey("a crash in a sheet shows what broke and Reload, never a blank window (F-new-crash-blank)", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { settings: {} }));
+  await page.keyboard.press("Meta+,");
+  await page.getByText("Ore hit a snag.").waitFor();
+  await page.getByRole("button", { name: "Reload" }).click();
+  await page.locator(".side-item").first().waitFor();
+  if (await page.getByText("hit a snag").count()) throw new Error("the app did not come back after Reload");
+});
+
+// F-new-toast-tutor: a toast (and the pick bar) landed over the open tutor's field, on what he was typing.
+journey("a toast stands left of the open tutor, never over its field (F-new-toast-tutor)", async (page) => {
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.keyboard.press("Meta+1");
+  await page.locator(".list .title").filter({ hasText: TESTING }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: /^Archive/ }).click();
+  const toast = page.locator(".toast").last();
+  await toast.waitFor();
+  await page.keyboard.press("Meta+j");
+  const tutor = page.locator("aside.tutor");
+  await tutor.waitFor();
+  const clear = async (how: string) => {
+    const [t, u] = [await toast.boundingBox(), await tutor.boundingBox()];
+    if (!t || !u) throw new Error(`no toast or no tutor to measure (${how})`);
+    if (t.x + t.width > u.x) throw new Error(`the toast (to x ${Math.round(t.x + t.width)}) is over the ${how} tutor (from x ${Math.round(u.x)})`);
+  };
+  try {
+    await clear("floating");
+    await tutor.getByRole("button", { name: "Dock to the side" }).click();
+    await tutor.getByRole("button", { name: "Float over the page" }).waitFor();
+    await clear("docked");
+  } finally {
+    // The tutor floating again, as every other journey finds it, and the source back in To read.
+    await tutor.getByRole("button", { name: "Float over the page" }).click().catch(() => {});
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Meta+z");
+    await inLibrary(page, [TESTING]);
+  }
+});
+
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
 for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {

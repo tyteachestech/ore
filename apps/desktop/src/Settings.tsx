@@ -348,8 +348,8 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                 <Row title="Skill tags" text="How a source's skills show in lists. Icon only leaves more room for titles.">
                   <Seg label="Skill tags" value={chips} options={CHIP_LOOKS} onChange={(v) => { setChipLook(v as ChipLook); setChips(v as ChipLook); }} />
                 </Row>
-                <Row title="Style controls" text="Colours and widths in a picker by the pointer (S), or a panel at the canvas's edge whenever something is picked.">
-                  <Seg label="Style controls" value={styleCtl} options={STYLE_CONTROLS} onChange={(v) => setStyleControls(v as StyleControls)} />
+                <Row title="Diagram style controls" text="A diagram's colours and widths in a picker by the pointer (S), or a panel at the canvas's edge whenever something is picked.">
+                  <Seg label="Diagram style controls" value={styleCtl} options={STYLE_CONTROLS} onChange={(v) => setStyleControls(v as StyleControls)} />
                 </Row>
                 {data && (
                     <Row title="Library folder" text="Your sources, notes and exercises, kept as plain files.">

@@ -222,7 +222,7 @@ type TabId = "today" | "sources" | "archive";
 
 /** Where he was, so a relaunch comes back to it, as Apple's apps do. */
 type Place = { tab: TabId; skill: string | null; skillNote?: boolean; course?: string | null; settings?: boolean; openId: string | null; noting?: boolean; side?: SideTab; finishing?: boolean; review: { pick: string[] | null; source?: string } | null };
-const PLACE = "ore-phone-place";
+export const PLACE = "ore-phone-place";
 function loadPlace(): Place {
   try {
     return { tab: "today", skill: null, openId: null, review: null, ...JSON.parse(localStorage.getItem(PLACE) ?? "{}") };
@@ -426,7 +426,11 @@ function NewSkill({ skills, onDone }: { skills: Skill[]; onDone: (made: Skill | 
   const [error, setError] = useState<string | null>(null);
   // The drawer's last rows sit where the keyboard comes up: the field, and its refusal once shown, stay above it.
   const form = useRef<HTMLFormElement>(null);
-  useLayoutEffect(() => form.current?.scrollIntoView({ block: "nearest" }), [error]);
+  // In braces: an effect may return only its clean-up, and a browser whose scrollIntoView answers with a promise
+  // (Chromium does) had React call that promise as one, which took the whole app down (F-new-effect-return).
+  useLayoutEffect(() => {
+    form.current?.scrollIntoView({ block: "nearest" });
+  }, [error]);
   const create = async () => {
     const n = name.trim().replace(/\s+/g, " ");
     if (!n) return onDone(null);
