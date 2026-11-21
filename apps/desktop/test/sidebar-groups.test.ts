@@ -4,7 +4,7 @@ import { sidebarGroups } from "../src/Skills";
 
 const skill = (id: string, collection?: string, archived?: boolean) => ({ id, name: id, collection, archived }) as unknown as Skill;
 
-// F-new-phone-skill-order: the Mac's sidebar listed the skills in no collection first with no heading (D36, 2026-11-20)
+// F442: the Mac's sidebar listed the skills in no collection first with no heading (D36, 2026-11-20)
 // while the iPhone's drawer still listed them last under "Other". Both lists now read this one order.
 test("the sidebar and the iPhone's drawer list skills in one order: those in no collection first with no heading, then each collection", () => {
   const groups = sidebarGroups([skill("a", "Craft"), skill("loose"), skill("b", "Work"), skill("c", "Craft"), skill("gone", "Work", true)]);

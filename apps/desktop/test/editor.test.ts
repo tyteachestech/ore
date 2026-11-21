@@ -176,7 +176,7 @@ describe("note editor (D38)", () => {
     expect(m("Divider", ["hr"], "etc folder")).toBe(false);
   });
 
-  test("F-new-slash-hyphen: / keeps its menu through a hyphen or a dot in a block's name (/to-do, /1.), as Notion does", async () => {
+  test("F435: / keeps its menu through a hyphen or a dot in a block's name (/to-do, /1.), as Notion does", async () => {
     expect(ed.menuTrigger("/to-do")).toEqual({ kind: "slash", query: "to-do", typed: 6 });
     expect(ed.menuTrigger("/to-")).toEqual({ kind: "slash", query: "to-", typed: 4 });
     expect(ed.menuTrigger("Text /1.")).toEqual({ kind: "slash", query: "1.", typed: 3 });

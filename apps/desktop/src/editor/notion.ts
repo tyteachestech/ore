@@ -259,7 +259,7 @@ const lineUnder = (state: EditorState, $c: ResolvedPos, trim = 0) => {
 };
 
 /** ↓ at the end of a code block that ends the note (or its toggle, quote, item) makes a line under
- *  it, as Linear and GitHub do: without it only a click below got out (F-new-code-exit). */
+ *  it, as Linear and GitHub do: without it only a click below got out (F434). */
 const downOutOfCode: Command = (state, dispatch) => {
   const $c = codeEnd(state);
   if (!$c) return false;

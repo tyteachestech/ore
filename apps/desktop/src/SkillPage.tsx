@@ -431,7 +431,7 @@ function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skil
   if (draft !== null)
     return (
       // The field wraps and grows, so a long goal's start stays in view (Linear's issue title), and the letters
-      // left show once the 140 (D102) are nearly used, since the field stops taking them there (F-new-goal-limit).
+      // left show once the 140 (D102) are nearly used, since the field stops taking them there (F437).
       <div className="skill-goal-edit">
         <Grow
           className="skill-goal editing"

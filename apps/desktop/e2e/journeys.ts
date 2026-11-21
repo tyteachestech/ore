@@ -16228,7 +16228,7 @@ journey("phone: Bold Text in iOS makes Ore's text heavier, a row's words and a t
   if ((await weights())[1] !== words) throw new Error("Bold Text turned off left the text heavy");
 }, "phone");
 
-journey("note: /to-do keeps the block menu open on To-do list, and Enter makes one (F-new-slash-hyphen)", async (page) => {
+journey("note: /to-do keeps the block menu open on To-do list, and Enter makes one (F435)", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   await openSource(page, AGENTS);
   await pm.click();
@@ -16251,7 +16251,7 @@ journey("note: /to-do keeps the block menu open on To-do list, and Enter makes o
   await page.keyboard.press("Backspace");
 });
 
-journey("note: ↓ at the end of a code block that ends the note makes a line under it (F-new-code-exit)", async (page) => {
+journey("note: ↓ at the end of a code block that ends the note makes a line under it (F434)", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   await openSource(page, AGENTS);
   await pm.click();
@@ -16271,7 +16271,7 @@ journey("note: ↓ at the end of a code block that ends the note makes a line un
   await page.keyboard.press("Backspace");
 });
 
-journey("What to review: a list longer than its box fades its last row, and not once scrolled to the end (F-new-pick-fade)", async (page) => {
+journey("What to review: a list longer than its box fades its last row, and not once scrolled to the end (F436)", async (page) => {
   // The box is half the window's height: a short window stands in for a long list of skills.
   await page.setViewportSize({ width: 1280, height: 280 });
   await page.getByRole("button", { name: "Start review" }).click();
@@ -16285,7 +16285,7 @@ journey("What to review: a list longer than its box fades its last row, and not 
   await page.keyboard.press("Escape");
 });
 
-journey("skill goal: a long goal wraps in its field, the letters left show near 140, and Enter saves it on one line (F-new-goal-limit)", async (page) => {
+journey("skill goal: a long goal wraps in its field, the letters left show near 140, and Enter saves it on one line (F437)", async (page) => {
   await page.locator(".sidebar .side-main", { hasText: "Teaching" }).click();
   await page.locator("button.skill-goal").click();
   const goal = page.locator("textarea.skill-goal");
@@ -16304,7 +16304,7 @@ journey("skill goal: a long goal wraps in its field, the letters left show near 
   await page.keyboard.press("Meta+z");
 });
 
-journey("sidebar: a long skill name ends before the ⋯ that shows on its row, by pointer or keyboard (F-new-more-over-name)", async (page) => {
+journey("sidebar: a long skill name ends before the ⋯ that shows on its row, by pointer or keyboard (F438)", async (page) => {
   const row = page.locator(".sidebar .side-item", { hasText: "Distributed Systems and Consensus" });
   const gap = () => row.evaluate((e) => e.querySelector(".side-more")!.getBoundingClientRect().left - e.querySelector(".label")!.getBoundingClientRect().right);
   await row.locator(".side-main").hover();
@@ -16316,7 +16316,7 @@ journey("sidebar: a long skill name ends before the ⋯ that shows on its row, b
   await until("and with the keyboard on the row", async () => (await gap()) >= 0);
 });
 
-journey("Home and What to review: each skill's ring, numbers and gems keep their columns down the list (F-new-number-columns)", async (page) => {
+journey("Home and What to review: each skill's ring, numbers and gems keep their columns down the list (F439)", async (page) => {
   const lefts = (rows: string, parts: string) =>
     page.evaluate(([rows, parts]) => [...document.querySelectorAll(rows!)].map((r) => [...r.querySelectorAll(parts!)].map((c) => `${c.className.split(" ")[0]}@${Math.round(c.getBoundingClientRect().left)}`)).flat(), [rows, parts]);
   const oneColumnEach = (found: string[]) => {
@@ -16336,7 +16336,7 @@ journey("Home and What to review: each skill's ring, numbers and gems keep their
   await page.keyboard.press("Escape");
 });
 
-journey("source note: a new table fits the side panel, its three columns whole (F-new-note-table-fits)", async (page) => {
+journey("source note: a new table fits the side panel, its three columns whole (F440)", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
   await openSource(page, AGENTS);
   await pm.click();
@@ -16356,7 +16356,7 @@ journey("source note: a new table fits the side panel, its three columns whole (
   await page.keyboard.press("Backspace");
 });
 
-journey("phone drawer: the skills in no collection come first with no heading, as in the Mac's sidebar (F-new-phone-skill-order)", async (page) => {
+journey("phone drawer: the skills in no collection come first with no heading, as in the Mac's sidebar (F442)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   const sections = await page.locator(".phone-drawer section").evaluateAll((all) => all.map((s) => s.querySelector("h2")?.textContent ?? ""));
   if (sections.length < 2 || sections[0] !== "" || sections.slice(1).some((h) => !h || h === "Other")) throw new Error(`the drawer's groups are headed ${JSON.stringify(sections)}`);

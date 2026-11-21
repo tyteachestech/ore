@@ -231,7 +231,7 @@ kbd {
 .side-item:has(> .side-main:focus-visible) .side-more { opacity: 1; }
 .side-head:has(> .side-label:focus-visible) .side-head-tools { opacity: 1; }
 .side-more[aria-expanded="true"] { color: var(--text); background: var(--bg-active); }
-/* While the ⋯ shows, the name gives it room (Notion, Linear): it drew over the end of a long one (F-new-more-over-name). */
+/* While the ⋯ shows, the name gives it room (Notion, Linear): it drew over the end of a long one (F438). */
 .side-item:is(:hover, :has(> .side-main:focus-visible), :has(> .side-more:is(:focus-visible, [aria-expanded="true"]))):has(> .side-more) > .side-main { padding-right: 30px; }
 
 /* Skill icons: an emoji, a Phosphor glyph masked and filled with the skill color, or a color dot. */
@@ -1423,7 +1423,7 @@ body.resizing iframe { pointer-events: none; }
 .note-editor code { font-family: var(--mono); font-size: 0.86em; background: var(--bg-raised); border-radius: 4px; padding: 1px 4px; }
 /* Tables (GFM): a grid in the note's text; wider than the note, it scrolls in place, faded at the edge
    with more to see. A column is 120px at least where three fit, and a third of a narrower note (the side
-   panel), so a new three-column table starts whole (F-new-note-table-fits). The room right of and under it holds the + that adds a column or a row. */
+   panel), so a new three-column table starts whole (F440). The room right of and under it holds the + that adds a column or a row. */
 .note-table { container-type: inline-size; overflow-x: auto; margin: 0 0 0.7em; padding: 0 18px 18px 0; --fade-l: 0px; --fade-r: 0px; mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent); }
 .note-table.more-left { --fade-l: 32px; } .note-table.more-right { --fade-r: 32px; }
 .note-table table { border-collapse: collapse; font-size: 0.93em; }
@@ -2179,7 +2179,7 @@ button.home-plan:hover { color: var(--text); }
 .pick-row:focus-visible { outline: none; background: var(--bg-hover); box-shadow: inset 0 0 0 2px var(--focus); }
 .pick-icon { flex: none; display: grid; place-items: center; width: 20px; font-size: 16px; }
 .pick-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
-/* Two fixed columns, so the gems and their numbers line up down the list whatever each row holds (F-new-number-columns). */
+/* Two fixed columns, so the gems and their numbers line up down the list whatever each row holds (F439). */
 .pick-gems { flex: none; display: grid; grid-template-columns: repeat(2, calc(22px + 2ch)); gap: 14px; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
 .pick-gems > span { display: inline-flex; align-items: center; gap: 6px; }
 .pick-gems > .loose { grid-column: 2; }
@@ -2208,7 +2208,7 @@ button.home-plan:hover { color: var(--text); }
 .home-skill-name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-level { display: flex; align-items: center; gap: 8px; }
 /* The ring, the cut count and the gems near cut each keep a column, so they line up down Home whether a
-   number has one digit or two, and whether a row has gems near cut at all (F-new-number-columns). */
+   number has one digit or two, and whether a row has gems near cut at all (F439). */
 .home-level:has(.home-solid) { display: grid; grid-template-columns: 26px auto minmax(40px, auto); }
 .home-level .home-solid { min-width: 2ch; text-align: right; }
 .home-lv { flex: none; font-size: 12px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }

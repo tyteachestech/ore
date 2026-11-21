@@ -500,7 +500,7 @@ describe("a diagram or image is a block of its own", () => {
 });
 
 describe("leaving a code block by keyboard", () => {
-  // F-new-code-exit: a code block at the end of a note held the caret; only a click below got out.
+  // F434: a code block at the end of a note held the caret; only a click below got out.
   test("↓ on the last line of a code block that ends the note makes a line under it", async () => {
     expect(await md("```\nx = 1‸\n```", "{ArrowDown}", "after")).toBe("```\nx = 1\n```\n\nafter");
     // Not on an earlier line, and not when a block already follows: the browser's own ↓.
