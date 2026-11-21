@@ -2202,7 +2202,6 @@ button.home-plan:hover { color: var(--text); }
 .home-meter { flex: 1; height: 6px; border-radius: 4px; background: var(--bg-active); overflow: hidden; }
 /* A source added and not opened yet, in the meter's place: the section head's quiet label, no colour (it is no intent). */
 .home-new { flex: none; width: 64px; text-align: right; font-size: 12px; color: var(--faint); }
-:root:not(.phone) .home-read:hover .home-new, .home-read:has(.more[aria-expanded="true"]) .home-new { visibility: hidden; }
 .home-skill-foot { color: var(--faint); font-size: 12px; }
 .home-cont { margin-top: 12px; padding: 6px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--lift); }
 .home-cont .home-h { margin: 8px 12px 4px; color: var(--text); font-size: 14px; font-weight: 600; }
@@ -2212,7 +2211,7 @@ button.home-plan:hover { color: var(--text); }
 .home-read.sel { background: var(--bg-active); }
 /* A row's or tile's ⋯ shows on hover (Linear). A row keeps its room at the right, where New sits on a source not
    opened yet, so the skill pills never run under it. */
-:root:not(.phone) .home-read:not(:has(.home-new))::after { content: ""; flex: none; width: 24px; }
+:root:not(.phone) .home-read::after { content: ""; flex: none; width: 24px; }
 .home-read { position: relative; }
 .home-read .more { position: absolute; width: 24px; height: 24px; border-radius: 6px; display: none; place-items: center; color: var(--faint); }
 .home-read .more { right: 12px; top: 50%; transform: translateY(-50%); }
@@ -2228,18 +2227,30 @@ button.home-plan:hover { color: var(--text); }
 .home-read .chips-button { max-width: 40%; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
 .home-read .chip { min-width: 0; }
-/* The picture is shown whole, in its own shape (D340; Finder's and Books' thumbnails): a video's
-   frame wide, a page or a cover upright, a show's art square. One 96×72 slot holds each of them centred, so
-   the titles still line up; a frame in it is the source lists' 96×54. Only a shape past a page's or a frame's
-   is cut, to that. A source with no picture gets its kind's icon on a tile of its kind's shape. On the iPhone
-   the row keeps its 16:9 picture. */
-.home-read { height: 88px; }
-.thumb-slot { display: contents; }
-:root:not(.phone) .thumb-slot { flex: none; display: grid; place-items: center; width: 96px; height: 72px; }
-/* Sized from the picture's shape (--ar, set once it loads; a frame until then), never its pixels, so a small picture fills its box too. */
-:root:not(.phone) .home-read .thumb { --shape: clamp(0.6944, var(--ar, 1.7778), 1.7778); width: min(96px, calc(72px * var(--shape))); height: min(72px, calc(96px / var(--shape))); }
-:root:not(.phone) .home-read .thumb.none { width: 96px; height: 54px; }
-:root:not(.phone) .home-read .thumb.none:is([data-kind="pdf"], [data-kind="epub"]) { width: 54px; height: 72px; }
+/* A row is Readwise Reader's (D-new-home-row): one picture box, the title, and under it one quiet line of what he
+   picks a source by. The box is the source lists' 96×54 for every picture, so the pictures and the titles line up:
+   a wide picture fills it, a page or a tall capture fills it from its top, and a cover or square art is shown
+   whole on a blurred copy of itself (data-fit, set once the picture loads). On the iPhone the row keeps its own
+   layout: the title beside the picture, the course under it. */
+.home-text, .home-meta { display: contents; }
+.home-meta > :is(.home-left, .home-site, .home-by) { display: none; }
+:root:not(.phone) .home-read { height: 70px; }
+:root:not(.phone) .home-read .thumb { width: 96px; height: 54px; }
+:root:not(.phone) .home-read img.thumb[data-fit="top"] { object-position: top; }
+:root:not(.phone) .home-read img.thumb[data-fit="whole"] { position: relative; object-fit: contain; background: none; outline: 0; }
+:root:not(.phone) .home-read .thumb-at:has(img[data-fit="whole"])::before { content: ""; position: absolute; inset: -12px; background: var(--pic) center / cover; filter: blur(10px) brightness(0.55) saturate(1.2); }
+:root:not(.phone) .home-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+:root:not(.phone) .home-text > :is(.title, .row-rename) { flex: none; max-width: 100%; }
+:root:not(.phone) .home-text > .row-rename { align-self: stretch; }
+:root:not(.phone) .home-read .title { font-weight: 500; }
+/* One line: what doesn't fit wraps out of sight whole, from the end, so nothing is left as a stub of two letters. */
+:root:not(.phone) .home-meta { display: flex; flex-wrap: wrap; align-items: center; align-self: stretch; height: 18px; overflow: hidden; color: var(--faint); font-size: 12px; white-space: nowrap; }
+:root:not(.phone) .home-read:is(:hover, .sel) .home-meta { color: var(--muted); }
+:root:not(.phone) .home-meta > span { display: block; flex: none; width: auto; max-width: min(100%, 28ch); line-height: 18px; overflow: hidden; text-overflow: ellipsis; text-align: left; visibility: visible; }
+:root:not(.phone) .home-meta > span + span::before { content: "·"; margin: 0 6px; }
+:root:not(.phone) .home-meta > .home-new { color: var(--text); }
+:root:not(.phone) .home-meta > .chips-button { flex: none; max-width: 100%; margin-left: 12px; }
+:root:not(.phone) .home-meta > .chips-button:first-child { margin-left: 0; }
 .home-read .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-read .row-rename { flex: 1; min-width: 0; height: 26px; margin: 0 -6px; padding: 0 6px; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: inherit; color: var(--text); }
 .home-read .course-of { flex: none; max-width: 35%; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 import { locate } from "../anchoring.ts";
 import { eachMarker, markerNumbers } from "../markers.ts";
-import { findItem, listItems, type AiStamp, type Item } from "../items.ts";
+import { findItem, listItems, wordCount, type AiStamp, type Item } from "../items.ts";
 import { readAnnotations } from "../annotations.ts";
 import { blankProblem, cardTextProblem, ContentType, hideBlanks, listCards, writeNewCard, type Card } from "../cards.ts";
 import { readReviews } from "../reviews.ts";
@@ -141,7 +141,6 @@ const readState = (lib: Library, chat: string): TutorState | null => {
 const turnsKey = (turns: { message: string; reply: string }[]) => createHash("sha256").update(JSON.stringify(turns.map((t) => [t.message.trim(), t.reply.trim()]))).digest("hex");
 /** The vendor's words for a session it no longer has (cleared, or made on another Mac). */
 const SESSION_GONE = /^(claude: |(claude|codex) failed \(exit \d+\): ).*(no conversation found|(session|thread|conversation|rollout)\b.*\bnot found|no (such )?(session|thread|rollout))/i;
-const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
 /** What the tutor is told of the open source: whether its passages hold all of it (its headings when they
  *  don't), the section on his screen, and what he highlighted in it (D294), Key points marked,

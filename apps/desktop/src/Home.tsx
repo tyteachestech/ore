@@ -13,7 +13,8 @@ import { DotBar, ThumbLine, minutes, minutesText, Ring } from "./Ring";
 import { dueSkills, knowsDue, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { archivedOnly, SkillChips, skillGroups, SkillPicker } from "./Skills";
 import { useSplit } from "./split";
-import { Thumb } from "./Thumb";
+import { Thumb, thumbSrc } from "./Thumb";
+import { siteOf } from "./details";
 import { localDay } from "../../../packages/core/src/ids";
 import { Roll } from "./Roll";
 import { count, errorText, load, typedLast, useKeptScroll, useDay, useLibraryChanges, type Notify } from "./util";
@@ -61,6 +62,19 @@ function reading(items: Item[], recent: string[], byTouch: Item[]): Item[] {
     ),
   ];
 }
+
+/** How long is left of a source, from where he is in it: "6 min left", "1 h 12 min left"; one not opened yet says
+ *  its whole length, "22 min". Read at 230 words a minute; a video or a talk is heard at about 150, the pace its
+ *  transcript was spoken at. Nothing for a source with no text to count. */
+export function timeLeft(item: Pick<Item, "words" | "type" | "video">, at: number, fresh = false): string | null {
+  if (!item.words) return null;
+  const min = Math.max(1, Math.round((item.words * (1 - Math.min(1, Math.max(0, at)))) / (item.type === "youtube" || item.video ? 150 : 230)));
+  const span = min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}`;
+  return fresh ? span : `${span} left`;
+}
+
+/** The picture again, for the blur a cover shown whole stands on. */
+const backdrop = (i: Item) => (i.thumbnail ? ({ "--pic": `url("${thumbSrc(i.thumbnail)}")` } as CSSProperties) : undefined);
 
 /** The row or tile he last opened from Home by the keyboard: Back puts focus on it again (Finder). Any other
  *  way back to Home forgets it. */
@@ -464,17 +478,17 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 // the skill chips and ⋯ sit beside it. A click anywhere else on the row still opens it.
                 <WithMenu key={i.id} actions={sourceMenu ? () => actionsFor(i) : []} hold>
                 <HomeRow id={i.id} drags={!!onDropOnSkill && renaming !== i.id} className={`home-read${picked.includes(i.id) ? " sel" : ""}`} aria-selected={picked.length ? picked.includes(i.id) : undefined} onClick={(e) => !(e.target as Element).closest("button, a, input, .chips, .more") && clickRow(e, i)}>
-                  {/* The picture whole, in its own shape, centred in one slot so the titles line up (D340).
-                      How far he is, as a line on the picture's foot (D327); the hint says it in words. */}
-                  <span className="thumb-slot">
+                  {/* One wide box for every picture, so the pictures and the titles line up (D-new-home-row); a cover
+                      shown whole in it stands on a blurred copy of itself. How far he is, as a line on the
+                      picture's foot (D327); the hint says it in words. */}
                   {isNew(i) ? (
-                    <span className="thumb-at"><Thumb item={i} iconSize={16} /></span>
+                    <span className="thumb-at" style={backdrop(i)}><Thumb item={i} iconSize={16} /></span>
                   ) : (
                     <Hint text={`${Math.round(at * 100)}% read`}>
-                      <span className="thumb-at"><Thumb item={i} iconSize={16} /><ThumbLine share={at} /></span>
+                      <span className="thumb-at" style={backdrop(i)}><Thumb item={i} iconSize={16} /><ThumbLine share={at} /></span>
                     </Hint>
                   )}
-                  </span>
+                  <span className="home-text">
                   {renaming === i.id ? (
                     // Focus goes back to the row once it closes, as after any pick from its menu (keepFocusNear).
                     <TitleField value={i.title} onSave={(t) => onRename!(i, t)} onClose={() => {
@@ -485,14 +499,21 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                   ) : (
                     <button className="title home-open" onClick={(e) => clickRow(e, i)}><span>{i.title}</span></button>
                   )}
-                  {i.course && <span className="course-of">{i.course.title}</span>}
-                  {onRefile && onCreateSkill && (
-                    <SkillPicker skills={skills} value={i.skills} title={i.title} onChange={(next, before, k) => onRefile(i, next, before, k)} onCreate={onCreateSkill}>
-                      {i.skills.length > 0 && <SkillChips ids={i.skills} skills={skills} />}
-                    </SkillPicker>
-                  )}
-                  {/* Not opened yet: where the others show how far he is, this one says it is new. */}
-                  {isNew(i) && <span className="home-new">New</span>}
+                  {/* Under the title, what he picks a source by (Readwise Reader's row): how long is left of it,
+                      where it is from and who made it, then its skills. What doesn't fit drops whole, from the end. */}
+                  <span className="home-meta">
+                    {/* Not opened yet: this one says it is new, where the others show how far he is. */}
+                    {isNew(i) && <span className="home-new">New</span>}
+                    {timeLeft(i, at, isNew(i)) && <span className="home-left">{timeLeft(i, at, isNew(i))}</span>}
+                    {i.course ? <span className="course-of">{i.course.title}</span> : siteOf(i.url) && <span className="home-site">{siteOf(i.url)}</span>}
+                    {i.author?.trim() && <span className="home-by">{i.author.trim()}</span>}
+                    {onRefile && onCreateSkill && (
+                      <SkillPicker skills={skills} value={i.skills} title={i.title} onChange={(next, before, k) => onRefile(i, next, before, k)} onCreate={onCreateSkill}>
+                        {i.skills.length > 0 && <SkillChips ids={i.skills} skills={skills} />}
+                      </SkillPicker>
+                    )}
+                  </span>
+                  </span>
                   {/* The ⋯ shows on hover, as on every other row (Linear). */}
                   {sourceMenu && <MoreButton label="Source actions" actions={() => actionsFor(i)} hoverOnly />}
                 </HomeRow>
@@ -664,6 +685,11 @@ function HomeRow({ id, drags, children, ref, ...props }: { id: string; drags: bo
       onPointerDown={(e) => {
         props.onPointerDown?.(e);
         listeners?.onPointerDown?.(e);
+      }}
+      // A right-click on the row's bare space (beside its title, between its lines) is on the row, as in Finder:
+      // focus goes to its title first, so the menu hands focus back to the row and not to nothing (F-new-menu-bare).
+      onContextMenuCapture={(e) => {
+        if (!(e.target as Element).closest("button, a, input")) e.currentTarget.querySelector<HTMLElement>(".home-open")?.focus({ preventScroll: true });
       }}
     >
       {children}

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { continueReading } from "../src/Home";
+import { continueReading, timeLeft } from "../src/Home";
+import { fitOf } from "../src/Thumb";
 import type { Item } from "../src/ore";
 
 const item = (id: string, title: string, opened_at?: string): Item =>
@@ -24,4 +25,27 @@ test("a source just added and not opened yet joins the list by when it was added
   expect(continueReading(items, [], now).map((i) => i.id)).toEqual(["new", "read", "older", "long"]);
   // What this device remembers opening still leads among what he is reading; a new one goes above the first older than it.
   expect(continueReading(items, ["long"], now).map((i) => i.id)).toEqual(["new", "older", "long", "read"]);
+});
+
+// D-new-home-row: under the title, how long is left of a source.
+test("a row says how long is left from where he is, and a new source its whole length", () => {
+  expect(timeLeft({ words: 2300, type: "article" }, 0.4)).toBe("6 min left");
+  expect(timeLeft({ words: 2300, type: "article" }, 0, true)).toBe("10 min");
+  // A video or a talk is heard at the pace it was spoken, slower than reading.
+  expect(timeLeft({ words: 13_500, type: "youtube" }, 0.2)).toBe("1 h 12 min left");
+  expect(timeLeft({ words: 9000, type: "article", video: "https://youtu.be/x" }, 0)).toBe("1 h left");
+  // Never "0 min left", and nothing for a source with no text to count.
+  expect(timeLeft({ words: 40, type: "article" }, 0.99)).toBe("1 min left");
+  expect(timeLeft({ type: "article" }, 0)).toBeNull();
+  expect(timeLeft({ words: 0, type: "pdf" }, 0)).toBeNull();
+});
+
+test("a picture sits in the wide box by its own shape: wide fills, a page shows its top, a cover is whole (F-new-home-row)", () => {
+  expect(fitOf("article", 1200, 630)).toBe("fill");
+  expect(fitOf("youtube", 320, 180)).toBe("fill");
+  expect(fitOf("pdf", 1280, 720)).toBe("fill"); // slides
+  expect(fitOf("pdf", 612, 792)).toBe("top");
+  expect(fitOf("article", 600, 1700)).toBe("top"); // a tall capture
+  expect(fitOf("epub", 400, 600)).toBe("whole");
+  expect(fitOf("article", 600, 600)).toBe("whole"); // a show's art
 });
