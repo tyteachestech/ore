@@ -16228,9 +16228,9 @@ journey("phone: Bold Text in iOS makes Ore's text heavier, a row's words and a t
   if ((await weights())[1] !== words) throw new Error("Bold Text turned off left the text heavy");
 }, "phone");
 
-// F443: a crash outside a screen's own boundary (a sheet, the sidebar, the phone outside Review) left
+// F445: a crash outside a screen's own boundary (a sheet, the sidebar, the phone outside Review) left
 // the window blank for good, with nothing to press. Settings is made to crash by an answer missing its fields.
-journey("a crash in a sheet shows what broke and Reload, never a blank window (F443)", async (page) => {
+journey("a crash in a sheet shows what broke and Reload, never a blank window (F445)", async (page) => {
   await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { settings: {} }));
   await page.keyboard.press("Meta+,");
   await page.getByText("Ore hit a snag.").waitFor();
@@ -16239,8 +16239,8 @@ journey("a crash in a sheet shows what broke and Reload, never a blank window (F
   if (await page.getByText("hit a snag").count()) throw new Error("the app did not come back after Reload");
 });
 
-// F445: a toast (and the pick bar) landed over the open tutor's field, on what he was typing.
-journey("a toast stands left of the open tutor, never over its field (F445)", async (page) => {
+// F447: a toast (and the pick bar) landed over the open tutor's field, on what he was typing.
+journey("a toast stands left of the open tutor, never over its field (F447)", async (page) => {
   await page.setViewportSize({ width: 1000, height: 700 });
   await page.keyboard.press("Meta+1");
   await page.locator(".list .title").filter({ hasText: TESTING }).first().click({ button: "right" });

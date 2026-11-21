@@ -427,7 +427,7 @@ function NewSkill({ skills, onDone }: { skills: Skill[]; onDone: (made: Skill | 
   // The drawer's last rows sit where the keyboard comes up: the field, and its refusal once shown, stay above it.
   const form = useRef<HTMLFormElement>(null);
   // In braces: an effect may return only its clean-up, and a browser whose scrollIntoView answers with a promise
-  // (Chromium does) had React call that promise as one, which took the whole app down (F444).
+  // (Chromium does) had React call that promise as one, which took the whole app down (F446).
   useLayoutEffect(() => {
     form.current?.scrollIntoView({ block: "nearest" });
   }, [error]);
