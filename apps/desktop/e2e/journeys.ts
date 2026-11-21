@@ -3857,7 +3857,7 @@ journey("note / menu at the bottom of a long note: it opens above the line, insi
   await page.keyboard.press("ArrowUp");
   await onInMenu("↑ to the last row");
   // The window shrinks while it is open: still inside, and the late row its smaller cap hides is scrolled back to.
-  await page.setViewportSize({ width: 1280, height: 280 });
+  await page.setViewportSize({ width: 1280, height: 420 });
   await frames();
   await inside("after the window shrinks");
   await onInMenu("after the window shrinks");
