@@ -65,16 +65,17 @@ function reading(items: Item[], recent: string[], byTouch: Item[]): Item[] {
 
 /** How long is left of a source, from where he is in it: "6 min left", "1 h 12 min left"; one not opened yet says
  *  its whole length, "22 min". Read at 230 words a minute; a video or a talk is heard at about 150, the pace its
- *  transcript was spoken at. Nothing for a source with no text to count. */
+ *  transcript was spoken at. Nothing for a source with no text to count, or one he is at the end of. */
 export function timeLeft(item: Pick<Item, "words" | "type" | "video">, at: number, fresh = false): string | null {
-  if (!item.words) return null;
+  // At its end and not finished yet: nothing is left to say.
+  if (!item.words || at >= 0.98) return null;
   const min = Math.max(1, Math.round((item.words * (1 - Math.min(1, Math.max(0, at)))) / (item.type === "youtube" || item.video ? 150 : 230)));
   const span = min < 60 ? `${min} min` : `${Math.floor(min / 60)} h${min % 60 ? ` ${min % 60} min` : ""}`;
   return fresh ? span : `${span} left`;
 }
 
 /** The picture again, for the blur a cover shown whole stands on. */
-const backdrop = (i: Item) => (i.thumbnail ? ({ "--pic": `url("${thumbSrc(i.thumbnail)}")` } as CSSProperties) : undefined);
+const backdrop = (i: Item) => (i.thumbnail ? ({ "--pic": `url("${thumbSrc(i.thumbnail).replace(/["\\\n]/g, (c) => encodeURIComponent(c))}")` } as CSSProperties) : undefined);
 
 /** The row or tile he last opened from Home by the keyboard: Back puts focus on it again (Finder). Any other
  *  way back to Home forgets it. */

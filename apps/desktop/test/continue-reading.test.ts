@@ -35,7 +35,8 @@ test("a row says how long is left from where he is, and a new source its whole l
   expect(timeLeft({ words: 13_500, type: "youtube" }, 0.2)).toBe("1 h 12 min left");
   expect(timeLeft({ words: 9000, type: "article", video: "https://youtu.be/x" }, 0)).toBe("1 h left");
   // Never "0 min left", and nothing for a source with no text to count.
-  expect(timeLeft({ words: 40, type: "article" }, 0.99)).toBe("1 min left");
+  expect(timeLeft({ words: 40, type: "article" }, 0.9)).toBe("1 min left");
+  expect(timeLeft({ words: 4000, type: "article" }, 1)).toBeNull();
   expect(timeLeft({ type: "article" }, 0)).toBeNull();
   expect(timeLeft({ words: 0, type: "pdf" }, 0)).toBeNull();
 });
