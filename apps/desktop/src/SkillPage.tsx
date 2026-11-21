@@ -9,7 +9,7 @@ import { Grow } from "./Grow";
 import { useSplit } from "./split";
 import type { LinkTarget, NoteEditorHandle } from "./editor/NoteEditor";
 import * as Popover from "@radix-ui/react-popover";
-import { focusFilter, IconPicker, SkillIcon } from "./IconPicker";
+import { focusFilter, hasIcon, IconPicker, SkillIcon } from "./IconPicker";
 import { is, isNotes, label, useKeymap, keepKeysIn } from "./keys";
 import { clickBelow, LinkedFrom, NoteBody, useNotes } from "./Notes";
 import { FindBar, onceFound } from "./Find";
@@ -303,7 +303,7 @@ function BadgePicker({ skill, onChanged, notify }: { skill: Skill; onChanged: ()
       <Hint text={skill.icon ? "Change icon" : "Add icon"}>
         <Popover.Trigger asChild>
           <button className={`skill-badge${skill.color ? " tinted" : ""}`} aria-label={skill.icon ? "Change icon" : "Add icon"}>
-            {skill.icon ? <SkillIcon icon={skill.icon} color={skill.color} /> : <span className="initial">{initial(skill.name)}</span>}
+            {hasIcon(skill.icon) ? <SkillIcon icon={skill.icon} color={skill.color} /> : <span className="initial">{initial(skill.name)}</span>}
           </button>
         </Popover.Trigger>
       </Hint>
@@ -403,6 +403,9 @@ function useStats(skill: string): SkillStats | null {
 /** His goal for the skill (D101), under its name in place of the why (D63): one thing he could show
  *  he can do. Click to write, Enter or clicking away saves (D211), Esc keeps what was there. Try it opens the
  *  closed-book recall with the goal as its prompt; each try is saved, dated, in the skill note. */
+/** A goal's longest (D102; core checks it on write). */
+const GOAL_MAX = 140;
+
 function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skill; lastTry: string | null; onTry: () => void; onChanged: () => void; notify: Notify; tools: ReactNode }) {
   const [draft, setDraft] = useState<string | null>(null);
   const goalRef = useRef<HTMLButtonElement>(null);
@@ -427,22 +430,33 @@ function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skil
   };
   if (draft !== null)
     return (
-      <input
-        className="skill-goal editing"
-        autoFocus
-        value={draft}
-        maxLength={140}
-        placeholder="Something you could show, like “Explain X to a beginner”"
-        aria-label={`Your goal for ${skill.name}`}
-        onChange={(e) => setDraft(e.target.value)}
-        // Clicking away saves (D211); an emptied field keeps the goal, only Enter clears it.
-        onBlur={() => document.hasFocus() && ((draft ?? "").trim() ? void save() : setDraft(null))}
-        onKeyDown={(e) => {
-          keepKeysIn(e); // ⌘Z still reaches the app history
-          if (e.key === "Enter") void save();
-          if (e.key === "Escape") setDraft(null);
-        }}
-      />
+      // The field wraps and grows, so a long goal's start stays in view (Linear's issue title), and the letters
+      // left show once the 140 (D102) are nearly used, since the field stops taking them there (F-new-goal-limit).
+      <div className="skill-goal-edit">
+        <Grow
+          className="skill-goal editing"
+          autoFocus
+          onFocus={(e) => e.currentTarget.setSelectionRange(e.currentTarget.value.length, e.currentTarget.value.length)}
+          value={draft}
+          maxLength={GOAL_MAX}
+          placeholder="Something you could show, like “Explain X to a beginner”"
+          aria-label={`Your goal for ${skill.name}`}
+          // One line of meaning: a pasted line break is a space.
+          onChange={(e) => setDraft(e.target.value.replace(/\s*\n\s*/g, " ").slice(0, GOAL_MAX))}
+          // Clicking away saves (D211); an emptied field keeps the goal, only Enter clears it.
+          onBlur={() => document.hasFocus() && ((draft ?? "").trim() ? void save() : setDraft(null))}
+          onKeyDown={(e) => {
+            keepKeysIn(e); // ⌘Z still reaches the app history
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) (e.preventDefault(), void save());
+            if (e.key === "Escape") setDraft(null);
+          }}
+        />
+        {GOAL_MAX - draft.length <= 20 && (
+          <span className={`skill-goal-left${draft.length >= GOAL_MAX ? " none" : ""}`} role="status" aria-label={`${GOAL_MAX - draft.length} letters left`}>
+            {GOAL_MAX - draft.length}
+          </span>
+        )}
+      </div>
     );
   return (
     <div className="skill-goal-row">

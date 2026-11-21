@@ -4,6 +4,7 @@ import { Hint } from "./Hint";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { SkillIcon } from "./IconPicker";
 import { is } from "./keys";
+import { more } from "./more";
 import { Trap } from "./Trap";
 import { PHONE, type Skill, type Today } from "./ore";
 import { letDown, sheetLayer, useSwipeDown } from "./phone/sheet";
@@ -124,7 +125,7 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
             </button>
           )}
         </div>
-        <div className="pick-list">
+        <div className="pick-list" ref={more}>
           {rows.map(({ skill: s, due, near, loose }) => (
             <button key={s.id} className="pick-row" role="checkbox" aria-checked={on.has(s.id)} onClick={(e) => toggle(s.id, e.altKey)}>
               <span className="pick-box" aria-hidden="true">
@@ -138,8 +139,8 @@ export function ReviewPick({ today, skills, onStart, onClose }: {
                   today, and cut ones that came loose, as a gem and a number with the words on hover (Tyler's pick). The count of what is due is for a screen reader only. */}
               {(near > 0 || loose > 0) && (
                 <span className="pick-gems" data-color={s.color}>
-                  {near > 0 && <Hint text={`${near} ${near === 1 ? "gem" : "gems"} one good answer from cut`}><span><Gem kind="ready" size={16} />{near}<span className="sr-only"> one good answer from cut</span></span></Hint>}
-                  {loose > 0 && <Hint text={`${loose} ${loose === 1 ? "gem" : "gems"} to win back`}><span><Gem kind="dull" size={16} />{loose}<span className="sr-only"> to win back</span></span></Hint>}
+                  {near > 0 && <Hint text={`${near} ${near === 1 ? "gem" : "gems"} one good answer from cut`}><span className="near"><Gem kind="ready" size={16} />{near}<span className="sr-only"> one good answer from cut</span></span></Hint>}
+                  {loose > 0 && <Hint text={`${loose} ${loose === 1 ? "gem" : "gems"} to win back`}><span className="loose"><Gem kind="dull" size={16} />{loose}<span className="sr-only"> to win back</span></span></Hint>}
                 </span>
               )}
               <span className="sr-only">{due} {due === 1 ? "exercise" : "exercises"} ready</span>

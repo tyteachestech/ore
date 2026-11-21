@@ -5,7 +5,7 @@ import { feedProof, type FoundFeed } from "./Feed";
 import { Hint } from "./Hint";
 import { Trap } from "./Trap";
 import { is } from "./keys";
-import { SkillIcon } from "./IconPicker";
+import { hasIcon, SkillIcon } from "./IconPicker";
 import { ore, type Skill } from "./ore";
 import { copiedFiles, pastesFiles, takeCopied } from "./copied";
 import { copiedWhat, entries, entryName, entryText, fileKind, isCourseLink, pastedHtml, withHtml, words, type Entry, type FileKind, type Pasted } from "./paste";
@@ -349,7 +349,7 @@ export function DropOverlay({ drop }: { drop: Dropping | null }) {
         <>
           <h2>
             Add to
-            {skill?.icon ? <SkillIcon icon={skill.icon} color={skill.color} /> : !skill && <Stack size={22} weight="bold" aria-hidden="true" />}
+            {hasIcon(skill?.icon) ? <SkillIcon icon={skill?.icon} color={skill?.color} /> : !skill && <Stack size={22} weight="bold" aria-hidden="true" />}
             <span className="name">{skill ? skill.name : "All sources"}</span>
           </h2>
           <p>{kinds.length > 1 ? `Drop ${kinds.length} files to read and highlight them` : front === "audio" ? "Drop the audio to transcribe it" : `Drop the ${NAMES[front]} to read and highlight it`}</p>

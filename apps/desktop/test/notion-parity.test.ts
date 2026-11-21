@@ -498,3 +498,24 @@ describe("a diagram or image is a block of its own", () => {
     expect(await md(`First‸\n\n- item ${D}`, "!")).toBe(`First!\n\n- item\n\n  ${D}`);
   });
 });
+
+describe("leaving a code block by keyboard", () => {
+  // F-new-code-exit: a code block at the end of a note held the caret; only a click below got out.
+  test("↓ on the last line of a code block that ends the note makes a line under it", async () => {
+    expect(await md("```\nx = 1‸\n```", "{ArrowDown}", "after")).toBe("```\nx = 1\n```\n\nafter");
+    // Not on an earlier line, and not when a block already follows: the browser's own ↓.
+    const up = await run("```\na‸\nb\n```", ["{ArrowDown}"]);
+    expect(up.handled).toEqual([false]);
+    const next = await run("```\nx = 1‸\n```\n\nnext", ["{ArrowDown}"]);
+    expect(next.handled).toEqual([false]);
+    expect(next.md).toBe("```\nx = 1\n```\n\nnext");
+  });
+
+  test("⌘↵ in a code block makes a line under it, wherever the caret is", async () => {
+    expect(await md("```\nx‸ = 1\n```\n\nnext", "{Mod-Enter}", "after")).toBe("```\nx = 1\n```\n\nafter\n\nnext");
+  });
+
+  test("Enter on a third empty line at the end of a code block leaves it, the empty lines gone", async () => {
+    expect(await md("```\nx = 1‸\n```", "{Enter}", "{Enter}", "{Enter}", "after")).toBe("```\nx = 1\n```\n\nafter");
+  });
+});

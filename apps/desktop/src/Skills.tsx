@@ -204,6 +204,16 @@ export function skillGroups(skills: Skill[]): { name: string; collection: string
   return groups;
 }
 
+/** The skill list as the Mac's sidebar and the iPhone's drawer show it: the skills in no collection first
+ *  (D36 as amended 2026-11-20: a new skill is named at the top, in sight however long the list is), then each
+ *  collection. Archived skills are left out (D173). `bare`: beside collections the first group has no heading,
+ *  like Notion's loose pages. One order for both, so a skill is where he left it on either device. */
+export function sidebarGroups(skills: Skill[]) {
+  const all = skillGroups(skills.filter((s) => !s.archived));
+  const named = all.some((g) => g.collection);
+  return [...all.filter((g) => !g.collection), ...all.filter((g) => g.collection)].map((g) => ({ ...g, bare: named && !g.collection }));
+}
+
 /** The sidebar layout `ore skills arrange` takes: collections in order with their skill ids. */
 export type SkillLayout = { collection: string; skills: string[] }[];
 export const layoutOf = (groups: ReturnType<typeof skillGroups>): SkillLayout => groups.map((g) => ({ collection: g.collection, skills: g.skills.map((s) => s.id) }));

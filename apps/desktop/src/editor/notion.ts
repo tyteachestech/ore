@@ -241,6 +241,40 @@ const tabInCode: Command = (state, dispatch) => {
   return true;
 };
 
+/** The caret's code block when the caret sits at its very end and the block ends its parent: where
+ *  nothing below can take the caret, so the keyboard needs its own way out. */
+const codeEnd = (state: EditorState) => {
+  const { $from, empty } = state.selection;
+  const at = $from.parent.type.spec.code && empty && $from.parentOffset === $from.parent.content.size;
+  return at && $from.index(-1) === $from.node(-1).childCount - 1 ? $from : null;
+};
+
+/** A line of text under the caret's code block, with the caret in it; `trim` drops that many
+ *  characters from the block's end first. */
+const lineUnder = (state: EditorState, $c: ResolvedPos, trim = 0) => {
+  const tr = state.tr.delete($c.pos - trim, $c.pos);
+  const after = tr.mapping.map($c.after());
+  const text = state.schema.nodes.paragraph!.createAndFill()!;
+  return tr.insert(after, text).setSelection(TextSelection.create(tr.doc, after + 1)).scrollIntoView();
+};
+
+/** ↓ at the end of a code block that ends the note (or its toggle, quote, item) makes a line under
+ *  it, as Linear and GitHub do: without it only a click below got out (F-new-code-exit). */
+const downOutOfCode: Command = (state, dispatch) => {
+  const $c = codeEnd(state);
+  if (!$c) return false;
+  dispatch?.(lineUnder(state, $c));
+  return true;
+};
+
+/** Enter on a second empty line at such a block's end leaves it, the empty lines gone (Notion, Tiptap). */
+const enterOutOfCode: Command = (state, dispatch) => {
+  const $c = codeEnd(state);
+  if (!$c || !$c.parent.textContent.endsWith("\n\n")) return false;
+  dispatch?.(lineUnder(state, $c, 2));
+  return true;
+};
+
 /** Tab on a line of text or a heading nests it under the block above, as Notion does, where Markdown
  *  can hold it: in the last item of a list above (as more of that item), or at the end of a toggle's
  *  body. A list item's own first line is the list's Tab (indent). */
@@ -291,7 +325,8 @@ const turnKeys = Object.fromEntries(
 export const notionKeys = $prose(() =>
   keymap({
     Backspace: backspace,
-    Enter: (state, dispatch) => enterInQuote(state, dispatch) || enterInTodo(state, dispatch),
+    Enter: (state, dispatch) => enterOutOfCode(state, dispatch) || enterInQuote(state, dispatch) || enterInTodo(state, dispatch),
+    ArrowDown: downOutOfCode,
     "Mod-Enter": tick,
     Tab: (state, dispatch) => tabInCode(state, dispatch) || nest(state, dispatch),
     "Shift-Tab": unnest,
