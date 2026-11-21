@@ -16404,6 +16404,67 @@ journey("phone drawer: the skills in no collection come first with no heading, a
   if (sections.length < 2 || sections[0] !== "" || sections.slice(1).some((h) => !h || h === "Other")) throw new Error(`the drawer's groups are headed ${JSON.stringify(sections)}`);
 }, "phone");
 
+journey("⌘K: a match in a source's text opens it at the passage the result showed, the words lit, never \"Not found\" (F443)", async (page) => {
+  await page.keyboard.press("Meta+k");
+  // Three words the source holds apart: under a heading, then in the paragraph after it.
+  await page.keyboard.type("why retrieval works");
+  await page.locator("[cmdk-item]").filter({ hasText: "Why it works" }).first().click();
+  await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+  const count = page.locator(".find-count");
+  await until("Find counts a match", async () => /^\d+\/\d+$/.test((await count.textContent().catch(() => "")) ?? ""));
+  if ((await page.getByLabel("Find in source").inputValue()) !== "Why it works") throw new Error(`Find holds "${await page.getByLabel("Find in source").inputValue()}"`);
+  // The heading the result showed is on screen.
+  await until("the passage is in view", () => page.evaluate(() => {
+    const h = [...document.querySelectorAll(".doc h2")].find((e) => e.textContent === "Why it works")?.getBoundingClientRect();
+    return !!h && h.top > 0 && h.bottom < innerHeight;
+  }));
+  await page.keyboard.press("Escape");
+  // Two words far apart in one sentence, the first of them also earlier in the source: Find starts in the result's sentence.
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("retrieval gains");
+  await page.locator("[cmdk-item]").filter({ hasText: "produces larger" }).first().click();
+  await until("Find starts past the first match", async () => {
+    const m = ((await count.textContent().catch(() => "")) ?? "").match(/^(\d+)\/(\d+)$/);
+    return !!m && +m[1]! > 1;
+  });
+  await page.keyboard.press("Escape");
+});
+
+journey("reader: a source with pictures above his place reopens on the passage he left, though the pictures have not loaded again (F444)", async (page) => {
+  // Six tall pictures, then a long text: far below them a picture is not loaded until he scrolls back near it.
+  const picture = (n: number) => `![Figure ${n}](https://pictures.test/figure-${n}.svg)`;
+  await page.route("https://pictures.test/**", (r) => r.fulfill({ contentType: "image/svg+xml", body: `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="700"><rect width="600" height="700" fill="#345"/></svg>` }));
+  const dir = mkdtempSync(join(tmpdir(), "ore-place-"));
+  const file = join(dir, "pictures.md");
+  writeFileSync(file, `# Pictures above the place\n\n${Array.from({ length: 6 }, (_, i) => picture(i + 1)).join("\n\n")}\n\n${Array.from({ length: 120 }, (_, i) => `Passage ${i + 1} goes on about recall and spacing, long enough to wrap across a couple of lines of the reading column.`).join("\n\n")}\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  try {
+    await page.reload();
+    await openSource(page, "Pictures above the place");
+    await until("the pictures at the top have loaded", () => page.evaluate(() => [...document.querySelectorAll<HTMLImageElement>(".doc img")].filter((i) => i.naturalHeight > 0).length >= 2));
+    const passage = page.locator(".doc p", { hasText: "Passage 100 " });
+    const offset = () => passage.evaluate((p) => Math.round(p.getBoundingClientRect().top - document.querySelector(".reader-scroll")!.getBoundingClientRect().top));
+    await passage.evaluate((p) => {
+      const pane = document.querySelector<HTMLElement>(".reader-scroll")!;
+      pane.scrollTop += p.getBoundingClientRect().top - pane.getBoundingClientRect().top - 20;
+    });
+    await page.waitForTimeout(600); // the place is saved a moment after the scroll ends
+    const was = await offset();
+    // The app opened again: no picture is in memory, so the text is drawn before any of them has a height.
+    await page.reload();
+    await openSource(page, "Pictures above the place");
+    await until(`Passage 100 is back at the top (${was}px down)`, async () => Math.abs((await offset()) - was) <= 4);
+    // And it stays there as he scrolls up into pictures that load late.
+    await page.locator(".reader-scroll").evaluate((e) => e.scrollBy(0, -200));
+    await page.waitForTimeout(400);
+    if (Math.abs((await offset()) - (was + 200)) > 6) throw new Error(`after scrolling up 200px, Passage 100 is ${await offset()}px down, not ${was + 200}`);
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+    await page.unroute("https://pictures.test/**");
+  }
+});
+
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);
 for (const [name, run, engine] of picked.slice((shard - 1) * per, shard * per)) {
