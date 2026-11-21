@@ -9,7 +9,7 @@ const KIND_ICON: Record<string, Icon> = { article: Article, youtube: YoutubeLogo
 /** Where a source's picture is read from: its file through the webview, or its bytes as they are. */
 export const thumbSrc = (thumbnail: string) => (thumbnail.startsWith("data:") ? thumbnail : convertFileSrc(thumbnail));
 
-/** How a picture sits in a wide 16:9 box (Home's Continue reading, D-new-home-row), from its own shape: a wide one
+/** How a picture sits in a wide 16:9 box (Home's Continue reading, D341), from its own shape: a wide one
  *  fills it; a page or a tall capture fills it from its top, where the title is; a cover or a show's square art
  *  is shown whole, since a strip of a cover is no cover. */
 export const fitOf = (type: string, w: number, h: number): "fill" | "top" | "whole" => {

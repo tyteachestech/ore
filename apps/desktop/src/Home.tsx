@@ -478,7 +478,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 // the skill chips and ⋯ sit beside it. A click anywhere else on the row still opens it.
                 <WithMenu key={i.id} actions={sourceMenu ? () => actionsFor(i) : []} hold>
                 <HomeRow id={i.id} drags={!!onDropOnSkill && renaming !== i.id} className={`home-read${picked.includes(i.id) ? " sel" : ""}`} aria-selected={picked.length ? picked.includes(i.id) : undefined} onClick={(e) => !(e.target as Element).closest("button, a, input, .chips, .more") && clickRow(e, i)}>
-                  {/* One wide box for every picture, so the pictures and the titles line up (D-new-home-row); a cover
+                  {/* One wide box for every picture, so the pictures and the titles line up (D341); a cover
                       shown whole in it stands on a blurred copy of itself. How far he is, as a line on the
                       picture's foot (D327); the hint says it in words. */}
                   {isNew(i) ? (
@@ -687,7 +687,7 @@ function HomeRow({ id, drags, children, ref, ...props }: { id: string; drags: bo
         listeners?.onPointerDown?.(e);
       }}
       // A right-click on the row's bare space (beside its title, between its lines) is on the row, as in Finder:
-      // focus goes to its title first, so the menu hands focus back to the row and not to nothing (F-new-menu-bare).
+      // focus goes to its title first, so the menu hands focus back to the row and not to nothing (F433).
       onContextMenuCapture={(e) => {
         if (!(e.target as Element).closest("button, a, input")) e.currentTarget.querySelector<HTMLElement>(".home-open")?.focus({ preventScroll: true });
       }}

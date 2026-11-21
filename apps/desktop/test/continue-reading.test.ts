@@ -27,7 +27,7 @@ test("a source just added and not opened yet joins the list by when it was added
   expect(continueReading(items, ["long"], now).map((i) => i.id)).toEqual(["new", "older", "long", "read"]);
 });
 
-// D-new-home-row: under the title, how long is left of a source.
+// D341: under the title, how long is left of a source.
 test("a row says how long is left from where he is, and a new source its whole length", () => {
   expect(timeLeft({ words: 2300, type: "article" }, 0.4)).toBe("6 min left");
   expect(timeLeft({ words: 2300, type: "article" }, 0, true)).toBe("10 min");
@@ -40,7 +40,7 @@ test("a row says how long is left from where he is, and a new source its whole l
   expect(timeLeft({ words: 0, type: "pdf" }, 0)).toBeNull();
 });
 
-test("a picture sits in the wide box by its own shape: wide fills, a page shows its top, a cover is whole (F-new-home-row)", () => {
+test("a picture sits in the wide box by its own shape: wide fills, a page shows its top, a cover is whole (F432)", () => {
   expect(fitOf("article", 1200, 630)).toBe("fill");
   expect(fitOf("youtube", 320, 180)).toBe("fill");
   expect(fitOf("pdf", 1280, 720)).toBe("fill"); // slides

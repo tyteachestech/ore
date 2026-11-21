@@ -184,7 +184,7 @@ export type Item = {
   enrich_skipped?: boolean;
   recall?: { text: string; at: string; feedback?: string };
   chapter_recalls?: ChapterRecall[];
-  /** From `ore ls`: how many words its text holds, for the time left to read it (D-new-home-row). */
+  /** From `ore ls`: how many words its text holds, for the time left to read it (D341). */
   words?: number;
   /** From `ore ls`: the source note (notes.md) has text. */
   has_notes?: boolean;

@@ -10,7 +10,7 @@ const ore = async (root: string, args: string[], stdin?: string) => {
   return JSON.parse(out);
 };
 
-// Home's Continue reading says how long is left of a source (D-new-home-row): `ore ls` counts its words.
+// Home's Continue reading says how long is left of a source (D341): `ore ls` counts its words.
 test("ore ls says how many words each source holds", async () => {
   const lib = await tempLibrary();
   const added = await ore(lib.root, ["add", "--stdin", "--no-enrich"], "# Counted\n\nOne two three four five.");

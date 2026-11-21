@@ -2227,7 +2227,7 @@ button.home-plan:hover { color: var(--text); }
 .home-read .chips-button { max-width: 40%; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
 .home-read .chip { min-width: 0; }
-/* A row is Readwise Reader's (D-new-home-row): one picture box, the title, and under it one quiet line of what he
+/* A row is Readwise Reader's (D341): one picture box, the title, and under it one quiet line of what he
    picks a source by. The box is the source lists' 96×54 for every picture, so the pictures and the titles line up:
    a wide picture fills it, a page or a tall capture fills it from its top, and a cover or square art is shown
    whole on a blurred copy of itself (data-fit, set once the picture loads). On the iPhone the row keeps its own
