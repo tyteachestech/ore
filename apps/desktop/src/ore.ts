@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { passageText } from "./text";
+import { foundIn } from "./search-landing";
 import { answersWithAi } from "./ai-commands";
 import { siteOf } from "./details";
 import { wakeOpenScreens } from "./util";
@@ -305,9 +306,14 @@ export type Skill = { id: string; name: string; priority?: Priority; archived?: 
 export type SearchHit = { kind: string; ref: string; item?: string; title: string; snippet?: string; annotation?: string };
 
 /** Where a search match lands in its source (Reader's `jumpTo`), for ⌘K and a list's search alike: the words in
- *  its text, a highlight's popup, the words in its source note; an exercise at the highlight it was made from. */
+ *  its text (those its snippet shows, then the passage they sit in on a line of its own: `foundIn`), a
+ *  highlight's popup, the words in its source note; an exercise at the highlight it was made from. */
+const inText = (h: SearchHit, query: string) => {
+  const { words, near } = foundIn(h.snippet ?? "", query);
+  return `find:${words}${near ? `\n${near}` : ""}`;
+};
 export const landing = (h: SearchHit, query: string): string | undefined =>
-  h.kind === "item" ? `find:${query}` : h.kind === "notes" ? `note:${query}` : h.kind === "annotation" ? `ann:${h.ref}` : h.annotation && `ann:${h.annotation}`;
+  h.kind === "item" ? inText(h, query) : h.kind === "notes" ? `note:${query}` : h.kind === "annotation" ? `ann:${h.ref}` : h.annotation && `ann:${h.annotation}`;
 
 /** `ore notes`: a source note or a skill note (notes.md) as it now is; `dir` is its folder, absolute. */
 export type Notes = { kept_from_feed?: boolean; item?: string; skill?: string; text: string; path: string; dir: string };

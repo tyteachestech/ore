@@ -22,10 +22,11 @@ import { Grow } from "./Grow";
 import { breakList, bulletOnSpace, fromBullets, showBullets } from "./list-keys";
 import { HideDots } from "./HideDots";
 import { Hint } from "./Hint";
-import { Thumb } from "./Thumb";
+import { Thumb, thumbSrc } from "./Thumb";
+import { useNowPlaying } from "./now-playing";
 import { SkillIcon } from "./IconPicker";
 import { inTextField, is, isLoose, label, useKeymap } from "./keys";
-import { bigger, keepPlace, placeOf, smaller } from "./reading";
+import { bigger, keepPlace, placeAt, placeOf, smaller, toPlace } from "./reading";
 import { againIn, define, lookable, wordAt } from "./lookup";
 import { Explain } from "./Explain";
 import { citeQuote, citeSources, copyCited, type Cited } from "./cite";
@@ -771,7 +772,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const readerRef = useRef<HTMLDivElement>(null);
   /** ⌘F: open with the bump that refocuses it; the query stays for the next ⌘F, as in Safari. `note`:
    *  opened by ⌘K on a match in the source note, so it searches only there. */
-  const [find, setFind] = useState<{ open: boolean; focus: number; query: string; note?: boolean }>({ open: false, focus: 0, query: "" });
+  const [find, setFind] = useState<{ open: boolean; focus: number; query: string; note?: boolean; near?: string }>({ open: false, focus: 0, query: "" });
   const [barsHidden, setBarsHidden] = useState(false);
   const lastTop = useRef(0);
   const lastTouch = useRef(0);
@@ -870,6 +871,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     return body !== undefined && m && m[1]!.trim() === loadedTitle.current.trim() ? body.slice(m[0].length) : body;
   }, [body]);
   const scrollKey = `ore.scroll.${p.id}`;
+  const placeKey = `ore.place.${p.id}`;
 
   // Video sources (D48 to D50): the player, transcript words located in the rendered text, and
   // following. `following` is a ref so scroll handlers see it at once; `away` drives the pill.
@@ -882,6 +884,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const { recording, playFrom } = p;
   useEffect(() => void (audio && playFrom(audio.file)), [audio, playFrom]);
   const player = audio ? recording : youtube;
+  // A recording answers the keyboard's play keys, AirPods and Control Center; YouTube's player tells them itself.
+  const playing = useMemo(() => (doc && audio ? { title: doc.title, artist: doc.author, artwork: doc.thumbnail ? thumbSrc(doc.thumbnail) : undefined } : null), [doc, audio]);
+  useNowPlaying(audio ? recording : null, playing);
   // A page with its video (D92): the player and its transcript sit in a card at the top of the text,
   // not pinned, and the transcript follows the speaker inside the card. Folding is kept per source.
   const cardMode = !!video && !!doc?.video && !!shownBody?.includes(VIDEO_END);
@@ -1250,7 +1255,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   useEffect(() => {
     if (!ready) return;
-    if (p.jumpTo?.startsWith("find:")) setFind((f) => ({ open: true, focus: f.focus + 1, query: p.jumpTo!.slice(5) }));
+    if (p.jumpTo?.startsWith("find:")) {
+      // The words, then (on a line of its own) the passage the result showed them in: Find starts there.
+      const [query = "", near] = p.jumpTo.slice(5).split("\n");
+      setFind((f) => ({ open: true, focus: f.focus + 1, query, near }));
+    }
     else if (p.jumpTo?.startsWith("note:")) {
       const query = p.jumpTo.slice(5);
       p.onShowSide("note", true);
@@ -1267,8 +1276,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }, []);
   useLayoutEffect(() => {
     if (!ready || !scrollRef.current) return;
+    // The passage he left at the top (F444); the distance down the page for a place saved before that.
     const y = Number(load(scrollKey) ?? 0);
-    if (y > 0 && !p.jumpTo) scrollRef.current.scrollTop = y;
+    if (y > 0 && !p.jumpTo && !(docEl.current && toPlace(scrollRef.current, docEl.current, load(placeKey) ?? ""))) scrollRef.current.scrollTop = y;
     // A long text is drawn in slices, and can be ready a second after it opened: a click into the note meanwhile keeps
     // the keys there, or what he types next lands in the source (CI, F396).
     if (clicked.current && document.activeElement && document.activeElement !== document.body) return;
@@ -1345,6 +1355,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       take();
     });
     ro.observe(scroll);
+    // The text growing or shrinking under him too: a picture above his place that loads late pushes it down,
+    // and WebKit does not hold the page still for it as Chromium does (F444).
+    if (docEl.current) ro.observe(docEl.current);
     scroll.addEventListener("scroll", take, { passive: true });
     return () => {
       ro.disconnect();
@@ -2722,6 +2735,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       const el = scrollRef.current;
       if (!el) return;
       save(scrollKey, String(Math.round(el.scrollTop)));
+      const place = docEl.current && placeAt(el, docEl.current);
+      if (place) save(placeKey, place);
       // How far down he is, for Continue reading on Home (D58).
       save(`ore.pos.${p.id}`, (el.scrollTop / Math.max(1, el.scrollHeight - el.clientHeight)).toFixed(3));
       noteReached();
@@ -3592,7 +3607,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           scope={find.note ? "note" : notesShown ? "source and note" : "source"}
           within={readerRef.current}
           query={find.query}
-          onQuery={(query) => setFind((f) => ({ ...f, query }))}
+          near={find.near}
+          onQuery={(query) => setFind((f) => ({ ...f, query, near: undefined }))}
           focus={find.focus}
           onClose={closeFind}
           onJump={() => {

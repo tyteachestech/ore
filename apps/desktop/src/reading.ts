@@ -116,11 +116,13 @@ export function keepPlace(capture: () => () => void): () => void {
   };
 }
 
-/** Finds the block at the top of `scroll`'s view inside `doc` and returns a function that scrolls it
- *  back to the same spot, as Books keeps your paragraph when the text size changes. */
-export function placeOf(scroll: HTMLElement, doc: HTMLElement): () => void {
+const BLOCKS = "p, li, h1, h2, h3, h4, h5, h6, pre, blockquote, tr, img";
+
+/** The block at the top of `scroll`'s view inside `doc`: which one, counting down the text, and how far into it
+ *  the view's top is (0 its top, 1 its foot). */
+function topBlock(scroll: HTMLElement, doc: HTMLElement): { el: HTMLElement; index: number; at: number } | null {
   const top = scroll.getBoundingClientRect().top;
-  const blocks = doc.querySelectorAll<HTMLElement>("p, li, h1, h2, h3, h4, h5, h6, pre, blockquote, tr, img");
+  const blocks = doc.querySelectorAll<HTMLElement>(BLOCKS);
   // Blocks run down the page in document order: the last one starting at or above the view's top.
   let lo = 0;
   let hi = blocks.length - 1;
@@ -131,13 +133,38 @@ export function placeOf(scroll: HTMLElement, doc: HTMLElement): () => void {
     else hi = mid - 1;
   }
   const el = blocks[found];
-  if (!el) return () => {};
+  if (!el) return null;
   const r = el.getBoundingClientRect();
-  const at = r.height ? (top - r.top) / r.height : 0;
-  return () => {
-    const n = el.getBoundingClientRect();
-    scroll.scrollTop += n.top + at * n.height - top;
-  };
+  return { el, index: found, at: r.height ? (top - r.top) / r.height : 0 };
+}
+
+/** Scrolls so the view's top is `at` of the way into `el`. */
+function toBlock(scroll: HTMLElement, el: HTMLElement, at: number) {
+  const n = el.getBoundingClientRect();
+  scroll.scrollTop += n.top + at * n.height - scroll.getBoundingClientRect().top;
+}
+
+/** Finds the block at the top of `scroll`'s view inside `doc` and returns a function that scrolls it
+ *  back to the same spot, as Books keeps your paragraph when the text size changes. */
+export function placeOf(scroll: HTMLElement, doc: HTMLElement): () => void {
+  const b = topBlock(scroll, doc);
+  return b ? () => toBlock(scroll, b.el, b.at) : () => {};
+}
+
+/** His place in a source, to save: the block at the top of the view and how far into it, as "index:at". A
+ *  passage, never a distance down the page: pictures above it change that distance as they load (F444). */
+export function placeAt(scroll: HTMLElement, doc: HTMLElement): string | null {
+  const b = topBlock(scroll, doc);
+  return b ? `${b.index}:${+b.at.toFixed(3)}` : null;
+}
+
+/** Scrolls to a place `placeAt` saved; false when the text has no such block (nothing saved, or a shorter text now). */
+export function toPlace(scroll: HTMLElement, doc: HTMLElement, place: string): boolean {
+  const m = place.match(/^(\d+):([\d.]+)$/);
+  const el = m && doc.querySelectorAll<HTMLElement>(BLOCKS)[+m[1]!];
+  if (!m || !el) return false;
+  toBlock(scroll, el, +m[2]!);
+  return true;
 }
 
 /** The reading looks now, outside React. */
