@@ -13,7 +13,7 @@ export function Thumb({ item, className = "thumb", iconSize = 12 }: { item: Pick
     return <img className={className} data-kind={item.type} src={item.thumbnail.startsWith("data:") ? item.thumbnail : convertFileSrc(item.thumbnail)} alt="" draggable={false} loading="lazy" onError={() => setFailed(item.thumbnail!)} />;
   const K = KIND_ICON[item.type] ?? Article;
   return (
-    <span className={`${className} none`} aria-hidden="true">
+    <span className={`${className} none`} data-kind={item.type} aria-hidden="true">
       <K size={iconSize} />
     </span>
   );

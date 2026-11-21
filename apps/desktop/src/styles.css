@@ -2226,9 +2226,17 @@ button.home-plan:hover { color: var(--text); }
 .home-read .chips-button { max-width: 40%; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
 .home-read .chip { min-width: 0; }
-/* The same 16:9 picture as the source list (D114), big enough to know a source by. */
-.home-read { height: 52px; }
-.home-read .thumb { width: 64px; height: 36px; }
+/* The picture is shown whole, in its own shape (D-new-whole-picture; Finder's and Books' thumbnails): a video's
+   frame wide, a page or a cover upright, a show's art square. One 96×72 slot holds each of them centred, so
+   the titles still line up; a frame in it is the source lists' 96×54. Only a shape past a page's or a frame's
+   is cut, to that. A source with no picture gets its kind's icon on a tile of its kind's shape. On the iPhone
+   the row keeps its 16:9 picture. */
+.home-read { height: 88px; }
+.thumb-slot { display: contents; }
+:root:not(.phone) .thumb-slot { flex: none; display: grid; place-items: center; width: 96px; height: 72px; }
+:root:not(.phone) .home-read .thumb { width: auto; height: auto; min-width: 50px; max-width: 96px; min-height: 54px; max-height: 72px; }
+:root:not(.phone) .home-read .thumb.none { width: 96px; height: 54px; }
+:root:not(.phone) .home-read .thumb.none:is([data-kind="pdf"], [data-kind="epub"]) { width: 54px; height: 72px; }
 .home-read .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-read .row-rename { flex: 1; min-width: 0; height: 26px; margin: 0 -6px; padding: 0 6px; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: inherit; color: var(--text); }
 .home-read .course-of { flex: none; max-width: 35%; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
