@@ -2234,7 +2234,8 @@ button.home-plan:hover { color: var(--text); }
 .home-read { height: 88px; }
 .thumb-slot { display: contents; }
 :root:not(.phone) .thumb-slot { flex: none; display: grid; place-items: center; width: 96px; height: 72px; }
-:root:not(.phone) .home-read .thumb { width: auto; height: auto; min-width: 50px; max-width: 96px; min-height: 54px; max-height: 72px; }
+/* Sized from the picture's shape (--ar, set once it loads; a frame until then), never its pixels, so a small picture fills its box too. */
+:root:not(.phone) .home-read .thumb { --shape: clamp(0.6944, var(--ar, 1.7778), 1.7778); width: min(96px, calc(72px * var(--shape))); height: min(72px, calc(96px / var(--shape))); }
 :root:not(.phone) .home-read .thumb.none { width: 96px; height: 54px; }
 :root:not(.phone) .home-read .thumb.none:is([data-kind="pdf"], [data-kind="epub"]) { width: 54px; height: 72px; }
 .home-read .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
