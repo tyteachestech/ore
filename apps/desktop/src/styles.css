@@ -2239,18 +2239,21 @@ button.home-plan:hover { color: var(--text); }
 :root:not(.phone) .home-read img.thumb[data-fit="top"] { object-position: top; }
 :root:not(.phone) .home-read img.thumb[data-fit="whole"] { position: relative; object-fit: contain; background: none; outline: 0; }
 :root:not(.phone) .home-read .thumb-at:has(img[data-fit="whole"])::before { content: ""; position: absolute; inset: -12px; background: var(--pic) center / cover; filter: blur(10px) brightness(0.55) saturate(1.2); }
-:root:not(.phone) .home-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+:root:not(.phone) .home-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 :root:not(.phone) .home-text > :is(.title, .row-rename) { flex: none; max-width: 100%; }
 :root:not(.phone) .home-text > .row-rename { align-self: stretch; }
 :root:not(.phone) .home-read .title { font-weight: 500; }
 /* One line: what doesn't fit wraps out of sight whole, from the end, so nothing is left as a stub of two letters. */
-:root:not(.phone) .home-meta { display: flex; flex-wrap: wrap; align-items: center; align-self: stretch; height: 18px; overflow: hidden; color: var(--faint); font-size: 12px; white-space: nowrap; }
+:root:not(.phone) .home-meta { display: flex; flex-wrap: wrap; align-items: center; align-self: stretch; height: 20px; overflow: hidden; color: var(--faint); font-size: 12px; white-space: nowrap; }
 :root:not(.phone) .home-read:is(:hover, .sel) .home-meta { color: var(--muted); }
-:root:not(.phone) .home-meta > span { display: block; flex: none; width: auto; max-width: min(100%, 28ch); line-height: 18px; overflow: hidden; text-overflow: ellipsis; text-align: left; visibility: visible; }
+:root:not(.phone) .home-meta > span { display: block; flex: none; width: auto; max-width: min(100%, 28ch); line-height: 20px; overflow: hidden; text-overflow: ellipsis; text-align: left; visibility: visible; }
 :root:not(.phone) .home-meta > span + span::before { content: "·"; margin: 0 6px; }
 :root:not(.phone) .home-meta > .home-new { color: var(--text); }
 :root:not(.phone) .home-meta > .chips-button { flex: none; max-width: 100%; margin-left: 12px; }
 :root:not(.phone) .home-meta > .chips-button:first-child { margin-left: 0; }
+/* A source in no skill: the + that files it, as tall as the line so the line never cuts it (style-check). */
+:root:not(.phone) .home-meta > .chips-add { margin-block: 0; margin-left: 6px; }
+:root:not(.phone) .home-read:hover .chips-add { opacity: 1; }
 .home-read .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-read .row-rename { flex: 1; min-width: 0; height: 26px; margin: 0 -6px; padding: 0 6px; border-radius: 6px; background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); font: inherit; color: var(--text); }
 .home-read .course-of { flex: none; max-width: 35%; color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
