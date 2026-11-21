@@ -15980,10 +15980,15 @@ journey("phone: a sheet rises from the foot of the screen and a tap outside lets
 journey("phone: the long-press menu grows from its row, which stays lit while the menu is open (D331)", async (page) => {
   const row = page.locator(".home-read").first();
   await row.waitFor();
+  // The animations that start on the menu are written down as they start: asking the menu what is running once
+  // the press has ended found nothing on a slow runner, where the 520 ms press outlasts the growing (F453).
+  await page.evaluate(() => {
+    const seen: string[] = ((window as unknown as { __menuGrew: string[] }).__menuGrew = []);
+    document.addEventListener("animationstart", (e) => { if ((e.target as Element).matches?.(".menu-list")) seen.push(e.animationName); }, true);
+  });
   await press(page, row, 520);
-  // Read while it is still growing: the press has only just ended.
-  const grew = await page.evaluate(() => document.querySelector(".menu-list")?.getAnimations().map((a) => (a as CSSAnimation).animationName).join() ?? "no menu");
   await page.getByRole("menu").waitFor();
+  const grew = await page.evaluate(() => (window as unknown as { __menuGrew: string[] }).__menuGrew.join());
   if (grew !== "menu-grow") throw new Error(`the long-press menu did not grow from its row (animations: "${grew}")`);
   const lit = await row.evaluate((el) => { const at = el.closest("[data-menu-row]") ?? el; return getComputedStyle(at).backgroundColor !== getComputedStyle(document.body).backgroundColor && getComputedStyle(at).backgroundColor !== "rgba(0, 0, 0, 0)"; });
   if (!lit) throw new Error("the row he pressed is not lit while its menu is open");
