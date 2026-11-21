@@ -11562,6 +11562,28 @@ journey("source rename: a save that fails keeps the title he typed, in the field
   await page.keyboard.press("Escape");
 });
 
+journey("a chat he had elsewhere: nothing is asked before it, and its first step is recalling it closed-book (D339)", async (page) => {
+  const { createItem, updateItemMeta } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ meta: { id: string } }>; updateItemMeta: (lib: { root: string }, id: string, f: (m: object) => object) => Promise<unknown> };
+  const made = await createItem({ root: LIB }, { type: "article", title: "A chat about liens", url: "https://claude.ai/share/00000000-0000-4000-8000-000000000000", author: "Claude", chat: "claude", body: "## What is a lien?\n\nA claim on the settlement by someone who paid for the client's care.\n\n## Who is paid first?\n\nThe lien holders, before the client. Which of them would you call first, and why?" });
+  await updateItemMeta({ root: LIB }, made.meta.id, (m) => ({ ...m, prequestions: [{ q: "Who holds a lien?" }] }));
+  try {
+    await page.reload();
+    await openSource(page, "A chat about liens");
+    const line = page.getByText("What do you remember from this chat?");
+    await line.waitFor();
+    if (await page.getByText("Who holds a lien?").count()) throw new Error("a chat he was in asked what he already knows before reading it");
+    // Opened, it is a source he is reading: the toolbar's Reading for chip would list the question too.
+    await page.waitForTimeout(600);
+    if (await page.locator(".reading-for").count()) throw new Error("the Reading for chip shows on a chat, and leads to a block that isn't there");
+    await page.getByRole("button", { name: "Recall" }).click();
+    await page.getByText("What do you remember from “A chat about liens”?").waitFor();
+    await until("the line steps aside while he recalls", async () => (await line.count()) === 0);
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("archive", made.meta.id).catch(() => {});
+  }
+});
+
 journey("resize drags: Esc mid-drag puts the size back and stays on the page; nothing is left stuck after", async (page) => {
   const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ meta: { id: string } }> };
   const made = await createItem({ root: LIB }, { type: "youtube", title: "A talk on spacing", url: "https://www.youtube.com/watch?v=spacingTalk1", body: "[00:00] Spacing works.\n\n[00:30] Test yourself after a pause.", source: { ext: "vtt", data: "WEBVTT\n\n00:00:00.000 --> 00:00:30.000\nSpacing works.\n\n00:00:30.000 --> 00:01:00.000\nTest yourself after a pause.\n" } });

@@ -149,6 +149,8 @@ export type Item = {
   status: Status;
   /** A Feed post being read, not saved: a highlight or a note line keeps it. */
   preview?: string;
+  /** A chat he had with an AI, brought in from its shared page: whose it is. */
+  chat?: "claude";
   /** Archived: hidden from lists and search (only in the Archived tab). */
   archived_at?: string;
   /** Pinned: listed first, under Pinned. */
