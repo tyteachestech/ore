@@ -4091,6 +4091,8 @@ journey("sidebar: a collection renamed from its menu keeps focus on its name; de
   await label(/^Craft$/i).waitFor();
   const heads = (await page.locator(".side-head .side-label-text").allInnerTexts()).map((t) => t.trim());
   const next = heads[heads.findIndex((t) => /^craft$/i.test(t)) + 1]!;
+  const rows = async () => (await page.locator(".sidebar div.side-item .label").allInnerTexts()).map((t) => t.trim());
+  const before = await rows();
   await label(/^Craft$/i).click({ button: "right" });
   await page.getByRole("menuitem", { name: "Delete collection" }).click();
   try {
@@ -4102,8 +4104,10 @@ journey("sidebar: a collection renamed from its menu keeps focus on its name; de
     await page.keyboard.press("Meta+z");
     await label(/^Craft$/i).waitFor();
   }
-  await page.waitForLoadState("networkidle"); // the Undo's write has landed and the sidebar read it back
-  const skills = (await page.locator(".sidebar div.side-item .label").allInnerTexts()).map((t) => t.trim());
+  // The Undo's write has landed and the sidebar read it back: Craft's skills, which sat at the top with no
+  // collection while it was gone, are in it again. A menu opened on a row still on its way back closes under the click.
+  await until("the skills are back in their order", async () => (await rows()).join("|") === before.join("|"));
+  const skills = await rows();
   await page.locator(".sidebar div.side-item").first().click({ button: "right" });
   await page.getByRole("menuitem", { name: "Archive skill" }).click();
   try {
