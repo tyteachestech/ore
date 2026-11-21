@@ -4009,7 +4009,7 @@ journey("source title: one click renames it in place, Enter saves, Esc keeps the
   await until("⌘Z puts the old title back", async () => (await page.locator(".doc-head h1").innerText()) === AGENTS);
 });
 
-journey("Home: a Continue reading picture is shown whole in its own shape, a page upright and a frame wide, and the titles still line up (F-new-home-picture-cut)", async (page) => {
+journey("Home: a Continue reading picture is shown whole in its own shape, a page upright and a frame wide, and the titles still line up (F429)", async (page) => {
   const dirOf = (slug: string) => (readdirSync(join(LIB, "items"), { recursive: true }) as string[]).find((d) => d.split("/").pop()!.startsWith(slug) && !d.endsWith(".md"))!;
   const sheet = (w: number, h: number) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#fff"/><rect x="${w / 8}" y="${h / 8}" width="${w / 2}" height="${h / 16}" fill="#222"/></svg>`;
   // As an import leaves them: a PDF's first page (upright), a video's frame (16:9) and a banner far wider than either.

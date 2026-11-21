@@ -2226,7 +2226,7 @@ button.home-plan:hover { color: var(--text); }
 .home-read .chips-button { max-width: 40%; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
 .home-read .chip { min-width: 0; }
-/* The picture is shown whole, in its own shape (D-new-whole-picture; Finder's and Books' thumbnails): a video's
+/* The picture is shown whole, in its own shape (D340; Finder's and Books' thumbnails): a video's
    frame wide, a page or a cover upright, a show's art square. One 96×72 slot holds each of them centred, so
    the titles still line up; a frame in it is the source lists' 96×54. Only a shape past a page's or a frame's
    is cut, to that. A source with no picture gets its kind's icon on a tile of its kind's shape. On the iPhone

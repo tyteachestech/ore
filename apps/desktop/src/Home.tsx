@@ -464,7 +464,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 // the skill chips and ⋯ sit beside it. A click anywhere else on the row still opens it.
                 <WithMenu key={i.id} actions={sourceMenu ? () => actionsFor(i) : []} hold>
                 <HomeRow id={i.id} drags={!!onDropOnSkill && renaming !== i.id} className={`home-read${picked.includes(i.id) ? " sel" : ""}`} aria-selected={picked.length ? picked.includes(i.id) : undefined} onClick={(e) => !(e.target as Element).closest("button, a, input, .chips, .more") && clickRow(e, i)}>
-                  {/* The picture whole, in its own shape, centred in one slot so the titles line up (D-new-whole-picture).
+                  {/* The picture whole, in its own shape, centred in one slot so the titles line up (D340).
                       How far he is, as a line on the picture's foot (D327); the hint says it in words. */}
                   <span className="thumb-slot">
                   {isNew(i) ? (
