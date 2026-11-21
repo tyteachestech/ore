@@ -89,7 +89,8 @@ await page.addInitScript({ path: new URL("./tauri.js", import.meta.url).pathname
 await page.goto(url);
 await page.waitForTimeout(1500);
 let n = await audit(page, "home");
-await page.locator(".sidebar .side-item:not(.side-main)").first().click();
+// A skill with sources: the first row is one in no collection (they come first, D36), which has none.
+await page.locator(".sidebar .side-item:not(.side-main)", { hasText: "Learning" }).first().click();
 await page.waitForTimeout(1200);
 n += await audit(page, "skill");
 await page.locator(".skill-page .list .row").first().click();
