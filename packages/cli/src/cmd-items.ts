@@ -18,7 +18,7 @@ import {
   undoPageText,
   redoPageText,
   enrichLogs, markEnrichSkipped, type Item, type Library,
-  acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
+  acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, wordCount, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
   appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, tryingNow, tryLine, markTried, planTry, addTry, useCount, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, itemCardSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
   type AnchoredAnnotation, type AnnotationPatch,
@@ -211,7 +211,7 @@ export const itemCommands: Record<string, Command> = {
         (i) => !isQuestionOnly(i) && (!status || i.meta.status === status) && (!f.skill || i.meta.skills.includes(f.skill as string)) && (!f.topic || i.meta.topics.includes(f.topic as string)),
       );
       const logs = enrichLogs(lib);
-      const data = items.map((i) => ({ ...i.meta, path: relative(lib.root, i.docPath), dir: i.dir, source_file: sourceFile(i), thumbnail: thumbnailFile(i), course_cover: i.meta.course ? courseCoverFile(i) : undefined, has_notes: readNotes(i).trim() !== "", ...enrichFailure(logs, i) }));
+      const data = items.map((i) => ({ ...i.meta, path: relative(lib.root, i.docPath), dir: i.dir, source_file: sourceFile(i), thumbnail: thumbnailFile(i), course_cover: i.meta.course ? courseCoverFile(i) : undefined, words: wordCount(i.body), has_notes: readNotes(i).trim() !== "", ...enrichFailure(logs, i) }));
       const text = items.length
         ? table(items.map((i) => [i.meta.id, i.meta.status, i.meta.type, i.meta.enriched_at ? "enriched" : "-", i.meta.title]))
         : f.archived ? "No archived sources." : status || f.skill || f.topic ? "No sources match."

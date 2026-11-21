@@ -4009,11 +4009,11 @@ journey("source title: one click renames it in place, Enter saves, Esc keeps the
   await until("⌘Z puts the old title back", async () => (await page.locator(".doc-head h1").innerText()) === AGENTS);
 });
 
-journey("Home: a Continue reading picture is shown whole in its own shape, a page upright and a frame wide, and the titles still line up (F429)", async (page) => {
+journey("Home: every Continue reading picture sits in one wide box, a page from its top and a cover whole, with how long is left and where it is from under the title (F429, F432)", async (page) => {
   const dirOf = (slug: string) => (readdirSync(join(LIB, "items"), { recursive: true }) as string[]).find((d) => d.split("/").pop()!.startsWith(slug) && !d.endsWith(".md"))!;
   const sheet = (w: number, h: number) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#fff"/><rect x="${w / 8}" y="${h / 8}" width="${w / 2}" height="${h / 16}" fill="#222"/></svg>`;
-  // As an import leaves them: a PDF's first page (upright), a video's frame (16:9) and a banner far wider than either.
-  const shapes: [string, string, number, number][] = [[TESTING, "the-testing-effect-why", 371, 480], ["Building Effective Agents", "building-effective", 480, 270], ["A very long title about", "a-very-long", 480, 60]];
+  // As an import leaves them: a cover (upright), a video's frame (16:9) and a capture far taller than either.
+  const shapes: [string, string, number, number, string][] = [[TESTING, "the-testing-effect-why", 371, 480, "whole"], ["Building Effective Agents", "building-effective", 480, 270, "fill"], ["A very long title about", "a-very-long", 200, 900, "top"]];
   const files = shapes.map(([, slug, w, h]) => {
     const file = join(LIB, "items", dirOf(slug), "thumbnail.svg");
     writeFileSync(file, sheet(w, h));
@@ -4024,18 +4024,34 @@ journey("Home: a Continue reading picture is shown whole in its own shape, a pag
     for (const [title] of shapes) await openSource(page, title);
     await page.reload();
     await page.getByRole("button", { name: /^Home/ }).click();
-    const box = async (title: string, part: string) => (await page.locator(".home-read").filter({ hasText: title }).first().locator(part).boundingBox())!;
-    const drawn = (title: string) => page.locator(".home-read").filter({ hasText: title }).first().locator("img.thumb").evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0);
-    for (const [title] of shapes) await until(`${title}'s picture is drawn`, () => drawn(title));
-    const page1 = await box(TESTING, "img.thumb");
-    const frame = await box("Building Effective Agents", "img.thumb");
-    const banner = await box("A very long title about", "img.thumb");
+    const row = (title: string) => page.locator(".home-read").filter({ hasText: title }).first();
+    const box = async (title: string, part: string) => (await row(title).locator(part).boundingBox())!;
     const near = (a: number, b: number) => Math.abs(a - b) <= 1;
-    if (!(near(page1.height, 72) && near(page1.width / page1.height, 371 / 480))) throw new Error(`a page is cut or squeezed: ${page1.width}×${page1.height}, want it whole at 72 high`);
-    if (!(near(frame.width, 96) && near(frame.height, 54))) throw new Error(`a video's frame is ${frame.width}×${frame.height}, want 96×54`);
-    if (!(near(banner.width, 96) && near(banner.height, 54))) throw new Error(`a banner is ${banner.width}×${banner.height}: a shape past a frame's is cut to the frame, 96×54`);
-    const lefts = await Promise.all(shapes.map(async ([title]) => (await box(title, ".title")).x));
-    if (!lefts.every((x) => near(x, lefts[0]!))) throw new Error(`titles start at ${lefts.join(", ")}: pictures of different shapes must not move them`);
+    for (const [title, , , , fit] of shapes) {
+      await until(`${title}'s picture is drawn and placed`, async () => (await row(title).locator("img.thumb").getAttribute("data-fit")) === fit);
+      const pic = await box(title, ".thumb-at");
+      if (!(near(pic.width, 96) && near(pic.height, 54))) throw new Error(`${title}'s picture box is ${pic.width}×${pic.height}, want the one 96×54 box every row has`);
+    }
+    const cover = await row(TESTING).locator("img.thumb").evaluate((el) => ({ fit: getComputedStyle(el).objectFit, behind: getComputedStyle(el.parentElement!, "::before").backgroundImage }));
+    if (cover.fit !== "contain" || !cover.behind.startsWith("url(")) throw new Error(`a cover is ${cover.fit} on ${cover.behind}: want it whole, on a blurred copy of itself`);
+    const tall = await row("A very long title about").locator("img.thumb").evaluate((el) => getComputedStyle(el).objectPosition);
+    if (!tall.endsWith(" 0%")) throw new Error(`a tall capture is placed at ${tall}: want its top, where its title is`);
+    for (const part of [".thumb-at", ".title", ".home-meta"]) {
+      const lefts = await Promise.all(shapes.map(async ([title]) => (await box(title, part)).x));
+      if (!lefts.every((x) => near(x, lefts[0]!))) throw new Error(`${part} starts at ${lefts.join(", ")}: every row's must line up`);
+    }
+    const meta = await row("Building Effective Agents").locator(".home-meta").innerText();
+    if (!/\d+ min left/.test(meta) || !meta.includes("anthropic.com")) throw new Error(`under the title: "${meta}", want how long is left and the site`);
+    // The title sits over the line, not beside it, and a long one still ends inside the row.
+    const [t, m, r] = [await box("A very long title about", ".title"), await box("A very long title about", ".home-meta"), (await row("A very long title about").boundingBox())!];
+    if (!(m.y >= t.y + t.height - 1 && t.x + t.width <= r.x + r.width - 24)) throw new Error("the detail line is not under the title, or a long title runs under the row's ⋯");
+    // In a narrow column what doesn't fit drops whole: nothing on the line is cut to a stub.
+    await page.addStyleTag({ content: ".home-cont { max-width: 300px !important; flex: none !important; }" });
+    const stub = await row("Building Effective Agents").locator(".home-meta").evaluate((el) => {
+      const line = el.getBoundingClientRect();
+      return [...el.children].filter((c) => { const b = c.getBoundingClientRect(); return b.top < line.bottom - 2 && b.right > line.right + 1; }).map((c) => c.textContent);
+    });
+    if (stub.length) throw new Error(`in a narrow column these run off the line instead of dropping: ${stub.join(", ")}`);
   } finally {
     for (const f of files) rmSync(f, { force: true });
   }

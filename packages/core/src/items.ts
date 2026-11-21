@@ -156,6 +156,9 @@ export interface NewItem {
 
 export type Asset = { name: string; data: Uint8Array };
 
+/** How many words a text holds: what a list says is left to read of a source. */
+export const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
+
 /** A title as one line: a PDF's metadata or a pasted rename can carry line breaks and runs of spaces. */
 const oneLine = (title: string) => title.replace(/\s+/g, " ").trim();
 
