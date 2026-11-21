@@ -8,6 +8,9 @@ const RUN = process.env.ORE_BRIDGE_BIN ? [process.env.ORE_BRIDGE_BIN] : ["bun", 
 const jobs = new Map<string, ReturnType<typeof Bun.spawn>>();
 Bun.serve({
   port: Number(process.env.PORT ?? 1421),
+  // Never hang up on a quiet connection. Bun's default closes one idle for 10 s, and a journey that sends its next
+  // call down that connection as it closes gets ECONNRESET (F452); a long `ore` run is quiet too.
+  idleTimeout: 0,
   async fetch(req) {
     const h = { "access-control-allow-origin": "*", "access-control-allow-headers": "*" };
     if (req.method === "OPTIONS") return new Response(null, { headers: h });

@@ -15980,10 +15980,15 @@ journey("phone: a sheet rises from the foot of the screen and a tap outside lets
 journey("phone: the long-press menu grows from its row, which stays lit while the menu is open (D331)", async (page) => {
   const row = page.locator(".home-read").first();
   await row.waitFor();
+  // The animations that start on the menu are written down as they start: asking the menu what is running once
+  // the press has ended found nothing on a slow runner, where the 520 ms press outlasts the growing (F453).
+  await page.evaluate(() => {
+    const seen: string[] = ((window as unknown as { __menuGrew: string[] }).__menuGrew = []);
+    document.addEventListener("animationstart", (e) => { if ((e.target as Element).matches?.(".menu-list")) seen.push(e.animationName); }, true);
+  });
   await press(page, row, 520);
-  // Read while it is still growing: the press has only just ended.
-  const grew = await page.evaluate(() => document.querySelector(".menu-list")?.getAnimations().map((a) => (a as CSSAnimation).animationName).join() ?? "no menu");
   await page.getByRole("menu").waitFor();
+  const grew = await page.evaluate(() => (window as unknown as { __menuGrew: string[] }).__menuGrew.join());
   if (grew !== "menu-grow") throw new Error(`the long-press menu did not grow from its row (animations: "${grew}")`);
   const lit = await row.evaluate((el) => { const at = el.closest("[data-menu-row]") ?? el; return getComputedStyle(at).backgroundColor !== getComputedStyle(document.body).backgroundColor && getComputedStyle(at).backgroundColor !== "rgba(0, 0, 0, 0)"; });
   if (!lit) throw new Error("the row he pressed is not lit while its menu is open");
@@ -16227,6 +16232,48 @@ journey("phone: Bold Text in iOS makes Ore's text heavier, a row's words and a t
   await page.evaluate(() => document.documentElement.style.setProperty("--bold", "0"));
   if ((await weights())[1] !== words) throw new Error("Bold Text turned off left the text heavy");
 }, "phone");
+
+// F445: a crash outside a screen's own boundary (a sheet, the sidebar, the phone outside Review) left
+// the window blank for good, with nothing to press. Settings is made to crash by an answer missing its fields.
+journey("a crash in a sheet shows what broke and Reload, never a blank window (F445)", async (page) => {
+  await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { settings: {} }));
+  await page.keyboard.press("Meta+,");
+  await page.getByText("Ore hit a snag.").waitFor();
+  await page.getByRole("button", { name: "Reload" }).click();
+  await page.locator(".side-item").first().waitFor();
+  if (await page.getByText("hit a snag").count()) throw new Error("the app did not come back after Reload");
+});
+
+// F447: a toast (and the pick bar) landed over the open tutor's field, on what he was typing.
+journey("a toast stands left of the open tutor, never over its field (F447)", async (page) => {
+  await page.setViewportSize({ width: 1000, height: 700 });
+  await page.keyboard.press("Meta+1");
+  await page.locator(".list .title").filter({ hasText: TESTING }).first().click({ button: "right" });
+  await page.getByRole("menuitem", { name: /^Archive/ }).click();
+  const toast = page.locator(".toast").last();
+  await toast.waitFor();
+  await page.keyboard.press("Meta+j");
+  const tutor = page.locator("aside.tutor");
+  await tutor.waitFor();
+  const clear = async (how: string) => {
+    const [t, u] = [await toast.boundingBox(), await tutor.boundingBox()];
+    if (!t || !u) throw new Error(`no toast or no tutor to measure (${how})`);
+    if (t.x + t.width > u.x) throw new Error(`the toast (to x ${Math.round(t.x + t.width)}) is over the ${how} tutor (from x ${Math.round(u.x)})`);
+  };
+  try {
+    await clear("floating");
+    await tutor.getByRole("button", { name: "Dock to the side" }).click();
+    await tutor.getByRole("button", { name: "Float over the page" }).waitFor();
+    await clear("docked");
+  } finally {
+    // The tutor floating again, as every other journey finds it, and the source back in To read.
+    await tutor.getByRole("button", { name: "Float over the page" }).click().catch(() => {});
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Meta+z");
+    await inLibrary(page, [TESTING]);
+  }
+});
+
 
 journey("note: /to-do keeps the block menu open on To-do list, and Enter makes one (F435)", async (page) => {
   const pm = page.locator(".note-editor .ProseMirror").first();
