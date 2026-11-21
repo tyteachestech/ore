@@ -4,7 +4,7 @@ import { gemHint, GemRing, NearGoal } from "./Gem";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
-import { SkillIcon } from "./IconPicker";
+import { hasIcon, SkillIcon } from "./IconPicker";
 import { lessonsOf, levelProgress, nextLesson, opt, ore, PHONE, touched, type DueEntry, type Item, type Skill, type Today } from "./ore";
 import * as HoverCard from "@radix-ui/react-hover-card";
 import { flushSync } from "react-dom";
@@ -570,7 +570,7 @@ function SkillTile({ skill: s, strength: k, onOpen, onStart, more, ...trigger }:
   const tile = (
     <div {...trigger} className="home-skill" data-id={s.id} data-color={s.color} onClick={(e) => !(e.target as Element).closest("button, a, input") && onOpen()}>
       <span className="home-skill-top">
-        <span className={`mark${s.icon && s.color ? " tile" : ""}`} data-color={s.color} aria-hidden="true">
+        <span className={`mark${hasIcon(s.icon) && s.color ? " tile" : ""}`} data-color={s.color} aria-hidden="true">
           <SkillIcon icon={s.icon} color={s.color} dot />
         </span>
         <button className="home-skill-name home-open" onClick={onOpen}>{s.name}</button>

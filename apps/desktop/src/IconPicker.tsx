@@ -3,13 +3,18 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type Keyboard
 import { Hint } from "./Hint";
 import { Shuffle } from "./icons";
 import { SKILL_COLORS, type SkillColor } from "./ore";
-import { findSkillIcons } from "./skill-icon-set";
+import { SKILL_ICON_SET, findSkillIcons } from "./skill-icon-set";
 import { load, save } from "./util";
 
 // A skill icon is "mc:<name>", one of the set in skill-icon-set.ts (D157): a MingCute fill glyph redrawn on the
 // UI icons' 16-pixel grid (vite.config.ts, pixelSkillIcons), tinted with the skill colour (D36). The SVGs ship
 // with the app, so the picker works offline. Anything else stored (an emoji from before D157, a hand edit) draws nothing.
-const iconUrl = (icon: string) => (icon.startsWith("mc:") ? `url(/mingcute-px/${icon.slice(3)}.svg)` : null);
+// A name the set lacks (an older set's, a hand edit) is one of those: its mask would load nothing and leave a hole (F441).
+const DRAWN = new Set(SKILL_ICON_SET.map(([name]) => name));
+export const iconUrl = (icon: string) => (icon.startsWith("mc:") && DRAWN.has(icon.slice(3)) ? `url(/mingcute-px/${icon.slice(3)}.svg)` : null);
+
+/** Whether a skill has an icon to draw: callers that draw something else without one (a letter, a plain mark) ask this, never the stored value. */
+export const hasIcon = (icon?: string) => !!icon && iconUrl(icon) !== null;
 
 /** Draws a skill's icon. Without one it draws nothing, or a colour dot with `dot`; a stored value it
  *  can't draw counts as no icon. */

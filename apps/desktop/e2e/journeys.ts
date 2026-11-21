@@ -9390,7 +9390,7 @@ journey("click away saves what he typed: the author, a source's title, a skill's
   await page.locator(".doc-head h1").filter({ hasText: TESTING }).filter({ hasNotText: "(clicked away)" }).waitFor();
   await page.locator(".sidebar .side-item:not(.side-main)").first().click();
   await page.locator("button.skill-goal").click();
-  const goal = page.locator("input.skill-goal");
+  const goal = page.locator("textarea.skill-goal");
   await goal.fill("Explain it to a friend, from memory");
   await page.mouse.click(640, 10); // a click on nothing in particular: the title bar
   await page.locator("button.skill-goal").filter({ hasText: "Explain it to a friend, from memory" }).waitFor();
@@ -9686,7 +9686,7 @@ journey("in-place editors give focus back on Esc: the author, a skill's goal, a 
   await goal.focus();
   const was = (await goal.innerText()).trim();
   await page.keyboard.press("Enter");
-  await page.locator("input.skill-goal").waitFor();
+  await page.locator("textarea.skill-goal").waitFor();
   await page.keyboard.press("Escape");
   await until("focus is back on the goal", () => on(was));
   await page.getByRole("textbox", { name: "Skill note" }).waitFor({ state: "attached" });
@@ -16226,6 +16226,140 @@ journey("phone: Bold Text in iOS makes Ore's text heavier, a row's words and a t
   if (!(boldWords! >= words! + 100 && boldTitle! > title!)) throw new Error(`under Bold Text the words weigh ${words} → ${boldWords}, the title ${title} → ${boldTitle}`);
   await page.evaluate(() => document.documentElement.style.setProperty("--bold", "0"));
   if ((await weights())[1] !== words) throw new Error("Bold Text turned off left the text heavy");
+}, "phone");
+
+journey("note: /to-do keeps the block menu open on To-do list, and Enter makes one (F435)", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await until("the note is empty", async () => ((await pm.textContent()) ?? "").trim() === "");
+  await page.keyboard.type("/to-do", { delay: 20 });
+  await page.locator(".note-menu-row.on", { hasText: "To-do list" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Buy chalk");
+  await until("a to-do with no slash left", async () => (await pm.locator("li", { hasText: "Buy chalk" }).count()) === 1 && !/\/to/.test((await pm.textContent()) ?? ""));
+  // A word with a mark that no block answers is prose again.
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("in /usr-local", { delay: 20 });
+  await until("no menu once nothing answers", async () => (await page.locator(".note-menu").count()) === 0);
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+});
+
+journey("note: ↓ at the end of a code block that ends the note makes a line under it (F434)", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await until("the note is empty", async () => ((await pm.textContent()) ?? "").trim() === "");
+  await page.keyboard.type("/code", { delay: 20 });
+  await page.locator(".note-menu-row.on", { hasText: "Code" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("x = 1");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.type("after");
+  await until("the words land under the block", async () => (await pm.locator("pre").textContent())?.trim() === "x = 1" && (await pm.locator("p", { hasText: "after" }).count()) === 1);
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+});
+
+journey("What to review: a list longer than its box fades its last row, and not once scrolled to the end (F436)", async (page) => {
+  // The box is half the window's height: a short window stands in for a long list of skills.
+  await page.setViewportSize({ width: 1280, height: 280 });
+  await page.getByRole("button", { name: "Start review" }).click();
+  const list = page.getByRole("dialog", { name: "What to review" }).locator(".pick-list");
+  await list.waitFor();
+  if (!(await list.evaluate((e) => e.scrollHeight > e.clientHeight + 1))) throw new Error("the seed's skills fit the box: nothing to fade");
+  const faded = () => list.evaluate((e) => e.hasAttribute("data-more") && getComputedStyle(e, "::after").height === "32px");
+  await until("the last row in view fades", faded);
+  await list.evaluate((e) => e.scrollTo(0, e.scrollHeight));
+  await until("no fade at the end", async () => !(await list.evaluate((e) => e.hasAttribute("data-more"))));
+  await page.keyboard.press("Escape");
+});
+
+journey("skill goal: a long goal wraps in its field, the letters left show near 140, and Enter saves it on one line (F437)", async (page) => {
+  await page.locator(".sidebar .side-main", { hasText: "Teaching" }).click();
+  await page.locator("button.skill-goal").click();
+  const goal = page.locator("textarea.skill-goal");
+  const left = page.locator(".skill-goal-left");
+  await goal.fill("Explain spacing");
+  const one = (await goal.boundingBox())!.height;
+  if (await left.count()) throw new Error("the letters left show on a short goal");
+  const long = "Explain spacing, retrieval and interleaving to a new teacher from memory in five minutes, then answer their questions with one worked example each, without notes";
+  await goal.fill("");
+  await page.keyboard.type(long);
+  await until("it stops at 140 and says none are left", async () => (await goal.inputValue()).length === 140 && (await left.textContent())?.trim() === "0");
+  if (!((await goal.boundingBox())!.height > one + 10)) throw new Error("the long goal stayed on one line");
+  if ((await goal.evaluate((e) => e.scrollWidth - e.clientWidth)) > 1) throw new Error("the long goal scrolls sideways");
+  await page.keyboard.press("Enter");
+  await page.locator("button.skill-goal").filter({ hasText: long.slice(0, 140).trim() }).waitFor();
+  await page.keyboard.press("Meta+z");
+});
+
+journey("sidebar: a long skill name ends before the ⋯ that shows on its row, by pointer or keyboard (F438)", async (page) => {
+  const row = page.locator(".sidebar .side-item", { hasText: "Distributed Systems and Consensus" });
+  const gap = () => row.evaluate((e) => e.querySelector(".side-more")!.getBoundingClientRect().left - e.querySelector(".label")!.getBoundingClientRect().right);
+  await row.locator(".side-main").hover();
+  await until("the name ends before the ⋯ under the pointer", async () => (await gap()) >= 0);
+  await page.mouse.move(700, 300);
+  await row.locator(".side-main").focus();
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("ArrowDown");
+  await until("and with the keyboard on the row", async () => (await gap()) >= 0);
+});
+
+journey("Home and What to review: each skill's ring, numbers and gems keep their columns down the list (F439)", async (page) => {
+  const lefts = (rows: string, parts: string) =>
+    page.evaluate(([rows, parts]) => [...document.querySelectorAll(rows!)].map((r) => [...r.querySelectorAll(parts!)].map((c) => `${c.className.split(" ")[0]}@${Math.round(c.getBoundingClientRect().left)}`)).flat(), [rows, parts]);
+  const oneColumnEach = (found: string[]) => {
+    const at = new Map<string, Set<string>>();
+    for (const f of found) at.set(f.split("@")[0]!, (at.get(f.split("@")[0]!) ?? new Set()).add(f.split("@")[1]!));
+    return [...at].filter(([, xs]) => xs.size > 1).map(([name, xs]) => `${name} at ${[...xs].join(", ")}`);
+  };
+  await page.locator(".home-level .home-solid").first().waitFor();
+  const home = await lefts(".home-level:has(.home-solid)", ".gem-ring, .near-goal");
+  if (home.length < 2) throw new Error("the seed has fewer than two skills with a ring on Home");
+  const off = oneColumnEach(home);
+  if (off.length) throw new Error(`Home's columns drift: ${off.join("; ")}`);
+  await page.getByRole("button", { name: "Start review" }).click();
+  await page.getByRole("dialog", { name: "What to review" }).waitFor();
+  const offPick = oneColumnEach(await lefts(".pick-gems", ".near, .loose"));
+  if (offPick.length) throw new Error(`What to review's columns drift: ${offPick.join("; ")}`);
+  await page.keyboard.press("Escape");
+});
+
+journey("source note: a new table fits the side panel, its three columns whole (F440)", async (page) => {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await until("the note is empty", async () => ((await pm.textContent()) ?? "").trim() === "");
+  await page.keyboard.type("/table");
+  await page.locator(".note-menu-row.on", { hasText: "Table" }).waitFor();
+  await page.keyboard.press("Enter");
+  const box = page.locator(".note-editor .note-table");
+  await box.waitFor();
+  const over = await box.evaluate((e) => e.scrollWidth - e.clientWidth);
+  if (over > 1) throw new Error(`the new table is ${over}px wider than the panel`);
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+});
+
+journey("phone drawer: the skills in no collection come first with no heading, as in the Mac's sidebar (F442)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  const sections = await page.locator(".phone-drawer section").evaluateAll((all) => all.map((s) => s.querySelector("h2")?.textContent ?? ""));
+  if (sections.length < 2 || sections[0] !== "" || sections.slice(1).some((h) => !h || h === "Other")) throw new Error(`the drawer's groups are headed ${JSON.stringify(sections)}`);
 }, "phone");
 
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);

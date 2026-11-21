@@ -241,6 +241,41 @@ const tabInCode: Command = (state, dispatch) => {
   return true;
 };
 
+/** The caret, when it sits at the very end of a code block; with `last`, only where no block follows it
+ *  at any depth (it ends the note, in or out of a toggle, quote or item), so nothing below can take the caret. */
+const codeEnd = (state: EditorState, last = false) => {
+  const { $from, empty } = state.selection;
+  if (!$from.parent.type.spec.code || !empty || $from.parentOffset !== $from.parent.content.size) return null;
+  for (let d = $from.depth - 1; last && d >= 0; d--) if ($from.index(d) !== $from.node(d).childCount - 1) return null;
+  return $from;
+};
+
+/** A line of text under the caret's code block, with the caret in it; `trim` drops that many
+ *  characters from the block's end first. */
+const lineUnder = (state: EditorState, $c: ResolvedPos, trim = 0) => {
+  const tr = state.tr.delete($c.pos - trim, $c.pos);
+  const after = tr.mapping.map($c.after());
+  const text = state.schema.nodes.paragraph!.createAndFill()!;
+  return tr.insert(after, text).setSelection(TextSelection.create(tr.doc, after + 1)).scrollIntoView();
+};
+
+/** ↓ at the end of a code block that ends the note makes a line under it, as Linear and GitHub do:
+ *  without it only a click below got out (F434). With a block below, ↓ is the browser's own. */
+const downOutOfCode: Command = (state, dispatch) => {
+  const $c = codeEnd(state, true);
+  if (!$c) return false;
+  dispatch?.(lineUnder(state, $c));
+  return true;
+};
+
+/** Enter on a second empty line at a code block's end leaves it, the empty lines gone (Notion, Tiptap). */
+const enterOutOfCode: Command = (state, dispatch) => {
+  const $c = codeEnd(state);
+  if (!$c || !$c.parent.textContent.endsWith("\n\n")) return false;
+  dispatch?.(lineUnder(state, $c, 2));
+  return true;
+};
+
 /** Tab on a line of text or a heading nests it under the block above, as Notion does, where Markdown
  *  can hold it: in the last item of a list above (as more of that item), or at the end of a toggle's
  *  body. A list item's own first line is the list's Tab (indent). */
@@ -291,7 +326,8 @@ const turnKeys = Object.fromEntries(
 export const notionKeys = $prose(() =>
   keymap({
     Backspace: backspace,
-    Enter: (state, dispatch) => enterInQuote(state, dispatch) || enterInTodo(state, dispatch),
+    Enter: (state, dispatch) => enterOutOfCode(state, dispatch) || enterInQuote(state, dispatch) || enterInTodo(state, dispatch),
+    ArrowDown: downOutOfCode,
     "Mod-Enter": tick,
     Tab: (state, dispatch) => tabInCode(state, dispatch) || nest(state, dispatch),
     "Shift-Tab": unnest,
