@@ -300,9 +300,9 @@ function BadgePicker({ skill, onChanged, notify }: { skill: Skill; onChanged: ()
   };
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      <Hint text={skill.icon ? "Change icon" : "Add icon"}>
+      <Hint text={hasIcon(skill.icon) ? "Change icon" : "Add icon"}>
         <Popover.Trigger asChild>
-          <button className={`skill-badge${skill.color ? " tinted" : ""}`} aria-label={skill.icon ? "Change icon" : "Add icon"}>
+          <button className={`skill-badge${skill.color ? " tinted" : ""}`} aria-label={hasIcon(skill.icon) ? "Change icon" : "Add icon"}>
             {hasIcon(skill.icon) ? <SkillIcon icon={skill.icon} color={skill.color} /> : <span className="initial">{initial(skill.name)}</span>}
           </button>
         </Popover.Trigger>

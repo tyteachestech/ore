@@ -509,6 +509,8 @@ describe("leaving a code block by keyboard", () => {
     const next = await run("```\nx = 1‸\n```\n\nnext", ["{ArrowDown}"]);
     expect(next.handled).toEqual([false]);
     expect(next.md).toBe("```\nx = 1\n```\n\nnext");
+    // Nor when it ends a quote that has a block after it: ↓ goes there.
+    expect((await run("> ```\n> x = 1‸\n> ```\n\nnext", ["{ArrowDown}"])).handled).toEqual([false]);
   });
 
   test("⌘↵ in a code block makes a line under it, wherever the caret is", async () => {

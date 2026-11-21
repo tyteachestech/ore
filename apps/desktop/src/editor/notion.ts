@@ -241,12 +241,13 @@ const tabInCode: Command = (state, dispatch) => {
   return true;
 };
 
-/** The caret's code block when the caret sits at its very end and the block ends its parent: where
- *  nothing below can take the caret, so the keyboard needs its own way out. */
-const codeEnd = (state: EditorState) => {
+/** The caret, when it sits at the very end of a code block; with `last`, only where no block follows it
+ *  at any depth (it ends the note, in or out of a toggle, quote or item), so nothing below can take the caret. */
+const codeEnd = (state: EditorState, last = false) => {
   const { $from, empty } = state.selection;
-  const at = $from.parent.type.spec.code && empty && $from.parentOffset === $from.parent.content.size;
-  return at && $from.index(-1) === $from.node(-1).childCount - 1 ? $from : null;
+  if (!$from.parent.type.spec.code || !empty || $from.parentOffset !== $from.parent.content.size) return null;
+  for (let d = $from.depth - 1; last && d >= 0; d--) if ($from.index(d) !== $from.node(d).childCount - 1) return null;
+  return $from;
 };
 
 /** A line of text under the caret's code block, with the caret in it; `trim` drops that many
@@ -258,16 +259,16 @@ const lineUnder = (state: EditorState, $c: ResolvedPos, trim = 0) => {
   return tr.insert(after, text).setSelection(TextSelection.create(tr.doc, after + 1)).scrollIntoView();
 };
 
-/** ↓ at the end of a code block that ends the note (or its toggle, quote, item) makes a line under
- *  it, as Linear and GitHub do: without it only a click below got out (F434). */
+/** ↓ at the end of a code block that ends the note makes a line under it, as Linear and GitHub do:
+ *  without it only a click below got out (F434). With a block below, ↓ is the browser's own. */
 const downOutOfCode: Command = (state, dispatch) => {
-  const $c = codeEnd(state);
+  const $c = codeEnd(state, true);
   if (!$c) return false;
   dispatch?.(lineUnder(state, $c));
   return true;
 };
 
-/** Enter on a second empty line at such a block's end leaves it, the empty lines gone (Notion, Tiptap). */
+/** Enter on a second empty line at a code block's end leaves it, the empty lines gone (Notion, Tiptap). */
 const enterOutOfCode: Command = (state, dispatch) => {
   const $c = codeEnd(state);
   if (!$c || !$c.parent.textContent.endsWith("\n\n")) return false;
