@@ -4009,6 +4009,38 @@ journey("source title: one click renames it in place, Enter saves, Esc keeps the
   await until("⌘Z puts the old title back", async () => (await page.locator(".doc-head h1").innerText()) === AGENTS);
 });
 
+journey("Home: a Continue reading picture is shown whole in its own shape, a page upright and a frame wide, and the titles still line up (F429)", async (page) => {
+  const dirOf = (slug: string) => (readdirSync(join(LIB, "items"), { recursive: true }) as string[]).find((d) => d.split("/").pop()!.startsWith(slug) && !d.endsWith(".md"))!;
+  const sheet = (w: number, h: number) => `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><rect width="${w}" height="${h}" fill="#fff"/><rect x="${w / 8}" y="${h / 8}" width="${w / 2}" height="${h / 16}" fill="#222"/></svg>`;
+  // As an import leaves them: a PDF's first page (upright), a video's frame (16:9) and a banner far wider than either.
+  const shapes: [string, string, number, number][] = [[TESTING, "the-testing-effect-why", 371, 480], ["Building Effective Agents", "building-effective", 480, 270], ["A very long title about", "a-very-long", 480, 60]];
+  const files = shapes.map(([, slug, w, h]) => {
+    const file = join(LIB, "items", dirOf(slug), "thumbnail.svg");
+    writeFileSync(file, sheet(w, h));
+    return file;
+  });
+  try {
+    // Opened last, so sources other journeys added and opened don't push them off the list.
+    for (const [title] of shapes) await openSource(page, title);
+    await page.reload();
+    await page.getByRole("button", { name: /^Home/ }).click();
+    const box = async (title: string, part: string) => (await page.locator(".home-read").filter({ hasText: title }).first().locator(part).boundingBox())!;
+    const drawn = (title: string) => page.locator(".home-read").filter({ hasText: title }).first().locator("img.thumb").evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0);
+    for (const [title] of shapes) await until(`${title}'s picture is drawn`, () => drawn(title));
+    const page1 = await box(TESTING, "img.thumb");
+    const frame = await box("Building Effective Agents", "img.thumb");
+    const banner = await box("A very long title about", "img.thumb");
+    const near = (a: number, b: number) => Math.abs(a - b) <= 1;
+    if (!(near(page1.height, 72) && near(page1.width / page1.height, 371 / 480))) throw new Error(`a page is cut or squeezed: ${page1.width}×${page1.height}, want it whole at 72 high`);
+    if (!(near(frame.width, 96) && near(frame.height, 54))) throw new Error(`a video's frame is ${frame.width}×${frame.height}, want 96×54`);
+    if (!(near(banner.width, 96) && near(banner.height, 54))) throw new Error(`a banner is ${banner.width}×${banner.height}: a shape past a frame's is cut to the frame, 96×54`);
+    const lefts = await Promise.all(shapes.map(async ([title]) => (await box(title, ".title")).x));
+    if (!lefts.every((x) => near(x, lefts[0]!))) throw new Error(`titles start at ${lefts.join(", ")}: pictures of different shapes must not move them`);
+  } finally {
+    for (const f of files) rmSync(f, { force: true });
+  }
+});
+
 journey("Home: Continue reading rows rename from their menu, in place; Esc keeps the title, ⌘Z takes it back", async (page) => {
   // Opened last, so sources other journeys added and opened don't push it off the list.
   await openSource(page, TESTING);
