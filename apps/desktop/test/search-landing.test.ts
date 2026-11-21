@@ -4,7 +4,7 @@ import { foundIn } from "../src/search-landing";
 
 const hit = (snippet: string) => ({ kind: "item", ref: "a", title: "T", snippet });
 
-// F-new-search-landing: search matches his words apart, but a match in a source's text handed Find the whole query
+// F443: search matches his words apart, but a match in a source's text handed Find the whole query
 // as one phrase, so the source opened at its top with "Not found" unless he had typed an exact phrase.
 test("a text match lands on words the source holds: the query when it is there as typed, else the stretch of the snippet that holds what matched", () => {
   // Typed as it stands in the text: Find gets it whole, and the passage to start from.

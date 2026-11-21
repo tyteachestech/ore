@@ -189,7 +189,7 @@ export function FindBar({ roots, scope, within, query, near, onQuery, focus, onC
     const first = rs[0] && scrollerOf(rs[0].startContainer);
     if (first) {
       const top = viewOf(first).top;
-      // From a search result: the match in the passage the result showed (F-new-search-landing).
+      // From a search result: the match in the passage the result showed (F443).
       const passage = near ? search(all, near)[0] : undefined;
       const j = passage ? rs.findIndex((r) => r.compareBoundaryPoints(Range.START_TO_START, passage) >= 0) : rs.findIndex((r) => r.getBoundingClientRect().bottom > top);
       if (j >= 0) i = j;

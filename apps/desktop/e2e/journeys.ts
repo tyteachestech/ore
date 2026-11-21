@@ -16362,7 +16362,7 @@ journey("phone drawer: the skills in no collection come first with no heading, a
   if (sections.length < 2 || sections[0] !== "" || sections.slice(1).some((h) => !h || h === "Other")) throw new Error(`the drawer's groups are headed ${JSON.stringify(sections)}`);
 }, "phone");
 
-journey("⌘K: a match in a source's text opens it at the passage the result showed, the words lit, never \"Not found\" (F-new-search-landing)", async (page) => {
+journey("⌘K: a match in a source's text opens it at the passage the result showed, the words lit, never \"Not found\" (F443)", async (page) => {
   await page.keyboard.press("Meta+k");
   // Three words the source holds apart: under a heading, then in the paragraph after it.
   await page.keyboard.type("why retrieval works");
@@ -16388,7 +16388,7 @@ journey("⌘K: a match in a source's text opens it at the passage the result sho
   await page.keyboard.press("Escape");
 });
 
-journey("reader: a source with pictures above his place reopens on the passage he left, though the pictures have not loaded again (F-new-place-by-passage)", async (page) => {
+journey("reader: a source with pictures above his place reopens on the passage he left, though the pictures have not loaded again (F444)", async (page) => {
   // Six tall pictures, then a long text: far below them a picture is not loaded until he scrolls back near it.
   const picture = (n: number) => `![Figure ${n}](https://pictures.test/figure-${n}.svg)`;
   await page.route("https://pictures.test/**", (r) => r.fulfill({ contentType: "image/svg+xml", body: `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="700"><rect width="600" height="700" fill="#345"/></svg>` }));

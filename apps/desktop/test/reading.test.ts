@@ -46,7 +46,7 @@ describe("reading page", () => {
     expect(top).toBe(3 * 150 + 0.4 * 150);
   });
 
-  // F-new-place-by-passage: the place was saved as a distance down the page, which pictures above it change as they
+  // F444: the place was saved as a distance down the page, which pictures above it change as they
   // load (or don't: a picture far above stays unloaded). Saved as the passage at the top, it is the same passage again.
   test("a saved place is the block at the top and how far into it, and goes back there whatever the heights above it now are", () => {
     const scroll = document.createElement("div");

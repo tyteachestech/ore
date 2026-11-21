@@ -152,7 +152,7 @@ export function placeOf(scroll: HTMLElement, doc: HTMLElement): () => void {
 }
 
 /** His place in a source, to save: the block at the top of the view and how far into it, as "index:at". A
- *  passage, never a distance down the page: pictures above it change that distance as they load (F-new-place-by-passage). */
+ *  passage, never a distance down the page: pictures above it change that distance as they load (F444). */
 export function placeAt(scroll: HTMLElement, doc: HTMLElement): string | null {
   const b = topBlock(scroll, doc);
   return b ? `${b.index}:${+b.at.toFixed(3)}` : null;

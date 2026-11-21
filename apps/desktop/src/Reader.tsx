@@ -1276,7 +1276,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }, []);
   useLayoutEffect(() => {
     if (!ready || !scrollRef.current) return;
-    // The passage he left at the top (F-new-place-by-passage); the distance down the page for a place saved before that.
+    // The passage he left at the top (F444); the distance down the page for a place saved before that.
     const y = Number(load(scrollKey) ?? 0);
     if (y > 0 && !p.jumpTo && !(docEl.current && toPlace(scrollRef.current, docEl.current, load(placeKey) ?? ""))) scrollRef.current.scrollTop = y;
     // A long text is drawn in slices, and can be ready a second after it opened: a click into the note meanwhile keeps
@@ -1356,7 +1356,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     });
     ro.observe(scroll);
     // The text growing or shrinking under him too: a picture above his place that loads late pushes it down,
-    // and WebKit does not hold the page still for it as Chromium does (F-new-place-by-passage).
+    // and WebKit does not hold the page still for it as Chromium does (F444).
     if (docEl.current) ro.observe(docEl.current);
     scroll.addEventListener("scroll", take, { passive: true });
     return () => {
