@@ -2228,7 +2228,7 @@ button.home-plan:hover { color: var(--text); }
 .home-read .chips-button { max-width: 40%; }
 .home-read .chips { flex-wrap: nowrap; min-width: 0; }
 .home-read .chip { min-width: 0; }
-/* The picture is Readwise Reader's (D-new-reader-square, after D340's whole pictures): one square for every source,
+/* The picture is Readwise Reader's (D341, after D340's whole pictures): one square for every source,
    filled edge to edge, so the list reads as one tidy column and no row is odd one out. A square keeps most of a
    page (from its top, where the title is), all of a show's art and the middle of a video's frame. A source with no
    picture gets its kind's icon on the same square. On the iPhone the row keeps its 16:9 picture. */
