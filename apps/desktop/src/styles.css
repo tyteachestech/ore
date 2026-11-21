@@ -595,8 +595,10 @@ body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
 /* The tutor's field sits at the window's foot, where a toast and the pick bar land: with the tutor open they stand
    in the room left of it, never over what he is typing (F-new-toast-tutor). A floating tutor is 400px wide, 16px
    in from the right; a docked one is --tutor-w. The window is never under 720px, which leaves them 256px. */
-body:has(.tutor.float) :is(.toasts, .pick-bar) { left: calc((100vw - 432px) / 2); max-width: min(70vw, calc(100vw - 464px)); }
-body:has(.tutor:not(.float)) :is(.toasts, .pick-bar) { left: calc((100vw - var(--tutor-w, 0px)) / 2); max-width: min(70vw, calc(100vw - var(--tutor-w, 0px) - 32px)); }
+body:has(aside.tutor.float) :is(.toasts, .pick-bar) { left: calc((100vw - 432px) / 2); }
+body:has(aside.tutor.float) .toasts { max-width: min(70vw, calc(100vw - 464px)); }
+body:has(aside.tutor:not(.float)) :is(.toasts, .pick-bar) { left: calc((100vw - var(--tutor-w, 0px)) / 2); }
+body:has(aside.tutor:not(.float)) .toasts { max-width: min(70vw, calc(100vw - var(--tutor-w, 0px) - 32px)); }
 @keyframes pick-in { from { opacity: 0; transform: translate(-50%, 4px) scale(0.97); } }
 @media (prefers-reduced-motion: reduce) { .pick-bar { animation: none; } }
 .toast:has(.toast-bar) { overflow: hidden; min-width: 300px; }
