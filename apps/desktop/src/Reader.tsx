@@ -1142,14 +1142,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const shownBodyOf = useRef<string | null>(null);
   /** Goes up on "Try again" after a failed open: the read runs once more (F299). */
   const [tries, setTries] = useState(0);
+  /** Goes up when a filing under skills starts and when it ends: a read that was out across either has skills
+   *  older than what he picked, so it keeps the ones on screen (F-new-stale-skills-read). */
+  const filings = useRef(0);
   useEffect(() => {
     let live = true;
+    const filedAt = filings.current;
     ore<Doc>("show", p.id, "--annotations").then(
       (d) => {
         if (!live) return;
         if (opened.current === p.id && shownBodyOf.current !== null && shownBodyOf.current !== d.body) return p.reload();
         shownBodyOf.current = d.body;
-        setDoc(d);
+        setDoc((cur) => (cur?.id === d.id && filings.current !== filedAt ? { ...d, skills: cur.skills } : d));
         // Enrich runs once, right after `ore add`: long after that with nothing to show, it failed.
         if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || d.enrich_skipped || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);
         // Read again (a wake), what he made or changed here that is still saving stays as he has it.
@@ -3279,8 +3283,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // Filing under an archived skill brings it back (D173, as App's refile); Undo archives it again.
     const revived = skills.filter((id) => !before.includes(id) && p.skills.some((s) => s.id === id && s.archived));
     setDoc((cur) => cur && { ...cur, skills });
+    filings.current++;
     try {
-      const r = await ore<{ cards_before?: CardSkills }>("edit", doc.id, "--skills", skills.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : []));
+      const r = await ore<{ cards_before?: CardSkills }>("edit", doc.id, "--skills", skills.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : [])).finally(() => filings.current++);
       setFiled(skills.join());
       p.onChanged();
       if (revived.length) p.onSkillsChanged();

@@ -11255,6 +11255,31 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
   await page.keyboard.press("Escape");
 });
 
+journey("skill picker: a read of the source that started before a skill came off never puts it back in the picker (F-new-stale-skills-read)", async (page) => {
+  const item = () => ore("ls").then((ls) => (ls as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!);
+  const start = (await item()).skills;
+  const other = ((await ore("skills")) as { id: string; name: string }[]).find((k) => !start.includes(k.id))!;
+  await openSource(page, TESTING);
+  const pills = page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` });
+  await pills.click();
+  const row = page.locator(".skill-picker").getByRole("option").filter({ has: page.locator(".menu-label", { hasText: other.name }) });
+  await row.click();
+  await until("filed", async () => (await item()).skills.includes(other.id));
+  await page.getByText(`Filed under ${other.name}`, { exact: true }).last().waitFor();
+  // A read of the source is still out when he takes the skill off (back from time away here; on a slow
+  // machine the read after one ⌘Z, landing during the next): it must not tick the skill again.
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = { show: 600, edit: 1500 }));
+  await awayAndBack(page);
+  await Bun.sleep(100); // the read has started, with the skill still on
+  await row.click();
+  await Bun.sleep(900); // the old read has landed; the save has not
+  const ticked = await row.getAttribute("aria-checked");
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = undefined));
+  if (ticked === "true") throw new Error("the picker ticks a skill he just took off, so the next pick would do the opposite");
+  await until("taken off", async () => !(await item()).skills.includes(other.id));
+  await page.keyboard.press("Escape");
+});
+
 journey("skill picker: a skill with a long name still shows its tick", async (page) => {
   const long = "Quantum error correction for people who never took physics and want to read the papers anyway, slowly";
   const k = (await ore("skills", "add", long)) as { id: string };
