@@ -5036,6 +5036,9 @@ journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette 
 // F334: at 150% in an 800×600 window (533×400 CSS px) ⌘K ran below the window: its last
 // rows and its footer couldn't be reached, and End picked a row out of sight.
 journey("a small window: ⌘K, the Add box and the shortcuts sheet fit in it, and End shows the palette's last row", async (page) => {
+  // The skills are in before the palette opens: opened a moment after a reload it listed commands only, End took
+  // the last of those, and the skills then arrived below it (F-new-palette-end-early).
+  await page.locator(".sidebar div.side-item").first().waitFor({ state: "attached" });
   await page.setViewportSize({ width: 533, height: 400 });
   const inWindow = async (what: string, l: Locator) => {
     const b = (await l.boundingBox())!;
@@ -16469,6 +16472,89 @@ journey("reader: a source with pictures above his place reopens on the passage h
     await page.unroute("https://pictures.test/**");
   }
 });
+
+// F449: Esc or a click outside threw away what was typed in the Add box, where the tutor's field, a Finish
+// recall and a Review answer keep theirs.
+journey("add: what he typed and left with Esc is there, selected, at the next ⌘N; it goes once added or cleared (F449)", async (page) => {
+  const box = page.getByRole("dialog", { name: "Add a source" });
+  const field = box.getByLabel("Link, file path or text");
+  const openBox = async () => { await page.keyboard.press("Meta+KeyN"); await field.waitFor(); };
+  const title = `Kept words ${Date.now()}`;
+  try {
+    await openBox();
+    await field.fill("half a thought about spacing");
+    await page.keyboard.press("Escape");
+    await box.waitFor({ state: "detached" });
+    await openBox();
+    if ((await field.inputValue()) !== "half a thought about spacing") throw new Error(`the box came back with "${await field.inputValue()}", not what he typed`);
+    await until("what he left is selected whole", () => field.evaluate((f: HTMLTextAreaElement) => document.activeElement === f && f.selectionStart === 0 && f.selectionEnd === f.value.length));
+    await page.keyboard.type(`# ${title}`);
+    if ((await field.inputValue()) !== `# ${title}`) throw new Error("typing did not replace what he left");
+    await page.keyboard.press("Shift+Enter");
+    await page.keyboard.press("Shift+Enter");
+    await page.keyboard.type("Spacing beats cramming.");
+    await page.locator(".overlay").click({ position: { x: 5, y: 5 } });
+    await box.waitFor({ state: "detached" });
+    await openBox();
+    if (!(await field.inputValue()).startsWith(`# ${title}`)) throw new Error("a click outside dropped what he typed");
+    await page.keyboard.press("Enter");
+    await box.waitFor({ state: "detached" });
+    await openBox();
+    if ((await field.inputValue()) !== "") throw new Error(`what was added came back in the box: "${await field.inputValue()}"`);
+    await field.fill("soon gone");
+    await field.fill("");
+    await page.keyboard.press("Escape");
+    await box.waitFor({ state: "detached" });
+    await openBox();
+    if ((await field.inputValue()) !== "") throw new Error("a box he emptied came back with words");
+    await page.keyboard.press("Escape");
+  } finally {
+    const made = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === title);
+    if (made) await ore("archive", made.id).catch(() => {});
+  }
+});
+
+// F450: with the sidebar folded in a narrow window the reading column starts at the window's edge, and the
+// ambience radio's corner sat over the first letters of its lines.
+journey("ambience: in a narrow window with the sidebar folded the radio sits in the top bar, clear of the source's text, and still opens (F450)", async (page) => {
+  const size = page.viewportSize()!;
+  await openSource(page, TESTING);
+  await page.setViewportSize({ width: 760, height: 600 });
+  const folded = (await page.locator(".app.collapsed").count()) > 0;
+  if (!folded) await page.getByRole("button", { name: "Hide sidebar" }).click();
+  try {
+    await page.locator(".app.collapsed").waitFor();
+    const orb = page.getByRole("button", { name: /^Ambience/ });
+    const over = () => page.evaluate(() => {
+      const o = document.querySelector(".radio-orb")!.getBoundingClientRect(), d = document.querySelector(".reader-scroll")!.getBoundingClientRect();
+      const text = document.querySelector(".reader-scroll .doc")!.getBoundingClientRect();
+      return o.bottom > d.top && o.right > text.left && o.left < text.right;
+    });
+    await until("the radio is clear of the reading column", async () => !(await over()));
+    await orb.click();
+    const screen = page.locator(".popover.radio");
+    await screen.waitFor();
+    const box = (await screen.boundingBox())!;
+    if (box.x < 0 || box.y < 0 || box.x + box.width > 760 || box.y + box.height > 600) throw new Error(`the radio's screen opens off the window: ${JSON.stringify(box)}`);
+    await page.keyboard.press("Escape");
+    await screen.waitFor({ state: "detached" });
+  } finally {
+    if (!folded) await page.getByRole("button", { name: "Show sidebar" }).click();
+    await page.setViewportSize(size);
+  }
+});
+
+// F451: the Collected page beside a source had Back and no title, where Sources and Settings name themselves.
+journey("phone: a source's Collected page has its title, as Sources and Settings do (F451)", async (page) => {
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  const collected = page.locator('aside.mynotes[aria-label="Collected"]');
+  await collected.waitFor();
+  await collected.getByRole("heading", { level: 1, name: "Collected" }).waitFor();
+}, "phone");
+
+
+
 
 const picked = journeys.filter(([name]) => !only || name.includes(only)).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys);
 const per = Math.ceil(picked.length / shards);

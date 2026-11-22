@@ -3492,6 +3492,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* Settings on the phone (iOS Settings): grouped rows; a segmented choice goes under its name, full width. */
 .phone .phone-settings { padding: 8px 16px 40px; }
 .phone .phone-settings h1 { font-size: 30px; margin: 8px 0 20px; }
+.phone .phone-side-title { font-size: 30px; margin: 8px 0 12px; } /* Collected, beside a source (F451) */
 .phone .phone-settings .settings-row { gap: 10px 16px; padding: 12px 14px; flex-wrap: nowrap; }
 .phone .phone-settings .settings-row-text { flex: 1 1 0%; }
 .phone .phone-settings .settings-row-text > :is(span, label) { font-size: 16px; }
@@ -3630,6 +3631,15 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
   background: var(--lcd); box-shadow: 0 0 0 1px var(--lcd-edge), var(--float); animation: radio-tag var(--t-2) var(--ease-out);
 }
 .radio-tag canvas { display: block; }
+/* A source in a narrow window with the sidebar folded: the reading column starts at the window's edge, so the
+   radio's corner is over the first letters of its lines (F450). There it sits small in the top bar, after Forward. */
+@media (max-width: 1040px) {
+  :root:has(.app.collapsed .reader) .radio-orb { left: 166px; top: 6px; bottom: auto; transform: scale(0.5); transform-origin: 0 0; background: none; box-shadow: none; }
+  :root:has(.app.collapsed .reader) .radio-orb:hover { background: var(--bg-hover); }
+  :root:has(.app.collapsed .reader) svg.radio-orb-dots { transform: scale(1.4); } /* as big as Back and Forward beside it */
+  :root:has(.app.collapsed .reader) .radio-orb:active { transform: scale(0.48); }
+  :root:has(.app.collapsed .reader) .radio-tag { left: 198px; top: 9px; bottom: auto; }
+}
 @keyframes radio-tag { from { opacity: 0; transform: translateX(-6px); } }
 .popover.radio { width: 320px; padding: 12px; }
 .radio-screen { display: block; width: 100% !important; height: auto !important; aspect-ratio: 295 / 110; border-radius: 8px; background: var(--lcd); box-shadow: inset 0 1px 6px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--lcd-edge); }
