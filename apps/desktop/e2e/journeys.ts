@@ -11508,7 +11508,7 @@ journey("skill rename: a ⌘Z whose save fails stays on the history, so the next
   await until("the next ⌘Z takes it back", () => named("Habits"));
 });
 
-journey("delete skill: on a slow save the skill goes at once with its Undo, never a menu pick that seems to do nothing (F454)", async (page) => {
+journey("delete skill: on a slow save the skill goes at once with its Undo, never a menu pick that seems to do nothing (F455)", async (page) => {
   // His real Mac: the CLI took long enough that four picks of Delete skill… showed nothing at all.
   const k = (await ore("skills", "add", "Slow to go")) as { id: string };
   try {
