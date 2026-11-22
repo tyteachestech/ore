@@ -9465,7 +9465,7 @@ journey("questions on a source: Collected lists only this source's questions, no
     await until("the half-saved question is taken back", async () => (await count()) === before);
     await page.keyboard.press("Escape");
     // Filed under a skill, it still lists only its own: the skill's question asked elsewhere stays on the skill's page.
-    // In no skill, the byline holds a faint "Skill" where its skills go, as a blank Author does (F-new-bare-plus): no lone + on hover.
+    // In no skill, the byline holds a faint "Skill" where its skills go, as a blank Author does (F454): no lone + on hover.
     const blank = page.getByRole("button", { name: "Skills for A page in no skill" });
     await page.mouse.move(0, 0);
     const look = await blank.evaluate((el) => `${el.textContent} ${getComputedStyle(el).opacity}`);
