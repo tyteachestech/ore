@@ -126,7 +126,8 @@ export { paddleHome, paddlePath } from "./paddle-path.ts";
  *  fetches the models). On Apple silicon the model runs in mlx-vlm's server, started here on a free
  *  port and stopped after: one request at a time, since mlx-vlm 0.8.0 garbles pages read side by side. */
 export const DRIVER = `
-import json, os, socket, subprocess, sys, time
+import json, os, signal, socket, subprocess, sys, time
+signal.signal(signal.SIGTERM, lambda *a: sys.exit(1))  # a stopped read still stops its server
 MODEL = "PaddlePaddle/PaddleOCR-VL-1.6"
 mlx = sys.platform == "darwin" and os.uname().machine == "arm64"
 warm = sys.argv[1] == "--warm"
@@ -214,12 +215,32 @@ export async function removePaddle(): Promise<void> {
 export async function runPaddle(pdf: string, bin = paddlePath()): Promise<PaddlePage[]> {
   if (!bin) throw new Error("The PDF page reader isn't installed. Get it in Settings › AI.");
   const out = await mkdtemp(join(tmpdir(), "ore-paddle-"));
+  // One PDF at a time on this Mac: each read loads a 2 GB model, and ten PDFs dropped at once would
+  // load ten. The next waits for the lock, which a run that died no longer holds.
+  const lock = join(tmpdir(), "ore-paddle.lock");
+  for (;;) {
+    try {
+      writeFileSync(lock, String(process.pid), { flag: "wx" });
+      break;
+    } catch {
+      const pid = Number(await readFile(lock, "utf8").catch(() => ""));
+      let alive = pid > 0;
+      try {
+        if (alive) process.kill(pid, 0);
+      } catch {
+        alive = false;
+      }
+      if (alive) await Bun.sleep(2000);
+      else await rm(lock, { force: true });
+    }
+  }
   try {
     const proc = Bun.spawn([bin, await driver(out), pdf, join(out, "pages.json")], { stdout: "ignore", stderr: "pipe", env: { ...process.env, ...cacheEnv(dirname(dirname(dirname(bin)))) } });
     const [code, err] = await Promise.all([proc.exited, new Response(proc.stderr).text()]);
     if (code !== 0 || !existsSync(join(out, "pages.json"))) throw new Error(`The PDF page reader couldn't read this PDF: ${err.trim().split("\n").at(-1) || `exit ${code}`}`);
     return JSON.parse(await readFile(join(out, "pages.json"), "utf8")) as PaddlePage[];
   } finally {
+    await rm(lock, { force: true });
     await rm(out, { recursive: true, force: true });
   }
 }

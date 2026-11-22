@@ -195,6 +195,21 @@ describe("PDF tables and formulas (D125)", () => {
     expect((await pdfToDoc(data, climbing)).body).toBe(drawn);
   });
 
+  test("one PDF is read at a time: a second read waits for the first, and a lock left by a run that died is taken over", async () => {
+    const lib = await tempLibrary();
+    const a = await addSource(lib, join(FIX, "tables.pdf"));
+    const b = await addSource(lib, join(FIX, "paper.pdf"));
+    const log = join(mkdtempSync(join(tmpdir(), "ore-paddle-log-")), "log");
+    const bin = join(mkdtempSync(join(tmpdir(), "ore-paddle-bin-")), "python");
+    writeFileSync(bin, `#!/bin/sh\necho start >> "${log}"\nsleep 0.3\necho end >> "${log}"\necho "[]" > "$3"\n`);
+    chmodSync(bin, 0o755);
+    process.env.ORE_PADDLE = bin;
+    writeFileSync(join(tmpdir(), "ore-paddle.lock"), "999999999", { flag: "w" });
+    await Promise.all([readTables(lib, a.meta.id), readTables(lib, b.meta.id)]);
+    expect(readFileSync(log, "utf8")).toBe("start\nend\nstart\nend\n");
+    expect(existsSync(join(tmpdir(), "ore-paddle.lock"))).toBe(false);
+  });
+
   test("PDF: a scanned page, which has no text of its own, takes the reader's; a picture's words on a page with text stay in the picture", async () => {
     const body = (await pdfToDoc(pdf("scan.pdf"), await regionsOf("scan"))).body;
     expect(body).toBe("<!-- page 1 -->\n\n### The testing effect\n\nRetrieving a memory makes it stronger than reading it again. Quiz yourself before you feel ready.\n");
