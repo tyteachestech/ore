@@ -14031,7 +14031,11 @@ journey("phone: a selection handle held at the bottom of the screen turns the pa
       const ps = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")];
       const t = ps.find((p) => p.textContent!.startsWith(`Passage ${n} `))!.firstChild as Text;
       const end = ps.find((q) => q.getBoundingClientRect().bottom > b.bottom - 40)!;
-      const c = document.caretRangeFromPoint(end.getBoundingClientRect().left + 20, Math.min(end.getBoundingClientRect().bottom, b.bottom) - 30)!;
+      const x = end.getBoundingClientRect().left + 20;
+      const y = Math.min(end.getBoundingClientRect().bottom, b.bottom) - 30;
+      const c = document.caretRangeFromPoint(x, y);
+      // No text under the point (F-new-phone-handle-no-caret, once on CI): say where it was and what was there.
+      if (!c) throw new Error(`no text at ${Math.round(x)},${Math.round(y)}: window ${innerWidth}×${innerHeight}, pane ${Math.round(b.top)} to ${Math.round(b.bottom)}, paragraph ${Math.round(end.getBoundingClientRect().top)} to ${Math.round(end.getBoundingClientRect().bottom)}, on top there: ${document.elementFromPoint(x, y)?.className ?? "nothing"}`);
       getSelection()!.setBaseAndExtent(t, 0, c.startContainer, c.startOffset);
       return { n, last: Number(end.textContent!.match(/Passage (\d+)/)![1]) };
     }, start);
