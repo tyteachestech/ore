@@ -971,7 +971,7 @@ export function PhoneApp() {
     ) : openId && (startKnown || openId !== start.openId) ? (
       <Screen className="phone-full phone-reader phone-source" onBack={() => setOpenId(null)} onForward={setNoting}>
         {/* From the note, Back returns to the source, as the left-edge swipe does. */}
-        <Back label={noting ? "Source" : "Back"} stay={noting} onClick={() => (noting ? setNoting(false) : setOpenId(null))} />
+        <Back label={noting ? "Source" : "Back"} title={noting && side === "questions" ? "Collected" : undefined} stay={noting} onClick={() => (noting ? setNoting(false) : setOpenId(null))} />
         <Boundary onBack={() => setOpenId(null)}>
           <Reader
             key={openId}

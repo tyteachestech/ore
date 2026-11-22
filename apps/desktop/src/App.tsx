@@ -368,10 +368,15 @@ export function App() {
     }
   }, []);
 
+  // Which reads of the skills land, against the sidebar's layout writes (reads.ts).
+  const skillReads = useRef(readGuard()).current;
   /** Loads skills and drops a saved skill filter whose skill no longer exists. */
   const reloadSkills = useCallback(() => {
+    const read = skillReads.begin();
     loadSkills().then(
       (all) => {
+        // A read from before a later layout write (an Undo) would put its step back; that write reads again.
+        if (!read.lands()) return;
         setSkills(all);
         save(LAST_SKILLS, JSON.stringify(all));
         setSkill((k) => (k && !all.some((s) => s.id === k) ? null : k));
@@ -1601,7 +1606,7 @@ export function App() {
     })));
     const q = layoutWrites.current;
     const n = ++q.queued;
-    const write = q.last.then(() => ore("skills", "arrange", JSON.stringify(layout)));
+    const write = skillReads.writing(q.last.then(() => ore("skills", "arrange", JSON.stringify(layout))));
     q.last = write.catch(() => {});
     try {
       await write;

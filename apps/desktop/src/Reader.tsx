@@ -4047,38 +4047,42 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
               }
             />
           ) : (
-            <CollectedPanel
-              anns={anns}
-              timeOf={timeOf}
-              adding={adding}
-              onAdding={(on) => (on ? cardHere() : (setAdding(null), keyDrafts.delete(p.id)))}
-              onEdit={setAdding}
-              addAsk={addAsk}
-              takeAddFocus={() => {
-                const want = focusAdd.current;
-                focusAdd.current = false;
-                return want;
-              }}
-              onAdd={(line) => void addPoint(line)}
-              onJump={(id) => onSource(() => jumpToHighlight(id))}
-              onAsk={() => setAsk((n) => n + 1)}
-              actions={highlightActions}
-              filter={sideFilter}
-              questions={
-                <QuestionsPanel
-                  item={doc.id}
-                  skills={doc.skills.map((s) => ({ id: s, name: p.skills.find((k) => k.id === s)?.name ?? s }))}
-                  quote={sideQuote}
-                  onClearQuote={() => setSideQuote(null)}
-                  onJumpQuote={(m) => onSource(() => jumpToQuote(m))}
-                  onJumpHighlight={(id) => onSource(() => jumpToHighlight(id))}
-                  notify={p.notify}
-                  ask={ask}
-                  marked={`${filed}|${annWrites}|${anns.filter((a) => a.intent === "question").map((a) => a.id).join()}`}
-                  filter={sideFilter}
-                />
-              }
-            />
+            <>
+              {/* The phone's page names itself, as Sources and Settings do (F451); the Mac's panel has its tab. */}
+              {PHONE && <h1 className="phone-side-title">Collected</h1>}
+              <CollectedPanel
+                anns={anns}
+                timeOf={timeOf}
+                adding={adding}
+                onAdding={(on) => (on ? cardHere() : (setAdding(null), keyDrafts.delete(p.id)))}
+                onEdit={setAdding}
+                addAsk={addAsk}
+                takeAddFocus={() => {
+                  const want = focusAdd.current;
+                  focusAdd.current = false;
+                  return want;
+                }}
+                onAdd={(line) => void addPoint(line)}
+                onJump={(id) => onSource(() => jumpToHighlight(id))}
+                onAsk={() => setAsk((n) => n + 1)}
+                actions={highlightActions}
+                filter={sideFilter}
+                questions={
+                  <QuestionsPanel
+                    item={doc.id}
+                    skills={doc.skills.map((s) => ({ id: s, name: p.skills.find((k) => k.id === s)?.name ?? s }))}
+                    quote={sideQuote}
+                    onClearQuote={() => setSideQuote(null)}
+                    onJumpQuote={(m) => onSource(() => jumpToQuote(m))}
+                    onJumpHighlight={(id) => onSource(() => jumpToHighlight(id))}
+                    notify={p.notify}
+                    ask={ask}
+                    marked={`${filed}|${annWrites}|${anns.filter((a) => a.intent === "question").map((a) => a.id).join()}`}
+                    filter={sideFilter}
+                  />
+                }
+              />
+            </>
           )}
         </SidePanel>
       )}

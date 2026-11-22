@@ -83,6 +83,10 @@ function Detected({ list }: { list: Entry[] }) {
  *  fetched or read, any other text becomes a source as written. Its skills are picked in the box, as
  *  labels are in Linear's new-issue box: the open skill is ticked already, Tab reaches the pills, and a
  *  course is filed whole. ↵ adds, ⇧↵ is a new line; files can also be picked (⌘O) or dropped anywhere. */
+/** What he typed and left with Esc or a click outside, by box (Add, Follow): the next ⌘N shows it selected, so
+ *  ↵ adds it and typing replaces it (F449). In memory only: gone when Ore quits, and once it goes in. */
+const left: { add?: { value: string; pasted: Pasted | null }; follow?: { value: string; pasted: Pasted | null } } = {};
+
 export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, following, onPickFiles, onClose, notify }: {
   skill: Skill | null;
   skills: Skill[];
@@ -100,7 +104,8 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
   /** Says why an add failed after the box was closed while it ran (Esc mid-add). */
   notify: Notify;
 }) {
-  const [value, setValue] = useState("");
+  const box = following ? "follow" : "add";
+  const [value, setValue] = useState(() => left[box]?.value ?? "");
   const [picked, setPicked] = useState<string[]>(skill ? [skill.id] : []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,16 +113,26 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
   const skillsRef = useRef<HTMLSpanElement>(null);
   useFocusWhileMounted(ref);
   const open = useRef(true);
+  /** What to keep if the box closes now: nothing while an add runs or once it went in. */
+  /** It went in (or was followed): the box closes with nothing to keep. */
+  const went = useRef(false);
+  const close = () => ((went.current = true), (leaving.current = undefined), onClose());
+  const leaving = useRef<{ value: string; pasted: Pasted | null } | undefined>(undefined);
   useEffect(() => {
     open.current = true;
-    return () => void (open.current = false);
-  }, []);
+    if (value) ref.current?.select();
+    return () => {
+      open.current = false;
+      left[box] = leaving.current;
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   // A link or file he just copied in another app: the first row while the field is empty; ↵ adds it.
   const [copied, setCopied] = useState<Entry | null>(null);
   useEffect(() => void takeCopied(have).then(setCopied), []); // eslint-disable-line react-hooks/exhaustive-deps
   const offer = !value.trim() && !busy && !error && (!following || copied?.kind === "link") ? copied : null;
   // A page's text pasted into the empty box (a ChatGPT answer) goes in as its HTML, images and tables kept.
-  const [pasted, setPasted] = useState<Pasted | null>(null);
+  const [pasted, setPasted] = useState<Pasted | null>(() => left[box]?.pasted ?? null);
+  leaving.current = value.trim() && !busy && !went.current ? { value, pasted } : undefined;
   const list = withHtml(entries(value), pasted);
   const one = list.length === 1 && list[0]!.kind === "link" && (following || !isCourseLink(list[0]!.url)) ? list[0]!.url : null;
   const feed = useFeedOf(busy ? null : one);
@@ -131,7 +146,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
     const why = await onFollow(link, picked);
     if (!open.current) return why ? notify(why, "error") : undefined;
     setBusy(false);
-    if (!why) return onClose();
+    if (!why) return close();
     setError(why);
   };
 
@@ -160,8 +175,8 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
     if (!open.current) return notify(failure ?? "", "error");
     setBusy(false);
     // Cancelled from the toast: the box stays with what didn't go in, to fix or add again.
-    if (cancelled && !failure) return failed.length ? (setValue(failed.map(entryText).join("\n")), ref.current?.focus()) : onClose();
-    if (!failure) return onClose();
+    if (cancelled && !failure) return failed.length ? (setValue(failed.map(entryText).join("\n")), ref.current?.focus()) : close();
+    if (!failure) return close();
     // Keep only what didn't go in: the rest is already added, and a retry mustn't add it twice.
     if (failed.length < what.length || what !== list) setValue(failed.map(entryText).join("\n"));
     setError(failed.length < what.length ? `Added ${what.length - failed.length} of ${what.length}. ${failure}` : failure);
