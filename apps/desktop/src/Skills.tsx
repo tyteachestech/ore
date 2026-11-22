@@ -518,13 +518,15 @@ const Check = () => <CheckIcon className="check" size={12} aria-hidden="true" />
 
 /** Deleting a skill whose sources are filed nowhere else asks what happens to them (Tyler's call):
  *  kept by default, untagged, or archived. With nothing to ask it deletes at once, with Undo. Cards always stay and keep reviewing. Enter deletes, Esc cancels. */
-export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
+export function DeleteSkill({ skill, sources, onDone, onChanged, onFailed, notify }: {
   skill: Skill;
   /** Its sources, how many are filed under no other skill, and its archived ones (the delete takes it off them too). */
   sources: { all: number; only: number; archived: number };
   onDone: (deleted: boolean) => void;
-  /** Undo or redo changed the library after the dialog closed. */
+  /** The delete's write landed, or an undo or redo changed the library, after the dialog closed. */
   onChanged: () => void;
+  /** The delete's write failed after the skill left the screen: it goes back where it was. */
+  onFailed: () => void;
   notify: Notify;
 }) {
   const [archive, setArchive] = useState(false);
@@ -536,34 +538,47 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, notify }: {
   const n = (k: number) => count(k, "source");
   const alsoArchived = sources.archived ? ` (and ${sources.archived} archived)` : "";
 
-  const remove = async () => {
+  // It goes at once, with its Undo, and the write lands behind it: on the real Mac the CLI can take seconds, and a
+  // delete that waited for it showed nothing, so picking Delete skill… again seemed to do nothing too (F455).
+  const remove = () => {
     if (busy) return;
     setBusy(true);
-    try {
-      const rm = () => ore<{ removed: unknown }>("skills", "rm", skill.id, ...(archive ? ["--archive"] : []));
-      let { removed } = await rm();
-      // The history puts a failed step back and says why; the screens reload either way.
-      const fail = (e: unknown) => {
+    const rm = () => ore<{ removed: unknown }>("skills", "rm", skill.id, ...(archive ? ["--archive"] : []));
+    const write = rm();
+    let removed: unknown = null;
+    // The history puts a failed step back and says why; the screens reload either way.
+    const fail = (e: unknown) => {
+      onChanged();
+      throw e;
+    };
+    const slot = `delete-skill:${skill.id}`;
+    const forget = notify(
+      `Deleted ${skill.name}`,
+      "info",
+      () => ore("skills", "restore", JSON.stringify(removed)).then(onChanged, fail),
+      () => rm().then((r) => ((removed = r.removed), onChanged()), fail),
+      undefined,
+      undefined,
+      slot,
+    );
+    // Its undo and redo wait for this write; one that fails takes the step off.
+    forget.hold(write);
+    write.then(
+      (r) => {
+        removed = r.removed;
         onChanged();
-        throw e;
-      };
-      notify(
-        `Deleted ${skill.name}`,
-        "info",
-        () => ore("skills", "restore", JSON.stringify(removed)).then(onChanged, fail),
-        () => rm().then((r) => ((removed = r.removed), onChanged()), fail),
-      );
-      // Focus is often on the skill's own sidebar row (the menu gives it back there), which goes once the
-      // skills reload: it moves to the sidebar's current place instead of falling to <body>.
-      const was = document.activeElement;
-      settleFocus(() => (usable(was) ? was : document.querySelector<HTMLElement>('.sidebar button.side-main[aria-pressed="true"]') ?? document.querySelector<HTMLElement>(".sidebar button.side-main")));
-      onDone(true);
-    } catch (e) {
-      notify(errorText(e), "error");
-      setBusy(false);
-      // With no dialog to try again from, it lets go: Delete skill… starts it over.
-      if (!choice) onDone(false);
-    }
+      },
+      (e) => {
+        // In place of the toast that said it was deleted; the skill comes back, and Delete skill… tries again.
+        notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot);
+        onFailed();
+      },
+    );
+    // Focus is often on the skill's own sidebar row (the menu gives it back there), which goes now: it moves
+    // to the sidebar's current place instead of falling to <body>.
+    const was = document.activeElement;
+    settleFocus(() => (usable(was) ? was : document.querySelector<HTMLElement>('.sidebar button.side-main[aria-pressed="true"]') ?? document.querySelector<HTMLElement>(".sidebar button.side-main")));
+    onDone(true);
   };
 
   // Nothing to decide (no source would be left in no skill): it goes at once, with Undo, as every

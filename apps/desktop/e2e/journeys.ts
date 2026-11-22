@@ -11508,6 +11508,28 @@ journey("skill rename: a ⌘Z whose save fails stays on the history, so the next
   await until("the next ⌘Z takes it back", () => named("Habits"));
 });
 
+journey("delete skill: on a slow save the skill goes at once with its Undo, never a menu pick that seems to do nothing (F455)", async (page) => {
+  // His real Mac: the CLI took long enough that four picks of Delete skill… showed nothing at all.
+  const k = (await ore("skills", "add", "Slow to go")) as { id: string };
+  try {
+    await page.reload();
+    const row = page.locator(".sidebar .side-item", { hasText: "Slow to go" });
+    await row.first().waitFor();
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = { skills: 4000 }));
+    await row.first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: /^Delete skill/ }).click();
+    await page.locator(".toast-msg", { hasText: "Deleted Slow to go" }).waitFor({ timeout: 1500 });
+    await until("the skill leaves the sidebar before the save lands", async () => (await row.count()) === 0, 1500);
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = {}));
+    await until("the save lands", async () => !((await ore("skills")) as { id: string }[]).some((s) => s.id === k.id), 8000);
+    await page.keyboard.press("Meta+z");
+    await row.first().waitFor({ timeout: 8000 });
+  } finally {
+    await page.evaluate(() => void ((window as unknown as Rigged).__ORE_SLOW = {}));
+    await ore("skills", "rm", k.id).catch(() => {});
+  }
+});
+
 journey("delete skill: a delete whose save fails can be tried again from the same menu", async (page) => {
   const k = (await ore("skills", "add", "Empty for now")) as { id: string };
   try {
