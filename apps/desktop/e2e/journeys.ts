@@ -5447,6 +5447,39 @@ journey("answer pieces: Undo of a removed piece, then a Redo that fails, keeps t
   }
 });
 
+// CI met this on master (F357's journey, shard 2/5): the questions read again after the removal landed
+// answered after the Undo had put the piece back, and showed the answer without it.
+journey("answer pieces: Undo of a removed piece keeps it when the read after the removal answers late (F-new-answer-undo-stale-read)", async (page) => {
+  type Q = { id: string; note?: string; answers: { ts: string; text: string }[] };
+  const kids = async () => ((await ore("questions", "--skill=learning")) as Q[]).find((x) => x.note === "Does this hold for kids?")!;
+  const slow = (ms: number | null) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { questions: ms } : undefined), ms);
+  try {
+    await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+    await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Answer…" }).click();
+    await page.getByLabel("Your answer to Does this hold for kids?").fill("Mostly yes.");
+    await page.keyboard.press("Enter");
+    const piece = page.getByRole("button", { name: "Edit: Mostly yes." });
+    await piece.click();
+    await settled(page);
+    await slow(1200);
+    await page.getByLabel("Edit this part of your answer").fill("");
+    await page.keyboard.press("Enter");
+    await until("removed in the library", async () => (await kids()).answers.length === 0);
+    await page.locator(".toast").filter({ hasText: "Removed from your answer" }).getByRole("button", { name: "Undo" }).click();
+    await piece.waitFor();
+    await until("back in the library", async () => (await kids()).answers.length === 1);
+    await slow(null);
+    await settled(page);
+    await page.waitForTimeout(300);
+    if (!(await piece.isVisible())) throw new Error("the piece Undo put back went again when an older read of the questions answered");
+  } finally {
+    await slow(null);
+    const k = await kids();
+    for (const c of k.answers) await ore("answer", k.id, `--remove=${c.ts}`); // leave it as the seed had it
+  }
+});
+
 // F351: removes that take the row away at once put their step on the history only once the write
 // was back, so a ⌘Z meanwhile took back the step before (here the piece's edit) instead.
 journey("answer pieces: ⌘Z while an emptied piece is being removed brings that piece back, not the edit before it (F351)", async (page) => {
