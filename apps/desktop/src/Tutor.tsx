@@ -136,26 +136,28 @@ export function useTutorChat(notify: Notify) {
     queue.current = r.catch(() => {});
     return r;
   };
-  // Whether the last write of a chat failed: the one on screen is its only copy until a save lands.
-  const unsaved = useRef(false);
   const write = (f: () => Promise<unknown>) =>
     serial(f).then(
-      () => void (unsaved.current = false),
+      () => true,
       (e) => {
-        unsaved.current = true;
         notify(errorText(e, "save the chat"), "error");
+        return false;
       },
     );
-  const save = () => {
+  // The chat on screen whose last save failed, by id: until a save of it lands, the screen holds its only copy.
+  const unsaved = useRef<string | null>(null);
+  const save = async () => {
     const m = metaNow.current;
-    if (!m || !now.current.length) return Promise.resolve();
+    if (!m || !now.current.length) return;
     const chat = { ...m, carry: carryNow.current, turns: now.current.map(settled) };
-    return write(() => oreWith(JSON.stringify(chat), "chat", "--set", "--merge"));
+    const ok = await write(() => oreWith(JSON.stringify(chat), "chat", "--set", "--merge"));
+    if (ok && unsaved.current === m.id) unsaved.current = null;
+    if (!ok) unsaved.current = m.id;
   };
   /** Before the chat on screen gives way to another: one whose save failed is saved again first, and stays on
    *  screen (with the error) if that fails too, so leaving it never loses it (Codex UX sweep 2). */
   const savedFirst = async () => {
-    if (!unsaved.current) return true;
+    if (!unsaved.current || unsaved.current !== metaNow.current?.id) return true;
     await save();
     return !unsaved.current;
   };
@@ -330,6 +332,7 @@ export function useTutorChat(notify: Notify) {
     if (await savedFirst()) clear();
   };
   const clear = () => {
+    unsaved.current = null;
     unqueue();
     update(() => []);
     setCarry([]);

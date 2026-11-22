@@ -60,7 +60,9 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
   // after an Undo has given a removed piece a new ts (review of #442).
   const now = useRef(answers);
   const setAnswers = (f: (l: Question["answers"]) => Question["answers"]) => setShown((now.current = f(now.current)));
-  useEffect(() => setAnswers(() => q.answers), [q.answers]);
+  // A rewrite still out keeps what he sees: a re-read that landed before it would show the words before it.
+  const out = useRef(0);
+  useEffect(() => void (out.current || setAnswers(() => q.answers)), [q.answers]);
   const hasAnswer = answers.length > 0;
   /** Rewrites one piece of his answer (Notion: click the text, type); empty removes it. On the history.
    *  False when the save failed (his words are put back in the piece's field). */
@@ -70,7 +72,8 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
     const was = before.find((c) => c.ts === ts);
     if (!was) return false;
     setAnswers((l) => (gone ? l.filter((c) => c.ts !== ts) : l.map((c) => (c.ts === ts ? { ...c, text: to } : c))));
-    const write = ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)]));
+    out.current++;
+    const write = ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)])).finally(() => out.current--);
     // On the history at once, as the piece changes: a ⌘Z while the write is out takes back this step, not the one
     // before it. The history holds its Undo and Redo until this write has landed (history.ts `hold`).
     // A removed piece comes back as it was written (its source and passage), at the end of his answer.
@@ -105,6 +108,7 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
     for (const [ts, e] of [...editing.current]) {
       const to = e.to.trim();
       if (to !== e.from && !(await rewrite(ts, to, e.from))) return false;
+      editing.current.delete(ts); // saved: an unmount in the same batch must not write it again
       e.close();
     }
     return true;

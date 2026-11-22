@@ -9060,6 +9060,9 @@ journey("tutor: New chat after a chat that could not be saved saves it first, an
     await page.getByRole("button", { name: "New chat", exact: true }).click();
     await page.getByRole("button", { name: "Chats", exact: true }).click();
     await page.getByText("Unsaved learning chat").first().waitFor({ timeout: 4000 });
+    // And it opens again from there, with its reply.
+    await page.getByText("Unsaved learning chat").first().click();
+    await page.getByText("Recall it first, without the source in front of you.").waitFor();
   } finally {
     await page.evaluate(() => { const g = window as unknown as Record<string, unknown>; g.__ORE_FAIL = {}; delete g.__ORE_REPLY; });
     await page.keyboard.press("Escape").catch(() => {});

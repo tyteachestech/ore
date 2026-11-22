@@ -49,8 +49,10 @@ export function wakesScreens(args: string[]): boolean {
   if (args[0] === "skills") return ["rm", "restore", "archive"].includes(args[1]!) || (args[1] === "set" && has("--name"));
   // A source filed into or out of a skill: that skill's open page counts its questions and exercises again.
   if (args[0] === "edit") return has("--title") || has("--skills");
-  // His answer to a question (Codex UX sweep 2): the question's row and box on a skill page show what was saved.
-  return args[0] === "archive" || args[0] === "goal" || args[0] === "answer" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"));
+  // A piece of his answer rewritten or removed (Codex UX sweep 2): the question's row on a skill page shows what was
+  // saved. A new answer reaches its page through the box's own onSaved, so it wakes nothing more.
+  if (args[0] === "answer") return has("--edit") || has("--remove");
+  return args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"));
 }
 
 
