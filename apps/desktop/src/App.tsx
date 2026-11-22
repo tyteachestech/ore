@@ -2760,14 +2760,17 @@ export function App() {
           }}
           onDone={(deleted) => {
             setDeleting(null);
-            if (deleted) {
-              reloadSkills();
-              void refresh();
-            }
+            // Off the sidebar at once; the skills read again once its write lands (onChanged).
+            if (deleted) setSkills((all) => all.filter((s) => s.id !== deleting));
           }}
           onChanged={() => {
             reloadSkills();
             void refresh();
+          }}
+          onFailed={() => {
+            const back = skillOf(deleting);
+            const at = skills.findIndex((s) => s.id === deleting);
+            setSkills((all) => (all.some((s) => s.id === back.id) ? all : [...all.slice(0, at), back, ...all.slice(at)]));
           }}
           notify={notify}
         />
