@@ -12078,7 +12078,7 @@ journey("phone: the check-in before a session asks about what he is trying, its 
   // The seed's library has something he is trying, last touched before today.
   await page.evaluate(() => localStorage.setItem("e2e.check-in", "1"));
   // A day on for Date only: an installed clock also fakes requestAnimationFrame and timers, so the window checks
-  // (HYGIENE) ran two "frames" a moment apart while a screen still slid in, and saw it cut (F-new-ci-checkin-slide).
+  // (HYGIENE) ran two "frames" a moment apart while a screen still slid in, and saw it cut (F468).
   await page.clock.setFixedTime(new Date(Date.now() + 26 * 3600e3));
   await page.reload();
   await page.locator(".phone-app").waitFor();
@@ -12091,7 +12091,7 @@ journey("phone: the check-in before a session asks about what he is trying, its 
   await tap(page, page.getByRole("button", { name: "Not yet" }));
   await ask.waitFor({ state: "detached" });
   await page.getByRole("radio", { name: "Think so" }).or(page.locator(".review-q")).first().waitFor();
-  // The first exercise's screen settles where it belongs (F-new-ci-checkin-slide: on CI it was once seen 17 px in).
+  // The first exercise's screen settles where it belongs (F468: on CI it was once seen 17 px in).
   await until("no slide is still running", () => page.evaluate(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity)));
   const x = await page.locator(".review").first().evaluate((e) => Math.round(e.getBoundingClientRect().left));
   if (x !== 0) throw new Error(`the first exercise's screen settled ${x} px in from the left`);
