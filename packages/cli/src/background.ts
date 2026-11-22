@@ -20,7 +20,7 @@ export function startRemix(lib: Library, cardIds: string[]): "started" | "skippe
   return startBackground(lib, ["remix", ...cardIds], "remix");
 }
 
-// A PDF's tables and formulas (D125): `ore tables <id>` detached, since Docling takes seconds to minutes.
+// A PDF's tables and formulas (D125): `ore tables <id>` detached, since the page reader takes seconds to minutes.
 // Marked as being read before `ore add` returns, so the reader opened next shows it waiting.
 export function startTables(lib: Library, itemId: string): "started" | "skipped" {
   return startBackground(lib, ["tables", itemId], `tables-${itemId}`, (pid) => markTablesReading(lib, itemId, pid));

@@ -4,8 +4,9 @@ import { cancelOre, ore, oreJob, PHONE, type Doc } from "./ore";
 import { errorText } from "./util";
 import { Working } from "./Working";
 
-// Tables and display formulas in a PDF (D125): pdf.js reads them as lines of text; Docling, an optional
-// download on the Mac, reads them properly. Offered in the PDF that has them (Tyler, 2026-11-06, option A),
+// Headings, tables and display formulas in a PDF (D125, D-new-paddle-pages): pdf.js reads the words;
+// PaddleOCR-VL, an optional download on the Mac, reads each page's picture for its headings, tables and
+// formulas, on every PDF added once it is here. Offered in the PDF that has them (Tyler, 2026-11-06, option A),
 // and removed from Settings › AI.
 
 export type TablesState = { installed: boolean };
@@ -53,9 +54,10 @@ const what = (s: string[]) => (s.includes("tables") && s.includes("formulas") ? 
 /** What the line under a PDF's title says: nothing once its tables and formulas are read (or it has none),
  *  the Mac's own line with its button ("mac"), or on the phone, which can't run the reader, where to read them. */
 export function tablesLine(doc: Doc, phone: boolean): string | null {
-  if (doc.type !== "pdf" || !doc.structure?.length || doc.tables === "read") return null;
-  // The Mac is reading them now: the phone gets the result through sync.
-  if (phone && doc.tables === "reading") return null;
+  if (doc.type !== "pdf" || doc.tables === "read") return null;
+  // The Mac is reading them now (every PDF, once the reader is here): the phone gets the result through sync.
+  if (doc.tables === "reading") return phone ? null : "mac";
+  if (!doc.structure?.length) return null;
   return phone ? `${what(doc.structure)} in this PDF read as plain text. Open it on your Mac to read them properly.` : "mac";
 }
 
@@ -117,13 +119,13 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
     <div className="pdf-tables">
       {downloading !== null ? (
         <>
-          <Working label={`Downloading the table and formula reader${downloading}…`} slow="A few minutes, once" />
+          <Working label={`Downloading the PDF page reader${downloading}…`} slow="A few minutes, once" />
           <button className="pdf-tables-btn" onClick={() => ((cancelled.current = true), void cancelInstall())}>
             Cancel
           </button>
         </>
       ) : reading ? (
-        <Working stage="read" label={`Reading the ${what(doc.structure ?? []).toLowerCase()}…`} slow="Up to a few minutes for a long paper" />
+        <Working stage="read" label="Reading the pages for headings, tables and formulas…" slow="About 6 seconds a page" />
       ) : error ? (
         <>
           <span className="pdf-tables-err">{error}</span>
@@ -137,14 +139,14 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
           <button className="pdf-tables-btn" onClick={() => void read()}>
             Read them properly
           </button>
-          {!have && <span className="pdf-tables-size">about 2 GB, once</span>}
+          {!have && <span className="pdf-tables-size">about 4 GB, once</span>}
         </>
       )}
     </div>
   );
 }
 
-/** Settings › AI: get the reader before any PDF asks, or take its 2 GB back. `Row` is
+/** Settings › AI: get the reader before any PDF asks, or take its 4 GB back. `Row` is
  *  Settings' own row. */
 export function TablesSetting({ notify, Row }: { notify: (msg: string, kind?: "info" | "error") => void; Row: (p: { title: string; text: string; children: ReactNode }) => ReactNode }) {
   const downloading = useStep();
@@ -160,14 +162,14 @@ export function TablesSetting({ notify, Row }: { notify: (msg: string, kind?: "i
     setInstalled(false);
     try {
       await ore("tables", "--remove");
-      notify("Removed the table and formula reader. A PDF with tables offers it again.");
+      notify("Removed the PDF page reader. A PDF with tables offers it again.");
     } catch (e) {
       setInstalled(true);
       notify(errorText(e), "error");
     }
   };
   return (
-    <Row title="Tables and formulas in PDFs" text={installed ? "Reads them as real tables and typeset math, on this Mac. Uses about 2 GB." : "Reads them as real tables and typeset math, on this Mac. About a 2 GB download, once."}>
+    <Row title="Headings, tables and formulas in PDFs" text={installed ? "Reads them from every PDF you add, on this Mac. Uses about 4 GB." : "Reads them from every PDF you add, on this Mac. About a 4 GB download, once."}>
       {downloading !== null ? (
         <>
           <Working label={`Downloading${downloading}…`} />
