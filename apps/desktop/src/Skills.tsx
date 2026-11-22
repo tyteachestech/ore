@@ -60,9 +60,10 @@ export function SkillChips({ ids, skills }: { ids: string[]; skills: Skill[] }) 
 
 /** A source's skill pills, and the picker they open on click: Linear's label picker (Notion's
  *  multi-select). Type to filter, click or Enter ticks or unticks a skill and the list stays open, a
- *  name no skill has creates one. With no skills, a quiet + on hover stands where the pills would be.
+ *  name no skill has creates one. With no skills, a quiet + on hover stands where the pills would be
+ *  in a list's row; the reader's byline shows a faint "Skill" instead (`blank`), as its blank Author does.
  *  The caller writes `next` and offers Undo back to `before`. */
-export function SkillPicker({ skills, value, title, onChange, onCreate, startOpen = false, onClosed, returnFocus, inRow, children }: {
+export function SkillPicker({ skills, value, title, onChange, onCreate, startOpen = false, onClosed, returnFocus, inRow, blank, children }: {
   skills: Skill[];
   value: string[];
   /** The source's title, for the button's label. */
@@ -79,7 +80,9 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   inRow?: boolean;
   /** Where focus goes when it closes, instead of back to the pills (the add box's text field, so ↵ adds). */
   returnFocus?: RefObject<HTMLElement | null>;
-  /** The pills (or their names); none (on a skill page, the page's own is left out) shows the +. */
+  /** The word that stands where its skills go while it has none, as the reader's blank Author does (D210); without it, a + on hover. */
+  blank?: string;
+  /** The pills (or their names); none (on a skill page, the page's own is left out) shows `blank` or the +. */
   children?: ReactNode;
 }) {
   const [open, setOpen] = useState(startOpen);
@@ -117,14 +120,14 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   const button = (
     <button
       {...(bare && { type: "button", "aria-haspopup": "dialog", "aria-expanded": false })}
-      className={children ? "chips-button" : "chips-add"}
+      className={children ? "chips-button" : blank ? "chips-blank" : "chips-add"}
       aria-label={`Skills for ${title}`}
       tabIndex={inRow ? -1 : undefined}
       data-no-drag
       onClick={stop}
       onKeyDown={(e) => e.key === "Enter" && stop(e)}
     >
-      {children || <Plus size={11} weight="bold" aria-hidden="true" />}
+      {children || blank || <Plus size={11} weight="bold" aria-hidden="true" />}
     </button>
   );
   if (bare) return button;
