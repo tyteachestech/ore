@@ -5037,7 +5037,7 @@ journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette 
 // rows and its footer couldn't be reached, and End picked a row out of sight.
 journey("a small window: ⌘K, the Add box and the shortcuts sheet fit in it, and End shows the palette's last row", async (page) => {
   // The skills are in before the palette opens: opened a moment after a reload it listed commands only, End took
-  // the last of those, and the skills then arrived below it (F455).
+  // the last of those, and the skills then arrived below it (F456).
   await page.locator(".sidebar div.side-item").first().waitFor({ state: "attached" });
   await page.setViewportSize({ width: 533, height: 400 });
   const inWindow = async (what: string, l: Locator) => {
@@ -16571,9 +16571,9 @@ journey("ambience: in a narrow window with the sidebar folded the radio sits in 
   }
 });
 
-// CI (F456): a read of the skills that began before an Undo answered after it, and put the
+// CI (F457): a read of the skills that began before an Undo answered after it, and put the
 // deleted collection's skills back out of it until the next read.
-journey("sidebar: a collection brought back with ⌘Z stays back when an earlier read of the skills answers late (F456)", async (page) => {
+journey("sidebar: a collection brought back with ⌘Z stays back when an earlier read of the skills answers late (F457)", async (page) => {
   const slow = (ms: number | null) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { skills: ms } : undefined), ms);
   const craft = page.locator(".side-head").filter({ hasText: /^Craft$/i });
   await craft.waitFor();
