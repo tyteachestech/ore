@@ -47,7 +47,8 @@ export function wakesScreens(args: string[]): boolean {
   // to it. A skill's other settings (goal, colour, icon, priority) leave the names alone, so they wake nothing more.
   const has = (flag: string) => args.some((a) => a === flag || a.startsWith(`${flag}=`));
   if (args[0] === "skills") return ["rm", "restore", "archive"].includes(args[1]!) || (args[1] === "set" && has("--name"));
-  if (args[0] === "edit") return has("--title");
+  // A source filed into or out of a skill: that skill's open page counts its questions and exercises again.
+  if (args[0] === "edit") return has("--title") || has("--skills");
   return args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"));
 }
 

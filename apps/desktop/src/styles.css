@@ -1790,7 +1790,7 @@ button.try-stone:hover .stone { opacity: 1; }
 .forge-row:not([data-state="now"]) .try-do { color: var(--text-read); }
 .forge-row .forge-pick, .forge-row .more { visibility: hidden; }
 .forge-row:hover :is(.forge-pick, .more), .forge-row:focus-within :is(.forge-pick, .more), .forge-row .more[aria-expanded="true"] { visibility: visible; }
-.forge-add { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin: 4px 8px 8px; }
+.forge-add { display: grid; grid-template-columns: 2fr 1fr auto; align-items: start; gap: 8px; margin: 4px 8px 8px; }
 .forge-add .field, .plan-line .field { height: auto; min-height: 34px; padding: 7px 10px; line-height: 1.45; }
 .try-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 40px; }
 .try-title { margin: 14px 0 10px; font-size: 24px; line-height: 1.25; font-weight: 600; overflow-wrap: anywhere; }
@@ -3511,7 +3511,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-settings .settings-btn { height: 44px; padding: 0 14px; font-size: 15px; }
 /* "How did it go?" on a try and at the check-in: its buttons are thumb-sized, under the field. */
 .phone .try-did { flex-direction: column; align-items: stretch; }
-.phone .try-did .settings-btn { height: 44px; padding: 0 16px; font-size: 15px; }
+.phone :is(.try-did, .forge-add) .settings-btn { height: 44px; padding: 0 16px; font-size: 15px; }
 .phone .checkin { margin-top: 2vh; }
 .phone .phone-settings .phone-time { height: 44px; padding: 0 10px; color: var(--text); }
 /* iOS's switch size. */

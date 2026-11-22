@@ -12,3 +12,9 @@ test("a rename, delete or restore of a skill or source wakes open screens; other
   for (const quiet of ["--priority=high", "--color=red", "--icon=brain", "--goal=Ship it"]) expect(wakesScreens(["skills", "set", "habits", quiet])).toBe(false);
   expect(wakesScreens(["edit", "01ABC", "--author", "Ann"])).toBe(false);
 });
+
+// Codex UX sweep (iPhone): a source taken out of a skill left that skill's open page with its question and counts.
+test("a source filed in or out of a skill wakes open screens", () => {
+  expect(wakesScreens(["edit", "01ABC", "--skills", "learning"])).toBe(true);
+  expect(wakesScreens(["edit", "01ABC", "--skills="])).toBe(true);
+});

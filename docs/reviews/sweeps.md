@@ -71,6 +71,8 @@ When a sweep's triage is done, add a row per tester here.
 | 11-15 | [sweep 10](2026-11-15-codex-sweep-10/) months | Codex | 60–90 simulated days of sessions with `page.clock` | both | 1 | #443 |
 | 11-15 | [sweep 11](2026-11-15-codex-sweep-10/) offline | Codex | The Feed over weeks; the Mac offline or on a bad network | both | 2 | #443 |
 | 11-19 | [native scout](2026-11-19-phone-native-feel/) | Codex | How the iPhone app feels next to Apple's own apps (Settings, Files, Safari) in the Simulator: touch, keyboard, edges, type, controls | iPhone | 8 | #467 (keyboard) |
+| 11-22 | [ux sweep](2026-11-22-codex-ux-sweep/) mac | Codex | Obvious mishaps a first-time Mac user hits in minutes, the last five days first | Mac | 4 | #492 |
+| 11-22 | [ux sweep](2026-11-22-codex-ux-sweep/) phone | Codex | The same on the iPhone, 390×844 and 375×667 | iPhone | 3 | #492 |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
