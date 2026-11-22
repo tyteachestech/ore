@@ -12089,6 +12089,10 @@ journey("phone: the check-in before a session asks about what he is trying, its 
   await tap(page, page.getByRole("button", { name: "Not yet" }));
   await ask.waitFor({ state: "detached" });
   await page.getByRole("radio", { name: "Think so" }).or(page.locator(".review-q")).first().waitFor();
+  // The first exercise's screen settles where it belongs (F-new-ci-checkin-slide: on CI it was once seen 17 px in).
+  await until("no slide is still running", () => page.evaluate(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity)));
+  const x = await page.locator(".review").first().evaluate((e) => Math.round(e.getBoundingClientRect().left));
+  if (x !== 0) throw new Error(`the first exercise's screen settled ${x} px in from the left`);
 }, "phone");
 
 journey("phone: in Review the buttons he taps on every exercise sit at the foot of the screen, and what the last answer won stands above them (F137)", async (page) => {
