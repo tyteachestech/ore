@@ -208,7 +208,9 @@ const HYGIENE = `(() => {
       const cut = (b.top < -1 && v.top <= 1) || (b.left < -1 && v.left <= 1) || (b.bottom > H + 1 && v.bottom >= H - 1) || (b.right > W + 1 && v.right >= W - 1);
       if (!cut) continue;
       now.add(el);
-      if (out.has(el)) found.add("a " + (el.getAttribute("role") ?? "popup") + " runs out of the " + W + "×" + H + " window: " + el.className + " at " + [b.left, b.top, b.width, b.height].map(Math.round).join(","));
+      // What moved it, if anything still is: each ancestor with an animation, and the animation's state (F468).
+      const why = () => { const l = []; for (let a = el; a; a = a.parentElement) for (const x of a.getAnimations()) l.push((a.className || a.nodeName) + ":" + (x.animationName ?? x.transitionProperty ?? "waapi") + ":" + x.playState + ":" + Math.round(x.currentTime ?? -1)); return l.length ? " (animations: " + l.join(", ") + "; transform " + getComputedStyle(el.closest(".phone-full") ?? el).transform + ")" : " (no animations; transform " + getComputedStyle(el.closest(".phone-full") ?? el).transform + ")"; };
+      if (out.has(el)) found.add("a " + (el.getAttribute("role") ?? "popup") + " runs out of the " + W + "×" + H + " window: " + el.className + " at " + [b.left, b.top, b.width, b.height].map(Math.round).join(",") + why());
       else again = true;
     }
     out = now;
