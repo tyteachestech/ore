@@ -52,8 +52,8 @@ import { askDig } from "./Dig";
 import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
 import { FilterButton, FilterTags } from "./FilterBar";
-import { kindLabel, passes, type Filter } from "./filters";
-import { importanceActions, LEVELS } from "./importance";
+import { kindLabel, NO_SKILL, onlyNoSkill, passes, type Filter } from "./filters";
+import { importanceActions, LEVELS, sourceImportanceActions } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import type { Sub } from "./Forge";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
@@ -240,8 +240,6 @@ export function App() {
   /** What to review (D80), asked by ⌘R and the palette; Home asks from its own button. */
   const [asking, setAsking] = useState<Today | null>(null);
   const [homeTick, setHomeTick] = useState(0);
-  /** A source just pasted or dropped in with no skill: its row opens the skill picker. */
-  const [pickFor, setPickFor] = useState<string | null>(null);
   /** A highlight the reader scrolls to when it opens (a question on the skill page, D47). */
   const [jumpTo, setJumpTo] = useState<string | undefined>(undefined);
   /** A ⌘K match in a skill note: the words to find there, until the skill page has. */
@@ -450,14 +448,14 @@ export function App() {
   viewRef.current = where;
 
   /** `ore add` each entry in turn, filed under the skills in `to`. One source added by hand opens in the
-   *  reader (D109), with the skill picker open if it landed with no skill; Undo archives it and goes back.
+   *  reader (D109), filed or not (a source needs no skill; its byline's faint Skill is there to file it);
+   *  Undo archives it and goes back.
    *  Otherwise (a list, a course, Learn this, or he moved on or was reading while it was added) he stays
    *  where he is: the toast says what went in, with Show (the last one selected in To read, on the open
-   *  skill's page if it's one of them, else the first one's) and Undo (archives what was new). A paste or
-   *  drop of a list that landed with no skill goes to its row with the skill picker open. Returns the first error (shown as a toast unless the caller shows it)
+   *  skill's page if it's one of them, else the first one's) and Undo (archives what was new). Returns the first error (shown as a toast unless the caller shows it)
    *  and the entries that failed, so the add box can keep only those and a retry never adds the rest twice. */
   const addSources = useCallback(
-    async (list: Entry[], to: string[], toastError = true, pickAfter = false, forQuestion?: string): Promise<{ failure: string | null; failed: Entry[]; first: string | null; cancelled: boolean }> => {
+    async (list: Entry[], to: string[], toastError = true, forQuestion?: string): Promise<{ failure: string | null; failed: Entry[]; first: string | null; cancelled: boolean }> => {
       let last: Item | null = null;
       // Cancel on the toast stops the entry being added (`ore` takes out what it wrote) and skips the
       // rest; the entries already in stay, as Finder keeps the files a cancelled copy finished.
@@ -567,15 +565,8 @@ export function App() {
       };
       // One source added by hand, while not reading and still where he was: it opens (D109).
       const opens = !!at && !failure && !forQuestion && list.length === 1 && !!first && first === at && !from.openId && viewRef.current === from;
-      if (opens) {
-        openSource(at);
-        if (pickAfter && !to.length) setPickFor(at);
-      }
-      // Pasted or dropped where no skill was in play, with no box to pick one in: its row, picker open.
-      else if (at && (failure || (pickAfter && !to.length && list.length === 1))) {
-        show();
-        if (!failure) setPickFor(at);
-      }
+      if (opens) openSource(at);
+      else if (at && failure) show();
       // Undo archives only what this add made (files and cards kept), never a source that was here already.
       // Run only from the history, which puts a failed step back and says why.
       const archive = (on: boolean) => Promise.all(fresh.map((id) => ore("archive", id, ...(on ? [] : ["--undo"])))).finally(refresh);
@@ -612,7 +603,7 @@ export function App() {
   const pickFiles = useCallback(async () => {
     setAdding(false);
     const paths = await chooseFiles();
-    if (paths.length) await addSources(files(paths), addTo ? [addTo] : [], true, true);
+    if (paths.length) await addSources(files(paths), addTo ? [addTo] : []);
   }, [addSources, addTo, chooseFiles]);
 
   // Dropping files: onto a skill in the sidebar files them there; anywhere else, under the open skill
@@ -666,7 +657,7 @@ export function App() {
         if (n) tell(n.el, "ore-image-drop", { paths: p.paths, x: n.x, y: n.y });
         else if (p.paths.length) {
           const to = target(p.position);
-          void dropRef.current.addSources(files(p.paths), to ? [to] : [], true, true);
+          void dropRef.current.addSources(files(p.paths), to ? [to] : []);
         }
       }
     });
@@ -687,7 +678,7 @@ export function App() {
       const d = e.clipboardData;
       const add = (list: Entry[]) => {
         const to = dropRef.current.addTo;
-        void dropRef.current.addSources(list, to ? [to] : [], true, true);
+        void dropRef.current.addSources(list, to ? [to] : []);
       };
       // A file copied in Finder pastes only its name: its path comes from the pasteboard.
       if (pastesFiles(d)) {
@@ -1008,7 +999,7 @@ export function App() {
   const learnAdd = useCallback(
     async (urls: string[], to: string[], question: string, now: boolean, from: { id: string; title: string }) => {
       const here = viewRef.current;
-      const r = await addSources(urls.map((url) => ({ kind: "link" as const, url })), to, true, false, question);
+      const r = await addSources(urls.map((url) => ({ kind: "link" as const, url })), to, true, question);
       // Read now, unless he went elsewhere while it was added.
       if (!now || !r.first || viewRef.current !== here) return;
       setSideQuest({ to: r.first, from, question });
@@ -1049,6 +1040,18 @@ export function App() {
     setFilters(v.filters);
     return true;
   });
+
+  /** A source filed under no skill there is. */
+  const unfiled = (i: Item) => !i.skills.some((k) => skills.some((s) => s.id === k));
+  const loose = useMemo(() => (items ?? []).some((i) => !i.archived_at && !i.preview && !i.skills.length), [items]);
+  /** The sidebar's No skill row: All sources, narrowed to the sources with no skill by the same tag the
+   *  Filter button would put in the search, so what hides the rest is in sight and × lets it go. */
+  const openNoSkill = () => {
+    openSkill(null);
+    listSkill.current = null;
+    setQuery("");
+    setFilters([{ field: "skill", values: [NO_SKILL] }]);
+  };
 
   const onSkillPage = !openId && !!skill && skills.some((s) => s.id === skill);
   /** The sidebar row a source sits under (Finder, Linear): the skill he came from when it holds the
@@ -1862,6 +1865,27 @@ export function App() {
       void refresh();
     }
   };
+  /** Sets how much a source matters, over its skills' importance ("" hands it back to them): at once, then
+   *  through `ore`; on the history, as a skill's importance is. */
+  const setSourceImportance = async (item: Item, p: Priority | "", undoable = true) => {
+    const before = item.priority ?? "";
+    setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, priority: p || undefined } : i)) ?? all);
+    const write = ore("edit", item.id, opt("priority", p));
+    // Undo and redo wait for this write, then write the other way; a failure there is the history's to tell.
+    const undo = () => write.catch(() => {}).then(() => setSourceImportance({ ...item, priority: p || undefined }, before, false));
+    const redo = () => setSourceImportance({ ...item, priority: before || undefined }, p, false);
+    const said = p ? LEVELS.find((l) => l.p === p)!.label : item.skills.length ? "same as its skills" : "Normal";
+    const forget = undoable ? notify(`${item.title}: ${said}`, "quiet", undo, redo) : undefined;
+    try {
+      await write;
+    } catch (e) {
+      forget?.();
+      if (!undoable) throw e;
+      notify(errorText(e), "error");
+    } finally {
+      void refresh();
+    }
+  };
   /** A pinned source moved among the pinned of this list (drag, or Move up/down), to `to` among them. */
   const movePinned = async (item: Item, to: number) => {
     const pinned = tabRows.filter((i) => i.pinned_at);
@@ -1976,6 +2000,7 @@ export function App() {
           sub: skills.map((k) => ({ id: k.id, label: k.name, icon: <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />, checked: r.skills.includes(k.id), run: () => fileSource(r, k) })),
         }]
       : []),
+    { id: "importance", label: "Importance", run: () => {}, sub: sourceImportanceActions(r, skills, (p) => void setSourceImportance(r, p)) },
     ...(r.url || r.source_file ? [{ id: "original", divider: true, label: "Open original", hint: label(keys.original), run: () => original(r, "open") }] : []),
     { id: "reveal", label: "Reveal in Finder", hint: label(keys.reveal), divider: !(r.url || r.source_file), run: () => original(r, "reveal") },
     { id: "copy", label: "Copy as Markdown", hint: label(keys.copy), run: () => copySources([r]) },
@@ -1991,7 +2016,10 @@ export function App() {
     if (!r) return [];
     return rowActions(r)
       .filter((a) => !["rename", "pin-up", "pin-down"].includes(a.id) && a !== showMenu)
-      .flatMap((a): Action[] => (a.sub ? a.sub.map((b) => ({ id: `${a.id}:${b.id}`, label: b.checked ? `Remove from ${b.label}` : `File under ${b.label}`, keywords: ["skill", "move"], run: b.run })) : [{ id: a.id, label: a.label, hint: a.hint, run: a.run }]));
+      .flatMap((a): Action[] =>
+        a.id === "importance" ? a.sub!.filter((b) => !b.checked).map((b) => ({ id: `${a.id}:${b.id}`, label: `Importance: ${b.label}`, keywords: ["priority", "focus", "normal", "light"], run: b.run }))
+        : a.sub ? a.sub.map((b) => ({ id: `${a.id}:${b.id}`, label: b.checked ? `Remove from ${b.label}` : `File under ${b.label}`, keywords: ["skill", "move"], run: b.run }))
+        : [{ id: a.id, label: a.label, hint: a.hint, run: a.run }]);
   };
 
   /** ⌘K follows what is open (a source, a skill page), never what is selected in a list (D178): a row's
@@ -2024,7 +2052,7 @@ export function App() {
     ...(onFeed ? [] : [{ id: "go-feed", label: "Go to Feed", hint: label(keys["go-feed"]), keywords: ["rss", "newsletter", "blog", "follow"], run: goFeed }]),
     { id: "add", label: "Add source", hint: label(keys.add), run: () => setAdding(true) },
     { id: "file", label: "Open file", hint: label(keys.file), run: () => void pickFiles() },
-    { id: "add-tab", label: "Add page from browser tab", keywords: ["safari", "chrome", "signed in", "medium", "x"], run: () => void addSources([{ kind: "tab" }], addTo ? [addTo] : [], true, true) },
+    { id: "add-tab", label: "Add page from browser tab", keywords: ["safari", "chrome", "signed in", "medium", "x"], run: () => void addSources([{ kind: "tab" }], addTo ? [addTo] : []) },
     ...TABS.map((s) => ({ id: s.key, label: `Go to ${s.label}`, hint: label(keys[s.key]), run: () => go(s.id) })),
     ...(archived.length ? [{ id: "go-archived", label: "Go to Archived", run: () => go("archived") }] : []),
     ...(skill
@@ -2117,10 +2145,10 @@ export function App() {
     const pickN = sel ? many.length : 0;
     // Off screen, a row's menus and hints wait until it scrolls in (Lite.tsx): a long list opens at once.
     return (
-      <OnScreen key={r.id} id={`row-${r.id}`} full={on || renamingRow === r.id || pickFor === r.id}>
+      <OnScreen key={r.id} id={`row-${r.id}`} full={on || renamingRow === r.id}>
         {q && hits.q === q && hits.snip.get(r.id) === "" && !titled.has(r) && <WantsLine id={r.id} want={wantSnippet} />}
         <Same
-          deps={[r, lesson, snip, q, on, sel, pickN, dragged, renamingRow === r.id, pickFor === r.id, skills, skill, onSkillPage, details, mayAnswer.get(r.id)]}
+          deps={[r, lesson, snip, q, on, sel, pickN, dragged, renamingRow === r.id, skills, skill, onSkillPage, details, mayAnswer.get(r.id)]}
           render={() => rowView(r, lesson, snip, on, sel, pickN, dragged)}
         />
       </OnScreen>
@@ -2174,7 +2202,7 @@ export function App() {
             ) : !lesson && (() => {
               const by = authorOf(r);
               const picker = (
-                <SkillPicker inRow skills={skills} value={r.skills} title={r.title} onChange={(next, before, k) => void live.current.refile(live.current.sourceFiling(r), next, before, k)} onCreate={(name) => live.current.createSkill(name)} startOpen={pickFor === r.id} onClosed={() => setPickFor(null)}>
+                <SkillPicker inRow skills={skills} value={r.skills} title={r.title} onChange={(next, before, k) => void live.current.refile(live.current.sourceFiling(r), next, before, k)} onCreate={(name) => live.current.createSkill(name)}>
                   {others.length > 0 && skillsOf(others)}
                 </SkillPicker>
               );
@@ -2253,7 +2281,7 @@ export function App() {
             </span>
             <span className="row-line">
               {authorOf({ author: c.lessons.find((l) => l.author)?.author, url: c.url ?? c.lessons[0]?.url })}
-              <SkillPicker inRow skills={skills} value={courseSkills(c)} title={c.title} onChange={(next, _, k) => fileCourse(c, k, next.includes(k.id))} onCreate={createSkill} startOpen={!!pickFor && c.lessons.some((l) => l.id === pickFor)} onClosed={() => setPickFor(null)}>
+              <SkillPicker inRow skills={skills} value={courseSkills(c)} title={c.title} onChange={(next, _, k) => fileCourse(c, k, next.includes(k.id))} onCreate={createSkill}>
                 {others.length > 0 && skillsOf(others)}
               </SkillPicker>
               {/* Closed, it says which lesson a click opens; open, the lessons below say it. */}
@@ -2451,6 +2479,9 @@ export function App() {
         // A post read from the Feed sits under Feed, as a source sits under its skill.
         feed={place === "feed" && !onSkillPage && (!openId || previews.current.has(openId))}
         onFeed={goFeed}
+        loose={loose}
+        noSkill={openItem ? !previews.current.has(openItem.id) && unfiled(openItem) : place === "sources" && onlyNoSkill(filters)}
+        onNoSkill={openNoSkill}
         hidden={collapsed && !peek}
         peek={collapsed && peek}
         onPointer={(over) => (over ? clearTimeout(peekTimer.current) : peekOut())}
@@ -2514,8 +2545,6 @@ export function App() {
               document.querySelector<HTMLElement>(".feed-col .feed-list")?.focus({ preventScroll: true });
               feedStep.current?.(by);
             } : undefined}
-            pickSkill={pickFor === openId}
-            onPicked={() => setPickFor(null)}
             skills={skills}
             finishing={finishing}
             setFinishing={setFinishing}
@@ -2527,6 +2556,7 @@ export function App() {
             onOpenLesson={(id) => openSource(id)}
             onSound={setSound}
             onPin={(item) => void pinSource(item)}
+            onImportance={(item, p) => void setSourceImportance(item, p)}
             onReview={(item) => startReview(null, item.id)}
             onMove={(item, to) => void moveSource(item, to)}
             notesOpen={sideShown}

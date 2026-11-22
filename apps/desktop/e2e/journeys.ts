@@ -15583,6 +15583,75 @@ journey("All sources: a source with no author and no skill has no empty line bet
   }
 });
 
+journey("no skill: a pasted source opens with no picker, the sidebar's No skill row lists it, and its Importance is set from its menu, undone, and handed back to its skills", async (page) => {
+  const side = page.locator(".sidebar");
+  const noSkill = side.getByRole("button", { name: "No skill", exact: true });
+  for (const i of (await ore("ls")) as { id: string; skills: string[] }[]) if (!i.skills.length) await ore("archive", i.id);
+  await page.reload();
+  await side.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".list .row").first().waitFor();
+  if (await noSkill.count()) throw new Error("the sidebar has a No skill row with every source under a skill");
+  // Pasted outside a field, it is added under no skill and opens; nothing asks for a skill.
+  await page.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.setData("text/plain", "# A values guide\n\nWrite down the five things you would defend when it costs you something.");
+    document.body.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  await page.locator(".doc").getByText("Write down the five things").waitFor();
+  const made = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === "A values guide")!;
+  try {
+    await page.waitForTimeout(400);
+    if (await page.getByRole("dialog", { name: "Skills" }).count()) throw new Error("the skill picker opened by itself on a source added with no skill");
+    // Open, it sits under No skill in the sidebar, as a source sits under its skill.
+    await until("the No skill row is lit while its source is open", async () => (await noSkill.getAttribute("aria-pressed")) === "true");
+    // The row lists the sources with no skill, by the filter's own tag in the search.
+    await side.getByRole("button", { name: /^All sources/ }).click();
+    await noSkill.click();
+    const rows = page.locator(".list .row");
+    await until("only the source with no skill is listed", async () => (await rows.count()) === 1 && (await rows.first().innerText()).includes("A values guide"));
+    await page.locator(".filter").getByText("No skill").waitFor();
+    if ((await side.getByRole("button", { name: /^All sources/ }).getAttribute("aria-pressed")) !== "false") throw new Error("All sources is lit too");
+    // Importance ▸ on its menu: Normal is ticked with no skill; Focus is written to the source.
+    const level = async (name: string) => {
+      await rows.first().click({ button: "right" });
+      await page.getByRole("menuitem", { name: "Importance" }).hover();
+      await page.getByRole("menuitemcheckbox", { name }).click();
+    };
+    const ticked = async () => {
+      await rows.first().click({ button: "right" });
+      await page.getByRole("menuitem", { name: "Importance" }).hover();
+      await page.getByRole("menuitemcheckbox").first().waitFor();
+      const names = await page.getByRole("menuitemcheckbox").evaluateAll((els) => els.map((e) => `${e.textContent}${e.getAttribute("aria-checked") === "true" ? "✓" : ""}`));
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("Escape");
+      return names.join(" ");
+    };
+    const stored = async () => ((await ore("show", made.id)) as { priority?: string }).priority;
+    if ((await ticked()) !== "Focus Normal✓ Light") throw new Error(`with no skill and nothing set: ${await ticked()}`);
+    await level("Focus");
+    await until("Focus is written to the source", async () => (await stored()) === "P1");
+    if ((await ticked()) !== "Focus✓ Normal Light") throw new Error(`after Focus: ${await ticked()}`);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes it back", async () => (await stored()) === undefined);
+    // Filed under a Light skill it reads Light; set to Focus, a last row hands it back to its skills.
+    await ore("edit", made.id, "--skills=habits");
+    await page.reload();
+    await side.getByRole("button", { name: /^All sources/ }).click();
+    await page.getByPlaceholder("Search").fill("A values guide");
+    await until("it is found in All sources", async () => (await rows.count()) === 1);
+    if ((await ticked()) !== "Focus Normal Light✓") throw new Error(`under a Light skill: ${await ticked()}`);
+    if (await noSkill.count()) throw new Error("the No skill row stayed after its last source was filed");
+    await level("Focus");
+    await until("Focus is written over its skill's", async () => (await stored()) === "P1");
+    if ((await ticked()) !== "Focus✓ Normal Light Same as its skills") throw new Error(`set over its skill: ${await ticked()}`);
+    await level("Same as its skills");
+    await until("handed back to its skills", async () => (await stored()) === undefined);
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.reload();
+  }
+});
+
 journey("Feed: Follow opens a box that takes a link only, and never saves what is typed as a source (F385)", async (page) => {
   // The empty Feed is where Follow sits: this journey unfollows what an earlier one left.
   for (const f of ((await ore("feed")) as { feeds: { url: string }[] }).feeds) await ore("feed", "unfollow", f.url);
