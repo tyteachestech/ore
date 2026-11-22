@@ -12077,7 +12077,9 @@ journey("phone: every tap on a skill page is at least 44 pt (F89)", async (page)
 journey("phone: the check-in before a session asks about what he is trying, its buttons are 44 pt taps, and Not yet goes on to the first exercise (D324)", async (page) => {
   // The seed's library has something he is trying, last touched before today.
   await page.evaluate(() => localStorage.setItem("e2e.check-in", "1"));
-  await page.clock.install({ time: new Date(Date.now() + 26 * 3600e3) });
+  // A day on for Date only: an installed clock also fakes requestAnimationFrame and timers, so the window checks
+  // (HYGIENE) ran two "frames" a moment apart while a screen still slid in, and saw it cut (F-new-ci-checkin-slide).
+  await page.clock.setFixedTime(new Date(Date.now() + 26 * 3600e3));
   await page.reload();
   await page.locator(".phone-app").waitFor();
   await tap(page, page.getByRole("button", { name: "Start review" }).first());
