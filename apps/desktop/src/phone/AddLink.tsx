@@ -6,7 +6,7 @@ import { Working } from "../Working";
 import { useEffect, useRef, useState } from "react";
 import { Trap } from "../Trap";
 import { ore, queuePicked } from "../ore";
-import { errorText } from "../util";
+import { errorText, useFocusWhileMounted } from "../util";
 import { letDown, sheetLayer, useSwipeDown } from "./sheet";
 
 /** What the importers read from a file (FILE_TYPES in the core, less video, which needs the Mac's tools to hear). */
@@ -27,10 +27,9 @@ export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: 
   const box = useRef<HTMLFormElement>(null);
   const field = useRef<HTMLInputElement>(null);
   useSwipeDown(box, onClose, true);
-  useEffect(() => {
-    field.current?.focus();
-    field.current?.select();
-  }, []);
+  // Focus goes back where it was when the sheet closes, however it closes (a tap outside too).
+  useFocusWhileMounted(field);
+  useEffect(() => field.current?.select(), []);
   const add = async () => {
     if (!url.trim() || busy) return;
     setBusy(true);

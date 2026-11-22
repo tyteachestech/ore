@@ -3511,7 +3511,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone .phone-settings .settings-btn { height: 44px; padding: 0 14px; font-size: 15px; }
 /* "How did it go?" on a try and at the check-in: its buttons are thumb-sized, under the field. */
 .phone .try-did { flex-direction: column; align-items: stretch; }
-.phone .try-did .settings-btn { height: 44px; padding: 0 16px; font-size: 15px; }
+.phone :is(.try-did, .forge-add) .settings-btn { height: 44px; padding: 0 16px; font-size: 15px; }
 .phone .checkin { margin-top: 2vh; }
 .phone .phone-settings .phone-time { height: 44px; padding: 0 10px; color: var(--text); }
 /* iOS's switch size. */
