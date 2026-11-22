@@ -536,7 +536,7 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, onFailed, notif
   const alsoArchived = sources.archived ? ` (and ${sources.archived} archived)` : "";
 
   // It goes at once, with its Undo, and the write lands behind it: on the real Mac the CLI can take seconds, and a
-  // delete that waited for it showed nothing, so picking Delete skill… again seemed to do nothing too (F-new-delete-skill-slow).
+  // delete that waited for it showed nothing, so picking Delete skill… again seemed to do nothing too (F454).
   const remove = () => {
     if (busy) return;
     setBusy(true);
