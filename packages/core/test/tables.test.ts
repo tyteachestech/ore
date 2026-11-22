@@ -3,56 +3,60 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { addHighlight, readAnnotations } from "../src/annotations.ts";
-import { regionsFrom, tidyLatex, type Region } from "../src/ingest/docling.ts";
-import { pdfToDoc } from "../src/ingest/pdf.ts";
+import { cellsFrom, regionsFrom, tidyLatex, type PaddlePage, type Region } from "../src/ingest/paddle.ts";
+import { pageViews, pdfToDoc } from "../src/ingest/pdf.ts";
 import { addSource, addText, readTables, tablesState, reimportSource, undoReimport } from "../src/ingest/index.ts";
 import { findItem, updateItemMeta } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
-// D125: pdf.js reads a PDF's prose; Docling, an optional Mac download, reads its tables and display
-// formulas, and those regions replace pdf.js's lines by their place on the page. tables.pdf comes from
-// fixtures/intake/make-tables-pdf.py and tables.docling.json is Docling's real reading of it.
+// D125, D-new-paddle-pages: pdf.js reads a PDF's words; PaddleOCR-VL, an optional Mac download, reads
+// each page's picture for its headings, tables and display formulas, and those regions shape pdf.js's
+// lines by their place on the page. tables.pdf comes from fixtures/intake/make-tables-pdf.py;
+// tables.paddle.json and scan.paddle.json are the reader's real readings of tables.pdf and scan.pdf
+// on Tyler's Mac (2026-11-22).
 
 const FIX = join(import.meta.dir, "fixtures", "intake", "files");
-const LAYOUT = join(FIX, "tables.docling.json");
+const LAYOUT = join(FIX, "tables.paddle.json");
+const pdf = (name: string) => new Uint8Array(readFileSync(join(FIX, name)));
+const regionsOf = async (name: string) => regionsFrom(JSON.parse(readFileSync(join(FIX, `${name}.paddle.json`), "utf8")) as PaddlePage[], await pageViews(pdf(`${name}.pdf`)));
 
-/** A stand-in for the docling CLI: writes the saved reading into --output, as the real one does. */
-function fakeDocling(fail = false): string {
-  const bin = join(mkdtempSync(join(tmpdir(), "ore-docling-bin-")), "docling");
-  writeFileSync(bin, fail ? `#!/bin/sh\necho "RuntimeError: out of memory" >&2\nexit 1\n` : `#!/bin/sh\nwhile [ "$1" != "--output" ]; do shift; done\ncp "${LAYOUT}" "$2/tables.json"\n`);
+/** A stand-in for the reader's Python, run as `<python> <script> <pdf> <out.json>`: writes the saved reading. */
+function fakePaddle(fail = false): string {
+  const bin = join(mkdtempSync(join(tmpdir(), "ore-paddle-bin-")), "python");
+  writeFileSync(bin, fail ? `#!/bin/sh\necho "RuntimeError: out of memory" >&2\nexit 1\n` : `#!/bin/sh\ncp "${LAYOUT}" "$3"\n`);
   chmodSync(bin, 0o755);
   return bin;
 }
 
-const was = process.env.ORE_DOCLING;
+const was = process.env.ORE_PADDLE;
 afterEach(() => {
-  if (was === undefined) delete process.env.ORE_DOCLING;
-  else process.env.ORE_DOCLING = was;
+  if (was === undefined) delete process.env.ORE_PADDLE;
+  else process.env.ORE_PADDLE = was;
 });
 
 const TABLE = "| Schedule | Learners | Day 1 | Day 30 |\n| --- | --- | --- | --- |\n| Spaced | 412 | 91% | 74% |\n| Massed | 398 | 93% | 41% |\n| Control | 120 | 88% | 37% |";
 const PROSE = ["Learners who spread their reviews out remembered more a month later", "Table 1: Recall after one day and after thirty days.", "at a rate set by its stability S:", "Each successful review raises S, so the next gap can be longer than the last one."];
 
 describe("PDF tables and formulas (D125)", () => {
-  test("PDF: tables and display formulas read by Docling replace their lines, the prose stays as it was", async () => {
+  test("PDF: tables and display formulas read by the page reader replace their lines, the prose stays as it was", async () => {
     const lib = await tempLibrary();
     const item = await addSource(lib, join(FIX, "tables.pdf"));
-    // Without Docling the table's cells run into the text as lines, and the source says it has a table.
+    // Without the reader the table's cells run into the text as lines, and the source says it has a table.
     expect(item.body).not.toContain("| Schedule |");
     expect(item.meta.structure).toEqual(["tables"]);
-    process.env.ORE_DOCLING = "/nope/docling";
+    process.env.ORE_PADDLE = "/nope/python";
     expect(tablesState(lib, item)).toEqual({ tables_reader: false });
     for (const s of PROSE) expect(item.body).toContain(s);
     const kept = addHighlight(item, { exact: "Each successful review raises S", intent: "card" });
 
-    process.env.ORE_DOCLING = fakeDocling();
+    process.env.ORE_PADDLE = fakePaddle();
     const r = await readTables(lib, item.meta.id);
     expect(r.changed).toBe(true);
-    expect(r.regions).toBe(2);
+    expect(r.regions).toBe(7); // a heading, four blocks of text, a table and a formula
     const now = findItem(lib, item.meta.id);
     expect(now.body).toContain("## Spacing and recall\n\nLearners who spread");
     expect(now.body).toContain(`group.\n\n${TABLE}\n\nTable 1:`);
-    expect(now.body).toContain("stability S:\n\n$$\nR ( t ) = e ^ { - t / S } , \\quad S _ { n + 1 } = S _ { n } \\cdot ( 1 + \\alpha )\n$$\n\nEach successful");
+    expect(now.body).toContain("stability S:\n\n$$\nR(t)=e^{-t/S},\\quad S_{n+1}=S_{n}\\cdot(1+\\alpha)\n$$\n\nEach successful");
     for (const s of PROSE) expect(now.body).toContain(s);
     expect(now.body).not.toMatch(/412\s+91%/); // the cells are not also left as a line
     expect(readAnnotations(now).find((a) => a.id === kept.id)?.status).not.toBe("orphaned");
@@ -60,8 +64,8 @@ describe("PDF tables and formulas (D125)", () => {
     // Its step, for a read run in the background: the reader's Undo takes back exactly this one (review of #443).
     expect(tablesState(lib, now)).toEqual({ tables: "read", tables_step: r.step });
 
-    // The reading is kept: a later reimport (a better pdf.js reader) keeps the tables without Docling.
-    delete process.env.ORE_DOCLING;
+    // The reading is kept: a later reimport (a better pdf.js reader) keeps the tables without the reader.
+    delete process.env.ORE_PADDLE;
     expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
     expect(findItem(lib, item.meta.id).body).toContain(TABLE);
 
@@ -75,7 +79,7 @@ describe("PDF tables and formulas (D125)", () => {
     const lib = await tempLibrary();
     const item = await addSource(lib, join(FIX, "tables.pdf"));
     const asked = addHighlight(item, { exact: "Spaced 412 91% 74% Massed 398 93% 41%", intent: "question", note: "Why does massed drop so far?" });
-    const p = Bun.spawn(["bun", join(import.meta.dir, "../../cli/src/ore.ts"), "tables", item.meta.id, "--json"], { env: { ...process.env, ORE_LIBRARY: lib.root, ORE_NO_ENRICH: "1", ORE_DOCLING: fakeDocling() }, stdout: "pipe", stderr: "pipe" });
+    const p = Bun.spawn(["bun", join(import.meta.dir, "../../cli/src/ore.ts"), "tables", item.meta.id, "--json"], { env: { ...process.env, ORE_LIBRARY: lib.root, ORE_NO_ENRICH: "1", ORE_PADDLE: fakePaddle() }, stdout: "pipe", stderr: "pipe" });
     const [out, code] = await Promise.all([new Response(p.stdout).text(), p.exited]);
     expect(code).toBe(0);
     const r = JSON.parse(out) as { changed: boolean; step?: string; unplaced?: { id: string; exact: string; intent: string }[] };
@@ -95,60 +99,112 @@ describe("PDF tables and formulas (D125)", () => {
     expect(findItem(lib, item.meta.id).meta.structure).toEqual(["tables"]);
   });
 
-  test("reading tables says what to do when Docling is missing or fails, and leaves the source as it was", async () => {
+  test("reading tables says what to do when the reader is missing or fails, and leaves the source as it was", async () => {
     const lib = await tempLibrary();
     const item = await addSource(lib, join(FIX, "tables.pdf"));
-    process.env.ORE_DOCLING = "/nope/docling";
+    process.env.ORE_PADDLE = "/nope/python";
     await expect(readTables(lib, item.meta.id)).rejects.toThrow(/isn't installed.*Settings/);
-    process.env.ORE_DOCLING = fakeDocling(true);
+    process.env.ORE_PADDLE = fakePaddle(true);
     await expect(readTables(lib, item.meta.id)).rejects.toThrow("couldn't read this PDF: RuntimeError: out of memory");
     // The reader shows why at once, not a wait on a run that already died.
-    expect(tablesState(lib, item)).toEqual({ tables_error: "The table and formula reader couldn't read this PDF: RuntimeError: out of memory", tables_reader: true });
+    expect(tablesState(lib, item)).toEqual({ tables_error: "The PDF page reader couldn't read this PDF: RuntimeError: out of memory", tables_reader: true });
     expect(findItem(lib, item.meta.id).body).toBe(item.body);
     const text = await addText(lib, "# Spacing\n\nSpaced practice beats massed practice.");
     await expect(readTables(lib, text.meta.id)).rejects.toThrow("Only a PDF source");
   });
 
-  test("a formula Docling finds inside a table is one of its cells, and a label row lower down stays in the body", async () => {
-    const regions = regionsFrom(JSON.parse(readFileSync(LAYOUT, "utf8")));
+  test("a formula the reader finds inside a table is one of its cells, and a label row lower down stays in the body", async () => {
+    const regions = await regionsOf("tables");
     const t = regions.find((r) => r.kind === "table")!;
     if (t.kind !== "table") throw new Error("no table");
-    // Docling marks a row near the bottom as a header too (ResNet's "FLOPs" row).
+    // A reader may mark a row near the bottom as a header too (ResNet's "FLOPs" row).
     const marked: Region = { ...t, cells: t.cells.map((c) => (c.row === 3 ? { ...c, header: true } : c)) };
     const { l, r, t: top, b } = t.box;
     const inner: Region = { kind: "formula", page: 1, box: { l: l + (r - l) / 3, r: r - (r - l) / 3, t: top - (top - b) / 3, b: b + (top - b) / 3 }, latex: "412" };
-    const body = (await pdfToDoc(new Uint8Array(readFileSync(join(FIX, "tables.pdf"))), [marked, inner, ...regions.filter((r) => r.kind === "formula")])).body;
+    const body = (await pdfToDoc(pdf("tables.pdf"), [marked, inner, ...regions.filter((r) => r.kind === "formula")])).body;
     expect(body).toContain(TABLE);
     expect(body).not.toContain("$$\n412");
   });
 
-  test("a Granite-Docling cell, which has no box, takes pdf.js's own text for it where the two agree, so powers and bold stay", async () => {
-    const t = regionsFrom(JSON.parse(readFileSync(LAYOUT, "utf8"))).find((r) => r.kind === "table")!;
+  test("a cell, which has no box, takes pdf.js's own text for it where the two agree, so powers and bold stay", async () => {
+    const t = (await regionsOf("tables")).find((r) => r.kind === "table")!;
     if (t.kind !== "table") throw new Error("no table");
     expect(t.cells.every((c) => !c.box)).toBe(true);
     // The model spells a cell its own way ("10 19" for a power); pdf.js's reading of the same characters wins.
     const odd: Region = { ...t, cells: t.cells.map((c) => (c.text === "91%" ? { ...c, text: "9 1 %" } : c.text === "Massed" ? { ...c, text: "Massed (crammed)" } : c)) };
-    const body = (await pdfToDoc(new Uint8Array(readFileSync(join(FIX, "tables.pdf"))), [odd])).body;
+    const body = (await pdfToDoc(pdf("tables.pdf"), [odd])).body;
     expect(body).toContain("| Spaced | 412 | 91% | 74% |");
     // A cell pdf.js has no match for keeps the model's text.
     expect(body).toContain("| Massed (crammed) | 398 | 93% | 41% |");
   });
 
-  test("Docling's boxes are turned to bottom-left points, and its LaTeX made safe for KaTeX", () => {
-    const [t] = regionsFrom({
-      pages: { "1": { page_no: 1, size: { width: 612, height: 792 } } },
-      tables: [{ prov: [{ page_no: 1, bbox: { l: 10, t: 100, r: 200, b: 160, coord_origin: "TOPLEFT" } }], data: { num_rows: 2, num_cols: 2, table_cells: [{ bbox: { l: 10, t: 100, r: 100, b: 130, coord_origin: "TOPLEFT" }, start_row_offset_idx: 0, start_col_offset_idx: 0, column_header: true, text: " A " }] } }],
-    });
-    expect(t).toMatchObject({ kind: "table", page: 1, box: { l: 10, r: 200, t: 692, b: 632 }, cells: [{ row: 0, col: 0, rows: 1, cols: 1, header: true, text: "A", box: { t: 692, b: 662 } }] });
-    // A one-row "table" is a line Docling boxed, not a table.
-    expect(regionsFrom({ tables: [{ prov: [{ page_no: 1, bbox: { l: 0, t: 1, r: 1, b: 0 } }], data: { num_rows: 1, num_cols: 3, table_cells: [{ bbox: { l: 0, t: 1, r: 1, b: 0 }, start_row_offset_idx: 0, start_col_offset_idx: 0 }] } }] })).toEqual([]);
+  test("the reader's pixels are scaled onto the page's points, its HTML table laid on a grid, its LaTeX made safe for KaTeX", () => {
+    const page: PaddlePage = { page: 1, width: 1224, height: 1584, blocks: [
+      { label: "header", content: "Running head", bbox: [0, 0, 1224, 40] },
+      { label: "paragraph_title", content: "## Methods", bbox: [100, 100, 400, 140] },
+      { label: "text", content: "Each  $ x_n $ is drawn.", bbox: [100, 160, 1100, 200] },
+      { label: "table", content: '<table><tr><td rowspan="2">Task</td><td colspan="2">No &amp; back</td></tr><tr><td>Mean</td><td>SD</td></tr><tr><td>Flexion</td><td>66</td><td>23</td></tr></table>', bbox: [20, 200, 400, 320] },
+      { label: "table", content: "<table><tr><td>one row</td><td>is a line</td></tr></table>", bbox: [0, 0, 1, 1] },
+      { label: "display_formula", content: " $$ E=mc^{2} \\quad (3) $$ ", bbox: [200, 400, 600, 440] },
+    ] };
+    const [whole, head, text, t, f, ...rest] = regionsFrom([page], [[0, 0, 612, 792]]);
+    expect(rest).toEqual([]); // the running head and the one-row "table" are no regions
+    expect(whole).toEqual({ kind: "page", page: 1, box: { l: 0, b: 0, r: 612, t: 792 } });
+    expect(head).toEqual({ kind: "text", page: 1, box: { l: 50, r: 200, t: 742, b: 722 }, text: "Methods", head: true });
+    expect(text).toMatchObject({ kind: "text", text: "Each $x_n$ is drawn." });
+    expect(t).toMatchObject({ kind: "table", box: { l: 10, r: 200, t: 692, b: 632 }, rows: 3, cols: 3 });
+    expect(cellsFrom(page.blocks[3]!.content).cells.map((c) => [c.row, c.col, c.rows, c.cols, c.header, c.text])).toEqual([[0, 0, 2, 1, true, "Task"], [0, 1, 1, 2, true, "No & back"], [1, 1, 1, 1, false, "Mean"], [1, 2, 1, 1, false, "SD"], [2, 0, 1, 1, false, "Flexion"], [2, 1, 1, 1, false, "66"], [2, 2, 1, 1, false, "23"]]);
+    expect(f).toMatchObject({ kind: "formula", latex: "E=mc^{2} \\tag{3}" });
+    // A page with no size, or past the PDF's last page, is skipped.
+    expect(regionsFrom([{ ...page, page: 2 }], [[0, 0, 612, 792]])).toEqual([]);
     expect(tidyLatex("E = m c ^ { 2 } & & ( 3 )")).toBe("E = m c ^ { 2 } \\tag{3}");
     expect(tidyLatex("a & = b")).toBe("a = b");
     expect(tidyLatex("\\begin{aligned} a & = b \\end{aligned}")).toBe("\\begin{aligned} a & = b \\end{aligned}");
     expect(tidyLatex("f ( x ) = ( 2 )")).toBe("f ( x ) = ( 2 )"); // a bracket that isn't an equation number stays
-    // Granite-Docling sets the number after a space, and starts some formulas with a stray one.
     expect(tidyLatex("\\ F F N ( x ) = b _ { 2 } \\quad \\ \\ ( 3 )")).toBe("F F N ( x ) = b _ { 2 } \\tag{3}");
     expect(tidyLatex("\\mathcal { L } = p ( z ) \\, ( 7 )")).toBe("\\mathcal { L } = p ( z ) \\tag{7}");
+  });
+
+  test("PDF: on a page the reader read, a heading is what it saw as one, whatever the text's size", async () => {
+    const regions = await regionsOf("tables");
+    const caption = regions.find((r) => r.kind === "text" && r.text.startsWith("Table 1:"))!;
+    // The reader calls the caption, set in the body's size, a heading, and the large title plain text.
+    const swapped = regions.map((r): Region => (r === caption && r.kind === "text" ? { ...r, head: true } : r.kind === "text" && r.head ? { kind: "text", page: r.page, box: r.box, text: r.text } : r));
+    const body = (await pdfToDoc(pdf("tables.pdf"), swapped)).body;
+    expect(body).toContain("### Table 1: Recall after one day and after thirty days.");
+    expect(body).not.toContain("## Spacing and recall");
+    expect(body).toContain("Spacing and recall");
+    // A page it has not read keeps the size rule.
+    expect((await pdfToDoc(pdf("tables.pdf"))).body).toContain("## Spacing and recall");
+  });
+
+  test("PDF: a designed page drawn out of order is read in the reader's order, unless that order climbs back up a column", async () => {
+    // columns.pdf (make-columns-pdf.py) draws its right-hand column first, so pdf.js reads it first.
+    const data = pdf("columns.pdf");
+    const drawn = (await pdfToDoc(data)).body;
+    expect(drawn.indexOf("Second, test yourself")).toBeLessThan(drawn.indexOf("First, spread"));
+    const whole: Region = { kind: "page", page: 1, box: { l: 0, b: 0, r: 612, t: 792 } };
+    const left: Region = { kind: "text", page: 1, box: { l: 66, r: 300, t: 716, b: 664 }, text: "First" };
+    const right: Region = { kind: "text", page: 1, box: { l: 324, r: 560, t: 716, b: 664 }, text: "Second" };
+    const body = (await pdfToDoc(data, [whole, left, right])).body;
+    expect(body).toContain("as the memory starts to fade.\n\nSecond, test yourself before you feel ready, since recalling an idea strengthens it more than reading.");
+    expect(body.startsWith("<!-- page 1 -->\n\nFirst, spread your reviews out over days")).toBe(true);
+    // An order that climbs back up a column is the reader's mistake (seen on two-column papers): the PDF's own order stands.
+    const top = (r: Region, t: number, b: number): Region => ({ ...r, box: { ...r.box, t, b } });
+    const climbing = [whole, top(left, 690, 664), top(right, 716, 664), top(left, 716, 691)];
+    expect((await pdfToDoc(data, climbing)).body).toBe(drawn);
+  });
+
+  test("PDF: a scanned page, which has no text of its own, takes the reader's; a picture's words on a page with text stay in the picture", async () => {
+    const body = (await pdfToDoc(pdf("scan.pdf"), await regionsOf("scan"))).body;
+    expect(body).toBe("<!-- page 1 -->\n\n### The testing effect\n\nRetrieving a memory makes it stronger than reading it again. Quiz yourself before you feel ready.\n");
+    // On tables.pdf, which has its own text, a block of prose the page has no text for is left out; a caption or a table is not.
+    const regions = await regionsOf("tables");
+    const empty = { l: 400, r: 600, t: 80, b: 60 };
+    const added: Region[] = [...regions, { kind: "text", page: 1, box: empty, text: "Call me Ishmael." }, { kind: "text", page: 1, box: { ...empty, t: 50, b: 40 }, text: "Figure 2: a screenshot.", caption: true }];
+    const mixed = (await pdfToDoc(pdf("tables.pdf"), added)).body;
+    expect(mixed).not.toContain("Ishmael");
+    expect(mixed).toContain("the last one.\n\nFigure 2: a screenshot.");
   });
 });
 

@@ -29,12 +29,13 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   if (process.env.E2E_URL) return { url: process.env.E2E_URL, stop: () => {} };
   const lib = (LIB = mkdtempSync(join(tmpdir(), "ore-e2e-")));
   await $`bun ${join(MOCK, "seed.ts")} ${lib}`.quiet();
-  // The table and formula reader (D125) stands in as a script that writes Docling's saved reading of tables.pdf.
-  const docling = join(lib, ".ore", "docling");
-  writeFileSync(docling, `#!/bin/sh\nsleep 1\nwhile [ "$1" != "--output" ]; do shift; done\ncp "${FIXTURES}/tables.docling.json" "$2/tables.json"\n`);
-  chmodSync(docling, 0o755);
+  // The PDF page reader (D125, D-new-paddle-pages) stands in as a script that writes its saved reading of tables.pdf.
+  const paddle = join(lib, ".ore", "paddle");
+  // Every PDF added is read: any other one gets an empty reading, which changes nothing.
+  writeFileSync(paddle, `#!/bin/sh\nsleep 1\nif cmp -s "$2" "${FIXTURES}/tables.pdf"; then cp "${FIXTURES}/tables.paddle.json" "$3"; else echo "[]" > "$3"; fi\n`);
+  chmodSync(paddle, 0o755);
   // Ports of their own, so a mock left running for screenshots (1420, 1421) never answers instead.
-  const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_DOCLING: docling, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50", ORE_MOCK_ENRICH: "1" }, stdout: "ignore", stderr: "inherit" });
+  const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_PADDLE: paddle, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50", ORE_MOCK_ENRICH: "1" }, stdout: "ignore", stderr: "inherit" });
   // The ambience radio plays plain tones of its own (e2e/sounds), never the sounds on the Mac (D254).
   const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_SOUNDS: join(import.meta.dir, "sounds") }, stdout: "ignore", stderr: "ignore" });
   const url = `http://localhost:${PORT}/`;

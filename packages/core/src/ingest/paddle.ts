@@ -26,11 +26,13 @@ export interface Cell {
   text: string;
 }
 
-/** A part of a page as the page reader saw it (D-new-paddle-pages): a table, a display formula or a
- *  heading, and one `page` region for every page it read, so a page it found no heading on shows none.
- *  pdf.js still reads the words everywhere, so highlights on the prose never move and no word is the
- *  model's guess. */
-export type Region = { page: number; box: Box } & ({ kind: "table"; rows: number; cols: number; cells: Cell[] } | { kind: "formula"; latex: string } | { kind: "heading" } | { kind: "page" });
+/** A part of a page as the page reader saw it (D-new-paddle-pages), in the order it is read: a table,
+ *  a display formula, or a block of text (a paragraph, a caption, or with `head` a heading), and one
+ *  `page` region for every page it read, so a page it found no heading on shows none. Where the PDF has
+ *  its own text, pdf.js still reads the words, so highlights on the prose never move and no word is the
+ *  model's guess; a block's own `text` is used only where the page has none there (a scan, a table
+ *  that is a picture). */
+export type Region = { page: number; box: Box } & ({ kind: "table"; rows: number; cols: number; cells: Cell[] } | { kind: "formula"; latex: string } | { kind: "text"; text: string; head?: true; caption?: true } | { kind: "page" });
 
 /** A page as PaddleOCR-VL read it: its picture's size in pixels and its blocks, each with a label
  *  ("text", "paragraph_title", "table", "display_formula", …), its content (a table as HTML, a formula
@@ -65,6 +67,13 @@ export function cellsFrom(html: string): { rows: number; cols: number; cells: Ce
   return { rows: row, cols, cells };
 }
 
+/** The blocks that are the page's own reading text. A running head or foot, a page number and the
+ *  words inside a chart are not. */
+/** The reader pads its inline math with spaces ("$ ^{2} $"), which Markdown reads as no math at all. */
+const prose = (t: string) => t.trim().replace(/\$ ([^$\n]+?) \$/g, "$$$1$$").replace(/ {2,}/g, " ");
+
+const TEXT = new Set(["text", "abstract", "figure_title", "footnote", "vision_footnote", "reference_content", "algorithm", "aside_text"]);
+
 /** PaddleOCR-VL's pages as the regions Ore uses. `views` is each PDF page's box in points
  *  ([left, bottom, right, top], as pdf.js gives it): the picture's pixels are scaled onto it. */
 export function regionsFrom(pages: PaddlePage[], views: number[][]): Region[] {
@@ -82,7 +91,8 @@ export function regionsFrom(pages: PaddlePage[], views: number[][]): Region[] {
       } else if (b.label === "display_formula" || b.label === "formula") {
         const latex = tidyLatex(b.content.replace(/^\s*(?:\$\$|\\\[)|(?:\$\$|\\\])\s*$/g, ""));
         if (latex) out.push({ kind: "formula", page: p.page, box: box(b.bbox), latex });
-      } else if (b.label === "paragraph_title" || b.label === "doc_title") out.push({ kind: "heading", page: p.page, box: box(b.bbox) });
+      } else if (b.label === "paragraph_title" || b.label === "doc_title") out.push({ kind: "text", page: p.page, box: box(b.bbox), text: prose(b.content.replace(/^#+\s*/, "")), head: true });
+      else if (TEXT.has(b.label) && b.content.trim()) out.push({ kind: "text", page: p.page, box: box(b.bbox), text: prose(b.content), ...((b.label === "figure_title" || b.label === "vision_footnote") && { caption: true as const }) });
     }
   }
   return out;

@@ -549,25 +549,55 @@ const inside = (i: Item, b: Box) => {
  *  the reader's LaTeX. */
 function swapRegions(items: Item[], regions: Region[], blocks: string[]): Item[] {
   let out = items;
-  // A page the reader read says which text is a heading; one it has not read leaves that to the size.
-  const heads = regions.filter((r) => r.kind === "heading");
-  if (regions.some((r) => r.kind === "page")) out = out.map((i) => ({ ...i, head: heads.some((h) => inside(i, h.box)) }));
+  const read = regions.some((r) => r.kind === "page");
+  const parts = regions.filter((r) => r.kind !== "page");
+  if (read) {
+    // A page the reader read says which text is a heading; one it has not read leaves that to the size.
+    const heads = parts.filter((r) => r.kind === "text" && r.head);
+    out = out.map((i) => ({ ...i, head: heads.some((h) => inside(i, h.box)) }));
+    // And in what order its blocks are read: a designed page's text is often drawn in another. Text in
+    // no block (a running head, a page number) stays with the text drawn before it.
+    let at = -1;
+    const order = out.map((i) => {
+      const n = i.str.trim() ? parts.findIndex((r) => inside(i, r.box)) : -1;
+      if (n >= 0) at = n;
+      return at;
+    });
+    // Its order is trusted only where it never climbs back up a column, which reading never does: on
+    // a two-column paper the reader's order is sometimes scrambled, and the PDF's own is right.
+    const climbs = parts.some((r, k) => parts.slice(0, k).some((p) => r.box.b >= p.box.t - 1 && Math.min(r.box.r, p.box.r) - Math.max(r.box.l, p.box.l) > Math.min(r.box.r - r.box.l, p.box.r - p.box.l) / 2));
+    if (!climbs && order.some((n, k) => k > 0 && n < order[k - 1]!)) {
+      const sorted = out.map((i, k) => ({ i, n: order[k]!, k })).sort((a, b) => a.n - b.n || a.k - b.k);
+      // A block ends its line: the next one starts a new one, wherever the PDF broke its lines.
+      out = sorted.map((x, k) => (sorted[k + 1] && sorted[k + 1]!.n !== x.n ? { ...x.i, eol: true } : x.i));
+    }
+  }
   // A formula the reader found inside a table is one of its cells, read with the table.
   const within = (a: Box, b: Box) => (a.l + a.r) / 2 >= b.l && (a.l + a.r) / 2 <= b.r && (a.t + a.b) / 2 >= b.b && (a.t + a.b) / 2 <= b.t;
   const tables = regions.filter((r) => r.kind === "table");
-  for (const r of regions) {
-    if (r.kind === "heading" || r.kind === "page") continue;
+  /** Where the block before this one ended, so a block the PDF has no text for lands after it. */
+  let after = 0;
+  const scan = items.filter((i) => /[\p{L}\p{N}]{2}/u.test(i.str)).length < 5;
+  for (const r of parts) {
     if (r.kind === "formula" && tables.some((t) => within(r.box, t.box))) continue;
     const ins = (i: Item) => !!i.str.trim() && !isBlock(i.str) && inside(i, r.box);
     const at = out.findIndex(ins);
-    if (at < 0) continue;
-    const md = r.kind === "formula" ? `$$\n${r.latex}\n$$` : table(r, out.filter(ins));
+    if (r.kind === "text" && at >= 0) {
+      after = out.findLastIndex(ins) + 1;
+      continue;
+    }
+    // Where the PDF has no text of its own (a scanned page, a table that is a picture), the reader's.
+    // Prose only in a picture (a screenshot's words) stays in the picture; a scanned page is all picture.
+    if (r.kind === "text" && !scan && !r.caption) continue;
+    const md = r.kind === "formula" ? `$$\n${r.latex}\n$$` : r.kind === "table" ? table(r, out.filter(ins)) : r.head ? `### ${r.text.replace(/\s+/g, " ")}` : r.text;
     if (!md) continue;
     const mark: Item = { str: BLOCK + blocks.length + BLOCK_, x: r.box.l, y: r.box.t, end: r.box.r, size: 0, eol: true };
     blocks.push(md);
-    const kept = out.filter((i, n) => n < at || !ins(i));
-    if (at > 0) kept[at - 1] = { ...kept[at - 1]!, eol: true };
-    out = [...kept.slice(0, at), mark, ...kept.slice(at)];
+    const from = at < 0 ? after : at;
+    const kept = out.filter((i, n) => n < from || !ins(i));
+    if (from > 0) kept[from - 1] = { ...kept[from - 1]!, eol: true };
+    out = [...kept.slice(0, from), mark, ...kept.slice(from)];
+    after = from + 1;
   }
   return out;
 }
