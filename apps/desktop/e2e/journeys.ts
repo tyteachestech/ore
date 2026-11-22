@@ -16549,6 +16549,37 @@ journey("ambience: in a narrow window with the sidebar folded the radio sits in 
   }
 });
 
+// CI (F456): a read of the skills that began before an Undo answered after it, and put the
+// deleted collection's skills back out of it until the next read.
+journey("sidebar: a collection brought back with ⌘Z stays back when an earlier read of the skills answers late (F456)", async (page) => {
+  const slow = (ms: number | null) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { skills: ms } : undefined), ms);
+  const craft = page.locator(".side-head").filter({ hasText: /^Craft$/i });
+  await craft.waitFor();
+  await settled(page);
+  await slow(60_000);
+  await craft.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Delete collection" }).click();
+  try {
+    // The delete's write answers; the read after it has the library without Craft, and is kept waiting.
+    await until("the delete's write is out", () => isHeld(page, "skills"));
+    await release(page, "skills");
+    await until("the read after it is out", () => isHeld(page, "skills"));
+    await slow(null);
+    await page.keyboard.press("Meta+z");
+    await craft.waitFor();
+    await until("the Undo's write and its read have answered", () => page.evaluate(() => (window as unknown as { __ORE_INFLIGHT: string[] }).__ORE_INFLIGHT.filter((c) => c.startsWith("skills")).length === 1));
+    await release(page, "skills");
+    await settled(page);
+    await Bun.sleep(200);
+    if (!(await craft.count())) throw new Error("the late read took Craft away again");
+  } finally {
+    await slow(null);
+    await release(page, "skills");
+    await settled(page);
+    if (!(await craft.count())) await page.reload();
+  }
+});
+
 // F451: the Collected page beside a source had Back and no title, where Sources and Settings name themselves.
 journey("phone: a source's Collected page has its title, as Sources and Settings do (F451)", async (page) => {
   await phoneSource(page, TESTING);
