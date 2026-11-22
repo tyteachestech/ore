@@ -166,7 +166,10 @@ const HYGIENE = `(() => {
   const POPUPS = '[role="menu"], [role="listbox"], [role="dialog"], [role="toolbar"], .popover, .note-menu, .sel-bar, .tutor-sel, .tutor-mention';
   // The floating ones on screen, each with whether it is still being placed (Radix's first frame) or animating.
   // Animating: itself, or the screen it is on (a phone screen sliding in carries its dialog with it).
-  const moving = (el) => { for (let a = el; a; a = a.parentElement) if (a.getAnimations().some((x) => x.playState === "running")) return true; return false; };
+  // An animation that finished a moment ago counts too: WebKit on CI reported a screen's slide "finished" (327 ms into
+  // 300) while its box still stood 12 px in, a frame or two before the end state lands (F468).
+  const settling = (x) => x.playState === "running" || (x.playState === "finished" && (x.currentTime ?? 0) - (x.effect?.getComputedTiming().endTime ?? 0) < 150);
+  const moving = (el) => { for (let a = el; a; a = a.parentElement) if (a.getAnimations().some(settling)) return true; return false; };
   const floating = () => [...document.querySelectorAll(POPUPS)].flatMap((el) => {
     const css = getComputedStyle(el);
     const wrap = el.parentElement?.hasAttribute("data-radix-popper-content-wrapper") ? el.parentElement : null;
