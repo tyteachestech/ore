@@ -5037,7 +5037,7 @@ journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette 
 // rows and its footer couldn't be reached, and End picked a row out of sight.
 journey("a small window: ⌘K, the Add box and the shortcuts sheet fit in it, and End shows the palette's last row", async (page) => {
   // The skills are in before the palette opens: opened a moment after a reload it listed commands only, End took
-  // the last of those, and the skills then arrived below it (F-new-palette-end-early).
+  // the last of those, and the skills then arrived below it (F455).
   await page.locator(".sidebar div.side-item").first().waitFor({ state: "attached" });
   await page.setViewportSize({ width: 533, height: 400 });
   const inWindow = async (what: string, l: Locator) => {
