@@ -863,6 +863,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
           q={q}
           notify={notify}
           onClose={() => setAnswering(false)}
+          onRewrite={onChanged}
           onSaved={(saved, how) => {
             if (how !== "contribution") setAnswering(false);
             announce(q, saved, how, notify, onChanged);

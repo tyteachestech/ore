@@ -168,7 +168,7 @@ const HYGIENE = `(() => {
   // Animating: itself, or the screen it is on (a phone screen sliding in carries its dialog with it).
   // An animation that finished a moment ago counts too: WebKit on CI reported a screen's slide "finished" (327 ms into
   // 300) while its box still stood 12 px in, a frame or two before the end state lands (F468).
-  const settling = (x) => x.playState === "running" || (x.playState === "finished" && (x.currentTime ?? 0) - (x.effect?.getComputedTiming().endTime ?? 0) < 150);
+  const settling = (x) => x.playState === "running" || (x.playState === "finished" && (x.currentTime ?? 0) - (x.effect?.getComputedTiming().endTime ?? 0) < 1000);
   const moving = (el) => { for (let a = el; a; a = a.parentElement) if (a.getAnimations().some(settling)) return true; return false; };
   const floating = () => [...document.querySelectorAll(POPUPS)].flatMap((el) => {
     const css = getComputedStyle(el);

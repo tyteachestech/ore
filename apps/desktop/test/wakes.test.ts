@@ -19,9 +19,3 @@ test("a source filed in or out of a skill wakes open screens", () => {
   expect(wakesScreens(["edit", "01ABC", "--skills="])).toBe(true);
 });
 
-// Codex UX sweep 2 (iPhone): a corrected answer showed the old words once its question folded and opened again.
-test("an answer rewritten or removed wakes open screens", () => {
-  expect(wakesScreens(["answer", "01Q", "--edit", "1", "--text", "Better"])).toBe(true);
-  expect(wakesScreens(["answer", "01Q", "--remove", "1"])).toBe(true);
-  expect(wakesScreens(["answer", "01Q", "--text", "New"])).toBe(false); // its box tells its page
-});

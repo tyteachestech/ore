@@ -34,13 +34,15 @@ const drafts = new Map<string, string>();
 
 /** The answer box under a question. ↵ adds what he wrote to the answer and keeps the question open;
  *  Answered closes it; ⌘↵ closes it and asks for a card. Esc closes the box and keeps the draft. */
-export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
+export function AnswerBox({ q, item, quote, onSaved, onRewrite, onClose, notify }: {
   q: Question;
   /** The source he is reading, credited with what he writes. */
   item?: string;
   /** The passage he had selected, kept with his words. */
   quote?: string | null;
   onSaved: (s: Saved, how: "contribution" | "done" | "card") => void;
+  /** A piece of his answer rewritten or removed and saved: the page reads the question again (Codex UX sweep 2). */
+  onRewrite?: () => void;
   onClose: () => void;
   notify: Notify;
 }) {
@@ -90,6 +92,7 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
     try {
       const r = await write;
       setAnswers((l) => r.answers?.map((c) => ({ ...c, item_title: l.find((x) => x.ts === c.ts)?.item_title })) ?? []);
+      onRewrite?.();
     } catch (e) {
       // Only this piece goes back: another piece saved meanwhile keeps its new words.
       const at = before.indexOf(was);
