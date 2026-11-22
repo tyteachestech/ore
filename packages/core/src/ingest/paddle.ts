@@ -1,5 +1,5 @@
 import { existsSync, writeFileSync } from "node:fs";
-import { mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rename, rm } from "node:fs/promises";
 import { paddleHome, paddlePath, READY } from "./paddle-path.ts";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -31,8 +31,9 @@ export interface Cell {
  *  `page` region for every page it read, so a page it found no heading on shows none. Where the PDF has
  *  its own text, pdf.js still reads the words, so highlights on the prose never move and no word is the
  *  model's guess; a block's own `text` is used only where the page has none there (a scan, a table
- *  that is a picture). */
-export type Region = { page: number; box: Box } & ({ kind: "table"; rows: number; cols: number; cells: Cell[] } | { kind: "formula"; latex: string } | { kind: "text"; text: string; head?: true; caption?: true } | { kind: "page" });
+ *  that is a picture). A `page` region names the reader and model that read it (`by`), as all AI
+ *  output does. */
+export type Region = { page: number; box: Box } & ({ kind: "table"; rows: number; cols: number; cells: Cell[] } | { kind: "formula"; latex: string } | { kind: "text"; text: string; head?: true; caption?: true } | { kind: "page"; by?: string });
 
 /** A page as PaddleOCR-VL read it: its picture's size in pixels and its blocks, each with a label
  *  ("text", "paragraph_title", "table", "display_formula", …), its content (a table as HTML, a formula
@@ -67,12 +68,16 @@ export function cellsFrom(html: string): { rows: number; cols: number; cells: Ce
   return { rows: row, cols, cells };
 }
 
-/** The blocks that are the page's own reading text. A running head or foot, a page number and the
- *  words inside a chart are not. */
 /** The reader pads its inline math with spaces ("$ ^{2} $"), which Markdown reads as no math at all. */
 const prose = (t: string) => t.trim().replace(/\$ ([^$\n]+?) \$/g, "$$$1$$").replace(/ {2,}/g, " ");
 
-const TEXT = new Set(["text", "abstract", "figure_title", "footnote", "vision_footnote", "reference_content", "algorithm", "aside_text"]);
+/** The blocks that are not the page's reading text: a running head or foot, a page number, a picture.
+ *  Every other block with words is (a paragraph, an abstract, a contents list, a reference, a note). */
+const NOT_TEXT = new Set(["header", "footer", "number", "header_image", "footer_image", "image", "chart", "seal", "formula_number"]);
+
+const PADDLEOCR = "3.7.0";
+/** What read a page, kept with it. */
+export const READER = `PaddleOCR-VL-1.6 (paddleocr ${PADDLEOCR})`;
 
 /** PaddleOCR-VL's pages as the regions Ore uses. `views` is each PDF page's box in points
  *  ([left, bottom, right, top], as pdf.js gives it): the picture's pixels are scaled onto it. */
@@ -81,9 +86,12 @@ export function regionsFrom(pages: PaddlePage[], views: number[][]): Region[] {
   for (const p of pages) {
     const v = views[p.page - 1];
     if (!v || !p.width || !p.height) continue;
+    // A page turned on its side (/Rotate) is pictured turned, and its boxes would land on the wrong
+    // text: such a page is left to pdf.js.
+    if (Math.abs((v[2]! - v[0]!) / (v[3]! - v[1]!) / (p.width / p.height) - 1) > 0.05) continue;
     const sx = (v[2]! - v[0]!) / p.width, sy = (v[3]! - v[1]!) / p.height;
     const box = (b: number[]): Box => ({ l: v[0]! + b[0]! * sx, r: v[0]! + b[2]! * sx, t: v[3]! - b[1]! * sy, b: v[3]! - b[3]! * sy });
-    out.push({ kind: "page", page: p.page, box: { l: v[0]!, b: v[1]!, r: v[2]!, t: v[3]! } });
+    out.push({ kind: "page", page: p.page, box: { l: v[0]!, b: v[1]!, r: v[2]!, t: v[3]! }, by: READER });
     for (const b of p.blocks) {
       if (b.label === "table") {
         const t = cellsFrom(b.content);
@@ -92,7 +100,7 @@ export function regionsFrom(pages: PaddlePage[], views: number[][]): Region[] {
         const latex = tidyLatex(b.content.replace(/^\s*(?:\$\$|\\\[)|(?:\$\$|\\\])\s*$/g, ""));
         if (latex) out.push({ kind: "formula", page: p.page, box: box(b.bbox), latex });
       } else if (b.label === "paragraph_title" || b.label === "doc_title") out.push({ kind: "text", page: p.page, box: box(b.bbox), text: prose(b.content.replace(/^#+\s*/, "")), head: true });
-      else if (TEXT.has(b.label) && b.content.trim()) out.push({ kind: "text", page: p.page, box: box(b.bbox), text: prose(b.content), ...((b.label === "figure_title" || b.label === "vision_footnote") && { caption: true as const }) });
+      else if (!NOT_TEXT.has(b.label) && b.content.trim()) out.push({ kind: "text", page: p.page, box: box(b.bbox), text: prose(b.content), ...((b.label === "figure_title" || b.label === "vision_footnote") && { caption: true as const }) });
     }
   }
   return out;
@@ -115,7 +123,6 @@ export function tidyLatex(s: string): string {
  *  Mac's GPU. The models: PaddleOCR-VL 1.6 (Apache-2.0, 1.9 GB) reads each block, PP-DocLayoutV3
  *  (Apache-2.0) finds the blocks. Every licence is permissive (D273's rule). */
 const UV = "0.11.32";
-const PADDLEOCR = "3.7.0";
 const PADDLEPADDLE = "3.2.1";
 const MLX_VLM = "0.8.0";
 const MLX = process.platform === "darwin" && process.arch === "arm64";
@@ -145,6 +152,7 @@ try:
                 if srv.poll() is not None: raise RuntimeError("the model's server stopped")
                 try: socket.create_connection(("127.0.0.1", port), 1).close(); break
                 except OSError: time.sleep(1)
+            else: raise RuntimeError("the model's server didn't start")
         pipe = PaddleOCRVL(pipeline_version="v1.6", vl_rec_backend="mlx-vlm-server", vl_rec_server_url=f"http://127.0.0.1:{port}/", vl_rec_api_model_name=MODEL)
     else:
         pipe = PaddleOCRVL(pipeline_version="v1.6")
@@ -217,21 +225,29 @@ export async function runPaddle(pdf: string, bin = paddlePath()): Promise<Paddle
   const out = await mkdtemp(join(tmpdir(), "ore-paddle-"));
   // One PDF at a time on this Mac: each read loads a 2 GB model, and ten PDFs dropped at once would
   // load ten. The next waits for the lock, which a run that died no longer holds.
-  const lock = join(tmpdir(), "ore-paddle.lock");
+  const lock = process.env.ORE_PADDLE_LOCK || join(tmpdir(), "ore-paddle.lock");
   for (;;) {
     try {
       writeFileSync(lock, String(process.pid), { flag: "wx" });
       break;
     } catch {
-      const pid = Number(await readFile(lock, "utf8").catch(() => ""));
-      let alive = pid > 0;
+      const held = await readFile(lock, "utf8").catch(() => "");
+      let alive = Number(held) > 0;
       try {
-        if (alive) process.kill(pid, 0);
+        if (alive) process.kill(Number(held), 0);
       } catch {
         alive = false;
       }
-      if (alive) await Bun.sleep(2000);
-      else await rm(lock, { force: true });
+      if (alive) {
+        await Bun.sleep(2000);
+        continue;
+      }
+      // Taken over by moving it aside, so two waiters never both remove it: if another took the lock
+      // in between, what was moved is theirs and goes back.
+      const aside = `${lock}.${process.pid}.${Math.random().toString(36).slice(2)}`;
+      if (!(await rename(lock, aside).then(() => true, () => false))) continue;
+      if ((await readFile(aside, "utf8").catch(() => held)) !== held) await rename(aside, lock).catch(() => {});
+      else await rm(aside, { force: true });
     }
   }
   try {

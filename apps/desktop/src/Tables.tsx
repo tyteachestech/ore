@@ -91,6 +91,8 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
 
   const line = tablesLine(doc, PHONE);
   if (line === null) return null;
+  // A PDF with no table or formula spotted has a line only while it is read, or to say why that failed.
+  if (!doc.structure?.length && !reading && !error && downloading === null) return null;
   if (line !== "mac")
     return (
       <div className="pdf-tables">
@@ -102,8 +104,10 @@ export function TablesLine({ doc, onRead }: { doc: Doc; onRead: (r: Read) => voi
     setError(undefined);
     cancelled.current = false;
     try {
+      // Asked, not assumed: a PDF that was being read when it opened never said the reader is here,
+      // and a download starts by deleting what is installed.
       if (!have) {
-        await installReader();
+        if (!(await ore<TablesState>("tables", "--status")).installed) await installReader();
         setHave(true);
       }
       setReading(true);

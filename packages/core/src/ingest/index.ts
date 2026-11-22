@@ -971,7 +971,7 @@ export async function readTables(lib: Library, ref: string): Promise<Reimported 
     // A read run in the background names its step for the reader's Undo (tablesState).
     else if (r.step) writeFileSync(tablesFile(lib, item.meta.id, "step"), r.step);
     rmSync(tablesFile(lib, item.meta.id, "error"), { force: true });
-    return { ...r, regions: regions.filter((x) => x.kind !== "page").length };
+    return { ...r, regions: regions.filter((x) => x.kind === "table" || x.kind === "formula" || (x.kind === "text" && x.head)).length };
   } catch (e) {
     writeFileSync(tablesFile(lib, item.meta.id, "error"), e instanceof Error ? e.message : String(e));
     throw e;

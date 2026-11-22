@@ -1219,9 +1219,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   /** The PDF's tables and formulas were read into its text: show it, with the way back. */
   const tablesRead = (r: { changed: boolean; regions: number; step?: string; removed?: unknown[]; unplaced?: unknown[] }) => {
-    if (!r.changed) return (p.reload(), p.onChanged(), p.notify("Found no tables or formulas to read in this PDF"));
+    // Every PDF is read once the reader is here: one it changed nothing in says nothing.
+    if (!r.changed) return (p.reload(), p.onChanged());
     const lost = lostText(r);
-    reimported(p.id, `Read the tables and formulas into the text${lost ? `. ${lost}` : ""}`, r.step);
+    reimported(p.id, `Read this PDF's headings, tables and formulas into the text${lost ? `. ${lost}` : ""}`, r.step);
   };
 
   const retryEnrich = async () => {

@@ -44,9 +44,10 @@ interface Item {
   math?: boolean;
   /** Set in a typewriter face (Courier, TeX's cmtt): code. */
   mono?: boolean;
-  /** Inside a heading the page reader found (D-new-paddle-pages); false on a page it read and found
-   *  this text no heading on. Unset on a page it has not read, where the text's size decides. */
-  head?: boolean;
+  /** Which heading the page reader found this text in (D-new-paddle-pages), counted from 1; 0 on a
+   *  page it read and found this text no heading on. Unset on a page it has not read, where the
+   *  text's size decides. */
+  head?: number;
 }
 
 interface Line {
@@ -59,8 +60,8 @@ interface Line {
   /** Every word on the line is set in a typewriter face: a line of code, as written (`raw`, its
    *  spaces kept), with the width of one of its letters for the indent. */
   code?: { raw: string; cw: number };
-  /** The page reader's word on whether this line is a heading (Item.head). */
-  head?: boolean;
+  /** The page reader's word on whether this line is a heading, and which (Item.head). */
+  head?: number;
 }
 
 function toItem(it: TextItem, font: (name: string) => string): Item {
@@ -334,9 +335,9 @@ function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<strin
     // A numbered heading ("1.1.1 Acting humanly") may be set only a little larger, often in bold.
     // On a page the page reader read (D-new-paddle-pages), a heading is what it saw as one, whatever
     // its size: a heading set in the body's size in bold is found, a large pull quote is not.
-    if (l.head ?? (body && (l.size >= body * 1.15 || (l.size >= body * 1.05 && NUMBERED.test(line))))) {
+    if (l.head === undefined ? body && (l.size >= body * 1.15 || (l.size >= body * 1.05 && NUMBERED.test(line))) : l.head) {
       let j = i + 1;
-      while (j < lines.length && (l.head ? lines[j]!.head && lines[j - 1]!.y - lines[j]!.y <= Math.max(lines[j]!.size, l.size) * 1.8 : lines[j]!.size === l.size)) j++;
+      while (j < lines.length && (l.head ? lines[j]!.head === l.head : lines[j]!.size === l.size)) j++;
       const text = lines.slice(i, j).map((x) => plain(x.text)).reduce((a, t) => a + lineBreakSpace(a, t) + t);
       const next = lines[j];
       if (text.length <= 150 && /\p{L}{3}/u.test(text) && (l.head || (!/[.,;:<>]$/.test(text) && (!next || Math.abs(next.size - body) <= body * 0.1)))) {
@@ -547,14 +548,16 @@ const inside = (i: Item, b: Box) => {
  *  the Markdown each block stands for: a table built cell by cell from pdf.js's own reading of the
  *  text in each cell's box (its powers and bold kept), the reader's where pdf.js finds none; a formula as
  *  the reader's LaTeX. */
-function swapRegions(items: Item[], regions: Region[], blocks: string[]): Item[] {
+const worded = (i: Item) => /[\p{L}\p{N}]{2}/u.test(i.str);
+
+function swapRegions(items: Item[], regions: Region[], blocks: string[], scanned = false): Item[] {
   let out = items;
   const read = regions.some((r) => r.kind === "page");
   const parts = regions.filter((r) => r.kind !== "page");
   if (read) {
     // A page the reader read says which text is a heading; one it has not read leaves that to the size.
     const heads = parts.filter((r) => r.kind === "text" && r.head);
-    out = out.map((i) => ({ ...i, head: heads.some((h) => inside(i, h.box)) }));
+    out = out.map((i) => ({ ...i, head: heads.findIndex((h) => inside(i, h.box)) + 1 }));
     // And in what order its blocks are read: a designed page's text is often drawn in another. Text in
     // no block (a running head, a page number) stays with the text drawn before it.
     let at = -1;
@@ -577,7 +580,8 @@ function swapRegions(items: Item[], regions: Region[], blocks: string[]): Item[]
   const tables = regions.filter((r) => r.kind === "table");
   /** Where the block before this one ended, so a block the PDF has no text for lands after it. */
   let after = 0;
-  const scan = items.filter((i) => /[\p{L}\p{N}]{2}/u.test(i.str)).length < 5;
+  // A page of a scanned PDF with no text of its own (a stamp in its margin is not text).
+  const scan = scanned && items.filter(worded).length < 5;
   for (const r of parts) {
     if (r.kind === "formula" && tables.some((t) => within(r.box, t.box))) continue;
     const ins = (i: Item) => !!i.str.trim() && !isBlock(i.str) && inside(i, r.box);
@@ -731,7 +735,10 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   const structure = structureOf(items);
   const blocks: string[] = [];
   const split = items.map((p) => splitMargins(p, body));
-  const raw = split.map((p, i) => pageLines(swapRegions(p.items, regions.filter((r) => r.page === i + 1), blocks)));
+  // A scanned PDF: most of its pages have no text of their own. Only there is a page's prose the
+  // reader's; in a PDF with text, a page that is one picture and its caption keeps the picture's words in it.
+  const scanned = items.filter((p) => p.filter(worded).length < 5).length * 2 > items.length;
+  const raw = split.map((p, i) => pageLines(swapRegions(p.items, regions.filter((r) => r.page === i + 1), blocks, scanned)));
   const typical = lineGap(raw);
   const lines = dropRunning(raw, body, typical);
   const words = wordsOf(lines);

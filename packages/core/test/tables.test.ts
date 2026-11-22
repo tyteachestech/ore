@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { addHighlight, readAnnotations } from "../src/annotations.ts";
 import { cellsFrom, regionsFrom, tidyLatex, type PaddlePage, type Region } from "../src/ingest/paddle.ts";
 import { pageViews, pdfToDoc } from "../src/ingest/pdf.ts";
@@ -52,7 +52,7 @@ describe("PDF tables and formulas (D125)", () => {
     process.env.ORE_PADDLE = fakePaddle();
     const r = await readTables(lib, item.meta.id);
     expect(r.changed).toBe(true);
-    expect(r.regions).toBe(7); // a heading, four blocks of text, a table and a formula
+    expect(r.regions).toBe(3); // a heading, a table and a formula
     const now = findItem(lib, item.meta.id);
     expect(now.body).toContain("## Spacing and recall\n\nLearners who spread");
     expect(now.body).toContain(`group.\n\n${TABLE}\n\nTable 1:`);
@@ -149,7 +149,7 @@ describe("PDF tables and formulas (D125)", () => {
     ] };
     const [whole, head, text, t, f, ...rest] = regionsFrom([page], [[0, 0, 612, 792]]);
     expect(rest).toEqual([]); // the running head and the one-row "table" are no regions
-    expect(whole).toEqual({ kind: "page", page: 1, box: { l: 0, b: 0, r: 612, t: 792 } });
+    expect(whole).toEqual({ kind: "page", page: 1, box: { l: 0, b: 0, r: 612, t: 792 }, by: "PaddleOCR-VL-1.6 (paddleocr 3.7.0)" });
     expect(head).toEqual({ kind: "text", page: 1, box: { l: 50, r: 200, t: 742, b: 722 }, text: "Methods", head: true });
     expect(text).toMatchObject({ kind: "text", text: "Each $x_n$ is drawn." });
     expect(t).toMatchObject({ kind: "table", box: { l: 10, r: 200, t: 692, b: 632 }, rows: 3, cols: 3 });
@@ -157,6 +157,10 @@ describe("PDF tables and formulas (D125)", () => {
     expect(f).toMatchObject({ kind: "formula", latex: "E=mc^{2} \\tag{3}" });
     // A page with no size, or past the PDF's last page, is skipped.
     expect(regionsFrom([{ ...page, page: 2 }], [[0, 0, 612, 792]])).toEqual([]);
+    // A page turned on its side is pictured turned: its boxes would land on the wrong text, so it has no regions.
+    expect(regionsFrom([{ ...page, width: 1584, height: 1224 }], [[0, 0, 612, 792]])).toEqual([]);
+    // Every block with words is text, a contents list and a reference too; a page number never is.
+    expect(regionsFrom([{ ...page, blocks: [{ label: "content", content: "1 Intro 3", bbox: [0, 0, 9, 9] }, { label: "reference", content: "[1] A. Reader", bbox: [0, 9, 9, 19] }, { label: "number", content: "7", bbox: [0, 20, 9, 29] }] }], [[0, 0, 612, 792]]).map((r) => r.kind)).toEqual(["page", "text", "text"]);
     expect(tidyLatex("E = m c ^ { 2 } & & ( 3 )")).toBe("E = m c ^ { 2 } \\tag{3}");
     expect(tidyLatex("a & = b")).toBe("a = b");
     expect(tidyLatex("\\begin{aligned} a & = b \\end{aligned}")).toBe("\\begin{aligned} a & = b \\end{aligned}");
@@ -195,6 +199,19 @@ describe("PDF tables and formulas (D125)", () => {
     expect((await pdfToDoc(data, climbing)).body).toBe(drawn);
   });
 
+  test("PDF: two headings one after the other stay two, and a page that is one picture and a caption keeps the picture's words in it", async () => {
+    const regions = await regionsOf("tables");
+    const caption = regions.find((r) => r.kind === "text" && r.text.startsWith("Table 1:"))!;
+    const next = regions.find((r) => r.kind === "text" && r.text.startsWith("The chance"))!;
+    const both = regions.map((r): Region => ((r === caption || r === next) && r.kind === "text" ? { ...r, head: true } : r));
+    const body = (await pdfToDoc(pdf("tables.pdf"), both)).body;
+    expect(body).toContain("### Table 1: Recall after one day and after thirty days.\n\n### The chance of recalling");
+    // columns.pdf has six lines of its own: a block of prose the reader saw where the page has none is a picture's.
+    const whole: Region = { kind: "page", page: 1, box: { l: 0, b: 0, r: 612, t: 792 } };
+    const shot: Region = { kind: "text", page: 1, box: { l: 72, r: 540, t: 400, b: 200 }, text: "File Edit View" };
+    expect((await pdfToDoc(pdf("columns.pdf"), [whole, shot])).body).not.toContain("File Edit View");
+  });
+
   test("one PDF is read at a time: a second read waits for the first, and a lock left by a run that died is taken over", async () => {
     const lib = await tempLibrary();
     const a = await addSource(lib, join(FIX, "tables.pdf"));
@@ -204,10 +221,16 @@ describe("PDF tables and formulas (D125)", () => {
     writeFileSync(bin, `#!/bin/sh\necho start >> "${log}"\nsleep 0.3\necho end >> "${log}"\necho "[]" > "$3"\n`);
     chmodSync(bin, 0o755);
     process.env.ORE_PADDLE = bin;
-    writeFileSync(join(tmpdir(), "ore-paddle.lock"), "999999999", { flag: "w" });
-    await Promise.all([readTables(lib, a.meta.id), readTables(lib, b.meta.id)]);
+    // Its own lock, never the one a real read on this machine holds.
+    const lock = (process.env.ORE_PADDLE_LOCK = join(dirname(log), "lock"));
+    writeFileSync(lock, "999999999");
+    try {
+      await Promise.all([readTables(lib, a.meta.id), readTables(lib, b.meta.id)]);
+    } finally {
+      delete process.env.ORE_PADDLE_LOCK;
+    }
     expect(readFileSync(log, "utf8")).toBe("start\nend\nstart\nend\n");
-    expect(existsSync(join(tmpdir(), "ore-paddle.lock"))).toBe(false);
+    expect(readdirSync(dirname(log))).toEqual(["log"]);
   });
 
   test("PDF: a scanned page, which has no text of its own, takes the reader's; a picture's words on a page with text stay in the picture", async () => {
