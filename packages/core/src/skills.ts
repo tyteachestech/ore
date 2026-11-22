@@ -152,9 +152,11 @@ function parseFile(data: unknown): { file: SkillsFile; dropped: string[] } {
   throw new Error(`skills.yaml in your library: ${where}. Fix it in a text editor.`);
 }
 
-// A card's priority is the highest priority among its skills; an archived skill counts only when all of
-// them are archived (D173).
-export function cardPriority(skillIds: string[], skills: Skill[]): Priority {
+// A card's priority is the one he set on its source (`set`), else the highest priority among its skills;
+// an archived skill counts only when all of them are archived (D173). Read each time, never copied onto
+// the source, so a skill's importance changing needs nothing rewritten.
+export function cardPriority(skillIds: string[], skills: Skill[], set?: Priority | null): Priority {
+  if (set) return set;
   const own = skills.filter((s) => skillIds.includes(s.id));
   const live = own.filter((s) => !s.archived);
   const ps = (live.length ? live : own).map((s) => s.priority);
@@ -172,8 +174,17 @@ export const archivedOnly = (skillIds: string[], skills: Skill[]): boolean => {
 
 // Archived or not, as a card's skills were: archiving changes only what is listed and due, never a
 // card's retention, so its review history replays to the same schedule (D22, D173).
-export const desiredRetention = (skillIds: string[], skills: Skill[]): number =>
-  RETENTION[cardPriority(skillIds, skills.map((s) => (s.archived ? { ...s, archived: undefined } : s)))];
+export const desiredRetention = (skillIds: string[], skills: Skill[], own?: Priority | null): number =>
+  RETENTION[cardPriority(skillIds, skills.map((s) => (s.archived ? { ...s, archived: undefined } : s)), own)];
+
+/** The importance he set on a card's source, if any; a card whose source is gone has none. */
+export function sourcePriority(lib: Library, item: string): Priority | undefined {
+  try {
+    return findItem(lib, item).meta.priority;
+  } catch {
+    return undefined;
+  }
+}
 
 /** A new skill's id: its name's slug, numbered when another skill holds it ("C#" after "C++"). A name with
  *  no Latin letters or digits keeps its own letters ("日本語", "русский") instead of "untitled": the id names

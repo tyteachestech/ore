@@ -20,7 +20,7 @@ import {
   enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, wordCount, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
-  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, tryingNow, tryLine, markTried, planTry, addTry, useCount, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemArchived, setItemPinned, setItemSkills, itemCardSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
+  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, tryingNow, tryLine, markTried, planTry, addTry, useCount, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemPriority, checkPriority, setItemArchived, setItemPinned, setItemSkills, itemCardSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
   type AnchoredAnnotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
@@ -552,17 +552,19 @@ export const itemCommands: Record<string, Command> = {
   },
 
   edit: {
-    usage: '<item> [--title "<t>"] [--author "<a>"] [--skills a,b [--cards <json>]]   rename a source, set its author ("" clears it), or file it under exactly these skills ("" for none; its cards follow; the output\'s cards_before, passed back as --cards, puts each card\'s own skills back for Undo)',
-    options: { title: { type: "string" }, author: { type: "string" }, skills: { type: "string" }, cards: { type: "string" } },
+    usage: '<item> [--title "<t>"] [--author "<a>"] [--priority P1|P2|P3|""] [--skills a,b [--cards <json>]]   rename a source, set its author ("" clears it), set how much it matters over its skills\' importance (P1 Focus, P2 Normal, P3 Light; "" follows its skills again), or file it under exactly these skills ("" for none; its cards follow; the output\'s cards_before, passed back as --cards, puts each card\'s own skills back for Undo)',
+    options: { title: { type: "string" }, author: { type: "string" }, priority: { type: "string" }, skills: { type: "string" }, cards: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();
       const id = findItem(lib, need(ref, "<item>")).meta.id;
-      if (f.title === undefined && f.author === undefined && f.skills === undefined) throw new Error("nothing to change (--title, --author or --skills)");
+      if (f.title === undefined && f.author === undefined && f.priority === undefined && f.skills === undefined) throw new Error("nothing to change (--title, --author, --priority or --skills)");
       // Every field is checked before the first is written, so a refused edit changes nothing.
       if (f.skills !== undefined) checkSkills(lib, strs(f.skills));
       if (f.title !== undefined && !str(f.title)?.trim()) throw new Error("a source needs a title");
+      if (f.priority !== undefined) checkPriority(str(f.priority) ?? "");
       let meta = f.title !== undefined ? await renameItem(lib, id, str(f.title) ?? "") : findItem(lib, id).meta;
       if (f.author !== undefined) meta = await setItemAuthor(lib, id, str(f.author) ?? "");
+      if (f.priority !== undefined) meta = await setItemPriority(lib, id, str(f.priority) ?? "");
       const cards = f.cards === undefined ? undefined : (JSON.parse(str(f.cards)!) as Record<string, string[]>);
       const before = f.skills !== undefined ? itemCardSkills(lib, id) : undefined;
       if (f.skills !== undefined) meta = await setItemSkills(lib, id, strs(f.skills), cards);

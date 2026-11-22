@@ -7,7 +7,7 @@ import { withLock } from "./lock.ts";
 import { readReviews } from "./reviews.ts";
 import { findCard } from "./cards.ts";
 import { loadParams, retrievability } from "./scheduler.ts";
-import { desiredRetention, loadSkills, reviewSettings } from "./skills.ts";
+import { desiredRetention, loadSkills, reviewSettings, sourcePriority } from "./skills.ts";
 import { ACTIVE_CAP_MS } from "./study.ts";
 import { gemGrade, type GemGrade } from "./today.ts";
 
@@ -134,7 +134,8 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
   const skills = loadSkills(lib).skills;
   const target = (card: string) => {
     try {
-      return desiredRetention(findCard(lib, card).meta.skills, skills);
+      const { skills: own, item } = findCard(lib, card).meta;
+      return desiredRetention(own, skills, sourcePriority(lib, item));
     } catch {
       return 0.9; // a card file gone since: the default target
     }
