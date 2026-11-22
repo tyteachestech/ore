@@ -34,13 +34,15 @@ const drafts = new Map<string, string>();
 
 /** The answer box under a question. ↵ adds what he wrote to the answer and keeps the question open;
  *  Answered closes it; ⌘↵ closes it and asks for a card. Esc closes the box and keeps the draft. */
-export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
+export function AnswerBox({ q, item, quote, onSaved, onRewrite, onClose, notify }: {
   q: Question;
   /** The source he is reading, credited with what he writes. */
   item?: string;
   /** The passage he had selected, kept with his words. */
   quote?: string | null;
   onSaved: (s: Saved, how: "contribution" | "done" | "card") => void;
+  /** A piece of his answer rewritten or removed and saved: the page reads the question again (Codex UX sweep 2). */
+  onRewrite?: () => void;
   onClose: () => void;
   notify: Notify;
 }) {
@@ -60,7 +62,9 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
   // after an Undo has given a removed piece a new ts (review of #442).
   const now = useRef(answers);
   const setAnswers = (f: (l: Question["answers"]) => Question["answers"]) => setShown((now.current = f(now.current)));
-  useEffect(() => setAnswers(() => q.answers), [q.answers]);
+  // A rewrite still out keeps what he sees: a re-read that landed before it would show the words before it.
+  const out = useRef(0);
+  useEffect(() => void (out.current || setAnswers(() => q.answers)), [q.answers]);
   const hasAnswer = answers.length > 0;
   /** Rewrites one piece of his answer (Notion: click the text, type); empty removes it. On the history.
    *  False when the save failed (his words are put back in the piece's field). */
@@ -70,7 +74,8 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
     const was = before.find((c) => c.ts === ts);
     if (!was) return false;
     setAnswers((l) => (gone ? l.filter((c) => c.ts !== ts) : l.map((c) => (c.ts === ts ? { ...c, text: to } : c))));
-    const write = ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)]));
+    out.current++;
+    const write = ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)])).finally(() => out.current--);
     // On the history at once, as the piece changes: a ⌘Z while the write is out takes back this step, not the one
     // before it. The history holds its Undo and Redo until this write has landed (history.ts `hold`).
     // A removed piece comes back as it was written (its source and passage), at the end of his answer.
@@ -87,6 +92,7 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
     try {
       const r = await write;
       setAnswers((l) => r.answers?.map((c) => ({ ...c, item_title: l.find((x) => x.ts === c.ts)?.item_title })) ?? []);
+      onRewrite?.();
     } catch (e) {
       // Only this piece goes back: another piece saved meanwhile keeps its new words.
       const at = before.indexOf(was);
@@ -105,10 +111,16 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
     for (const [ts, e] of [...editing.current]) {
       const to = e.to.trim();
       if (to !== e.from && !(await rewrite(ts, to, e.from))) return false;
+      editing.current.delete(ts); // saved: an unmount in the same batch must not write it again
       e.close();
     }
     return true;
   };
+  // The box going away with a piece still being edited (its question folded, the page left) is a tap away from it:
+  // the correction is saved (D211), never dropped (Codex UX sweep 2). Read at unmount, so the latest is kept.
+  const commitNow = useRef(commitPieces);
+  commitNow.current = commitPieces;
+  useEffect(() => () => void commitNow.current(), []);
 
   const send = async (how: "contribution" | "done" | "card") => {
     if (busy || (how === "contribution" && !t) || (how === "card" && !t && !hasAnswer)) return;
