@@ -204,9 +204,12 @@ function lineGap(pages: Line[][]): number {
 
 /** Running heads and feet ("2  Chapter 1  Introduction", "Section 1.1 What Is AI?  3", a bare page
  *  number): the first or last line of a page, set apart from the text, that is a page number, starts
- *  or ends with one, or comes back on other pages. */
+ *  or ends with one, or comes back on other pages. One set larger than the text (a guide's "Solved
+ *  VALUES GUIDE 7", its name in bold) is one only when it comes back on three pages or more: a
+ *  heading alone at a page's foot is set large too. */
 function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
-  const key = (l?: Line) => (l ? plain(l.text) : "").replace(/\d+/g, "#").toLowerCase();
+  // Numbers left out: the contents pages' foot has no page number, the others' do.
+  const key = (l?: Line) => (l ? plain(l.text) : "").replace(/\d+/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
   const count = (keys: string[]) => keys.reduce((m, k) => m.set(k, (m.get(k) ?? 0) + 1), new Map<string, number>());
   const top = (p: Line[]) => p.reduce<Line | undefined>((a, l) => (!a || l.y > a.y ? l : a), undefined);
   const bottom = (p: Line[]) => p.reduce<Line | undefined>((a, l) => (!a || l.y < a.y ? l : a), undefined);
@@ -223,11 +226,11 @@ function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
     const [head, next] = byY;
     const t = (l: Line) => plain(l.text);
     // A table or formula Docling read (D125) is never a running head, though many pages start with one.
-    if (head && next && !isBlock(head.text) && t(head).length <= 80 && head.size <= body * 1.1 && head.y - next.y > typical * 1.5 && (number.test(t(head)) || folio.test(t(head)) || heads.get(key(head))! > 1)) drop.add(head);
+    if (head && next && !isBlock(head.text) && t(head).length <= 80 && (head.size <= body * 1.1 || heads.get(key(head))! >= 3) && head.y - next.y > typical * 1.5 && (number.test(t(head)) || folio.test(t(head)) || heads.get(key(head))! > 1)) drop.add(head);
     const rest = byY.filter((l) => !drop.has(l));
     const foot = rest.at(-1);
     const prev = rest.at(-2);
-    if (foot && prev && !isBlock(foot.text) && t(foot).length <= 80 && foot.size <= body * 1.1 && prev.y - foot.y > typical * 1.5 && (number.test(t(foot)) || feet.get(key(foot))! > 1)) drop.add(foot);
+    if (foot && prev && !isBlock(foot.text) && t(foot).length <= 80 && (foot.size <= body * 1.1 || feet.get(key(foot))! >= 3) && prev.y - foot.y > typical * 1.5 && (number.test(t(foot)) || feet.get(key(foot))! > 1)) drop.add(foot);
     return lines.filter((l) => !drop.has(l));
   });
 }
@@ -237,6 +240,35 @@ const BULLET = /^[•◦▪‣·●○■□–]\s*/;
 const NUMBERED = /^\d+(?:\.\d+)*\.?\s+\p{L}/u;
 /** A footnote's first line: its number or mark, then its text. */
 const FOOTNOTE = /^(?:\d{1,3}|[*†‡§])\s+\S/;
+
+/** A contents entry's last line ends in its page number: "Beyond Happiness 8", "Methods . . . 12". */
+const ENTRY = /\S[\s.·…]*\s\d{1,4}$/;
+
+/** A contents page's entries from line `i`: three or more in a row, set close, each a line or two
+ *  ending in a page number and starting in capitals, as prose that wraps does not. One entry per
+ *  list item, a section indented under its part as on the page (Tyler's Values Guide, 2026-11-22). */
+function contents(lines: Line[], i: number, body: number, typical: number, words: Set<string>): { text: string; end: number } | null {
+  const entries: Line[][] = [];
+  let cur: Line[] = [];
+  let end = i;
+  for (let j = i; j < lines.length; j++) {
+    const l = lines[j]!;
+    const gap = j > i ? lines[j - 1]!.y - l.y : 1;
+    if (gap <= 0 || gap > typical * 1.4 || isBlock(l.text) || l.code || (body && l.size < body * 0.9)) break;
+    if (!cur.length && /^\p{Ll}/u.test(plain(l.text))) break;
+    cur.push(l);
+    if (ENTRY.test(plain(l.text))) {
+      entries.push(cur);
+      cur = [];
+      end = j + 1;
+    } else if (cur.length > 1) break;
+  }
+  if (entries.length < 3) return null;
+  const xs = [...new Set(entries.map((e) => Math.round(e[0]!.x)))].sort((a, b) => a - b).filter((x, n, a) => n === 0 || x - a[n - 1]! > 2);
+  const depth = (x: number) => Math.min(xs.filter((s) => x >= s - 2).length - 1, 2);
+  const text = entries.map((e) => "  ".repeat(depth(e[0]!.x)) + "- " + e.map((l) => l.text).reduce((a, t) => join(a, t, words))).join("\n");
+  return { text, end };
+}
 
 // Join lines into paragraphs: a vertical gap clearly larger than the document's
 // typical line spacing (or a jump upwards, i.e. a new column) starts a paragraph.
@@ -282,6 +314,16 @@ function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<strin
       skip = j;
       return;
     }
+    if (!para || gap > typical * 1.4 || gap < 0) {
+      const toc = contents(lines, i, body, typical, words);
+      if (toc) {
+        push();
+        out.push({ text: toc.text, note: false });
+        item = null;
+        skip = toc.end;
+        return;
+      }
+    }
     // Lines set clearly larger than the body text, then body text, are a heading (the outline's);
     // a heading that wraps is joined. Large text not followed by body text is a figure's labels.
     // A numbered heading ("1.1.1 Acting humanly") may be set only a little larger, often in bold.
@@ -299,7 +341,10 @@ function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<strin
       }
     }
     const bullet = BULLET.test(line) && line.replace(BULLET, "").length > 0;
-    const note = !!body && l.size <= body * 0.85 && FOOTNOTE.test(line);
+    // A footnote starts with its mark, or is small print set apart at the foot of the page, below
+    // the text (its mark read as a raised number): a sentence running onto the next page skips it.
+    const small = (o: Line) => o.size <= body * 0.85;
+    const note = !!body && small(l) && (FOOTNOTE.test(line) || (i > 0 && !small(lines[i - 1]!) && gap > typical * 1.4 && lines.slice(i).every(small)));
     // A list item goes on while its lines start past its bullet; a line back at the margin ends it.
     const ended = item !== null && l.x < item - 2;
     // A book's paragraph starts with its first line indented: the lines around it start further left,
