@@ -75,8 +75,8 @@ When a sweep's triage is done, add a row per tester here.
 | 11-22 | [ux sweep](2026-11-22-codex-ux-sweep/) phone | Codex | The same on the iPhone, 390×844 and 375×667 | iPhone | 3 | #492 |
 | 11-22 | [ux sweep 2](2026-11-22-codex-ux-sweep-2/) mac | Codex | Round 2: notes, tutor, lists, sidebar and skill pages, keys | Mac | 3 | #493 |
 | 11-22 | [ux sweep 2](2026-11-22-codex-ux-sweep-2/) phone | Codex | Round 2: notes, reader, skill pages, search, Settings | iPhone | 2 | #493 |
-| 11-22 | [ux sweep 3](2026-11-22-codex-ux-sweep-3/) mac | Codex | Round 3: reading deeply, Feed, Review edges, Settings | Mac | 6 | #PRNUM |
-| 11-22 | [ux sweep 3](2026-11-22-codex-ux-sweep-3/) phone | Codex | Round 3: drawer, Review, reading, long-press menus | iPhone | 5 (1 open for Tyler) | #PRNUM |
+| 11-22 | [ux sweep 3](2026-11-22-codex-ux-sweep-3/) mac | Codex | Round 3: reading deeply, Feed, Review edges, Settings | Mac | 6 | #495 |
+| 11-22 | [ux sweep 3](2026-11-22-codex-ux-sweep-3/) phone | Codex | Round 3: drawer, Review, reading, long-press menus | iPhone | 5 (1 open for Tyler) | #495 |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
