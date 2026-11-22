@@ -1041,16 +1041,27 @@ export function App() {
     return true;
   });
 
-  /** A source filed under no skill there is. */
-  const unfiled = (i: Item) => !i.skills.some((k) => skills.some((s) => s.id === k));
-  const loose = useMemo(() => (items ?? []).some((i) => !i.archived_at && !i.preview && !i.skills.length), [items]);
+  /** Live sources filed under no skill, as the list's No skill filter counts them (`filters.ts`). */
+  const looseOnes = useMemo(() => (items ?? []).filter((i) => !i.archived_at && !i.preview && !i.skills.length), [items]);
+  const loose = looseOnes.length > 0;
   /** The sidebar's No skill row: All sources, narrowed to the sources with no skill by the same tag the
-   *  Filter button would put in the search, so what hides the rest is in sight and × lets it go. */
+   *  Filter button would put in the search, so what hides the rest is in sight and × lets it go. On a tab
+   *  that holds none of them (they are all read, or the list is on Archived) it opens the tab that does. */
   const openNoSkill = () => {
     openSkill(null);
     listSkill.current = null;
     setQuery("");
     setFilters([{ field: "skill", values: [NO_SKILL] }]);
+    const has = (t: Tab) => looseOnes.some((i) => inTab(i.status, t));
+    if (!has(status)) setStatus(has("toread") ? "toread" : "done");
+  };
+  /** All sources, whole: from the No skill list its tag goes too, or the click would change nothing. */
+  const openAll = () => {
+    if (onlyNoSkill(filters)) {
+      setFilters([]);
+      setQuery("");
+    }
+    openSkill(null);
   };
 
   const onSkillPage = !openId && !!skill && skills.some((s) => s.id === skill);
@@ -2009,6 +2020,13 @@ export function App() {
     ...(r.archived_at ? [] : [{ id: "archive", label: "Archive", hint: label(keys.archive), danger: true, divider: true, run: () => void archiveSource(r) }]),
   ];
 
+  /** A source's submenu as ⌘K rows of their own: each skill to file under or take it from, each
+   *  importance level it isn't at. */
+  const subActions = (a: MenuAction): Action[] =>
+    a.id === "importance"
+      ? a.sub!.filter((b) => !b.checked).map((b) => ({ id: `${a.id}:${b.id}`, label: `Importance: ${b.label}`, keywords: ["priority", "focus", "normal", "light"], run: b.run }))
+      : a.sub!.map((b) => ({ id: `${a.id}:${b.id}`, label: b.checked ? `Remove from ${b.label}` : `File under ${b.label}`, keywords: ["skill", "move"], run: b.run }));
+
   /** What ⌘K offers on a source row of its own (Tab on the row): its ⋯ menu's actions, each skill a row of
    *  its own. Not Rename, which edits a list row in place, nor the list's own Show menu and pin moves. */
   const paletteSourceActions = (id: string): Action[] => {
@@ -2016,10 +2034,7 @@ export function App() {
     if (!r) return [];
     return rowActions(r)
       .filter((a) => !["rename", "pin-up", "pin-down"].includes(a.id) && a !== showMenu)
-      .flatMap((a): Action[] =>
-        a.id === "importance" ? a.sub!.filter((b) => !b.checked).map((b) => ({ id: `${a.id}:${b.id}`, label: `Importance: ${b.label}`, keywords: ["priority", "focus", "normal", "light"], run: b.run }))
-        : a.sub ? a.sub.map((b) => ({ id: `${a.id}:${b.id}`, label: b.checked ? `Remove from ${b.label}` : `File under ${b.label}`, keywords: ["skill", "move"], run: b.run }))
-        : [{ id: a.id, label: a.label, hint: a.hint, run: a.run }]);
+      .flatMap((a): Action[] => (a.sub ? subActions(a) : [{ id: a.id, label: a.label, hint: a.hint, run: a.run }]));
   };
 
   /** ⌘K follows what is open (a source, a skill page), never what is selected in a list (D178): a row's
@@ -2029,14 +2044,14 @@ export function App() {
     ...(openId
       ? readerActions.current.flatMap((a): Action[] =>
           a.sub
-            ? a.sub.map((b) => ({ id: `${a.id}:${b.id}`, label: b.checked ? `Remove from ${b.label}` : `File under ${b.label}`, keywords: ["skill", "move"], run: b.run }))
+            ? subActions(a)
             : [{ id: a.id, label: a.id === "rename" ? "Rename source…" : a.id === "archive" ? "Archive source" : a.label, hint: a.hint, run: a.id === "rename" ? () => setRenameSource((n) => n + 1) : a.run }],
         )
       : []),
     // The day's main job comes first among the app-wide actions, as Raycast puts the likely one on top.
     { id: "review", label: "Start review", hint: label(keys.review), run: askReview },
     ...(openId ? [{ id: "back", label: skill ? `Back to ${skillOf(skill).name}` : "Back to sources", hint: "Esc", run: () => setOpenId(null) }] : []),
-    ...(skill || onHome ? [{ id: "all", label: "All sources", run: () => openSkill(null) }] : []),
+    ...(skill || onHome || onlyNoSkill(filters) ? [{ id: "all", label: "All sources", run: openAll }] : []),
     ...(!openId && !onSkillPage ? [{ id: "filter", label: "Search sources", hint: label(keys.filter), keywords: ["search", "find"], run: () => {
       setPlace("sources");
       requestAnimationFrame(() => filterRef.current?.focus());
@@ -2480,13 +2495,13 @@ export function App() {
         feed={place === "feed" && !onSkillPage && (!openId || previews.current.has(openId))}
         onFeed={goFeed}
         loose={loose}
-        noSkill={openItem ? !previews.current.has(openItem.id) && unfiled(openItem) : place === "sources" && onlyNoSkill(filters)}
+        noSkill={openItem ? !openItem.preview && !openItem.skills.length : place === "sources" && onlyNoSkill(filters)}
         onNoSkill={openNoSkill}
         hidden={collapsed && !peek}
         peek={collapsed && peek}
         onPointer={(over) => (over ? clearTimeout(peekTimer.current) : peekOut())}
         drop={dropping ? (dropping.skill ?? "") : (rowDrag?.skill ?? homeDrop ?? undefined)}
-        onOpen={openSkill}
+        onOpen={(id) => (id ? openSkill(id) : openAll())}
         menu={skillMenu}
         newSkill={newSkill}
         onCreated={(s) => {
@@ -2556,6 +2571,7 @@ export function App() {
             onOpenLesson={(id) => openSource(id)}
             onSound={setSound}
             onPin={(item) => void pinSource(item)}
+            priority={openItem?.priority}
             onImportance={(item, p) => void setSourceImportance(item, p)}
             onReview={(item) => startReview(null, item.id)}
             onMove={(item, to) => void moveSource(item, to)}

@@ -180,7 +180,9 @@ export const desiredRetention = (skillIds: string[], skills: Skill[], own?: Prio
 /** The importance he set on a card's source, if any; a card whose source is gone has none. */
 export function sourcePriority(lib: Library, item: string): Priority | undefined {
   try {
-    return findItem(lib, item).meta.priority;
+    // By its whole id only: `findItem` also takes a part of one, and a card with none would match any source.
+    const meta = findItem(lib, item).meta;
+    return meta.id === item ? meta.priority : undefined;
   } catch {
     return undefined;
   }

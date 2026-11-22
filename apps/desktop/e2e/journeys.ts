@@ -15633,6 +15633,20 @@ journey("no skill: a pasted source opens with no picker, the sidebar's No skill 
     if ((await ticked()) !== "Focus✓ Normal Light") throw new Error(`after Focus: ${await ticked()}`);
     await page.keyboard.press("Meta+z");
     await until("⌘Z takes it back", async () => (await stored()) === undefined);
+    // Open, ⌘K names the levels as levels (never "File under Focus"), and the reader's own menu ticks what is stored.
+    await rows.first().click();
+    await page.locator(".doc").getByText("Write down the five things").waitFor();
+    await page.keyboard.press("Meta+k");
+    await page.keyboard.type("importance");
+    await page.locator("[cmdk-item]").filter({ hasText: "Importance: Focus" }).waitFor();
+    if (await page.locator("[cmdk-item]").filter({ hasText: /File under (Focus|Light)/ }).count()) throw new Error("⌘K offers to file the source under an importance level");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    // All sources from the No skill list lets its tag go: the whole list, and All sources lit.
+    await noSkill.click();
+    await until("the No skill list is back", async () => (await rows.count()) === 1);
+    await side.getByRole("button", { name: /^All sources/ }).click();
+    await until("All sources shows every source again", async () => (await rows.count()) > 1 && (await side.getByRole("button", { name: /^All sources/ }).getAttribute("aria-pressed")) === "true");
     // Filed under a Light skill it reads Light; set to Focus, a last row hands it back to its skills.
     await ore("edit", made.id, "--skills=habits");
     await page.reload();

@@ -630,6 +630,8 @@ type Props = {
   /** Whether the open source has sound of its own (a video or a recording): the menu bar greys out Listen there. */
   onSound?: (sound: boolean) => void;
   onPin: (item: Item) => void;
+  /** The importance he set on the source, as the app's list has it now (after an undo, or a write that failed). */
+  priority?: Priority;
   /** Sets how much the source matters, over its skills' importance ("" hands it back): the Mac's menus. */
   onImportance?: (item: Item, p: Priority | "") => void;
   onMove: (item: Item, to: Item["status"]) => void;
@@ -3366,10 +3368,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
               id: "importance",
               label: "Importance",
               run: () => {},
-              sub: sourceImportanceActions(doc, p.skills, (level) => {
-                setDoc((cur) => cur && { ...cur, priority: level || undefined });
-                p.onImportance!(doc, level);
-              }),
+              sub: sourceImportanceActions({ skills: doc.skills, priority: p.priority }, p.skills, (level) => p.onImportance!({ ...doc, priority: p.priority }, level)),
             }]
           : []),
         ...(focus ? [{ id: "highlight", label: "Highlight focused text", hint: label(keys.highlight), paletteOnly: true, run: () => highlightFocus("keep") }] : []),
