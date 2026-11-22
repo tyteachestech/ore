@@ -154,6 +154,8 @@ export type Item = {
   chat?: "claude";
   /** Archived: hidden from lists and search (only in the Archived tab). */
   archived_at?: string;
+  /** How much it matters, set by him over its skills' importance; unset, its exercises follow its skills. */
+  priority?: Priority;
   /** Pinned: listed first, under Pinned. */
   pinned_at?: string;
   /** Last opened in the reader (D110). */

@@ -63,7 +63,7 @@ export function SkillChips({ ids, skills }: { ids: string[]; skills: Skill[] }) 
  *  name no skill has creates one. With no skills, a quiet + on hover stands where the pills would be
  *  in a list's row; the reader's byline shows a faint "Skill" instead (`blank`), as its blank Author does.
  *  The caller writes `next` and offers Undo back to `before`. */
-export function SkillPicker({ skills, value, title, onChange, onCreate, startOpen = false, onClosed, returnFocus, inRow, blank, children }: {
+export function SkillPicker({ skills, value, title, onChange, onCreate, returnFocus, inRow, blank, children }: {
   skills: Skill[];
   value: string[];
   /** The source's title, for the button's label. */
@@ -72,9 +72,6 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   onChange: (next: string[], before: string[], changed: Skill) => void;
   /** Makes a skill (`ore skills add`); undefined if that failed and the caller said why. */
   onCreate: (name: string) => Promise<Skill | undefined>;
-  /** Opens as it appears: on a source just added with no skill, so filing it is the next keystroke. */
-  startOpen?: boolean;
-  onClosed?: () => void;
   /** In a list's row: no Tab stop of its own, since the list is one stop and its arrows move through the rows (F381).
    *  The row's menu (⌃↵, right-click) holds Skills. */
   inRow?: boolean;
@@ -85,7 +82,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
   /** The pills (or their names); none (on a skill page, the page's own is left out) shows `blank` or the +. */
   children?: ReactNode;
 }) {
-  const [open, setOpen] = useState(startOpen);
+  const [open, setOpen] = useState(false);
   const lite = useLite();
   const [query, setQuery] = useState("");
   // Ticks made while open show at once and build on each other; whenever the skills it is given change
@@ -137,10 +134,7 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, startOpe
       onOpenChange={(o) => {
         setOpen(o);
         if (o) setFirst(sel);
-        else {
-          setQuery("");
-          onClosed?.();
-        }
+        else setQuery("");
       }}
     >
       <Hint text={children ? "Change skills" : "Add to a skill"}>

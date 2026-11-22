@@ -12,7 +12,7 @@ import { appendReview, appendUndo, readReviews, type FsrsState, type Review } fr
 import { emptyState, loadParams, nextState, replay, retrievability } from "./scheduler.ts";
 import { NO_SKILL } from "./no-skill.ts";
 import { openSessionId, readSessions } from "./sessions.ts";
-import { archivedOnly, cardPriority, unfiled, desiredRetention, loadSkills, reviewSettings } from "./skills.ts";
+import { archivedOnly, cardPriority, unfiled, desiredRetention, loadSkills, reviewSettings, sourcePriority } from "./skills.ts";
 import { retentionMetric } from "./stats.ts";
 import { gemPast, SOLID_DAYS } from "./today.ts";
 
@@ -51,7 +51,7 @@ export interface ReviewResult {
  *  be dated after now: the review is logged now, and FSRS counts the time since that one as none, rather
  *  than refusing time that runs backwards. Shared by the review itself and the timeline's lookahead. */
 function stateBefore(lib: Library, card: ReturnType<typeof findCard>, now: Date) {
-  const retention = desiredRetention(card.meta.skills, loadSkills(lib).skills);
+  const retention = desiredRetention(card.meta.skills, loadSkills(lib).skills, sourcePriority(lib, card.meta.item));
   const w = loadParams(lib);
   const prior = readReviews(lib).filter((r) => r.card === card.meta.id);
   const before = replay(prior, retention, w) ?? emptyState(now);
@@ -192,7 +192,7 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
         item: c.item,
         skills: c.skills,
         topics: c.topics,
-        priority: cardPriority(c.skills, skills),
+        priority: cardPriority(c.skills, skills, items.get(c.item)?.priority),
         question: c.question,
         due: c.fsrs?.due ?? null,
         retrievability: retrievability(c.fsrs, now, c.retention, w),

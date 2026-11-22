@@ -55,6 +55,7 @@ source_app: Safari          # snippets only
 text_sha256: ...            # of the body; anchoring checks this
 status: inbox | reading | done
 skills: [ai, learning]      # AI-assigned (only obvious fits, may be empty), user-editable
+priority:                   # optional P1|P2|P3: how much this source matters, set by him; unset, its exercises take the highest of its skills' (P2 with none)
 suggested_skill:            # optional: AI-proposed skill when none fits; accept or dismiss (D25)
   name: Web Development
   hook: ...
@@ -178,7 +179,7 @@ ore pin <item> [--at <iso>] [--undo]   sets pinned_at (--at sets its place): lis
 ore add <url> --course [--skill s]     a Claude Academy course (or lesson) or YouTube playlist: one source per lesson, in order (D79); again: only missing lessons, and page text for lessons added as bare videos (D92)
 ore course preview <url> | set <course> [--title t] [--skills a,b] | archive <course> [--undo] | lessons <course>
 ore feed [--refresh] | find <url> | restore <json> --at N | follow <url> [--skill s] | unfollow <feed> | arrange '["<feed url>",…]' | set <feed> [--name n] [--skill s] | read|unread <post url>… | open <post url> | close <item>   the Feed (D107): posts of the last 14 days; open reads a post as a preview (`preview` set, never listed), close keeps it only if it has a highlight or a source note, else deletes it
-ore edit <item> [--title t] [--author a] [--skills a,b]   rename a source, set its author ("" clears it), or file it under exactly these skills ("" for none); its cards follow, its topics gain new ones
+ore edit <item> [--title t] [--author a] [--priority P1|P2|P3|""] [--skills a,b]   rename a source, set its author ("" clears it), set its own importance (`priority` in its frontmatter: it wins over its skills' for the source's exercises; "" follows its skills again), or file it under exactly these skills ("" for none); its cards follow, its topics gain new ones
 ore skills                            list skills (id, name, priority, hook, goal, icon, color, collection)
 ore skills set <skill> [--name n] [--priority P1|P2|P3] [--icon mc:name] [--color gray|red|orange|yellow|green|teal|blue|purple|pink] [--collection c] [--hook "why"] [--goal "what I could show"]   --name renames it (the ID stays, so links hold); "" clears any other field; hook is his one line on why (≤140 chars, D63), goal what he could show he can do (≤140 chars, D102); edits skills.yaml in place, keeping comments
 ore skills add <name> [--collection c]   new skill, Light (P3, D173) (the sidebar's + on a section header); refuses a name that matches an existing skill

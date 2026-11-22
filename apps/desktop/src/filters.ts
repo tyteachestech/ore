@@ -20,6 +20,9 @@ export const kindLabel = (type: string) => KINDS[type] ?? type.charAt(0).toUpper
 /** No skill is a value of its own, so the unfiled can be found. */
 export const NO_SKILL = "";
 
+/** The list is narrowed to the sources with no skill and by nothing else: the sidebar's No skill row is lit. */
+export const onlyNoSkill = (filters: Filter[]) => filters.length === 1 && filters[0]!.field === "skill" && filters[0]!.values.length === 1 && filters[0]!.values[0] === NO_SKILL;
+
 function valuesOf(i: Item, field: Field): string[] {
   if (field === "kind") return [i.type];
   if (field === "skill") return i.skills.length ? i.skills : [NO_SKILL];

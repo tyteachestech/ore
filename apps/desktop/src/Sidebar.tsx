@@ -1,4 +1,4 @@
-import { CaretRight, House, Plus, Rss, Stack } from "./icons";
+import { CaretRight, FileText, House, Plus, Rss, Stack } from "./icons";
 import { watchMore } from "./more";
 import { keepKeysIn } from "./keys";
 import {
@@ -46,7 +46,7 @@ const SETTLE: DropAnimation = { duration: 180, easing: "cubic-bezier(0.2, 0, 0, 
  *  where it will land and the other rows slide aside; a skill drops into, out of and within any
  *  collection. Icons sit bare (Dia, Notion); the open skill's row takes its color, as Dia tints a space,
  *  and holds a fainter tint while one of its sources is open. */
-export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hidden, peek, drop, onPointer, onOpen, menu, onCreated, newSkill: asked, onArrange, onDeleteCollection }: {
+export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loose, noSkill, onNoSkill, hidden, peek, drop, onPointer, onOpen, menu, onCreated, newSkill: asked, onArrange, onDeleteCollection }: {
   skills: Skill[];
   skill: string | null;
   /** A source is open: the selected row is where it sits, so it takes a quieter tint than its own page. */
@@ -56,6 +56,12 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   /** The Feed is open (posts from the blogs and newsletters he follows). */
   feed: boolean;
   onFeed: () => void;
+  /** Some sources are filed under no skill: they get a row of their own under All sources (Zotero's
+   *  Unfiled Items, Raindrop's Unsorted), so one read with no skill behind it has a place to be found. */
+  loose: boolean;
+  /** That list is open, or a source with no skill is. */
+  noSkill: boolean;
+  onNoSkill: () => void;
   hidden: boolean;
   /** Floating over the content while the sidebar is collapsed; reports the pointer entering and leaving. */
   peek: boolean;
@@ -239,7 +245,8 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
   );
 
   const nav = useRef<HTMLElement>(null);
-  const cursor = useSideCursor(nav, home ? "home" : feed ? "feed" : skill ?? "all");
+  const none = noSkill && !home && !feed && !skill;
+  const cursor = useSideCursor(nav, home ? "home" : feed ? "feed" : skill ?? (none ? "none" : "all"));
   const roving = useRoving(nav);
   useEffect(() => (nav.current ? watchMore(nav.current) : undefined), []);
 
@@ -277,14 +284,24 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, hid
           <span className="label">Feed</span>
         </button>
       </Hint>
-      <button className={`side-item side-main${skill || home || feed ? "" : " on"}${drop === "" ? " drop-on" : ""}`} data-drop-skill="" aria-pressed={!skill && !home && !feed} onClick={() => onOpen(null)}>
+      <button className={`side-item side-main${skill || home || feed || none ? "" : " on"}${drop === "" ? " drop-on" : ""}`} data-drop-skill="" aria-pressed={!skill && !home && !feed && !none} onClick={() => onOpen(null)}>
         {marked && (
           <span className="mark" aria-hidden="true">
-            <Stack size={15} weight={!skill && !home && !feed ? "fill" : "regular"} />
+            <Stack size={15} weight={!skill && !home && !feed && !none ? "fill" : "regular"} />
           </span>
         )}
         <span className="label">All sources</span>
       </button>
+      {(loose || none) && (
+        <button className={`side-item side-main${none ? " on" : ""}`} aria-pressed={none} onClick={onNoSkill}>
+          {marked && (
+            <span className="mark" aria-hidden="true">
+              <FileText size={15} weight={none ? "fill" : "regular"} />
+            </span>
+          )}
+          <span className="label">No skill</span>
+        </button>
+      )}
       <DndContext sensors={sensors} collisionDetection={collide} onDragStart={onDragStart} onDragOver={onDragOver} onDragEnd={onDragEnd} onDragCancel={onDragCancel}>
         <SortableContext items={shown.map((g) => groupId(g.collection))} strategy={verticalListSortingStrategy}>
           {shown.map((g) => (

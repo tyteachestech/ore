@@ -185,7 +185,7 @@ async function enrichOnce(lib: Library, ref: string, now: Date): Promise<EnrichR
   const all = loadSkills(lib).skills;
   // The AI never files under an archived skill (D173), unless the source already is.
   const skills = all.filter((s) => !s.archived || item.meta.skills.includes(s.id));
-  const cap = item.meta.skills.length && cardPriority(item.meta.skills, all) === "P3" ? LIGHT_PLAN_CAP : PLAN_CAP;
+  const cap = (item.meta.skills.length || item.meta.priority) && cardPriority(item.meta.skills, all, item.meta.priority) === "P3" ? LIGHT_PLAN_CAP : PLAN_CAP;
   const topics = listTopics(lib);
   const pendingIds = new Set(pending.map((a) => a.id));
   const plain = pending.filter((a) => a.intent === "keep");

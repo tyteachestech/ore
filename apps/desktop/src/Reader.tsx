@@ -38,8 +38,9 @@ import { clickBelow, SidePanel, SidePanelFrame, SourceNoteBody, useSourceNote, t
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
-import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type CardSkills, type ChapterFeedback, type Doc, type Intent, type Item, type Skill } from "./ore";
+import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type CardSkills, type ChapterFeedback, type Doc, type Intent, type Item, type Priority, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
+import { sourceImportanceActions } from "./importance";
 import { chunks, pageChunks, pageOf, footnotes, hitTest, holderOf as holding, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, wholeMath, type TextIndex } from "./text";
 import { alignWords, skeletonRange, wordAtOffset, wordAtTime } from "./transcript";
 import { byTime, topLevel } from "./sections";
@@ -600,9 +601,6 @@ type Props = {
   known?: { title: string; author?: string };
   /** A post open beside the Feed (D289): J and K open the next and previous post. */
   onStep?: (by: 1 | -1) => void;
-  /** Just added with no skill (D109): the skill picker opens with the source. */
-  pickSkill?: boolean;
-  onPicked?: () => void;
   skills: Skill[];
   finishing: boolean;
   setFinishing: (on: boolean) => void;
@@ -632,6 +630,10 @@ type Props = {
   /** Whether the open source has sound of its own (a video or a recording): the menu bar greys out Listen there. */
   onSound?: (sound: boolean) => void;
   onPin: (item: Item) => void;
+  /** The importance he set on the source, as the app's list has it now (after an undo, or a write that failed). */
+  priority?: Priority;
+  /** Sets how much the source matters, over its skills' importance ("" hands it back): the Mac's menus. */
+  onImportance?: (item: Item, p: Priority | "") => void;
   onMove: (item: Item, to: Item["status"]) => void;
   /** A highlight to scroll to once the text is ready (a question on the skill page, D47), or
    *  `q:start:end[:n]`, a quote a card or citation points to (D99; n a count, so a repeat click jumps again), or a ⌘K match: `find:<words>` in the text (the find
@@ -3361,6 +3363,14 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
               })),
             }]
           : []),
+        ...(p.onImportance
+          ? [{
+              id: "importance",
+              label: "Importance",
+              run: () => {},
+              sub: sourceImportanceActions({ skills: doc.skills, priority: p.priority }, p.skills, (level) => p.onImportance!({ ...doc, priority: p.priority }, level)),
+            }]
+          : []),
         ...(focus ? [{ id: "highlight", label: "Highlight focused text", hint: label(keys.highlight), paletteOnly: true, run: () => highlightFocus("keep") }] : []),
         // The open highlight's own tools, also in ⌘K (three ways to every action); its popup has the buttons.
         ...(popup && !PHONE
@@ -3686,7 +3696,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                   {PHONE ? (
                     doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)
                   ) : (
-                    <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => void fileUnder(next, k)} onCreate={createSkill} startOpen={p.pickSkill} onClosed={p.onPicked} blank="Skill">
+                    <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => void fileUnder(next, k)} onCreate={createSkill} blank="Skill">
                       {doc.skills.length > 0 &&
                         doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)}
                     </SkillPicker>

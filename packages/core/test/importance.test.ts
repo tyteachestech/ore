@@ -5,7 +5,8 @@ import { writeNewCard } from "../src/cards.ts";
 import { addSnippet, addSource, addText } from "../src/ingest/index.ts";
 import { paths } from "../src/library.ts";
 import { acceptSuggestedSkill, addSkill, archiveSkill, cardPriority, desiredRetention, loadSkills, setItemSkills, setSkillLook } from "../src/skills.ts";
-import { updateItemMeta } from "../src/items.ts";
+import { findItem, setItemPriority, updateItemMeta } from "../src/items.ts";
+import { openIndex } from "../src/db.ts";
 import { dueQueue } from "../src/study.ts";
 import { today } from "../src/today.ts";
 import { tempLibrary } from "./helpers.ts";
@@ -95,5 +96,62 @@ describe("skill importance (D173)", () => {
     expect(loadSkills(lib).skills.find((s) => s.id === "habits")!.archived).toBe(true);
     await addSnippet(lib, { text: "Tiny habits start small.", skills: ["habits"] });
     expect(loadSkills(lib).skills.find((s) => s.id === "habits")!.archived).toBeUndefined();
+  });
+});
+
+// A source's own importance (Tyler, 2026-11-22): set by him it wins over its skills', else its exercises
+// take the highest of their skills', else Normal. Nothing is copied onto the source.
+describe("a source's own importance", () => {
+  test("his own setting wins, either way; unset, the skills' highest; with no skill, Normal", () => {
+    const skills = [{ id: "a", name: "A", priority: "P1" as const }, { id: "b", name: "B", priority: "P3" as const }];
+    expect(cardPriority([], skills)).toBe("P2");
+    expect(cardPriority(["b"], skills)).toBe("P3");
+    expect(cardPriority(["a", "b"], skills)).toBe("P1");
+    expect(cardPriority([], skills, "P1")).toBe("P1"); // no skill, and it matters
+    expect(cardPriority(["a"], skills, "P3")).toBe("P3"); // a light read inside a Focus skill
+    expect(desiredRetention([], skills, "P1")).toBe(0.92);
+    expect(desiredRetention(["a"], skills, "P3")).toBe(0.8);
+  });
+
+  test("it is set, read back, refused when it isn't a level, and handed back to the skills", async () => {
+    const { lib, item } = await setup();
+    expect((await setItemPriority(lib, item.meta.id, "p1")).priority).toBe("P1");
+    expect(findItem(lib, item.meta.id).meta.priority).toBe("P1");
+    await expect(setItemPriority(lib, item.meta.id, "high")).rejects.toThrow(/P1 \(Focus\), P2 \(Normal\), P3 \(Light\)/);
+    expect((await setItemPriority(lib, item.meta.id, "")).priority).toBeUndefined();
+    expect(readFileSync(findItem(lib, item.meta.id).docPath, "utf8")).not.toContain("priority:");
+  });
+
+  test("a source with no skill, set to Focus, has its exercises ranked and kept as Focus", async () => {
+    const { lib, item, mk } = await setup();
+    const card = mk("What does positioning pick?", []);
+    const of = () => dueQueue(lib, tomorrow()).find((e) => e.id === card.meta.id)!.priority;
+    const kept = () => {
+      const index = openIndex(lib);
+      try {
+        return index.cards().find((c) => c.id === card.meta.id)!.retention;
+      } finally {
+        index.db.close();
+      }
+    };
+    expect(of()).toBe("P2");
+    expect(kept()).toBe(0.88);
+    await setItemPriority(lib, item.meta.id, "P1");
+    expect(of()).toBe("P1");
+    expect(kept()).toBe(0.92);
+  });
+
+  test("a skill's importance changing moves the sources that follow it, and leaves one he set", async () => {
+    const { lib, item, mk } = await setup();
+    const { item: other } = await addSnippet(lib, { text: "A second source, set by hand." });
+    await setItemSkills(lib, item.meta.id, ["habits"]);
+    await setItemSkills(lib, other.meta.id, ["habits"]);
+    const follows = mk("Follows its skill?", ["habits"]);
+    const set = writeNewCard(lib, { kind: "card", item: other.meta.id, skills: ["habits"], topics: [], content_type: "fact", question: "Set by hand?", answer: "A", rubric: [] });
+    await setItemPriority(lib, other.meta.id, "P2");
+    const of = (id: string) => dueQueue(lib, tomorrow()).find((e) => e.id === id)!.priority;
+    expect([of(follows.meta.id), of(set.meta.id)]).toEqual(["P3", "P2"]);
+    await setSkillLook(lib, "habits", { priority: "P1" });
+    expect([of(follows.meta.id), of(set.meta.id)]).toEqual(["P1", "P2"]);
   });
 });

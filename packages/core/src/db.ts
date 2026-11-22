@@ -9,17 +9,17 @@ import { ID_END, readItemDir } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 import { readReviews, type FsrsState, type Review } from "./reviews.ts";
 import { loadParams, replay } from "./scheduler.ts";
-import { desiredRetention, loadSkills } from "./skills.ts";
+import { desiredRetention, loadSkills, type Priority } from "./skills.ts";
 
 // .index/library.sqlite is a disposable cache of the files: FTS5 search plus
 // card states replayed from the review log. Every open syncs it by comparing
 // file mtimes and sizes, so direct file edits by agents are picked up.
-const SCHEMA_VERSION = "8"; // 5: card_state.sig, so a new review replays only its own card; 6: rebuilt once to drop doubled search rows; 7: again, for rows from copied folders; 8: fts.chars, words inside Chinese, Japanese and Thai
+const SCHEMA_VERSION = "9"; // 9: items.priority, the importance he set on a source; 5: card_state.sig, so a new review replays only its own card; 6: rebuilt once to drop doubled search rows; 7: again, for rows from copied folders; 8: fts.chars, words inside Chinese, Japanese and Thai
 
 const SCHEMA = `
 create table meta(key text primary key, value text);
 create table files(path text primary key, kind text, mtime real, size integer);
-create table items(id text primary key, path text, title text, type text, status text, skills text, topics text, finished_at text, enriched_at text, archived integer);
+create table items(id text primary key, path text, title text, type text, status text, skills text, topics text, finished_at text, enriched_at text, archived integer, priority text);
 create table cards(id text primary key, path text, kind text, state text, item text, annotation text, from_notes integer, content_type text, skills text, topics text, question text, created text);
 create table card_state(id text primary key, retention real, fsrs text, due text, reps integer, sig text);
 create virtual table fts using fts5(kind unindexed, ref unindexed, item unindexed, title, body, chars);
@@ -83,6 +83,8 @@ export interface ItemRow {
   topics: string[];
   finished_at: string | null;
   enriched_at: string | null;
+  /** The importance he set on it himself (P1–P3), over its skills'. */
+  priority: Priority | null;
 }
 
 /** The text around a word found in `chars`, marked as the index marks its own hits (its snippet would be of the spaced letters). */
@@ -271,8 +273,8 @@ function indexFile(db: Database, lib: Library, f: FileStat): void {
   if (f.kind === "doc") {
     const item = readItemDir(dir);
     const m = item.meta;
-    db.run("insert or replace into items values (?,?,?,?,?,?,?,?,?,?)", [
-      m.id, relative(lib.root, f.path), m.title, m.type, m.status, JSON.stringify(m.skills), JSON.stringify(m.topics), m.finished_at ?? null, m.enriched_at ?? null, m.archived_at ? 1 : 0,
+    db.run("insert or replace into items values (?,?,?,?,?,?,?,?,?,?,?)", [
+      m.id, relative(lib.root, f.path), m.title, m.type, m.status, JSON.stringify(m.skills), JSON.stringify(m.topics), m.finished_at ?? null, m.enriched_at ?? null, m.archived_at ? 1 : 0, m.priority ?? null,
     ]);
     addFts(db, ["item", m.id, m.id, m.title, item.body]);
   } else if (f.kind === "ann") {
@@ -333,11 +335,11 @@ function recomputeStates(db: Database, lib: Library): void {
     else byCard.set(r.card, [r]);
   }
   const stored = new Map(db.query<{ id: string; sig: string | null }, []>("select id, sig from card_state").all().map((r) => [r.id, r.sig]));
-  const rows = db.query<{ id: string; skills: string }, []>("select id, skills from cards").all();
+  const rows = db.query<{ id: string; skills: string; own: Priority | null }, []>("select c.id, c.skills, i.priority as own from cards c left join items i on i.id = c.item").all();
   const keep = new Set<string>();
   for (const row of rows) {
     keep.add(row.id);
-    const retention = desiredRetention(JSON.parse(row.skills), skills);
+    const retention = desiredRetention(JSON.parse(row.skills), skills, row.own);
     const own = byCard.get(row.id) ?? [];
     const sig = Bun.hash(`${retention}|${w?.join(",") ?? ""}|${own.map((r) => `${r.ts}:${r.rating}`).sort().join(",")}`).toString(36);
     if (stored.get(row.id) === sig) continue;
@@ -368,14 +370,18 @@ export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncRepo
   const report: SyncReport = { changed: changed.length, removed: removed.length, errors: [] };
   if (changed.length || removed.length) {
     db.transaction(() => {
+      // A write comes first so this process holds the lock before it looks: a read that another process
+      // then wrote past would fail the transaction instead of waiting its turn.
+      db.run("delete from files where path = ''");
+      // The sources he set an importance on: a change there moves their cards' retention, as a skill's does.
+      const set = () => db.query<{ p: string }, []>("select coalesce(group_concat(id || priority), '') as p from (select id, priority from items where priority is not null order by id)").get()!.p;
+      const before = set();
       for (const k of removed) {
         dropFile(db, lib, k.path, k.kind);
         db.run("delete from files where path = ?", [k.path]);
       }
       // An empty index has no rows to drop, and each drop scans the whole search table: on a first build they cost
-      // most of its time (F84). The write comes first so this process holds the lock before it
-      // looks: a read that another process then wrote past would fail the transaction instead of waiting its turn.
-      db.run("delete from files where path = ''");
+      // most of its time (F84).
       const fresh = !db.query("select 1 where exists (select 1 from fts) or exists (select 1 from items) or exists (select 1 from cards)").get();
       for (const f of changed) {
         // Otherwise always, not only for files this process saw before: several `ore` processes sync at once (the
@@ -388,7 +394,7 @@ export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncRepo
         }
         db.run("insert or replace into files values (?,?,?,?)", [f.path, f.kind, f.mtime, f.size]);
       }
-      if ([...changed, ...removed].some((f) => f.kind === "card" || f.kind === "review" || f.kind === "config")) recomputeStates(db, lib);
+      if ([...changed, ...removed].some((f) => f.kind === "card" || f.kind === "review" || f.kind === "config") || set() !== before) recomputeStates(db, lib);
     })();
   }
   return { index: new LibraryIndex(db, lib), report };

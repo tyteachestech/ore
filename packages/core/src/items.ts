@@ -100,6 +100,9 @@ export const ItemMetaSchema = z.object({
   preview: z.string().optional(),
   course: CourseRef.optional(),
   skills: z.array(z.string()).default([]),
+  // How much this source matters, when he set it himself (P1 Focus, P2 Normal, P3 Light): it wins over its
+  // skills' importance for the source's exercises. Unset, they follow the skills (`cardPriority`).
+  priority: z.enum(["P1", "P2", "P3"]).optional(),
   suggested_skill: SuggestedSkill.optional(),
   topics: z.array(z.string()).default([]),
   prequestions: z.array(Prequestion).optional(),
@@ -341,6 +344,20 @@ export async function renameItem(lib: Library, id: string, title: string): Promi
   const t = oneLine(title);
   if (!t) throw new Error("a source needs a title");
   return updateItemMeta(lib, id, (m) => ({ ...m, title: t }));
+}
+
+/** Sets how much a source matters by hand (P1 Focus, P2 Normal, P3 Light), over its skills' importance;
+ *  empty hands it back to its skills. */
+export async function setItemPriority(lib: Library, id: string, priority: string): Promise<ItemMeta> {
+  const p = checkPriority(priority);
+  return updateItemMeta(lib, id, (m) => ({ ...m, priority: p }));
+}
+
+/** A source's own importance as typed ("p1", "P3", ""), or why it can't be one. */
+export function checkPriority(priority: string): ItemMeta["priority"] {
+  const p = priority.trim().toUpperCase();
+  if (p && p !== "P1" && p !== "P2" && p !== "P3") throw new Error('priority must be P1 (Focus), P2 (Normal), P3 (Light) or "" (as its skills)');
+  return (p || undefined) as ItemMeta["priority"];
 }
 
 /** Sets a source's author by hand (one line); empty clears it. */
