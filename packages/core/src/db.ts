@@ -370,6 +370,9 @@ export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncRepo
   const report: SyncReport = { changed: changed.length, removed: removed.length, errors: [] };
   if (changed.length || removed.length) {
     db.transaction(() => {
+      // A write comes first so this process holds the lock before it looks: a read that another process
+      // then wrote past would fail the transaction instead of waiting its turn.
+      db.run("delete from files where path = ''");
       // The sources he set an importance on: a change there moves their cards' retention, as a skill's does.
       const set = () => db.query<{ p: string }, []>("select coalesce(group_concat(id || priority), '') as p from (select id, priority from items where priority is not null order by id)").get()!.p;
       const before = set();
@@ -378,9 +381,7 @@ export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncRepo
         db.run("delete from files where path = ?", [k.path]);
       }
       // An empty index has no rows to drop, and each drop scans the whole search table: on a first build they cost
-      // most of its time (F84). The write comes first so this process holds the lock before it
-      // looks: a read that another process then wrote past would fail the transaction instead of waiting its turn.
-      db.run("delete from files where path = ''");
+      // most of its time (F84).
       const fresh = !db.query("select 1 where exists (select 1 from fts) or exists (select 1 from items) or exists (select 1 from cards)").get();
       for (const f of changed) {
         // Otherwise always, not only for files this process saw before: several `ore` processes sync at once (the
