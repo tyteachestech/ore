@@ -88,9 +88,16 @@ export function reopenSession(lib: Library, id: string): Promise<void> {
 
 // The last session started lives in .ore/session: a review given no session attaches to it. Two windows
 // can each have one open (the main window and the quick quiz, D76), so the app names its own by id.
+// Read without the lock (a review asks which session it belongs to), so the file may go between a check and the read:
+// an end in another window, or the one before it, removing it (CI, a review that opened on "ENOENT … .ore/session").
+// Gone is the same as none.
 export function openSessionId(lib: Library): string | null {
-  const p = paths.openSession(lib);
-  return existsSync(p) ? readFileSync(p, "utf8").trim() || null : null;
+  try {
+    return readFileSync(paths.openSession(lib), "utf8").trim() || null;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw e;
+  }
 }
 
 // Starting, ending and reopening read and write .ore/session under the library lock, so one window's
