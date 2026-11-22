@@ -408,7 +408,13 @@ function AddTry({ onAdd, onClose }: { onAdd: (plan: string, when: string) => Pro
   const [when, setWhen] = useState("");
   const first = useRef<HTMLTextAreaElement>(null);
   useFocusWhileMounted(first, () => document.querySelector<HTMLElement>(".forge-head .icon-btn"));
-  const add = () => plan.trim() && void onAdd(plan.trim(), when.trim()).then((ok) => ok && onClose());
+  // One add at a time: a double-click or a second Enter while it is out would make the try twice.
+  const adding = useRef(false);
+  const add = () => {
+    if (!plan.trim() || adding.current) return;
+    adding.current = true;
+    void onAdd(plan.trim(), when.trim()).then((ok) => (ok ? onClose() : (adding.current = false)));
+  };
   const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     keepKeysIn(e);
     if (e.key === "Enter" && !e.shiftKey) {

@@ -2000,13 +2000,15 @@ export function Review(props: Parameters<typeof Session>[0]) {
   if (!t) return <Session {...props} />;
   const save = async (text: string, mine: boolean) => {
     const use = useOf(t, text, mine);
+    // On the history at once: a ⌘Z while the write is out takes back this use, not the step before it.
+    const write = use.run();
+    props.notify(use.msg, "quiet", use.undo, use.run).hold(write);
     try {
-      await use.run();
+      await write;
     } catch (e) {
       props.notify(errorText(e), "error");
       return false;
     }
-    props.notify(use.msg, "quiet", use.undo, use.run);
     if (text) askMole(t.id);
     return true;
   };

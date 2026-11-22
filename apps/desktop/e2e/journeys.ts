@@ -8963,11 +8963,43 @@ journey("forge: a try typed with the pointer is added with its Add button (Codex
   const add = page.locator(".forge-add").getByRole("button", { name: "Add", exact: true });
   if (!(await add.isDisabled())) throw new Error("Add is live with nothing typed");
   await page.getByLabel("I’ll…").fill("Hum the tune before writing it down");
+  await hold(page, "try");
   await add.click();
+  await until("the add's write is out", () => isHeld(page, "try"));
+  await add.click({ timeout: 1000 }).catch(() => {}); // a double-click, or a second Enter
+  await release(page, "try");
   const row = page.locator(".forge-row").filter({ hasText: "Hum the tune before writing it down" });
-  await row.waitFor();
-  const t = ((await ore("tries", "--skill", "creativity")) as { id: string; note?: string }[]).find((x) => x.note === "Hum the tune before writing it down");
-  if (t) await ore("annotate", t.id, "--status", "deleted");
+  await row.first().waitFor();
+  await page.waitForLoadState("networkidle");
+  const made = ((await ore("tries", "--skill", "creativity")) as { id: string; note?: string }[]).filter((x) => x.note === "Hum the tune before writing it down");
+  for (const t of made) await ore("annotate", t.id, "--status", "deleted");
+  if (made.length !== 1) throw new Error(`one Add made ${made.length} tries`);
+});
+
+journey("review: ⌘Z while the check-in's use is being saved takes back that use (code review of the Codex UX sweep)", async (page) => {
+  const mine = (await ore("try", "--skill", "habits", "--plan", "Stretch at the kettle", "--when", "the kettle boils")) as { id: string };
+  try {
+    await page.evaluate(() => localStorage.setItem("e2e.check-in", "1"));
+    for (const t of (await ore("tries", "--now")) as { id: string }[]) if (t.id !== mine.id) await ore("try", t.id, "--pick");
+    await page.clock.install({ time: new Date(Date.now() + 26 * 3600e3) });
+    await page.reload();
+    await page.locator(".side-item").first().waitFor();
+    await startReview(page, null, false, "check-in");
+    await page.locator(".checkin").filter({ hasText: "Stretch at the kettle" }).waitFor();
+    await page.getByLabel("How did it go?").fill("Did it twice.");
+    await hold(page, "tried");
+    await page.keyboard.press("Enter");
+    await until("the use's write is out", () => isHeld(page, "tried"));
+    await page.keyboard.press("Meta+z");
+    const landed = answered(page, "tried");
+    await release(page, "tried");
+    await landed;
+    await Bun.sleep(300); // an Undo that waited for it runs now
+    await until("⌘Z took back the use", async () => !((await ore("tries", "--skill", "habits")) as TryRec[]).find((t) => t.id === mine.id)?.uses?.length);
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("annotate", mine.id, "--status", "deleted");
+  }
 });
 
 /** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
@@ -16783,7 +16815,14 @@ journey("phone: a link typed into Add a link and left with a tap outside is ther
   await tap(page, page.getByRole("button", { name: "Add a link" }));
   const v = await page.locator(".add-link input.field").inputValue();
   if (v !== "https://example.com/learning-on-the-bus") throw new Error(`the link he typed is gone: "${v}"`);
-  await page.locator(".add-link input.field").fill("");
+  await page.keyboard.press("Escape");
+  // Kept for where it was typed: a skill's own Add a link (which files it there) opens empty.
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
+  await tap(page, page.getByRole("button", { name: "Add a source to Learning" }));
+  const there = await page.locator(".add-link input.field").inputValue();
+  if (there) throw new Error(`a link typed on Today came back on a skill's page, to be filed there: "${there}"`);
   await page.keyboard.press("Escape");
 }, "phone");
 
