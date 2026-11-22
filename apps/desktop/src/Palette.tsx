@@ -141,6 +141,8 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
     setPage(p);
     setQ("");
     setError(null);
+    // A row clicked with the pointer took focus to the list: the next page's typing goes in its field.
+    inputRef.current?.focus();
   };
 
   const create = async (name: string) => {

@@ -1704,6 +1704,15 @@ function Tally({ tiles, go, onDone }: { tiles: Tile[]; go: boolean; onDone: () =
 /** The end of a session (D62): the ring fills by this session's minutes and bursts if it closed
  *  just now, a skill that went up a level says so, and the count is of memories kept, never a score. */
 export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end: End; skills: Skill[]; quick?: boolean; onDone: () => void; onAgain: () => void; onDig?: (skill: string) => void }) {
+  // The screen opens at its top, with Done holding the keys: on a short phone it is taller than the window, and the
+  // scroll the last exercise left (its rating buttons at the foot) and a plain autoFocus on Done opened it past the
+  // goal line and the mole (Codex UX sweep).
+  const done = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const body = done.current?.closest(".review-body");
+    if (body) body.scrollTop = 0;
+    done.current?.focus({ preventScroll: true });
+  }, []);
   const { session: s, today: t, before: b } = end;
   const part = (x: Today | null) => (!x ? 0 : x.met ? 1 : x.goal_ms ? x.active_ms / x.goal_ms : 0);
   const closed = t.met && !!b && !b.met;
@@ -1931,7 +1940,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           </button>
         )}
         <Hint text={<>Done <kbd>↵</kbd></>}>
-          <button className="pill-btn quiz-go" autoFocus onClick={onDone}>
+          <button ref={done} className="pill-btn quiz-go" onClick={onDone}>
             Done
           </button>
         </Hint>

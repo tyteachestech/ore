@@ -138,16 +138,19 @@ export function useTries(skill: string, notify: Notify) {
     };
   }, [skill, notify, changes]);
 
+  // On the history at once, as the change is asked: a ⌘Z while its write is out takes back this step, not the one
+  // before it (which, after an add, removed the whole try). Its Undo waits for the write; one that fails is taken off.
   const step = async (msg: string, run: () => Promise<unknown>, undo: () => Promise<unknown>, kind: "quiet" | "info" = "quiet") => {
+    const write = run();
+    notify(msg, kind, () => undo().then(reload), () => run().then(reload)).hold(write);
     try {
-      await run();
+      await write;
     } catch (e) {
       notify(errorText(e), "error");
       return false;
     }
     // The write stands even if the re-read fails: he can undo it, and a second Enter must not write it twice.
     await reload().catch((e) => notify(errorText(e), "error"));
-    notify(msg, kind, () => undo().then(reload), () => run().then(reload));
     return true;
   };
   const active = ts?.find((t) => t.active);
@@ -193,7 +196,14 @@ export function Did({ t, onSave, onClose, skip }: { t: Try; onSave: (text: strin
   useEffect(() => void (home.current = field.current?.closest<HTMLElement>("[data-try]") ?? null), []);
   useFocusWhileMounted(field, () => (home.current?.isConnected ? home.current.querySelector<HTMLElement>("button") : null));
   // A save that fails leaves the box open with every word.
-  const save = (mine: boolean) => void onSave(v.trim(), mine).then((ok) => ok && (drafts.delete(t.id), onClose()));
+  // One save at a time: a second press while the first is out would write the same use twice. Its toast shows at
+  // once; the buttons stay enabled so focus stays on the one he pressed if the save fails.
+  const saving = useRef(false);
+  const save = (mine: boolean) => {
+    if (saving.current) return;
+    saving.current = true;
+    void onSave(v.trim(), mine).then((ok) => (ok ? (drafts.delete(t.id), onClose()) : (saving.current = false)));
+  };
   const canMine = usesOf(t) >= MINE_FROM;
   return (
     <div className="try-did">
@@ -392,18 +402,18 @@ export function Forge({ skill, tries, onSub }: { skill: Skill; tries: Tries; onS
   );
 }
 
-/** A try typed here, with no passage behind it: what he'll do, and when. Enter adds it, Esc closes. */
+/** A try typed here, with no passage behind it: what he'll do, and when. Enter or Add adds it, Esc closes. */
 function AddTry({ onAdd, onClose }: { onAdd: (plan: string, when: string) => Promise<boolean>; onClose: () => void }) {
   const [plan, setPlan] = useState("");
   const [when, setWhen] = useState("");
   const first = useRef<HTMLTextAreaElement>(null);
   useFocusWhileMounted(first, () => document.querySelector<HTMLElement>(".forge-head .icon-btn"));
+  const add = () => plan.trim() && void onAdd(plan.trim(), when.trim()).then((ok) => ok && onClose());
   const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     keepKeysIn(e);
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (!plan.trim()) return;
-      void onAdd(plan.trim(), when.trim()).then((ok) => ok && onClose());
+      add();
     } else if (e.key === "Escape") {
       e.preventDefault();
       onClose();
@@ -413,6 +423,10 @@ function AddTry({ onAdd, onClose }: { onAdd: (plan: string, when: string) => Pro
     <div className="forge-add">
       <Grow ref={first} className="field" aria-label="I’ll…" placeholder="I’ll…" value={plan} onChange={(e) => setPlan(e.target.value)} onKeyDown={keys} />
       <Grow className="field" aria-label="When…" placeholder="when…" value={when} onChange={(e) => setWhen(e.target.value)} onKeyDown={keys} />
+      {/* The pointer's way to add it, as the Add box's ↵ Add is (F306). */}
+      <Hint text={<>Add <kbd>↵</kbd></>}>
+        <button className="settings-btn" disabled={!plan.trim()} onClick={add}>Add</button>
+      </Hint>
     </div>
   );
 }

@@ -14,20 +14,28 @@ const PICKED = "image/*,.pdf,.epub,.md,.markdown,.txt,.html,.htm,.docx,.pptx,.rt
 
 export type Waiting = { id: string; url: string; skills: string[]; error?: string };
 
+/** A link typed and left with a tap outside, a swipe down or Esc: the sheet opens with it selected, so Add takes it
+ *  and typing replaces it, as the Mac's Add box keeps his words (D342). In memory only: gone once it goes in. */
+let left = "";
+
 /** `skill`: added from a skill's page, it is filed there. */
 export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: () => void; onAdded: () => void }) {
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(left);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const box = useRef<HTMLFormElement>(null);
   const field = useRef<HTMLInputElement>(null);
   useSwipeDown(box, onClose, true);
-  useEffect(() => field.current?.focus(), []);
+  useEffect(() => {
+    field.current?.focus();
+    field.current?.select();
+  }, []);
   const add = async () => {
     if (!url.trim() || busy) return;
     setBusy(true);
     try {
       await ore("inbox", "--add", url.trim(), ...(skill ? ["--skill", skill] : []));
+      left = "";
       onAdded();
       onClose();
     } catch (e) {
@@ -68,7 +76,7 @@ export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: 
             aria-describedby={error ? "add-link-error" : undefined}
             value={url}
             readOnly={busy}
-            onChange={(e) => (setUrl(e.target.value), setError(null))}
+            onChange={(e) => (setUrl(e.target.value), (left = e.target.value), setError(null))}
           />
           {error && <p className="phone-error" id="add-link-error" role="alert">{error}</p>}
           <button className="pill-btn" type="submit" disabled={!url.trim() || busy}>

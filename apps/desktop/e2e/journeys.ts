@@ -4905,6 +4905,18 @@ journey("⌘K: New skill… opens the sidebar's name field at the top, in no col
   await page.keyboard.press("Escape");
 });
 
+journey("⌘K: New collection… clicked with the pointer puts the caret in its name field (Codex UX sweep)", async (page) => {
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("New collection");
+  await page.getByRole("option", { name: "New collection…" }).click();
+  await until("the name field has the caret", () => page.getByRole("dialog", { name: "Command palette" }).locator("input").evaluate((e) => e === document.activeElement).catch(() => false));
+  await page.keyboard.type("Research A");
+  const v = await page.getByRole("dialog", { name: "Command palette" }).locator("input").inputValue();
+  if (v !== "Research A") throw new Error(`typed into nothing: the field holds "${v}"`);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+});
+
 journey("sidebar: New collection “Other” names a skill among the ungrouped ones, in the sidebar and in ⌘K", async (page) => {
   const box = (await page.locator(".sidebar").boundingBox())!;
   await page.mouse.click(box.x + box.width / 2, box.y + box.height - 20, { button: "right" });
@@ -8886,6 +8898,76 @@ journey("forge: a try typed with no passage waits, Try this now swaps it in, and
   await page.locator(".forge-row").first().waitFor();
   await back.click();
   await page.locator(".skill-hero").waitFor();
+});
+
+/** A try he types into the Forge of `skill`, opened on its own page; returns its id. */
+async function newTry(page: Page, skill: string, plan: string) {
+  await page.locator(".sidebar .side-item", { hasText: new RegExp(`^${skill}$`) }).first().click();
+  await page.getByRole("button", { name: "Forge" }).click();
+  await page.getByRole("button", { name: "Add something to try" }).click();
+  await page.getByLabel("I’ll…").fill(plan);
+  await page.keyboard.press("Enter");
+  await page.locator(".forge-row").filter({ hasText: plan }).locator(".forge-open").click();
+  return (await page.locator(".try-page").getAttribute("data-try"))!;
+}
+type TryRec = { id: string; when?: string; uses?: unknown[] };
+const tryById = async (id: string) => ((await ore("tries", "--skill", "creativity")) as TryRec[]).find((t) => t.id === id);
+
+journey("forge: ⌘Z while a plan edit is still being written takes back that edit, never the try (Codex UX sweep)", async (page) => {
+  const id = await newTry(page, "Creativity", "Sketch one idea before lunch");
+  try {
+    await hold(page, "try");
+    const when = page.locator(".plan-line", { hasText: /^When/ }).locator("textarea");
+    await when.click();
+    await page.keyboard.type("After breakfast");
+    await page.keyboard.press("Enter");
+    await until("the plan's write is out", () => isHeld(page, "try"));
+    await page.keyboard.press("Meta+z");
+    await release(page, "try");
+    await until("the When edit is taken back", async () => (await tryById(id))?.when === "" || (await tryById(id))?.when === undefined);
+    if (!(await tryById(id))) throw new Error("⌘Z took the whole try away");
+    await page.locator(".try-page").waitFor();
+  } finally {
+    await page.locator(".sidebar .side-item").first().click().catch(() => {});
+    await ore("annotate", id, "--status", "deleted");
+  }
+});
+
+journey("forge: Again pressed twice while its use is being saved keeps one use (Codex UX sweep)", async (page) => {
+  const id = await newTry(page, "Creativity", "Write three bad first lines");
+  try {
+    const go = page.getByRole("button", { name: "Try this now" });
+    if (await go.count()) await go.click();
+    await page.getByRole("button", { name: "I did it" }).first().click();
+    await page.getByLabel("How did it go?").fill("Two were usable.");
+    await hold(page, "tried");
+    const again = page.getByRole("button", { name: "Again" });
+    await again.click();
+    await until("the use's write is out", () => isHeld(page, "tried"));
+    await again.click({ timeout: 1000 }).catch(() => {});
+    await release(page, "tried");
+    await until("the use is saved", async () => ((await tryById(id))?.uses?.length ?? 0) > 0);
+    await Bun.sleep(500);
+    const n = (await tryById(id))?.uses?.length;
+    if (n !== 1) throw new Error(`one use was saved ${n} times`);
+  } finally {
+    await page.locator(".sidebar .side-item").first().click().catch(() => {});
+    await ore("annotate", id, "--status", "deleted");
+  }
+});
+
+journey("forge: a try typed with the pointer is added with its Add button (Codex UX sweep)", async (page) => {
+  await page.locator(".sidebar .side-item", { hasText: /^Creativity$/ }).first().click();
+  await page.getByRole("button", { name: "Forge" }).click();
+  await page.getByRole("button", { name: "Add something to try" }).click();
+  const add = page.locator(".forge-add").getByRole("button", { name: "Add", exact: true });
+  if (!(await add.isDisabled())) throw new Error("Add is live with nothing typed");
+  await page.getByLabel("I’ll…").fill("Hum the tune before writing it down");
+  await add.click();
+  const row = page.locator(".forge-row").filter({ hasText: "Hum the tune before writing it down" });
+  await row.waitFor();
+  const t = ((await ore("tries", "--skill", "creativity")) as { id: string; note?: string }[]).find((x) => x.note === "Hum the tune before writing it down");
+  if (t) await ore("annotate", t.id, "--status", "deleted");
 });
 
 /** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
@@ -16693,6 +16775,49 @@ journey("phone: a source's Collected page has its title, as Sources and Settings
   await collected.waitFor();
   await collected.getByRole("heading", { level: 1, name: "Collected" }).waitFor();
 }, "phone");
+journey("phone: a link typed into Add a link and left with a tap outside is there when it opens again (Codex UX sweep, D342)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  await page.locator(".add-link input.field").fill("https://example.com/learning-on-the-bus");
+  await page.mouse.click(195, 40); // the dimmed page above the sheet
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Add a link" }));
+  const v = await page.locator(".add-link input.field").inputValue();
+  if (v !== "https://example.com/learning-on-the-bus") throw new Error(`the link he typed is gone: "${v}"`);
+  await page.locator(".add-link input.field").fill("");
+  await page.keyboard.press("Escape");
+}, "phone");
+
+journey("phone: on a small phone the end screen opens at its top, its first lines in sight (Codex UX sweep)", async (page) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.reload(); // a phone this size from the start: a window shrunk after load reads as the keyboard coming up
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
+  for (let i = 0; ; i++) {
+    if (i > 20) throw new Error("the review never ended");
+    const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
+    await sure.or(page.locator(".phone-full .review-end")).first().waitFor();
+    if (!(await sure.count())) break;
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    const rating = page.locator(".phone-full button:visible").filter({ hasText: /^Good/ });
+    await rating.waitFor();
+    await tap(page, rating);
+    await rating.waitFor({ state: "detached" }).catch(() => {});
+  }
+  const end = page.locator(".phone-full .review-end");
+  await end.waitFor();
+  await Bun.sleep(1500); // its rise and the count settle
+  const top = await end.evaluate((e) => {
+    let s: HTMLElement | null = e as HTMLElement;
+    while (s && s.scrollHeight <= s.clientHeight + 1) s = s.parentElement;
+    return { scrolled: s?.scrollTop ?? 0, first: (e.firstElementChild as HTMLElement | null)?.getBoundingClientRect().top ?? 0 };
+  });
+  if (top.scrolled > 1 || top.first < 0) throw new Error(`the end screen opened scrolled ${top.scrolled} pt down, its first line at y ${top.first}`);
+}, "phone");
+
 
 
 
