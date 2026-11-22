@@ -16,7 +16,7 @@ import { MoreButton } from "./Menu";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
-import { afterAnswer, cardQuotes, lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
+import { afterAnswer, cardQuotes, lastWin, ore, opt, PHONE, whileOut, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { tick } from "./phone/haptics";
 import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
 import { endMood, endSays, endTiles, endVoice, weeksAgo, type Tile } from "./end-says";
@@ -719,7 +719,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
    *  ⌘Z takes it back and ⇧⌘Z gives it again: the same rating, answer and time. Throws if the write fails. */
   const submit = async (args: string[], rating: number, elapsed: number, again?: { forget: Forget; setTs: (ts: string) => void }) => {
     const was = { queue: queue ?? [], done, activeMs: activeMs.current, off: new Set(putOffIds.current), won: wonLast.current, told: goalTold.current };
-    const r = await ore<{ ts: string }>("review", ...args);
+    const r = await whileOut(ore<{ ts: string }>("review", ...args));
     reviewed.current++;
     const id = args[0]!;
     // Answered: a miss's relearn pass is a new turn, not one he put off.
@@ -877,7 +877,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     dropAhead();
     setBusy(true);
     try {
-      await ore("card", "retire", card.id);
+      await whileOut(ore("card", "retire", card.id));
       const { id, state } = card;
       retired.current.add(id);
       drafts.delete(id); // what he typed goes with it

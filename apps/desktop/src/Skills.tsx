@@ -8,7 +8,7 @@ import { isOther } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
 import { onBackdrop, Trap } from "./Trap";
 import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
-import { ore, opt, type Skill, type SkillColor } from "./ore";
+import { ore, opt, whileOut, type Skill, type SkillColor } from "./ore";
 import { count, errorText, load, save, settleFocus, usable, useFocusWhileMounted, type Notify } from "./util";
 
 /** How skill tags show in lists (Settings → General): icon and name, or the icon alone for a small
@@ -359,7 +359,7 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
     const before = look;
     setLook((l) => ({ ...l, [key]: value }));
     try {
-      await ore("skills", "set", skill.id, opt(key, value));
+      await whileOut(ore("skills", "set", skill.id, opt(key, value)));
       onSaved();
       const what = { icon: "icon", color: "colour", collection: "collection" }[key];
       if (undoable && before[key] !== value) notify(`Changed the ${what} of ${skill.name}`, "quiet", () => set(key, before[key], false), () => set(key, value, false));

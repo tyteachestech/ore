@@ -247,7 +247,7 @@ export function CollectedPanel({ anns, timeOf, adding, onAdding, onEdit, addAsk,
   const row = (a: Annotation) => {
     const t = timeOf?.(a);
     return (
-      <WithMenu key={a.id} actions={actions && !PHONE ? () => actions(a) : []}>
+      <WithMenu key={a.id} hold actions={actions ? () => actions(a) : []}>
         <div className="cp-line">
           <button className={`cp-row${a.point ? " point" : ""}`} onClick={() => onJump(a.id)}>
             <span className="cp-text">{a.point || (a.note && a.intent !== "keep") ? a.note : passage(a.exact)}</span>

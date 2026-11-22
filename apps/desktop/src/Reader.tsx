@@ -38,7 +38,7 @@ import { clickBelow, SidePanel, SidePanelFrame, SourceNoteBody, useSourceNote, t
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
 import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
-import { INTENTS, ore, opt, PHONE, visible, type Annotation, type CardFull, type CardSkills, type ChapterFeedback, type Doc, type Intent, type Item, type Priority, type Skill } from "./ore";
+import { INTENTS, ore, opt, PHONE, visible, whileOut, type Annotation, type CardFull, type CardSkills, type ChapterFeedback, type Doc, type Intent, type Item, type Priority, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { sourceImportanceActions } from "./importance";
 import { chunks, pageChunks, pageOf, footnotes, hitTest, holderOf as holding, indexText, rangeFor, skeletonOffset, sourceHint, sourceQuote, sourceSkeleton, wholeMath, type TextIndex } from "./text";
@@ -1917,7 +1917,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     try {
       const made = ore<Annotation>("highlight", p.id, "--at", String(at), opt("note", line));
       wake(made);
-      const ann = await made;
+      const ann = await whileOut(made); // ⌘Z meanwhile waits for its step (F-new-undo-waits)
       keptFromFeed(ann);
       savedIds.current.set(tmp, ann.id); // so a read again landing before the swap doesn't list it twice
       setAnns((l) => l.map((a) => (a.id === tmp ? ann : a)));
@@ -2242,7 +2242,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     let rid = id;
     try {
       rid = await realId(id);
-      await annotateWaking(wake, rid, opt("note", note));
+      await whileOut(annotateWaking(wake, rid, opt("note", note)));
       unsavedNotes.delete(rid);
       if (undoable) p.notify(note ? "Highlight note saved" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
     } catch (e) {

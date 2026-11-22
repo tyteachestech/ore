@@ -28,7 +28,7 @@ import { Palette } from "../Palette";
 import { SkillEditor, sidebarGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
-import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, shareOpen, shareSkills, type CardSkills, type Item, type Skill, touched } from "../ore";
+import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, whileOut, shareOpen, shareSkills, type CardSkills, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -825,7 +825,7 @@ export function PhoneApp() {
     setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, status: to } : i)) ?? all);
     try {
       // Back to Done (an Undo): it keeps the finish date it had.
-      await ore("status", item.id, to, ...(to === "done" && item.status === "done" && item.finished_at ? [opt("at", item.finished_at)] : []));
+      await whileOut(ore("status", item.id, to, ...(to === "done" && item.status === "done" && item.finished_at ? [opt("at", item.finished_at)] : [])));
       if (undoable) notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => moveTo(item, item.status, false), () => moveTo(item, to, false));
     } catch (e) {
       // From the history (Undo or Redo): it puts the step back and says why.
@@ -837,7 +837,7 @@ export function PhoneApp() {
   };
   const refile = async (item: Item, next: string[], before: string[], changed?: Skill, cards?: CardSkills) => {
     try {
-      const r = await ore<{ cards_before?: CardSkills }>("edit", item.id, "--skills", next.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : []));
+      const r = await whileOut(ore<{ cards_before?: CardSkills }>("edit", item.id, "--skills", next.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : [])));
       // Undo gives each exercise back its own skills (Codex sweep 3).
       if (changed)
         notify(next.includes(changed.id) ? `Filed “${item.title}” under ${changed.name}` : `Removed “${item.title}” from ${changed.name}`, "info", () => refile(item, before, next, undefined, r?.cards_before), () => refile(item, next, before));
@@ -884,7 +884,7 @@ export function PhoneApp() {
     const set = (pinned_at: string | undefined) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at } : i)) ?? all);
     set(on ? new Date().toISOString() : undefined);
     try {
-      await ore("pin", item.id, ...(on ? [] : ["--undo"]));
+      await whileOut(ore("pin", item.id, ...(on ? [] : ["--undo"])));
       const flip = (now: boolean) => () => pin({ ...item, pinned_at: now ? "x" : undefined }, false);
       if (undoable) notify(on ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`, "quiet", flip(on), flip(!on));
     } catch (e) {

@@ -9072,6 +9072,97 @@ journey("tutor: New chat after a chat that could not be saved saves it first, an
   }
 });
 
+journey("Collected: ⌘Z while a new key point is being written takes back that one, never the point before (Codex UX sweep 3)", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const toggle = page.locator(".cp-head.card .cp-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  const add = async (t: string) => {
+    await page.getByRole("button", { name: "Add a key point" }).click();
+    await page.getByRole("textbox", { name: "Key point", exact: true }).fill(t);
+    await page.keyboard.press("Enter");
+  };
+  const row = (t: string) => page.locator(".cp-row").filter({ hasText: t });
+  await add("A baseline point to keep");
+  await row("A baseline point to keep").waitFor();
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await hold(page, "highlight");
+  await add("A second point to take back");
+  await until("its write is out", () => isHeld(page, "highlight"));
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await page.keyboard.press("Meta+z");
+  const landed = answered(page, "highlight");
+  await release(page, "highlight");
+  await landed;
+  await until("⌘Z took back the second point", async () => (await row("A second point to take back").count()) === 0);
+  await Bun.sleep(500);
+  if (!(await row("A baseline point to keep").count())) throw new Error("⌘Z took back the point before it");
+  await page.keyboard.press("Meta+z"); // the baseline too, leaving the source as it was
+  await until("the baseline is taken back", async () => (await row("A baseline point to keep").count()) === 0);
+});
+
+journey("settings: ⌘Z while a new daily goal is being written takes back that goal, to the one before (Codex UX sweep 3)", async (page) => {
+  const was = ((await ore("today")) as { goal_minutes: number }).goal_minutes;
+  const goal = async () => ((await ore("today")) as { goal_minutes: number }).goal_minutes;
+  try {
+    await pickGoal(page, 15);
+    await page.keyboard.press("Meta+Comma");
+    await page.getByRole("tab", { name: "Review" }).click();
+    await hold(page, "goal");
+    await page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "20", exact: true }).click();
+    await until("its write is out", () => isHeld(page, "goal"));
+    await page.keyboard.press("Meta+z");
+    const landed = answered(page, "goal");
+    await release(page, "goal");
+    await landed;
+    await Bun.sleep(600);
+    await until("⌘Z took back 20, to 15", async () => (await goal()) === 15);
+  } finally {
+    await page.keyboard.press("Escape").catch(() => {});
+    await ore("goal", "--minutes", String(was));
+  }
+});
+
+journey("finish: ⌘Z during the Source finished moment takes back the finish, not the step before it (Codex UX sweep 3)", async (page) => {
+  const item = ((await ore("ls")) as { id: string; title: string; status: string }[]).find((i) => i.title === AGENTS)!;
+  await openSource(page, AGENTS);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  const toggle = page.locator(".cp-head.card .cp-toggle");
+  if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+  await page.getByRole("button", { name: "Add a key point", exact: true }).click();
+  await page.getByRole("textbox", { name: "Key point", exact: true }).fill("Finish keeps this point");
+  await page.keyboard.press("Enter");
+  const point = page.locator(".cp-row").filter({ hasText: "Finish keeps this point" });
+  await point.waitFor();
+  try {
+    await page.evaluate(() => ((window as unknown as { __ORE_REPLY: Record<string, unknown> }).__ORE_REPLY = { enrich: { item: "x", title: "x", prequestions: [], skills: [], topics: [], topics_created: [], cards: [] } }));
+    await page.getByRole("button", { name: "Finish", exact: true }).click();
+    await page.getByLabel("Free recall").fill("Agents loop on tools; workflows follow set paths.");
+    // Past the recall's feedback (none comes here) and any questions, to "Done with this source?".
+    const doneQ = page.getByRole("heading", { name: "Done with this source?" });
+    for (let i = 0; i < 14 && !(await doneQ.isVisible()); i++) {
+      const next = page.getByRole("button", { name: /^(Continue|Skip|Skip to questions|Next|No idea|Next question|Finish)$/ }).first();
+      if (await next.isVisible().catch(() => false)) await next.click().catch(() => {});
+      await Bun.sleep(400);
+    }
+    await doneQ.waitFor();
+    await page.evaluate(() => ((window as unknown as { __ORE_SLOW: Record<string, number> }).__ORE_SLOW = { status: 1500 }));
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await Bun.sleep(200);
+    await page.keyboard.press("Meta+z"); // while Done is written, before the second of "Source finished" ends
+    await page.evaluate(() => delete (window as unknown as { __ORE_SLOW?: unknown }).__ORE_SLOW);
+    await Bun.sleep(3500); // the write, the moment and the Undo that waited for them
+    await until("⌘Z took the source back out of Done", async () => ((await ore("ls")) as { id: string; status: string }[]).find((i) => i.id === item.id)?.status !== "done").catch(async (e) => { throw new Error(`${e.message}: it is ${((await ore("ls")) as { id: string; status: string }[]).find((i) => i.id === item.id)?.status}, was ${item.status}`); });
+    await Bun.sleep(500);
+    const anns = ((await ore("show", item.id, "--annotations")) as { annotations: { note?: string; status?: string }[] }).annotations;
+    if (!anns.some((a) => a.note === "Finish keeps this point" && a.status !== "deleted")) throw new Error("⌘Z took back the key point made before Finish");
+  } finally {
+    await page.evaluate(() => ((window as unknown as { __ORE_REPLY: Record<string, unknown> }).__ORE_REPLY = {}));
+    await ore("status", item.id, item.status);
+    for (const a of ((await ore("show", item.id, "--annotations")) as { annotations: { id: string; note?: string }[] }).annotations) if (a.note === "Finish keeps this point") await ore("annotate", a.id, "--status", "deleted");
+  }
+});
+
 /** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
 const hold = (page: Page, key: string, calls = 1) => page.evaluate(([k, n]) => {
   const w = window as unknown as { __ORE_HOLD?: Record<string, unknown[]> };
@@ -16959,6 +17050,35 @@ journey("phone: a correction to a saved answer shows when its question folds and
   await tap(page, head);
   await page.getByRole("button", { name: "Edit: Folded correction" }).waitFor({ timeout: 3000 });
 }, "phone");
+journey("phone: the drawer's skill editor has 44 pt colours, name and collection (Codex UX sweep 3)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await press(page, page.locator(".phone-drawer section button").filter({ hasText: "Learning" }).first());
+  await tap(page, page.getByRole("menuitem", { name: "Edit skill…" }));
+  const edit = page.locator(".skill-edit");
+  await edit.waitFor();
+  const small = await edit.evaluate((root) => [...root.querySelectorAll<HTMLElement>(".swatch, .skill-name button, .select-button")].flatMap((e) => {
+    const r = e.getBoundingClientRect();
+    let [w, h] = [r.width, r.height];
+    const cs = getComputedStyle(e, "::after");
+    if (cs.content !== "none" && cs.position === "absolute") { const o = (v: string) => Math.max(0, -parseFloat(v) || 0); w += o(cs.left) + o(cs.right); h += o(cs.top) + o(cs.bottom); }
+    return w < 44 || h < 44 ? [`${e.getAttribute("aria-label") ?? e.textContent?.trim()} ${Math.round(w)}×${Math.round(h)}`] : [];
+  }));
+  if (small.length) throw new Error(`taps under 44 pt in the skill editor: ${small.join(", ")}`);
+  await page.keyboard.press("Escape");
+}, "phone");
+
+journey("phone: a long press on a Collected row opens its actions (Codex UX sweep 3)", async (page) => {
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  const collected = page.locator('aside.mynotes[aria-label="Collected"]');
+  await collected.waitFor();
+  const row = collected.locator(".cp-row").first();
+  await row.waitFor();
+  await press(page, row);
+  await page.getByRole("menuitem").first().waitFor({ timeout: 3000 });
+  await page.keyboard.press("Escape");
+}, "phone");
+
 
 
 

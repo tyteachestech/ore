@@ -5,7 +5,7 @@ import { Grow } from "./Grow";
 import { PixelGem } from "./PixelIcon";
 import { Hint } from "./Hint";
 import { is } from "./keys";
-import { ore, opt, PHONE, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
+import { ore, opt, PHONE, whileOut, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
 import { stampBefore } from "./transcript";
 import { errorText, focusPicked, kept, stepLabel, type Notify } from "./util";
 import { Matrix, useLate, Working } from "./Working";
@@ -295,7 +295,10 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     setStep(step + 1);
   }
 
-  async function finish(then?: () => void) {
+  // Its step goes on the history only after the write and the moment (App's onDone): ⌘Z meanwhile waits for it
+  // (F-new-undo-waits), so it takes back the finish, not the step before it.
+  const finish = (then?: () => void) => whileOut(finishNow(then));
+  async function finishNow(then?: () => void) {
     setBusy(true);
     try {
       if (!marked) await markDone();

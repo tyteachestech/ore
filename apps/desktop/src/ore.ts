@@ -70,6 +70,32 @@ export async function oreJob<T>(job: string | null, stdin: string | null, ...arg
   return answered(args, await oreRun<T>(job, stdin, args));
 }
 
+/** Changes still being written whose step goes on the history only once they land (`whileOut`). ⌘Z waits for
+ *  them (Toast.tsx), so it takes back that change, never the step before it (Codex UX sweeps 1 to 3). */
+let out = 0;
+let idle: (() => void)[] = [];
+export const callsOut = () => out > 0;
+/** Once nothing counted is out (a step goes on in the same turn its write lands), or after `max` ms. */
+export function callsSettled(max = 8000): Promise<void> {
+  const quiet = new Promise<void>((r) => (out ? idle.push(r) : r()));
+  return Promise.race([quiet, new Promise<void>((r) => setTimeout(r, max))]);
+}
+const counted = async <T,>(run: () => Promise<T>): Promise<T> => {
+  out++;
+  try {
+    return await run();
+  } finally {
+    // After the caller's own continuation (its notify) has run: a task, not a microtask.
+    setTimeout(() => {
+      if (!--out) [idle, idle = []][0]!.forEach((r) => r());
+    }, 0);
+  }
+};
+
+/** Counts `p` as out until it settles and its caller has gone on: wrap the write (or the wait, as Finish's moment)
+ *  of a change whose step goes on the history only after it. */
+export const whileOut = <T,>(p: Promise<T>): Promise<T> => counted(() => p);
+
 async function oreRun<T>(job: string | null, stdin: string | null, args: string[]): Promise<T> {
   // On iPhone the same commands run inside the app (src/phone/core.ts).
   if (PHONE) return (await import("./phone/core")).run<T>(args, stdin);

@@ -10,7 +10,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { escTaken, Hint } from "./Hint";
 import { onBackdrop, Trap } from "./Trap";
 import { comboOf, label, rebind, useKeymap } from "./keys";
-import { ore, opt, PHONE } from "./ore";
+import { ore, opt, PHONE, whileOut } from "./ore";
 import { setSounds, setVoice, useSounds, useVoice } from "./sfx";
 import { TablesSetting } from "./Tables";
 import { setTray, trayOn } from "./quick";
@@ -153,7 +153,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     const prev = dataRef.current;
     setData(next);
     dataRef.current = next;
-    return queueSettings(async () => {
+    return whileOut(queueSettings(async () => {
       try {
         await run();
       } catch (e) {
@@ -177,7 +177,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
       }
       if (step) notify(step.message, "quiet", step.undo, step.redo);
       return true;
-    });
+    }));
   };
   /** What each goal setting is called in an Undone toast. */
   const NAMES: Record<string, string> = { minutes: "Minutes a day", "weekdays-only": "Weekdays only", "new-per-day": "New exercises a day", plan: "When you review", remix: "Remix exercises" };
