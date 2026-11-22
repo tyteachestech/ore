@@ -286,13 +286,20 @@ export function SkillPage({ skill, view, search, targets, blocked, onOpen, onQue
 /** The skill's badge opens the icon picker in place, as a Notion page icon does; picks save at once. */
 function BadgePicker({ skill, onChanged, notify }: { skill: Skill; onChanged: () => void; notify: Notify }) {
   const [open, setOpen] = useState(false);
+  // What each was last set to here: two picks in a row, the second before the first's re-read, undo to the first.
+  const shown = useRef({ icon: skill.icon ?? "", color: skill.color ?? "" });
+  useEffect(() => void (shown.current = { icon: skill.icon ?? "", color: skill.color ?? "" }), [skill.icon, skill.color]);
   const set = async (key: "icon" | "color", value: string, undoable = true) => {
-    const before = skill[key] ?? "";
+    const before = shown.current[key];
+    shown.current[key] = value;
+    const write = ore("skills", "set", skill.id, opt(key, value));
+    // On the history at once: a ⌘Z while the write is out takes back this change, not the one before it.
+    if (undoable && before !== value) notify(`Changed the ${key === "icon" ? "icon" : "colour"} of ${skill.name}`, "quiet", () => set(key, before, false), () => set(key, value, false)).hold(write);
     try {
-      await ore("skills", "set", skill.id, opt(key, value));
+      await write;
       onChanged();
-      if (undoable && before !== value) notify(`Changed the ${key === "icon" ? "icon" : "colour"} of ${skill.name}`, "quiet", () => set(key, before, false), () => set(key, value, false));
     } catch (e) {
+      shown.current[key] = before;
       // From the history (undo or redo): it puts the step back and says why.
       if (!undoable) throw e;
       notify(errorText(e), "error");
@@ -410,20 +417,26 @@ function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skil
   const [draft, setDraft] = useState<string | null>(null);
   const goalRef = useRef<HTMLButtonElement>(null);
   useFocusBack(draft !== null, goalRef);
+  // The goal as last saved here, so a second edit before the first's re-read undoes to the first.
+  const shownGoal = useRef(skill.goal ?? "");
+  useEffect(() => void (shownGoal.current = skill.goal ?? ""), [skill.goal]);
   const save = async () => {
     const v = (draft ?? "").trim();
     setDraft(null);
-    const before = skill.goal ?? "";
+    const before = shownGoal.current;
     if (v === before) return;
-    const to = (goal: string) => () => ore("skills", "set", skill.id, opt("goal", goal)).then(onChanged);
+    shownGoal.current = v;
+    const to = (goal: string) => () => ((shownGoal.current = goal), ore("skills", "set", skill.id, opt("goal", goal)).then(onChanged));
+    const write = ore("skills", "set", skill.id, opt("goal", v));
+    // On the history at once: a ⌘Z while the write is out takes back this goal, not the one before it.
+    // Emptying the field throws the goal away: say so, with Undo.
+    (!v ? notify(`Cleared the goal for ${skill.name}`, "info", to(before), to("")) : notify(`Goal for ${skill.name}`, "quiet", to(before), to(v))).hold(write);
     try {
-      await ore("skills", "set", skill.id, opt("goal", v));
+      await write;
       onChanged();
-      // Emptying the field throws the goal away: say so, with Undo.
-      if (!v) notify(`Cleared the goal for ${skill.name}`, "info", to(before), to(""));
-      else notify(`Goal for ${skill.name}`, "quiet", to(before), to(v));
     } catch (e) {
       // The field opens again with what he typed, so a failed save loses nothing.
+      shownGoal.current = before;
       setDraft(v);
       notify(errorText(e), "error");
     }
@@ -850,6 +863,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
           q={q}
           notify={notify}
           onClose={() => setAnswering(false)}
+          onRewrite={onChanged}
           onSaved={(saved, how) => {
             if (how !== "contribution") setAnswering(false);
             announce(q, saved, how, notify, onChanged);
