@@ -563,6 +563,17 @@ describe("import coverage: files", () => {
     expect(b).toContain("Experimental Psychology, translated by"); // a reference's second line, indented, doesn't
   });
 
+  test("PDF: a contents page keeps one entry per line, and a running foot set larger than the text is dropped", async () => {
+    // Tyler's Values Guide (2026-11-22): its contents came in as one paragraph, and its foot
+    // ("Solved" in bold, "VALUES GUIDE 7", set larger than the text) stayed in, splitting sentences.
+    const b = (await addSource(await tempLibrary(), file("contents.pdf"))).body;
+    expect(b).toContain("## Table of Contents\n\n- **Why Notes Matter 2**\n  - Beyond Rereading 2\n  - Two Common Mistakes With Notes 3\n- **What Is a Good Note? 3**\n  - Writing Notes in Your Own Words Instead of Copying the Page 3\n  - The Question Test 4\n\n<!-- page 2 -->\n\n- **Keeping Notes Alive 5**\n  - Review on a Schedule 5\n  - When to Let a Note Go 6\n\n<!-- page 3 -->");
+    expect(b).not.toContain("NOTES GUIDE");
+    expect(b).toContain("holds an idea in place for the weeks after you first read it, even when the answer comes slowly.\n\n<!-- page 4 -->");
+    // Prose whose lines happen to end in numbers runs on: its lines go on in lower case.
+    expect(b).toContain("\n\nIn one class the notes were tested on day 1 and then again on day 7 and on day 30, and the");
+  });
+
   test("notebook: Markdown cells, code in its language, text output", async () => {
     const item = await addSource(await tempLibrary(), file("numpy.ipynb"));
     expect(item.meta.title).toBe("Introducing NumPy");
