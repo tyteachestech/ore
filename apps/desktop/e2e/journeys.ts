@@ -9004,6 +9004,68 @@ journey("review: ⌘Z while the check-in's use is being saved takes back that us
   }
 });
 
+journey("skill page: ⌘Z while a goal or colour change is still being written takes back that change (Codex UX sweep 2)", async (page) => {
+  type S = { id: string; name: string; goal?: string; color?: string };
+  const id = ((await ore("skills")) as S[]).find((k) => k.name === "Habits")!.id;
+  const get = async () => ((await ore("skills")) as S[]).find((k) => k.id === id)!;
+  const was = await get();
+  const settle = async () => {
+    const landed = answered(page, "skills");
+    await release(page, "skills set");
+    await landed;
+    await Bun.sleep(600); // an Undo that waited for the write runs now
+  };
+  try {
+    await page.locator(".sidebar .side-item", { hasText: /^Habits$/ }).first().click();
+    await page.locator("button.skill-goal").click();
+    await page.locator("textarea.skill-goal").fill("First goal");
+    await page.keyboard.press("Enter");
+    await until("the first goal is saved", async () => (await get()).goal === "First goal");
+    await page.locator("button.skill-goal").click();
+    await page.locator("textarea.skill-goal").fill("Second goal");
+    await hold(page, "skills set");
+    await page.keyboard.press("Enter");
+    await until("the second goal's write is out", () => isHeld(page, "skills set"));
+    await page.keyboard.press("Meta+z");
+    await settle();
+    await until("⌘Z took back the second goal, to the first", async () => (await get()).goal === "First goal");
+    await page.locator(".skill-badge").click();
+    await page.getByRole("radio", { name: "red" }).click();
+    await until("red is saved", async () => (await get()).color === "red");
+    await hold(page, "skills set");
+    await page.getByRole("radio", { name: "blue" }).click();
+    await until("blue's write is out", () => isHeld(page, "skills set"));
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Meta+z");
+    await settle();
+    await until("⌘Z took back blue, to red", async () => (await get()).color === "red");
+  } finally {
+    await ore("skills", "set", id, `--goal=${was.goal ?? ""}`, `--color=${was.color ?? ""}`);
+  }
+});
+
+journey("tutor: New chat after a chat that could not be saved saves it first, and it is in Chats (Codex UX sweep 2)", async (page) => {
+  await page.getByRole("button", { name: "Open the tutor" }).click();
+  await page.evaluate(() => {
+    const g = window as unknown as Record<string, unknown>;
+    g.__ORE_FAIL = { chat: "Test: chat write refused" };
+    g.__ORE_REPLY = { tutor: { reply: "Recall it first, without the source in front of you.", citations: [], general: true, steps: [], marks: [], title: "Unsaved learning chat", ai: { vendor: "codex", model: "mock", prompt: "tutor", version: 1 } } };
+  });
+  try {
+    await page.getByRole("textbox", { name: "Message the tutor" }).fill("How do I start a study hour?");
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    await page.getByText("Recall it first, without the source in front of you.").waitFor();
+    await page.locator("[role=alert], .toast").filter({ hasText: /chat write refused/ }).first().waitFor();
+    await page.evaluate(() => ((window as unknown as Record<string, unknown>).__ORE_FAIL = {}));
+    await page.getByRole("button", { name: "New chat", exact: true }).click();
+    await page.getByRole("button", { name: "Chats", exact: true }).click();
+    await page.getByText("Unsaved learning chat").first().waitFor({ timeout: 4000 });
+  } finally {
+    await page.evaluate(() => { const g = window as unknown as Record<string, unknown>; g.__ORE_FAIL = {}; delete g.__ORE_REPLY; });
+    await page.keyboard.press("Escape").catch(() => {});
+  }
+});
+
 /** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
 const hold = (page: Page, key: string, calls = 1) => page.evaluate(([k, n]) => {
   const w = window as unknown as { __ORE_HOLD?: Record<string, unknown[]> };
@@ -16864,6 +16926,34 @@ journey("phone: on a small phone the end screen opens at its top, its first line
   });
   if (top.scrolled > 1 || top.first < 0) throw new Error(`the end screen opened scrolled ${top.scrolled} pt down, its first line at y ${top.first}`);
 }, "phone");
+journey("phone: a correction to a saved answer shows when its question folds and opens, and one left typing is saved by the fold (Codex UX sweep 2)", async (page) => {
+  const q = `Bus question ${Date.now() % 100000}`;
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
+  await tap(page, page.getByRole("button", { name: "Add a question" }));
+  await page.getByRole("textbox", { name: "New question" }).fill(q);
+  await page.keyboard.press("Enter");
+  const head = page.getByRole("button", { name: q, exact: true });
+  await tap(page, head);
+  await page.getByRole("textbox", { name: `Your answer to ${q}` }).fill("First answer");
+  await tap(page, page.getByRole("button", { name: "Save", exact: true }));
+  await page.getByRole("button", { name: "Edit: First answer" }).waitFor();
+  // Saved with Return, then folded and opened: the correction shows, not the answer before it.
+  await tap(page, page.getByRole("button", { name: "Edit: First answer" }));
+  await page.getByRole("textbox", { name: "Edit this part of your answer" }).fill("Saved correction");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Edit: Saved correction" }).waitFor();
+  await tap(page, head);
+  await tap(page, head);
+  await page.getByRole("button", { name: "Edit: Saved correction" }).waitFor({ timeout: 3000 });
+  // Typed and left by folding the question: a tap away saves it (D211).
+  await tap(page, page.getByRole("button", { name: "Edit: Saved correction" }));
+  await page.getByRole("textbox", { name: "Edit this part of your answer" }).fill("Folded correction");
+  await tap(page, head);
+  await tap(page, head);
+  await page.getByRole("button", { name: "Edit: Folded correction" }).waitFor({ timeout: 3000 });
+}, "phone");
+
 
 
 

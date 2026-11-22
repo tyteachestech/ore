@@ -136,12 +136,28 @@ export function useTutorChat(notify: Notify) {
     queue.current = r.catch(() => {});
     return r;
   };
-  const write = (f: () => Promise<unknown>) => serial(f).catch((e) => notify(errorText(e, "save the chat"), "error"));
+  // Whether the last write of a chat failed: the one on screen is its only copy until a save lands.
+  const unsaved = useRef(false);
+  const write = (f: () => Promise<unknown>) =>
+    serial(f).then(
+      () => void (unsaved.current = false),
+      (e) => {
+        unsaved.current = true;
+        notify(errorText(e, "save the chat"), "error");
+      },
+    );
   const save = () => {
     const m = metaNow.current;
-    if (!m || !now.current.length) return;
+    if (!m || !now.current.length) return Promise.resolve();
     const chat = { ...m, carry: carryNow.current, turns: now.current.map(settled) };
-    void write(() => oreWith(JSON.stringify(chat), "chat", "--set", "--merge"));
+    return write(() => oreWith(JSON.stringify(chat), "chat", "--set", "--merge"));
+  };
+  /** Before the chat on screen gives way to another: one whose save failed is saved again first, and stays on
+   *  screen (with the error) if that fails too, so leaving it never loses it (Codex UX sweep 2). */
+  const savedFirst = async () => {
+    if (!unsaved.current) return true;
+    await save();
+    return !unsaved.current;
   };
   /** A turn's change, in the chat on screen or, once he has moved on, in its own saved chat. */
   const patch = (chat: string, id: string, p: Partial<TutorTurn>, title?: string) => {
@@ -310,7 +326,10 @@ export function useTutorChat(notify: Notify) {
     }
   };
   /** A new chat, even while one is thinking (its reply lands in its own saved chat). */
-  const fresh = () => {
+  const fresh = async () => {
+    if (await savedFirst()) clear();
+  };
+  const clear = () => {
     unqueue();
     update(() => []);
     setCarry([]);
@@ -320,7 +339,7 @@ export function useTutorChat(notify: Notify) {
   /** Opens a saved chat where he left it, with its @ context. A turn saved with no reply, and none on its
    *  way, was cut off by a quit: it says so and offers Try again. */
   const open = async (id: string) => {
-    if (metaNow.current?.id === id) return;
+    if (metaNow.current?.id === id || !(await savedFirst())) return;
     unqueue();
     try {
       const c = await serial(() => ore<SavedChat & { root?: string }>("chat", id));
@@ -337,14 +356,14 @@ export function useTutorChat(notify: Notify) {
   const remove = async (id: string) => {
     // Off the screen first, so a reply landing meanwhile can't save it back.
     const wasOpen = metaNow.current?.id === id;
-    if (wasOpen) fresh();
+    if (wasOpen) clear();
     try {
       const c = await serial(() => ore<SavedChat>("chat", id, "--delete"));
       notify(
         "Chat deleted",
         "info",
         () => serial(() => oreWith(JSON.stringify(c), "chat", "--set", "--keep-time")).then(() => (wasOpen && !now.current.length ? open(id) : undefined)),
-        () => serial(() => ore("chat", id, "--delete")).then(() => (metaNow.current?.id === id ? fresh() : undefined)),
+        () => serial(() => ore("chat", id, "--delete")).then(() => (metaNow.current?.id === id ? clear() : undefined)),
       );
     } catch (e) {
       notify(errorText(e, "delete that chat"), "error");
@@ -670,7 +689,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
           <button className="tutor-quiz" onClick={() => onQuiz(quizSkills)}>Quiz me</button>
         </Hint>
         <Hint text="New chat">
-          <button className="icon-btn" aria-label="New chat" disabled={!turns.length} onClick={() => { chat.fresh(); field.current?.focus(); }}>
+          <button className="icon-btn" aria-label="New chat" disabled={!turns.length} onClick={() => { void chat.fresh(); field.current?.focus(); }}>
             <Plus size={14} aria-hidden="true" />
           </button>
         </Hint>

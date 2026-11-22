@@ -49,7 +49,8 @@ export function wakesScreens(args: string[]): boolean {
   if (args[0] === "skills") return ["rm", "restore", "archive"].includes(args[1]!) || (args[1] === "set" && has("--name"));
   // A source filed into or out of a skill: that skill's open page counts its questions and exercises again.
   if (args[0] === "edit") return has("--title") || has("--skills");
-  return args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"));
+  // His answer to a question (Codex UX sweep 2): the question's row and box on a skill page show what was saved.
+  return args[0] === "archive" || args[0] === "goal" || args[0] === "answer" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"));
 }
 
 

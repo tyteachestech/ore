@@ -109,6 +109,11 @@ export function AnswerBox({ q, item, quote, onSaved, onClose, notify }: {
     }
     return true;
   };
+  // The box going away with a piece still being edited (its question folded, the page left) is a tap away from it:
+  // the correction is saved (D211), never dropped (Codex UX sweep 2). Read at unmount, so the latest is kept.
+  const commitNow = useRef(commitPieces);
+  commitNow.current = commitPieces;
+  useEffect(() => () => void commitNow.current(), []);
 
   const send = async (how: "contribution" | "done" | "card") => {
     if (busy || (how === "contribution" && !t) || (how === "card" && !t && !hasAnswer)) return;
