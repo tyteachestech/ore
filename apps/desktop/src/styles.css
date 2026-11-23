@@ -1182,6 +1182,11 @@ body.resizing iframe { pointer-events: none; }
 /* Notion's hint on the empty block the caret is on: what / does, or the block's kind. Never saved. */
 .note-editor .ProseMirror-focused .empty-hint:not(.ghost):has(> br:only-child)::before { content: attr(data-hint); color: var(--faint); pointer-events: none; float: left; height: 0; }
 /* Feedback on a chapter recall, under the note (D34.3: after his attempt). */
+/* A chapter's recall ends here too, not only with ⌘↵ and Esc (Codex UX sweep 7). */
+.block-end { display: flex; align-items: center; gap: 12px; margin: 18px 0 8px; }
+.phone .block-end button { min-height: 44px; }
+/* Recall this chapter is a 44 pt tap on the phone. */
+.phone .chap-sign { min-height: 44px; }
 .chapter-fb { margin: 18px 0 8px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; line-height: 1.55; color: var(--text-read); }
 .chapter-fb .quiz-kicker { margin: 0 0 6px; display: flex; align-items: center; }
 .chapter-fb .quiz-kicker button { margin-left: auto; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 4px; color: var(--faint); }

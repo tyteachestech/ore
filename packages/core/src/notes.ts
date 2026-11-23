@@ -201,6 +201,18 @@ export async function setRecall(lib: Library, ref: string, text: string) {
 
 export const chapterMarker = (n: number) => `<!-- chapter ${n} -->`;
 
+/** Takes a chapter's recall back (the app's Undo, Codex UX sweep 7): its record goes, so the chapter is offered
+ *  again; what he wrote stays in the note. Returns whether there was one. */
+export async function clearChapterRecall(lib: Library, ref: string, n: number) {
+  let had = false;
+  const meta = await updateItemMeta(lib, findItem(lib, ref).meta.id, (m) => {
+    had = (m.chapter_recalls ?? []).some((c) => c.n === n);
+    const rest = (m.chapter_recalls ?? []).filter((c) => c.n !== n);
+    return { ...m, chapter_recalls: rest.length ? rest : undefined };
+  });
+  return { item: meta.id, chapter: n, removed: had };
+}
+
 // EPUB chapter recall: upsert chapter_recalls[n] (new text drops feedback)
 // and append it to the source note under `heading` (the chapter's title, D115;
 // "Chapter N recall" when none is given). Text already in the note is not added again.
@@ -209,7 +221,9 @@ export async function setChapterRecall(lib: Library, ref: string, n: number, tex
   if (!t) throw new Error("recall text is empty");
   if (!Number.isInteger(n) || n < 1) throw new Error("--chapter must be a positive integer");
   const item = findItem(lib, ref);
-  if (!item.body.includes(chapterMarker(n))) throw new Error(`item ${item.meta.id} has no ${chapterMarker(n)} marker`);
+  // An EPUB's chapters are marked in its text; a video's are its ### headings (D115; recall.ts chapterLines).
+  const heads = item.meta.type === "youtube" && !/<!-- chapter \d+ -->/.test(item.body) ? (item.body.match(/^### +\S/gm) ?? []).length : 0;
+  if (!item.body.includes(chapterMarker(n)) && n > heads) throw new Error(`item ${item.meta.id} has no chapter ${n}`);
   const meta = await updateItemMeta(lib, item.meta.id, (m) => {
     const others = (m.chapter_recalls ?? []).filter((c) => c.n !== n);
     return { ...m, chapter_recalls: [...others, { n, text: t, at: nowIso() }].sort((a, b) => a.n - b.n) };

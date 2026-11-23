@@ -54,13 +54,20 @@ export async function recallFeedback(lib: Library, ref: string) {
 }
 
 // Lines (1-based, in doc.md as a file) from the `<!-- chapter n -->` marker to
-// the line before the next chapter marker, or to EOF.
-export function chapterLines(fileText: string, n: number): { from: number; to: number } | null {
+// the line before the next chapter marker, or to EOF. A video has no markers: its own chapter list became its
+// `###` headings at import (D115, as the reader's chapterMarks reads them), so its nth chapter runs from the nth.
+export function chapterLines(fileText: string, n: number, type?: string): { from: number; to: number } | null {
   const lines = fileText.split("\n");
   const from = lines.findIndex((l) => l.trim() === chapterMarker(n));
-  if (from === -1) return null;
-  const next = lines.findIndex((l, i) => i > from && /^<!-- chapter \d+ -->$/.test(l.trim()));
-  return { from: from + 1, to: next === -1 ? lines.length : next };
+  if (from !== -1) {
+    const next = lines.findIndex((l, i) => i > from && /^<!-- chapter \d+ -->$/.test(l.trim()));
+    return { from: from + 1, to: next === -1 ? lines.length : next };
+  }
+  if (type !== "youtube" || lines.some((l) => /^<!-- chapter \d+ -->$/.test(l.trim()))) return null;
+  const heads = lines.flatMap((l, i) => (/^### +\S/.test(l) ? [i] : []));
+  const at = heads[n - 1];
+  if (at === undefined) return null;
+  return { from: at + 1, to: heads[n] ?? lines.length };
 }
 
 // D18 for EPUBs: feedback on one chapter's closed-book recall only, stored
@@ -70,8 +77,8 @@ export async function chapterRecallFeedback(lib: Library, ref: string, n: number
   const recall = item.meta.chapter_recalls?.find((c) => c.n === n)?.text;
   if (!recall) throw new Error(`no recall for chapter ${n}: record one first (ore recall ${item.meta.id} --chapter ${n} --text)`);
   const file = readFileSync(item.docPath, "utf8");
-  const lines = chapterLines(file, n);
-  if (!lines) throw new Error(`item ${item.meta.id} has no ${chapterMarker(n)} marker`);
+  const lines = chapterLines(file, n, item.meta.type);
+  if (!lines) throw new Error(`item ${item.meta.id} has no chapter ${n}`);
   // Only the section lines whose heading is in this chapter, and not the recall itself (it sits
   // under the chapter's title in the note, D115).
   const chapterText = file.split("\n").slice(lines.from - 1, lines.to).join("\n");
