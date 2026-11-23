@@ -639,11 +639,22 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
   const [version, setVersion] = useState(0);
   const changes = useLibraryChanges();
   const reload = () => setVersion((v) => v + 1);
+  /** Goes up when a write to an answer's pieces starts or ends (AnswerBox `onWriting`): a read out across one is made again. */
+  const writes = useRef(0);
+  /** A read landed while a write was out: it is made again once, when that write ends (odd = one is out). */
+  const owed = useRef(false);
+  const writing = useCallback(() => {
+    if (++writes.current % 2 === 0 && owed.current) {
+      owed.current = false;
+      setVersion((v) => v + 1);
+    }
+  }, []);
 
   useEffect(() => {
     let live = true;
+    const at = writes.current;
     ore<Question[]>("questions", opt("skill", skill)).then(
-      (r) => live && setQs(r),
+      (r) => live && (writes.current === at ? setQs(r) : writes.current % 2 ? (owed.current = true) : reload()),
       (e) => live && notify(errorText(e), "error"),
     );
     return () => {
@@ -709,7 +720,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
       {find && !found.length && <p className="quiet">No questions match “{find}”.</p>}
       {/* Open and Answered are the header's tabs (D226); a search looks through both. */}
       {!(byStatus && showAnswered) && (showAll || find ? open : open.slice(0, QUESTION_CAP)).map((q) => (
-        <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />
+        <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} onWriting={writing} notify={notify} />
       ))}
       {!find && !(byStatus && showAnswered) && open.length > QUESTION_CAP && (
         <button className="answered-toggle" aria-expanded={showAll} onClick={() => setShowAll(!showAll)}>
@@ -717,7 +728,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
         </button>
       )}
       {(find ? true : byStatus && showAnswered) &&
-        answered.map((q) => <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} notify={notify} />)}
+        answered.map((q) => <QuestionRow key={q.id} q={q} skill={skill} onQuestion={onQuestion} onOpenSource={onOpenSource} onAdded={onAdded} onStatus={setStatus} onRemove={remove} onChanged={reload} onWriting={writing} notify={notify} />)}
     </Fold>
   );
 }
@@ -739,7 +750,7 @@ function moveRow(e: ReactKeyboardEvent<HTMLButtonElement>) {
   next?.focus();
 }
 
-function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, onRemove, onChanged, notify }: {
+function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, onRemove, onChanged, onWriting, notify }: {
   q: Question;
   skill: string;
   onQuestion: (q: Question) => void;
@@ -749,6 +760,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
   onRemove: (q: Question) => void;
   /** After his answer changed: the list reloads. */
   onChanged: () => void;
+  onWriting: () => void;
   notify: Notify;
 }) {
   const [found, setFound] = useState<Research["sources"] | null>(null);
@@ -872,6 +884,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
           notify={notify}
           onClose={() => setAnswering(false)}
           onRewrite={onChanged}
+          onWriting={onWriting}
           onSaved={(saved, how) => {
             if (how !== "contribution") setAnswering(false);
             announce(q, saved, how, notify, onChanged);
