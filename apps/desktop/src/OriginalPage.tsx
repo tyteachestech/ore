@@ -128,7 +128,8 @@ export default function OriginalPage({ file, page, lit }: { file: string; page: 
   return (
     <div className="original" ref={box}>
       {error ? (
-        <p className="loading">This file’s pages can’t be shown here. Open the original from ⋯ to see them.</p>
+        // The phone's ⋯ has no Open original for a file (it stays on the Mac): it names what it can do (Codex UX sweep 7).
+        <p className="loading">{PHONE ? "This file’s pages can’t be shown here. Its text is in the source, and the original opens on your Mac." : "This file’s pages can’t be shown here. Open the original from ⋯ to see them."}</p>
       ) : !pdf ? (
         <p className="loading"><Working stage="read" label="Opening the original…" /></p>
       ) : (

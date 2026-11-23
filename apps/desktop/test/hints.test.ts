@@ -165,6 +165,7 @@ describe("icon-only buttons", () => {
 // the same file; a button built elsewhere (a Radix Close, a component) isn't checked.
 const DISMISS_OK: Record<string, [count: number, why: string]> = {
   "Review.tsx Done": [1, "the end screen's default button: its hint shows ↵, its key, as a Mac sheet's default button shows Return"],
+  "Reader.tsx Done": [1, "a chapter's recall: its hint shows its key, finish (⌘↵); Esc is its Back to the source, which records nothing"],
   "Finish.tsx Done": [1, "its hint shows its key, finish (⌘↵); Esc leaves the panel, which runs Keep reading unless the source is already done"],
   "Tables.tsx Cancel": [2, "stops the 4 GB reader download (in a PDF and in Settings); Esc doesn't, so a stray Esc never throws the download away"],
   "Diagram.tsx Done": [1, "the phone's diagram view (DiagramView, PHONE only): no keyboard to show Esc on; the Mac's editor's Done shows it"],

@@ -1532,17 +1532,29 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     if ("practice" in block) notesField.current?.scaffold(block.heading, block.prompts);
     else notesField.current?.scaffold(block.title ?? `Chapter ${block.n}`, CHAPTER_PROMPTS);
   }, [block, notesShown, notes.text === null]);
+  // On the phone, Source over a chapter's recall goes back to the text: the recall ends unrecorded (as Back to the
+  // source does), so the text isn't left as dots with no way out (Codex UX sweep 7).
+  // Only the note screen closing does it (not a switch to Collected), and only for a chapter (a tutor's exercise stays).
+  const blockSeen = useRef(false);
+  useEffect(() => {
+    if (!block || "practice" in block) return void (blockSeen.current = false);
+    if (p.notesOpen) blockSeen.current = true;
+    else if (PHONE && blockSeen.current) void endBlock(false);
+  }, [block, p.notesOpen]);
   const toggleHide = () => {
     setHideSource((v) => {
       if (!block) save("ore.hidesource", v ? "0" : "1");
       return !v;
     });
   };
+  /** Chapters whose recall was taken back while its feedback was on the way: that feedback is dropped. */
+  const undoneChapters = useRef(new Set<number>());
   async function endBlock(record: boolean) {
     const c = block;
     if (!c || !doc) return;
-    // An empty answer is refused where he is, as a form refuses an empty submit: the block stays open.
-    if (record && "practice" in c && notesField.current && !notesField.current.written()) return p.notify("Nothing written, so nothing was sent.", "info");
+    // An empty answer is refused where he is, as a form refuses an empty submit: the block stays open. A chapter's
+    // too, now that Done is a button (Codex UX sweep 7): it used to close with nothing recorded and nothing said.
+    if (record && notesField.current && !notesField.current.written()) return p.notify("Nothing written, so nothing was sent.", "info");
     const text = notesField.current?.settle() ?? null;
     setBlock(null);
     scaffolded.current = null;
@@ -1559,9 +1571,22 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     try {
       // The recall comes back inside the note's text: never over a draft that failed to save.
       if (!(await notes.flush())) throw new Error("your note’s last edit isn’t saved yet.");
-      const r = await ore<{ recall: { text: string; at: string }; notes: string }>("recall", doc.id, opt("chapter", String(c.n)), opt("text", text), opt("heading", title));
-      notes.apply(r.notes);
-      setDoc((cur) => cur && { ...cur, chapter_recalls: [...(cur.chapter_recalls ?? []).filter((x) => x.n !== c.n), { n: c.n, ...r.recall }] });
+      const id = doc.id;
+      const record = async () => {
+        const r = await ore<{ recall: { text: string; at: string }; notes: string }>("recall", id, opt("chapter", String(c.n)), opt("text", text), opt("heading", title));
+        notes.apply(r.notes);
+        setDoc((cur) => cur && cur.id === id ? { ...cur, chapter_recalls: [...(cur.chapter_recalls ?? []).filter((x) => x.n !== c.n), { n: c.n, ...r.recall }] } : cur);
+      };
+      await whileOut(record());
+      // On the history (Codex UX sweep 7): ⌘Z offers the chapter again; what he wrote stays in his note. A feedback
+      // still on its way for it is dropped; ⇧⌘Z records it again and asks for feedback again.
+      p.notify(`Recalled “${title}”`, "quiet", () => {
+        undoneChapters.current.add(c.n);
+        return ore("recall", id, opt("chapter", String(c.n)), "--undo").then(() => {
+          setChapterFb((f) => (f?.n === c.n ? null : f));
+          setDoc((cur) => cur && cur.id === id ? { ...cur, chapter_recalls: (cur.chapter_recalls ?? []).filter((x) => x.n !== c.n) } : cur);
+        });
+      }, () => record().then(() => void feedbackFor(c.n, title)));
     } catch (e) {
       p.notify(`Recall not saved: ${errorText(e)}`, "error");
       setChapterFb(null);
@@ -1571,12 +1596,15 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }
   async function feedbackFor(n: number, title: string) {
     if (!doc) return;
+    undoneChapters.current.delete(n);
     setChapterFb({ n, title });
     try {
       const f = await ore<ChapterFeedback>("recall", doc.id, opt("chapter", String(n)), "--feedback");
+      if (undoneChapters.current.has(n)) return;
       setChapterFb({ n, title, feedback: f });
       setDoc((cur) => cur && { ...cur, chapter_recalls: (cur.chapter_recalls ?? []).map((x) => (x.n === n ? { ...x, feedback: f } : x)) });
     } catch (e) {
+      if (undoneChapters.current.has(n)) return;
       setChapterFb({ n, title, error: errorText(e) });
     }
   }
@@ -4039,7 +4067,20 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
               targets={p.targets}
               onOpen={p.onOpenLink}
               tail={
-                chapterFb && (
+                <>
+                {/* The pointer's and the finger's way to end a chapter's recall (D115), as ⌘↵ and Esc do (Codex UX sweep 7):
+                    Done records it and asks for feedback; Back to the source keeps what he wrote and records nothing. */}
+                {block && (
+                  <div className="block-end">
+                    <Hint text="Done" keys="finish">
+                      <button className="pill-btn small" onClick={() => void endBlock(true)}>Done</button>
+                    </Hint>
+                    <Hint text={<>Back to the source <kbd>Esc</kbd></>}>
+                      <button className="quiz-ghost" onClick={() => void endBlock(false)}>Back to the source</button>
+                    </Hint>
+                  </div>
+                )}
+                {chapterFb && (
                   <div className="chapter-fb" role="status">
                     <div className="quiz-kicker">
                       {chapterFb.title}
@@ -4075,7 +4116,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                       </>
                     )}
                   </div>
-                )
+                )}
+                </>
               }
             />
           ) : (

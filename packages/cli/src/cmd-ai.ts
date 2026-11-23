@@ -1,5 +1,5 @@
 import {
-  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, listChats, readChat, saveChat, deleteChat, attachToChat, pendingItems, recallFeedback, research, setChapterRecall, setRecall, type EnrichResult,
+  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, listChats, readChat, saveChat, deleteChat, attachToChat, pendingItems, recallFeedback, research, setChapterRecall, clearChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
 import { fromBase64, int, need, readStdin, str, strs } from "./util.ts";
@@ -176,11 +176,17 @@ export const aiCommands: Record<string, Command> = {
   },
 
   recall: {
-    usage: '<item> [--chapter N [--heading "<title>"]] --text "<text>" | --feedback   store free recall, also appended to the source note (clears old feedback) / AI feedback on it (+ after-answers when not a chapter)',
-    options: { text: { type: "string" }, feedback: { type: "boolean" }, chapter: { type: "string" }, heading: { type: "string" } },
+    usage: '<item> [--chapter N [--heading "<title>"]] --text "<text>" | --feedback | --chapter N --undo   store free recall, also appended to the source note (clears old feedback) / AI feedback on it (+ after-answers when not a chapter) / take a chapter\'s recall back (the note keeps the words)',
+    options: { text: { type: "string" }, feedback: { type: "boolean" }, chapter: { type: "string" }, heading: { type: "string" }, undo: { type: "boolean" } },
     async run([ref], f) {
       const lib = openLibrary();
       const item = need(ref, "<item>");
+      if (f.undo) {
+        const n = int(f.chapter, "chapter");
+        if (n === undefined) throw new Error("--undo takes back a chapter's recall: give --chapter N");
+        const r = await clearChapterRecall(lib, item, n);
+        return { data: r, text: r.removed ? `Chapter ${n} recall taken back for ${r.item}; the note keeps the words` : `Chapter ${n} had no recall` };
+      }
       if ((f.text !== undefined) === Boolean(f.feedback)) throw new Error("give exactly one of --text or --feedback");
       const chapter = int(f.chapter, "chapter");
       if (chapter !== undefined) {

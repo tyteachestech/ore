@@ -9341,6 +9341,39 @@ journey("sidebar: a collection rename that is refused opens its field again with
   await head.waitFor();
 });
 
+journey("reader: a chapter's recall ends with Done and Back to the source as well as ⌘↵ and Esc, and ⌘Z takes it back (Codex UX sweep 7)", async (page) => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-chapters-"));
+  const file = join(dir, "chapters.md");
+  const para = (c: number, i: number) => `Paragraph ${i} of part ${c} says that spacing practice over days beats cramming it into one night, and that recall beats rereading. `.repeat(3);
+  writeFileSync(file, `# A book in two chapters\n\n${[1, 2].map((c) => `<!-- chapter ${c} -->\n\n## Part ${c}\n\n${Array.from({ length: 14 }, (_, i) => para(c, i)).join("\n\n")}`).join("\n\n")}\n`);
+  const made = (await ore("add", file, "--no-enrich")) as { id: string };
+  const recalls = async () => ((await ore("show", made.id)) as { chapter_recalls?: { n: number }[] }).chapter_recalls ?? [];
+  try {
+    await page.reload();
+    await openSource(page, "A book in two chapters");
+    const sign = page.getByRole("button", { name: /Recall this chapter/ }).first();
+    await sign.scrollIntoViewIfNeeded();
+    // Back to the source: the source comes back, nothing is recorded.
+    await sign.click();
+    const back = page.getByRole("button", { name: "Back to the source" });
+    await back.click();
+    await sign.waitFor();
+    if ((await recalls()).length) throw new Error("Back to the source recorded the recall");
+    // Done: recorded, then ⌘Z offers the chapter again.
+    await sign.click();
+    await page.keyboard.type("Spacing beats cramming; recall beats rereading.");
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await until("Done recorded the chapter's recall", async () => (await recalls()).some((r) => r.n === 1));
+    await page.locator(".doc").click({ position: { x: 5, y: 5 } }).catch(() => {});
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z took the recall back", async () => !(await recalls()).some((r) => r.n === 1));
+    await sign.waitFor();
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+  }
+});
+
 /** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
 const hold = (page: Page, key: string, calls = 1) => page.evaluate(([k, n]) => {
   const w = window as unknown as { __ORE_HOLD?: Record<string, unknown[]> };

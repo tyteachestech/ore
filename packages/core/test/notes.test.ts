@@ -84,6 +84,28 @@ describe("My notes storage", () => {
     expect((await setRecall(lib, id, "Spacing too.")).notes).toBe(`${r.notes}\n\nSpacing too.`);
   });
 
+  // Codex UX sweep 7: a video's chapters are its ### headings (its own chapter list, D115), with no chapter comments,
+  // so its offered chapter recall was refused: "has no <!-- chapter 1 --> marker".
+  test("a video's chapter recall is kept by its ### heading, and its feedback reads that chapter", async () => {
+    const lib = await tempLibrary();
+    const v = await createItem(lib, { type: "youtube", title: "Talk", body: "### Intro\n\nHello there.\n\n### Tokens\n\nWords become numbers.\n\n### Attention\n\nEach token looks back.\n" });
+    const r = await setChapterRecall(lib, v.meta.id, 2, "Text turns into numbers.", "Tokens");
+    expect(r.chapter).toBe(2);
+    expect(findItem(lib, v.meta.id).meta.chapter_recalls!.map((c) => c.n)).toEqual([2]);
+    const { chapterLines } = await import("../src/ai/recall.ts");
+    const file = readFileSync(findItem(lib, v.meta.id).docPath, "utf8");
+    const at = chapterLines(file, 2, "youtube")!;
+    const text = file.split("\n").slice(at.from - 1, at.to).join("\n");
+    expect(text).toContain("Words become numbers.");
+    expect(text).not.toContain("Each token looks back.");
+    await expect(setChapterRecall(lib, v.meta.id, 4, "x")).rejects.toThrow(/no chapter 4/);
+    // Taken back (Undo): the chapter is offered again, his words stay in the note.
+    const { clearChapterRecall } = await import("../src/notes.ts");
+    expect((await clearChapterRecall(lib, v.meta.id, 2)).removed).toBe(true);
+    expect(findItem(lib, v.meta.id).meta.chapter_recalls ?? []).toEqual([]);
+    expect(readFileSync(notesPath(findItem(lib, v.meta.id)), "utf8")).toContain("Text turns into numbers.");
+  });
+
   test("chapter recall upserts chapter_recalls[n], drops old feedback, and appends to notes", async () => {
     const lib = await tempLibrary();
     const book = await createItem(lib, { type: "epub", title: "Book", body: "<!-- chapter 1 -->\n\nOne idea.\n\n<!-- chapter 2 -->\n\nTwo ideas.\n" });
@@ -99,7 +121,7 @@ describe("My notes storage", () => {
     expect(meta.chapter_recalls![0]!.feedback).toBeDefined();
     expect(meta.chapter_recalls![1]).toEqual({ n: 2, text: "Two things, revised.", at: again.recall.at });
     expect(again.notes).toBe("## Chapter 2 recall\n\nTwo things.\n\nTwo things, revised.\n\n## Chapter 1 recall\n\nOne thing.");
-    await expect(setChapterRecall(lib, id, 3, "x")).rejects.toThrow(/no <!-- chapter 3 --> marker/);
+    await expect(setChapterRecall(lib, id, 3, "x")).rejects.toThrow(/no chapter 3/);
     await expect(setChapterRecall(lib, id, 0, "x")).rejects.toThrow(/positive integer/);
     // D115: the block he wrote in the note under the chapter's title is recorded, not appended twice.
     await setNotes(lib, id, `${again.notes}\n\n## The second idea\n\nMy own words.`);
