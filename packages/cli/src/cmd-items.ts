@@ -132,6 +132,17 @@ export const itemCommands: Record<string, Command> = {
       }
       if (f.import) {
         const r = await importQueued(lib, async (url, skills) => {
+          // A playlist or a course the phone queued comes in here as a course, a lesson per video (D79): its own
+          // add refuses one, which the phone says the Mac does (Codex UX sweep 8). The phone (--owe) can't.
+          // A playlist only: an Academy lesson's own link stays one source, as the phone adds it.
+          if (!f.owe && isCourseUrl(url) && /youtube\.com\/playlist\?/i.test(url)) {
+            const c = await addCourse(lib, await planCourse(url), { skills });
+            // Nothing came in and nothing was here: the link waits with the reason, for a retry.
+            if (!c.added.length && c.failed.length && !c.kept) throw new Error(c.failed[0]!.error);
+            startEnrichMany(lib, c.added.map((i) => i.meta.id));
+            const first = c.added[0] ?? courseLessons(lib, c.course.id)[0];
+            return { id: first?.meta.id ?? c.course.id, title: c.course.title, kept: !c.added.length };
+          }
           const item = await addSource(lib, url, { skills, owe: !!f.owe });
           afterAdd(lib, item, false);
           return { id: item.meta.id, title: item.meta.title, kept: !!item.kept };
