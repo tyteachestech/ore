@@ -14,15 +14,17 @@ export const FIELDS: { id: Field; label: string; plural: string }[] = [
 ];
 
 /** Source kinds as he would say them, on the rows, in Add and in the filter alike. */
-const KINDS: Record<string, string> = { article: "Article", youtube: "Video", pdf: "PDF", epub: "Book", markdown: "Text", snippet: "Snippet", slides: "Slides", sheet: "Spreadsheet", notebook: "Notebook", document: "Document", image: "Image", audio: "Audio", video: "Video", transcript: "Transcript" };
+const KINDS: Record<string, string> = { article: "Article", youtube: "Video", pdf: "PDF", epub: "Book", markdown: "Text", snippet: "Snippet", slides: "Slides", sheet: "Spreadsheet", notebook: "Notebook", document: "Document", image: "Image", audio: "Audio" };
 export const kindLabel = (type: string) => KINDS[type] ?? type.charAt(0).toUpperCase() + type.slice(1);
 
-/** What a file kept as its original says it is, for the many that import as an article (Codex UX sweep 5: a deck,
+/** What a file kept as its original says it is, for the many that import as an article (Codex UX sweep 6: a deck,
  *  a spreadsheet and a notebook all read "Article", and the Kind filter couldn't tell them apart). */
 const BY_EXT: Record<string, string> = {
-  pptx: "slides", key: "slides", xlsx: "sheet", csv: "sheet", tsv: "sheet", ipynb: "notebook", docx: "document", rtf: "document",
+  pptx: "slides", xlsx: "sheet", csv: "sheet", tsv: "sheet", ipynb: "notebook", docx: "document", rtf: "document",
   png: "image", jpg: "image", jpeg: "image", heic: "image", tiff: "image", webp: "image", gif: "image",
-  mp3: "audio", m4a: "audio", wav: "audio", aac: "audio", aiff: "audio", flac: "audio", mp4: "video", mov: "video", m4v: "video", vtt: "transcript", srt: "transcript",
+  mp3: "audio", m4a: "audio", wav: "audio", aac: "audio", aiff: "audio", flac: "audio",
+  // A transcript kept alone (source.vtt) is a video file, a talk on a video site, an older podcast or a subtitle
+  // file: the file can't say which, so it stays Article rather than be named wrongly.
 };
 /** A source's kind as shown and filtered: its stored type, or for an article, what its kept original is. */
 export const kindOf = (i: Pick<Item, "type" | "source_file">) => (i.type === "article" && i.source_file ? BY_EXT[i.source_file.split(".").pop()!.toLowerCase()] : undefined) ?? i.type;
