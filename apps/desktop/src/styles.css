@@ -2519,31 +2519,32 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .end-lap { animation: none; } }
 /* Under the ring: the skills the session fed, a row each (`SkillRows`). */
-.end-skills { display: grid; gap: 16px; width: 100%; max-width: 340px; margin: 24px auto 0; text-align: left; }
+.end-skills { display: flex; justify-content: center; align-items: flex-start; width: 100%; min-height: 104px; margin: 28px auto 0; }
 .end-skills[data-wait] { visibility: hidden; }
-.end-skill { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; align-items: center; animation: end-lap-in var(--t-4) var(--ease-out) calc(var(--i) * 150ms) both; }
-.end-skills[data-wait] .end-skill, .end-skills[data-wait] .end-skill-bar i { animation: none; }
-.end-skill > .skill-icon { grid-row: 1 / span 2; justify-self: center; }
-.end-skill > .skill-icon.glyph { width: 28px; height: 28px; -webkit-mask-size: 28px; mask-size: 28px; }
-.end-skill > .skill-icon.dot { width: 8px; height: 8px; }
-.end-skill-name { grid-column: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 14px/20px var(--font); color: var(--text); }
-.end-skill > b { grid-column: 3; grid-row: 1 / span 2; display: flex; align-items: center; gap: 8px; font: 400 12px/1 var(--mono); color: var(--muted); }
-.end-skill > b .dot-number { color: var(--text); }
-.end-skill[data-up] > b, .end-skill[data-up] > b .dot-number { color: var(--skill, var(--text)); }
-.end-skill-level { grid-column: 2; display: flex; align-items: center; gap: 10px; font: 400 12px/1 var(--mono); color: var(--muted); white-space: nowrap; }
-.end-skill-bar { display: flex; gap: 4px; }
-.end-skill-bar i { width: 8px; height: 8px; border-radius: 50%; background: color-mix(in oklab, var(--text) 20%, transparent); }
-.end-skill-bar i[data-on] { background: var(--muted); }
-/* The dots this session lit come on one by one, once the row is in. */
-.end-skill-bar i[data-new] { background: var(--skill, var(--text)); animation: end-skill-dot var(--t-3) var(--ease-spring); }
-.end-skill-left { display: inline-block; animation: end-skill-left var(--t-3) var(--ease-out); }
-@keyframes end-skill-left { from { color: var(--skill, var(--text)); transform: translateY(-3px); } }
-.end-skill > b[data-flip] { animation: end-skill-flip 700ms var(--ease-spring); }
-@keyframes end-skill-flip { from { transform: scale(1.6); } 40% { transform: scale(1.6); } }
-@keyframes end-skill-dot { from { background: color-mix(in oklab, var(--text) 20%, transparent); transform: scale(0.4); } }
-.end-skills-more { justify-self: center; font: 400 12px/1.3 var(--mono); color: var(--muted); border-radius: 4px; }
+/* A medal: the skill's icon in the ring of its level. It steps up large, takes its stones, and settles small. */
+.end-medal { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 104px; color: var(--skill, var(--text)); transform-origin: 50% 32px; transition: transform var(--t-4) var(--ease-spring), opacity var(--t-3) var(--ease-out); animation: end-medal-in var(--t-4) var(--ease-out) both; }
+.end-medal[data-on] { transform: scale(1.5); z-index: 1; }
+.end-skills:has([data-on]) .end-medal:not([data-on]) { opacity: 0.45; }
+@keyframes end-medal-in { from { width: 0; opacity: 0; } }
+.end-medal-ring { position: relative; display: inline-grid; place-items: center; width: 64px; height: 64px; }
+.end-medal-core { width: 64px; height: 64px; }
+.end-medal-core > .skill-icon.glyph { width: 28px; height: 28px; -webkit-mask-size: 28px; mask-size: 28px; }
+.end-medal-core > .skill-icon.dot { width: 10px; height: 10px; }
+.end-medal-core[data-beat] { animation: end-ring-beat 320ms var(--ease-spring); }
+@keyframes end-ring-beat { 35% { transform: scale(1.16); } }
+.end-medal-ring .gem-ring-lv { color: var(--text); font-size: 11px; }
+.end-medal-ring .gem-ring-lv[data-flip] { color: var(--bg); background: var(--skill, var(--text)); border-color: transparent; animation: end-lv-flip var(--t-moment) var(--ease-spring); }
+@keyframes end-lv-flip { from { transform: translateX(-50%) scale(0.4); } 40% { transform: translateX(-50%) scale(1.7); } }
+/* A new level: the ring's dots are thrown outward, once. */
+.end-medal-burst { position: absolute; inset: 0; pointer-events: none; }
+.end-medal-burst i { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; background: var(--skill, var(--text)); animation: ring-throw var(--t-moment) var(--ease-out) both; --r: 28px; --far: 26px; }
+.end-medal-fliers { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.end-medal-fliers > span { position: absolute; display: grid; place-items: center; visibility: hidden; }
+.end-medal-name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 12px/1.3 var(--mono); color: var(--muted); }
+.end-medal[data-on] .end-medal-name { color: var(--text); }
+.end-skills-more { align-self: center; margin: 0 0 28px 4px; font: 400 12px/1.3 var(--mono); color: var(--muted); border-radius: 4px; }
 .end-skills-more:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
-@media (prefers-reduced-motion: reduce) { .end-skill, .end-skill-bar i { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .end-medal, .end-medal * { animation: none !important; transition: none; } .end-medal-burst { display: none; } }
 /* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
    Each lands in hard steps, one after another, then is still. */
 .end-tally { list-style: none; display: flex; justify-content: center; gap: 16px; margin: 20px 0 0; padding: 0; }
@@ -2632,10 +2633,6 @@ button.home-plan:hover { color: var(--text); }
 /* A stone the cart dropped is cut in place (Cutting, D239): it arrives by landing, so it has no entrance of its own. */
 .review-cut > span[data-stone] { animation: none; }
 .review-cut b[data-gone] { visibility: hidden; }
-.review-stone { position: relative; color: var(--skill, var(--text)); }
-.review-stone small { font: 400 12px/1 var(--mono); color: var(--muted); }
-.end-skill-left[data-wait] { visibility: hidden; animation: none; }
-.end-skill-level { min-height: 12px; }
 .gem-cutting { position: relative; display: inline-grid; place-items: center; }
 .gem-cutting > span { display: block; transform-origin: 50% 85%; will-change: transform; }
 .gem-cutting[data-cutting] .gem { opacity: 1; }
@@ -3292,7 +3289,6 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .says.end-says .says-line { font-size: 15px; text-wrap: balance; }
 .phone .says.end-says .says-block { display: none; }
 @keyframes end-says-phone { from { opacity: 0; transform: translate(-50%, 6px) scale(0.96); } }
-.phone .end-skill-name { font-size: 16px; }
 .phone .end-skills { max-width: none; }
 /* The results stand in equal columns as wide as the rows over them and Done under them, so the pair is even about
    the screen's middle whatever each one's words (two tiles of unlike width, centred as a group, leaned left). */

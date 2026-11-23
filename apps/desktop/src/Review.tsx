@@ -22,7 +22,7 @@ import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
 import { endMood, endSays, endTiles, endVoice, weeksAgo, type Tile } from "./end-says";
 import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
-import { LapCentre, lapPlan, lapTickUp, SkillRows, overDots, Sparkles, useLap } from "./Lap";
+import { endPlan, LapCentre, lapPlan, lapTickUp, SkillRows, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
 import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useDay, useFocusWhileMounted, useLibraryChanges, type Forget, type Notify } from "./util";
 import { Working } from "./Working";
@@ -1764,37 +1764,26 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   // `old`: a gem that was cut before this session and polished in it; it shows once the cart has poured.
   const gems = [...shown.map((skill, i) => ({ skill, seam: s.grades?.[i] === "mended", polished: s.grades?.[i] === "polished", old: false })), ...(s.polished ?? []).slice(0, CUT_SHOWN - shown.length).map((skill) => ({ skill, seam: false, polished: true, old: true }))];
   const more = cutN + (s.polished?.length ?? 0) - gems.length;
-  // A skill that kept memories and cut no gem has one rough stone in the ring, with how many it kept: it flies
-  // to the skill's row as the gems do, so a day with no gem still shows where the work went.
-  const stones = quick ? [] : (s.kept_skills ?? []).filter((k) => k.n > 0 && !(s.cut ?? []).includes(k.skill) && skills.some((x) => x.id === k.skill)).slice(0, Math.max(0, 4 - Math.min(shown.length, 3)));
-  // What leaves the ring, in the order it leaves: the gems cut, then the stones.
-  const fliers = [...shown.map((skill) => ({ skill, gem: true })), ...stones.map((k) => ({ skill: k.skill, gem: false }))];
+  // What leaves the ring for the skills' rows: every memory kept, as a stone or as the gem it became.
+  const [rowPlan] = useState(() => (quick ? endPlan([], [], [], []) : endPlan(s.cut ?? [], s.kept_skills ?? [], b?.skills ?? t.skills, t.skills)));
+  const fliers = rowPlan.fliers;
   // D242: the gems land inside the ring, sized to fit it.
-  const gemSize = quick ? 36 : gems.length + stones.length <= 3 ? 56 : gems.length + stones.length <= 6 ? 48 : 32;
-  const cluster = gems.length + stones.length > 0 && (
+  const gemSize = quick ? 36 : gems.length <= 3 ? 56 : gems.length <= 6 ? 48 : 32;
+  const cluster = gems.length > 0 && (
         <p className="review-cut" aria-label={[cutN && `${cutN} became solid`, mendedN && `${mendedN} won back`, polishedN && `${polishedN} polished`].filter(Boolean).join(", ")}>
           {gems.map((g, i) => {
             const sk = skills.find((x) => x.id === g.skill);
             return (
               // With the cart, a gem is cut the moment its rough stone lands; its place is kept until then. A gem cut before today and polished now shows once the cart has poured.
               <Hint key={i} text={`${sk ? `${sk.name} · ` : ""}${g.polished ? "Polished: you passed it as a remix" : g.seam ? "Won back: you missed it once and cut it again" : "Cut: you'd still recall it three weeks from now"}`}>
-                <span data-color={sk?.color} data-fly={!g.old || undefined} data-stone={(pour && !g.old) || undefined} data-wait={(g.old ? stage === "cart" : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
+                <span data-color={sk?.color} data-fly={!g.old || undefined} data-skill={g.skill} data-stone={(pour && !g.old) || undefined} data-wait={(g.old ? stage === "cart" : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
                   {/* With the cart, the stone that lands is cut where it stands: its dots fuse into pixels (D239). */}
                   {pour && !g.old ? <Cutting go={i < landed} size={gemSize} seam={g.seam} polished={g.polished} /> : <Gem kind="cut" size={gemSize} seam={g.seam} polished={g.polished} />}
                 </span>
               </Hint>
             );
           })}
-          {stones.map((k) => {
-            const sk = skills.find((x) => x.id === k.skill);
-            return (
-              <span key={k.skill} className="review-stone" data-color={sk?.color} data-fly data-wait={stage === "cart" || landed < shown.length || undefined}>
-                <Gem kind="rough" size={Math.min(gemSize, 40)} />
-                <small>{k.n}</small>
-              </span>
-            );
-          })}
-          {more > 0 && landed >= shown.length && <b data-gone={(fliers.length > 0 && flown >= fliers.length) || undefined}>+{more}</b>}
+          {more > 0 && landed >= shown.length && <b data-gone={(shown.length > 0 && flown >= fliers.length) || undefined}>+{more}</b>}
         </p>
   );
   // The quick quiz says the count in a line of its own; the full end screen has it in the row of results.
@@ -1828,48 +1817,65 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   // last stone, and a beat more so each cut is seen. Then the count has no room to run up to the goal, so it
   // starts there.
   const calm = still();
-  const [away, setAway] = useState(calm || !!quick || gems.length + stones.length === 0);
+  const [away, setAway] = useState(calm || !!quick || gems.length === 0 && fliers.length === 0);
   // The gems cut in the ring leave it one at a time, each for the row of the skill it belongs to, where it is one
   // step to that skill's next level. The rows come in first, as the skills stood before the session.
-  const cutAll = s.cut ?? [];
-  const got: Record<string, number> = {};
-  for (const id of flown >= fliers.length ? cutAll : shown.slice(0, flown)) got[id] = (got[id] ?? 0) + 1;
-  const stoned = new Set(fliers.slice(0, flown).filter((f) => !f.gem).map((f) => f.skill));
   useEffect(() => {
     if (calm || quick || !fliers.length || !full || landed < shown.length) return;
     const id = setTimeout(() => setRowsIn(true), pour ? 500 : 1100 + gems.length * 90);
     return () => clearTimeout(id);
   }, [full, landed]);
+  // The skill up now (`SkillRows`): none yet, then each in turn, then -1 when all have been.
+  const [onStage, setOnStage] = useState<number | null>(calm || quick ? -1 : null);
   useEffect(() => {
-    if (!rowsIn || flown >= fliers.length || !host) return;
-    // A skill's gems go as one volley, close on each other's heels; a breath between skills. So the wait grows
-    // with the skills fed, not with the gems.
+    if (!rowsIn || onStage === -1 || !host) return;
+    // A skill steps up, its stones go in as one volley close on each other's heels, it is held a beat (longer
+    // for a new level) and the next steps up. So the wait grows with the skills fed, not with the stones.
     const ids: ReturnType<typeof setTimeout>[] = [];
-    let t = 450;
-    fliers.forEach(({ skill, gem }, i) => {
-      t += i === 0 ? 0 : gem && skill === fliers[i - 1]!.skill ? 110 : gem ? 380 : 240;
-      ids.push(setTimeout(() => {
-        const el = host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]")[i];
-        const to = skill ? host.querySelector(`.end-skill[data-skill="${CSS.escape(skill)}"] .end-skill-level`) ?? host.querySelector(".end-skills-more") : null;
-        if (!el) return setFlown((f) => f + 1);
-        const a = el.getBoundingClientRect(), z = to?.getBoundingClientRect();
-        // A gem with no row to go to (filed under no skill) fades where it stands.
-        const dx = z ? z.left + z.width / 2 - (a.left + a.width / 2) : 0, dy = z ? z.top + z.height / 2 - (a.top + a.height / 2) : 0;
-        el.style.zIndex = "5";
-        el.animate(z ? [{ transform: "none" }, { transform: `translate(${dx * 0.3}px, ${dy * 0.1 - 26}px) scale(0.85)`, offset: 0.4 }, { transform: `translate(${dx}px, ${dy}px) scale(0.18)` }] : [{ opacity: 1 }, { opacity: 0 }], { duration: 520, easing: "cubic-bezier(0.45, 0, 0.3, 1)", fill: "forwards" }).onfinish = () => {
-          el.style.visibility = "hidden";
-          if (z) layer(gem ? "right" : "tap", { up: END_NOTES[Math.min(i, END_NOTES.length - 1)] ?? 0, level: gem ? 0.6 : 0.45 });
-          setFlown((f) => f + 1);
-        };
-      }, t));
+    let t = 200;
+    rowPlan.rows.forEach((r, row) => {
+      ids.push(setTimeout(() => setOnStage(row), t));
+      t += 520;
+      r.slots.forEach((kind, d) => {
+        const i = r.first + d;
+        t += d === 0 ? 0 : kind === "cut" ? 150 : 80;
+        ids.push(setTimeout(() => {
+          const slot = host.querySelector<HTMLElement>(`[data-slot="${i}"]`), medal = host.querySelector<HTMLElement>(`.end-medal-ring[data-row="${row}"]`);
+          if (!slot || !medal) return setFlown((n) => n + 1);
+          // A gem leaves from where it was cut in the ring; a stone comes out of the ring's middle.
+          const src = kind === "cut" ? host.querySelector<HTMLElement>(`.review-cut > span[data-fly][data-skill="${CSS.escape(r.skill)}"]:not([data-gone])`) : null;
+          const a = (src ?? host.querySelector(".end-ring")!).getBoundingClientRect(), z = medal.getBoundingClientRect();
+          const w = kind === "cut" ? 28 : 20, x = z.left + z.width / 2 - w / 2, y = z.top + z.height / 2 - w / 2;
+          const dx = a.left + a.width / 2 - (z.left + z.width / 2), dy = a.top + a.height / 2 - (z.top + z.height / 2);
+          const big = src ? a.width / w : 1.4;
+          if (src) (src.setAttribute("data-gone", ""), (src.style.visibility = "hidden"));
+          const ghost = slot.cloneNode(true) as HTMLElement;
+          ghost.removeAttribute("data-slot");
+          Object.assign(ghost.style, { position: "fixed", left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${w}px`, zIndex: "5", pointerEvents: "none", visibility: "visible", color: getComputedStyle(medal).color });
+          document.body.append(ghost);
+          // It lifts off, arcs over and drops into the medal, which takes it with a beat.
+          ghost.animate([
+            { transform: `translate(${dx}px, ${dy}px) scale(${src ? big : 0.3})`, opacity: src ? 1 : 0 },
+            { transform: `translate(${dx * 0.6}px, ${dy * 0.8 - 30}px) scale(${big * 1.1})`, opacity: 1, offset: 0.32 },
+            { transform: "translate(0, 0) scale(1.2)", opacity: 1, offset: 0.9 },
+            { transform: "translate(0, 0) scale(0.4)", opacity: 0 },
+          ], { duration: kind === "cut" ? 620 : 480, easing: "cubic-bezier(0.5, 0, 0.25, 1)" }).onfinish = () => {
+            ghost.remove();
+            layer(kind === "cut" ? "right" : "tap", { up: END_NOTES[Math.min(kind === "cut" ? d : row, END_NOTES.length - 1)] ?? 0, level: kind === "cut" ? 0.6 : 0.3 });
+            setFlown((n) => n + 1);
+          };
+        }, t));
+      });
+      t += (r.slots.length ? (r.slots[r.slots.length - 1] === "cut" ? 620 : 480) : 0) + (ups.some((k) => k.skill === r.skill) ? 1300 : 550);
     });
+    ids.push(setTimeout(() => setOnStage(-1), t));
     return () => ids.forEach(clearTimeout);
   }, [rowsIn, host]);
   useEffect(() => {
-    if (away || !full || landed < shown.length || flown < fliers.length) return;
-    const id = setTimeout(() => setAway(true), fliers.length ? 600 : pour ? 1100 : 1400 + gems.length * 90);
+    if (away || !full || landed < shown.length || (fliers.length > 0 && onStage !== -1)) return;
+    const id = setTimeout(() => setAway(true), fliers.length ? 350 : pour ? 1100 : 1400 + gems.length * 90);
     return () => clearTimeout(id);
-  }, [away, full, landed, flown]);
+  }, [away, full, landed, onStage]);
   const [plan] = useState(() => {
     const p = lapPlan(b, t);
     return away ? p : { ...p, from: Math.max(p.from, Math.min(p.to, p.goal || p.to)) };
@@ -1891,7 +1897,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   // Each minute the count takes ticks, a little higher each time, up to an octave.
   useEffect(() => void (!quick && !calm && full && away && lap.min > plan.from && layer("tap", { up: lapTickUp(plan, lap.min), level: 0.35 })), [lap.min]);
   // A skill that went up a level rings the goal's chime as its last gem lands.
-  useEffect(() => void (!calm && shown.length > 0 && flown >= fliers.length && ups.length > 0 && once("goal", 0.1)), [flown]);
+  useEffect(() => void (!calm && onStage !== null && onStage >= 0 && ups.some((k) => k.skill === rowPlan.rows[onStage]?.skill) && flown >= rowPlan.rows[onStage]!.first + rowPlan.rows[onStage]!.slots.length && sfx("goal", { after: 0.05 })), [flown]);
   // "Caught up" never hides the new cards the daily limits hold back (D65).
   const held = t.caught_up && t.new_waiting > 0 && <p className="quiz-faint">{waiting(t)}</p>;
   return (
@@ -1918,7 +1924,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
               {away ? <LapCentre min={lap.min} /> : cluster}
             </div>
           </div>
-          <SkillRows cut={cutAll} got={got} kept={stones} stoned={calm ? null : stoned} was={b?.skills ?? []} now={t.skills} skills={skills} run={calm || rowsIn} />
+          <SkillRows plan={rowPlan} flown={flown} stage={onStage ?? (calm ? -1 : 0)} was={b?.skills ?? []} now={t.skills} skills={skills} run={calm || rowsIn} />
           <Tally tiles={tiles} go={rowed} onDone={() => setTallied(true)} />
           {held}
         </>

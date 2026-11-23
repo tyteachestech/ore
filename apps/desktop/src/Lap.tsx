@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Hint } from "./Hint";
-import { DotNumber, minutes } from "./Ring";
+import { DotNumber, DotRing, minutes } from "./Ring";
+import { Gem } from "./Gem";
 import { still } from "./SideCursor";
 import { SkillIcon } from "./IconPicker";
 import { type Skill, type Today } from "./ore";
@@ -84,63 +85,84 @@ export function LapCentre({ min }: { min: number }) {
  *  quietest thing in its own row" and "+9" had no unit).
  *  One that went up leads, then the ones fed most, three at most. A memory filed under no skill is named as the
  *  review picker names it, and has no level. `was` and `now` are each skill's strength before and after. */
-export function SkillRows({ cut, got, kept, stoned, was, now, skills, run }: { cut: string[]; got: Record<string, number>; /** Skills that kept memories and cut no gem, and the ones whose stone has landed (null: all). */ kept: { skill: string; n: number }[]; stoned: Set<string> | null; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
+/** What the end screen's rows show and what flies to them, worked out once so the screen and the flight agree.
+ *  A row is a skill the session fed; its line is the session's own stones for it, one per memory kept: the ones
+ *  that became gems first, then the ones one good answer from a gem, then the rest. A flier is one of those,
+ *  leaving the ring for its place in the line. Skills that went up lead, then by gems, then by memories kept. */
+export type EndRow = { skill: string; cut: number; kept: number; slots: ("cut" | "ready" | "rough")[]; extra: number; first: number };
+export function endPlan(cut: string[], kept: { skill: string; n: number }[], was: Today["skills"], now: Today["skills"]): { rows: EndRow[]; fliers: { skill: string; kind: "cut" | "ready" | "rough"; row: number }[]; more: number } {
   const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
-  const n = new Map<string, number>();
-  // A gem filed under no skill has no level to feed, so no row.
-  for (const id of cut) if (of(now, id)) n.set(id, (n.get(id) ?? 0) + 1);
   const up = (id: string) => (of(now, id)?.level ?? 0) > (of(was, id)?.level ?? of(now, id)?.level ?? 0);
-  const all = [...[...n.keys()].sort((x, y) => Number(up(y)) - Number(up(x)) || n.get(y)! - n.get(x)!), ...kept.map((k) => k.skill)], rows = all.slice(0, all.length > REEL_ROWS ? REEL_ROWS - 1 : REEL_ROWS);
-  if (!rows.length) return null;
-  // Where the skill stands once `got` of its gems have landed: a gem is one step, and a full level flips.
-  const at = (id: string) => {
-    const k = of(now, id), b = of(was, id) ?? k;
-    if (!k || !b) return null;
-    const here = Math.min(got[id] ?? 0, n.get(id)!), count = here >= n.get(id)! ? Math.max(k.peak, b.peak + here) : b.peak + here;
+  const ids = [...new Set([...cut, ...kept.map((k) => k.skill)])].filter((id) => of(now, id));
+  const all = ids.map((id) => {
+    const c = cut.filter((x) => x === id).length, n = Math.max(c, kept.find((k) => k.skill === id)?.n ?? 0);
+    const near = Math.min(of(now, id)!.ready, n - c);
+    const line = [...Array<"cut">(c).fill("cut"), ...Array<"ready">(near).fill("ready"), ...Array<"rough">(n - c - near).fill("rough")];
+    return { skill: id, cut: c, kept: n, slots: line.slice(0, LINE), extra: Math.max(0, n - LINE), first: 0 };
+  }).sort((x, y) => Number(up(y.skill)) - Number(up(x.skill)) || y.cut - x.cut || y.kept - x.kept);
+  const rows = all.slice(0, all.length > REEL_ROWS ? REEL_ROWS - 1 : REEL_ROWS);
+  const fliers = rows.flatMap((r, row) => ((r.first = rows.slice(0, row).reduce((n, x) => n + x.slots.length, 0)), r.slots.map((kind) => ({ skill: r.skill, kind, row }))));
+  return { rows, fliers, more: all.length - rows.length };
+}
+/** The most stones a row's line holds; past it the line ends on "+N". */
+const LINE = 8;
+
+/** Under the end screen's ring: a medal for each skill the session fed, and no sentence in it (Tyler, 2026-11-23,
+ *  of "4 kept · 3 nearly gems": "I don't want to read it. I want to feel it with an animation"). A medal is the
+ *  skill's icon inside the ring of its level, the level on its rim. The skills step up one at a time (`stage`:
+ *  the one up now, -1 once all have been): the medal comes in large, the session's stones for it fly in from the
+ *  ring above (`flown`: how many of the plan's fliers have landed), each gem lights its share of the ring, a new
+ *  level throws the ring's dots outward and turns the number, and it settles small as the next steps up. The dim
+ *  dots ahead are the memories one good answer from a gem. One thing at a time, the level a ring round the
+ *  thing itself: Duolingo's lesson end and level up, Mimo, Finch's bar (Mobbin, 2026-11-23).
+ *  `was` and `now` are each skill's strength before and after. */
+export function SkillRows({ plan, flown, stage, was, now, skills, run }: { plan: ReturnType<typeof endPlan>; flown: number; stage: number; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
+  const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
+  if (!plan.rows.length) return null;
+  const all = flown >= plan.fliers.length;
+  // Where the skill's level stands with the gems that have landed so far.
+  const at = (r: EndRow) => {
+    const k = of(now, r.skill)!, b = of(was, r.skill) ?? k;
+    const here = all ? r.cut : Math.min(r.cut, Math.max(0, flown - r.first)), count = all ? Math.max(k.peak, b.peak + here) : b.peak + here;
     const lv = Math.floor(Math.sqrt(count / 5)), from = 5 * lv ** 2, next = 5 * (lv + 1) ** 2;
-    const before = lv > b.level ? 0 : Math.round(((b.peak - from) / (next - from)) * BAR);
-    // A skill that went up filled the level it was on: its bar stays full, in its colour, and says so.
-    if (lv > b.level) return { lv, up: true, line: `reached level ${lv}`, before: 0, to: BAR, here };
-    return { lv, up: false, line: `${next - count} to level ${lv + 1}`, before: Math.max(0, before), to: Math.max(before, Math.round(((count - from) / (next - from)) * BAR)), here };
+    // A skill that went up filled the level it was on: its ring stays full.
+    return { lv, up: lv > b.level, share: lv > b.level ? 1 : (count - from) / (next - from), soon: lv > b.level ? 0 : Math.min(k.ready, next - count) / (next - from), here, in: Math.min(r.slots.length, Math.max(0, flown - r.first)) };
   };
   const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
-  // A skill with no gem today says what it kept, and how many of its stones are one good answer from a gem.
-  const stone = (id: string) => {
-    const k = kept.find((x) => x.skill === id);
-    if (!k) return null;
-    const near = of(now, id)?.ready ?? 0;
-    return `${k.n} kept${near > 0 ? ` · ${near} nearly ${near === 1 ? "a gem" : "gems"}` : ""}`;
-  };
-  const said = all.map((id) => [name(id), stone(id) ?? `${n.get(id)} ${n.get(id) === 1 ? "gem" : "gems"}`, up(id) && `level ${of(now, id)!.level}`].filter(Boolean).join(", ")).join(" · ");
-  const more = all.length - rows.length;
+  const said = (r: EndRow, lv: number) => [name(r.skill), `${r.kept} kept`, r.cut > 0 && `${r.cut} became ${r.cut === 1 ? "a gem" : "gems"}`, `level ${lv}`].filter(Boolean).join(" · ");
   return (
     // Its room is held from the start, so the results under it never move when it comes in.
     <div className="end-skills" data-wait={!run || undefined}>
-      <span className="sr-only">{said}</span>
-      {rows.map((id, i) => {
-        const s = skills.find((x) => x.id === id), st = stone(id), lv = st ? null : at(id), k = of(now, id);
+      <span className="sr-only">{plan.rows.map((r) => said(r, of(now, r.skill)!.level)).join(". ")}</span>
+      {plan.rows.map((r, i) => {
+        const s = skills.find((x) => x.id === r.skill), lv = at(r);
+        if (stage >= 0 && i > stage) return null;
         return (
-          <div key={id} className="end-skill" data-skill={id} data-color={s?.color} data-up={lv?.up || undefined} aria-hidden="true" style={{ "--i": i } as React.CSSProperties}>
-            <SkillIcon icon={s?.icon} color={s?.color} dot />
-            <span className="end-skill-name">{name(id)}</span>
-            {lv && <b key={lv.lv} data-flip={lv.up || undefined}>Level <DotNumber value={lv.lv} height={24} /></b>}
-            {st && k && <b>Level <DotNumber value={k.level} height={24} /></b>}
-            <span className="end-skill-level">
-              {lv && <span className="end-skill-bar">{Array.from({ length: BAR }, (_, d) => <i key={d} data-on={d < lv.before || undefined} data-new={(d >= lv.before && d < lv.to) || undefined} />)}</span>}
-              {lv && <span key={lv.here} className="end-skill-left">{lv.line}</span>}
-              {st && <span className="end-skill-left" data-wait={(stoned && !stoned.has(id)) || undefined}>{st}</span>}
-            </span>
-          </div>
+          <Hint key={r.skill} text={said(r, lv.lv)}>
+            <div className="end-medal" data-skill={r.skill} data-color={s?.color} data-on={stage === i || undefined} data-up={lv.up || undefined}>
+              <span className="end-medal-ring" data-row={i} aria-hidden="true">
+                <span className="end-medal-core gem-ring" data-beat={lv.in || undefined} key={lv.in}>
+                  <DotRing size={MEDAL} share={lv.share} ghost={lv.soon} step />
+                  <SkillIcon icon={s?.icon} color={s?.color} dot />
+                </span>
+                {lv.up && <span className="end-medal-burst">{Array.from({ length: 12 }, (_, d) => <i key={d} style={{ "--a": `${d * 30}deg` } as React.CSSProperties} />)}</span>}
+                <b className="gem-ring-lv" key={lv.lv} data-flip={lv.up || undefined}>{lv.lv}</b>
+                {/* What flies in, drawn once here so the flight can lift a copy of it. */}
+                <span className="end-medal-fliers">{r.slots.map((kind, d) => <span key={d} data-slot={r.first + d}><Gem kind={kind} size={kind === "cut" ? 28 : 20} /></span>)}</span>
+              </span>
+              <span className="end-medal-name">{name(r.skill)}</span>
+            </div>
+          </Hint>
         );
       })}
-      {/* Three rows at most; a session that fed more says how many, and names them all on hover and focus. */}
-      {more > 0 && <Hint text={`Gems cut this session · ${said}`}><span className="end-skills-more" tabIndex={0}>and {more} more {more === 1 ? "skill" : "skills"}</span></Hint>}
+      {/* Three at most; a session that fed more says how many. */}
+      {plan.more > 0 && (stage < 0 || stage >= plan.rows.length - 1) && <span className="end-skills-more">+{plan.more}</span>}
     </div>
   );
 }
 const REEL_ROWS = 3;
-/** The dots in a row's bar to the next level. */
-const BAR = 10;
+/** A medal's ring, in px. */
+const MEDAL = 64;
 
 /** White sparkles over the ring's bonus dots, for as long as the end screen is up: small crosses of dots that
  *  open and fade, only on the stretch past the goal, so they also say how far it went. A few past the goal,
