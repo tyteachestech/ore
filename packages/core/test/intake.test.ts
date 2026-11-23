@@ -6,7 +6,7 @@ import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/i
 import { addPageText, addSource, addTab, addText, audioOf, fillOwed, hasPageText, redoPageText, reimportSource, undoPageText } from "../src/ingest/index.ts";
 import { addHighlight, readAnnotations } from "../src/annotations.ts";
 import { cutText } from "../src/cut.ts";
-import { findItem } from "../src/items.ts";
+import { findItem, listItems } from "../src/items.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
@@ -860,6 +860,11 @@ describe("import coverage: awkward files", () => {
     await expect(addSource(lib, put(".DS_Store", new Uint8Array([0, 0, 0, 1, 0x42, 0x75, 0x64, 0x31])))).rejects.toThrow(/Finder keeps for itself.*Add the file you meant/);
     await expect(addSource(lib, put("._notes.md", "x"))).rejects.toThrow(/Finder keeps for itself/);
     await expect(addSource(lib, put("blob", new Uint8Array([0x7f, 0x45, 0, 1])))).rejects.toThrow(/no extension and isn’t text/);
+    // F4: a binary file named .md or .txt is refused with the next step, not saved as a source of junk.
+    const png = readFileSync(file("screenshot.png"));
+    await expect(addSource(lib, put("photo.md", png))).rejects.toThrow(/“photo\.md” isn’t text.*real ending/);
+    await expect(addSource(lib, put("photo.txt", png))).rejects.toThrow(/isn’t text/);
+    expect(listItems(lib)).toHaveLength(0);
   });
 
   test("a # comment in fenced code is not the title", async () => {

@@ -263,7 +263,8 @@ describe("reimport", () => {
     unlinkSync(join(audio.dir, "source.mp3"));
     expect(canReimport(findItem(lib, audio.meta.id))).toBe(false);
     const before = readFileSync(audio.docPath, "utf8");
-    await expect(reimportSource(lib, audio.meta.id)).rejects.toThrow("from a link or a file");
+    // F5: it says the file is gone, not that the source never came from one.
+    await expect(reimportSource(lib, audio.meta.id)).rejects.toThrow(/file it came from is no longer kept.*Add the file again/);
     expect(readFileSync(audio.docPath, "utf8")).toBe(before);
   });
 

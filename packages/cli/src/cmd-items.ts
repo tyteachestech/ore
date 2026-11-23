@@ -5,10 +5,10 @@ import {
   undoReimport,
   readTables,
   tablesState,
-  doclingHome,
-  doclingPath,
-  installDocling,
-  removeDocling,
+  paddleHome,
+  paddlePath,
+  installPaddle,
+  removePaddle,
   cutText,
   restoreCut,
   redoCut,
@@ -26,12 +26,12 @@ import {
 import type { Command } from "./types.ts";
 
 /** What follows an add, from `ore add` or a link the iPhone queued: enrichment in the background (also for a Feed
- *  post now kept, which wasn't yet), and a PDF's tables and formulas once the optional reader is installed (D125). */
+ *  post now kept, which wasn't yet), and every PDF's pages once the optional reader is installed (D125, D346). */
 function afterAdd(lib: Library, item: Awaited<ReturnType<typeof addSource>>, noEnrich: boolean): string {
   const kept = !!item.kept;
   const enrich = noEnrich || (kept && !item.fromFeed) ? "skipped" : startEnrich(lib, item.meta.id);
   if (noEnrich && !kept) markEnrichSkipped(lib, item.meta.id);
-  if (!kept && item.meta.structure?.length && doclingPath()) startTables(lib, item.meta.id);
+  if (!kept && item.meta.type === "pdf" && paddlePath()) startTables(lib, item.meta.id);
   return enrich;
 }
 import { fromBase64, int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
@@ -611,7 +611,7 @@ export const itemCommands: Record<string, Command> = {
   },
 
   tables: {
-    usage: "<item> [--status] | --install | --remove | --status   read a PDF's tables and display formulas with Docling and put them in its text in place of their lines; highlights stay (D125). Docling is an optional download of about 2 GB: --install gets it, --remove deletes it, --status says whether it is here (and, for a PDF read, its step). Undo with `ore reimport <item> --undo --step <step>`",
+    usage: "<item> [--status] | --install | --remove | --status   read a PDF's pages with PaddleOCR-VL and mark its headings and put its tables and display formulas in its text in place of their lines; the words and highlights stay (D125, D346). The reader is an optional download of about 4 GB: --install gets it, --remove deletes it, --status says whether it is here (and, for a PDF read, its step). Undo with `ore reimport <item> --undo --step <step>`",
     options: { install: { type: "boolean" }, remove: { type: "boolean" }, status: { type: "boolean" } },
     async run([ref], f) {
       if (f.status && ref) {
@@ -620,21 +620,21 @@ export const itemCommands: Record<string, Command> = {
         return { data: tablesState(lib, findItem(lib, ref)), text: "" };
       }
       if (f.status) {
-        const installed = !!doclingPath();
-        return { data: { installed, path: installed ? doclingHome() : undefined }, text: installed ? `The table and formula reader is installed (${doclingHome()})` : "The table and formula reader isn't installed. Get it with `ore tables --install`." };
+        const installed = !!paddlePath();
+        return { data: { installed, path: installed ? paddleHome() : undefined }, text: installed ? `The PDF page reader is installed (${paddleHome()})` : "The PDF page reader isn't installed. Get it with `ore tables --install`." };
       }
       if (f.remove) {
-        await removeDocling();
-        return { data: { installed: false }, text: "Removed the table and formula reader" };
+        await removePaddle();
+        return { data: { installed: false }, text: "Removed the PDF page reader" };
       }
       if (f.install) {
-        const home = await installDocling((done, of, label) => progress(done - 1, of, label, `${label}… (${done} of ${of})`));
-        return { data: { installed: true, path: home }, text: `Installed the table and formula reader (${home})` };
+        const home = await installPaddle((done, of, label) => progress(done - 1, of, label, `${label}… (${done} of ${of})`));
+        return { data: { installed: true, path: home }, text: `Installed the PDF page reader (${home})` };
       }
       const lib = openLibrary();
       const r = await readTables(lib, findItem(lib, need(ref, "<item>")).meta.id);
       const data = { id: r.item.meta.id, title: r.item.meta.title, changed: r.changed, regions: r.regions, moved: r.moved, removed: r.removed.map(brief), unplaced: r.unplaced.map(brief), step: r.step };
-      return { data, text: !r.changed ? `Found no tables or formulas to add in ${r.item.meta.title}` : `Read ${r.regions} table(s) and formula(s) into ${r.item.meta.title}` };
+      return { data, text: !r.changed ? `Found nothing to change in ${r.item.meta.title}` : `Read ${r.regions} heading(s), table(s) and formula(s) into ${r.item.meta.title}` };
     },
   },
 

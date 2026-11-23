@@ -52,9 +52,9 @@ export * from "./ai/explain.ts";
 export * from "./ai/recall.ts";
 export * from "./ai/check.ts";
 export * from "./cut.ts";
-export { doclingHome, doclingPath } from "./ingest/docling-path.ts";
-// Loaded only when called: Docling's runner needs Bun and node:fs/promises, which the iPhone app has not.
-type Docling = typeof import("./ingest/docling.ts");
-export const installDocling = async (...a: Parameters<Docling["installDocling"]>) => (await import("./ingest/docling.ts")).installDocling(...a);
-export const removeDocling = async () => (await import("./ingest/docling.ts")).removeDocling();
+export { paddleHome, paddlePath } from "./ingest/paddle-path.ts";
+// Loaded only when called: the page reader's runner needs Bun and node:fs/promises, which the iPhone app has not.
+type Paddle = typeof import("./ingest/paddle.ts");
+export const installPaddle = async (...a: Parameters<Paddle["installPaddle"]>) => (await import("./ingest/paddle.ts")).installPaddle(...a);
+export const removePaddle = async () => (await import("./ingest/paddle.ts")).removePaddle();
 export * from "./inbox.ts";
