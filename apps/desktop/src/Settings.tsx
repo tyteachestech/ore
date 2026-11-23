@@ -28,10 +28,10 @@ type Data = { library: string; ai: Vendor; ai_env: string | null; model: string;
 type Model = { id: string; label: string; description?: string };
 
 const SECTIONS = [
+  { id: "general", label: "General", icon: GearSix },
   { id: "reading", label: "Reading", icon: BookOpen },
   { id: "review", label: "Review", icon: Target },
   { id: "ai", label: "AI", icon: Sparkle },
-  { id: "general", label: "General", icon: GearSix },
   { id: "shortcuts", label: "Keyboard shortcuts", icon: Keyboard },
 ] as const;
 type Section = (typeof SECTIONS)[number]["id"];
@@ -362,6 +362,18 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                     </Row>
                 )}
               </Group>
+              <Group title="Sound">
+                <Row title="Sound effects" text="A short sound when you show an answer, rate it, reach your goal and finish." htmlFor="sounds">
+                  <Switch.Root id="sounds" className="switch" checked={sounds} onCheckedChange={setSounds}>
+                    <Switch.Thumb className="switch-thumb" />
+                  </Switch.Root>
+                </Row>
+                <Row title="Mole’s voice" text={VOICE_TEXT} htmlFor="voice">
+                  <Switch.Root id="voice" className="switch" checked={voice} onCheckedChange={setVoice}>
+                    <Switch.Thumb className="switch-thumb" />
+                  </Switch.Root>
+                </Row>
+              </Group>
             </Tabs.Content>
 
             <Tabs.Content value="review" tabIndex={-1}>
@@ -441,18 +453,6 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                   </Row>
                 </Group>
               )}
-              <Group title="Sound">
-                <Row title="Sound effects" text="A short sound when you show an answer, rate it, reach your goal and finish." htmlFor="sounds">
-                  <Switch.Root id="sounds" className="switch" checked={sounds} onCheckedChange={setSounds}>
-                    <Switch.Thumb className="switch-thumb" />
-                  </Switch.Root>
-                </Row>
-                <Row title="Mole’s voice" text={VOICE_TEXT} htmlFor="voice">
-                  <Switch.Root id="voice" className="switch" checked={voice} onCheckedChange={setVoice}>
-                    <Switch.Thumb className="switch-thumb" />
-                  </Switch.Root>
-                </Row>
-              </Group>
             </Tabs.Content>
 
             <Tabs.Content value="shortcuts" tabIndex={-1}>

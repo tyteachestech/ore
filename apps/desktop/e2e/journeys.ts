@@ -7747,7 +7747,7 @@ journey("review sounds: showing the answer ticks and a rating shines, ⌘Z is si
   const q = page.locator(".review-q");
   const sounds = async (on: boolean) => {
     await page.keyboard.press("Meta+Comma");
-    await page.getByRole("tab", { name: "Review" }).click();
+    await page.getByRole("tab", { name: "General" }).click();
     const sw = page.getByRole("switch", { name: "Sound effects" });
     if (((await sw.getAttribute("aria-checked")) === "true") !== on) await sw.click();
     await until(`Sound effects is ${on ? "on" : "off"}`, async () => ((await sw.getAttribute("aria-checked")) === "true") === on);
@@ -15440,6 +15440,9 @@ journey("Settings: enlarged to 200% the sections run across the top and no choic
   await settings.waitFor();
   const tabs = settings.getByRole("tab");
   const n = await tabs.count();
+  // General first and shortcuts last, as a Mac app's settings run; between them the order he works in (D347).
+  const names = (await tabs.allInnerTexts()).map((t) => t.trim()).join(", ");
+  if (names !== "General, Reading, Review, AI, Keyboard shortcuts") throw new Error(`the sections read: ${names}`);
   const tops = await tabs.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
   if (new Set(tops).size !== 1) throw new Error(`the sections are not one row across the top: tops ${tops.join(", ")}`);
   for (let i = 0; i < n; i++) {
