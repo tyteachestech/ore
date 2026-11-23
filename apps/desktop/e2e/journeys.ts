@@ -9,7 +9,7 @@
 //   ORE_E2E_REPEAT=30                each picked journey that many times in a row, to catch a flaky one
 //   ORE_E2E_CPU=6                    Chromium's CPU slowed that many times, as a busy CI runner is
 //   ORE_E2E_SLOW='{"ls":800}'        those `ore` commands answer that many ms late (window.__ORE_SLOW), to widen a race
-import { chromium, devices, webkit, type Browser, type Locator, type Page } from "playwright";
+import { chromium, devices, webkit, type Browser, type Locator, type Page, type Route } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -12889,7 +12889,8 @@ journey("phone: renaming a low Continue reading row on Today keeps the field abo
 
 journey("phone: Remove on a link still being read takes it off at once (F79)", async (page) => {
   // The remove waited its turn behind the read of a link that hung, so the tap showed nothing for 15 s.
-  await page.route("https://example.com/articles/slow", () => {}); // never answers
+  const held: Route[] = [];
+  await page.route("https://example.com/articles/slow", (r) => void held.push(r)); // never answers
   await tap(page, page.getByRole("button", { name: "Add a link" }));
   await page.locator(".add-link input.field").fill("https://example.com/articles/slow");
   await tap(page, page.getByRole("button", { name: "Add", exact: true }));
@@ -12897,6 +12898,8 @@ journey("phone: Remove on a link still being read takes it off at once (F79)", a
   const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/slow" });
   await tap(page, row.getByRole("button", { name: "Remove" }));
   await row.waitFor({ state: "detached", timeout: 1000 });
+  // The hung read is let go, so the journey leaves no call in flight (the phone build counts its calls too, F477).
+  for (const r of held) await r.abort();
 }, "phone");
 
 journey("phone: a jump from Sections puts the heading below the Back bar, not under it (F73)", async (page) => {
