@@ -549,6 +549,9 @@ export function PhoneApp() {
   const [skillNote, setSkillNote] = useState(!!start.skillNote);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(start.openId);
+  /** The source open now, for a callback made while another was (Finish's moment). */
+  const openNow = useRef(openId);
+  openNow.current = openId;
   const [noting, setNoting] = useState(!!start.noting);
   /** What the page beside the source shows: the note, or what he collected (a tap on the collected count). */
   const [side, setSide] = useState<SideTab>(start.side ?? "note");
@@ -1219,9 +1222,10 @@ export function PhoneApp() {
             onChanged={() => void refresh()}
             onSkillsChanged={() => void refresh()}
             onDone={() => {
-              // Only the source he finished closes: one he opened during the moment's second stays (Codex UX sweep 16).
-              const was = openId;
-              setOpenId((now) => (was && now !== was ? now : null));
+              // Only the source he finished closes: one he opened during the moment's second stays, and so does a
+              // Finish he started on it (Codex UX sweeps 16, 17).
+              if (openNow.current !== openId) return void refresh();
+              setOpenId(null);
               setFinishing(false);
               void refresh();
             }}
