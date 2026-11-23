@@ -51,7 +51,7 @@ export function Timeline({ history, rating }: { history: CardHistory; rating: 1 
   return (
     <>
     {PHONE && dots.length ? (
-      <button className="timeline-tap" aria-expanded={listed} aria-label={`${count(dots.length, "review")}: ${listed ? "hide" : "show"} each one's rating and date`} onClick={() => setListed((v) => !v)}>
+      <button className="timeline-tap" aria-expanded={listed} aria-label={`${count(dots.length, "review")}; next ${inWords(history.next[rating])} if ${RATINGS[rating - 1]}. ${listed ? "Hide" : "Show"} each one's rating and date`} onClick={() => setListed((v) => !v)}>
         {line}
       </button>
     ) : (

@@ -9382,7 +9382,7 @@ journey("tutor: a chat list that can't be read says so with Try again, not No ch
     await page.getByText("Couldn’t read your chats").waitFor({ timeout: 3000 });
     if (await page.getByText("No chats yet").count()) throw new Error("a failed read said No chats yet");
     await page.evaluate(() => ((window as unknown as Record<string, unknown>).__ORE_FAIL = {}));
-    await page.getByRole("button", { name: "Try again" }).click();
+    await page.getByRole("option", { name: "Try again" }).click();
     await until("the error goes once the read works", async () => !(await page.getByText("Couldn’t read your chats").count()));
   } finally {
     await page.evaluate(() => ((window as unknown as Record<string, unknown>).__ORE_FAIL = {}));

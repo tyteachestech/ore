@@ -843,14 +843,22 @@ export function PhoneApp() {
     if (t.kind === "item") {
       open(t.id, undefined, true);
       if (from) backTo.current.push(from);
-      if (note) setNoting(true);
-    } else (setOpenId(null), setSkill(t.id));
+      if (note) (setSide("note"), setNoting(true));
+    } else {
+      backTo.current = [];
+      setOpenId(null);
+      setSkill(t.id);
+      // A Linked from row quoting a skill's note opens that note (Codex UX sweep 9).
+      if (note) setSkillNote(true);
+    }
   };
-  /** Back from a source: to the note a link left, else out of the source. */
+  /** Back from a source: to the note a link left (on its note, nothing of this source's left over), else out. Back
+   *  to a note is a step inside the source's screen (`stay`): it stays, the earlier source in place of this one. */
   const backFromSource = () => {
     const prev = backTo.current.pop();
     if (!prev) return setOpenId(null);
-    setOpenId(prev);
+    open(prev, undefined, true);
+    setSide("note");
     setNoting(true);
   };
   // What the share card's Open asked for, as soon as it is in the list; given up after half a minute (it
@@ -1174,10 +1182,10 @@ export function PhoneApp() {
         </Boundary>
       </Screen>
     ) : openId && (startKnown || openId !== start.openId) ? (
-      <Screen className="phone-full phone-reader phone-source" onBack={backFromSource} onForward={setNoting}>
+      <Screen className="phone-full phone-reader phone-source" onBack={backFromSource} onForward={setNoting} stay={backTo.current.length > 0}>
         {/* From the note, Back returns to the source, as the left-edge swipe does. */}
-        <Back label={noting ? "Source" : "Back"} title={noting && side === "questions" ? "Collected" : undefined} stay={noting} onClick={() => (noting ? setNoting(false) : backFromSource())} />
-        <Boundary onBack={() => setOpenId(null)}>
+        <Back label={noting ? "Source" : "Back"} title={noting && side === "questions" ? "Collected" : undefined} stay={noting || backTo.current.length > 0} onClick={() => (noting ? setNoting(false) : backFromSource())} />
+        <Boundary onBack={() => ((backTo.current = []), setOpenId(null))}>
           <Reader
             key={openId}
             id={openId}
@@ -1207,7 +1215,7 @@ export function PhoneApp() {
             blocked={false}
             targets={targets}
             onOpenLink={openLink}
-            onBack={() => setOpenId(null)}
+            onBack={backFromSource}
             onChanged={() => void refresh()}
             onSkillsChanged={() => void refresh()}
             onDone={() => {

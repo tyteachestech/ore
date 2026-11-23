@@ -1229,10 +1229,11 @@ function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void })
             <Command.Input className="menu-input" placeholder="Find a chat…" value={query} onValueChange={setQuery} autoFocus />
             <Command.List>
               {failed && (
-                <div className="tutor-chats-none" role="alert">
-                  Couldn’t read your chats: {failed}{" "}
-                  <button className="retry" onClick={load}>Try again</button>
-                </div>
+                <>
+                  <div className="tutor-chats-none" role="alert">Couldn’t read your chats: {failed}</div>
+                  {/* An item, so ↓ and ↵ reach it from the filter as well as a click (Codex UX sweep 9 review). */}
+                  <Command.Item value="try again" onSelect={load}>Try again</Command.Item>
+                </>
               )}
               {rows && !shown.length && <Command.Empty className="tutor-chats-none">{query.trim() ? "No chat by that name" : "No chats yet"}</Command.Empty>}
               {chatGroups(shown).map((g) => (
