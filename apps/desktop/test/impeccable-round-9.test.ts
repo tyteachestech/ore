@@ -13,7 +13,7 @@ test("a source's kind has one name: the filter, the rows and Add all say Text (F
   expect(kindLabel("markdown")).toBe("Text");
   // One map: All sources' rows read it from filters.ts instead of keeping their own.
   expect(src("App.tsx")).not.toMatch(/const KIND\b/);
-  expect(src("App.tsx")).toContain("kindLabel(r.type)");
+  expect(src("App.tsx")).toContain("kindLabel(kindOf(r))"); // by what the kept original is (Codex UX sweep 6)
 });
 
 test("the pick bar's × is Clear the pick, with Esc on hover, as the Shortcuts sheet names it (F220)", () => {

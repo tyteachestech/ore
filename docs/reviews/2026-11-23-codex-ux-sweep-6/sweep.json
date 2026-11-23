@@ -1,0 +1,4 @@
+{ "testers": [
+  { "name": "mac", "seed": "seed" },
+  { "name": "phone", "seed": "seed" }
+] }
