@@ -92,7 +92,7 @@ export type { Section as SettingsSection };
 export const VOICE_TEXT = "A word from the mole when a session ends on a new level, a met goal or a rare recall.";
 
 export function Settings({ section: initial, onClose, notify }: { section?: Section; onClose: () => void; notify: Notify }) {
-  const [section, setSection] = useState<Section>(() => initial ?? (SECTIONS.some((s) => s.id === load(LAST)) ? (load(LAST) as Section) : "reading"));
+  const [section, setSection] = useState<Section>(() => initial ?? (SECTIONS.some((s) => s.id === load(LAST)) ? (load(LAST) as Section) : SECTIONS[0].id));
   const [data, setData] = useState<Data | null>(null);
   const styleCtl = useStyleControls();
   const sounds = useSounds();

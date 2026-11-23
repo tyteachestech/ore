@@ -9,7 +9,7 @@ import * as YAML from "yaml";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setLibraryRoot } from "./tauri-core";
-import { existsSync, load, mkdirSync, mount, mountDisk, readdirSync, readFileSync, rescan, rmSync, writeFileSync } from "./fs";
+import { existsSync, load, mkdirSync, mount, mountDisk, readdirSync, readFileSync, rescan, rmSync, saved, writeFileSync } from "./fs";
 import { ready } from "./sqlite";
 import { iterableStreams } from "./streams";
 import { shareList } from "./share-skills";
@@ -233,9 +233,17 @@ async function loadShared() {
 
 /** `ore <args> --json` in-process: the command's JSON output, or its one-line error. */
 export async function run<T>(args: string[], input: string | null): Promise<T> {
-  const lib = await boot();
-  if (args[0] === "inbox" && args.includes("--import")) await loadShared();
-  return exclusive(() => command<T>(lib, args, input));
+  // window.__ORE_PENDING, as the Mac's mock counts it (scripts/mock/tauri.js): the commands not yet answered and
+  // saved, so a journey can wait for a write before it reloads the page (F477).
+  const w = globalThis as { __ORE_PENDING?: number };
+  w.__ORE_PENDING = (w.__ORE_PENDING ?? 0) + 1;
+  try {
+    const lib = await boot();
+    if (args[0] === "inbox" && args.includes("--import")) await loadShared();
+    return await exclusive(() => command<T>(lib, args, input));
+  } finally {
+    void saved().finally(() => w.__ORE_PENDING!--);
+  }
 }
 
 async function command<T>({ commands, errorLine }: typeof import("ore-commands"), args: string[], input: string | null): Promise<T> {
