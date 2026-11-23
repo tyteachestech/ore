@@ -17595,13 +17595,15 @@ journey("phone: a skill's note opens again where he was in it, and the Dig's but
   await tap(page, page.getByRole("button", { name: "Your note" }));
   await until("it opens where he was", () => page.locator(".phone-note").first().evaluate((e) => e.scrollTop > 300));
   await tap(page, page.locator(".phone-full .phone-back").first());
-  // The Dig, from the skill's goal.
-  const dig = page.getByRole("button", { name: "Dig" });
-  if (await dig.count()) {
-    await tap(page, dig.first());
-    const small = await page.locator(".skill-recall").evaluate((root) => [...root.querySelectorAll<HTMLElement>(".skill-recall-close, .skill-recall-foot button")].map((b) => b.getBoundingClientRect()).filter((r) => r.width && r.height < 44).length);
-    if (small) throw new Error(`${small} of the Dig's buttons are under 44 pt`);
-  }
+  // The Dig, from the skill's goal (the seed sets none: he writes one first).
+  await tap(page, page.getByRole("button", { name: /What could you show you can do\?/ }).first());
+  await page.keyboard.insertText("Explain retrieval practice to a beginner");
+  await page.keyboard.press("Enter");
+  const dig = page.getByRole("button", { name: "Dig" }).first();
+  await tap(page, dig);
+  await page.getByLabel("What you remember").fill("Testing beats rereading.");
+  const small = await page.locator(".skill-recall").evaluate((root) => [...root.querySelectorAll<HTMLElement>(".skill-recall-close, .skill-recall-foot button")].map((b) => b.getBoundingClientRect()).filter((r) => r.width && r.height < 44).length);
+  if (small) throw new Error(`${small} of the Dig's buttons are under 44 pt`);
 }, "phone");
 
 
