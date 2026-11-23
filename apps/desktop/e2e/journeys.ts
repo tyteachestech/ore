@@ -11932,7 +11932,7 @@ journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the sugges
   }
 });
 
-journey("byline: a suggested skill stands where the faint Skill would, and editing the author moves nothing after it (F-new-byline-skill, F-new-byline-author)", async (page) => {
+journey("byline: a suggested skill stands where the faint Skill would, and editing the author moves nothing after it (F507, F508)", async (page) => {
   const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Values guide\n\nWhat you give up says what you value." }) }).then((r) => r.json())) as { id: string };
   await ore("suggested-skill", made.id, "undo", JSON.stringify({ suggestion: { name: "Personal Development" } }));
   try {
