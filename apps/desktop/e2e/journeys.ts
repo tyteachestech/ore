@@ -3600,6 +3600,48 @@ journey("review: a key pressed in Review never types into the skill note selecte
   if (!now.includes(line) || /^[ex]+$/.test(now.trim())) throw new Error(`the note behind Review changed: ${JSON.stringify(now.slice(0, 80))}`);
 }, "webkit");
 
+journey("menus: a letter typed to pick a right-click menu item never types into the note selected behind it (WebKit)", async (page) => {
+  // Codex UX sweep 15: Review was guarded (sweep 14), but a right-click menu was not: E, to reach Edit skill…, replaced
+  // the selected skill note with "e" and saved it. Typing goes only where the focus is, app-wide.
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const pm = page.locator(".skill-note .ProseMirror");
+  await pm.waitFor();
+  await pm.click();
+  const line = `Kept through a menu (${Date.now() % 100000})`;
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.type(line);
+  await until("the line is in the note", async () => ((await pm.textContent()) ?? "").includes(line));
+  await page.keyboard.press("Meta+a");
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click({ button: "right" });
+  await page.locator(".menu-list").first().waitFor();
+  await page.keyboard.press("e");
+  await page.keyboard.press("x");
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Escape");
+  const now = (await pm.textContent()) ?? "";
+  if (!now.includes(line)) throw new Error(`the note behind the menu changed: ${JSON.stringify(now.slice(0, 80))}`);
+}, "webkit");
+
+journey("notes: the selection bar's Turn into opens its list and turns the paragraph into a heading (WebKit)", async (page) => {
+  // Codex UX sweep 15: the list's focus counted as leaving the note, so the bar and its list closed at once.
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const pm = page.locator(".skill-note .ProseMirror");
+  await pm.waitFor();
+  await pm.click();
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.press("Enter");
+  const line = `Turned into a heading (${Date.now() % 100000})`;
+  await page.keyboard.type(line);
+  await pm.locator("p", { hasText: line }).click({ clickCount: 3 });
+  const turn = page.locator(".sel-bar").getByRole("button", { name: "Turn into" });
+  await turn.waitFor();
+  await turn.click();
+  const h2 = page.locator(".menu-list").getByRole("menuitem", { name: "Heading 2", exact: true });
+  await until("Turn into's list stays open", async () => (await h2.count()) === 1 && (await h2.isVisible()));
+  await h2.click();
+  await until("the line is a heading", async () => (await pm.locator("h2", { hasText: line }).count()) === 1);
+}, "webkit");
+
 journey("prequestion: a guess typed but not stored is still there when he comes back to the source, and not marked answered", async (page) => {
   const q = "When is an agent the wrong choice?";
   const guess = `When a fixed workflow does the job (${Date.now() % 100000})`;

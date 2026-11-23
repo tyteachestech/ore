@@ -1129,8 +1129,12 @@ function selBarPlugin(host: { current: HTMLElement | null }, setSel: (s: Sel | n
               return false;
             },
             blur: (view, e) => {
-              // Focus moving into the bar's own popovers keeps it.
-              if (!(e.relatedTarget as HTMLElement | null)?.closest?.(".sel-bar, .sel-pop")) setSel(null);
+              // Focus moving into the bar's own popovers keeps it, and into the list its Turn into opened, which is
+              // drawn outside the bar and named by its button there (Codex UX sweep 15: the list closed as it opened).
+              const to = e.relatedTarget as HTMLElement | null;
+              const list = to?.closest?.<HTMLElement>(".menu-list[aria-labelledby]");
+              const from = list && document.getElementById(list.getAttribute("aria-labelledby")!);
+              if (!to?.closest?.(".sel-bar, .sel-pop") && !from?.closest(".sel-bar")) setSel(null);
               return false;
             },
           },
