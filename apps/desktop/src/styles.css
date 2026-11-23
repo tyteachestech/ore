@@ -4090,3 +4090,32 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .dig-idea:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .dig-idea:active .stone { transform: scale(0.92); }
 .phone .dig-idea { width: 44px; height: 44px; }
+
+/* iPhone Sources: Filter and Select at the title's right (the Mac's Filter word, D288; Mail's Select), the
+   filters as tags under it, and the pick's bar at the foot (D283), a thumb's reach from the rows. */
+.phone-list-head { display: flex; align-items: center; gap: 4px; }
+.phone-list-head h1 { flex: 1; min-width: 0; }
+.phone-head-tool { flex: none; min-width: 44px; height: 44px; padding: 0 8px; border: 0; border-radius: 8px; background: none; color: var(--muted); font: 500 15px var(--font); }
+.phone-head-tool:active, .phone-head-tool[aria-expanded="true"] { background: var(--bg-hover); color: var(--text); }
+.phone-list-head .phone-head-tool:last-child { margin-right: -8px; }
+.phone-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 4px; }
+/* 44 pt to the finger, a 28 pt tag to the eye. */
+.phone-filter-tag { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; height: 44px; padding: 0; border: 0; background: none; color: var(--text); font: 15px var(--font); }
+.phone-filter-tag > * { display: flex; align-items: center; height: 28px; background: var(--bg-hover); }
+.phone-filter-tag > span { display: block; min-width: 0; padding: 0 2px 0 10px; border-radius: 7px 0 0 7px; line-height: 28px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.phone-filter-tag > svg { flex: none; box-sizing: content-box; margin-left: -4px; padding: 0 6px 0 2px; border-radius: 0 7px 7px 0; color: var(--muted); }
+.phone-filter-tag:active > * { background: var(--bg-active); }
+.action-sheet .filter-n { flex: none; color: var(--faint); font-size: 14px; font-variant-numeric: tabular-nums; }
+.phone-pick-dot { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--faint); animation: pick-dot-in var(--t-2) var(--ease-out); }
+.phone-pick-dot[data-on] { background: var(--accent); box-shadow: none; color: var(--bg); }
+@keyframes pick-dot-in { from { opacity: 0; margin-right: -34px; } }
+.phone .pick-bar { left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); transform: none; gap: 0; padding: 4px 4px 4px 16px; border-radius: 16px; font-size: 15px; animation: pick-up var(--t-3) var(--ease-out); }
+.phone .pick-bar .pick-n { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.phone .pick-bar button { flex: none; flex-direction: column; justify-content: center; gap: 3px; min-width: 60px; height: 48px; padding: 0 6px; border-radius: 12px; font-size: 11px; }
+.phone .pick-bar button:active { background: var(--bg-hover); }
+.phone .pick-bar .pick-x { min-width: 44px; width: 44px; }
+.phone .pick-bar .pick-sep { display: none; }
+@keyframes pick-up { from { opacity: 0; transform: translateY(12px); } }
+@media (prefers-reduced-motion: reduce) { .phone .pick-bar, .phone-pick-dot { animation: none; } }
+/* The last rows clear the bar. */
+.phone-app:has(.pick-bar) .phone-page { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 84px); }

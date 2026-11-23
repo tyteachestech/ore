@@ -11,8 +11,9 @@ export function PickBar({ n, actions, onClear }: { n: number; actions: MenuActio
   const skills = by("skills");
   const archive = by("archive");
   return (
-    <div className="pick-bar" role="toolbar" aria-label={`Actions for ${n} picked sources`}>
-      <span className="pick-n" aria-live="polite">{n} picked</span>
+    <div className="pick-bar" role="toolbar" aria-label={`Actions for ${n} picked sources`} data-none={n ? undefined : true}>
+      {/* The iPhone's Select starts with none picked (Mail): the bar says what a tap does. */}
+      <span className="pick-n" aria-live="polite">{n ? `${n} picked` : "Tap sources to pick them"}</span>
       {move && (
         <Hint text={move.label}>
           <button onClick={move.run}>
