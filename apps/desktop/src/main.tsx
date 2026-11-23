@@ -12,6 +12,7 @@ import { HintProvider } from "./Hint";
 import { trackInput } from "./input-mode";
 import { installGlide } from "./pill-glide";
 import { suppressPageMenu } from "./native-menu";
+import { typeWhereFocused } from "./typing";
 import { QuickQuiz } from "./QuickQuiz";
 import "./styles.css";
 import "./retro.css";
@@ -19,6 +20,7 @@ import "./tailwind.css";
 
 suppressPageMenu(document);
 trackInput(document);
+typeWhereFocused(document);
 installGlide();
 
 /** A click on a control that stops its own event still closes an open popover: Radix counts one that doesn't reach the document as
