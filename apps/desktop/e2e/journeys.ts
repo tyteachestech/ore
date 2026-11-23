@@ -3574,6 +3574,32 @@ journey("notes: a click on the empty space under a note puts the caret at its en
   await typedAtEnd(".skill-note", b);
 });
 
+journey("review: a key pressed in Review never types into the skill note selected behind it (WebKit)", async (page) => {
+  // Codex UX sweep 13: with the skill note's text selected, ⌘R and then E (Edit, not yet offered) replaced the whole
+  // note with "e" and saved it. Review had the focus; WebKit typed into the selection the page behind still held.
+  await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+  const pm = page.locator(".skill-note .ProseMirror");
+  await pm.waitFor();
+  await pm.click();
+  const line = `Kept through review (${Date.now() % 100000})`;
+  await page.keyboard.press("Meta+ArrowDown");
+  await page.keyboard.type(line);
+  await until("the line is in the note", async () => ((await pm.textContent()) ?? "").includes(line));
+  await page.keyboard.press("Meta+a");
+  await page.keyboard.press("Meta+r");
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const review = page.getByRole("dialog", { name: "Review" });
+  await until("Review or What to review opens", async () => (await pick.count()) > 0 || (await review.count()) > 0);
+  if (await pick.count()) await pick.getByRole("button", { name: "Start review" }).click();
+  await review.waitFor();
+  await page.waitForTimeout(300);
+  await page.keyboard.press("e");
+  await page.keyboard.press("x");
+  await page.waitForTimeout(300);
+  const now = (await pm.textContent()) ?? "";
+  if (!now.includes(line) || /^[ex]+$/.test(now.trim())) throw new Error(`the note behind Review changed: ${JSON.stringify(now.slice(0, 80))}`);
+}, "webkit");
+
 journey("prequestion: a guess typed but not stored is still there when he comes back to the source, and not marked answered", async (page) => {
   const q = "When is an agent the wrong choice?";
   const guess = `When a fixed workflow does the job (${Date.now() % 100000})`;
