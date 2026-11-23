@@ -14720,7 +14720,7 @@ journey("source rename: ⌘Z leaves a title set outside since, and says so (F175
 journey("source note: after leaving, ⌘Z takes back the note's edits, not the source added before (F157)", async (page) => {
   const title = `Source with a note ${Date.now()}`;
   await page.reload();
-  await page.locator(".side-item").first().waitFor(); // ⌘N before the app is up after a reload goes nowhere (F-new-ci-f157-reload)
+  await page.locator(".side-item").first().waitFor(); // ⌘N before the app is up after a reload goes nowhere (F492)
   await page.keyboard.press("Meta+n");
   await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nThis source must survive undoing its note.`);
   await page.keyboard.press("Enter");
