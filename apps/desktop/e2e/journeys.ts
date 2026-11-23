@@ -11932,6 +11932,40 @@ journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the sugges
   }
 });
 
+journey("byline: a suggested skill stands where the faint Skill would, and editing the author moves nothing after it (F507, F508)", async (page) => {
+  const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Values guide\n\nWhat you give up says what you value." }) }).then((r) => r.json())) as { id: string };
+  await ore("suggested-skill", made.id, "undo", JSON.stringify({ suggestion: { name: "Personal Development" } }));
+  try {
+    await page.reload();
+    await openSource(page, "Values guide");
+    const head = page.locator(".doc-head");
+    const chip = head.locator(".chip.suggested");
+    await chip.waitFor();
+    // One thing in the skill's place: the suggestion, not a blank "Skill" beside it.
+    if (await head.locator(".chips-blank").count()) throw new Error("the faint Skill shows beside a suggested skill");
+    await head.locator(".by-add").click();
+    await page.getByLabel("Author").fill("Mark Manson");
+    await page.keyboard.press("Enter");
+    const by = head.locator("button.by");
+    await by.waitFor();
+    const at = async () => ({ chip: (await chip.boundingBox())!.x, row: (await head.locator(".chips").boundingBox())!.height });
+    const rest = await at();
+    await by.click();
+    await page.getByLabel("Author").waitFor();
+    const editing = await at();
+    if (Math.abs(editing.chip - rest.chip) > 1 || editing.row !== rest.row) throw new Error(`editing the author moved what follows it: ${JSON.stringify(rest)} → ${JSON.stringify(editing)}`);
+    // The field grows with the name as he types.
+    await page.getByLabel("Author").fill("Mark Manson and a second author");
+    if ((await at()).chip - rest.chip < 40) throw new Error("the author field did not grow with a longer name");
+    await page.keyboard.press("Escape");
+    // Dismissed, the blank Skill is back, so a skill can still be picked.
+    await chip.getByRole("button", { name: "Dismiss suggested skill Personal Development" }).click();
+    await head.locator(".chips-blank").waitFor();
+  } finally {
+    await ore("archive", made.id);
+  }
+});
+
 journey("skill importance (D173): Importance ▸ Focus with ⌘Z, Archive folds it under Archived and out of review, Bring back puts it in its place", async (page) => {
   type S = { id: string; priority: string; archived?: boolean };
   const habits = async () => ((await ore("skills")) as S[]).find((s) => s.id === "habits")!;
