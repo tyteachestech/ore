@@ -403,7 +403,8 @@ export function Forge({ skill, tries, onSub }: { skill: Skill; tries: Tries; onS
 }
 
 /** A try typed here, with no passage behind it: what he'll do, and when. Enter or Add adds it, Esc closes. */
-/** A try being typed and left (Back, or another screen), by skill: the form opens on it again (Codex UX sweep 5). */
+/** A try being typed and left (Back, Esc, or another screen), by skill: the form opens on it again, as the Add box
+ *  keeps his words (D342; Codex UX sweep 5). */
 const addDrafts = new Map<string, { plan: string; when: string }>();
 
 function AddTry({ skill, onAdd, onClose }: { skill: string; onAdd: (plan: string, when: string) => Promise<boolean>; onClose: () => void }) {
@@ -419,7 +420,10 @@ function AddTry({ skill, onAdd, onClose }: { skill: string; onAdd: (plan: string
   const add = () => {
     if (!plan.trim() || adding.current) return;
     adding.current = true;
-    void onAdd(plan.trim(), when.trim()).then((ok) => (ok ? (addDrafts.delete(skill), onClose()) : (adding.current = false)));
+    // Out of the drafts while it is being added, so a + opened meanwhile can't add it twice; back if it fails.
+    const draft = addDrafts.get(skill);
+    addDrafts.delete(skill);
+    void onAdd(plan.trim(), when.trim()).then((ok) => (ok ? onClose() : ((adding.current = false), draft && addDrafts.set(skill, draft))));
   };
   const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     keepKeysIn(e);
@@ -445,15 +449,21 @@ function AddTry({ skill, onAdd, onClose }: { skill: string; onAdd: (plan: string
 
 /** One line of the plan, edited in place: Enter or a click away saves, Esc puts back what was there (D211). */
 /** A plan line whose save failed, by try and line: it opens on his words again (Codex UX sweep 5: Back dropped them). */
-const planDrafts = new Map<string, string>();
+const planDrafts = new Map<string, { from: string; to: string }>();
 
 function PlanField({ label, hint, value, draftKey, onSave }: { label: string; hint: string; value: string; draftKey: string; onSave: (v: string) => Promise<boolean> }) {
-  const [v, setV] = useState(() => planDrafts.get(draftKey) ?? value);
-  useEffect(() => void (planDrafts.has(draftKey) || setV(value)), [value]);
+  const [v, setV] = useState(() => planDrafts.get(draftKey)?.to ?? value);
+  // A change from elsewhere (the phone, ⌘Z, a re-read) since the failed save wins: the kept words go.
+  useEffect(() => {
+    const d = planDrafts.get(draftKey);
+    if (d && d.from === value) return setV(d.to);
+    planDrafts.delete(draftKey);
+    setV(value);
+  }, [value, draftKey]);
   const save = () => {
     const to = v.trim();
     if (to === value) return;
-    planDrafts.set(draftKey, to);
+    planDrafts.set(draftKey, { from: value, to });
     void onSave(to).then((ok) => ok && planDrafts.delete(draftKey));
   };
   return (

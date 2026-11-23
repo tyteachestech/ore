@@ -2512,6 +2512,7 @@ export function App() {
           madeSkill(s);
           if (open) openSkill(s.id);
         }}
+        onError={(why) => notify(why, "error")}
         onArrange={(layout, step) => {
           const before = layoutOf(skillGroups(skills));
           const saved = arrange(layout);
