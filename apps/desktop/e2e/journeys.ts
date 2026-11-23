@@ -5095,7 +5095,7 @@ journey("peeked sidebar: it stays while its own menu is open, and slides away on
   await page.getByRole("button", { name: "Show sidebar" }).click();
 });
 
-// F-new-settings-first: Settings lists General first (D347) but a first open landed on Reading, one section down.
+// F541: Settings lists General first (D347) but a first open landed on Reading, one section down.
 journey("Settings: a first open lands on General, the first section in its list", async (page) => {
   await page.evaluate(() => localStorage.removeItem("ore.settings"));
   await page.keyboard.press("Meta+Comma");
@@ -5106,7 +5106,7 @@ journey("Settings: a first open lands on General, the first section in its list"
   if (on.trim() !== "General") throw new Error(`a first open of Settings lands on ${on.trim()}, not General`);
 });
 
-// F-new-end-done: with three skills kept the end screen ran past a 1280×800 window and Done sat under its foot.
+// F539: with three skills kept the end screen ran past a 1280×800 window and Done sat under its foot.
 // A shorter window shows the same with one skill row.
 journey("review: the end screen's Done stays in sight when the screen runs longer than the window", async (page) => {
   const app = oreCalls(page);
@@ -15385,7 +15385,7 @@ journey("all sources: a filter is a tag in the search; closing its list leaves t
   await until("the search keeps the keys after ×", () => search.evaluate((el) => el === document.activeElement));
 });
 
-// F-new-filter-tag-x, F-new-filter-count, F-new-tab-cut (Impeccable round 10): the filter tag's × drew 2px wider than its
+// F544, F543, F542 (Impeccable round 10): the filter tag's × drew 2px wider than its
 // button and past the tag's edge; a highlighted filter row's count stayed faint on the highlight (3.97:1); and in a
 // 720px window with a tag in the search the open tab's name was cut mid-letter ("To re").
 journey("all sources: a filter tag's × fits its button, a highlighted filter row's count is readable, and a narrow window never cuts the open tab's name", async (page) => {
@@ -17108,7 +17108,7 @@ journey("phone: Search's ⓧ clears what he typed and keeps Search open with the
   // The only × beside the field closed Search, and the keyboard showed Return (Settings, Files: a clear button in the field, a Search key).
   await tap(page, page.getByRole("button", { name: "Search" }));
   const field = page.locator("[cmdk-input]");
-  // The sheet is announced by the name on the button that opened it, not as the Mac's "Command palette" (F-new-search-name).
+  // The sheet is announced by the name on the button that opened it, not as the Mac's "Command palette" (F546).
   await page.getByRole("dialog", { name: "Search" }).waitFor();
   if ((await field.getAttribute("enterkeyhint")) !== "search") throw new Error("the keyboard's key doesn't say Search");
   if (await page.getByRole("button", { name: "Clear" }).count()) throw new Error("Clear shows with nothing typed");
@@ -17748,7 +17748,7 @@ journey("phone: Sources narrows by kind and skill from Filter, each a tag under 
   const value = async (field: string, name: RegExp) => {
     await tap(page, page.getByRole("button", { name: /^Filter by/ }));
     await tap(page, page.locator(".action-sheet .pick-row").filter({ hasText: field }));
-    // The row that steps back is a 44 pt tap, as the rows under it are (F-new-sheet-back: it was 36).
+    // The row that steps back is a 44 pt tap, as the rows under it are (F545: it was 36).
     const back = (await page.locator(".action-sheet .sheet-back").boundingBox())!.height;
     if (back < 44) throw new Error(`the sheet's back row is a ${back} pt tap`);
     const row = page.locator(".action-sheet").getByRole("checkbox", { name });
