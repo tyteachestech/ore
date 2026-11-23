@@ -7,7 +7,7 @@ import { load, save } from "./util";
    the mole's pop and a closing jingle, and over them a layer for each thing that lands (`layer`): the minutes
    counting, each skill's row, each result, the mole's letters.
    The files are ElevenLabs output, kept out of git and taken from the Mac's sounds folder as the radio's are (D254,
-   vite.config.ts): one that is missing is just silent. The iPhone build carries them too. Settings › Review › Sound
+   vite.config.ts): one that is missing is just silent. The iPhone build carries them too. Settings › General › Sound
    has a switch for the sound effects and one for the mole. */
 
 export const SFX = ["tap", "right", "missed", "goal", "cart", "pop", "done"] as const;
