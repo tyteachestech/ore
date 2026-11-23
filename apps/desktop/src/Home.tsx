@@ -75,6 +75,13 @@ export function timeLeft(item: Pick<Item, "words" | "type" | "video">, at: numbe
   return fresh ? span : `${span} left`;
 }
 
+/** Under a title in the iPhone's lists: how long is left of it (its whole length before he opens it) and who made it; a
+ *  source he has finished says only who made it. */
+export function rowLine(item: Pick<Item, "words" | "type" | "video" | "status" | "author">, at: number): string {
+  const left = item.status === "done" ? null : timeLeft(item, at, at <= 0);
+  return [left, item.author?.trim()].filter(Boolean).join(" · ");
+}
+
 /** The picture again, for the blur a cover shown whole stands on. */
 const backdrop = (i: Item) => (i.thumbnail ? ({ "--pic": `url("${thumbSrc(i.thumbnail).replace(/["\\\n]/g, (c) => encodeURIComponent(c))}")` } as CSSProperties) : undefined);
 
