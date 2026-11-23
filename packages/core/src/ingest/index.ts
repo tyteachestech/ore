@@ -204,6 +204,8 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     return { type: "article", title: fileStem(name), url, body: vttToBody(vtt), source: { ext: "vtt", data: vtt } };
   }
   if (kind === "markdown") {
+    // A picture or a PDF renamed .md is not text: saved, it would be a source of junk (D96, F4).
+    if (/[\0-\x08\x0e-\x1a]/.test(text.slice(0, 4096))) throw new Error(`“${basename(name)}” isn’t text, though its name says it is. If it is a PDF or a picture, give it its real ending and add it again; otherwise copy its text and paste it here.`);
     const ext = /\.(md|markdown|txt|text)$/i.exec(name)?.[1]?.toLowerCase() ?? "md";
     return { type: "markdown", ...(await markdownFile(text, fileStem(name))), url, source: { ext, data: text } };
   }
@@ -817,7 +819,8 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   // `local` reads the kept copy of a link's file too (a PDF's tables, read from the copy they came from).
   const copy = keptOriginal(item.dir);
   const kept = url && !(local && copy) ? undefined : copy;
-  if (!canReimport(item)) throw new Error("Only a source added from a link or a file can be reimported.");
+  // A file's source whose kept copy was deleted says so, not that it never came from a file (F5).
+  if (!canReimport(item)) throw new Error(type === "markdown" || type === "snippet" || url ? "Only a source added from a link or a file can be reimported." : "The file it came from is no longer kept beside this source, so there is nothing to read again. Add the file again to read it fresh.");
   const regions = read ?? layoutOf(item.dir);
   // A pasted page (source.html beside a Markdown source) is read as it was pasted.
   const pasted = type === "markdown" && !url && kept === "source.html";
