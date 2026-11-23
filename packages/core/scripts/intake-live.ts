@@ -28,6 +28,7 @@ const LINKS: { type: string; url: string; minWords?: number; refused?: RegExp }[
   { type: "EPUB", url: "https://www.gutenberg.org/ebooks/1342.epub3.images", minWords: 100000 },
   { type: "YouTube video", url: "https://www.youtube.com/watch?v=kCc8FmEb1nY", minWords: 15000 },
   { type: "TED talk", url: "https://www.ted.com/talks/sir_ken_robinson_do_schools_kill_creativity", minWords: 2500 },
+  { type: "Course lesson", url: "https://academy.claude.com/courses/ai-fluency-framework-foundations/introduction-to-ai-fluency", minWords: 1000 },
   { type: "Page with a video", url: "https://www.dwarkesh.com/p/andrej-karpathy", minWords: 20000 },
   { type: "Speaker Deck", url: "https://speakerdeck.com/jennybc/how-to-name-files", minWords: 800 },
   { type: "Bot check", url: "https://www.khanacademy.org/science/biology/gene-expression-central-dogma/transcription-of-dna-into-rna/a/overview-of-transcription", refused: /bot check|almost no text|wouldn’t let/ },

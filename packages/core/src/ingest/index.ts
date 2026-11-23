@@ -16,7 +16,7 @@ import { loadSkills, setItemSkills, unarchiveFiled } from "../skills.ts";
 import { saveImages, withImages } from "./assets.ts";
 import { recordEnd } from "../cut.ts";
 import { BOT, cleanAuthor, cleanDate, FROM_TAB, refusal, wordCount } from "./check.ts";
-import { isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./course.ts";
+import { academyVideo, isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./course.ts";
 import { dropTitle, hasText, pageDraft } from "./page.ts";
 import type { Tab } from "./tab.ts";
 import { makeThumbnail } from "./thumbnail.ts";
@@ -212,8 +212,9 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
   }
   if (/^\s*(?:<\?xml[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*)*<(?:rss|feed)\b/.test(text.slice(0, 2000)))
     throw new Error("That’s a podcast or blog feed, not one episode or post. Add the link of the episode or post you want instead.");
-  // An article that embeds a video keeps both: its text, then the video's transcript (D92).
-  const page = await pageDraft(text, base ?? `file://${name}`);
+  // An article that embeds a video keeps both: its text, then the video's transcript (D92). A Claude
+  // Academy lesson names its video in a script, not the page; the video is the lesson's, so it must load.
+  const page = await pageDraft(text, base ?? `file://${name}`, { video: base ? await academyVideo(text, base) : undefined });
   if (page.type !== "article") return page;
   // A page that is an episode comes in as its episode, the page kept beside it (D215).
   const heard = !page.video && opts.episode !== false && base && /^https?:/.test(base) ? await asEpisode(text, base, { ...page, url }, opts) : null;
