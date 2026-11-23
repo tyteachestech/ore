@@ -15406,7 +15406,7 @@ journey("Settings: enlarged to 200% the sections run across the top and no choic
   await settings.waitFor();
   const tabs = settings.getByRole("tab");
   const n = await tabs.count();
-  // General first and shortcuts last, as a Mac app's settings run; between them the order he works in (D-new-settings-order).
+  // General first and shortcuts last, as a Mac app's settings run; between them the order he works in (D347).
   const names = (await tabs.allInnerTexts()).map((t) => t.trim()).join(", ");
   if (names !== "General, Reading, Review, AI, Keyboard shortcuts") throw new Error(`the sections read: ${names}`);
   const tops = await tabs.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
