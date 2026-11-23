@@ -930,6 +930,29 @@ describe("import coverage: video", () => {
     expect(item.body).toBe("[00:02] Good morning. Creativity is as important as literacy.\n");
   });
 
+  test("a Claude Academy lesson: its page's text and its video's transcript, the video named in the lesson's own script (Codex sweep 8)", async () => {
+    ytdlp({ title: "Introduction to AI Fluency", channel: "Anthropic", upload_date: "20250801", webpage_url: "https://www.youtube.com/watch?v=oreGolden01", subtitles: { en: [{ ext: "vtt", url: "https://captions.test/en.vtt" }] } });
+    const lesson = "https://academy.claude.com/courses/ai-fluency-framework-foundations/introduction-to-ai-fluency";
+    const script = "https://academy.claude.com/assets/v1/content/courses/ai-fluency-framework-foundations/lessons/01-introduction-to-ai-fluency/index-lyovv4rv.js";
+    const page = { body: web("academy-lesson.html"), type: HTML };
+    serve({ [lesson]: page, [script]: { body: web("academy-lesson.js"), type: "text/javascript" }, "https://captions.test/en.vtt": { body: VTT, type: "text/vtt" } });
+    const item = await addSource(await tempLibrary(), lesson);
+    expect(item.meta).toMatchObject({ type: "article", title: "Introduction to AI Fluency", url: lesson, video: "https://www.youtube.com/watch?v=oreGolden01" });
+    expect(item.body).toStartWith("## Video transcript\n\n[00:00] Welcome to the talk.");
+    expect(item.body).toContain("[01:00] Then we train the model.");
+    // The page's text from its first line to its last, with its headings; the player's own line and switch are left out.
+    const text = item.body.slice(item.body.indexOf("<!-- end of video transcript -->"));
+    expect(text).toContain("Question! This level forgetting you to this habit’s pause");
+    expect(text).toContain("## Note exercise");
+    expect(text).toContain("### Generation");
+    expect(text).toContain('the "4Ds" of Attention, Generation, Elaboration, and Question.');
+    expect(text).not.toContain("Introduction to AI Fluency ·");
+    expect(text).not.toContain("Prompt Generation");
+    // The site changed how it names the video again: the lesson is refused, never saved without it (D122).
+    serve({ [lesson]: page });
+    await expect(addSource(await tempLibrary(), lesson)).rejects.toThrow(/video/);
+  });
+
   test("chapters never split mid-paragraph and keep order", () => {
     expect(vttToBody(VTT, [{ start_time: 5, title: "Tokens" }])).toBe("[00:00] Welcome to the talk.\n\n### Tokens\n\n[00:05] First we tokenize the text.\n\n[01:00] Then we train the model.\n");
   });

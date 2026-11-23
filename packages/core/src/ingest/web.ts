@@ -363,6 +363,16 @@ export async function htmlToDoc(html: string, url: string, min = 200): Promise<W
 const ZWJ = "\u200d";
 const HELD_ZWJ = "\uf8f0";
 
+/** A Claude Academy lesson's video card: its line of title and length and its Summary/Transcript
+ *  switch belong to the player, which the reader draws itself; the video's summary is the lesson's text. */
+function videoCards(doc: Document) {
+  for (const card of doc.querySelectorAll("[data-living-video]")) {
+    card.querySelector('[role="radiogroup"]')?.remove();
+    const title = card.getAttribute("data-title");
+    if (title) [...card.querySelectorAll("p")].find((p) => p.textContent?.startsWith(title))?.remove();
+  }
+}
+
 async function readHtml(html: string, url: string, min: number): Promise<WebDoc> {
   // A chat shared from Claude, as the browser drew it.
   const chat = chatMarkdown(html);
@@ -382,6 +392,7 @@ async function readHtml(html: string, url: string, min: number): Promise<WebDoc>
   const linked = document.querySelector('link[rel~="author"][content]')?.getAttribute("content") ?? undefined;
   try {
     videoLinks(document as unknown as Document);
+    videoCards(document as unknown as Document);
     flatTables(document as unknown as Document);
     footnoteLists(document as unknown as Document);
     wikiMath(document as unknown as Document);

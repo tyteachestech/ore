@@ -69,23 +69,19 @@ export function academyLessons(html: string, course: string, origin: string): { 
   return { title, lessons };
 }
 
-/** Each lesson's YouTube ID, by lesson slug, from the scripts the course page loads: the router chunk
- *  names each lesson's script, and a lesson with a video passes `youtubeId:"…"` to its player. */
-async function academyVideos(html: string, course: string, origin: string): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  const router = html.match(/\/assets\/[\w/-]*courses-[\w-]+\.js/)?.[0];
-  if (!router) return out;
-  const js = await get(origin + router).catch(() => "");
-  const chunk = new RegExp(`assets/[\\w/-]*content/courses/${course}/lessons/\\d+-([\\w-]+)/index-[\\w-]+\\.js`, "g");
-  const chunks = new Map<string, string>();
-  for (const m of js.matchAll(chunk)) chunks.set(m[1]!, m[0]);
-  await Promise.all(
-    [...chunks].map(async ([slug, path]) => {
-      const id = (await get(`${origin}/${path}`).catch(() => "")).match(/youtubeId:"([\w-]{11})"/)?.[1];
-      if (id) out.set(slug, id);
-    }),
-  );
-  return out;
+/** A Claude Academy lesson's YouTube video, as a watch link, or undefined for a lesson without one.
+ *  The page shows only the player's frame: the video's ID is in the lesson's own script, which the
+ *  page preloads, and its player gets it as `youtubeId:"…"`. A page that shows a video Ore can't find
+ *  (the site changed how it loads one) is refused, never saved without it (D92, D122). */
+export async function academyVideo(html: string, url: string): Promise<string | undefined> {
+  const m = url.match(ACADEMY);
+  const slug = url.replace(/[?#].*$/, "").replace(/\/$/, "").split("/").pop();
+  if (!m || !slug || slug === m[1]) return undefined;
+  const script = html.match(new RegExp(`/assets/[\\w/-]*content/courses/${m[1]}/lessons/\\d+-${slug}/index-[\\w-]+\\.js`))?.[0];
+  const id = script && (await get(new URL(script, url).href).catch(() => "")).match(/youtubeId:"([\w-]{11})"/)?.[1];
+  if (id) return `https://www.youtube.com/watch?v=${id}`;
+  if (/\bdata-living-video\b/.test(html)) throw new Error("Couldn’t find this lesson’s video on its page, so Ore didn’t add the lesson without it. Claude Academy may have changed its pages: try again later, or add the video’s YouTube link on its own.");
+  return undefined;
 }
 
 async function playlist(url: string): Promise<CoursePlan> {
@@ -115,24 +111,19 @@ export async function planCourse(url: string): Promise<CoursePlan> {
   const html = await get(page);
   const { title, lessons } = academyLessons(html, course, origin);
   if (!lessons.length) throw new Error(`Found no lessons on ${page}. Open it in the browser to check it’s a course.`);
-  const videos = await academyVideos(html, course, origin);
-  return {
-    title,
-    url: page,
-    lessons: lessons.map((l) => {
-      const id = videos.get(l.url.split("/").pop()!);
-      return id ? { ...l, video: `https://www.youtube.com/watch?v=${id}` } : l;
-    }),
-  };
+  // Each lesson's video is named on its own page; a page that won't open is read again as it is added.
+  const videos = await Promise.all(lessons.map((l) => get(l.url).then((h) => academyVideo(h, l.url)).catch(() => undefined)));
+  return { title, url: page, lessons: lessons.map((l, i) => (videos[i] ? { ...l, video: videos[i] } : l)) };
 }
 
 /** A lesson as a source: its page's text and its video's transcript in one source (D92), the video
  *  alone when the page has nothing to read, the page alone when there is no video. A playlist's
  *  lesson is only its video. */
-export async function lessonDraft(l: CourseLesson): Promise<Omit<NewItem, "course" | "skills">> {
+export async function lessonDraft(l: Omit<CourseLesson, "title"> & { title?: string }): Promise<Omit<NewItem, "course" | "skills">> {
   const html = l.url === l.video ? "" : await get(l.url).catch((e) => (l.video ? "" : Promise.reject(e)));
-  // The course's name for the lesson, not the video's ("Lesson 2B: … | AI Fluency course").
-  const d = await pageDraft(html, l.url, { title: l.title, video: l.video });
+  // The course's name for the lesson, not the video's ("Lesson 2B: … | AI Fluency course"); a lesson
+  // added by its own link is named by its page.
+  const d = await pageDraft(html, l.url, { title: l.title, video: l.video ?? (await academyVideo(html, l.url)) });
   // The author a course page yields is page furniture, not a person.
   return d.type === "article" ? { ...d, author: undefined } : d;
 }
