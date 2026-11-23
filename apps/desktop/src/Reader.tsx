@@ -2241,8 +2241,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note } : a)));
     let rid = id;
     try {
-      rid = await realId(id);
-      await whileOut(annotateWaking(wake, rid, opt("note", note)));
+      // Counted from the highlight's own write (realId waits for it) to the note's.
+      await whileOut((async () => {
+        rid = await realId(id);
+        await annotateWaking(wake, rid, opt("note", note));
+      })());
       unsavedNotes.delete(rid);
       if (undoable) p.notify(note ? "Highlight note saved" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
     } catch (e) {

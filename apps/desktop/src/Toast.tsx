@@ -148,7 +148,7 @@ export function useToast() {
   const queue = useRef<Promise<void> | null>(null);
   const inTurn = (f: () => void) => {
     if (!queue.current && !callsOut()) return f();
-    const p: Promise<void> = (queue.current ?? Promise.resolve()).then(() => callsSettled()).then(f).finally(() => {
+    const p: Promise<void> = (queue.current ?? Promise.resolve()).then(() => callsSettled()).then(f).catch(() => {}).finally(() => {
       if (queue.current === p) queue.current = null;
     });
     queue.current = p;
@@ -171,10 +171,14 @@ export function useToast() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.isContentEditable || ownsUndo(t)) return;
-      if (is(e, "undo") && (history.current.canUndo || callsOut() || !!queue.current)) {
+      // A change still being written counts as a step to come, except in a text field with nothing on the history
+      // yet: there ⌘Z stays the field's own.
+      const field = t.tagName === "INPUT" || t.tagName === "TEXTAREA";
+      const coming = !field && (callsOut() || !!queue.current);
+      if (is(e, "undo") && (history.current.canUndo || coming)) {
         e.preventDefault();
         undo();
-      } else if (is(e, "redo") && (history.current.canRedo || callsOut() || !!queue.current)) {
+      } else if (is(e, "redo") && (history.current.canRedo || coming)) {
         e.preventDefault();
         redo();
       }

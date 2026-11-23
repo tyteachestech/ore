@@ -75,20 +75,39 @@ export async function oreJob<T>(job: string | null, stdin: string | null, ...arg
 let out = 0;
 let idle: (() => void)[] = [];
 export const callsOut = () => out > 0;
-/** Once nothing counted is out (a step goes on in the same turn its write lands), or after `max` ms. */
-export function callsSettled(max = 8000): Promise<void> {
-  const quiet = new Promise<void>((r) => (out ? idle.push(r) : r()));
-  return Promise.race([quiet, new Promise<void>((r) => setTimeout(r, max))]);
+/** Told whenever a change starts or stops being written (the iPhone's shake names what it would undo). */
+export const outChanged = new Set<() => void>();
+/** Once nothing counted is out, or after `max` ms (a write that never answers must not hold ⌘Z for good). */
+export function callsSettled(max = 30_000): Promise<void> {
+  if (!out) return Promise.resolve();
+  return new Promise<void>((r) => {
+    const done = () => {
+      clearTimeout(timer);
+      idle = idle.filter((x) => x !== done);
+      r();
+    };
+    const timer = setTimeout(done, max);
+    idle.push(done);
+  });
 }
 const counted = async <T,>(run: () => Promise<T>): Promise<T> => {
-  out++;
+  if (!out++) outChanged.forEach((f) => f());
   try {
     return await run();
   } finally {
-    // After the caller's own continuation (its notify) has run: a task, not a microtask.
-    setTimeout(() => {
-      if (!--out) [idle, idle = []][0]!.forEach((r) => r());
-    }, 0);
+    // Once the caller's own continuation (its notify) has run and React has drawn what it set (Review's undo reads
+    // its rendered state): a frame, or 50 ms where no frame comes (a page in the background).
+    let gone = false;
+    const release = () => {
+      if (gone) return;
+      gone = true;
+      if (!--out) {
+        [...idle].forEach((r) => r());
+        outChanged.forEach((f) => f());
+      }
+    };
+    const t = setTimeout(release, 50);
+    requestAnimationFrame(() => setTimeout(() => (clearTimeout(t), release()), 0));
   }
 };
 
