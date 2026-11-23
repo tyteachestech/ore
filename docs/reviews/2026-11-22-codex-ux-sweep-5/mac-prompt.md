@@ -1,0 +1,11 @@
+Your name is `mac`.
+
+Your ports: Mac app page http://localhost:{{mac}}/ with `window.__ORE_BRIDGE = {{bridge}}` (library `{{library}}`). WebKit server: `{{webkit}}`. The `ore` CLI: `ORE_NO_ENRICH=1 ORE_LIBRARY={{library}} bun packages/cli/src/ore.ts` (always keep ORE_NO_ENRICH=1, or real AI starts). Write everything to `{{out}}/` and the report to `{{out}}/report.md`. Your library is seeded with `seed.ts`. Mac only: do not open the iPhone app.
+
+Earlier sweeps covered many angles (see `docs/reviews/sweeps.md`). Four UX sweeps ran today (records `docs/reviews/2026-11-22-codex-ux-sweep/` through `-4/`; the newest rows in `docs/reviews/findings.md`). Their reports list what passed: don't redo those paths. ⌘Z during a save is fixed app-wide (`whileOut` in `apps/desktop/src/ore.ts`, guarded by `apps/desktop/test/undo-waits.test.ts`): don't hunt that class again. Known and being built elsewhere, skip: F493 (phone Sources filters) and F494 (picking several sources on the phone). The iPhone strives for parity with the Mac (Tyler): a Mac feature the phone lacks without a reason in `docs/DECISIONS.md` is a finding.
+
+## Your focus: obvious UX mishaps a Mac user hits in minutes, round 5
+Tyler's words: "basic things that I figured would have been handled already". Hunt the obvious: a control that does nothing, focus lost after an action, Esc or Enter misbehaving, a missing Undo, a list not showing a change made elsewhere, a wait with no sign, an error with no next step, a label that misleads, an empty state that leaves you stuck, text cut off with no way to read it.
+
+Round 5 is a broad pass: a fresh learner's first hour, start to finish, twice, each from a fresh page. Add three sources of different kinds, read one with highlights and a note, ask the tutor once, make a skill and file the sources, review what is due, open Settings, use ⌘K to get around, leave and come back. Note every moment you hesitate, every click that surprised you, and every place you had to guess. Then go back to the three worst and confirm each twice.
+For each candidate, read the code to confirm it is the app and not the mock, and give the file and line.
