@@ -11231,6 +11231,9 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
   // By keys: he types to filter and ticks with ↵, so focus stays in the filter field, which has
   // nothing typed since the tick: ⌘Z is the app's (macOS keeps one undo run per window).
   await page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` }).click();
+  // The keys go to the filter field, so it must have focus first: sent as the picker was still opening, "AI"
+  // was typed at the page and nothing was filed (F475, CI twice on #497).
+  await until("the picker's filter field has focus", () => page.evaluate(() => !!document.activeElement?.closest(".skill-picker") && document.activeElement.matches("input")));
   for (const k of others) {
     await page.keyboard.press("ControlOrMeta+a");
     await page.keyboard.press("Backspace");
