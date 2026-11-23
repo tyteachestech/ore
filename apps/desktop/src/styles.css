@@ -480,7 +480,12 @@ img.thumb { filter: brightness(0.86); }
 /* The iPhone's skill editor (a long press, Edit skill…): the screen's width less its gutters, the colours on two lines. */
 .phone .panel.skill-edit { width: calc(100vw - 32px); padding-bottom: 12px; }
 .phone .skill-edit .look-row { grid-template-columns: 76px minmax(0, 1fr); padding: 4px 0; }
-.phone .skill-edit .swatches { flex-wrap: wrap; gap: 8px; }
+.phone .skill-edit .swatches { flex-wrap: wrap; gap: 12px; }
+/* Its colours, name and collection are 44 pt taps, as on the skill page (Codex UX sweep 3): each colour a 32 pt
+   circle with an unseen 6 pt ring, the name and the collection 44 pt tall. */
+.phone .skill-edit .swatch { position: relative; width: 32px; height: 32px; }
+.phone .skill-edit .swatch::after { content: ""; position: absolute; inset: -6px; }
+.phone .skill-edit :is(.skill-name button, .select-button) { min-height: 44px; }
 .swatch { width: 20px; height: 20px; border-radius: 50%; background: var(--skill, transparent); border: 1px solid var(--border); }
 .swatch.small { width: 16px; height: 16px; }
 .swatch-hint { display: flex; } /* the swatch's hover hint (IconPicker.tsx Swatches) */
@@ -2981,6 +2986,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* The skills in no collection have no heading (as the Mac's sidebar): space alone sets them off from Archive. */
 .phone-drawer section.bare { margin-top: 12px; }
 .phone-drawer h2 { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--muted); margin: 20px 8px 4px; }
+/* A collection's heading opens its menu on a long press: a 44 pt target round its 12 pt line (Codex UX sweep 4). */
+.phone-drawer h2[tabindex] { position: relative; }
+.phone-drawer h2[tabindex]::after { content: ""; position: absolute; inset: -16px -8px; }
 .phone-icon { justify-content: center; width: 44px; height: 44px; padding: 0; }
 .phone-root > .phone-bar { justify-content: space-between; }
 /* Shown behind the content as it is pulled down; the rubber band makes the room. */

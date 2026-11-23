@@ -25,6 +25,7 @@ import { TitleField } from "./TitleField";
 import { pickRun, typeSelect } from "./typeahead";
 import { keepFocusNear } from "./focus-near";
 import { ExerciseText } from "./ExerciseText";
+import { PickBar } from "./PickBar";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -554,6 +555,10 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
         </section>
       )}
       </div>
+      {/* The pick's bar, as All sources has (D283): a pick seen only through its rows' menus wasn't one he could act on. */}
+      {!PHONE && manyMenu && pick.length > 1 && (
+        <PickBar n={pick.length} actions={manyMenu(pick).map((a) => ({ ...a, run: () => (setPicked([]), a.run()) }))} onClear={() => setPicked([])} />
+      )}
     </div>
   );
 }

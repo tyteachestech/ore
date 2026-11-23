@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { PHONE } from "./ore";
+import { callsOut, callsSettled, PHONE } from "./ore";
 import { History, ownsUndo, type Step } from "./history";
 import { CHECK, CROSS, Matrix, Sprite } from "./Working";
 import { Hint } from "./Hint";
@@ -142,14 +142,27 @@ export function useToast() {
   const undone = useCallback((step: Step) => again({ message: `Undone: ${step.message}`, kind: "info", offer: step.redo ? "redo" : undefined, step }, step), [again]);
   const redone = useCallback((step: Step) => again({ message: step.message, kind: "info", offer: "undo", step }, step), [again]);
   failed.current = (step, e, what) => again({ message: `Couldn’t ${what} “${step.message}”: ${errorText(e)}`, kind: "error" }, step);
-  const undo = useCallback(() => {
+  // A change asked for just now may still be writing, its step not yet on the history: ⌘Z (the shake, the swipe)
+  // waits for the calls out, then takes back the newest step, which is then that change.
+  // Undo and redo run in the order asked, each after any change still out: at once when nothing is.
+  const queue = useRef<Promise<void> | null>(null);
+  const inTurn = (f: () => void) => {
+    if (!queue.current && !callsOut()) return f();
+    // A change still being written after half a minute: ⌘Z waits no longer, and says so rather than take back the
+    // step before it.
+    const p: Promise<void> = (queue.current ?? Promise.resolve()).then(() => callsSettled()).then((ok) => (ok ? f() : void notify("Still saving the last change. Try again in a moment.", "info"))).catch(() => {}).finally(() => {
+      if (queue.current === p) queue.current = null;
+    });
+    queue.current = p;
+  };
+  const undo = useCallback(() => inTurn(() => {
     const step = history.current.undo();
     if (step) undone(step);
-  }, [undone]);
-  const redo = useCallback(() => {
+  }), [undone]);
+  const redo = useCallback(() => inTurn(() => {
     const step = history.current.redo();
     if (step) redone(step);
-  }, [redone]);
+  }), [redone]);
   const undoOne = (step?: Step) => (step && history.current.take(step) ? undone(step) : undo());
   takeBack.current = (step) => void (history.current.take(step) && undone(step));
   const redoOne = (step?: Step) => (step && history.current.again(step) ? redone(step) : redo());
@@ -160,10 +173,14 @@ export function useToast() {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (t.isContentEditable || ownsUndo(t)) return;
-      if (is(e, "undo") && history.current.canUndo) {
+      // A change still being written counts as a step to come, except in a text field with nothing on the history
+      // yet: there ⌘Z stays the field's own.
+      const field = t.tagName === "INPUT" || t.tagName === "TEXTAREA";
+      const coming = !field && (callsOut() || !!queue.current);
+      if (is(e, "undo") && (history.current.canUndo || coming)) {
         e.preventDefault();
         undo();
-      } else if (is(e, "redo") && history.current.canRedo) {
+      } else if (is(e, "redo") && (history.current.canRedo || coming)) {
         e.preventDefault();
         redo();
       }

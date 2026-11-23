@@ -5,7 +5,7 @@ import * as Switch from "@radix-ui/react-switch";
 import { useEffect, useRef, useState } from "react";
 import { goalOptions, Group, newOptions, PlanField, REMINDER_TEXT, Row, Seg, VOICE_TEXT } from "../Settings";
 import { setSounds, setVoice, useSounds, useVoice } from "../sfx";
-import { ore, opt, pullFromMac } from "../ore";
+import { ore, opt, pullFromMac, whileOut } from "../ore";
 import { errorText, type Notify } from "../util";
 import { syncState } from "./fs";
 import { allowReminders, planReminders } from "./reminder";
@@ -81,7 +81,7 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
     const was = r[key];
     setReview({ ...r, [key]: value });
     try {
-      await ore("goal", opt(FLAG[key], key === "reminder" ? String(value) || "off" : String(value)));
+      await whileOut(ore("goal", opt(FLAG[key], key === "reminder" ? String(value) || "off" : String(value))));
       void planReminders();
       if (record) notify(`Changed “${NAME[key]}”`, "quiet", () => set(key, was, false), () => set(key, value, false));
       return true;

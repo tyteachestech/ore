@@ -1,0 +1,5 @@
+# Codex UX sweep, round 3, 2026-11-22
+
+Same two testers as rounds 1 and 2, aimed at reading deeply, the Feed, Review's edges and Settings on the Mac; the drawer, Review, reading and every long-press menu on the iPhone.
+
+Eleven candidates, eleven real. Nine were one class, the class rounds 1 and 2 also found site by site: a change put on the Undo history only once its write landed, so ⌘Z during the write took back the step before it (a key point, a highlight note, Finish, the daily goal, Mark read, Unfollow; on the iPhone the drawer's skill editor, Pin, Move to Done, filing, a rating and a retire through the shake). Fixed once for all of them: a change still being written is marked (`whileOut` in `ore.ts`), and ⌘Z, ⇧⌘Z, the shake and the swipe wait for it and run in the order asked (`Toast.tsx`). The other three on the iPhone: the drawer's skill editor had 20 pt colours (fixed), Collected rows had no long press (fixed), and collections made on the phone cannot be renamed, reordered or removed there (open: Tyler's call).

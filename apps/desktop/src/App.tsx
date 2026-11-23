@@ -16,7 +16,7 @@ import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, oreWith, searchFieldsOf, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, whileOut, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, oreWith, searchFieldsOf, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
@@ -1915,7 +1915,7 @@ export function App() {
         void refresh();
       }
     };
-    await repin(at);
+    await whileOut(repin(at));
     notify(`Moved “${item.title}”`, "quiet", () => repin(item.pinned_at!, true), () => repin(at, true));
   };
 

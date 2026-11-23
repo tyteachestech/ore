@@ -6,6 +6,7 @@
 import { useEffect } from "react";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { History } from "../history";
+import { callsOut, outChanged } from "../ore";
 
 // Where he types: a checkbox, a radio or a slider has no typing to undo, so the app's steps stay in reach there.
 const editing = (el: Element | null) =>
@@ -15,11 +16,19 @@ export function useNativeUndo(history: History, undo: () => void, redo: () => vo
   useEffect(() => {
     if (!isTauri()) return;
     const w = window as unknown as { __oreUndo?: () => void; __oreRedo?: () => void };
-    w.__oreUndo = undo;
-    w.__oreRedo = redo;
+    // As the keys: Review holds a ⌘Z while a rating or a retire is still being written, and takes it once it lands
+    // (Codex UX sweep 3: the shake skipped that and took back the step before).
+    const key = (shiftKey: boolean, run: () => void) => () => {
+      const e = new KeyboardEvent("keydown", { key: "z", code: "KeyZ", metaKey: true, shiftKey, bubbles: true, cancelable: true });
+      (document.activeElement ?? document.body).dispatchEvent(e);
+      if (!e.defaultPrevented) run();
+    };
+    w.__oreUndo = key(false, undo);
+    w.__oreRedo = key(true, redo);
     let last = "";
     const report = () => {
-      const state = { undo: history.undoName ?? null, redo: history.redoName ?? null, field: editing(document.activeElement) };
+      // A change still being written is what the shake would take back (it waits for it): it has no name yet.
+      const state = { undo: callsOut() ? "Last Change" : (history.undoName ?? null), redo: history.redoName ?? null, field: editing(document.activeElement) };
       const now = JSON.stringify(state);
       if (now === last) return;
       last = now;
@@ -28,11 +37,13 @@ export function useNativeUndo(history: History, undo: () => void, redo: () => vo
     // Focus moves before the next one is in (focusout, then focusin): read it once it has settled.
     const later = () => void setTimeout(report, 0);
     history.onChange = report;
+    outChanged.add(report);
     document.addEventListener("focusin", report);
     document.addEventListener("focusout", later);
     report();
     return () => {
       if (history.onChange === report) history.onChange = undefined;
+      outChanged.delete(report);
       document.removeEventListener("focusin", report);
       document.removeEventListener("focusout", later);
     };

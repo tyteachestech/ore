@@ -110,3 +110,14 @@ test("images a note holds, dropped or pasted into it; other pictures are sources
   expect(["/a/scan.heic", "/a/scan.tiff", "/a/paper.pdf", "/a/png"].some(noteImage)).toBe(false);
   expect(["image/png", "image/jpeg", "image/svg+xml", "image/webp"].map(imageExt)).toEqual(["png", "jpg", "svg", "webp"]);
 });
+
+// Codex UX sweep 4: a file picked after typing a note went in as text, its path a line of the note.
+test("files picked into a box that has text go in as files, the text as its own source", () => {
+  const value = "Notes to review alongside the file.\n/Users/me/field-guide.md";
+  expect(entries(value, ["/Users/me/field-guide.md"])).toEqual([
+    { kind: "text", text: "Notes to review alongside the file." },
+    { kind: "file", path: "/Users/me/field-guide.md" },
+  ]);
+  // A path he typed himself in a note stays part of it.
+  expect(entries(value)).toEqual([{ kind: "text", text: value }]);
+});

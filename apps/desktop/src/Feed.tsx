@@ -11,7 +11,7 @@ import { Article, CaretDown, Plus, Tick, YoutubeLogo } from "./icons";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
-import { ore, opt, type Skill } from "./ore";
+import { ore, opt, whileOut, type Skill } from "./ore";
 import { SkillChips, SkillPicker, unfile } from "./Skills";
 import { count, errorText, load, save, singleFlight, typedLast, useLibraryChanges, type Notify } from "./util";
 import { Working } from "./Working";
@@ -165,7 +165,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     put(on);
     const what = urls.size > 1 ? ` ${urls.size} posts` : "";
     // From the history (toast false), a failure goes back to it, which says why. One write for the whole pick.
-    return ore("feed", on ? "read" : "unread", ...urls).then(
+    return whileOut(ore("feed", on ? "read" : "unread", ...urls)).then(
       () => void (toast && notify(on ? `Marked${what} read` : `Marked${what} unread`, "info", () => setRead(post, !on, false), () => setRead(post, on, false))),
       (e) => {
         put(!on);
@@ -178,7 +178,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   const unfollow = (f: FeedInfo) => {
     const before = data;
     setData((d) => d && { feeds: d.feeds.filter((x) => x.url !== f.url), posts: d.posts.filter((p) => p.feed !== f.url) });
-    ore<{ feed: FeedInfo; at: number }>("feed", "unfollow", f.url).then(
+    whileOut(ore<{ feed: FeedInfo; at: number }>("feed", "unfollow", f.url)).then(
       (r) => {
         const back = () => ore("feed", "restore", JSON.stringify(r.feed), "--at", String(r.at)).then(() => read());
         notify(`Unfollowed ${f.title}`, "info", back, () => ore("feed", "unfollow", f.url).then(() => read()));

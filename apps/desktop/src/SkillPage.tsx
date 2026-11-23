@@ -426,7 +426,15 @@ function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skil
     const before = shownGoal.current;
     if (v === before) return;
     shownGoal.current = v;
-    const to = (goal: string) => () => ((shownGoal.current = goal), ore("skills", "set", skill.id, opt("goal", goal)).then(onChanged));
+    const to = (goal: string) => () => {
+      const was = shownGoal.current;
+      shownGoal.current = goal;
+      // One that fails leaves the goal as it was, so typing this goal again still saves it.
+      return ore("skills", "set", skill.id, opt("goal", goal)).then(onChanged, (e) => {
+        shownGoal.current = was;
+        throw e;
+      });
+    };
     const write = ore("skills", "set", skill.id, opt("goal", v));
     // On the history at once: a ⌘Z while the write is out takes back this goal, not the one before it.
     // Emptying the field throws the goal away: say so, with Undo.

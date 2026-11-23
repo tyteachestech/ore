@@ -70,6 +70,53 @@ export async function oreJob<T>(job: string | null, stdin: string | null, ...arg
   return answered(args, await oreRun<T>(job, stdin, args));
 }
 
+/** Changes still being written whose step goes on the history only once they land (`whileOut`). ⌘Z waits for
+ *  them (Toast.tsx), so it takes back that change, never the step before it (Codex UX sweeps 1 to 3). */
+let out = 0;
+let idle: (() => void)[] = [];
+export const callsOut = () => out > 0;
+/** Told whenever a change starts or stops being written (the iPhone's shake names what it would undo). */
+export const outChanged = new Set<() => void>();
+/** Once nothing counted is out, or after `max` ms (a write that never answers must not hold ⌘Z for good). */
+/** True once nothing is out; false when `max` ms passed with a change still being written. */
+export function callsSettled(max = 30_000): Promise<boolean> {
+  if (!out) return Promise.resolve(true);
+  return new Promise<boolean>((r) => {
+    const done = (ok: boolean) => {
+      clearTimeout(timer);
+      idle = idle.filter((x) => x !== quiet);
+      r(ok);
+    };
+    const quiet = () => done(true);
+    const timer = setTimeout(() => done(false), max);
+    idle.push(quiet);
+  });
+}
+const counted = async <T,>(run: () => Promise<T>): Promise<T> => {
+  if (!out++) outChanged.forEach((f) => f());
+  try {
+    return await run();
+  } finally {
+    // Once the caller's own continuation (its notify) has run and React has drawn what it set (Review's undo reads
+    // its rendered state): a frame, or 50 ms where no frame comes (a page in the background).
+    let gone = false;
+    const release = () => {
+      if (gone) return;
+      gone = true;
+      if (!--out) {
+        [...idle].forEach((r) => r());
+        outChanged.forEach((f) => f());
+      }
+    };
+    const t = setTimeout(release, 50);
+    requestAnimationFrame(() => setTimeout(() => (clearTimeout(t), release()), 0));
+  }
+};
+
+/** Counts `p` as out until it settles and its caller has gone on: wrap the write (or the wait, as Finish's moment)
+ *  of a change whose step goes on the history only after it. */
+export const whileOut = <T,>(p: Promise<T>): Promise<T> => counted(() => p);
+
 async function oreRun<T>(job: string | null, stdin: string | null, args: string[]): Promise<T> {
   // On iPhone the same commands run inside the app (src/phone/core.ts).
   if (PHONE) return (await import("./phone/core")).run<T>(args, stdin);

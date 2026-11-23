@@ -41,13 +41,18 @@ function one(line: string): Entry | null {
   return null;
 }
 
-/** A link or file per line when every line is one (a pasted list), else the whole text as one source. */
-export function entries(raw: string): Entry[] {
+/** A link or file per line when every line is one (a pasted list), else the whole text as one source. `picked`:
+ *  files chosen in the file panel, whose lines go in as those files beside the text, never as part of it. */
+export function entries(raw: string, picked: string[] = []): Entry[] {
   const text = raw.trim();
   if (!text) return [];
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const each = lines.map(one);
-  return each.every((e) => e) ? (each as Entry[]) : [{ kind: "text", text }];
+  if (each.every((e) => e)) return each as Entry[];
+  const files = lines.filter((l) => picked.includes(l));
+  if (!files.length) return [{ kind: "text", text }];
+  const rest = text.split(/\r?\n/).filter((l) => !picked.includes(l.trim())).join("\n").trim();
+  return [...(rest ? [{ kind: "text" as const, text: rest }] : []), ...files.map((path) => ({ kind: "file" as const, path }))];
 }
 
 /** What a paste is, plain and as HTML. */

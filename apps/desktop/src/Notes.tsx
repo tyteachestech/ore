@@ -7,7 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { NoteEditor, type LinkTarget, type NoteEditorHandle } from "./editor/NoteEditor";
 import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
-import { ore, opt, oreWith, type Backlink, type Notes } from "./ore";
+import { ore, opt, oreWith, whileOut, type Backlink, type Notes } from "./ore";
 import { errorText, LIBRARY_BACK, load, save, useLibraryChanges, type Notify } from "./util";
 
 /** Which note: a source note (D31) or a skill note (D41). */
@@ -191,7 +191,7 @@ export function useNotes(ref: NoteRef, notify: Notify, onKept?: () => void): MyN
       try {
         // The file as it is now (not what this editor last based a save on, which a merge can leave behind).
         const before = (await queue(() => ore<Notes>("notes", ...key.split(" "))).catch(() => undefined))?.text;
-        const r = await queue(() => ore<Notes>("notes", ...key.split(" "), opt("append", t), opt("heading", heading)));
+        const r = await whileOut(queue(() => ore<Notes>("notes", ...key.split(" "), opt("append", t), opt("heading", heading))));
         if (r.kept_from_feed) kept.current?.();
         // His typing before it is a step of its own, under this one.
         if (before !== undefined) checkpoint(key, before);

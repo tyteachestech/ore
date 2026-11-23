@@ -146,20 +146,29 @@ export function useTutorChat(notify: Notify) {
     );
   // The chat on screen whose last save failed, by id: until a save of it lands, the screen holds its only copy.
   const unsaved = useRef<string | null>(null);
-  const save = async () => {
+  // A chat whose save was tried again on the way out and failed: a second ask to leave it leaves it, as he chose.
+  const stuck = useRef<string | null>(null);
+  const save = async (leaving = false) => {
     const m = metaNow.current;
     if (!m || !now.current.length) return;
+    // He went on with the chat after the warning: the next leave warns again.
+    if (!leaving) stuck.current = null;
     const chat = { ...m, carry: carryNow.current, turns: now.current.map(settled) };
     const ok = await write(() => oreWith(JSON.stringify(chat), "chat", "--set", "--merge"));
-    if (ok && unsaved.current === m.id) unsaved.current = null;
+    if (ok && unsaved.current === m.id) unsaved.current = stuck.current = null;
     if (!ok) unsaved.current = m.id;
   };
   /** Before the chat on screen gives way to another: one whose save failed is saved again first, and stays on
    *  screen (with the error) if that fails too, so leaving it never loses it (Codex UX sweep 2). */
   const savedFirst = async () => {
-    if (!unsaved.current || unsaved.current !== metaNow.current?.id) return true;
-    await save();
-    return !unsaved.current;
+    const id = metaNow.current?.id;
+    if (!unsaved.current || unsaved.current !== id) return true;
+    if (stuck.current === id) return true;
+    await save(true);
+    if (!unsaved.current) return true;
+    stuck.current = id;
+    notify("This chat isn’t saved. Leave it again to go without it, or keep it open and try later.", "error");
+    return false;
   };
   /** A turn's change, in the chat on screen or, once he has moved on, in its own saved chat. */
   const patch = (chat: string, id: string, p: Partial<TutorTurn>, title?: string) => {
@@ -329,10 +338,13 @@ export function useTutorChat(notify: Notify) {
   };
   /** A new chat, even while one is thinking (its reply lands in its own saved chat). */
   const fresh = async () => {
-    if (await savedFirst()) clear();
+    // A message sent while the save was tried again stays on screen: he went on with this chat.
+    const n = now.current.length;
+    if ((await savedFirst()) && now.current.length === n) clear();
   };
   const clear = () => {
     unsaved.current = null;
+    stuck.current = null;
     unqueue();
     update(() => []);
     setCarry([]);
