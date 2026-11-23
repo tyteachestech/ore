@@ -2631,6 +2631,7 @@ button.home-plan:hover { color: var(--text); }
 .review-cut b { font-family: var(--round); font-size: 24px; color: var(--text); font-variant-numeric: tabular-nums; animation: pop var(--t-4) var(--ease-out) 700ms both; }
 /* A stone the cart dropped is cut in place (Cutting, D239): it arrives by landing, so it has no entrance of its own. */
 .review-cut > span[data-stone] { animation: none; }
+.review-cut b[data-gone] { visibility: hidden; }
 .gem-cutting { position: relative; display: inline-grid; place-items: center; }
 .gem-cutting > span { display: block; transform-origin: 50% 85%; will-change: transform; }
 .gem-cutting[data-cutting] .gem { opacity: 1; }

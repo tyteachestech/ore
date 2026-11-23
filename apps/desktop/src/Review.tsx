@@ -1734,6 +1734,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   // cart: rolling and pouring · poured: the ring is full · leaving: the cart starts off, and the mole comes up unless he is riding it (then when he has fallen) · done: the cart has gone.
   const [stage, setStage] = useState<"cart" | "poured" | "leaving" | "done">(pour ? "cart" : "done");
   const [landed, setLanded] = useState(pour ? 0 : shown.length);
+  // Of the gems cut in the ring, how many have left it for their skill's row.
+  const [flown, setFlown] = useState(still() || quick ? shown.length : 0);
   // He comes up out of the ground first, with or without a cart before it, and after falling off the cart into his hole too (D255: `hole` while he is on it, `pop` once he has gone down) (under Reduce Motion he is just there, at rest: pleased, or plain after a session of misses).
   const [settled, setSettled] = useState(still);
   const [fell, setFell] = useState(false);
@@ -1778,7 +1780,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
               </Hint>
             );
           })}
-          {more > 0 && landed >= shown.length && <b>+{more}</b>}
+          {more > 0 && landed >= shown.length && <b data-gone={(shown.length > 0 && flown >= shown.length) || undefined}>+{more}</b>}
         </p>
   );
   // The quick quiz says the count in a line of its own; the full end screen has it in the row of results.
@@ -1815,35 +1817,42 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   const [away, setAway] = useState(calm || !!quick || gems.length === 0);
   // The gems cut in the ring leave it one at a time, each for the row of the skill it belongs to, where it is one
   // step to that skill's next level. The rows come in first, as the skills stood before the session.
-  const [flown, setFlown] = useState(calm || quick ? shown.length : 0);
   const cutAll = s.cut ?? [];
   const got: Record<string, number> = {};
   for (const id of flown >= shown.length ? cutAll : shown.slice(0, flown)) got[id] = (got[id] ?? 0) + 1;
   useEffect(() => {
     if (calm || quick || !shown.length || !full || landed < shown.length) return;
-    const id = setTimeout(() => setRowsIn(true), pour ? 700 : 1100 + gems.length * 90);
+    const id = setTimeout(() => setRowsIn(true), pour ? 500 : 1100 + gems.length * 90);
     return () => clearTimeout(id);
   }, [full, landed]);
   useEffect(() => {
     if (!rowsIn || flown >= shown.length || !host) return;
-    const id = setTimeout(() => {
-      const el = host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]")[flown];
-      const to = host.querySelector(`.end-skill[data-skill="${CSS.escape(shown[flown]!)}"] .end-skill-bar`) ?? host.querySelector(".end-skills-more");
-      if (!el || !to) return setFlown((f) => f + 1);
-      const a = el.getBoundingClientRect(), z = to.getBoundingClientRect();
-      const dx = z.left + z.width / 2 - (a.left + a.width / 2), dy = z.top + z.height / 2 - (a.top + a.height / 2);
-      el.style.zIndex = "5";
-      el.animate([{ transform: "none" }, { transform: `translate(${dx * 0.3}px, ${dy * 0.1 - 26}px) scale(0.85)`, offset: 0.4 }, { transform: `translate(${dx}px, ${dy}px) scale(0.18)` }], { duration: 560, easing: "cubic-bezier(0.45, 0, 0.3, 1)", fill: "forwards" }).onfinish = () => {
-        el.style.visibility = "hidden";
-        layer("right", { up: END_NOTES[Math.min(flown, END_NOTES.length - 1)] ?? 0, level: 0.6 });
-        setFlown((f) => f + 1);
-      };
-    }, flown ? 220 : 700);
-    return () => clearTimeout(id);
-  }, [rowsIn, flown, host]);
+    // A skill's gems go as one volley, close on each other's heels; a breath between skills. So the wait grows
+    // with the skills fed, not with the gems.
+    const ids: ReturnType<typeof setTimeout>[] = [];
+    let t = 450;
+    shown.forEach((skill, i) => {
+      t += i === 0 ? 0 : skill === shown[i - 1] ? 110 : 380;
+      ids.push(setTimeout(() => {
+        const el = host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]")[i];
+        const to = skill ? host.querySelector(`.end-skill[data-skill="${CSS.escape(skill)}"] .end-skill-bar`) ?? host.querySelector(".end-skills-more") : null;
+        if (!el) return setFlown((f) => f + 1);
+        const a = el.getBoundingClientRect(), z = to?.getBoundingClientRect();
+        // A gem with no row to go to (filed under no skill) fades where it stands.
+        const dx = z ? z.left + z.width / 2 - (a.left + a.width / 2) : 0, dy = z ? z.top + z.height / 2 - (a.top + a.height / 2) : 0;
+        el.style.zIndex = "5";
+        el.animate(z ? [{ transform: "none" }, { transform: `translate(${dx * 0.3}px, ${dy * 0.1 - 26}px) scale(0.85)`, offset: 0.4 }, { transform: `translate(${dx}px, ${dy}px) scale(0.18)` }] : [{ opacity: 1 }, { opacity: 0 }], { duration: 520, easing: "cubic-bezier(0.45, 0, 0.3, 1)", fill: "forwards" }).onfinish = () => {
+          el.style.visibility = "hidden";
+          if (z) layer("right", { up: END_NOTES[Math.min(i, END_NOTES.length - 1)] ?? 0, level: 0.6 });
+          setFlown((f) => f + 1);
+        };
+      }, t));
+    });
+    return () => ids.forEach(clearTimeout);
+  }, [rowsIn, host]);
   useEffect(() => {
     if (away || !full || landed < shown.length || flown < shown.length) return;
-    const id = setTimeout(() => setAway(true), shown.length ? 900 : pour ? 1100 : 1400 + gems.length * 90);
+    const id = setTimeout(() => setAway(true), shown.length ? 600 : pour ? 1100 : 1400 + gems.length * 90);
     return () => clearTimeout(id);
   }, [away, full, landed, flown]);
   const [plan] = useState(() => {

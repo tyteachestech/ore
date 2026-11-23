@@ -87,9 +87,10 @@ export function LapCentre({ min }: { min: number }) {
 export function SkillRows({ cut, got, was, now, skills, run }: { cut: string[]; got: Record<string, number>; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
   const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
   const n = new Map<string, number>();
-  for (const id of cut) n.set(id, (n.get(id) ?? 0) + 1);
+  // A gem filed under no skill has no level to feed, so no row.
+  for (const id of cut) if (of(now, id)) n.set(id, (n.get(id) ?? 0) + 1);
   const up = (id: string) => (of(now, id)?.level ?? 0) > (of(was, id)?.level ?? of(now, id)?.level ?? 0);
-  const all = [...n.keys()].sort((x, y) => Number(up(y)) - Number(up(x)) || n.get(y)! - n.get(x)!), rows = all.slice(0, REEL_ROWS);
+  const all = [...n.keys()].sort((x, y) => Number(up(y)) - Number(up(x)) || n.get(y)! - n.get(x)!), rows = all.slice(0, all.length > REEL_ROWS ? REEL_ROWS - 1 : REEL_ROWS);
   if (!rows.length) return null;
   // Where the skill stands once `got` of its gems have landed: a gem is one step, and a full level flips.
   const at = (id: string) => {
