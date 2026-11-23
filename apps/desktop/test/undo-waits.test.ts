@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-// Codex UX sweeps 1 to 4 (F459, F467, F470, F480 and on): a change put on the Undo history only once its write had
+// Codex UX sweeps 1 to 4 (F459, F467, F470, F481 and on): a change put on the Undo history only once its write had
 // landed let a ⌘Z (or the shake) pressed meanwhile take back the step before it. Each such write is now marked with
 // `whileOut` (ore.ts), which ⌘Z waits for, or its step goes on at once with `.hold(write)`. This finds a new one: a
 // notify with an Undo that comes after an `await` in the lines before it, with neither.
