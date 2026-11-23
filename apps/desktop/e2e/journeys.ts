@@ -12542,6 +12542,45 @@ journey("phone: a long press on a Today source opens its menu", async (page) => 
   await page.getByRole("menuitem", { name: "Pin to top" }).waitFor();
 }, "phone");
 
+journey("phone: the drawer's No skill lists the sources with no skill, only while there are some, and a held source sets its Importance (D345)", async (page) => {
+  const drawer = page.locator(".phone-drawer");
+  const noSkill = drawer.locator("button").filter({ hasText: /^No skill$/ });
+  const menu = () => tap(page, page.getByRole("button", { name: "Open menu" }));
+  await menu();
+  await drawer.locator("button").filter({ hasText: "Sources" }).waitFor();
+  if (await noSkill.count()) throw new Error("the drawer has a No skill row with every source under a skill");
+  const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
+  await phoneWith(page, async () => (await createItem({ root: PHONE_LIB }, { type: "article", title: "A values guide", body: "Write down the five things you would defend." })).dir, async () => {
+    await menu();
+    await tap(page, noSkill);
+    const rows = page.locator(".phone-sources li button");
+    await until("only the source with no skill is listed", async () => (await rows.count()) === 1 && (await rows.first().innerText()).includes("A values guide"));
+    // Held, Importance ▸ ticks Normal with no skill; Focus is set and ticked the next time.
+    const levels = async () => {
+      await press(page, rows.first());
+      await tap(page, page.getByRole("menuitem", { name: "Importance" }));
+      await page.getByRole("menuitemcheckbox", { name: "Focus" }).waitFor();
+      return page.getByRole("menuitemcheckbox").evaluateAll((els) => els.map((e) => `${e.textContent}${e.getAttribute("aria-checked") === "true" ? "✓" : ""}`).join(" "));
+    };
+    if ((await levels()) !== "Focus Normal✓ Light") throw new Error(`with no skill and nothing set: ${await levels()}`);
+    await tap(page, page.getByRole("menuitemcheckbox", { name: "Focus" }));
+    await page.getByText("A values guide: Focus").waitFor();
+    await until("Focus is ticked", async () => {
+      const now = await levels();
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("Escape");
+      return now === "Focus✓ Normal Light";
+    });
+  });
+  // Gone, the row stays only while its list is open; from Today it is gone.
+  await page.reload();
+  await menu();
+  await tap(page, drawer.locator("button").filter({ hasText: "Today" }));
+  await menu();
+  await drawer.locator("button").filter({ hasText: "Sources" }).waitFor();
+  if (await noSkill.count()) throw new Error("the No skill row stayed after its last source went");
+}, "phone");
+
 journey("phone: a held row in a skill's list opens its own menu only; Return in Rename opens nothing; Rename… is on Today's rows too (F46–F48)", async (page) => {
   // On a skill's page a held row is under the section's own menu: a finger's pointer opens only the row's (F46).
   await tap(page, page.getByRole("button", { name: "Open menu" }));
