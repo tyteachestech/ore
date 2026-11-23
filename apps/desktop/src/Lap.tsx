@@ -3,7 +3,7 @@ import { Hint } from "./Hint";
 import { DotNumber, minutes } from "./Ring";
 import { still } from "./SideCursor";
 import { SkillIcon } from "./IconPicker";
-import { levelProgress, type Skill, type Today } from "./ore";
+import { type Skill, type Today } from "./ore";
 
 /** The end screen's minutes: where the day stood before this session, where it stands now, and the goal they
  *  are measured against (0 when today has none: an off day under Weekdays only). */
@@ -84,41 +84,47 @@ export function LapCentre({ min }: { min: number }) {
  *  quietest thing in its own row" and "+9" had no unit).
  *  One that went up leads, then the ones fed most, three at most. A memory filed under no skill is named as the
  *  review picker names it, and has no level. `was` and `now` are each skill's strength before and after. */
-export function SkillRows({ kept, was, now, skills, run }: { kept: { skill: string; n: number }[]; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
+export function SkillRows({ cut, got, was, now, skills, run }: { cut: string[]; got: Record<string, number>; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
   const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
+  const n = new Map<string, number>();
+  for (const id of cut) n.set(id, (n.get(id) ?? 0) + 1);
   const up = (id: string) => (of(now, id)?.level ?? 0) > (of(was, id)?.level ?? of(now, id)?.level ?? 0);
-  const all = [...kept.filter((k) => up(k.skill)), ...kept.filter((k) => !up(k.skill))], rows = all.slice(0, REEL_ROWS);
+  const all = [...n.keys()].sort((x, y) => Number(up(y)) - Number(up(x)) || n.get(y)! - n.get(x)!), rows = all.slice(0, REEL_ROWS);
   if (!rows.length) return null;
-  const level = (id: string) => {
+  // Where the skill stands once `got` of its gems have landed: a gem is one step, and a full level flips.
+  const at = (id: string) => {
     const k = of(now, id), b = of(was, id) ?? k;
     if (!k || !b) return null;
-    // A skill that went up filled the level it was on: the bar is that level's, full.
-    const from = Math.round(levelProgress(b).share * BAR), to = up(id) ? BAR : Math.round(levelProgress(k).share * BAR);
-    return { from: up(id) ? 0 : Math.min(from, to), to, n: k.level, said: up(id) ? `level ${k.level}` : "" };
+    const here = Math.min(got[id] ?? 0, n.get(id)!), count = here >= n.get(id)! ? Math.max(k.peak, b.peak + here) : b.peak + here;
+    const lv = Math.floor(Math.sqrt(count / 5)), from = 5 * lv ** 2, next = 5 * (lv + 1) ** 2;
+    const before = lv > b.level ? 0 : Math.round(((b.peak - from) / (next - from)) * BAR);
+    // A skill that went up filled the level it was on: its bar stays full, in its colour, and says so.
+    if (lv > b.level) return { lv, up: true, line: `reached level ${lv}`, before: 0, to: BAR, here };
+    return { lv, up: false, line: `${next - count} to level ${lv + 1}`, before: Math.max(0, before), to: Math.max(before, Math.round(((count - from) / (next - from)) * BAR)), here };
   };
   const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
-  const said = all.map((k) => [name(k.skill), `${k.n} kept`, level(k.skill)?.said].filter(Boolean).join(", ")).join(" · ");
+  const said = all.map((id) => [name(id), `${n.get(id)} ${n.get(id) === 1 ? "gem" : "gems"}`, up(id) && `level ${of(now, id)!.level}`].filter(Boolean).join(", ")).join(" · ");
   const more = all.length - rows.length;
   return (
     // Its room is held from the start, so the results under it never move when it comes in.
     <div className="end-skills" data-wait={!run || undefined}>
       <span className="sr-only">{said}</span>
-      {rows.map((k, i) => {
-        const s = skills.find((x) => x.id === k.skill), lv = level(k.skill);
+      {rows.map((id, i) => {
+        const s = skills.find((x) => x.id === id), lv = at(id);
         return (
-          <div key={k.skill} className="end-skill" data-color={s?.color} data-up={up(k.skill) || undefined} aria-hidden="true" style={{ "--i": i } as React.CSSProperties}>
+          <div key={id} className="end-skill" data-skill={id} data-color={s?.color} data-up={lv?.up || undefined} aria-hidden="true" style={{ "--i": i } as React.CSSProperties}>
             <SkillIcon icon={s?.icon} color={s?.color} dot />
-            <span className="end-skill-name">{name(k.skill)}</span>
-            {lv && <b>Level <DotNumber value={lv.n} height={24} /></b>}
+            <span className="end-skill-name">{name(id)}</span>
+            {lv && <b key={lv.lv} data-flip={lv.up || undefined}>Level <DotNumber value={lv.lv} height={24} /></b>}
             <span className="end-skill-level">
-              {lv && <span className="end-skill-bar">{Array.from({ length: BAR }, (_, d) => <i key={d} data-on={d < lv.from || undefined} data-new={(d >= lv.from && d < lv.to) || undefined} style={{ "--d": d - lv.from } as React.CSSProperties} />)}</span>}
-              {k.n} kept
+              {lv && <span className="end-skill-bar">{Array.from({ length: BAR }, (_, d) => <i key={d} data-on={d < lv.before || undefined} data-new={(d >= lv.before && d < lv.to) || undefined} />)}</span>}
+              {lv && <span key={lv.here} className="end-skill-left">{lv.line}</span>}
             </span>
           </div>
         );
       })}
       {/* Three rows at most; a session that fed more says how many, and names them all on hover and focus. */}
-      {more > 0 && <Hint text={`Memories kept this session · ${said}`}><span className="end-skills-more" tabIndex={0}>and {more} more {more === 1 ? "skill" : "skills"}</span></Hint>}
+      {more > 0 && <Hint text={`Gems cut this session · ${said}`}><span className="end-skills-more" tabIndex={0}>and {more} more {more === 1 ? "skill" : "skills"}</span></Hint>}
     </div>
   );
 }

@@ -2535,7 +2535,11 @@ button.home-plan:hover { color: var(--text); }
 .end-skill-bar i { width: 8px; height: 8px; border-radius: 50%; background: color-mix(in oklab, var(--text) 20%, transparent); }
 .end-skill-bar i[data-on] { background: var(--muted); }
 /* The dots this session lit come on one by one, once the row is in. */
-.end-skill-bar i[data-new] { background: var(--skill, var(--text)); animation: end-skill-dot var(--t-3) var(--ease-out) calc(var(--t-4) + var(--i) * 150ms + var(--d) * 60ms) backwards; }
+.end-skill-bar i[data-new] { background: var(--skill, var(--text)); animation: end-skill-dot var(--t-3) var(--ease-spring); }
+.end-skill-left { display: inline-block; animation: end-skill-left var(--t-3) var(--ease-out); }
+@keyframes end-skill-left { from { color: var(--skill, var(--text)); transform: translateY(-3px); } }
+.end-skill > b[data-flip] { animation: end-skill-flip 700ms var(--ease-spring); }
+@keyframes end-skill-flip { from { transform: scale(1.6); } 40% { transform: scale(1.6); } }
 @keyframes end-skill-dot { from { background: color-mix(in oklab, var(--text) 20%, transparent); transform: scale(0.4); } }
 .end-skills-more { justify-self: center; font: 400 12px/1.3 var(--mono); color: var(--muted); border-radius: 4px; }
 .end-skills-more:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }

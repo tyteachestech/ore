@@ -3,7 +3,7 @@ import { VOICE, type MoleLine } from "./sfx";
 import { depthParts, depthText, longGapText, rescuedWorthSaying, type SessionEnd, type Today } from "./ore";
 
 /** One of the end screen's results (D252): a number, what it counts, and for a rare one what kind. */
-export type Tile = { key: "depth" | "cut"; value: string; label: string; hint?: string };
+export type Tile = { key: "kept" | "depth"; value: string; label: string; hint?: string };
 
 /** A line of the mole's. `rare`: a thing most sessions don't have, which leads and wears its own mark (D247). */
 export type Said = { text: string; hint?: string; verdict?: true; rare?: { kind: "level"; skill: string } | { kind: "then" } | { kind: "long" } | { kind: "rescued" } };
@@ -80,11 +80,11 @@ export function endVoice(first: Said | undefined, o: { session: SessionEnd; clos
 export function endTiles(o: { session: SessionEnd }): Tile[] {
   const s = o.session;
   if (s.kept === 0) return [];
-  const days = s.depth_days ?? 0, extra = s.depth_extra_days ?? 0, cut = s.cut?.length ?? 0;
+  const days = s.depth_days ?? 0, extra = s.depth_extra_days ?? 0;
   const { n, unit } = depthParts(days);
   return [
+    { key: "kept", value: String(s.kept), label: s.kept === 1 ? "memory kept" : "memories kept", hint: "Exercises you remembered this session" },
     ...(days > 0 ? [{ key: "depth", value: `+${n}`, label: `${unit} of memory`, hint: `How much longer the exercises you passed today will now last, added up (at most 30 days each)${extra > 0 && extra < days ? `; ${depthText(extra)} of it came after today’s goal` : ""}` } satisfies Tile] : []),
-    ...(cut ? [{ key: "cut", value: String(cut), label: cut === 1 ? "gem cut" : "gems cut", hint: "Cut: you’d still recall it three weeks from now" } satisfies Tile] : []),
   ];
 }
 
