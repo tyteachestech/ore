@@ -298,6 +298,11 @@ export function decodeText(bytes: Uint8Array): string {
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
+    // Not UTF-8: a page that names its own charset in a <meta> (Shift_JIS on Aozora Bunko, F38) is read in it.
+    const named = /<meta[^>]+charset\s*=\s*["']?([\w-]+)/i.exec(new TextDecoder("latin1").decode(bytes.subarray(0, 4096)))?.[1];
+    try {
+      if (named) return new TextDecoder(named).decode(bytes);
+    } catch {}
     return new TextDecoder("windows-1252").decode(bytes);
   }
 }
