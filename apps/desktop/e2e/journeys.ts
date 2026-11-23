@@ -17104,7 +17104,7 @@ journey("phone: every field on every screen stays in sight when the keyboard com
   if (bad.length) throw new Error(`fields out of sight with the keyboard up:\n${bad.join("\n")}`);
 }, "phone");
 
-journey("phone: Search's ⓧ clears what he typed and keeps Search open with the keyboard up, × leaves, and the keyboard's key says Search (Codex native scout)", async (page) => {
+journey("phone: Search's ⓧ clears what he typed and keeps Search open with the keyboard up, Cancel leaves, and the keyboard's key says Search (Codex native scout)", async (page) => {
   // The only × beside the field closed Search, and the keyboard showed Return (Settings, Files: a clear button in the field, a Search key).
   await tap(page, page.getByRole("button", { name: "Search" }));
   const field = page.locator("[cmdk-input]");
@@ -17116,7 +17116,11 @@ journey("phone: Search's ⓧ clears what he typed and keeps Search open with the
   await tap(page, page.getByRole("button", { name: "Clear" }));
   await until("the field is cleared", async () => (await field.inputValue()) === "");
   if (!(await field.evaluate((el) => el === document.activeElement))) throw new Error("clearing took the keyboard away");
-  await tap(page, page.getByRole("button", { name: "Close" }));
+  // One ✕ only, the field's own: leaving is the word Cancel beside it, as iOS's search fields have (Tyler 2026-11-23).
+  await field.fill("agents");
+  const xs = await page.getByRole("dialog", { name: "Search" }).locator(".panel-input ~ button svg").count();
+  if (xs !== 1) throw new Error(`${xs} ✕ beside the field with text typed`);
+  await tap(page, page.getByRole("button", { name: "Cancel", exact: true }));
   await field.waitFor({ state: "detached" });
 }, "phone");
 

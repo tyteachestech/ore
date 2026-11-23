@@ -3018,7 +3018,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .palette-field .panel-input { flex: 1; min-width: 0; height: 44px; padding: 0 8px; border: 0; font-size: 16px; }
 .phone .palette-clear { display: grid; place-items: center; flex: none; width: 44px; height: 44px; margin-left: -8px; background: none; border: 0; color: var(--bg); }
 .phone .palette-clear svg { box-sizing: content-box; padding: 3px; border-radius: 50%; background: var(--muted); }
-.phone .palette-close { display: grid; place-items: center; flex: none; width: 44px; height: 44px; background: none; border: 0; color: var(--muted); }
+.phone .palette-close { display: grid; place-items: center; flex: none; height: 44px; padding: 0 4px 0 8px; background: none; border: 0; color: var(--text); font: 400 17px var(--font); }
 .phone .overlay .panel [cmdk-list] { flex: 1; min-height: 0; max-height: none; }
 .phone .overlay .panel [cmdk-item] { min-height: 44px; height: auto; font-size: 16px; }
 .phone .overlay .panel .panel-foot:not(:has(.err)) { display: none; }
