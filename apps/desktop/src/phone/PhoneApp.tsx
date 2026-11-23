@@ -1219,7 +1219,9 @@ export function PhoneApp() {
             onChanged={() => void refresh()}
             onSkillsChanged={() => void refresh()}
             onDone={() => {
-              setOpenId(null);
+              // Only the source he finished closes: one he opened during the moment's second stays (Codex UX sweep 16).
+              const was = openId;
+              setOpenId((now) => (was && now !== was ? now : null));
               setFinishing(false);
               void refresh();
             }}

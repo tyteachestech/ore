@@ -9287,6 +9287,33 @@ journey("finish: ⌘Z during the Source finished moment takes back the finish, n
   }
 });
 
+journey("finish: a source opened during the Source finished moment stays open (Codex UX sweep 16)", async (page) => {
+  // The moment's second ran out and closed whatever source was open then: the next one he had already opened.
+  const LECTURE = "Lecture 4 the testing effect";
+  const item = ((await ore("ls")) as { id: string; title: string; status: string }[]).find((i) => i.title === LECTURE)!;
+  await openSource(page, LECTURE);
+  try {
+    await page.evaluate(() => ((window as unknown as { __ORE_REPLY: Record<string, unknown> }).__ORE_REPLY = { enrich: { item: "x", title: "x", prequestions: [], skills: [], topics: [], topics_created: [], cards: [] } }));
+    await page.getByRole("button", { name: "Finish", exact: true }).click();
+    await page.getByLabel("Free recall").fill("Retrieval beats rereading.");
+    const doneQ = page.getByRole("heading", { name: "Done with this source?" });
+    for (let i = 0; i < 14 && !(await doneQ.isVisible()); i++) {
+      const next = page.getByRole("button", { name: /^(Continue|Skip|Skip to questions|Next|No idea|Next question|Finish)$/ }).first();
+      if (await next.isVisible().catch(() => false)) await next.click().catch(() => {});
+      await Bun.sleep(400);
+    }
+    await doneQ.waitFor();
+    await page.getByRole("button", { name: "Done", exact: true }).click();
+    await page.getByText("Source finished").first().waitFor();
+    await openSource(page, AGENTS);
+    await Bun.sleep(1800); // past the moment's second
+    if (!(await page.locator(".doc-head").filter({ hasText: AGENTS }).isVisible())) throw new Error("the source opened during the moment closed by itself");
+  } finally {
+    await page.evaluate(() => ((window as unknown as { __ORE_REPLY: Record<string, unknown> }).__ORE_REPLY = {}));
+    await ore("status", item.id, item.status);
+  }
+});
+
 journey("add: a draft left with Esc comes back with the skills he picked for it (Codex UX sweep 4)", async (page) => {
   const box = page.getByRole("dialog", { name: "Add a source" });
   const field = box.getByLabel("Link, file path or text");
