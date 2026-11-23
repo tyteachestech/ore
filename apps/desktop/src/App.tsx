@@ -2614,8 +2614,9 @@ export function App() {
             rearchive={rearchive}
             onDone={() => {
               // The panel showed the moment (D71); the toast takes a mistaken Done back (D106).
+              // Only the source he finished closes: one he opened during the moment's second stays (Codex UX sweep 16).
               const item = openItem;
-              setOpenId(null);
+              setOpenId((now) => (item && now !== item.id ? now : null));
               setFinishing(false);
               void refresh();
               if (item) notify(`Finished “${item.title}” · exercises start tomorrow`, "info", () => moveSource(item, "reading", false), () => moveSource(item, "done", false));
