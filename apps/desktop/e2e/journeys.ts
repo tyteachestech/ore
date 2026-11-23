@@ -15424,9 +15424,16 @@ journey("source note: the format bar shows whole in the side panel, reaching ove
     await pm.click();
     await page.keyboard.press("Meta+a");
     await page.keyboard.type("## Recall beats rereading every time");
-    await page.keyboard.press("Shift+Home");
+    // The line is a heading first: a Shift+Home pressed while "## " was still being turned into one selected
+    // nothing on a slow runner, and the bar never came (master red after #508, F529).
+    await pm.locator("h2", { hasText: "Recall beats rereading every time" }).waitFor();
     const bar = page.locator(".sel-bar");
-    await bar.waitFor();
+    await until("the bar shows for the selected line", async () => {
+      if (await bar.isVisible()) return true;
+      await page.keyboard.press("End");
+      await page.keyboard.press("Shift+Home");
+      return bar.isVisible();
+    });
     await until("every part of the bar is in sight", () => bar.evaluate((el) => {
       const b = el.getBoundingClientRect();
       if (b.left < 0 || b.right > innerWidth) return false;
