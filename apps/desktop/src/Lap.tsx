@@ -84,13 +84,13 @@ export function LapCentre({ min }: { min: number }) {
  *  quietest thing in its own row" and "+9" had no unit).
  *  One that went up leads, then the ones fed most, three at most. A memory filed under no skill is named as the
  *  review picker names it, and has no level. `was` and `now` are each skill's strength before and after. */
-export function SkillRows({ cut, got, was, now, skills, run }: { cut: string[]; got: Record<string, number>; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
+export function SkillRows({ cut, got, kept, stoned, was, now, skills, run }: { cut: string[]; got: Record<string, number>; /** Skills that kept memories and cut no gem, and the ones whose stone has landed (null: all). */ kept: { skill: string; n: number }[]; stoned: Set<string> | null; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
   const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
   const n = new Map<string, number>();
   // A gem filed under no skill has no level to feed, so no row.
   for (const id of cut) if (of(now, id)) n.set(id, (n.get(id) ?? 0) + 1);
   const up = (id: string) => (of(now, id)?.level ?? 0) > (of(was, id)?.level ?? of(now, id)?.level ?? 0);
-  const all = [...n.keys()].sort((x, y) => Number(up(y)) - Number(up(x)) || n.get(y)! - n.get(x)!), rows = all.slice(0, all.length > REEL_ROWS ? REEL_ROWS - 1 : REEL_ROWS);
+  const all = [...[...n.keys()].sort((x, y) => Number(up(y)) - Number(up(x)) || n.get(y)! - n.get(x)!), ...kept.map((k) => k.skill)], rows = all.slice(0, all.length > REEL_ROWS ? REEL_ROWS - 1 : REEL_ROWS);
   if (!rows.length) return null;
   // Where the skill stands once `got` of its gems have landed: a gem is one step, and a full level flips.
   const at = (id: string) => {
@@ -104,22 +104,31 @@ export function SkillRows({ cut, got, was, now, skills, run }: { cut: string[]; 
     return { lv, up: false, line: `${next - count} to level ${lv + 1}`, before: Math.max(0, before), to: Math.max(before, Math.round(((count - from) / (next - from)) * BAR)), here };
   };
   const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
-  const said = all.map((id) => [name(id), `${n.get(id)} ${n.get(id) === 1 ? "gem" : "gems"}`, up(id) && `level ${of(now, id)!.level}`].filter(Boolean).join(", ")).join(" · ");
+  // A skill with no gem today says what it kept, and how many of its stones are one good answer from a gem.
+  const stone = (id: string) => {
+    const k = kept.find((x) => x.skill === id);
+    if (!k) return null;
+    const near = of(now, id)?.ready ?? 0;
+    return `${k.n} kept${near > 0 ? ` · ${near} nearly ${near === 1 ? "a gem" : "gems"}` : ""}`;
+  };
+  const said = all.map((id) => [name(id), stone(id) ?? `${n.get(id)} ${n.get(id) === 1 ? "gem" : "gems"}`, up(id) && `level ${of(now, id)!.level}`].filter(Boolean).join(", ")).join(" · ");
   const more = all.length - rows.length;
   return (
     // Its room is held from the start, so the results under it never move when it comes in.
     <div className="end-skills" data-wait={!run || undefined}>
       <span className="sr-only">{said}</span>
       {rows.map((id, i) => {
-        const s = skills.find((x) => x.id === id), lv = at(id);
+        const s = skills.find((x) => x.id === id), st = stone(id), lv = st ? null : at(id), k = of(now, id);
         return (
           <div key={id} className="end-skill" data-skill={id} data-color={s?.color} data-up={lv?.up || undefined} aria-hidden="true" style={{ "--i": i } as React.CSSProperties}>
             <SkillIcon icon={s?.icon} color={s?.color} dot />
             <span className="end-skill-name">{name(id)}</span>
             {lv && <b key={lv.lv} data-flip={lv.up || undefined}>Level <DotNumber value={lv.lv} height={24} /></b>}
+            {st && k && <b>Level <DotNumber value={k.level} height={24} /></b>}
             <span className="end-skill-level">
               {lv && <span className="end-skill-bar">{Array.from({ length: BAR }, (_, d) => <i key={d} data-on={d < lv.before || undefined} data-new={(d >= lv.before && d < lv.to) || undefined} />)}</span>}
               {lv && <span key={lv.here} className="end-skill-left">{lv.line}</span>}
+              {st && <span className="end-skill-left" data-wait={(stoned && !stoned.has(id)) || undefined}>{st}</span>}
             </span>
           </div>
         );

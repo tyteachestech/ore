@@ -2632,6 +2632,10 @@ button.home-plan:hover { color: var(--text); }
 /* A stone the cart dropped is cut in place (Cutting, D239): it arrives by landing, so it has no entrance of its own. */
 .review-cut > span[data-stone] { animation: none; }
 .review-cut b[data-gone] { visibility: hidden; }
+.review-stone { position: relative; color: var(--skill, var(--text)); }
+.review-stone small { font: 400 12px/1 var(--mono); color: var(--muted); }
+.end-skill-left[data-wait] { visibility: hidden; animation: none; }
+.end-skill-level { min-height: 12px; }
 .gem-cutting { position: relative; display: inline-grid; place-items: center; }
 .gem-cutting > span { display: block; transform-origin: 50% 85%; will-change: transform; }
 .gem-cutting[data-cutting] .gem { opacity: 1; }
