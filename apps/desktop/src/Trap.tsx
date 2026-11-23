@@ -10,8 +10,13 @@ export function Trap({ children, off = false }: { children: ReactElement; off?: 
     const panel = ref.current;
     if (off || !panel) return;
     const onKey = (e: KeyboardEvent) => wrap(e, panel);
+    const onInput = (e: InputEvent) => typedBehind(e, panel);
     panel.addEventListener("keydown", onKey);
-    return () => panel.removeEventListener("keydown", onKey);
+    document.addEventListener("beforeinput", onInput, true);
+    return () => {
+      panel.removeEventListener("keydown", onKey);
+      document.removeEventListener("beforeinput", onInput, true);
+    };
   }, [off]);
   return (
     <FocusScope asChild ref={ref} data-trap="" trapped={!off} loop={!off} onMountAutoFocus={(e) => e.preventDefault()} onUnmountAutoFocus={(e) => e.preventDefault()}>
@@ -34,6 +39,14 @@ export const onBackdrop = (close: () => void, commit?: () => Promise<boolean> | 
   e.preventDefault(); // focus stays in the field while it saves
   void Promise.resolve(commit()).then((ok) => ok && close());
 };
+
+/** Typing that lands on the page behind while the panel has the focus: WebKit types into a selection left in a note
+ *  behind, so a key pressed in Review replaced his selected skill note and saved it (Codex UX sweep 13). Refused; the
+ *  selection stays, so a menu acting on it still can once focus is back in the note. */
+function typedBehind(e: InputEvent, panel: HTMLElement) {
+  const at = e.target instanceof Node ? e.target : null;
+  if (at && !panel.contains(at) && panel.contains(document.activeElement)) e.preventDefault();
+}
 
 const CONTROLS = "a[href], button:not([disabled]), input:not([disabled]):not([type=hidden]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1']), [contenteditable=true]";
 
