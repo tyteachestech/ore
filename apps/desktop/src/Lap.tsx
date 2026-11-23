@@ -141,12 +141,12 @@ export function SkillRows({ plan, flown, stage, was, now, skills, run }: { plan:
           <Hint key={r.skill} text={said(r, lv.lv)}>
             <div className="end-medal" data-skill={r.skill} data-color={s?.color} data-on={stage === i || undefined} data-up={lv.up || undefined}>
               <span className="end-medal-ring" data-row={i} aria-hidden="true">
-                <span className="end-medal-core gem-ring" data-beat={lv.in || undefined} key={lv.in}>
+                <span className="end-medal-core gem-ring" data-beat={lv.in || undefined} key={`in${lv.in}`}>
                   <DotRing size={MEDAL} share={lv.share} ghost={lv.soon} step />
                   <SkillIcon icon={s?.icon} color={s?.color} dot />
                 </span>
                 {lv.up && <span className="end-medal-burst">{Array.from({ length: 12 }, (_, d) => <i key={d} style={{ "--a": `${d * 30}deg` } as React.CSSProperties} />)}</span>}
-                <b className="gem-ring-lv" key={lv.lv} data-flip={lv.up || undefined}>{lv.lv}</b>
+                <b className="gem-ring-lv" key={`lv${lv.lv}`} data-flip={lv.up || undefined}>{lv.lv}</b>
                 {/* What flies in, drawn once here so the flight can lift a copy of it. */}
                 <span className="end-medal-fliers">{r.slots.map((kind, d) => <span key={d} data-slot={r.first + d}><Gem kind={kind} size={kind === "cut" ? 28 : 20} /></span>)}</span>
               </span>

@@ -2519,12 +2519,13 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .end-lap { animation: none; } }
 /* Under the ring: the skills the session fed, a row each (`SkillRows`). */
-.end-skills { display: flex; justify-content: center; align-items: flex-start; width: 100%; min-height: 104px; margin: 28px auto 0; }
+.end-skills { display: flex; justify-content: center; align-items: flex-start; width: 100%; min-height: 104px; margin: 36px auto 0; }
 .end-skills[data-wait] { visibility: hidden; }
 /* A medal: the skill's icon in the ring of its level. It steps up large, takes its stones, and settles small. */
 .end-medal { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 104px; color: var(--skill, var(--text)); transform-origin: 50% 32px; transition: transform var(--t-4) var(--ease-spring), opacity var(--t-3) var(--ease-out); animation: end-medal-in var(--t-4) var(--ease-out) both; }
-.end-medal[data-on] { transform: scale(1.5); z-index: 1; }
-.end-skills:has([data-on]) .end-medal:not([data-on]) { opacity: 0.45; }
+.end-medal[data-on] { transform: scale(1.8); z-index: 1; }
+.end-skills:has([data-on]) .end-medal:not([data-on]) { opacity: 0.4; }
+.end-medal { width: 120px; }
 @keyframes end-medal-in { from { width: 0; opacity: 0; } }
 .end-medal-ring { position: relative; display: inline-grid; place-items: center; width: 64px; height: 64px; }
 .end-medal-core { width: 64px; height: 64px; }

@@ -1835,7 +1835,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     let t = 200;
     rowPlan.rows.forEach((r, row) => {
       ids.push(setTimeout(() => setOnStage(row), t));
-      t += 520;
+      t += 420;
       r.slots.forEach((kind, d) => {
         const i = r.first + d;
         t += d === 0 ? 0 : kind === "cut" ? 150 : 80;
@@ -1866,7 +1866,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           };
         }, t));
       });
-      t += (r.slots.length ? (r.slots[r.slots.length - 1] === "cut" ? 620 : 480) : 0) + (ups.some((k) => k.skill === r.skill) ? 1300 : 550);
+      t += (r.slots.length ? (r.slots[r.slots.length - 1] === "cut" ? 620 : 480) : 0) + (ups.some((k) => k.skill === r.skill) ? 1100 : 380);
     });
     ids.push(setTimeout(() => setOnStage(-1), t));
     return () => ids.forEach(clearTimeout);
