@@ -22,7 +22,8 @@ const clean = (s: string | null) => (s ?? "").replace(/\s+/g, " ").trim();
 export function chapterMarks(body: string, type?: string): { n: number; at: number; text: number; title: string | null }[] {
   const marks = [...body.matchAll(/<!-- chapter (\d+) -->/g)].map((m) => ({ n: Number(m[1]), at: m.index, text: m.index + m[0].length, title: null as string | null }));
   if (marks.length || type !== "youtube") return marks;
-  return [...body.matchAll(/^### +(.+)$/gm)].map((m, i) => ({ n: i + 1, at: m.index, text: m.index + m[0].indexOf(m[1]!), title: clean(m[1]!) || null }));
+  // One pattern with the CLI's (notes.ts, ai/recall.ts): a heading of only spaces isn't a chapter.
+  return [...body.matchAll(/^### +(\S.*)$/gm)].map((m, i) => ({ n: i + 1, at: m.index, text: m.index + m[0].indexOf(m[1]!), title: clean(m[1]!) || null }));
 }
 
 /** The last rendered block of every chapter but the final one (the source finish covers it).
