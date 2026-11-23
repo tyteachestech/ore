@@ -1,11 +1,25 @@
 import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { Item } from "./ore";
 
+/** Hosts that only store files for other sites: nobody knows a source by their names. */
+const STORAGE = /(^|\.)(cloudfront\.net|amazonaws\.com|googleusercontent\.com|storage\.googleapis\.com|blob\.core\.windows\.net|r2\.dev|digitaloceanspaces\.com|b-cdn\.net|backblazeb2\.com)$/;
+
+const decoded = (s: string) => {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s; // a bare % in the name
+  }
+};
+
 /** Where a source came from: its web address, else the file kept at capture (source.epub, …). */
 export function originalLabel(item: Item): string | null {
   if (item.url) {
     try {
-      return new URL(item.url).hostname.replace(/^www\./, "");
+      const at = new URL(item.url);
+      // A storage host's name is random letters ("d3o9bzvr1aje7d.cloudfront.net"): the file's own name says what it is.
+      const file = STORAGE.test(at.hostname) && /[^/]+\.[a-z0-9]{2,5}$/i.exec(at.pathname)?.[0];
+      return file ? decoded(file) : at.hostname.replace(/^www\./, "");
     } catch {
       return item.url;
     }

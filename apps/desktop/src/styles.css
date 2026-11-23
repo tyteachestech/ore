@@ -699,7 +699,7 @@ body:has(aside.tutor:not(.float)) .toasts { max-width: min(70vw, calc(100vw - va
 /* In no skill, a faint "Skill" where its skills go: the same blank field as Author beside it, and it opens the picker. */
 .doc-head .chips-blank { font-size: 13px; margin-right: 4px; color: var(--faint); }
 .doc-head :is(.by-add, .chips-blank):hover, .doc-head .chips-blank[aria-expanded="true"] { color: var(--muted); }
-.doc-head .author-edit { font: inherit; font-size: 13px; color: var(--text); margin-right: 4px; max-width: 40ch; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: inset 0 -1px 0 var(--accent); outline: none; }
+.doc-head .author-edit { font: inherit; font-size: 13px; color: var(--text); margin-right: 3px; min-width: 6ch; max-width: 40ch; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: inset 0 -1px 0 var(--accent); outline: none; }
 .doc-thumb { display: block; height: 128px; max-width: 100%; width: auto; object-fit: cover; object-position: top; border-radius: 0; margin: 8px 0 14px; outline: 1px solid rgba(255, 255, 255, 0.08); outline-offset: -1px; }
 .doc-thumb.none { display: none; }
 /* The byline is its own line group, then the original link 18px on (or flush left when it wraps); 28px clears it from the text. */
