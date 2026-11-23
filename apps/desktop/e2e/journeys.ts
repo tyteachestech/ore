@@ -29,12 +29,13 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   if (process.env.E2E_URL) return { url: process.env.E2E_URL, stop: () => {} };
   const lib = (LIB = mkdtempSync(join(tmpdir(), "ore-e2e-")));
   await $`bun ${join(MOCK, "seed.ts")} ${lib}`.quiet();
-  // The table and formula reader (D125) stands in as a script that writes Docling's saved reading of tables.pdf.
-  const docling = join(lib, ".ore", "docling");
-  writeFileSync(docling, `#!/bin/sh\nsleep 1\nwhile [ "$1" != "--output" ]; do shift; done\ncp "${FIXTURES}/tables.docling.json" "$2/tables.json"\n`);
-  chmodSync(docling, 0o755);
+  // The PDF page reader (D125, D346) stands in as a script that writes its saved reading of tables.pdf.
+  const paddle = join(lib, ".ore", "paddle");
+  // Every PDF added is read: any other one gets an empty reading, which changes nothing.
+  writeFileSync(paddle, `#!/bin/sh\nsleep 1\nif cmp -s "$2" "${FIXTURES}/tables.pdf"; then cp "${FIXTURES}/tables.paddle.json" "$3"; else echo "[]" > "$3"; fi\n`);
+  chmodSync(paddle, 0o755);
   // Ports of their own, so a mock left running for screenshots (1420, 1421) never answers instead.
-  const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_DOCLING: docling, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50", ORE_MOCK_ENRICH: "1" }, stdout: "ignore", stderr: "inherit" });
+  const bridge = Bun.spawn(["bun", join(MOCK, "bridge.ts")], { env: { ...process.env, ORE_LIBRARY: lib, ORE_PADDLE: paddle, PORT: String(BRIDGE), ORE_MOCK_AI: join(import.meta.dir, "ai"), ORE_MOCK_DELAY: "50", ORE_MOCK_ENRICH: "1" }, stdout: "ignore", stderr: "inherit" });
   // The ambience radio plays plain tones of its own (e2e/sounds), never the sounds on the Mac (D254).
   const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_SOUNDS: join(import.meta.dir, "sounds") }, stdout: "ignore", stderr: "ignore" });
   const url = `http://localhost:${PORT}/`;
@@ -5441,6 +5442,55 @@ journey("answer pieces: Undo of a removed piece, then a Redo that fails, keeps t
     if (!(await piece.isVisible())) throw new Error("a failed Redo of the piece's removal lost the piece or the answer box");
   } finally {
     await fail(null);
+    const k = await kids();
+    for (const c of k.answers) await ore("answer", k.id, `--remove=${c.ts}`); // leave it as the seed had it
+  }
+});
+
+// CI met this on master (F357's journey, shard 2/5): the questions read again after the removal landed
+// answered after the Undo had put the piece back, and showed the answer without it.
+journey("answer pieces: Undo of a removed piece keeps it when the read after the removal answers late (F476)", async (page) => {
+  type Q = { id: string; note?: string; answers: { ts: string; text: string }[] };
+  const kids = async () => ((await ore("questions", "--skill=learning")) as Q[]).find((x) => x.note === "Does this hold for kids?")!;
+  const slow = (ms: number | null) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { questions: ms } : undefined), ms);
+  try {
+    await page.locator(".sidebar .side-item", { hasText: "Learning" }).first().click();
+    await page.getByText("Does this hold for kids?", { exact: true }).first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Answer…" }).click();
+    await page.getByLabel("Your answer to Does this hold for kids?").fill("Mostly yes.");
+    await page.keyboard.press("Enter");
+    const piece = page.getByRole("button", { name: "Edit: Mostly yes." });
+    await piece.click();
+    await settled(page);
+    await slow(1200);
+    await page.getByLabel("Edit this part of your answer").fill("");
+    await page.keyboard.press("Enter");
+    await until("removed in the library", async () => (await kids()).answers.length === 0);
+    await page.locator(".toast").filter({ hasText: "Removed from your answer" }).getByRole("button", { name: "Undo" }).click();
+    await piece.waitFor();
+    await until("back in the library", async () => (await kids()).answers.length === 1);
+    await slow(null);
+    await settled(page);
+    await page.waitForTimeout(300);
+    if (!(await piece.isVisible())) throw new Error("the piece Undo put back went again when an older read of the questions answered");
+    // And an edit made straight after an Undo, while that older read is still out, is not lost to the read made again.
+    await piece.click();
+    await page.getByLabel("Edit this part of your answer").fill("");
+    await slow(1200);
+    await page.keyboard.press("Enter");
+    await until("emptied, it goes", async () => (await piece.count()) === 0);
+    await page.locator(".toast").filter({ hasText: "Removed from your answer" }).getByRole("button", { name: "Undo" }).click();
+    await piece.waitFor();
+    await piece.click();
+    await page.getByLabel("Edit this part of your answer").fill("");
+    await page.keyboard.press("Enter");
+    await until("emptied straight after the Undo, it goes", async () => (await piece.count()) === 0);
+    await slow(null);
+    await settled(page);
+    await page.waitForTimeout(1500);
+    if ((await piece.count()) !== 0) throw new Error("a piece removed straight after its Undo came back when the questions were read again");
+  } finally {
+    await slow(null);
     const k = await kids();
     for (const c of k.answers) await ore("answer", k.id, `--remove=${c.ts}`); // leave it as the seed had it
   }
@@ -11257,6 +11307,31 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
   await page.keyboard.press("Escape");
 });
 
+journey("skill picker: a read of the source that started before a skill came off never puts it back in the picker (F474)", async (page) => {
+  const item = () => ore("ls").then((ls) => (ls as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!);
+  const start = (await item()).skills;
+  const other = ((await ore("skills")) as { id: string; name: string }[]).find((k) => !start.includes(k.id))!;
+  await openSource(page, TESTING);
+  const pills = page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` });
+  await pills.click();
+  const row = page.locator(".skill-picker").getByRole("option").filter({ has: page.locator(".menu-label", { hasText: other.name }) });
+  await row.click();
+  await until("filed", async () => (await item()).skills.includes(other.id));
+  await page.getByText(`Filed under ${other.name}`, { exact: true }).last().waitFor();
+  // A read of the source is still out when he takes the skill off (back from time away here; on a slow
+  // machine the read after one ⌘Z, landing during the next): it must not tick the skill again.
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = { show: 600, edit: 1500 }));
+  await awayAndBack(page);
+  await Bun.sleep(100); // the read has started, with the skill still on
+  await row.click();
+  await Bun.sleep(900); // the old read has landed; the save has not
+  const ticked = await row.getAttribute("aria-checked");
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = undefined));
+  if (ticked === "true") throw new Error("the picker ticks a skill he just took off, so the next pick would do the opposite");
+  await until("taken off", async () => !(await item()).skills.includes(other.id));
+  await page.keyboard.press("Escape");
+});
+
 journey("skill picker: a skill with a long name still shows its tick", async (page) => {
   const long = "Quantum error correction for people who never took physics and want to read the papers anyway, slowly";
   const k = (await ore("skills", "add", long)) as { id: string };
@@ -12880,6 +12955,7 @@ journey("phone: Settings in the drawer changes the daily goal and the reminder, 
   await tap(page, page.getByRole("switch", { name: "Reminder" }));
   await page.locator(".phone-time").waitFor();
   await page.locator(".phone-settings").getByText("isn’t in iCloud").waitFor();
+  await settled(page); // the reload drops a save still on its way to the mock, which a real relaunch does not (F477)
   await page.reload();
   await page.locator(".phone-settings h1").waitFor();
   await until("the goal stayed 20", async () => (await page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "20" }).getAttribute("aria-checked")) === "true");
@@ -14049,7 +14125,11 @@ journey("phone: a selection handle held at the bottom of the screen turns the pa
       const ps = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")];
       const t = ps.find((p) => p.textContent!.startsWith(`Passage ${n} `))!.firstChild as Text;
       const end = ps.find((q) => q.getBoundingClientRect().bottom > b.bottom - 40)!;
-      const c = document.caretRangeFromPoint(end.getBoundingClientRect().left + 20, Math.min(end.getBoundingClientRect().bottom, b.bottom) - 30)!;
+      const x = end.getBoundingClientRect().left + 20;
+      const y = Math.min(end.getBoundingClientRect().bottom, b.bottom) - 30;
+      const c = document.caretRangeFromPoint(x, y);
+      // No text under the point (F475, once on CI): say where it was and what was there.
+      if (!c) throw new Error(`no text at ${Math.round(x)},${Math.round(y)}: window ${innerWidth}×${innerHeight}, pane ${Math.round(b.top)} to ${Math.round(b.bottom)}, paragraph ${Math.round(end.getBoundingClientRect().top)} to ${Math.round(end.getBoundingClientRect().bottom)}, on top there: ${document.elementFromPoint(x, y)?.className ?? "nothing"}`);
       getSelection()!.setBaseAndExtent(t, 0, c.startContainer, c.startOffset);
       return { n, last: Number(end.textContent!.match(/Passage (\d+)/)![1]) };
     }, start);
@@ -16853,6 +16933,38 @@ journey("add: what he typed and left with Esc is there, selected, at the next �
     if ((await field.inputValue()) !== "") throw new Error("a box he emptied came back with words");
     await page.keyboard.press("Escape");
   } finally {
+    const made = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === title);
+    if (made) await ore("archive", made.id).catch(() => {});
+  }
+});
+
+// F478: a source he just added is still opening when he presses ⌘N again; once its text was ready the
+// reader took the keys from the Add box, so what he typed next went nowhere and Esc did not close the box.
+journey("add: a source that finishes opening under the Add box leaves the keys in the box (F478)", async (page) => {
+  const box = page.getByRole("dialog", { name: "Add a source" });
+  const field = box.getByLabel("Link, file path or text");
+  const title = `Opens under the box ${Date.now()}`;
+  const slow = (ms?: number) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { show: ms } : undefined), ms);
+  try {
+    await page.keyboard.press("Meta+KeyN");
+    await field.fill(`# ${title}\n\nThe keys stay where he is typing.`);
+    await slow(700);
+    await page.keyboard.press("Enter");
+    await box.waitFor({ state: "detached" });
+    await page.keyboard.press("Meta+KeyN");
+    await field.waitFor();
+    await page.locator(".reader-scroll .doc").getByText("The keys stay where he is typing.").waitFor();
+    await Bun.sleep(300); // a long text is ready a little after it shows
+    await slow();
+    if (!(await field.evaluate((f) => document.activeElement === f))) throw new Error(`the keys left the Add box for ${await page.evaluate(() => document.activeElement?.className)}`);
+    await page.keyboard.type("still here");
+    if ((await field.inputValue()) !== "still here") throw new Error("typing did not reach the Add box");
+    await field.fill("");
+    await page.keyboard.press("Escape");
+    await box.waitFor({ state: "detached" });
+    await until("with the box gone the keys are the source's", () => page.evaluate(() => !!document.activeElement?.closest(".reader-scroll")));
+  } finally {
+    await slow();
     const made = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === title);
     if (made) await ore("archive", made.id).catch(() => {});
   }

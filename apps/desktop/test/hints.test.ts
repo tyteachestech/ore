@@ -166,7 +166,7 @@ describe("icon-only buttons", () => {
 const DISMISS_OK: Record<string, [count: number, why: string]> = {
   "Review.tsx Done": [1, "the end screen's default button: its hint shows ↵, its key, as a Mac sheet's default button shows Return"],
   "Finish.tsx Done": [1, "its hint shows its key, finish (⌘↵); Esc leaves the panel, which runs Keep reading unless the source is already done"],
-  "Tables.tsx Cancel": [2, "stops the 2 GB reader download (in a PDF and in Settings); Esc doesn't, so a stray Esc never throws the download away"],
+  "Tables.tsx Cancel": [2, "stops the 4 GB reader download (in a PDF and in Settings); Esc doesn't, so a stray Esc never throws the download away"],
   "Diagram.tsx Done": [1, "the phone's diagram view (DiagramView, PHONE only): no keyboard to show Esc on; the Mac's editor's Done shows it"],
   "Toast.tsx Cancel": [1, "stops a long job from its progress toast; Esc doesn't reach a toast, so a stray Esc never stops one"],
 };

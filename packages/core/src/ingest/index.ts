@@ -1,6 +1,6 @@
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
-import type { Region } from "./docling.ts";
-import { doclingPath } from "./docling-path.ts";
+import type { Region } from "./paddle.ts";
+import { paddlePath } from "./paddle-path.ts";
 import { homedir } from "node:os";
 import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
@@ -28,6 +28,7 @@ export { embeddedVideo, pageDraft, TRANSCRIPT_HEADING, VIDEO_END } from "./page.
 // The extractors pull in pdf.js, linkedom and defuddle (~200 ms to load), so they load only when a
 // source is added, never on the reads every screen makes.
 const pdfToDoc = async (bytes: Uint8Array, regions?: Region[]) => (await import("./pdf.ts")).pdfToDoc(bytes, regions);
+const pageViews = async (bytes: Uint8Array) => (await import("./pdf.ts")).pageViews(bytes);
 const epubToDoc = async (bytes: Uint8Array) => (await import("./epub.ts")).epubToDoc(bytes);
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
@@ -39,7 +40,7 @@ export interface AddOptions {
   onProgress?: (done: number, label?: string) => void;
   /** A Feed post opened to read, not kept until he highlights or writes in it. */
   preview?: boolean;
-  /** A PDF's tables and formulas as Docling read them (D125), swapped into pdf.js's text. */
+  /** A PDF's tables and formulas as the page reader read them (D125), swapped into pdf.js's text. */
   regions?: Region[];
   /** The speech's language when the episode names it (its feed's), so it is heard in it. */
   language?: string;
@@ -944,8 +945,8 @@ export async function fillOwed(lib: Library, opts: { onProgress?: (id: string, d
   return filled;
 }
 
-/** The tables and formulas Docling read in a source's PDF (D125), kept beside it as `layout.json` so a
- *  reimport keeps them without reading the PDF with Docling again. */
+/** What the page reader saw in a source's PDF (D125, D346), kept beside it as `layout.json`
+ *  so a reimport keeps it without reading the PDF's pages again. */
 function layoutOf(dir: string): Region[] | undefined {
   try {
     return JSON.parse(readFileSync(join(dir, "layout.json"), "utf8")) as Region[];
@@ -956,7 +957,7 @@ function layoutOf(dir: string): Region[] | undefined {
 
 const tablesFile = (lib: Library, id: string, ext: "reading" | "error" | "step") => join(paths.logs(lib), `tables-${id}.${ext}`);
 
-/** Reads a PDF source's tables and formulas with Docling (D125) and puts them in its text in place of
+/** Reads a PDF source's pages with PaddleOCR-VL (D346) and puts its tables and formulas in the text in place of
  *  pdf.js's lines, through a reimport from the kept PDF: the prose is unchanged, so every highlight
  *  stays where it is. While it runs, and after it fails, `tablesState` says so. */
 export async function readTables(lib: Library, ref: string): Promise<Reimported & { regions: number }> {
@@ -964,14 +965,16 @@ export async function readTables(lib: Library, ref: string): Promise<Reimported 
   if (item.meta.type !== "pdf" || !existsSync(join(item.dir, "source.pdf"))) throw new Error("Only a PDF source has tables and formulas to read.");
   markTablesReading(lib, item.meta.id, process.pid);
   try {
-    const regions = await (await import("./docling.ts")).runDocling(join(item.dir, "source.pdf"));
+    const { runPaddle, regionsFrom } = await import("./paddle.ts");
+    const pdf = join(item.dir, "source.pdf");
+    const regions = regionsFrom(await runPaddle(pdf), await pageViews(new Uint8Array(readFileSync(pdf))));
     const r = await reimportSource(lib, item.meta.id, { local: true, regions });
     // Nothing to swap in is still a reading: the PDF stops offering it.
     if (!r.changed) writeAtomic(join(item.dir, "layout.json"), JSON.stringify(regions));
     // A read run in the background names its step for the reader's Undo (tablesState).
     else if (r.step) writeFileSync(tablesFile(lib, item.meta.id, "step"), r.step);
     rmSync(tablesFile(lib, item.meta.id, "error"), { force: true });
-    return { ...r, regions: regions.length };
+    return { ...r, regions: regions.filter((x) => x.kind === "table" || x.kind === "formula" || (x.kind === "text" && x.head)).length };
   } catch (e) {
     writeFileSync(tablesFile(lib, item.meta.id, "error"), e instanceof Error ? e.message : String(e));
     throw e;
@@ -998,7 +1001,7 @@ export function tablesState(lib: Library, item: Item): { tables?: "reading" | "r
     return step ? { tables: "read", tables_step: step } : { tables: "read" };
   }
   const error = readOr(tablesFile(lib, item.meta.id, "error"));
-  const reader = item.meta.structure?.length ? { tables_reader: !!doclingPath() } : {};
+  const reader = item.meta.structure?.length ? { tables_reader: !!paddlePath() } : {};
   return error ? { tables_error: error, ...reader } : reader;
 }
 
