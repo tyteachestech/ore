@@ -10,7 +10,7 @@ import { FillingLine, useFilling } from "../Filling";
 import { AddLink, WaitingLinks, macOnly, type AddedText, type Waiting } from "./AddLink";
 import { trackDrag, type Drag } from "./drag";
 import { tick } from "./haptics";
-import { Home } from "../Home";
+import { Home, rowLine } from "../Home";
 import { HeadTabs, type HeadTab as HeadTabT } from "../HeadTabs";
 import type { Sub } from "../Forge";
 import { ranked } from "../match";
@@ -35,9 +35,10 @@ import { courseThumb, pinBetween, fillOwed, lessonsOf, nextLesson, opt, ore, pul
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
+import { ThumbLine } from "../Ring";
 import { useToast } from "../Toast";
 import { Working } from "../Working";
-import { count, errorText, inOrder, stepLanded, usable, useKeptScroll, wakeScreens, type Notify } from "../util";
+import { count, errorText, inOrder, load, stepLanded, usable, useKeptScroll, wakeScreens, type Notify } from "../util";
 
 // The reading page's Auto follows the iPhone's Light or Dark mode (D311).
 followAppearance();
@@ -247,6 +248,8 @@ type RowActions = {
   /** Picking several sources (Mail's Select, the Mac's ⌘-click): the ids picked, or null when a tap opens. */
   picked: string[] | null;
   pick: (id: string) => void;
+  /** The library's skills, for the icons at a row's right. */
+  skills: Skill[];
 };
 
 /** A list row with Mail's swipes: left archives, right moves it between To read and Done. It follows the
@@ -265,6 +268,9 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   const on = !!row.picked?.includes(item.id);
   /** An archived row only restores, to the left. */
   const only = (dx: number) => (item.archived_at ? Math.min(0, dx) : dx);
+  const at = Number(load(`ore.pos.${item.id}`) ?? 0) || 0;
+  const line = rowLine(item, at);
+  const mine = item.skills.flatMap((id) => row.skills.find((k) => k.id === id) ?? []);
   useHorizontalDrag(ref, {
     // While he picks, a row only takes taps, as Mail's do in Select.
     accept: (t) => ((swiped.current = false), !renaming && !picking.current && t.clientX > 24),
@@ -318,14 +324,27 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
         {/* Hidden, not gone, while renaming: its swipes and hold are on this element. */}
         <button ref={ref} hidden={renaming} aria-pressed={row.picked ? on : undefined} onClick={() => (row.picked ? row.pick(item.id) : swiped.current || onOpen(item.id))} onTouchEnd={() => setTimeout(() => (swiped.current = false), 350)}>
           {row.picked && <span className="phone-pick-dot" data-on={on || undefined} aria-hidden="true">{on && <Check size={12} />}</span>}
-          <Thumb item={item} className="thumb phone-thumb" />
+          {/* Matter's and Speechify's row (Tyler, 2026-11-23): a small picture with how far he is on its foot, the
+              title, one line of what he picks a source by, and its skills at the right. */}
+          <span className="thumb-at">
+            <Thumb item={item} className="thumb phone-thumb" />
+            {at > 0 && item.status !== "done" && <ThumbLine share={at} />}
+          </span>
           {filling ? (
             <span className="phone-title phone-two">
               <span>{item.title}</span>
               <FillingLine filling={filling} row />
             </span>
           ) : (
-            <span className="phone-title">{item.title}</span>
+            <span className="phone-title phone-lined">
+              <span>{item.title}</span>
+              {line && <small>{line}</small>}
+            </span>
+          )}
+          {mine.length > 0 && (
+            <span className="phone-row-skills" aria-hidden="true">
+              {mine.slice(0, 2).map((k) => <SkillIcon key={k.id} icon={k.icon} color={k.color} dot />)}
+            </span>
           )}
         </button>
       </li>
@@ -1144,6 +1163,7 @@ export function PhoneApp() {
     <button className="phone-head-tool" onClick={() => setPicking([])}>Select</button>
   );
   const row: RowActions = {
+    skills,
     picked: picking,
     pick: (id) => setPicking((p) => (!p ? [id] : p.includes(id) ? p.filter((x) => x !== id) : [...p, id])),
     course: setCourse,

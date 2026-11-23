@@ -12998,7 +12998,9 @@ journey("phone: a long title on Today and in Sources shows on two lines, with th
       const lines = Math.round(t.getBoundingClientRect().height / parseFloat(getComputedStyle(t).lineHeight));
       const cut = t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1;
       // Beside the picture, the title has the rest of the row: nothing else takes its width.
-      const room = row.getBoundingClientRect().right - t.getBoundingClientRect().right;
+      // (A list row's skills stand at its right: the title runs up to them.)
+      const skills = row.querySelector(".phone-row-skills")?.getBoundingClientRect();
+      const room = (skills ? skills.left - 12 : row.getBoundingClientRect().right) - t.getBoundingClientRect().right;
       // And never more than two: WebKit drew a clamped <button> title whole, four lines and more (F99).
       return (cut && lines < 2) || lines > 2 || room > 4 ? [`"${t.textContent.slice(0, 40)}": ${lines} line(s), ${Math.round(room)}px left of the row's edge`] : [];
     }), title);
@@ -13024,7 +13026,31 @@ journey("phone: a long title on Today and in Sources shows on two lines, with th
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
   await page.locator(".phone-sources li button").first().waitFor();
-  await check("Sources", ".phone-sources li button", ".phone-title:not(.phone-two)");
+  await check("Sources", ".phone-sources li button", ".phone-lined > span");
+}, "phone");
+
+journey("phone: a Sources row is a small picture, the title, a line of how long it is and who made it, and its skills at the right (Matter)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  await page.locator(".phone-sources li button .phone-lined").first().waitFor();
+  for (const t of [1, 28 / 17]) {
+    await page.evaluate((t) => document.documentElement.style.setProperty("--type", String(t)), t);
+    const bad = await page.locator(".phone-sources li button:not(.phone-course)").evaluateAll((rows) => rows.flatMap((row) => {
+      const r = row.getBoundingClientRect(), pic = row.querySelector(".phone-thumb")!.getBoundingClientRect();
+      const title = row.querySelector(".phone-lined > span")!, line = row.querySelector<HTMLElement>(".phone-lined > small");
+      const skills = row.querySelector(".phone-row-skills")?.getBoundingClientRect();
+      const name = title.textContent!.slice(0, 30), out: string[] = [];
+      if (Math.round(pic.width) !== 44 || Math.round(pic.height) !== 44) out.push(`${name}: the picture is ${Math.round(pic.width)}×${Math.round(pic.height)}`);
+      if (r.height < 44) out.push(`${name}: the row is ${Math.round(r.height)} pt tall`);
+      if (line && (line.getBoundingClientRect().top < title.getBoundingClientRect().bottom - 1 || line.scrollHeight > line.clientHeight + 2)) out.push(`${name}: the line under the title is not one line under it`);
+      if (skills && (skills.right > r.right + 1 || skills.left < title.getBoundingClientRect().right)) out.push(`${name}: its skills are not at the row's right, clear of the title`);
+      return out;
+    }));
+    if (bad.length) throw new Error(`at text size ${t.toFixed(2)}: ${bad.join("; ")}`);
+  }
+  const lines = await page.locator(".phone-sources section").first().locator(".phone-lined > small").allInnerTexts();
+  if (!lines.some((l) => /^\d+ min( left)?( · .+)?$/.test(l))) throw new Error(`no To read row says how long it is: ${lines.slice(0, 5).join(" | ")}`);
+  if (!(await page.locator(".phone-sources .phone-row-skills .skill-icon").count())) throw new Error("no row shows a skill's icon");
 }, "phone");
 
 journey("phone: under a Today title one line says how long is left and where the source is from, as the Mac's rows do (D341)", async (page) => {
@@ -13456,7 +13482,7 @@ journey("phone: a skill's page is the Mac's in one column, and a course is one r
       await tap(page, course);
       const lessons = page.locator(".phone-sources").filter({ has: page.locator("h1", { hasText: "Memory 101" }) });
       await lessons.waitFor();
-      const titles = await lessons.locator("li .phone-title").allInnerTexts();
+      const titles = await lessons.locator("li .phone-lined > span").allInnerTexts();
       if (!titles[0]?.startsWith("Lecture 4") || !titles[1]?.startsWith("The Testing Effect")) throw new Error(`the lessons aren't in course order: ${titles.join(" | ")}`);
       // A relaunch comes back to the course's lessons, as to any screen he was on.
       await page.reload();
