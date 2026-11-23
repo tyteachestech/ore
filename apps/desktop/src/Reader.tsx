@@ -3554,7 +3554,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // Search matches the words apart (F443): each of them is in the transcript.
     const text = (box.textContent ?? "").toLowerCase();
     if (!node && !(query?.trim() && query.toLowerCase().split(/\s+/).filter(Boolean).every((w) => text.includes(w)))) return false;
+    // Once: the resize comes within a frame of the transcript showing, and a later one (the window, a picture) keeps his place.
     unfolded.current = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => void (unfolded.current = false)));
     foldCard({ open: true, transcript: true }, false);
     return true;
   }
