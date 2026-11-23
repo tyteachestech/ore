@@ -14027,7 +14027,7 @@ journey("phone: a selection handle held at the bottom of the screen turns the pa
     });
     await page.waitForTimeout(150); // a change of its own: a new selection alone never turns the page
     // The word the handle is dragged to must be there to drag to: as the first phone journey of a CI shard, on a
-    // phone build just started, nothing answered at that point yet and the drag below threw on null (F-new-phone-handle-caret-null).
+    // phone build just started, nothing answered at that point yet and the drag below threw on null (F474).
     let under = "";
     await until("there is text at the foot of the reader to drag the handle to", async () => {
       under = await page.evaluate(() => {
