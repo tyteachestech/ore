@@ -2,7 +2,7 @@
 // and the skills, as in Obsidian; a source and Review open full screen over it, with a way back.
 // Everything inside the screens is the Mac app's own code.
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Archive, BookOpen, CaretLeft, CaretRight, Check, FileText, GearSix, GraduationCap, House, MagnifyingGlass, Plus, SidebarSimple } from "../icons";
+import { Archive, BookOpen, CaretLeft, CaretRight, Check, FileText, GearSix, GraduationCap, House, MagnifyingGlass, Plus, SidebarSimple, XSmall } from "../icons";
 import { flushSync } from "react-dom";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
@@ -23,7 +23,9 @@ import { SkillIcon } from "../IconPicker";
 import { NoteBody, useNotes, type SideTab } from "../Notes";
 import { PixelBook, PixelNote } from "../PixelIcon";
 import type { LinkTarget, NoteEditorHandle } from "../editor/NoteEditor";
-import { holdMenu, WithMenu, type MenuAction } from "../Menu";
+import { holdMenu, MoreButton, WithMenu, type MenuAction } from "../Menu";
+import { PickBar } from "../PickBar";
+import { FIELDS, kindLabel, options, passes, summary, toggle, type Filter } from "../filters";
 import { Palette } from "../Palette";
 import { SkillEditor, sidebarGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
@@ -242,6 +244,9 @@ type RowActions = {
   /** A course row: a tap opens its lessons; a long press its menu. */
   course: (id: string) => void;
   courseMenu: (line: Extract<Line, { kind: "course" }>) => MenuAction[];
+  /** Picking several sources (Mail's Select, the Mac's ⌘-click): the ids picked, or null when a tap opens. */
+  picked: string[] | null;
+  pick: (id: string) => void;
 };
 
 /** A list row with Mail's swipes: left archives, right moves it between To read and Done. It follows the
@@ -255,10 +260,14 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   const [side, setSide] = useState<"left" | "right" | null>(null);
   const [renaming, setRenaming] = useState(false);
   const filling = useFilling(item.id);
+  const picking = useRef(false);
+  picking.current = !!row.picked;
+  const on = !!row.picked?.includes(item.id);
   /** An archived row only restores, to the left. */
   const only = (dx: number) => (item.archived_at ? Math.min(0, dx) : dx);
   useHorizontalDrag(ref, {
-    accept: (t) => ((swiped.current = false), !renaming && t.clientX > 24),
+    // While he picks, a row only takes taps, as Mail's do in Select.
+    accept: (t) => ((swiped.current = false), !renaming && !picking.current && t.clientX > 24),
     // iOS's half second, not the menu library's 700 ms (D145.4): Radix's trigger opens on contextmenu, and clears its own timer.
     hold: (_, y) => {
       swiped.current = true; // Letting go after the menu opened is not a tap on the row.
@@ -296,7 +305,8 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
   });
   return (
     // Rename… goes after Open, and edits the title in place (Finder, the Mac's rows); not on an archived row.
-    <WithMenu actions={() => row.menu(item).map((a) => (a.id === "rename" ? { ...a, run: () => setRenaming(true) } : a))}>
+    // Select starts a pick with this row in it (Files, Photos), in a list only: Today's rows have no pick.
+    <WithMenu actions={() => row.menu(item).flatMap((a) => (a.id === "rename" ? [{ ...a, run: () => setRenaming(true) }] : a.id === "open" ? [a, { id: "select", label: "Select", run: () => row.pick(item.id) }] : [a]))}>
       <li>
         {side && <span className={`phone-swipe ${side}`}>{side === "left" ? (item.archived_at ? "Restore" : "Archive") : item.status === "done" ? "To read" : "Done"}</span>}
         {renaming && (
@@ -306,7 +316,8 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
           </div>
         )}
         {/* Hidden, not gone, while renaming: its swipes and hold are on this element. */}
-        <button ref={ref} hidden={renaming} onClick={() => swiped.current || onOpen(item.id)} onTouchEnd={() => setTimeout(() => (swiped.current = false), 350)}>
+        <button ref={ref} hidden={renaming} aria-pressed={row.picked ? on : undefined} onClick={() => (row.picked ? row.pick(item.id) : swiped.current || onOpen(item.id))} onTouchEnd={() => setTimeout(() => (swiped.current = false), 350)}>
+          {row.picked && <span className="phone-pick-dot" data-on={on || undefined} aria-hidden="true">{on && <Check size={12} />}</span>}
           <Thumb item={item} className="thumb phone-thumb" />
           {filling ? (
             <span className="phone-title phone-two">
@@ -372,12 +383,15 @@ function Rows({ lines, row, onOpen }: { lines: Line[]; row: RowActions; onOpen: 
 }
 
 /** Sources by To read and Done, as one list; `flat`: as given, no sections or courses (Archive, a course's lessons). */
-function SourceList({ title, items, onOpen, row, head, flat, empty = "Nothing here yet. Add a link with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; flat?: boolean; empty?: string }) {
+function SourceList({ title, items, onOpen, row, head, tools, flat, empty = "Nothing here yet. Add a link with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; /** At the title's right: Filter and Select. */ tools?: ReactNode; flat?: boolean; empty?: ReactNode }) {
   // Pinned first, in the order they were pinned, as on the Mac's lists; then the latest touched.
   const sorted = [...(items ?? [])].sort(toReadOrder);
   return (
     <div className="phone-sources">
-      <h1>{title}</h1>
+      <div className="phone-list-head">
+        <h1>{title}</h1>
+        {tools}
+      </div>
       {head}
       {items === null ? null : !items.length ? (
         <p className="phone-empty">{empty}</p>
@@ -596,7 +610,13 @@ export function PhoneApp() {
   usePullToSearch(main, cue, () => flushSync(() => setSearching(true)));
   // The lists share this one scroller: each keeps its own place, as Mail's tabs do (and across a relaunch).
   useKeptScroll(main, `phone:${tab}`);
-  const go = (t: TabId) => (setTab(t), setSkill(null), setCourse(null), setDrawer(false));
+  /** What narrows Sources: the Mac's Kind, Skill and Author (D286), let go on leaving the list. */
+  const [filters, setFilters] = useState<Filter[]>([]);
+  /** The sources picked to act on together (Mail's Select; the Mac's ⌘-click, D283), or null when a tap opens one. */
+  const [picking, setPicking] = useState<string[] | null>(null);
+  // A pick belongs to the list it was made in: another list, or a source or review opened over it, ends it.
+  useEffect(() => setPicking(null), [tab, skill, course, openId, reviewing, skillTab]);
+  const go = (t: TabId) => (setTab(t), setSkill(null), setCourse(null), setDrawer(false), setFilters([]));
 
   useEffect(() => {
     try {
@@ -992,7 +1012,94 @@ export function PhoneApp() {
     notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
     apply(true).catch((e) => notify(errorText(e), "error"));
   };
+  /** Writes each picked source in turn, as one step with one Undo and Redo (the Mac's `batch`). `patch` shows
+   *  the result at once: the source as it will be, or null when it leaves the list. */
+  const batch = (sel: Item[], message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null) => {
+    const ids = new Set(sel.map((i) => i.id));
+    const run = async (forward: boolean, fromHistory = false) => {
+      if (forward) {
+        if (patch) setItems((all) => all?.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) ?? all);
+        else setArchived((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
+      }
+      try {
+        for (const i of sel) await write(i, forward);
+      } catch (e) {
+        if (fromHistory) throw e;
+        notify(errorText(e), "error");
+      } finally {
+        void refresh();
+      }
+    };
+    setPicking(null);
+    void whileOut(run(true));
+    notify(message, "info", () => run(false, true), () => run(true, true));
+  };
+  /** What the picked sources can do together: the Mac's pick bar (Mark done or To read, Skills, Archive; Restore in Archive). */
+  const manyActions = (sel: Item[]): MenuAction[] => {
+    if (!sel.length) return [];
+    const what = count(sel.length, "source");
+    if (sel.every((i) => i.archived_at)) return [{ id: "restore", label: `Restore ${what}`, run: () => batch(sel, `Restored ${what}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : []))) }];
+    const to: Item["status"] = sel.every((i) => i.status === "done") ? "reading" : "done";
+    return [
+      {
+        id: to === "done" ? "done" : "toread",
+        label: `Move ${what} to ${to === "done" ? "Done" : "To read"}`,
+        // Taken back, each goes to where it was, a finished one with the day it was finished.
+        run: () => batch(sel, `Moved ${what} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...(f ? [to] : [i.status, ...(i.status === "done" && i.finished_at ? [opt("at", i.finished_at)] : [])])), (i) => ({ ...i, status: to })),
+      },
+      ...(skills.length
+        ? [{
+            id: "skills",
+            label: "Skills",
+            run: () => {},
+            sub: skills.map((k) => {
+              const all = sel.every((i) => i.skills.includes(k.id));
+              const next = (i: Item) => (all ? i.skills.filter((s) => s !== k.id) : [...new Set([...i.skills, k.id])]);
+              // What each source's exercises were filed under before, so Undo puts each one back as it was.
+              const was = new Map<string, CardSkills | undefined>();
+              return {
+                id: k.id,
+                label: k.name,
+                icon: <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />,
+                checked: all,
+                run: () =>
+                  batch(
+                    sel,
+                    all ? `Removed ${what} from ${k.name}` : `Filed ${what} under ${k.name}`,
+                    (i, f) =>
+                      f
+                        ? ore<{ cards_before?: CardSkills }>("edit", i.id, "--skills", next(i).join(",")).then((r) => void was.set(i.id, r?.cards_before))
+                        : ore("edit", i.id, "--skills", i.skills.join(","), ...(was.get(i.id) ? [opt("cards", JSON.stringify(was.get(i.id)))] : [])),
+                    (i) => ({ ...i, skills: next(i) }),
+                  ),
+              };
+            }),
+          }]
+        : []),
+      { id: "archive", label: `Archive ${what}`, danger: true, run: () => batch(sel, `Archived ${what}`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null) },
+    ];
+  };
+  /** The picked sources still there, in the list's order. */
+  const many = picking ? (tab === "archive" && !skill ? archived ?? [] : items ?? []).filter((i) => picking.includes(i.id)) : [];
+  /** Sources' filter sheet: a field, then its values with how many sources each holds; a tap ticks one and the sheet stays (D286). */
+  const live = useMemo(() => (items ?? []).filter((i) => !i.archived_at), [items]);
+  const skillLabel = (id: string) => skills.find((k) => k.id === id)?.name ?? id;
+  const filterActions = (): MenuAction[] =>
+    FIELDS.flatMap((f) => {
+      const on = filters.find((x) => x.field === f.id)?.values ?? [];
+      const sub = options(live, f.id, skillLabel).map((o) => {
+        const k = f.id === "skill" ? skills.find((x) => x.id === o.value) : undefined;
+        return { id: o.value || "no-skill", label: o.label, count: o.n, icon: k && <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />, checked: on.includes(o.value), keep: true, run: () => setFilters((all) => toggle(all, f.id, o.value)) };
+      });
+      return sub.length ? [{ id: f.id, label: f.label, run: () => {}, sub }] : [];
+    });
+  const valueLabel = (f: Filter) => (v: string) => (f.field === "skill" ? (v ? skillLabel(v) : "No skill") : f.field === "kind" ? kindLabel(v) : v);
+  const select = (list: Item[] | null) => !picking && !!list?.length && (
+    <button className="phone-head-tool" onClick={() => setPicking([])}>Select</button>
+  );
   const row: RowActions = {
+    picked: picking,
+    pick: (id) => setPicking((p) => (!p ? [id] : p.includes(id) ? p.filter((x) => x !== id) : [...p, id])),
     course: setCourse,
     courseMenu: (c) => [
       { id: "open", label: c.next && c.next !== c.lessons[0] ? "Continue" : "Open", run: () => open((c.next ?? c.lessons[0]!).id) },
@@ -1099,6 +1206,8 @@ export function PhoneApp() {
       </Screen>
     ) : null;
 
+  /** Sources as its filters leave it. */
+  const shownItems = useMemo(() => (items && filters.length ? items.filter((i) => passes(i, filters)) : items), [items, filters]);
   const skillOf = skills.find((s) => s.id === skill);
   const skillName = skillOf?.name;
   const courseOf = course ? lessonsOf(items ?? [], course) : [];
@@ -1177,12 +1286,38 @@ export function PhoneApp() {
             ) : (
               <SourceList
                 title={tab === "archive" ? "Archive" : tab === "loose" ? "No skill" : "Sources"}
-                items={tab === "archive" ? archived : tab === "loose" ? loose : items}
+                items={tab === "archive" ? archived : tab === "loose" ? loose : shownItems}
                 onOpen={open}
                 row={row}
                 flat={tab === "archive"}
-                head={tab === "sources" && <WaitingLinks links={waiting} reading={reading} onRemove={removeWaiting} />}
-                empty={tab === "archive" ? "Nothing archived. Swipe a source left to archive it." : waiting.length ? "" : undefined}
+                tools={
+                  <>
+                    {tab === "sources" && !picking && !!items?.length && <MoreButton label="Filter by kind, skill or author" className="phone-head-tool" icon="Filter" actions={filterActions} />}
+                    {select(tab === "archive" ? archived : tab === "loose" ? loose : shownItems)}
+                  </>
+                }
+                head={
+                  tab === "sources" && (
+                    <>
+                      {filters.length > 0 && (
+                        <div className="phone-filters">
+                          {filters.map((f) => (
+                            <button key={f.field} className="phone-filter-tag" aria-label={`Remove the ${f.field} filter: ${summary(f, valueLabel(f))}`} onClick={() => setFilters((all) => all.filter((x) => x.field !== f.field))}>
+                              <span>{summary(f, valueLabel(f))}</span>
+                              <XSmall aria-hidden="true" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <WaitingLinks links={waiting} reading={reading} onRemove={removeWaiting} />
+                    </>
+                  )
+                }
+                empty={
+                  tab === "archive" ? "Nothing archived. Swipe a source left to archive it."
+                  : tab === "sources" && filters.length && items?.length ? <>No sources match these filters. <button className="link" onClick={() => setFilters([])}>Clear them</button></>
+                  : waiting.length ? "" : undefined
+                }
               />
             )}
           </main>
@@ -1382,6 +1517,7 @@ export function PhoneApp() {
           onClose={() => setSearching(false)}
         />
       )}
+      {picking && !over && !searching && !adding && <PickBar n={many.length} actions={manyActions(many)} onClear={() => setPicking(null)} />}
       {adding && <AddLink skill={addTo} onClose={() => (setAdding(false), setAddTo(undefined))} onAdded={() => void refresh().then(bringIn)} />}
       {editingSkill && skills.some((s) => s.id === editingSkill) && (
         <SkillEditor

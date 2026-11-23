@@ -53,6 +53,8 @@ export type MenuAction = {
   icon?: ReactNode;
   /** A checkbox item, ticked when true (Linear's labels): in a submenu, or at the top of a ⋯ menu. */
   checked?: boolean;
+  /** How many things it stands for (a filter value's sources), at the row's right on the iPhone's sheet. */
+  count?: number;
   /** In a submenu: picking it leaves the menu open, for settings he toggles while watching (Show). */
   keep?: boolean;
   run: () => void;
@@ -386,9 +388,11 @@ function ActionSheet({ label, actions, className, icon, open: controlled, onOpen
                     <Fragment key={a.id}>
                       {a.divider && !step && <div className="sheet-sep" role="separator" />}
                       <button className={`pick-row${a.danger ? " danger" : ""}`} role={a.checked === undefined ? undefined : "checkbox"} aria-checked={a.checked} onClick={() => pick(a)}>
-                        {step ? <span className="menu-tick">{a.checked && <Tick />}</span> : <Glyph a={a} />}
-                        {step && a.icon}
+                        {/* A row that ticks shows its tick, at the top too (the pick bar's Skills opens on the skills themselves). */}
+                        {step || a.checked !== undefined ? <span className="menu-tick">{a.checked && <Tick />}</span> : <Glyph a={a} />}
+                        {(step || a.checked !== undefined) && a.icon}
                         <span className="name">{a.label}</span>
+                        {a.count !== undefined && <span className="filter-n">{a.count}</span>}
                         {a.sub && <CaretRight className="menu-caret" size={11} weight="bold" aria-hidden="true" />}
                       </button>
                     </Fragment>
