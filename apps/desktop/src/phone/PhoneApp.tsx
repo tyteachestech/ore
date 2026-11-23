@@ -25,7 +25,7 @@ import { PixelBook, PixelNote } from "../PixelIcon";
 import type { LinkTarget, NoteEditorHandle } from "../editor/NoteEditor";
 import { holdMenu, MoreButton, WithMenu, type MenuAction } from "../Menu";
 import { PickBar } from "../PickBar";
-import { FIELDS, kindLabel, options, passes, rowLine, summary, toggle, type Filter } from "../filters";
+import { FIELDS, kindLabel, options, passes, summary, toggle, type Filter } from "../filters";
 import { Palette } from "../Palette";
 import { SkillEditor, sidebarGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
@@ -325,10 +325,7 @@ function SwipeRow({ item, row, onOpen }: { item: Item; row: RowActions; onOpen: 
               <FillingLine filling={filling} row />
             </span>
           ) : (
-            <span className="phone-title phone-two phone-lined">
-              <span>{item.title}</span>
-              <small>{rowLine(item)}</small>
-            </span>
+            <span className="phone-title">{item.title}</span>
           )}
         </button>
       </li>

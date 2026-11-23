@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { kindLabel, NO_SKILL, options, passes, settled, summary, toggle, type Filter, rowLine } from "../src/filters";
+import { kindLabel, NO_SKILL, options, passes, settled, summary, toggle, type Filter } from "../src/filters";
 import type { Item } from "../src/ore";
 
 const item = (id: string, type: string, skills: string[], author?: string) => ({ id, type, skills, author, title: id, dir: "", captured_at: "", status: "inbox" }) as unknown as Item;
@@ -71,12 +71,4 @@ test("a file that imports as an article shows and filters as what its kept origi
   expect(options(files, "kind", (s) => s).map((o) => o.label).sort()).toEqual(["Article", "Document", "Notebook", "Slides", "Spreadsheet"]);
   expect(files.filter((i) => passes(i, [{ field: "kind", values: ["slides"] }])).map((i) => i.id)).toEqual(["deck"]);
   expect(files.filter((i) => passes(i, [{ field: "kind", values: ["article"] }])).map((i) => i.id)).toEqual(["page", "web"]);
-});
-
-// F549: the iPhone's Sources rows showed a title alone, so two sources with the same title, or a list
-// narrowed by kind, gave no way to tell why a row was there. The Mac's row says its author and kind.
-test("an iPhone source row says its author and kind under the title, as the Mac's row does", () => {
-  expect(rowLine({ type: "youtube", author: "Ana Ruiz" })).toBe("Ana Ruiz · Video");
-  expect(rowLine({ type: "markdown" })).toBe("Text");
-  expect(rowLine({ type: "article", source_file: "deck.pptx", author: "" })).toBe("Slides");
 });

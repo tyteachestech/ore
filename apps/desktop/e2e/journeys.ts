@@ -17781,9 +17781,6 @@ journey("phone: Select picks several sources and the bar at the foot archives th
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
   const row = (t: string) => page.locator(".phone-sources li").filter({ hasText: t }).first();
   const bar = page.locator(".pick-bar");
-  // A row says its author and kind under the title, as the Mac's row does (F549).
-  const line = await row(AGENTS).locator("small").innerText();
-  if (!/ · Text$/.test(line)) throw new Error(`the row's line under its title reads “${line}”`);
   // From the title's Select: none picked yet, and the bar says what a tap does.
   await tap(page, page.getByRole("button", { name: "Select", exact: true }));
   await bar.getByText("Tap sources to pick them").waitFor();

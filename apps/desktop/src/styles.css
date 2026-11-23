@@ -3514,9 +3514,6 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .phone-sources .phone-two { display: flex; flex-direction: column; gap: 2px; }
 .phone-two > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .phone-two small { font-size: 13px; color: var(--muted); }
-/* A source's row: the title keeps its two lines over the author and kind (the Mac's row; Today's rows). */
-.phone-sources .phone-lined > span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
-.phone-lined small { color: var(--faint); line-height: 1.4; }
 .phone-sources .phone-course > svg:last-child { flex: none; color: var(--faint); }
 /* The drawer's last rows: a new skill named in place, then Settings. */
 .phone-drawer .phone-drawer-quiet { color: var(--muted); }

@@ -48,18 +48,14 @@ end screen, and on a 13-inch Mac it ended with Done out of sight (fixed).
 - **iPhone: a sheet's back row** (Filter › Kind, Importance) was a 36 pt tap; it is 44.
 - **iPhone: Search's sheet** was announced as "Command palette"; it is named Search.
 
-- **iPhone: a Sources row showed its title alone.** It says its author and kind under the title, as the Mac's row and
-  Today's rows do (parity is the default, Tyler 2026-11-22).
-  ![before](shots/2026-11-23-round-10/phone-rows-before.png) ![after](shots/2026-11-23-round-10/phone-rows-after.png)
-
 ## Raised with Tyler
 1. **The end screen's ten dots beside "N kept"** are level progress, but read as a meter of kept ("1 kept" with no
    dot lit in one row, two lit in the next). (a) dots alone under the name, "N kept" at the right by Level; (b) dots
    only on a row that gained one.
-2. **iPhone Add takes links and files only**; the Mac saves pasted words as a Text source. By the parity rule it
-   should take text too: its own piece of work (the one-line link field becomes a text box, and a text source added
-   on the phone needs its exercises written by the Mac later).
-3. **iPhone Search with text typed shows two ✕** side by side, one clears and one closes. (a) close becomes "Cancel",
+2. **iPhone Sources rows show the title only**; the Mac's row has author, skills and kind. (a) one faint line
+   "Author · Kind", as Today has; (b) skill icons at the row's right.
+3. **iPhone Add takes links and files only**; the Mac saves pasted words as a Text source. Accept pasted text there?
+4. **iPhone Search with text typed shows two ✕** side by side, one clears and one closes. (a) close becomes "Cancel",
    as iOS; (b) keep.
 
 ## Found and left
