@@ -319,11 +319,11 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
 
   return (
     <Trap>
-    <div className="overlay" role="dialog" aria-modal="true" aria-label="Command palette" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" role="dialog" aria-modal="true" aria-label={PHONE ? "Search" : "Command palette"} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Command
         ref={sheet}
         className="panel"
-        label="Command palette"
+        label={PHONE ? "Search" : "Command palette"}
         shouldFilter={false}
         value={selected}
         onValueChange={setSelected}

@@ -15385,6 +15385,43 @@ journey("all sources: a filter is a tag in the search; closing its list leaves t
   await until("the search keeps the keys after ×", () => search.evaluate((el) => el === document.activeElement));
 });
 
+// F-new-filter-tag-x, F-new-filter-count, F-new-tab-cut (Impeccable round 10): the filter tag's × drew 2px wider than its
+// button and past the tag's edge; a highlighted filter row's count stayed faint on the highlight (3.97:1); and in a
+// 720px window with a tag in the search the open tab's name was cut mid-letter ("To re").
+journey("all sources: a filter tag's × fits its button, a highlighted filter row's count is readable, and a narrow window never cuts the open tab's name", async (page) => {
+  // One source archived, so the Archived tab stands beside To read and Done: the three tabs are what ran out of room.
+  const put = ((await ore("ls")) as { id: string }[])[0]!.id;
+  await ore("archive", put);
+  try {
+  await page.reload();
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.getByRole("button", { name: "Filter by kind, skill or author" }).click();
+  await page.getByRole("option", { name: "Kind" }).click();
+  const row = page.locator(".filter-menu [cmdk-item][data-selected=true]").first();
+  await row.locator(".filter-n").waitFor();
+  const ratio = await row.locator(".filter-n").evaluate((n) => {
+    const rgb = (c: string) => c.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+    const lum = (c: number[]) => c.map((v) => v / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i]!, 0);
+    const a = lum(rgb(getComputedStyle(n).color)), b = lum(rgb(getComputedStyle(n.closest("[cmdk-item]")!).backgroundColor));
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  });
+  await row.click();
+  await page.keyboard.press("Escape");
+  const x = page.locator(".filter-tag-x");
+  await x.waitFor();
+  const over = await x.evaluate((b) => b.querySelector("svg")!.getBoundingClientRect().right - b.getBoundingClientRect().right);
+  await page.setViewportSize({ width: 720, height: 800 });
+  await page.waitForTimeout(400);
+  const cut = await page.locator(".head-tab.on .head-tab-name > *").evaluate((h) => h.scrollWidth - h.clientWidth);
+  if (process.env.ORE_E2E_SHOT) await page.screenshot({ path: process.env.ORE_E2E_SHOT });
+  await x.click();
+  const wrong = [ratio < 4.5 && `the highlighted row's count is ${ratio.toFixed(2)}:1`, over > 0.5 && `the × overhangs its button by ${over}px`, cut > 0 && `the open tab's name is cut by ${cut}px at 720`].filter(Boolean);
+  if (wrong.length) throw new Error(wrong.join("; "));
+  } finally {
+    await ore("archive", put, "--undo");
+  }
+});
+
 journey("feed: a post reads beside the list, J and K step through the posts, and Esc gives the list back (D289)", async (page) => {
   const stamp = Date.now();
   const titles = [`Split first ${stamp}`, `Split second ${stamp}`];
@@ -17071,6 +17108,8 @@ journey("phone: Search's ⓧ clears what he typed and keeps Search open with the
   // The only × beside the field closed Search, and the keyboard showed Return (Settings, Files: a clear button in the field, a Search key).
   await tap(page, page.getByRole("button", { name: "Search" }));
   const field = page.locator("[cmdk-input]");
+  // The sheet is announced by the name on the button that opened it, not as the Mac's "Command palette" (F-new-search-name).
+  await page.getByRole("dialog", { name: "Search" }).waitFor();
   if ((await field.getAttribute("enterkeyhint")) !== "search") throw new Error("the keyboard's key doesn't say Search");
   if (await page.getByRole("button", { name: "Clear" }).count()) throw new Error("Clear shows with nothing typed");
   await field.fill("agents");
@@ -17709,6 +17748,9 @@ journey("phone: Sources narrows by kind and skill from Filter, each a tag under 
   const value = async (field: string, name: RegExp) => {
     await tap(page, page.getByRole("button", { name: /^Filter by/ }));
     await tap(page, page.locator(".action-sheet .pick-row").filter({ hasText: field }));
+    // The row that steps back is a 44 pt tap, as the rows under it are (F-new-sheet-back: it was 36).
+    const back = (await page.locator(".action-sheet .sheet-back").boundingBox())!.height;
+    if (back < 44) throw new Error(`the sheet's back row is a ${back} pt tap`);
     const row = page.locator(".action-sheet").getByRole("checkbox", { name });
     await tap(page, row);
     // The sheet stays, ticked, so several can be picked.
