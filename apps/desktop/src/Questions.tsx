@@ -383,7 +383,7 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
     if (!text.trim() || busy) return;
     setBusy(true);
     try {
-      // Counted as one change being written, so a ⌘Z meanwhile waits for its step (F-new-undo-waits).
+      // Counted as one change being written, so a ⌘Z meanwhile waits for its step (F474).
       const r = await whileOut((async () => {
         const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
         // Two writes: if the second fails, the first is taken back, so a retry never leaves a question nobody can see.
