@@ -1185,11 +1185,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     let n = 0;
     const t = setInterval(() => {
       if (++n > 45) return setGaveUp(true);
+      const filedAt = filings.current;
       ore<Item[]>("ls").then(
         (all) => {
           const d = all.find((i) => i.id === p.id);
           if (d && (d.enriched_at || d.prequestions?.length))
-            setDoc((cur) => cur && { ...cur, prequestions: d.prequestions, skills: d.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at });
+            setDoc((cur) => cur && { ...cur, prequestions: d.prequestions, skills: filings.current === filedAt ? d.skills : cur.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at });
           else if (d?.enrich_error) {
             // The background run died: say why now, not after the wait runs out.
             setDoc((cur) => cur && { ...cur, enrich_error: d.enrich_error });

@@ -633,13 +633,20 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
   const reload = () => setVersion((v) => v + 1);
   /** Goes up when a write to an answer's pieces starts or ends (AnswerBox `onWriting`): a read out across one is made again. */
   const writes = useRef(0);
-  const writing = useCallback(() => void writes.current++, []);
+  /** A read landed while a write was out: it is made again once, when that write ends (odd = one is out). */
+  const owed = useRef(false);
+  const writing = useCallback(() => {
+    if (++writes.current % 2 === 0 && owed.current) {
+      owed.current = false;
+      setVersion((v) => v + 1);
+    }
+  }, []);
 
   useEffect(() => {
     let live = true;
     const at = writes.current;
     ore<Question[]>("questions", opt("skill", skill)).then(
-      (r) => live && (writes.current === at ? setQs(r) : reload()),
+      (r) => live && (writes.current === at ? setQs(r) : writes.current % 2 ? (owed.current = true) : reload()),
       (e) => live && notify(errorText(e), "error"),
     );
     return () => {
