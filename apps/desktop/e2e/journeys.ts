@@ -9374,6 +9374,23 @@ journey("reader: a chapter's recall ends with Done and Back to the source as wel
   }
 });
 
+journey("tutor: a chat list that can't be read says so with Try again, not No chats yet (Codex UX sweep 9)", async (page) => {
+  await page.getByRole("button", { name: "Open the tutor" }).click();
+  await page.evaluate(() => ((window as unknown as Record<string, unknown>).__ORE_FAIL = { chat: "The library is busy" }));
+  try {
+    await page.getByRole("button", { name: "Chats", exact: true }).click();
+    await page.getByText("Couldn’t read your chats").waitFor({ timeout: 3000 });
+    if (await page.getByText("No chats yet").count()) throw new Error("a failed read said No chats yet");
+    await page.evaluate(() => ((window as unknown as Record<string, unknown>).__ORE_FAIL = {}));
+    await page.getByRole("option", { name: "Try again" }).click();
+    await until("the error goes once the read works", async () => !(await page.getByText("Couldn’t read your chats").count()));
+  } finally {
+    await page.evaluate(() => ((window as unknown as Record<string, unknown>).__ORE_FAIL = {}));
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.keyboard.press("Escape").catch(() => {});
+  }
+});
+
 /** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
 const hold = (page: Page, key: string, calls = 1) => page.evaluate(([k, n]) => {
   const w = window as unknown as { __ORE_HOLD?: Record<string, unknown[]> };
@@ -15457,8 +15474,9 @@ journey("Settings: each section opens at its top, however far the last one was s
   await settings.waitFor();
   await settings.getByRole("tab", { name: "Review" }).click();
   const main = settings.locator(".settings-main");
-  await main.evaluate((el) => (el.scrollTop = el.scrollHeight));
-  await until("Review scrolls", () => main.evaluate((el) => el.scrollTop > 0));
+  // Scrolled again on each look: the section's settings come in a moment after the tab opens, and a scroll made
+  // before then had nowhere to go (F524).
+  await until("Review scrolls", () => main.evaluate((el) => ((el.scrollTop = el.scrollHeight), el.scrollTop > 0)));
   await settings.getByRole("tab", { name: "Keyboard shortcuts" }).click();
   await until("Keyboard shortcuts opens at its top", () => main.evaluate((el) => el.scrollTop === 0));
   await settings.getByRole("tab", { name: "Review" }).click();
@@ -17665,6 +17683,55 @@ journey("phone: a skill's note opens again where he was in it, and the Dig's but
   const small = await page.locator(".skill-recall").evaluate((root) => [...root.querySelectorAll<HTMLElement>(".skill-recall-close, .skill-recall-foot button")].map((b) => b.getBoundingClientRect()).filter((r) => r.width && r.height < 44).length);
   if (small) throw new Error(`${small} of the Dig's buttons are under 44 pt`);
 }, "phone");
+journey("phone: Back from a note's link returns to that note, and a Linked from row opens the note it quotes (Codex UX sweep 9)", async (page) => {
+  await phoneSource(page, AGENTS);
+  await tap(page, page.locator(".phone-tools > :nth-child(2)"));
+  await page.locator(".reader.noting").waitFor();
+  const editor = page.locator(".phone-reader [contenteditable=true]").first();
+  await editor.click();
+  await page.keyboard.press("End");
+  await page.keyboard.type("Bus link: [[Testing");
+  await tap(page, page.getByRole("option", { name: new RegExp(TESTING.slice(0, 20)) }).first());
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  await Bun.sleep(600); // the note saves
+  await page.locator(".phone-reader [contenteditable] a").filter({ hasText: "The Testing Effect" }).first().click();
+  await page.locator(".phone-reader .doc h1, .phone-reader .doc-head h1").filter({ hasText: "Testing" }).first().waitFor();
+  // Its note's Linked from opens the note it quotes, not the article.
+  await tap(page, page.locator(".phone-tools > :nth-child(2)"));
+  await tap(page, page.locator(".linked-from .backlink").filter({ hasText: AGENTS }).first());
+  await page.locator(".reader.noting").waitFor({ timeout: 3000 });
+  await page.locator(".mynotes").filter({ hasText: "Bus link:" }).waitFor();
+  // From there, a link and Back: back on the note it left.
+  await page.locator(".phone-reader [contenteditable] a").filter({ hasText: "The Testing Effect" }).first().click();
+  await page.locator(".phone-reader .doc-head h1").filter({ hasText: "Testing" }).first().waitFor();
+  await tap(page, page.locator(".phone-full .phone-back").first());
+  await page.locator(".reader.noting").waitFor({ timeout: 3000 });
+  await page.locator(".mynotes").filter({ hasText: "Bus link:" }).waitFor();
+}, "phone");
+
+journey("phone: a tap on an exercise's history line lists each review's rating and date (Codex UX sweep 9)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const sure = page.getByRole("radio", { name: "Sure" });
+  await sure.or(page.locator(".phone-full .review-end")).first().waitFor();
+  for (let i = 0; i < 8 && !(await page.locator(".timeline-tap").count()); i++) {
+    if (!(await sure.count())) break;
+    const field = page.locator(".phone-full textarea:visible");
+    if (await field.count()) (await tap(page, field), await page.keyboard.type("Spacing beats cramming."));
+    await tap(page, sure);
+    const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
+    if (await check.count()) await tap(page, check);
+    if (await page.locator(".timeline-tap").count()) break;
+    const good = page.locator(".phone-full button:visible").filter({ hasText: /^Good/ });
+    await good.waitFor();
+    await tap(page, good);
+  }
+  const line = page.locator(".timeline-tap").first();
+  await line.waitFor({ timeout: 3000 });
+  await tap(page, line);
+  await page.locator(".timeline-list").filter({ hasText: /(Again|Hard|Good|Easy) · / }).waitFor();
+}, "phone");
+
 
 
 

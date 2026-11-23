@@ -1185,7 +1185,9 @@ function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void })
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<ChatRow[] | null>(null);
   const [query, setQuery] = useState("");
-  const load = () => void ore<ChatRow[]>("chat").then(setRows, () => setRows([]));
+  // A read that fails says so with Try again, never "No chats yet" over chats that are there (Codex UX sweep 9).
+  const [failed, setFailed] = useState<string | null>(null);
+  const load = () => void ore<ChatRow[]>("chat").then((r) => (setFailed(null), setRows(r)), (e) => (setFailed(errorText(e)), setRows(null)));
   // The chat on screen as it is now, though its last save may still be on its way.
   const cur = chat.current;
   const all = !rows ? [] : cur ? [{ id: cur.id, title: cur.title, updated: rows.find((r) => r.id === cur.id)?.updated ?? new Date().toISOString() }, ...rows.filter((r) => r.id !== cur.id)] : rows;
@@ -1226,6 +1228,13 @@ function ChatList({ chat, onPicked }: { chat: TutorChat; onPicked: () => void })
           >
             <Command.Input className="menu-input" placeholder="Find a chat…" value={query} onValueChange={setQuery} autoFocus />
             <Command.List>
+              {failed && (
+                <>
+                  <div className="tutor-chats-none" role="alert">Couldn’t read your chats: {failed}</div>
+                  {/* An item, so ↓ and ↵ reach it from the filter as well as a click (Codex UX sweep 9 review). */}
+                  <Command.Item value="try again" onSelect={load}>Try again</Command.Item>
+                </>
+              )}
               {rows && !shown.length && <Command.Empty className="tutor-chats-none">{query.trim() ? "No chat by that name" : "No chats yet"}</Command.Empty>}
               {chatGroups(shown).map((g) => (
                 <Command.Group key={g.heading} heading={g.heading}>
