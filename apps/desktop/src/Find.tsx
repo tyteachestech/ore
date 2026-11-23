@@ -216,7 +216,8 @@ export function FindBar({ roots, scope, within, query, near, onQuery, focus, onC
         setAt((i) => Math.min(i, Math.max(0, rs.length - 1)));
       }, 120);
     });
-    mo.observe(within, { childList: true, subtree: true, characterData: true });
+    // A part shown or hidden (a video's transcript folded open) changes what can be found too (Codex UX sweep 10).
+    mo.observe(within, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["hidden"] });
     return () => {
       mo.disconnect();
       clearTimeout(t);

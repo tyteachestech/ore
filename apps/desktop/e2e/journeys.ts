@@ -17578,6 +17578,9 @@ journey("phone: Sources narrows by kind and skill from Filter, each a tag under 
   await value("Skill", /^AI/);
   // Fields narrow together: the one audio lecture isn't filed under AI.
   await page.getByText("No sources match these filters.").waitFor();
+  // Its Clear them is a 44 pt tap round its line (Codex UX sweep 10).
+  const clear = await page.getByRole("button", { name: "Clear them" }).evaluate((e) => { const r = e.getBoundingClientRect(); const a = getComputedStyle(e, "::after"); return a.content !== "none" && a.position === "absolute" ? r.height + Math.max(0, -parseFloat(a.top) || 0) + Math.max(0, -parseFloat(a.bottom) || 0) : r.height; });
+  if (clear < 44) throw new Error(`Clear them is a ${clear} pt tap`);
   const tags = page.locator(".phone-filter-tag");
   if ((await tags.count()) !== 2) throw new Error(`${await tags.count()} filter tags, not 2`);
   const box = (await tags.first().boundingBox())!;

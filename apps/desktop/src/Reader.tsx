@@ -37,7 +37,7 @@ import { CodeBlock } from "./Code";
 import { clickBelow, SidePanel, SidePanelFrame, SourceNoteBody, useSourceNote, type SideTab } from "./Notes";
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
-import { openOriginal, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
+import { openOriginal, playerLink, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
 import { INTENTS, ore, opt, PHONE, visible, whileOut, type Annotation, type CardFull, type CardSkills, type ChapterFeedback, type Doc, type Intent, type Item, type Priority, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { sourceImportanceActions } from "./importance";
@@ -1264,7 +1264,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   useEffect(() => {
     if (!ready) return;
     if (p.jumpTo?.startsWith("find:")) {
-      // The words, then (on a line of its own) the passage the result showed them in: Find starts there.
+      // The words, then (on a line of its own) the passage the result showed them in: Find starts there. A video's
+      // transcript folded away opens, since Find looks only at what shows (Codex UX sweep 10).
+      showTranscriptFor(null);
       const [query = "", near] = p.jumpTo.slice(5).split("\n");
       setFind((f) => ({ open: true, focus: f.focus + 1, query, near }));
     }
@@ -1876,10 +1878,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   /** From the Collected tab (D64): scroll the passage a third of the way down the text in view (below a
    *  video's player) and open its popup, whose ▶ plays from there. */
-  function jumpToHighlight(id: string) {
+  function jumpToHighlight(id: string, opened = false) {
     const el = scrollRef.current;
     const range = rangeOf(id);
     if (!el) return;
+    // In a video's folded transcript: it opens first, so the passage is in sight beside its note (Codex UX sweep 10).
+    if (!opened && range && showTranscriptFor(range.startContainer)) return void requestAnimationFrame(() => jumpToHighlight(id, true));
     // Its passage gone from the text (a reimport): say so, never a click that does nothing.
     if (!range) return void (annOf(id)?.anchor === null && p.notify("The passage it was marked on is no longer in this source.", "error"));
     toThird(range);
@@ -3534,6 +3538,14 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   };
   /** Folds the whole card or its transcript, kept for this source. Folding the card pauses the video;
    *  opening the transcript brings the spoken word back into it. */
+  /** Opens a video's transcript that is folded away: for `node` when it is inside it, or (null) whenever there is one.
+   *  True when it had to open. */
+  function showTranscriptFor(node: Node | null): boolean {
+    const box = document.querySelector<HTMLElement>(".doc .vc-transcript");
+    if (!box || !box.hidden || (node && !box.contains(node))) return false;
+    foldCard({ open: true, transcript: true });
+    return true;
+  }
   const foldCard = (next: typeof vc) => {
     setVc(next);
     try {
@@ -3572,7 +3584,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
               sections={talkParts}
               title={doc.title}
               onFinish={() => p.setFinishing(true)}
-              onOpen={() => void openOriginal(doc).catch((e) => p.notify(errorText(e), "error"))}
+              // Open on YouTube goes to the video, not the page that plays it (a course's lesson; Codex UX sweep 10).
+              onOpen={() => void (playerLink(doc) ? openUrl(playerLink(doc)!) : openOriginal(doc)).catch((e) => p.notify(errorText(e), "error"))}
             />
           </div>
         ),

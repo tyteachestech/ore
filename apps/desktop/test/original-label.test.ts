@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { originalLabel } from "../src/original";
+import { originalLabel, playerLink } from "../src/original";
 import type { Item } from "../src/ore";
 
 const label = (url?: string, source_file?: string) => originalLabel({ url, source_file } as Item);
@@ -24,4 +24,10 @@ test("a file kept on a storage host is named by the file, not the host's random 
 test("a source with no address is named by its kept file", () => {
   expect(label(undefined, "/Users/t/Ore/items/a/chapter-3.pdf")).toBe("chapter-3.pdf");
   expect(label()).toBe(null);
+});
+
+// Codex UX sweep 10: a course lesson's player said Open on YouTube and opened the lesson's page.
+test("the player's Open on YouTube goes to the video, not the page that plays it", () => {
+  expect(playerLink({ url: "https://academy.claude.com/courses/x/intro", video: "https://www.youtube.com/watch?v=JpGtOfSgR-c" })).toBe("https://www.youtube.com/watch?v=JpGtOfSgR-c");
+  expect(playerLink({ url: "https://www.youtube.com/watch?v=abc" })).toBe("https://www.youtube.com/watch?v=abc");
 });
