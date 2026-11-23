@@ -819,7 +819,8 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   // `local` reads the kept copy of a link's file too (a PDF's tables, read from the copy they came from).
   const copy = keptOriginal(item.dir);
   const kept = url && !(local && copy) ? undefined : copy;
-  if (!canReimport(item)) throw new Error("Only a source added from a link or a file can be reimported.");
+  // A file's source whose kept copy was deleted says so, not that it never came from a file (F5).
+  if (!canReimport(item)) throw new Error(type === "markdown" || type === "snippet" || url ? "Only a source added from a link or a file can be reimported." : "The file it came from is no longer kept beside this source, so there is nothing to read again. Add the file again to read it fresh.");
   const regions = read ?? layoutOf(item.dir);
   // A pasted page (source.html beside a Markdown source) is read as it was pasted.
   const pasted = type === "markdown" && !url && kept === "source.html";
