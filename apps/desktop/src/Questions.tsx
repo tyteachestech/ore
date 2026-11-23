@@ -88,7 +88,7 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onWriting, onClo
       (gone
         ? notify("Removed from your answer", "info", async () => {
             // Out like a rewrite, and the page is told at both ends: the read made when the removal landed may still be
-            // on its way, and would show the answer without the piece (F-new-answer-undo-stale-read).
+            // on its way, and would show the answer without the piece (F476).
             out.current++;
             onWriting?.();
             const r = await ore<Saved["question"]>("answer", q.id, opt("text", from), ...(was.item ? [opt("item", was.item)] : []), ...(was.quote ? [opt("quote", was.quote)] : [])).finally(() => (out.current--, onWriting?.()));

@@ -1143,7 +1143,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   /** Goes up on "Try again" after a failed open: the read runs once more (F299). */
   const [tries, setTries] = useState(0);
   /** Goes up when a filing under skills starts and when it ends: a read that was out across either has skills
-   *  older than what he picked, so it keeps the ones on screen (F-new-stale-skills-read). */
+   *  older than what he picked, so it keeps the ones on screen (F474). */
   const filings = useRef(0);
   useEffect(() => {
     let live = true;

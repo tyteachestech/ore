@@ -1,6 +1,6 @@
 # Makes files/tables.pdf: a page of a paper with a table and a numbered display formula between
 # paragraphs, the parts pdf.js reads as plain lines and the page reader reads as structure (D125). Its
-# reading by PaddleOCR-VL 1.6 (D-new-paddle-pages), saved as files/tables.paddle.json, is what runPaddle
+# reading by PaddleOCR-VL 1.6 (D346), saved as files/tables.paddle.json, is what runPaddle
 # returns for it (`ore tables` with the reader installed)
 # Run: python3 make-tables-pdf.py (needs reportlab).
 from reportlab.lib.pagesizes import letter

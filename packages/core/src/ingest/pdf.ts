@@ -44,7 +44,7 @@ interface Item {
   math?: boolean;
   /** Set in a typewriter face (Courier, TeX's cmtt): code. */
   mono?: boolean;
-  /** Which heading the page reader found this text in (D-new-paddle-pages), counted from 1; 0 on a
+  /** Which heading the page reader found this text in (D346), counted from 1; 0 on a
    *  page it read and found this text no heading on. Unset on a page it has not read, where the
    *  text's size decides. */
   head?: number;
@@ -333,7 +333,7 @@ function paragraphs(lines: Line[], body = 0, typical = 12, words = new Set<strin
     // Lines set clearly larger than the body text, then body text, are a heading (the outline's);
     // a heading that wraps is joined. Large text not followed by body text is a figure's labels.
     // A numbered heading ("1.1.1 Acting humanly") may be set only a little larger, often in bold.
-    // On a page the page reader read (D-new-paddle-pages), a heading is what it saw as one, whatever
+    // On a page the page reader read (D346), a heading is what it saw as one, whatever
     // its size: a heading set in the body's size in bold is found, a large pull quote is not.
     if (l.head === undefined ? body && (l.size >= body * 1.15 || (l.size >= body * 1.05 && NUMBERED.test(line))) : l.head) {
       let j = i + 1;

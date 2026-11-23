@@ -29,7 +29,7 @@ async function start(): Promise<{ url: string; stop: () => void }> {
   if (process.env.E2E_URL) return { url: process.env.E2E_URL, stop: () => {} };
   const lib = (LIB = mkdtempSync(join(tmpdir(), "ore-e2e-")));
   await $`bun ${join(MOCK, "seed.ts")} ${lib}`.quiet();
-  // The PDF page reader (D125, D-new-paddle-pages) stands in as a script that writes its saved reading of tables.pdf.
+  // The PDF page reader (D125, D346) stands in as a script that writes its saved reading of tables.pdf.
   const paddle = join(lib, ".ore", "paddle");
   // Every PDF added is read: any other one gets an empty reading, which changes nothing.
   writeFileSync(paddle, `#!/bin/sh\nsleep 1\nif cmp -s "$2" "${FIXTURES}/tables.pdf"; then cp "${FIXTURES}/tables.paddle.json" "$3"; else echo "[]" > "$3"; fi\n`);
@@ -5449,7 +5449,7 @@ journey("answer pieces: Undo of a removed piece, then a Redo that fails, keeps t
 
 // CI met this on master (F357's journey, shard 2/5): the questions read again after the removal landed
 // answered after the Undo had put the piece back, and showed the answer without it.
-journey("answer pieces: Undo of a removed piece keeps it when the read after the removal answers late (F-new-answer-undo-stale-read)", async (page) => {
+journey("answer pieces: Undo of a removed piece keeps it when the read after the removal answers late (F476)", async (page) => {
   type Q = { id: string; note?: string; answers: { ts: string; text: string }[] };
   const kids = async () => ((await ore("questions", "--skill=learning")) as Q[]).find((x) => x.note === "Does this hold for kids?")!;
   const slow = (ms: number | null) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { questions: ms } : undefined), ms);
@@ -11304,7 +11304,7 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
   await page.keyboard.press("Escape");
 });
 
-journey("skill picker: a read of the source that started before a skill came off never puts it back in the picker (F-new-stale-skills-read)", async (page) => {
+journey("skill picker: a read of the source that started before a skill came off never puts it back in the picker (F474)", async (page) => {
   const item = () => ore("ls").then((ls) => (ls as { id: string; title: string; skills: string[] }[]).find((i) => i.title === TESTING)!);
   const start = (await item()).skills;
   const other = ((await ore("skills")) as { id: string; name: string }[]).find((k) => !start.includes(k.id))!;
@@ -12926,7 +12926,7 @@ journey("phone: Settings in the drawer changes the daily goal and the reminder, 
   await tap(page, page.getByRole("switch", { name: "Reminder" }));
   await page.locator(".phone-time").waitFor();
   await page.locator(".phone-settings").getByText("isn’t in iCloud").waitFor();
-  await settled(page); // the reload drops a save still on its way to the mock, which a real relaunch does not (F-new-phone-settings-reload)
+  await settled(page); // the reload drops a save still on its way to the mock, which a real relaunch does not (F477)
   await page.reload();
   await page.locator(".phone-settings h1").waitFor();
   await until("the goal stayed 20", async () => (await page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "20" }).getAttribute("aria-checked")) === "true");
@@ -14084,7 +14084,7 @@ journey("phone: a selection handle held at the bottom of the screen turns the pa
       const x = end.getBoundingClientRect().left + 20;
       const y = Math.min(end.getBoundingClientRect().bottom, b.bottom) - 30;
       const c = document.caretRangeFromPoint(x, y);
-      // No text under the point (F-new-phone-handle-no-caret, once on CI): say where it was and what was there.
+      // No text under the point (F475, once on CI): say where it was and what was there.
       if (!c) throw new Error(`no text at ${Math.round(x)},${Math.round(y)}: window ${innerWidth}×${innerHeight}, pane ${Math.round(b.top)} to ${Math.round(b.bottom)}, paragraph ${Math.round(end.getBoundingClientRect().top)} to ${Math.round(end.getBoundingClientRect().bottom)}, on top there: ${document.elementFromPoint(x, y)?.className ?? "nothing"}`);
       getSelection()!.setBaseAndExtent(t, 0, c.startContainer, c.startOffset);
       return { n, last: Number(end.textContent!.match(/Passage (\d+)/)![1]) };

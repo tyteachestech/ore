@@ -4,7 +4,7 @@ import { cancelOre, ore, oreJob, PHONE, type Doc } from "./ore";
 import { errorText } from "./util";
 import { Working } from "./Working";
 
-// Headings, tables and display formulas in a PDF (D125, D-new-paddle-pages): pdf.js reads the words;
+// Headings, tables and display formulas in a PDF (D125, D346): pdf.js reads the words;
 // PaddleOCR-VL, an optional download on the Mac, reads each page's picture for its headings, tables and
 // formulas, on every PDF added once it is here. Offered in the PDF that has them (Tyler, 2026-11-06, option A),
 // and removed from Settings › AI.

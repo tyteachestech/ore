@@ -9,7 +9,7 @@ import { addSource, addText, readTables, tablesState, reimportSource, undoReimpo
 import { findItem, updateItemMeta } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
-// D125, D-new-paddle-pages: pdf.js reads a PDF's words; PaddleOCR-VL, an optional Mac download, reads
+// D125, D346: pdf.js reads a PDF's words; PaddleOCR-VL, an optional Mac download, reads
 // each page's picture for its headings, tables and display formulas, and those regions shape pdf.js's
 // lines by their place on the page. tables.pdf comes from fixtures/intake/make-tables-pdf.py;
 // tables.paddle.json and scan.paddle.json are the reader's real readings of tables.pdf and scan.pdf

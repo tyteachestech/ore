@@ -26,7 +26,7 @@ export interface Cell {
   text: string;
 }
 
-/** A part of a page as the page reader saw it (D-new-paddle-pages), in the order it is read: a table,
+/** A part of a page as the page reader saw it (D346), in the order it is read: a table,
  *  a display formula, or a block of text (a paragraph, a caption, or with `head` a heading), and one
  *  `page` region for every page it read, so a page it found no heading on shows none. Where the PDF has
  *  its own text, pdf.js still reads the words, so highlights on the prose never move and no word is the

@@ -1,6 +1,6 @@
 # Makes files/columns.pdf: a designed page whose right-hand column is drawn first, so pdf.js, which
 # reads a page in the order it is drawn, reads it before the left one. The page reader's order of the
-# blocks puts them right (D-new-paddle-pages). Run: python3 make-columns-pdf.py (needs reportlab).
+# blocks puts them right (D346). Run: python3 make-columns-pdf.py (needs reportlab).
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import os

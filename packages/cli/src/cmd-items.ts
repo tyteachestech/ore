@@ -26,7 +26,7 @@ import {
 import type { Command } from "./types.ts";
 
 /** What follows an add, from `ore add` or a link the iPhone queued: enrichment in the background (also for a Feed
- *  post now kept, which wasn't yet), and every PDF's pages once the optional reader is installed (D125, D-new-paddle-pages). */
+ *  post now kept, which wasn't yet), and every PDF's pages once the optional reader is installed (D125, D346). */
 function afterAdd(lib: Library, item: Awaited<ReturnType<typeof addSource>>, noEnrich: boolean): string {
   const kept = !!item.kept;
   const enrich = noEnrich || (kept && !item.fromFeed) ? "skipped" : startEnrich(lib, item.meta.id);
@@ -611,7 +611,7 @@ export const itemCommands: Record<string, Command> = {
   },
 
   tables: {
-    usage: "<item> [--status] | --install | --remove | --status   read a PDF's pages with PaddleOCR-VL and mark its headings and put its tables and display formulas in its text in place of their lines; the words and highlights stay (D125, D-new-paddle-pages). The reader is an optional download of about 4 GB: --install gets it, --remove deletes it, --status says whether it is here (and, for a PDF read, its step). Undo with `ore reimport <item> --undo --step <step>`",
+    usage: "<item> [--status] | --install | --remove | --status   read a PDF's pages with PaddleOCR-VL and mark its headings and put its tables and display formulas in its text in place of their lines; the words and highlights stay (D125, D346). The reader is an optional download of about 4 GB: --install gets it, --remove deletes it, --status says whether it is here (and, for a PDF read, its step). Undo with `ore reimport <item> --undo --step <step>`",
     options: { install: { type: "boolean" }, remove: { type: "boolean" }, status: { type: "boolean" } },
     async run([ref], f) {
       if (f.status && ref) {

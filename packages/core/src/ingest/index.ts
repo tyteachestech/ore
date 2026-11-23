@@ -942,7 +942,7 @@ export async function fillOwed(lib: Library, opts: { onProgress?: (id: string, d
   return filled;
 }
 
-/** What the page reader saw in a source's PDF (D125, D-new-paddle-pages), kept beside it as `layout.json`
+/** What the page reader saw in a source's PDF (D125, D346), kept beside it as `layout.json`
  *  so a reimport keeps it without reading the PDF's pages again. */
 function layoutOf(dir: string): Region[] | undefined {
   try {
@@ -954,7 +954,7 @@ function layoutOf(dir: string): Region[] | undefined {
 
 const tablesFile = (lib: Library, id: string, ext: "reading" | "error" | "step") => join(paths.logs(lib), `tables-${id}.${ext}`);
 
-/** Reads a PDF source's pages with PaddleOCR-VL (D-new-paddle-pages) and puts its tables and formulas in the text in place of
+/** Reads a PDF source's pages with PaddleOCR-VL (D346) and puts its tables and formulas in the text in place of
  *  pdf.js's lines, through a reimport from the kept PDF: the prose is unchanged, so every highlight
  *  stays where it is. While it runs, and after it fails, `tablesState` says so. */
 export async function readTables(lib: Library, ref: string): Promise<Reimported & { regions: number }> {
