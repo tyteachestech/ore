@@ -4075,7 +4075,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 .mynotes-head > .icon-btn[aria-pressed="true"] { color: var(--text); }
 /* Adding a link on the iPhone (D223): one field and Add. */
 .add-link { display: flex; flex-direction: column; gap: 12px; padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)); }
-.add-link .field { font-size: 17px; min-height: 44px; }
+.add-link .field { font-size: 17px; min-height: 44px; max-height: 40vh; overflow-y: auto; } /* a long paste scrolls in the field, the Add button in sight */
 .add-link .phone-error { padding: 0; }
 .add-link .pill-btn { justify-content: center; text-align: center; min-height: 44px; }
 .add-link-file { min-height: 44px; color: var(--muted); font: 500 15px var(--font); }

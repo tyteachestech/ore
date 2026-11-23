@@ -7,7 +7,7 @@ import { flushSync } from "react-dom";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
 import { FillingLine, useFilling } from "../Filling";
-import { AddLink, WaitingLinks, macOnly, type Waiting } from "./AddLink";
+import { AddLink, WaitingLinks, macOnly, type AddedText, type Waiting } from "./AddLink";
 import { trackDrag, type Drag } from "./drag";
 import { tick } from "./haptics";
 import { Home, rowLine } from "../Home";
@@ -402,7 +402,7 @@ function Rows({ lines, row, onOpen }: { lines: Line[]; row: RowActions; onOpen: 
 }
 
 /** Sources by To read and Done, as one list; `flat`: as given, no sections or courses (Archive, a course's lessons). */
-function SourceList({ title, items, onOpen, row, head, tools, flat, empty = "Nothing here yet. Add a link with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; /** At the title's right: Filter and Select. */ tools?: ReactNode; flat?: boolean; empty?: ReactNode }) {
+function SourceList({ title, items, onOpen, row, head, tools, flat, empty = "Nothing here yet. Add one with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; /** At the title's right: Filter and Select. */ tools?: ReactNode; flat?: boolean; empty?: ReactNode }) {
   // Pinned first, in the order they were pinned, as on the Mac's lists; then the latest touched.
   const sorted = [...(items ?? [])].sort(toReadOrder);
   return (
@@ -898,6 +898,26 @@ export function PhoneApp() {
     return () => clearTimeout(late);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wanted, items, reading]);
+  /** Text pasted into Add is a source at once: it opens when its sheet was still up, as on the Mac (D109), and the
+   *  toast says what happened, each with Undo: new (archived again), filed under a skill too, or back from Archived. */
+  const addedText = (t: AddedText, show: boolean) => {
+    const archived = (on: boolean) => () => {
+      // Undo takes back the page the add opened too, as the Mac's does.
+      if (on) setOpenId((id) => (id === t.id ? null : id));
+      return ore("archive", t.id, ...(on ? [] : ["--undo"])).finally(() => void refresh());
+    };
+    const skillsTo = (ids: string[]) => () => ore("edit", t.id, "--skills", ids.join(",")).finally(() => void refresh());
+    const filed = t.filed ?? [];
+    const now = t.skills ?? [];
+    const names = filed.map((k) => skills.find((s) => s.id === k)?.name ?? k).join(", ");
+    if (!t.kept) notify(`Added “${t.title}”`, "info", archived(true), archived(false));
+    else if (t.restored) notify(`“${t.title}” is back from Archived`, "info", archived(true), archived(false));
+    else if (filed.length) notify(`Added “${t.title}” to ${names}`, "info", skillsTo(now.filter((k) => !filed.includes(k))), skillsTo(now));
+    else notify(`Already here: “${t.title}”`, "info");
+    if (!show) return;
+    setReviewing(null);
+    open(t.id);
+  };
   /** Archive from the source's menu: back to the list at once, with Undo, as on the Mac. */
   const archive = async (item: Item) => {
     setOpenId(null);
@@ -1293,7 +1313,7 @@ export function PhoneApp() {
             <button className="phone-back phone-icon" aria-label="Open menu" aria-expanded={drawer} onClick={() => setDrawer(true)}>
               <SidebarSimple size={16} aria-hidden="true" />
             </button>
-            <button className="phone-back phone-icon phone-add" aria-label="Add a link" onClick={() => setAdding(true)}>
+            <button className="phone-back phone-icon phone-add" aria-label="Add a source" onClick={() => setAdding(true)}>
               <Plus size={16} aria-hidden="true" />
             </button>
             <button className="phone-back phone-icon" aria-label="Search" onClick={() => setSearching(true)}>
@@ -1509,7 +1529,7 @@ export function PhoneApp() {
                   <div className="phone-sources">
                     <WaitingLinks links={coming} reading={reading} onRemove={removeWaiting} />
                     {!lines.length ? (
-                      coming.length > 0 ? null : <p className="quiet">{q ? `No sources match “${q}”.` : skillTab === "done" ? "Nothing done yet." : "Nothing to read. Add a link with +."}</p>
+                      coming.length > 0 ? null : <p className="quiet">{q ? `No sources match “${q}”.` : skillTab === "done" ? "Nothing done yet." : "Nothing to read. Add one with +."}</p>
                     ) : (
                       <Rows lines={shown} row={row} onOpen={open} />
                     )}
@@ -1567,7 +1587,7 @@ export function PhoneApp() {
         />
       )}
       {picking && !over && !searching && !adding && <PickBar n={many.length} actions={manyActions(many)} onClear={() => setPicking(null)} />}
-      {adding && <AddLink skill={addTo} onClose={() => (setAdding(false), setAddTo(undefined))} onAdded={() => void refresh().then(bringIn)} />}
+      {adding && <AddLink skill={addTo} onClose={() => (setAdding(false), setAddTo(undefined))} onAdded={(t, show) => void refresh().then(() => (t ? addedText(t, show) : bringIn()))} />}
       {editingSkill && skills.some((s) => s.id === editingSkill) && (
         <SkillEditor
           skill={skills.find((s) => s.id === editingSkill)!}
