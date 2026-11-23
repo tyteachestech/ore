@@ -14026,6 +14026,21 @@ journey("phone: a selection handle held at the bottom of the screen turns the pa
       return Number(p.textContent!.match(/Passage (\d+)/)![1]);
     });
     await page.waitForTimeout(150); // a change of its own: a new selection alone never turns the page
+    // The word the handle is dragged to must be there to drag to: as the first phone journey of a CI shard, on a
+    // phone build just started, nothing answered at that point yet and the drag below threw on null (F-new-phone-handle-caret-null).
+    let under = "";
+    await until("there is text at the foot of the reader to drag the handle to", async () => {
+      under = await page.evaluate(() => {
+        const b = document.querySelector<HTMLElement>(".phone-reader .reader-scroll")!.getBoundingClientRect();
+        const end = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")].find((q) => q.getBoundingClientRect().bottom > b.bottom - 40);
+        if (!end) return "no paragraph reaches the reader's foot";
+        const [x, y] = [end.getBoundingClientRect().left + 20, Math.min(end.getBoundingClientRect().bottom, b.bottom) - 30];
+        if (document.caretRangeFromPoint(x, y)) return "";
+        const at = document.elementFromPoint(x, y);
+        return `no text at ${Math.round(x)},${Math.round(y)} (window ${innerWidth}×${innerHeight}, reader ends at ${Math.round(b.bottom)}): ${at ? `${at.tagName}.${at.className}` : "nothing there"}`;
+      });
+      return !under;
+    }, 5000).catch((e) => { throw new Error(`${(e as Error).message}: ${under}`); });
     const from = await page.evaluate((n) => {
       const b = document.querySelector<HTMLElement>(".phone-reader .reader-scroll")!.getBoundingClientRect();
       const ps = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")];
