@@ -1277,6 +1277,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     }
   }, [ready, p.jumpTo]);
 
+  /** A folded transcript just opened to show a passage: the reader's resize watcher leaves the scroll alone once. */
+  const unfolded = useRef(false);
+
   /** He has clicked somewhere since the source opened: the text drawn after that leaves his focus where he put it. */
   const clicked = useRef(false);
   useEffect(() => {
@@ -1372,7 +1375,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     };
     take();
     const ro = new ResizeObserver(() => {
-      back();
+      // Not when the page grew because a folded transcript opened to show a passage: the passage is where he
+      // was taken, and putting the old place back threw it off the window (Codex UX sweep 12).
+      if (unfolded.current) unfolded.current = false;
+      else back();
       take();
     });
     ro.observe(scroll);
@@ -3548,6 +3554,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // Search matches the words apart (F443): each of them is in the transcript.
     const text = (box.textContent ?? "").toLowerCase();
     if (!node && !(query?.trim() && query.toLowerCase().split(/\s+/).filter(Boolean).every((w) => text.includes(w)))) return false;
+    // Once: the resize comes within a frame of the transcript showing, and a later one (the window, a picture) keeps his place.
+    unfolded.current = true;
+    requestAnimationFrame(() => requestAnimationFrame(() => void (unfolded.current = false)));
     foldCard({ open: true, transcript: true }, false);
     return true;
   }
