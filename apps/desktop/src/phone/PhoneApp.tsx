@@ -879,7 +879,7 @@ export function PhoneApp() {
     }
   };
   /** The pinned sources of an item's list, in their order (toReadOrder: oldest pin first). */
-  const pinnedWith = (item: Item) => (items ?? []).filter((i) => i.pinned_at && !i.archived_at && (i.status === "done") === (item.status === "done")).sort((a, b) => a.pinned_at!.localeCompare(b.pinned_at!));
+  const pinnedWith = (_: Item) => (items ?? []).filter((i) => i.pinned_at && !i.archived_at && i.status !== "done").sort((a, b) => a.pinned_at!.localeCompare(b.pinned_at!));
   /** Moves a pinned source up or down among the pinned, with Undo (the Mac's pinMoves, parity). */
   const movePinned = async (item: Item, to: number) => {
     const rest = pinnedWith(item).filter((i) => i.id !== item.id);
@@ -899,7 +899,9 @@ export function PhoneApp() {
     notify(`Moved “${item.title}”`, "quiet", () => repin(item.pinned_at!, true), () => repin(at, true));
   };
   const pinMoves = (item: Item): MenuAction[] => {
-    if (!item.pinned_at || item.archived_at) return [];
+    // Only where the list is ordered by pin and holds every pinned source: Sources' To read (a skill's list shows
+    // some of them, and Done lists by when each was finished).
+    if (!item.pinned_at || item.archived_at || item.status === "done" || skill || tab !== "sources") return [];
     const pinned = pinnedWith(item);
     const i = pinned.findIndex((x) => x.id === item.id);
     return [

@@ -120,11 +120,13 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onClose, notify 
   };
   // The box going away with a piece still being edited (its question folded, the page left) is a tap away from it:
   // the correction is saved (D211), never dropped (Codex UX sweep 2). Read at unmount, so the latest is kept.
-  const commitNow = useRef(async () => {
+  const commitNow = useRef(async () => {});
+  commitNow.current = async () => {
     // One that fails keeps his words for when the question opens again (the piece opens on them).
-    for (const [ts, e] of [...editing.current]) if (e.to.trim() !== e.from) pieceDrafts.set(`${q.id} ${ts}`, e.to);
-    if (await commitPieces()) for (const ts of editing.current.keys()) pieceDrafts.delete(`${q.id} ${ts}`);
-  });
+    const keys = [...editing.current].filter(([, e]) => e.to.trim() !== e.from).map(([ts]) => `${q.id} ${ts}`);
+    for (const [ts, e] of editing.current) if (e.to.trim() !== e.from) pieceDrafts.set(`${q.id} ${ts}`, e.to);
+    if (await commitPieces()) for (const k of keys) pieceDrafts.delete(k);
+  };
   useEffect(() => () => void commitNow.current(), []);
 
   const send = async (how: "contribution" | "done" | "card") => {

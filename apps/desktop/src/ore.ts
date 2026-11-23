@@ -78,16 +78,18 @@ export const callsOut = () => out > 0;
 /** Told whenever a change starts or stops being written (the iPhone's shake names what it would undo). */
 export const outChanged = new Set<() => void>();
 /** Once nothing counted is out, or after `max` ms (a write that never answers must not hold ⌘Z for good). */
-export function callsSettled(max = 30_000): Promise<void> {
-  if (!out) return Promise.resolve();
-  return new Promise<void>((r) => {
-    const done = () => {
+/** True once nothing is out; false when `max` ms passed with a change still being written. */
+export function callsSettled(max = 30_000): Promise<boolean> {
+  if (!out) return Promise.resolve(true);
+  return new Promise<boolean>((r) => {
+    const done = (ok: boolean) => {
       clearTimeout(timer);
-      idle = idle.filter((x) => x !== done);
-      r();
+      idle = idle.filter((x) => x !== quiet);
+      r(ok);
     };
-    const timer = setTimeout(done, max);
-    idle.push(done);
+    const quiet = () => done(true);
+    const timer = setTimeout(() => done(false), max);
+    idle.push(quiet);
   });
 }
 const counted = async <T,>(run: () => Promise<T>): Promise<T> => {

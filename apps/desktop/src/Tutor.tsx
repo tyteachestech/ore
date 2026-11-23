@@ -148,9 +148,11 @@ export function useTutorChat(notify: Notify) {
   const unsaved = useRef<string | null>(null);
   // A chat whose save was tried again on the way out and failed: a second ask to leave it leaves it, as he chose.
   const stuck = useRef<string | null>(null);
-  const save = async () => {
+  const save = async (leaving = false) => {
     const m = metaNow.current;
     if (!m || !now.current.length) return;
+    // He went on with the chat after the warning: the next leave warns again.
+    if (!leaving) stuck.current = null;
     const chat = { ...m, carry: carryNow.current, turns: now.current.map(settled) };
     const ok = await write(() => oreWith(JSON.stringify(chat), "chat", "--set", "--merge"));
     if (ok && unsaved.current === m.id) unsaved.current = stuck.current = null;
@@ -162,7 +164,7 @@ export function useTutorChat(notify: Notify) {
     const id = metaNow.current?.id;
     if (!unsaved.current || unsaved.current !== id) return true;
     if (stuck.current === id) return true;
-    await save();
+    await save(true);
     if (!unsaved.current) return true;
     stuck.current = id;
     notify("This chat isn’t saved. Leave it again to go without it, or keep it open and try later.", "error");

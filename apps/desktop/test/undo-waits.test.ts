@@ -9,6 +9,11 @@ import { join } from "node:path";
 const ALLOWED = [
   // A source added in the background by the phone's inbox, not a change he just asked for.
   "phone/PhoneApp.tsx: else notify(`Added “${a.title}”`",
+  // Imports and fetches that can take a minute (a source added for a question, a feed followed, a page's text):
+  // ⌘Z meanwhile acts on the steps already made, and theirs goes on once they land. Counted, they held ⌘Z for all.
+  "SkillPage.tsx: else notify(`Added “${r.title}”`",
+  "App.tsx: else notify(`Following ${r.feed.title}",
+  "Reader.tsx: p.notify(`Added the page’s text",
   // The step goes on before its write (void go(true), then notify); its queue keeps Undo after the write.
   "App.tsx: notify(message, \"info\", () => go(false, true)",
 ];

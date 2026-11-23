@@ -148,7 +148,9 @@ export function useToast() {
   const queue = useRef<Promise<void> | null>(null);
   const inTurn = (f: () => void) => {
     if (!queue.current && !callsOut()) return f();
-    const p: Promise<void> = (queue.current ?? Promise.resolve()).then(() => callsSettled()).then(f).catch(() => {}).finally(() => {
+    // A change still being written after half a minute: ⌘Z waits no longer, and says so rather than take back the
+    // step before it.
+    const p: Promise<void> = (queue.current ?? Promise.resolve()).then(() => callsSettled()).then((ok) => (ok ? f() : void notify("Still saving the last change. Try again in a moment.", "info"))).catch(() => {}).finally(() => {
       if (queue.current === p) queue.current = null;
     });
     queue.current = p;

@@ -225,6 +225,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
             e.preventDefault();
             void copiedFiles().then((files) => {
               if (!files.length) return setError("Couldn't read the copied file. Drag it in, or choose it with File.");
+              setFiles((f) => [...f, ...files.flatMap((e) => (e.kind === "file" ? [e.path] : []))]);
               setValue((v) => [v.trim(), ...files.map(entryText)].filter(Boolean).join("\n"));
               setError(null);
             });

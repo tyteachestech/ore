@@ -3259,7 +3259,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const d = doc;
     setAddingPage(true);
     try {
-      const c = await whileOut(ore<{ id: string; words: number }>("page-text", d.id));
+      const c = await ore<{ id: string; words: number }>("page-text", d.id);
       p.reload();
       p.onChanged();
       const step = (flag: string) => () => ore("page-text", d.id, flag, c.id).then(() => (p.reload(), p.onChanged()));

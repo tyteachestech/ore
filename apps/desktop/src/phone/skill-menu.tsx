@@ -64,14 +64,26 @@ export function skillMenu({ skills, refresh, notify, open, review, edit }: {
     notify(on ? `Archived “${s.name}”` : `Brought back “${s.name}”`, "info", () => change(s.id, { archived: !on }, true), () => change(s.id, { archived: on }, true));
   };
   const collections = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
+  /** The drawer as it shows: archived skills (D173) are out of it, so a move never swaps with one he can't see. */
+  const layout = () => layoutOf(skillGroups(skills.filter((s) => !s.archived)));
+  /** A layout of what shows, with the archived skills put back in their collections, as the Mac's sidebar writes it. */
+  const withArchived = (lay: ReturnType<typeof layoutOf>) => {
+    const out = lay.map((g) => ({ ...g, skills: [...g.skills] }));
+    for (const s of skills.filter((k) => k.archived)) {
+      const g = out.find((x) => x.collection === (s.collection ?? ""));
+      if (g) g.skills.push(s.id);
+      else out.push({ collection: s.collection ?? "", skills: [s.id] });
+    }
+    return out;
+  };
   /** A new layout, with Undo back to the one before. */
-  const relayout = (label: string, after: ReturnType<typeof layoutOf>) => {
+  const relayout = (label: string, shown: ReturnType<typeof layoutOf>) => {
     const before = layoutOf(skillGroups(skills));
+    const after = withArchived(shown);
     const saved = arrange(after);
     notify(label, "info", () => arrange(before, true), () => arrange(after, true)).hold(saved.then((ok) => ok || Promise.reject(new Error("not saved"))));
     return saved;
   };
-  const layout = () => layoutOf(skillGroups(skills));
   const swap = <T,>(l: T[], i: number, j: number) => {
     const out = [...l];
     [out[i], out[j]] = [out[j]!, out[i]!];

@@ -17,7 +17,7 @@ import { escTaken, Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, GEM_WORD, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
-import { depthText, levelProgress, ore, opt, PHONE, whileOut, type Question, type Research, type Skill, type SkillStats } from "./ore";
+import { depthText, levelProgress, ore, opt, PHONE, type Question, type Research, type Skill, type SkillStats } from "./ore";
 import { AnswerBox, AskQuestion, announce, questionText, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
@@ -780,7 +780,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
     if (adding.includes(url)) return;
     setAdding((a) => [...a, url]);
     try {
-      const r = await whileOut(ore<{ id: string; title: string; kept?: boolean }>("add", url, opt("skill", skill), opt("for", q.id)));
+      const r = await ore<{ id: string; title: string; kept?: boolean }>("add", url, opt("skill", skill), opt("for", q.id));
       setAdded((a) => [...a, url]);
       // As adding from the bar: Undo archives what was just added, ⇧⌘Z brings it back.
       const keep = (on: boolean) =>

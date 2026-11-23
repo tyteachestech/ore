@@ -771,7 +771,7 @@ export function App() {
   /** ⌘N's Follow: the feed behind a link; Undo unfollows, Show opens the Feed. */
   const followFeed = useCallback(async (url: string, to: string[]): Promise<string | null> => {
     try {
-      const r = await whileOut(ore<{ feed: { url: string; title: string }; already: boolean; found: FoundFeed }>("feed", "follow", url, ...to.map((k) => opt("skill", k))));
+      const r = await ore<{ feed: { url: string; title: string }; already: boolean; found: FoundFeed }>("feed", "follow", url, ...to.map((k) => opt("skill", k)));
       setFeedTick((n) => n + 1);
       if (r.already) notify(`Already following ${r.feed.title}`, "info", undefined, undefined, goFeed);
       else notify(`Following ${r.feed.title} · ${feedProof(r.found)}`, "info", () => ore("feed", "unfollow", r.feed.url).then(() => setFeedTick((n) => n + 1)), () => ore("feed", "follow", url, ...to.map((k) => opt("skill", k))).then(() => setFeedTick((n) => n + 1)), goFeed);
