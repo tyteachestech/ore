@@ -17485,16 +17485,16 @@ journey("phone: Sources narrows by kind and skill from Filter, each a tag under 
     await page.keyboard.press("Escape");
     await page.locator(".action-sheet").waitFor({ state: "detached" });
   };
-  await value("Kind", /^Article/);
-  await until("only the article is listed", async () => (await rows()) === 1 && (await page.locator(".phone-sources li").innerText()).includes("Lecture 4"));
+  await value("Kind", /^Audio/);
+  await until("only the audio lecture is listed", async () => (await rows()) === 1 && (await page.locator(".phone-sources li").innerText()).includes("Lecture 4"));
   await value("Skill", /^AI/);
-  // Fields narrow together: the one article isn't filed under AI.
+  // Fields narrow together: the one audio lecture isn't filed under AI.
   await page.getByText("No sources match these filters.").waitFor();
   const tags = page.locator(".phone-filter-tag");
   if ((await tags.count()) !== 2) throw new Error(`${await tags.count()} filter tags, not 2`);
   const box = (await tags.first().boundingBox())!;
   if (box.height < 44) throw new Error(`a filter tag is a ${box.height} pt tap`);
-  await tap(page, tags.filter({ hasText: "Article" }));
+  await tap(page, tags.filter({ hasText: "Audio" }));
   await until("AI's source alone", async () => (await rows()) === 1 && (await page.locator(".phone-sources li").innerText()).includes(AGENTS));
   await tap(page, tags.first());
   await until("every source is back", async () => (await rows()) === all);
