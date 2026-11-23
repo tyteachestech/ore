@@ -28,6 +28,10 @@ export function originalLabel(item: Item): string | null {
   return item.source_file?.split("/").pop() ?? null;
 }
 
+/** Where the player's Open on YouTube goes: the video itself, not the page that plays it (a course lesson; Codex UX
+ *  sweep 10), else the original. */
+export const playerLink = (item: Pick<Item, "video" | "url">) => item.video ?? item.url ?? null;
+
 /** Opens the web page in the browser, or the original file in its default app. */
 export async function openOriginal(item: Item): Promise<void> {
   if (item.url) await openUrl(item.url);

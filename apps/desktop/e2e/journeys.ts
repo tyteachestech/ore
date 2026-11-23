@@ -15424,9 +15424,16 @@ journey("source note: the format bar shows whole in the side panel, reaching ove
     await pm.click();
     await page.keyboard.press("Meta+a");
     await page.keyboard.type("## Recall beats rereading every time");
-    await page.keyboard.press("Shift+Home");
+    // The line is a heading first: a Shift+Home pressed while "## " was still being turned into one selected
+    // nothing on a slow runner, and the bar never came (master red after #508, F529).
+    await pm.locator("h2", { hasText: "Recall beats rereading every time" }).waitFor();
     const bar = page.locator(".sel-bar");
-    await bar.waitFor();
+    await until("the bar shows for the selected line", async () => {
+      if (await bar.isVisible()) return true;
+      await page.keyboard.press("End");
+      await page.keyboard.press("Shift+Home");
+      return bar.isVisible();
+    });
     await until("every part of the bar is in sight", () => bar.evaluate((el) => {
       const b = el.getBoundingClientRect();
       if (b.left < 0 || b.right > innerWidth) return false;
@@ -17578,6 +17585,9 @@ journey("phone: Sources narrows by kind and skill from Filter, each a tag under 
   await value("Skill", /^AI/);
   // Fields narrow together: the one audio lecture isn't filed under AI.
   await page.getByText("No sources match these filters.").waitFor();
+  // Its Clear them is a 44 pt tap round its line (Codex UX sweep 10).
+  const clear = await page.getByRole("button", { name: "Clear them" }).evaluate((e) => { const r = e.getBoundingClientRect(); const a = getComputedStyle(e, "::after"); return a.content !== "none" && a.position === "absolute" ? r.height + Math.max(0, -parseFloat(a.top) || 0) + Math.max(0, -parseFloat(a.bottom) || 0) : r.height; });
+  if (clear < 44) throw new Error(`Clear them is a ${clear} pt tap`);
   const tags = page.locator(".phone-filter-tag");
   if ((await tags.count()) !== 2) throw new Error(`${await tags.count()} filter tags, not 2`);
   const box = (await tags.first().boundingBox())!;

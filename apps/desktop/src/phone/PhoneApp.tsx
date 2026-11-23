@@ -1338,7 +1338,7 @@ export function PhoneApp() {
                 }
                 empty={
                   tab === "archive" ? "Nothing archived. Swipe a source left to archive it."
-                  : tab === "sources" && filters.length && items?.length ? <>No sources match these filters. <button className="link" onClick={() => setFilters([])}>Clear them</button></>
+                  : tab === "sources" && filters.length && items?.length ? <>No sources match these filters. <button className="link clear-filters" onClick={() => setFilters([])}>Clear them</button></>
                   : waiting.length ? "" : undefined
                 }
               />
