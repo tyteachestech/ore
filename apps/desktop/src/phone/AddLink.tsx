@@ -95,6 +95,7 @@ export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: 
 /** A link only the Mac can read (a video's transcript needs its tools) isn't a failure: it says where it
  *  comes in. Anything else the phone couldn't read keeps its reason, and the Mac tries it. */
 export function macOnly(error: string): string | null {
+  if (/is a playlist/.test(error)) return "Your Mac adds a playlist as a course, each video a lesson.";
   if (/yt-dlp/.test(error)) return "A video comes in through your Mac.";
   if (/Transcribing audio needs/.test(error)) return "Your Mac writes the transcript for a podcast.";
   if (/scanned pages/.test(error)) return "Your Mac reads the text in a picture or a scan.";

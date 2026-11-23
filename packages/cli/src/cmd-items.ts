@@ -132,6 +132,13 @@ export const itemCommands: Record<string, Command> = {
       }
       if (f.import) {
         const r = await importQueued(lib, async (url, skills) => {
+          // A playlist or a course the phone queued comes in here as a course, a lesson per video (D79): its own
+          // add refuses one, which the phone says the Mac does (Codex UX sweep 8). The phone (--owe) can't.
+          if (!f.owe && isCourseUrl(url)) {
+            const c = await addCourse(lib, await planCourse(url), { skills });
+            startEnrichMany(lib, c.added.map((i) => i.meta.id));
+            return { id: c.added[0]?.meta.id ?? c.course.id, title: c.course.title, kept: !c.added.length };
+          }
           const item = await addSource(lib, url, { skills, owe: !!f.owe });
           afterAdd(lib, item, false);
           return { id: item.meta.id, title: item.meta.title, kept: !!item.kept };
