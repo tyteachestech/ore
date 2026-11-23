@@ -30,8 +30,11 @@ test("a change whose step goes on the history after its write is marked, so ⌘Z
     lines.forEach((l, i) => {
       if (!/notify\(.*"(info|quiet)",\s*(\(\)|async|[a-zA-Z_.]+\()/.test(l) || lines.slice(i, i + 3).join("\n").includes(".hold(")) return;
       // Its step goes on before the write: `const forget = notify(…)`, or the write started just before (`void go()`).
-      if (/const forget =/.test(l) || /^\s*void /.test(lines[i - 1] ?? "")) return;
-      const before = lines.slice(Math.max(0, i - 15), i).join("\n");
+      if (/const forget =/.test(l) || /const forget =/.test(lines[i - 1] ?? "") || /^\s*void /.test(lines[i - 1] ?? "")) return;
+      // Back to the start of the function it is in, at most 15 lines: an await in the function before isn't this one's.
+      let from = i;
+      while (from > Math.max(0, i - 15) && !/^\s*(const \w+ = (async )?\(.*\{|(async )?function .*\{)\s*$/.test(lines[from - 1]!)) from--;
+      const before = lines.slice(Math.max(0, from - 1), i).join("\n");
       if (!/await (?!whileOut)/.test(before) || before.includes("whileOut") || before.includes(".hold(")) return;
       const at = `${f.slice(src.length + 1)}: ${l.trim()}`;
       if (!ALLOWED.some((a) => at.startsWith(a))) found.push(at.slice(0, 140));
