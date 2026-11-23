@@ -78,7 +78,7 @@ export const ItemMetaSchema = z.object({
   page_added: z.string().optional(),
   author: z.string().optional(),
   published: z.string().optional(),
-  // A PDF's tables or formulas that read as lines of text until Docling reads them (D125).
+  // A PDF's tables or formulas that read as lines of text until the page reader reads them (D125).
   structure: z.array(z.enum(["tables", "formulas"])).optional(),
   // What a device with no tools couldn't bring in (a video's transcript, D227): a device that has them
   // reads the source again and fills it (`fillOwed`). `owed_error`: why that failed; Reimport tries again.

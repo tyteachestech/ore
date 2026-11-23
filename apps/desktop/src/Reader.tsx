@@ -1142,14 +1142,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const shownBodyOf = useRef<string | null>(null);
   /** Goes up on "Try again" after a failed open: the read runs once more (F299). */
   const [tries, setTries] = useState(0);
+  /** Goes up when a filing under skills starts and when it ends: a read that was out across either has skills
+   *  older than what he picked, so it keeps the ones on screen (F474). */
+  const filings = useRef(0);
   useEffect(() => {
     let live = true;
+    const filedAt = filings.current;
     ore<Doc>("show", p.id, "--annotations").then(
       (d) => {
         if (!live) return;
         if (opened.current === p.id && shownBodyOf.current !== null && shownBodyOf.current !== d.body) return p.reload();
         shownBodyOf.current = d.body;
-        setDoc(d);
+        setDoc((cur) => (cur?.id === d.id && filings.current !== filedAt ? { ...d, skills: cur.skills } : d));
         // Enrich runs once, right after `ore add`: long after that with nothing to show, it failed.
         if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || d.enrich_skipped || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);
         // Read again (a wake), what he made or changed here that is still saving stays as he has it.
@@ -1181,11 +1185,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     let n = 0;
     const t = setInterval(() => {
       if (++n > 45) return setGaveUp(true);
+      const filedAt = filings.current;
       ore<Item[]>("ls").then(
         (all) => {
           const d = all.find((i) => i.id === p.id);
           if (d && (d.enriched_at || d.prequestions?.length))
-            setDoc((cur) => cur && { ...cur, prequestions: d.prequestions, skills: d.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at });
+            setDoc((cur) => cur && { ...cur, prequestions: d.prequestions, skills: filings.current === filedAt ? d.skills : cur.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at });
           else if (d?.enrich_error) {
             // The background run died: say why now, not after the wait runs out.
             setDoc((cur) => cur && { ...cur, enrich_error: d.enrich_error });
@@ -1219,9 +1224,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   /** The PDF's tables and formulas were read into its text: show it, with the way back. */
   const tablesRead = (r: { changed: boolean; regions: number; step?: string; removed?: unknown[]; unplaced?: unknown[] }) => {
-    if (!r.changed) return (p.reload(), p.onChanged(), p.notify("Found no tables or formulas to read in this PDF"));
+    // Every PDF is read once the reader is here: one it changed nothing in says nothing.
+    if (!r.changed) return (p.reload(), p.onChanged());
     const lost = lostText(r);
-    reimported(p.id, `Read the tables and formulas into the text${lost ? `. ${lost}` : ""}`, r.step);
+    reimported(p.id, `Read this PDF's headings, tables and formulas into the text${lost ? `. ${lost}` : ""}`, r.step);
   };
 
   const retryEnrich = async () => {
@@ -1284,7 +1290,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // A long text is drawn in slices, and can be ready a second after it opened: a click into the note meanwhile keeps
     // the keys there, or what he types next lands in the source (CI, F396).
     if (clicked.current && document.activeElement && document.activeElement !== document.body) return;
-    scrollRef.current.focus({ preventScroll: true });
+    // A box open over the source (⌘N pressed again while what he just added opens) keeps the keys; the
+    // source takes them when the box goes and leaves them nowhere.
+    const text = scrollRef.current;
+    const boxOpen = () => !!document.querySelector('[aria-modal="true"]');
+    if (!boxOpen()) return void text.focus({ preventScroll: true });
+    const gone = new MutationObserver(() => {
+      if (boxOpen()) return;
+      gone.disconnect();
+      if (!document.activeElement || document.activeElement === document.body) text.focus({ preventScroll: true });
+    });
+    gone.observe(document.body, { childList: true, subtree: true });
+    return () => gone.disconnect();
   }, [ready, scrollKey]);
 
   // Paint highlights with the CSS Custom Highlight API; the Markdown DOM is never mutated.
@@ -3278,8 +3295,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // Filing under an archived skill brings it back (D173, as App's refile); Undo archives it again.
     const revived = skills.filter((id) => !before.includes(id) && p.skills.some((s) => s.id === id && s.archived));
     setDoc((cur) => cur && { ...cur, skills });
+    filings.current++;
     try {
-      const r = await ore<{ cards_before?: CardSkills }>("edit", doc.id, "--skills", skills.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : []));
+      const r = await ore<{ cards_before?: CardSkills }>("edit", doc.id, "--skills", skills.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : [])).finally(() => filings.current++);
       setFiled(skills.join());
       p.onChanged();
       if (revived.length) p.onSkillsChanged();

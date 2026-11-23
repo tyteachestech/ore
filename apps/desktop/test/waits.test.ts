@@ -27,7 +27,7 @@ const WAITS: Record<string, string> = {
   "Feed.tsx feed --refresh": "Checking your feeds…",
   "Add.tsx feed find": "background: only offers Follow once a feed is found",
   "Settings.tsx models": "background: the saved model shows until the list arrives",
-  // Docling reads a PDF's tables and formulas (D125); its download (oreJob) shows "Downloading the table and formula reader".
+  // The page reader reads a PDF's headings, tables and formulas (D125); its download (oreJob) shows "Downloading the PDF page reader".
   "Tables.tsx tables": "Reading the ",
 };
 
