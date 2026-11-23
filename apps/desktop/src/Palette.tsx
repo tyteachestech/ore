@@ -319,11 +319,11 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
 
   return (
     <Trap>
-    <div className="overlay" role="dialog" aria-modal="true" aria-label="Command palette" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" role="dialog" aria-modal="true" aria-label={PHONE ? "Search" : "Command palette"} onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Command
         ref={sheet}
         className="panel"
-        label="Command palette"
+        label={PHONE ? "Search" : "Command palette"}
         shouldFilter={false}
         value={selected}
         onValueChange={setSelected}
@@ -370,7 +370,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
             autoComplete="off"
             enterKeyHint={PHONE ? "search" : undefined}
           />
-          {/* iOS's search fields clear in place with an ⓧ inside the field; the × beside it leaves (Settings, Files). */}
+          {/* iOS's search fields clear in place with an ⓧ inside the field; Cancel beside it leaves (Settings, Files). */}
           {PHONE && q && (
             <button
               className="palette-clear"
@@ -386,10 +386,11 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
               <X size={10} aria-hidden="true" />
             </button>
           )}
-          {/* The phone has no Esc to leave with, and the sheet fills the screen. */}
+          {/* The phone has no Esc to leave with, and the sheet fills the screen. The word, as iOS's search fields
+              say it (Settings, Mail): a second ✕ beside the field's ⓧ read as the same button twice (Tyler 2026-11-23). */}
           {PHONE && (
-            <button className="palette-close" aria-label="Close" onClick={onClose}>
-              <X size={16} aria-hidden="true" />
+            <button className="palette-close" onClick={onClose}>
+              Cancel
             </button>
           )}
         </div>

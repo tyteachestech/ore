@@ -636,13 +636,17 @@ async function tabDraft(tab: Tab, host: string): Promise<NewItem> {
   throw new Error(`${tab.browser} is showing almost no text on ${host}: it may still be loading, or need a sign-in. Sign in there, wait for the page to load, then add it again.`);
 }
 
+/** A character he can see: not white space, not an invisible format character. */
+const VISIBLE = /[^\s\p{Cf}]/u;
+
 // Pasted text as a source: a Markdown item titled by its first heading, else its first line.
 // Pasted frontmatter (a copied Obsidian note) fills the title, author and date, as a .md file's does.
 // Pasted HTML (a ChatGPT answer, a page's selection) keeps its headings, tables, math, code and images,
 // which its plain text loses; the images it shows are saved beside it, as a page's are (D96, D122).
 // The same text pasted again (a retry after an add that looked failed) is the source already here, as a file's is.
 export async function addText(lib: Library, text: string, opts: AddOptions & { html?: boolean } = {}): Promise<Item & Partial<Kept>> {
-  if (!text.trim()) throw new Error("text is empty");
+  // Only invisible characters (zero-width, a BOM, a soft hyphen) is empty too: no name to show, nothing to read.
+  if (!VISIBLE.test(text)) throw new Error("text is empty");
   const draft = opts.html ? await pastedDraft(text) : null;
   const source = draft ? draft.source.data : text.trim() + "\n";
   const md = draft ?? (await markdownFile(source, ""));
@@ -653,7 +657,7 @@ export async function addText(lib: Library, text: string, opts: AddOptions & { h
   const { body, assets } = await saveImages(md.body.trim() + "\n");
   const same = sameText(lib, body);
   if (same) return keep(lib, same, opts);
-  const first = body.split("\n")[0]!.replace(/^#+\s*/, "");
+  const first = (body.split("\n").find((l) => VISIBLE.test(l)) ?? "").replace(/\p{Cf}/gu, "").replace(/^#+\s*/, "");
   const title = md.title || (first.length > 80 ? first.slice(0, 77).trimEnd() + "…" : first);
   const item = await createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: draft ? "html" : "md", data: source }, assets, skills: opts.skills });
   await unarchive(lib, opts.skills);

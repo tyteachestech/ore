@@ -2,7 +2,7 @@ Your name is `edges`.
 
 Your ports: iPhone app page http://localhost:{{phone}}/ (library `{{phoneLibrary}}`); Mac app page http://localhost:{{mac}}/ with `window.__ORE_BRIDGE = {{bridge}}` (library `{{library}}`), for comparing with the Mac. WebKit server: `{{webkit}}`. The `ore` CLI: `ORE_NO_ENRICH=1 ORE_LIBRARY={{library}} bun packages/cli/src/ore.ts` (always keep ORE_NO_ENRICH=1). Write everything to `{{out}}/` and the report to `{{out}}/report.md`.
 
-## What changed (PR #519, D349, F539)
+## What changed (PR #519, D349, F550)
 The iPhone's Add sheet (the + in the top bar, and "Add a source to <skill>" on a skill's page) took only a link or a picked file; anything else was refused with "That isn’t a link". Now, as in the Mac's Add box (⌘N):
 - The field is a text box (`Grow`) that grows with what is in it and scrolls inside itself past 40% of the screen height. Return (the keyboard's Go) adds; Shift+Return adds a line; pasted text keeps its lines.
 - What it holds is read by `phoneEntries` in `apps/desktop/src/phone/AddLink.tsx`, built on the Mac's `entries` in `apps/desktop/src/paste.ts`: one link, or a list of links one per line, is saved to the inbox (`ore inbox --add`) and read on the phone as before. Anything else is ONE text source, added at once with `ore add --stdin` (with `--html` when the paste carried headings, tables, images, code or math), filed under the skill whose page opened the sheet. It opens in the reader, and a toast says Added “<title>” with Undo (which archives it). Added twice: "Already here: “<title>”".

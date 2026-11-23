@@ -25,15 +25,20 @@ let chain: Promise<void> = Promise.resolve();
 function persist(p: string, e: Entry | "tombstone" | null) {
   if (disk) return p.startsWith(disk.prefix + "/") ? queue(p, e && e !== "tombstone" ? { text: e.text } : null) : undefined;
   if (!db) return;
-  const store = () => db!.transaction("files", "readwrite").objectStore("files");
   chain = chain.then(
     () =>
       new Promise<void>((done) => {
-        const r = e === "tombstone" ? store().put(null, p) : e ? store().put(e, p) : store().delete(p);
-        r.onsuccess = r.onerror = () => done();
+        // Done once the transaction has committed, not when the request answers: a reload in between drops the write.
+        const tx = db!.transaction("files", "readwrite"), store = tx.objectStore("files");
+        if (e === "tombstone") store.put(null, p);
+        else if (e) store.put(e, p);
+        else store.delete(p);
+        tx.oncomplete = tx.onerror = tx.onabort = () => done();
       }),
   );
 }
+/** Resolves once every write made so far is in IndexedDB (the browser build; the phone's folder has `flush`). */
+export const saved = (): Promise<void> => chain;
 
 /** Loads the shipped snapshot, then the writes made on this phone on top, kept across new builds. Until
  *  sync, a new build is the only way the Mac's changes arrive, so on a new snapshot each file the Mac

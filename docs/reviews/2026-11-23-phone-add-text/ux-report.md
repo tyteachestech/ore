@@ -74,7 +74,7 @@ Tested the supplied WebKit apps, using only ports 1761/1762/1763 and the `ux` sc
 
 ## Known rows seen again
 
-No known fixed row was observed returning in its original form. F539’s rejection of ordinary text is fixed in these runs. F464/F449’s plain-text draft recovery works; UX-2 is the newly relevant rich-paste case. F160’s missing Undo does not recur. The listed out-of-scope open rows were not re-reported.
+No known fixed row was observed returning in its original form. F550’s rejection of ordinary text is fixed in these runs. F464/F449’s plain-text draft recovery works; UX-2 is the newly relevant rich-paste case. F160’s missing Undo does not recur. The listed out-of-scope open rows were not re-reported.
 
 ## What passed
 

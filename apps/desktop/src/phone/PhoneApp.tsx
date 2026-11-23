@@ -879,11 +879,23 @@ export function PhoneApp() {
     return () => clearTimeout(late);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wanted, items, reading]);
-  /** Text pasted into Add is a source at once: it opens, as on the Mac (D109), and a new one is a step Undo archives. */
-  const addedText = (t: AddedText) => {
-    const archived = (on: boolean) => () => ore("archive", t.id, ...(on ? [] : ["--undo"])).finally(() => void refresh());
-    if (t.kept) notify(`Already here: “${t.title}”`, "info");
-    else notify(`Added “${t.title}”`, "info", archived(true), archived(false));
+  /** Text pasted into Add is a source at once: it opens when its sheet was still up, as on the Mac (D109), and the
+   *  toast says what happened, each with Undo: new (archived again), filed under a skill too, or back from Archived. */
+  const addedText = (t: AddedText, show: boolean) => {
+    const archived = (on: boolean) => () => {
+      // Undo takes back the page the add opened too, as the Mac's does.
+      if (on) setOpenId((id) => (id === t.id ? null : id));
+      return ore("archive", t.id, ...(on ? [] : ["--undo"])).finally(() => void refresh());
+    };
+    const skillsTo = (ids: string[]) => () => ore("edit", t.id, "--skills", ids.join(",")).finally(() => void refresh());
+    const filed = t.filed ?? [];
+    const now = t.skills ?? [];
+    const names = filed.map((k) => skills.find((s) => s.id === k)?.name ?? k).join(", ");
+    if (!t.kept) notify(`Added “${t.title}”`, "info", archived(true), archived(false));
+    else if (t.restored) notify(`“${t.title}” is back from Archived`, "info", archived(true), archived(false));
+    else if (filed.length) notify(`Added “${t.title}” to ${names}`, "info", skillsTo(now.filter((k) => !filed.includes(k))), skillsTo(now));
+    else notify(`Already here: “${t.title}”`, "info");
+    if (!show) return;
     setReviewing(null);
     open(t.id);
   };
@@ -1555,7 +1567,7 @@ export function PhoneApp() {
         />
       )}
       {picking && !over && !searching && !adding && <PickBar n={many.length} actions={manyActions(many)} onClear={() => setPicking(null)} />}
-      {adding && <AddLink skill={addTo} onClose={() => (setAdding(false), setAddTo(undefined))} onAdded={(t) => void refresh().then(() => (t ? addedText(t) : bringIn()))} />}
+      {adding && <AddLink skill={addTo} onClose={() => (setAdding(false), setAddTo(undefined))} onAdded={(t, show) => void refresh().then(() => (t ? addedText(t, show) : bringIn()))} />}
       {editingSkill && skills.some((s) => s.id === editingSkill) && (
         <SkillEditor
           skill={skills.find((s) => s.id === editingSkill)!}

@@ -122,6 +122,20 @@ describe("ingest", () => {
     expect(addText(lib, "  \n ")).rejects.toThrow("text is empty");
   });
 
+  test("text that is only invisible characters is empty, not a source with a blank name (F557)", async () => {
+    const lib = await tempLibrary();
+    await expect(addText(lib, "\u200b\u200d\n\ufeff\u2060 \u00ad")).rejects.toThrow("text is empty");
+    // Visible words after an invisible first line: the title is the first line he can read.
+    const a = await addText(lib, "\u200b\u200d\nSpacing beats cramming\n\nMore.");
+    expect(a.meta.title).toBe("Spacing beats cramming");
+  });
+
+  test("a pasted list's HTML comes in as a Markdown list (F556)", async () => {
+    const lib = await tempLibrary();
+    const a = await addText(lib, "<ol><li>Read</li><li>Recall</li><li>Review</li></ol>", { html: true });
+    expect(readFileSync(join(a.dir, "doc.md"), "utf8")).toContain("1. Read\n2. Recall\n3. Review\n");
+  });
+
   test("the same text pasted again is the source already here, filed under the new skill too", async () => {
     const lib = await tempLibrary();
     const a = await addText(lib, "# Pasted twice\n\nThe very same paragraph, pasted again.");

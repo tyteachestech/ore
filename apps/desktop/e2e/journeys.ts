@@ -9,7 +9,7 @@
 //   ORE_E2E_REPEAT=30                each picked journey that many times in a row, to catch a flaky one
 //   ORE_E2E_CPU=6                    Chromium's CPU slowed that many times, as a busy CI runner is
 //   ORE_E2E_SLOW='{"ls":800}'        those `ore` commands answer that many ms late (window.__ORE_SLOW), to widen a race
-import { chromium, devices, webkit, type Browser, type Locator, type Page } from "playwright";
+import { chromium, devices, webkit, type Browser, type Locator, type Page, type Route } from "playwright";
 import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -5093,6 +5093,39 @@ journey("peeked sidebar: it stays while its own menu is open, and slides away on
   await until("it slides away under a menu of the page", async () => !(await shown()));
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Show sidebar" }).click();
+});
+
+// F541: Settings lists General first (D347) but a first open landed on Reading, one section down.
+journey("Settings: a first open lands on General, the first section in its list", async (page) => {
+  await page.evaluate(() => localStorage.removeItem("ore.settings"));
+  await page.keyboard.press("Meta+Comma");
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await settings.waitFor();
+  const on = await settings.getByRole("tab", { selected: true }).innerText();
+  await page.keyboard.press("Escape");
+  if (on.trim() !== "General") throw new Error(`a first open of Settings lands on ${on.trim()}, not General`);
+});
+
+// F539: with three skills kept the end screen ran past a 1280×800 window and Done sat under its foot.
+// A shorter window shows the same with one skill row.
+journey("review: the end screen's Done stays in sight when the screen runs longer than the window", async (page) => {
+  const app = oreCalls(page);
+  await page.setViewportSize({ width: 1280, height: 640 });
+  await startReview(page, null);
+  try {
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await page.waitForTimeout(400);
+    await page.keyboard.press("Escape");
+    const done = page.locator(".review-foot").getByRole("button", { name: "Done" });
+    await done.waitFor();
+    await page.waitForTimeout(3000); // the end screen's moment settles
+    const box = (await done.boundingBox())!;
+    if (process.env.ORE_E2E_SHOT) await page.screenshot({ path: process.env.ORE_E2E_SHOT });
+    if (box.y + box.height > 640) throw new Error(`Done's foot is at ${Math.round(box.y + box.height)}px in a 640px window`);
+  } finally {
+    await app.undoAll();
+  }
 });
 
 journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette or the shortcuts sheet (Linear)", async (page) => {
@@ -12856,7 +12889,8 @@ journey("phone: renaming a low Continue reading row on Today keeps the field abo
 
 journey("phone: Remove on a link still being read takes it off at once (F79)", async (page) => {
   // The remove waited its turn behind the read of a link that hung, so the tap showed nothing for 15 s.
-  await page.route("https://example.com/articles/slow", () => {}); // never answers
+  const held: Route[] = [];
+  await page.route("https://example.com/articles/slow", (r) => void held.push(r)); // never answers
   await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
   await page.locator(".add-link .field").fill("https://example.com/articles/slow");
   await tap(page, page.getByRole("button", { name: "Add", exact: true }));
@@ -12864,6 +12898,8 @@ journey("phone: Remove on a link still being read takes it off at once (F79)", a
   const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/slow" });
   await tap(page, row.getByRole("button", { name: "Remove" }));
   await row.waitFor({ state: "detached", timeout: 1000 });
+  // The hung read is let go, so the journey leaves no call in flight (the phone build counts its calls too, F477).
+  for (const r of held) await r.abort();
 }, "phone");
 
 journey("phone: a jump from Sections puts the heading below the Back bar, not under it (F73)", async (page) => {
@@ -13276,6 +13312,86 @@ journey("phone: words pasted into Add are a text source at once, which opens, as
   await page.getByText("Added “Spacing beats cramming”").waitFor();
   await page.locator(".phone-reader .doc").filter({ hasText: "keep what one long sitting loses" }).first().waitFor();
   if (await page.locator(".phone-waiting").count()) throw new Error("the text is listed as coming in, as a link would be");
+}, "phone");
+
+/** A paste into a field as Safari sends one: the clipboard's plain text and HTML on the event, then the words in the field. */
+async function pasteInto(field: Locator, text: string, html?: string) {
+  await field.focus();
+  await field.evaluate((el, [text, html]) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", text!);
+    if (html) data.setData("text/html", html);
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  }, [text, html ?? ""]);
+  await field.fill(text);
+}
+
+const RICH_TEXT = "Spacing in practice\nSpread reviews out\nMix the kinds\nconst gap = days(3);";
+const RICH_HTML = "<h2>Spacing in practice</h2><ul><li>Spread reviews out</li><li>Mix the kinds</li></ul><pre><code>const gap = days(3);</code></pre>";
+
+journey("phone: a text add finishing after its sheet was closed leaves the next sheet and its words alone, and says Adding… while it works (F551, F552)", async (page) => {
+  // Codex test of #519 (UX-1, UX-4, E4): the first add's end closed the new sheet and emptied its draft; the wait showed no sign.
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  await page.route("https://example.com/held.png", async (r) => (await held, r.fulfill({ status: 200, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64") })));
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  const field = page.locator(".add-link .field");
+  await pasteInto(field, "A held picture\nWords under it.", '<h2>A held picture</h2><img src="https://example.com/held.png"><p>Words under it.</p>');
+  await field.press("Enter");
+  await page.locator(".add-link [role=status]").filter({ hasText: "Adding" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").fill("My next note, half written");
+  release();
+  await page.getByText("Added “A held picture”").waitFor();
+  await Bun.sleep(300);
+  if (!(await page.locator(".add-link").count())) throw new Error("the first add's end closed the sheet he was writing in");
+  const v = await page.locator(".add-link .field").inputValue();
+  if (v !== "My next note, half written") throw new Error(`the next note's words are gone: "${v}"`);
+}, "phone");
+
+journey("phone: a rich paste left in Add keeps its headings, list and code when it is added later (F553)", async (page) => {
+  // Codex test of #519 (UX-2, E1): a sheet closed and opened again kept the words but not the paste's HTML.
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await pasteInto(page.locator(".add-link .field"), RICH_TEXT, RICH_HTML);
+  await page.keyboard.press("Escape");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").press("Enter");
+  const doc = page.locator(".phone-reader .doc").first();
+  await doc.locator("li").filter({ hasText: "Mix the kinds" }).waitFor();
+  await doc.locator("pre").filter({ hasText: "const gap" }).waitFor();
+}, "phone");
+
+journey("phone: dragging down in a long paste scrolls it back up instead of closing Add (F554)", async (page) => {
+  // Codex test of #519 (UX-3): the sheet's swipe down took a drag meant for the text, and closed the sheet.
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  const field = page.locator(".add-link .field");
+  await field.fill(Array.from({ length: 80 }, (_, i) => `Line ${i + 1} of a long pasted article.`).join("\n"));
+  await field.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  const box = (await field.boundingBox())!;
+  await swipe(page, [box.x + box.width / 2, box.y + 30], [box.x + box.width / 2, box.y + box.height - 10], 300, true);
+  await Bun.sleep(400);
+  if (!(await page.locator(".add-link").count())) throw new Error("a drag inside the scrolled text closed Add");
+}, "phone");
+
+journey("phone: text added, undone and added again says it is back from Archived, with Undo, as on the Mac (F555)", async (page) => {
+  // Codex test of #519 (E3): the phone said only "Already here", with no Undo for bringing it back.
+  const add = async () => {
+    await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+    await page.locator(".add-link .field").fill("Interleaving notes\n\nMix problem kinds in one sitting.");
+    await page.locator(".add-link .field").press("Enter");
+    await page.locator(".add-link").waitFor({ state: "detached" });
+  };
+  await add();
+  await tap(page, page.locator(".toast button").filter({ hasText: "Undo" }));
+  // Undo takes back the add, and the page it opened, as on the Mac.
+  await page.locator(".phone-reader").waitFor({ state: "detached" });
+  await add();
+  const back = page.locator(".toast").filter({ hasText: "“Interleaving notes” is back from Archived" });
+  await back.waitFor();
+  await back.locator("button").filter({ hasText: "Undo" }).waitFor();
 }, "phone");
 
 journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {
@@ -15366,6 +15482,43 @@ journey("all sources: a filter is a tag in the search; closing its list leaves t
   await until("the search keeps the keys after ×", () => search.evaluate((el) => el === document.activeElement));
 });
 
+// F544, F543, F542 (Impeccable round 10): the filter tag's × drew 2px wider than its
+// button and past the tag's edge; a highlighted filter row's count stayed faint on the highlight (3.97:1); and in a
+// 720px window with a tag in the search the open tab's name was cut mid-letter ("To re").
+journey("all sources: a filter tag's × fits its button, a highlighted filter row's count is readable, and a narrow window never cuts the open tab's name", async (page) => {
+  // One source archived, so the Archived tab stands beside To read and Done: the three tabs are what ran out of room.
+  const put = ((await ore("ls")) as { id: string }[])[0]!.id;
+  await ore("archive", put);
+  try {
+  await page.reload();
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.getByRole("button", { name: "Filter by kind, skill or author" }).click();
+  await page.getByRole("option", { name: "Kind" }).click();
+  const row = page.locator(".filter-menu [cmdk-item][data-selected=true]").first();
+  await row.locator(".filter-n").waitFor();
+  const ratio = await row.locator(".filter-n").evaluate((n) => {
+    const rgb = (c: string) => c.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+    const lum = (c: number[]) => c.map((v) => v / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)).reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i]!, 0);
+    const a = lum(rgb(getComputedStyle(n).color)), b = lum(rgb(getComputedStyle(n.closest("[cmdk-item]")!).backgroundColor));
+    return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  });
+  await row.click();
+  await page.keyboard.press("Escape");
+  const x = page.locator(".filter-tag-x");
+  await x.waitFor();
+  const over = await x.evaluate((b) => b.querySelector("svg")!.getBoundingClientRect().right - b.getBoundingClientRect().right);
+  await page.setViewportSize({ width: 720, height: 800 });
+  await page.waitForTimeout(400);
+  const cut = await page.locator(".head-tab.on .head-tab-name > *").evaluate((h) => h.scrollWidth - h.clientWidth);
+  if (process.env.ORE_E2E_SHOT) await page.screenshot({ path: process.env.ORE_E2E_SHOT });
+  await x.click();
+  const wrong = [ratio < 4.5 && `the highlighted row's count is ${ratio.toFixed(2)}:1`, over > 0.5 && `the × overhangs its button by ${over}px`, cut > 0 && `the open tab's name is cut by ${cut}px at 720`].filter(Boolean);
+  if (wrong.length) throw new Error(wrong.join("; "));
+  } finally {
+    await ore("archive", put, "--undo");
+  }
+});
+
 journey("feed: a post reads beside the list, J and K step through the posts, and Esc gives the list back (D289)", async (page) => {
   const stamp = Date.now();
   const titles = [`Split first ${stamp}`, `Split second ${stamp}`];
@@ -17048,17 +17201,23 @@ journey("phone: every field on every screen stays in sight when the keyboard com
   if (bad.length) throw new Error(`fields out of sight with the keyboard up:\n${bad.join("\n")}`);
 }, "phone");
 
-journey("phone: Search's ⓧ clears what he typed and keeps Search open with the keyboard up, × leaves, and the keyboard's key says Search (Codex native scout)", async (page) => {
+journey("phone: Search's ⓧ clears what he typed and keeps Search open with the keyboard up, Cancel leaves, and the keyboard's key says Search (Codex native scout)", async (page) => {
   // The only × beside the field closed Search, and the keyboard showed Return (Settings, Files: a clear button in the field, a Search key).
   await tap(page, page.getByRole("button", { name: "Search" }));
   const field = page.locator("[cmdk-input]");
+  // The sheet is announced by the name on the button that opened it, not as the Mac's "Command palette" (F546).
+  await page.getByRole("dialog", { name: "Search" }).waitFor();
   if ((await field.getAttribute("enterkeyhint")) !== "search") throw new Error("the keyboard's key doesn't say Search");
   if (await page.getByRole("button", { name: "Clear" }).count()) throw new Error("Clear shows with nothing typed");
   await field.fill("agents");
   await tap(page, page.getByRole("button", { name: "Clear" }));
   await until("the field is cleared", async () => (await field.inputValue()) === "");
   if (!(await field.evaluate((el) => el === document.activeElement))) throw new Error("clearing took the keyboard away");
-  await tap(page, page.getByRole("button", { name: "Close" }));
+  // One ✕ only, the field's own: leaving is the word Cancel beside it, as iOS's search fields have (Tyler 2026-11-23).
+  await field.fill("agents");
+  const xs = await page.getByRole("dialog", { name: "Search" }).locator(".panel-input ~ button svg").count();
+  if (xs !== 1) throw new Error(`${xs} ✕ beside the field with text typed`);
+  await tap(page, page.getByRole("button", { name: "Cancel", exact: true }));
   await field.waitFor({ state: "detached" });
 }, "phone");
 
@@ -17690,6 +17849,9 @@ journey("phone: Sources narrows by kind and skill from Filter, each a tag under 
   const value = async (field: string, name: RegExp) => {
     await tap(page, page.getByRole("button", { name: /^Filter by/ }));
     await tap(page, page.locator(".action-sheet .pick-row").filter({ hasText: field }));
+    // The row that steps back is a 44 pt tap, as the rows under it are (F545: it was 36).
+    const back = (await page.locator(".action-sheet .sheet-back").boundingBox())!.height;
+    if (back < 44) throw new Error(`the sheet's back row is a ${back} pt tap`);
     const row = page.locator(".action-sheet").getByRole("checkbox", { name });
     await tap(page, row);
     // The sheet stays, ticked, so several can be picked.

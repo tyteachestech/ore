@@ -102,7 +102,7 @@ Tested the iPhone Add sheet at 390×844 with touch and the Mac Add box at 1280×
 
 ## 3. Known rows seen again
 
-No confirmed recurrence of a known findings row. F539’s original rejection of ordinary text did not recur. F518’s playlist guidance correctly says the Mac adds the playlist as a course. The listed out-of-scope open findings were not re-reported. E2 and E5 also affect the Mac and are not specific to PR #519.
+No confirmed recurrence of a known findings row. F550’s original rejection of ordinary text did not recur. F518’s playlist guidance correctly says the Mac adds the playlist as a course. The listed out-of-scope open findings were not re-reported. E2 and E5 also affect the Mac and are not specific to PR #519.
 
 ## 4. What passed
 

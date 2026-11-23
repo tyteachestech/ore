@@ -280,12 +280,13 @@ kbd {
 .filter input { min-width: 6ch; }
 .filter-tag { display: inline-flex; flex: 0 1 auto; min-width: 0; align-items: center; height: 20px; border-radius: 5px; background: var(--bg-hover); font-size: 12px; color: var(--text); }
 .filter-tag-open { min-width: 0; height: 100%; padding: 0 4px 0 8px; border-radius: 5px 0 0 5px; max-width: 22ch; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.filter-tag-x { display: grid; place-items: center; flex: none; width: 18px; height: 100%; margin-right: 1px; border-radius: 0 5px 5px 0; color: var(--muted); }
+.filter-tag-x { display: grid; place-items: center; flex: none; width: 20px; height: 100%; margin-right: 1px; border-radius: 0 5px 5px 0; color: var(--muted); }
 .filter-tag-open:hover, .filter-tag-open[data-state="open"], .filter-tag-x:hover { background: var(--bg-active); color: var(--text); }
 .filter-add { flex: none; height: 20px; margin-right: -4px; padding: 0 6px; border-radius: 5px; color: var(--faint); font-size: 12px; }
 .filter-add:hover, .filter-add[data-state="open"] { background: var(--bg-hover); color: var(--text); }
 .filter-menu [cmdk-item] .menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .filter-menu [cmdk-item] .filter-n { margin-left: 8px; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.filter-menu [cmdk-item][data-selected="true"] .filter-n { color: var(--muted); } /* --faint is 3.97:1 on the highlight */
 .filter-menu [cmdk-item] .check { width: 12px; margin-left: 8px; }
 .filter-menu [cmdk-item] .sub-caret { margin-left: auto; color: var(--faint); }
 .list-group { padding: 12px 12px 4px; color: var(--faint); font-size: 12px; font-weight: 600; }
@@ -398,7 +399,7 @@ img.thumb { filter: brightness(0.86); }
 /* A long skill name ends in … (its whole name on hover, SkillChip) instead of pushing the card wider. */
 .chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; line-height: 16px; } /* tall enough for g and y */
 .chip .icon { vertical-align: 0; line-height: 1; }
-:root[data-chips="icon"] .chip:has(> .icon) .chip-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+:root[data-chips="icon"] .chip:has(> .icon.glyph) .chip-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* A source's pills open its skill picker (SkillPicker, Linear's labels); with none, a quiet + on hover. */
 /* The skills past a row's first two, counted (D198); the count never gives way to a name. */
 .chip-more { flex: none; font-family: var(--mono); font-size: 11px; }
@@ -2609,6 +2610,9 @@ button.home-plan:hover { color: var(--text); }
 .review-kept b { font-family: var(--round); color: var(--text); font-size: 24px; font-variant-numeric: tabular-nums; }
 .review-rescued { margin: 6px 0 0; color: color-mix(in srgb, var(--c-green) 70%, var(--text)); }
 .review-end .quiz-faint { margin: 10px 0 0; }
+/* Done stays in sight when the end screen runs longer than the window (three skill rows in a 1280×800 one): the
+   foot holds to the window's foot and the rows scroll under it. The phone lays its own foot out below. */
+:where(:root:not(.phone)) .review-end .review-foot { position: sticky; bottom: -16px; z-index: 1; align-self: stretch; margin-top: 6px; padding: 12px 0 16px; background: var(--bg); }
 .review-try { display: flex; align-items: baseline; gap: 8px; max-width: 100%; margin: 18px 0 0; padding: 6px 12px 6px 10px; border-radius: 8px; color: var(--apply-solid); font-size: 14px; line-height: 1.4; text-align: left; }
 .review-try:hover { background: var(--bg-hover); }
 .review-try:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
@@ -3014,7 +3018,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .palette-field .panel-input { flex: 1; min-width: 0; height: 44px; padding: 0 8px; border: 0; font-size: 16px; }
 .phone .palette-clear { display: grid; place-items: center; flex: none; width: 44px; height: 44px; margin-left: -8px; background: none; border: 0; color: var(--bg); }
 .phone .palette-clear svg { box-sizing: content-box; padding: 3px; border-radius: 50%; background: var(--muted); }
-.phone .palette-close { display: grid; place-items: center; flex: none; width: 44px; height: 44px; background: none; border: 0; color: var(--muted); }
+.phone .palette-close { display: grid; place-items: center; flex: none; height: 44px; padding: 0 4px 0 8px; background: none; border: 0; color: var(--text); font: 400 17px var(--font); }
 .phone .overlay .panel [cmdk-list] { flex: 1; min-height: 0; max-height: none; }
 .phone .overlay .panel [cmdk-item] { min-height: 44px; height: auto; font-size: 16px; }
 .phone .overlay .panel .panel-foot:not(:has(.err)) { display: none; }
@@ -3993,7 +3997,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* Its icon (menu-icons.ts), as in the Mac's menus: the row's own 12px gap to the label. */
 .action-sheet .pick-row > .menu-icon { margin-right: 0; }
 .action-sheet .pick-row.danger .menu-icon { color: inherit; }
-.action-sheet .sheet-back { color: var(--muted); font-size: 14px; min-height: 36px; }
+.action-sheet .sheet-back { color: var(--muted); font-size: 14px; min-height: 44px; }
 .action-sheet .sheet-sep { height: 1px; margin: 6px 12px; background: var(--border); }
 .action-sheet .menu-caret { color: var(--faint); }
 @media (prefers-reduced-motion: reduce) { .action-sheet .sheet-steps { transition: none; } }

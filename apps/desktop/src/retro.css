@@ -127,6 +127,7 @@
 .head-tab-after { margin-left: -2px; padding-right: 4px; border-color: var(--border); border-left: 0; border-top-left-radius: 0; background: var(--bg); }
 .head-tabs.with-after .head-tab.on { border-right: 0; border-top-right-radius: 0; padding-right: 0; }
 .head-tab.on { border-color: var(--border); background: var(--bg); padding-right: 4px; }
+.head-tabs, .head-tab.on { flex: none; } /* the search gives way in a narrow window, never the open tab's name */
 .head-tab-btn { display: flex; align-items: center; height: 100%; padding: 0 7px; border-radius: 7px 7px 0 0; color: var(--faint); }
 .head-tab.on .head-tab-btn { padding: 0 8px 0 10px; cursor: default; }
 .head-tab:not(.on) .head-tab-btn:hover { background: var(--bg-hover); }
