@@ -11282,7 +11282,7 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
   // nothing typed since the tick: ⌘Z is the app's (macOS keeps one undo run per window).
   await page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` }).click();
   // The keys go to the filter field, so it must have focus first: sent as the picker was still opening, "AI"
-  // was typed at the page and nothing was filed (F475, CI twice on #497).
+  // was typed at the page and nothing was filed (F479, CI twice on #497).
   await until("the picker's filter field has focus", () => page.evaluate(() => !!document.activeElement?.closest(".skill-picker") && document.activeElement.matches("input")));
   for (const k of others) {
     await page.keyboard.press("ControlOrMeta+a");
@@ -14106,7 +14106,7 @@ journey("phone: a selection handle held at the bottom of the screen turns the pa
     });
     await page.waitForTimeout(150); // a change of its own: a new selection alone never turns the page
     // The word the handle is dragged to must be there to drag to: as the first phone journey of a CI shard, on a
-    // phone build just started, nothing answered at that point yet and the drag below threw on null (F474).
+    // phone build just started, nothing answered at that point yet and the drag below threw on null (F475).
     let under = "";
     await until("there is text at the foot of the reader to drag the handle to", async () => {
       under = await page.evaluate(() => {
