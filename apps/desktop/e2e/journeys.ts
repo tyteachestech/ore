@@ -12500,6 +12500,32 @@ journey("phone: a long title on Today and in Sources shows on two lines, with th
   await check("Sources", ".phone-sources li button", ".phone-title:not(.phone-two)");
 }, "phone");
 
+journey("phone: under a Today title one line says how long is left and where the source is from, as the Mac's rows do (D341)", async (page) => {
+  await page.locator(".home-read .title").first().waitFor();
+  for (const t of [1, 28 / 17]) {
+    await page.evaluate((t) => document.documentElement.style.setProperty("--type", String(t)), t);
+    const rows = await page.locator(".home-read").evaluateAll((els) => els.map((row) => {
+      const [title, meta, r] = [row.querySelector(".title")!.getBoundingClientRect(), row.querySelector(".home-meta")!.getBoundingClientRect(), row.getBoundingClientRect()];
+      const parts = [...row.querySelectorAll<HTMLElement>(".home-meta > :is(.home-left, .home-site, .home-by, .course-of)")].map((c) => ({ text: c.textContent ?? "", box: c.getBoundingClientRect() }));
+      const onLine = parts.filter((c) => c.box.top < meta.bottom - 2);
+      return {
+        name: row.querySelector(".title")!.textContent!.slice(0, 30),
+        line: onLine.map((c) => c.text).join(" | "),
+        // Under the title, in the row, and nothing on the line cut to a stub: what doesn't fit drops whole.
+        under: meta.top >= title.bottom - 1 && Math.abs(meta.left - title.left) <= 1 && meta.bottom <= r.bottom + 1,
+        stubs: onLine.filter((c) => c.box.right > meta.right + 1).map((c) => c.text),
+        // No chip to mis-tap: a skill chip here would be a tap under 44 pt.
+        chips: [...row.querySelectorAll<HTMLElement>(".chips-button, .chips-add")].filter((c) => c.getBoundingClientRect().width > 0).length,
+      };
+    }));
+    const bad = rows.filter((r) => !r.under || r.stubs.length || r.chips);
+    if (bad.length) throw new Error(`Today at ${t.toFixed(2)}: the detail line is off: ${JSON.stringify(bad)}`);
+    if (!rows.some((r) => /\d+ (min|h)/.test(r.line))) throw new Error(`Today at ${t.toFixed(2)}: no row says how long is left: ${rows.map((r) => `"${r.line}"`).join(", ")}`);
+    if (!rows.some((r) => r.line.includes("anthropic.com"))) throw new Error(`Today at ${t.toFixed(2)}: no row says where its source is from: ${rows.map((r) => `"${r.line}"`).join(", ")}`);
+  }
+  await page.evaluate(() => document.documentElement.style.setProperty("--type", "1"));
+}, "phone");
+
 journey("phone: an episode on a phone that can't hear speech says the Mac fills its transcript, not that it is on its way (F77)", async (page) => {
   // With no speech model (the Simulator, an older phone) the episode said “on its way” for good: the Mac fills it.
   const cors = { "access-control-allow-origin": "*" };
