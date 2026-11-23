@@ -9124,8 +9124,10 @@ journey("settings: ⌘Z while a new daily goal is being written takes back that 
 });
 
 journey("finish: ⌘Z during the Source finished moment takes back the finish, not the step before it (Codex UX sweep 3)", async (page) => {
-  const item = ((await ore("ls")) as { id: string; title: string; status: string }[]).find((i) => i.title === AGENTS)!;
-  await openSource(page, AGENTS);
+  // A source no other journey finishes: its saved recall and answers would change where their Finish opens.
+  const LECTURE = "Lecture 4 the testing effect";
+  const item = ((await ore("ls")) as { id: string; title: string; status: string }[]).find((i) => i.title === LECTURE)!;
+  await openSource(page, LECTURE);
   await page.getByRole("tab", { name: "Collected" }).click();
   const toggle = page.locator(".cp-head.card .cp-toggle");
   if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
