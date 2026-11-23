@@ -17,7 +17,7 @@ import { escTaken, Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, GEM_WORD, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
-import { depthText, levelProgress, ore, opt, PHONE, type Question, type Research, type Skill, type SkillStats } from "./ore";
+import { depthText, levelProgress, ore, opt, PHONE, whileOut, type Question, type Research, type Skill, type SkillStats } from "./ore";
 import { AnswerBox, AskQuestion, announce, questionText, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
 import { Roll } from "./Roll";
@@ -426,7 +426,15 @@ function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skil
     const before = shownGoal.current;
     if (v === before) return;
     shownGoal.current = v;
-    const to = (goal: string) => () => ((shownGoal.current = goal), ore("skills", "set", skill.id, opt("goal", goal)).then(onChanged));
+    const to = (goal: string) => () => {
+      const was = shownGoal.current;
+      shownGoal.current = goal;
+      // One that fails leaves the goal as it was, so typing this goal again still saves it.
+      return ore("skills", "set", skill.id, opt("goal", goal)).then(onChanged, (e) => {
+        shownGoal.current = was;
+        throw e;
+      });
+    };
     const write = ore("skills", "set", skill.id, opt("goal", v));
     // On the history at once: a ⌘Z while the write is out takes back this goal, not the one before it.
     // Emptying the field throws the goal away: say so, with Undo.
@@ -772,7 +780,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
     if (adding.includes(url)) return;
     setAdding((a) => [...a, url]);
     try {
-      const r = await ore<{ id: string; title: string; kept?: boolean }>("add", url, opt("skill", skill), opt("for", q.id));
+      const r = await whileOut(ore<{ id: string; title: string; kept?: boolean }>("add", url, opt("skill", skill), opt("for", q.id)));
       setAdded((a) => [...a, url]);
       // As adding from the bar: Undo archives what was just added, ⇧⌘Z brings it back.
       const keep = (on: boolean) =>

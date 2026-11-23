@@ -4,7 +4,7 @@ import { Grow } from "./Grow";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Hint } from "./Hint";
 import { is, label, useKeymap, keepKeysIn } from "./keys";
-import { ore, opt, PHONE, type Annotation, type Question } from "./ore";
+import { ore, opt, PHONE, whileOut, type Annotation, type Question } from "./ore";
 import { rankScore } from "./match";
 import { errorText, focusQuietly, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { passageText } from "./text";
@@ -31,6 +31,8 @@ type Saved = { question: Annotation & { answers?: Question["answers"] }; added?:
 
 /** Unsent answers, per question, kept when the box closes (as the finish quiz keeps its draft). */
 const drafts = new Map<string, string>();
+/** A piece's correction whose save failed as its box closed (its question folded), by question and piece. */
+const pieceDrafts = new Map<string, string>();
 
 /** The answer box under a question. ↵ adds what he wrote to the answer and keeps the question open;
  *  Answered closes it; ⌘↵ closes it and asks for a card. Esc closes the box and keeps the draft. */
@@ -118,8 +120,11 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onClose, notify 
   };
   // The box going away with a piece still being edited (its question folded, the page left) is a tap away from it:
   // the correction is saved (D211), never dropped (Codex UX sweep 2). Read at unmount, so the latest is kept.
-  const commitNow = useRef(commitPieces);
-  commitNow.current = commitPieces;
+  const commitNow = useRef(async () => {
+    // One that fails keeps his words for when the question opens again (the piece opens on them).
+    for (const [ts, e] of [...editing.current]) if (e.to.trim() !== e.from) pieceDrafts.set(`${q.id} ${ts}`, e.to);
+    if (await commitPieces()) for (const ts of editing.current.keys()) pieceDrafts.delete(`${q.id} ${ts}`);
+  });
   useEffect(() => () => void commitNow.current(), []);
 
   const send = async (how: "contribution" | "done" | "card") => {
@@ -173,7 +178,8 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onClose, notify 
               key={c.ts}
               text={c.text}
               from={c.item_title}
-              onSave={(to) => rewrite(c.ts, to, c.text)}
+              kept={pieceDrafts.get(`${q.id} ${c.ts}`)}
+              onSave={(to) => rewrite(c.ts, to, c.text).then((ok) => (ok && pieceDrafts.delete(`${q.id} ${c.ts}`), ok))}
               onEditing={(e) => (e ? editing.current.set(c.ts, e) : editing.current.delete(c.ts))}
             />
           ))}
@@ -211,14 +217,16 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onClose, notify 
 /** One piece of his answer: one click edits it in place, Enter saves, Esc puts it back, and saving it
  *  empty removes it (with Undo), as a Notion block does. A blur keeps the field and what he typed; a
  *  failed save opens it again with his words. */
-function Piece({ text, from, onSave, onEditing }: {
+function Piece({ text, from, kept, onSave, onEditing }: {
   text: string;
   from?: string;
+  /** A correction whose save failed as its box closed: it opens on it again. */
+  kept?: string;
   onSave: (to: string) => Promise<boolean>;
   /** The edit open now (null: none), for the box to save before it sends or closes. */
   onEditing: (e: { to: string; from: string; close: () => void } | null) => void;
 }) {
-  const [draft, setDraft] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string | null>(kept ?? null);
   useEffect(() => {
     onEditing(draft === null ? null : { to: draft, from: text, close: () => setDraft(null) });
     return () => onEditing(null);
@@ -373,13 +381,17 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
     if (!text.trim() || busy) return;
     setBusy(true);
     try {
-      const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
-      // Two writes: if the second fails, the first is taken back, so a retry never leaves a question nobody can see.
-      if (item)
-        await ore("match", item, r.annotation.id).catch(async (e) => {
-          await ore("annotate", r.annotation.id, "--status", "deleted").catch(() => {});
-          throw e;
-        });
+      // Counted as one change being written, so a ⌘Z meanwhile waits for its step (F-new-undo-waits).
+      const r = await whileOut((async () => {
+        const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
+        // Two writes: if the second fails, the first is taken back, so a retry never leaves a question nobody can see.
+        if (item)
+          await ore("match", item, r.annotation.id).catch(async (e) => {
+            await ore("annotate", r.annotation.id, "--status", "deleted").catch(() => {});
+            throw e;
+          });
+        return r;
+      })());
       giveBack();
       onDone(true);
       // Asking goes on the history: ⌘Z takes the question back, ⇧⌘Z asks it again.
@@ -557,6 +569,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
             item={item}
             quote={quote}
             notify={notify}
+            onRewrite={reload}
             onClose={() => {
               setOpen(null);
               requestAnimationFrame(() => listRef.current?.querySelector<HTMLButtonElement>(`[data-q="${q.id}"]`)?.focus());

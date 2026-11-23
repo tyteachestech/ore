@@ -2988,6 +2988,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* The skills in no collection have no heading (as the Mac's sidebar): space alone sets them off from Archive. */
 .phone-drawer section.bare { margin-top: 12px; }
 .phone-drawer h2 { font: 400 12px var(--mono); letter-spacing: .06em; color: var(--muted); margin: 20px 8px 4px; }
+/* A collection's heading opens its menu on a long press: a 44 pt target round its 12 pt line (Codex UX sweep 4). */
+.phone-drawer h2[tabindex] { position: relative; }
+.phone-drawer h2[tabindex]::after { content: ""; position: absolute; inset: -16px -8px; }
 .phone-icon { justify-content: center; width: 44px; height: 44px; padding: 0; }
 .phone-root > .phone-bar { justify-content: space-between; }
 /* Shown behind the content as it is pulled down; the rubber band makes the room. */

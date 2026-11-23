@@ -9165,6 +9165,62 @@ journey("finish: ⌘Z during the Source finished moment takes back the finish, n
   }
 });
 
+journey("add: a draft left with Esc comes back with the skills he picked for it (Codex UX sweep 4)", async (page) => {
+  const box = page.getByRole("dialog", { name: "Add a source" });
+  const field = box.getByLabel("Link, file path or text");
+  await page.keyboard.press("Meta+KeyN");
+  await field.fill("a thought to file under Learning");
+  await box.locator(".add-skills button").first().click();
+  await page.getByRole("option", { name: /Learning/ }).first().click();
+  await page.keyboard.press("Escape"); // the picker
+  await box.locator(".add-skills").filter({ hasText: "Learning" }).waitFor();
+  await page.keyboard.press("Escape"); // the box
+  await box.waitFor({ state: "detached" });
+  await page.keyboard.press("Meta+KeyN");
+  await field.waitFor();
+  try {
+    await box.locator(".add-skills").filter({ hasText: "Learning" }).waitFor({ timeout: 3000 });
+  } finally {
+    await field.fill("");
+    await page.keyboard.press("Escape");
+  }
+});
+
+journey("Home: two Continue reading rows picked with ⌘ show the pick's bar, as All sources does (Codex UX sweep 4, D283)", async (page) => {
+  const rows = page.locator(".home-read .home-open");
+  await rows.nth(1).waitFor();
+  await rows.nth(0).click({ modifiers: ["Meta"] });
+  await rows.nth(1).click({ modifiers: ["Meta"] });
+  const bar = page.getByRole("toolbar", { name: "Actions for 2 picked sources" });
+  await bar.waitFor({ timeout: 3000 });
+  await bar.getByRole("button", { name: "Mark done" }).waitFor();
+  await page.keyboard.press("Escape");
+  await bar.waitFor({ state: "detached" });
+});
+
+journey("tutor: a chat whose save keeps failing stays at the first New chat, and a second New chat leaves it (code review of #493)", async (page) => {
+  await page.getByRole("button", { name: "Open the tutor" }).click();
+  await page.evaluate(() => {
+    const g = window as unknown as Record<string, unknown>;
+    g.__ORE_FAIL = { chat: "Test: chat write refused" };
+    g.__ORE_REPLY = { tutor: { reply: "Space the practice out over days.", citations: [], general: true, steps: [], marks: [], title: "A stuck chat", ai: { vendor: "codex", model: "mock", prompt: "tutor", version: 1 } } };
+  });
+  try {
+    await page.getByRole("textbox", { name: "Message the tutor" }).fill("How should I space practice?");
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    const reply = page.getByText("Space the practice out over days.");
+    await reply.waitFor();
+    await page.getByRole("button", { name: "New chat", exact: true }).click();
+    await page.locator("[role=alert], .toast").filter({ hasText: "isn’t saved" }).first().waitFor();
+    if (!(await reply.isVisible())) throw new Error("the first New chat dropped a chat it couldn't save");
+    await page.getByRole("button", { name: "New chat", exact: true }).click();
+    await until("a second New chat leaves it", async () => !(await reply.isVisible()));
+  } finally {
+    await page.evaluate(() => { const g = window as unknown as Record<string, unknown>; g.__ORE_FAIL = {}; delete g.__ORE_REPLY; });
+    await page.keyboard.press("Escape").catch(() => {});
+  }
+});
+
 /** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
 const hold = (page: Page, key: string, calls = 1) => page.evaluate(([k, n]) => {
   const w = window as unknown as { __ORE_HOLD?: Record<string, unknown[]> };
@@ -17080,6 +17136,69 @@ journey("phone: a long press on a Collected row opens its actions (Codex UX swee
   await page.getByRole("menuitem").first().waitFor({ timeout: 3000 });
   await page.keyboard.press("Escape");
 }, "phone");
+journey("phone: a collection in the drawer renames, moves and deletes from a long press on its heading, each with Undo (parity, Codex UX sweep 4)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  const heads = () => page.locator(".phone-drawer h2").allInnerTexts();
+  const first = (await heads())[0]!;
+  const head = page.locator(".phone-drawer h2", { hasText: first }).first();
+  // A 44 pt target round its 12 pt line.
+  const h = await head.evaluate((e) => { const r = e.getBoundingClientRect(); const a = getComputedStyle(e, "::after"); return r.height + Math.max(0, -parseFloat(a.top) || 0) + Math.max(0, -parseFloat(a.bottom) || 0); });
+  if (h < 44) throw new Error(`a collection heading is a ${h} pt tap`);
+  await press(page, head);
+  await tap(page, page.getByRole("menuitem", { name: "Rename…" }));
+  const field = page.getByRole("textbox", { name: "Collection name" });
+  await field.fill("Renamed on the bus");
+  // A save that fails keeps what he typed in the field.
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { skills: "disk full" }));
+  await field.press("Enter");
+  await until("the field is back with his words", async () => (await field.count()) > 0 && (await field.inputValue()) === "Renamed on the bus");
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  await field.press("Enter");
+  await page.locator(".phone-drawer h2", { hasText: "Renamed on the bus" }).waitFor();
+  await page.keyboard.press("Meta+z");
+  await page.locator(".phone-drawer h2", { hasText: first }).waitFor();
+  // Move down, then Delete (its skills stay), each undone.
+  const all = await heads();
+  if (all.length > 1) {
+    await press(page, page.locator(".phone-drawer h2", { hasText: first }).first());
+    await tap(page, page.getByRole("menuitem", { name: "Move down" }));
+    await until("it moved down", async () => (await heads())[1] === first);
+    await page.keyboard.press("Meta+z");
+    await until("Undo put it back", async () => (await heads())[0] === first);
+  }
+  await press(page, page.locator(".phone-drawer h2", { hasText: first }).first());
+  await tap(page, page.getByRole("menuitem", { name: "Delete collection" }));
+  await until("it is gone", async () => !(await heads()).includes(first));
+  await page.keyboard.press("Meta+z");
+  await until("Undo brought it back", async () => (await heads()).includes(first));
+}, "phone");
+
+journey("phone: a skill's long-press menu lists each action once, with Move up and Move down (Codex UX sweep 4)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await press(page, page.locator(".phone-drawer section button").nth(1));
+  const names = await page.getByRole("menuitem").allInnerTexts();
+  const twice = names.filter((n, i) => names.indexOf(n) !== i);
+  if (twice.length) throw new Error(`the menu lists ${twice.join(", ")} twice`);
+  if (!names.some((n) => /Move up|Move down/.test(n))) throw new Error("no Move up or Move down");
+  await page.keyboard.press("Escape");
+}, "phone");
+journey("phone: a pinned source moves up among the pinned from its long press, with Undo (parity, Codex UX sweep 4)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const row = (t: string) => page.locator(".phone-sources li").filter({ hasText: t }).first();
+  const pinIt = async (t: string) => { await press(page, row(t)); await tap(page, page.getByRole("menuitem", { name: "Pin to top" })); };
+  await pinIt(AGENTS);
+  await pinIt(TESTING);
+  const order = async () => (await page.locator(".phone-sources li").allInnerTexts()).map((x) => (x.includes(AGENTS) ? "A" : x.includes(TESTING) ? "T" : "")).filter(Boolean).slice(0, 2).join("");
+  await until("pinned in the order pinned", async () => (await order()) === "AT");
+  await press(page, row(TESTING));
+  await tap(page, page.getByRole("menuitem", { name: "Move up" }));
+  await until("it moved up", async () => (await order()) === "TA");
+  await page.keyboard.press("Meta+z");
+  await until("Undo put it back", async () => (await order()) === "AT");
+}, "phone");
+
+
 
 
 

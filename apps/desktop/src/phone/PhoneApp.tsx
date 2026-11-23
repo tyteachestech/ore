@@ -28,7 +28,7 @@ import { Palette } from "../Palette";
 import { SkillEditor, sidebarGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
-import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, whileOut, shareOpen, shareSkills, type CardSkills, type Item, type Skill, touched } from "../ore";
+import { courseThumb, pinBetween, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, whileOut, shareOpen, shareSkills, type CardSkills, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -878,6 +878,35 @@ export function PhoneApp() {
       void refresh();
     }
   };
+  /** The pinned sources of an item's list, in their order (toReadOrder: oldest pin first). */
+  const pinnedWith = (item: Item) => (items ?? []).filter((i) => i.pinned_at && !i.archived_at && (i.status === "done") === (item.status === "done")).sort((a, b) => a.pinned_at!.localeCompare(b.pinned_at!));
+  /** Moves a pinned source up or down among the pinned, with Undo (the Mac's pinMoves, parity). */
+  const movePinned = async (item: Item, to: number) => {
+    const rest = pinnedWith(item).filter((i) => i.id !== item.id);
+    const at = pinBetween(rest[to - 1]?.pinned_at, rest[to]?.pinned_at);
+    const repin = async (t: string, fromHistory = false) => {
+      setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: t } : i)) ?? all);
+      try {
+        await ore("pin", item.id, "--at", t);
+      } catch (e) {
+        if (fromHistory) throw e;
+        notify(errorText(e), "error");
+      } finally {
+        void refresh();
+      }
+    };
+    await whileOut(repin(at));
+    notify(`Moved “${item.title}”`, "quiet", () => repin(item.pinned_at!, true), () => repin(at, true));
+  };
+  const pinMoves = (item: Item): MenuAction[] => {
+    if (!item.pinned_at || item.archived_at) return [];
+    const pinned = pinnedWith(item);
+    const i = pinned.findIndex((x) => x.id === item.id);
+    return [
+      ...(i > 0 ? [{ id: "pin-up", label: "Move up", run: () => void movePinned(item, i - 1) }] : []),
+      ...(i >= 0 && i < pinned.length - 1 ? [{ id: "pin-down", label: "Move down", run: () => void movePinned(item, i + 1) }] : []),
+    ];
+  };
   /** Pins a source to the top of the Sources list, or unpins it, with Undo (the Mac's pinSource). */
   const pin = async (item: Item, undoable = true) => {
     const on = !item.pinned_at;
@@ -895,6 +924,7 @@ export function PhoneApp() {
       void refresh();
     }
   };
+  const [renamingCollection, setRenamingCollection] = useState<{ collection: string; draft?: string } | null>(null);
   const menuOf = skillMenu({
     skills,
     refresh,
@@ -932,6 +962,7 @@ export function PhoneApp() {
       { id: "rename", label: "Rename…", run: () => {} },
       { id: "review-source", label: "Review this source", run: () => setReviewing({ pick: null, source: item.id, run: 0 }) },
       { id: "pin", label: item.pinned_at ? "Unpin" : "Pin to top", run: () => void pin(item) },
+      ...pinMoves(item),
       { id: "move", label: item.status === "done" ? "Move to To read" : "Move to Done", run: () => row.toggle(item) },
       ...(item.url ? [{ id: "original", label: "Open original", run: () => void openUrl(item.url!).catch((e) => notify(errorText(e), "error")) }] : []),
       ...(skills.length
@@ -1117,9 +1148,35 @@ export function PhoneApp() {
             <span className="phone-title">Archive</span>
           </button>
           {/* The Mac sidebar's order (sidebarGroups): the skills in no collection first, with no heading beside collections. */}
-          {sidebarGroups(skills).map((g) => (
-            <section key={g.collection} className={g.bare ? "bare" : undefined}>
-              {!g.bare && <h2>{g.name}</h2>}
+          {/* By place, not name: a heading renamed (or put back by Undo) stays the element that has focus. */}
+          {sidebarGroups(skills).map((g, i) => (
+            <section key={i} className={g.bare ? "bare" : undefined}>
+              {!g.bare &&
+                (renamingCollection?.collection === g.collection ? (
+                  <input
+                    className="field phone-collection-name"
+                    aria-label="Collection name"
+                    defaultValue={renamingCollection.draft ?? g.collection}
+                    autoFocus
+                    enterKeyHint="done"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                      else if (e.key === "Escape") (e.currentTarget.value = g.collection), e.currentTarget.blur();
+                    }}
+                    onBlur={(e) => {
+                      const typed = e.currentTarget.value;
+                      setRenamingCollection(null);
+                      // Refused, the field opens again with what he typed, to try again (TitleField's way).
+                      void menuOf.renameCollection(g.collection, typed).then((ok) => ok || setRenamingCollection({ collection: g.collection, draft: typed }));
+                      // Focus goes to the heading it became, not to <body> (Finder after a rename).
+                      requestAnimationFrame(() => [...document.querySelectorAll<HTMLElement>(".phone-drawer h2[tabindex]")].find((h) => [typed.trim(), g.collection].includes(h.textContent ?? ""))?.focus({ preventScroll: true }));
+                    }}
+                  />
+                ) : (
+                  <WithMenu actions={() => menuOf.collection(g.collection, () => setRenamingCollection({ collection: g.collection }))} hold>
+                    <h2 tabIndex={0}>{g.name}</h2>
+                  </WithMenu>
+                ))}
               {g.skills.map((s) => (
                 <WithMenu key={s.id} actions={() => menuOf(s)} hold>
                   <button onClick={() => (setSkill(s.id), setDrawer(false))}>

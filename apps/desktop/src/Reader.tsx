@@ -418,7 +418,7 @@ function DocTable({ children }: { children?: ReactNode }) {
     const row = cellText((td.parentElement as HTMLTableRowElement).cells[0]);
     const column = cellText(table.current.tHead?.rows[0]?.cells[td.cellIndex]);
     try {
-      const c = await ore<CardFull>("card", "cell", ctx.item, opt("row", row), opt("column", column), opt("answer", cellText(td)));
+      const c = await whileOut(ore<CardFull>("card", "cell", ctx.item, opt("row", row), opt("column", column), opt("answer", cellText(td))));
       ctx.notify("Exercise made", "info", () => ore("card", "retire", c.id), () => ore("card", "restore", c.id, "--state=draft"));
     } catch (e) {
       ctx.notify(`Couldn’t make the exercise: ${errorText(e)}`, "error");
@@ -2329,7 +2329,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         made.current.get(rid)?.();
         await annotate(rid, "--status", "deleted");
       }
-      const c = await ore<{ id: string; words: number; section: boolean; removed: unknown[] }>("cut", d.id, "--from", String(a.start), "--to", String(a.end), ...(section ? ["--section"] : []));
+      const c = await whileOut(ore<{ id: string; words: number; section: boolean; removed: unknown[] }>("cut", d.id, "--from", String(a.start), "--to", String(a.end), ...(section ? ["--section"] : [])));
       p.reload();
       p.onChanged();
       const n = c.removed.length;
@@ -3259,7 +3259,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const d = doc;
     setAddingPage(true);
     try {
-      const c = await ore<{ id: string; words: number }>("page-text", d.id);
+      const c = await whileOut(ore<{ id: string; words: number }>("page-text", d.id));
       p.reload();
       p.onChanged();
       const step = (flag: string) => () => ore("page-text", d.id, flag, c.id).then(() => (p.reload(), p.onChanged()));
@@ -3282,7 +3282,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const revived = skills.filter((id) => !before.includes(id) && p.skills.some((s) => s.id === id && s.archived));
     setDoc((cur) => cur && { ...cur, skills });
     try {
-      const r = await ore<{ cards_before?: CardSkills }>("edit", doc.id, "--skills", skills.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : []));
+      const r = await whileOut(ore<{ cards_before?: CardSkills }>("edit", doc.id, "--skills", skills.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : [])));
       setFiled(skills.join());
       p.onChanged();
       if (revived.length) p.onSkillsChanged();
@@ -3470,12 +3470,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     };
     try {
       if (action === "accept") {
-        const r = await ore<{ skill: Skill; created: boolean; item: Item; undo: object }>("suggested-skill", id, "accept");
+        const r = await whileOut(ore<{ skill: Skill; created: boolean; item: Item; undo: object }>("suggested-skill", id, "accept"));
         setDoc((cur) => cur && cur.id === id ? { ...cur, skills: r.item.skills, suggested_skill: undefined } : cur);
         p.onSkillsChanged();
         if (undoable) p.notify(r.created ? `Created skill ${r.skill.name}` : `Filed under ${r.skill.name}`, "info", takeBack(r.undo), () => suggestion("accept", false));
       } else {
-        await ore("suggested-skill", id, "dismiss");
+        await whileOut(ore("suggested-skill", id, "dismiss"));
         setDoc((cur) => cur && cur.id === id ? { ...cur, suggested_skill: undefined } : cur);
         if (undoable) p.notify(`Dismissed suggested skill ${was.name}`, "info", takeBack({ suggestion: was }), () => suggestion("dismiss", false));
       }

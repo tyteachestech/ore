@@ -85,7 +85,8 @@ function Detected({ list }: { list: Entry[] }) {
  *  course is filed whole. ↵ adds, ⇧↵ is a new line; files can also be picked (⌘O) or dropped anywhere. */
 /** What he typed and left with Esc or a click outside, by box (Add, Follow): the next ⌘N shows it selected, so
  *  ↵ adds it and typing replaces it (F449). In memory only: gone when Ore quits, and once it goes in. */
-const left: { add?: { value: string; pasted: Pasted | null }; follow?: { value: string; pasted: Pasted | null } } = {};
+type Left = { value: string; pasted: Pasted | null; picked: string[]; files: string[] };
+const left: { add?: Left; follow?: Left } = {};
 
 export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, following, onPickFiles, onClose, notify }: {
   skill: Skill | null;
@@ -106,7 +107,10 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
 }) {
   const box = following ? "follow" : "add";
   const [value, setValue] = useState(() => left[box]?.value ?? "");
-  const [picked, setPicked] = useState<string[]>(skill ? [skill.id] : []);
+  // The skills he picked for a draft he left come back with it (Codex UX sweep 4), else the open skill's.
+  const [picked, setPicked] = useState<string[]>(() => left[box]?.picked ?? (skill ? [skill.id] : []));
+  /** Files chosen in the file panel: their lines go in as those files, beside any text (Codex UX sweep 4). */
+  const [files, setFiles] = useState<string[]>(() => left[box]?.files ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -117,7 +121,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
   /** It went in (or was followed): the box closes with nothing to keep. */
   const went = useRef(false);
   const close = () => ((went.current = true), (leaving.current = undefined), onClose());
-  const leaving = useRef<{ value: string; pasted: Pasted | null } | undefined>(undefined);
+  const leaving = useRef<Left | undefined>(undefined);
   useEffect(() => {
     open.current = true;
     if (value) ref.current?.select();
@@ -132,8 +136,8 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
   const offer = !value.trim() && !busy && !error && (!following || copied?.kind === "link") ? copied : null;
   // A page's text pasted into the empty box (a ChatGPT answer) goes in as its HTML, images and tables kept.
   const [pasted, setPasted] = useState<Pasted | null>(() => left[box]?.pasted ?? null);
-  leaving.current = value.trim() && !busy && !went.current ? { value, pasted } : undefined;
-  const list = withHtml(entries(value), pasted);
+  leaving.current = value.trim() && !busy && !went.current ? { value, pasted, picked, files } : undefined;
+  const list = withHtml(entries(value, files), pasted);
   const one = list.length === 1 && list[0]!.kind === "link" && (following || !isCourseLink(list[0]!.url)) ? list[0]!.url : null;
   const feed = useFeedOf(busy ? null : one);
   /** The link is the feed itself: adding it would be refused, so ↵ follows it. */
@@ -156,6 +160,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
     const paths = await onPickFiles();
     if (!open.current) return;
     if (paths.length) {
+      setFiles((f) => [...f, ...paths]);
       setValue((v) => [v.trim(), ...paths.map((path) => entryText({ kind: "file", path }))].filter(Boolean).join("\n"));
       setError(null);
     }
