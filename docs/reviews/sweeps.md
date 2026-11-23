@@ -91,6 +91,8 @@ When a sweep's triage is done, add a row per tester here.
 | 11-23 | [ux sweep 9](2026-11-23-codex-ux-sweep-9/) phone | Codex | Round 9: the same on the iPhone, notes that link sources | iPhone | 3 | #508 |
 | 11-23 | [ux sweep 10](2026-11-23-codex-ux-sweep-10/) mac | Codex | Round 10: Academy lessons with video (#507), recheck | Mac | 3 | #509 |
 | 11-23 | [ux sweep 10](2026-11-23-codex-ux-sweep-10/) phone | Codex | Round 10: Filter and Select (#500), recheck | iPhone | 1 | #509 |
+| 11-23 | [ux sweep 11](2026-11-23-codex-ux-sweep-11/) mac | Codex | Round 11: recheck of round 10, fresh journeys | Mac | 2 | #510 |
+| 11-23 | [ux sweep 11](2026-11-23-codex-ux-sweep-11/) phone | Codex | Round 11: recheck of round 10, fresh journeys | iPhone | 0 | — |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 

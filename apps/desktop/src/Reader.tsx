@@ -1883,7 +1883,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const range = rangeOf(id);
     if (!el) return;
     // In a video's folded transcript: it opens first, so the passage is in sight beside its note (Codex UX sweep 10).
-    if (!opened && range && showTranscriptFor(range.startContainer)) return void requestAnimationFrame(() => jumpToHighlight(id, true));
+    // Two frames: the reader keeps its place as the opened transcript grows the page (its resize watcher), and the
+    // jump comes after that, or the place it kept wins and the popup opens off the window (Codex UX sweep 11).
+    if (!opened && range && showTranscriptFor(range.startContainer)) return void requestAnimationFrame(() => requestAnimationFrame(() => jumpToHighlight(id, true)));
     // Its passage gone from the text (a reimport): say so, never a click that does nothing.
     if (!range) return void (annOf(id)?.anchor === null && p.notify("The passage it was marked on is no longer in this source.", "error"));
     toThird(range);

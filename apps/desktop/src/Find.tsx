@@ -135,14 +135,17 @@ function viewOf(el: HTMLElement) {
   return { top: Math.max(box.top, pin && pin.bottom > box.top ? pin.bottom : box.top), bottom: box.bottom };
 }
 
-/** Brings a match into view a third of the way down, as the quiz's passages do (D55); left alone when already in view. */
+/** Brings a match into view a third of the way down, as the quiz's passages do (D55); left alone when already in view.
+ *  Through every scroller it sits in, inner first: a match in a video's transcript box is in that box's view, and the
+ *  box in the reader's (Codex UX sweep 11: it counted as shown inside a box that was above the window). */
 function reveal(r: Range) {
-  const el = scrollerOf(r.startContainer);
-  const rect = r.getBoundingClientRect();
-  if (!el || !rect.height) return;
-  const v = viewOf(el);
-  if (rect.top >= v.top && rect.bottom <= v.bottom) return;
-  el.scrollTop += rect.top - (v.top + (v.bottom - v.top) / 3);
+  if (!r.getBoundingClientRect().height) return;
+  for (let el = scrollerOf(r.startContainer); el; el = scrollerOf(el)) {
+    const rect = r.getBoundingClientRect();
+    const v = viewOf(el);
+    if (rect.top >= v.top && rect.bottom <= v.bottom) continue;
+    el.scrollTop += rect.top - (v.top + (v.bottom - v.top) / 3);
+  }
 }
 
 function show(all: Range[], on: Range | undefined) {
