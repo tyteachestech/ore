@@ -57,7 +57,6 @@ describe("shortcut hints", () => {
 // on hover through <Hint> (ChatGPT's and Claude's Send, Linear's toolbar): an icon alone is a guess. One
 // that can't is listed here, by file and aria-label, with the reason.
 const ICON_ONLY_OK: Record<string, string> = {
-  "Palette.tsx Close": "phone only (PHONE): a touch screen has no hover",
   "Palette.tsx Clear": "phone only (PHONE): a touch screen has no hover",
   "Reader.tsx Find in source": "phone only (PHONE): a touch screen has no hover",
   "Reader.tsx readingFor(qs.length)": "phone only (PHONE): a touch screen has no hover",
@@ -166,6 +165,7 @@ describe("icon-only buttons", () => {
 const DISMISS_OK: Record<string, [count: number, why: string]> = {
   "Review.tsx Done": [1, "the end screen's default button: its hint shows ↵, its key, as a Mac sheet's default button shows Return"],
   "Reader.tsx Done": [1, "a chapter's recall: its hint shows its key, finish (⌘↵); Esc is its Back to the source, which records nothing"],
+  "Palette.tsx Cancel": [1, "the iPhone Search’s Cancel (PHONE): a touch screen has no hover, and no Esc"],
   "Finish.tsx Done": [1, "its hint shows its key, finish (⌘↵); Esc leaves the panel, which runs Keep reading unless the source is already done"],
   "Tables.tsx Cancel": [2, "stops the 4 GB reader download (in a PDF and in Settings); Esc doesn't, so a stray Esc never throws the download away"],
   "Diagram.tsx Done": [1, "the phone's diagram view (DiagramView, PHONE only): no keyboard to show Esc on; the Mac's editor's Done shows it"],
