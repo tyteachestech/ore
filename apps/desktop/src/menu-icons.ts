@@ -16,6 +16,10 @@ const BY_ID: Record<string, Icon> = {
   rename: PencilSimple,
   edit: PencilSimple,
   author: User,
+  // The iPhone's Filter sheet (Kind, Skill, Author) and a row's Select.
+  kind: Stack,
+  skill: Target,
+  select: Circle,
   pin: Pin,
   "pin-up": ArrowUp,
   "pin-down": ArrowDown,

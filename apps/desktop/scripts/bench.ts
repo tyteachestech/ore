@@ -212,7 +212,8 @@ try {
         console.error(`${name}: ${(e as Error).message.split("\n")[0]}`);
         // What was on screen, so a step that broke names its cause instead of a timeout.
         const seen = await page.evaluate(() => ({
-          text: (document.querySelector("[role=dialog], .review, main") as HTMLElement | null)?.innerText.replace(/\s+/g, " ").slice(0, 400),
+          // The topmost layer first: one selector list gave whichever came first in the page, which was Home under an open review.
+          text: (["[role=dialog]", ".review", "main"].map((q) => document.querySelector<HTMLElement>(q)).find(Boolean))?.innerText.replace(/\s+/g, " ").slice(0, 600),
           open: (window as unknown as { __bench: { open: string[] } }).__bench.open,
         })).catch(() => undefined);
         console.error(`  on screen: ${seen?.text ?? "(nothing)"}\n  calls still running: ${seen?.open.join("; ") || "none"}`);

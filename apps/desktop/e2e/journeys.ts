@@ -17539,6 +17539,66 @@ journey("phone: a pinned source moves up among the pinned from its long press, w
   await page.keyboard.press("Meta+z");
   await until("Undo put it back", async () => (await order()) === "AT");
 }, "phone");
+journey("phone: Sources narrows by kind and skill from Filter, each a tag under the title that a tap lets go (F493, D286)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const rows = () => page.locator(".phone-sources li").count();
+  const all = await rows();
+  const value = async (field: string, name: RegExp) => {
+    await tap(page, page.getByRole("button", { name: /^Filter by/ }));
+    await tap(page, page.locator(".action-sheet .pick-row").filter({ hasText: field }));
+    const row = page.locator(".action-sheet").getByRole("checkbox", { name });
+    await tap(page, row);
+    // The sheet stays, ticked, so several can be picked.
+    await until(`the ${field} value is ticked and the sheet stays`, async () => (await row.getAttribute("aria-checked")) === "true");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Escape");
+    await page.locator(".action-sheet").waitFor({ state: "detached" });
+  };
+  await value("Kind", /^Audio/);
+  await until("only the audio lecture is listed", async () => (await rows()) === 1 && (await page.locator(".phone-sources li").innerText()).includes("Lecture 4"));
+  await value("Skill", /^AI/);
+  // Fields narrow together: the one audio lecture isn't filed under AI.
+  await page.getByText("No sources match these filters.").waitFor();
+  const tags = page.locator(".phone-filter-tag");
+  if ((await tags.count()) !== 2) throw new Error(`${await tags.count()} filter tags, not 2`);
+  const box = (await tags.first().boundingBox())!;
+  if (box.height < 44) throw new Error(`a filter tag is a ${box.height} pt tap`);
+  await tap(page, tags.filter({ hasText: "Audio" }));
+  await until("AI's source alone", async () => (await rows()) === 1 && (await page.locator(".phone-sources li").innerText()).includes(AGENTS));
+  await tap(page, tags.first());
+  await until("every source is back", async () => (await rows()) === all);
+}, "phone");
+journey("phone: Select picks several sources and the bar at the foot archives them as one step, with one Undo (F494, D283)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const row = (t: string) => page.locator(".phone-sources li").filter({ hasText: t }).first();
+  const bar = page.locator(".pick-bar");
+  // From the title's Select: none picked yet, and the bar says what a tap does.
+  await tap(page, page.getByRole("button", { name: "Select", exact: true }));
+  await bar.getByText("Tap sources to pick them").waitFor();
+  await tap(page, row(AGENTS));
+  await bar.getByText("1 picked").waitFor();
+  if (await page.locator(".phone-reader").count()) throw new Error("a tap while picking opened the source");
+  await tap(page, bar.getByRole("button", { name: "Clear the pick" }));
+  await bar.waitFor({ state: "detached" });
+  // From a row's long press: that row is picked.
+  await press(page, row(AGENTS));
+  await tap(page, page.getByRole("menuitem", { name: "Select" }));
+  await bar.getByText("1 picked").waitFor();
+  await tap(page, row(TESTING));
+  await bar.getByText("2 picked").waitFor();
+  const b = (await bar.boundingBox())!;
+  if (b.x < 0 || b.x + b.width > 390) throw new Error(`the bar runs off the screen: ${Math.round(b.x)} to ${Math.round(b.x + b.width)}`);
+  for (const btn of await bar.locator("button").all()) {
+    const k = (await btn.boundingBox())!;
+    if (k.width < 44 || k.height < 44) throw new Error(`a bar button is a ${Math.round(k.width)}×${Math.round(k.height)} pt tap`);
+  }
+  await tap(page, bar.getByRole("button", { name: "Archive" }));
+  await until("both left the list and the pick ended", async () => !(await row(AGENTS).count()) && !(await row(TESTING).count()) && !(await bar.count()));
+  await page.keyboard.press("Meta+z");
+  await until("one Undo brought both back", async () => (await row(AGENTS).count()) === 1 && (await row(TESTING).count()) === 1);
+}, "phone");
 journey("phone: a try typed and left with Back is there when the Forge's + opens again, in 44 pt fields (Codex UX sweep 5)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
