@@ -762,6 +762,18 @@ describe("import coverage: awkward files", () => {
     expect((await doctor(lib)).warnings).toBe(0);
   });
 
+  test("a Shift_JIS page whose own <meta> names its charset reads in Japanese (F38)", async () => {
+    const lib = await tempLibrary();
+    // 日本の文学 / 吾輩は猫である。, in Shift_JIS bytes, the way Aozora Bunko serves its pages with no charset in the header.
+    const title = [0x93, 0xfa, 0x96, 0x7b, 0x82, 0xcc, 0x95, 0xb6, 0x8a, 0x77];
+    const line = [0x8c, 0xe1, 0x94, 0x79, 0x82, 0xcd, 0x94, 0x4c, 0x82, 0xc5, 0x82, 0xa0, 0x82, 0xe9, 0x81, 0x42];
+    const para = Array.from({ length: 40 }, () => line).flat();
+    const bytes = new Uint8Array([...Buffer.from('<html><head><meta http-equiv="Content-Type" content="text/html;charset=Shift_JIS"><title>'), ...title, ...Buffer.from("</title></head><body><article><h1>"), ...title, ...Buffer.from("</h1><p>"), ...para, ...Buffer.from("</p><p>"), ...para, ...Buffer.from("</p></article></body></html>")]);
+    const item = await addSource(lib, put("neko.html", bytes));
+    expect(item.meta.title).toBe("日本の文学");
+    expect(item.body).toContain("吾輩は猫である。");
+  });
+
   test("a text file with no extension is read; a binary one, a folder and a huge file say why not", async () => {
     const lib = await tempLibrary();
     expect((await addSource(lib, put("README", "# Read me\n\nPlain text with no extension."))).meta.title).toBe("Read me");
