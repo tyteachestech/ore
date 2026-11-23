@@ -17,7 +17,7 @@ Tested the supplied WebKit apps, using only ports 1761/1762/1763 and the `ux` sc
 
 **Expected:** The first add may finish and notify, but the current sheet and its unsent text survive. **Actual:** The second sheet is dismissed and its draft is empty on reopening. The first operation removes the shared draft and invokes its old close callback against the new sheet. This loses a learner’s second thought without their submitting or discarding it.
 
-**Parity:** Mac keeps the second Add box open, with all its text, when its first delayed add finishes. This difference has no exception in D349.
+**Parity:** Mac keeps the second Add box open, with all its text, when its first delayed add finishes. This difference has no exception in D350.
 
 **Evidence:** [second draft before completion](shots/ux-race-phone-1-second-draft.png), [first add takes over](shots/ux-race-phone-1-landed.png), [phone trace](race-phone-1.json), [second phone trace](race-phone-2.json), [Mac preserves draft](shots/ux-race-mac-1-landed.png), [Mac trace](race-mac-2.json). Runner: `node codex-out/ux/race.cjs`.
 
@@ -34,7 +34,7 @@ Tested the supplied WebKit apps, using only ports 1761/1762/1763 and the `ux` sc
 
 **Expected:** The recovered draft adds the same source as an uninterrupted paste. **Actual:** The source contains plain prose; the subheading, bullet structure, and code block have disappeared. The interrupted reader’s body contains **0 headings, 0 list items, 0 code blocks**, versus **1 subheading, 2 list items, 1 code block** in the corresponding Mac result. The text field itself gives no indication that the clipboard’s richer representation has been discarded.
 
-**Parity:** The Mac keeps the HTML alongside its draft. D342’s interruption protection and D349’s rich-paste parity should extend to the whole paste.
+**Parity:** The Mac keeps the HTML alongside its draft. D342’s interruption protection and D350’s rich-paste parity should extend to the whole paste.
 
 **Evidence:** [phone after reopening and adding](shots/ux-deep-390-dark-1-rich.png), [small/light example](shots/ux-deep-375-light-2-rich.png), [phone trace](deep-375-light-2.json), [uninterrupted phone result](shots/ux-390-dark-rich-1-added.png), [Mac interrupted result](shots/ux-mac-interrupted-1-added.png), [Mac trace](mac-interrupted-2.json). Runner: `node codex-out/ux/deep.cjs`.
 
@@ -66,7 +66,7 @@ Tested the supplied WebKit apps, using only ports 1761/1762/1763 and the `ux` sc
 
 **Expected:** A visible working indicator says the source is being added, as required by the interaction checklist. **Actual:** The field becomes read-only and both buttons dim, but the sheet still says only “Add” and “Choose a file or photo.” There is no “Adding…” label or working indicator within the sheet. The learner cannot distinguish progress from a dead control. Return during the wait does not add a second source, and releasing the request completes the add.
 
-**Parity:** Mac’s Add displays “Adding…” with `Working`. D349 supplies no phone exception. The imported `Working` component in `AddLink.tsx` is used for queued-link reading, not this text-add wait.
+**Parity:** Mac’s Add displays “Adding…” with `Working`. D350 supplies no phone exception. The imported `Working` component in `AddLink.tsx` is used for queued-link reading, not this text-add wait.
 
 **Evidence:** [phone wait](shots/ux-phone-slow-1.png), [repeat](shots/ux-phone-slow-2.png), [phone trace](slow-1.json), [Mac wait](shots/ux-race-mac-1-busy.png), [Mac trace](race-mac-2.json). Note: `slow-*.json`’s `statusCount` includes a page-wide status region; it is **not** an adding indicator in the sheet. `race-phone-*.json` measures the dialog’s `.working` count directly: zero.
 
@@ -100,9 +100,9 @@ No known fixed row was observed returning in its original form. F550’s rejecti
 | Moment | Phone versus Mac | Judgment |
 | --- | --- | --- |
 | Text entry, Return, Shift+Return, uninterrupted rich paste | Same basic behavior | Parity achieved |
-| Skill filing | Phone uses the originating skill; Mac also offers a picker before Add | Origin-based filing is explicit in D349; no incorrect filing observed |
-| Link lists | Phone saves to inbox and displays Coming in; Mac imports through its Add flow | Explicit D349 phone reason |
-| Local file paths | Phone treats them as words; Mac reads paths | Explicit D349 exception; code reviewed, native filesystem-picker work outside this audit |
+| Skill filing | Phone uses the originating skill; Mac also offers a picker before Add | Origin-based filing is explicit in D350; no incorrect filing observed |
+| Link lists | Phone saves to inbox and displays Coming in; Mac imports through its Add flow | Explicit D350 phone reason |
+| Local file paths | Phone treats them as words; Mac reads paths | Explicit D350 exception; code reviewed, native filesystem-picker work outside this audit |
 | Draft recovery | Phone recovers words but loses HTML; Mac retains both | UX-2 parity gap |
 | Finish of a dismissed add | Phone deletes the newer draft; Mac preserves it | UX-1 parity gap |
 | Wait | Phone disables controls; Mac says Adding… | UX-4 parity gap |

@@ -109,7 +109,7 @@ No confirmed recurrence of a known findings row. F550’s original rejection of 
 - Bare HTTPS links, bare domains, and `www` domains take the link path on both platforms; the phone queues them in its inbox.
 - A URL with a space, a link in a sentence, two links on one line, mixed links/words, and a URL followed by prose each save as one complete text source on both platforms.
 - Links on separate lines with blank lines between queue as separate links; a trailing period is passed through as part of the link on both platforms.
-- `README.md` and `main.py` save as text; absolute paths, `file://` paths, and `~/notes.md` save as text only on the phone, as D349 requires. The Mac attempts the paths and reports missing files.
+- `README.md` and `main.py` save as text; absolute paths, `file://` paths, and `~/notes.md` save as text only on the phone, as D350 requires. The Mac attempts the paths and reports missing files.
 - Playlist, X-post, and Podcasts-show links take the link path and do not create half-read text sources; the playlist’s phone guidance names the Mac. Live network/import success was not established for these test URLs.
 - Single words, emoji, leading/trailing blank lines, CRLF, tabs, Hebrew/Arabic, CJK, combining accents, and mixed visible/invisible text preserve their stored words/characters in order. Boundary whitespace is trimmed and CRLF becomes LF.
 - Whitespace-only submission is blocked on both platforms, with no saved source (the original Mac button-selector harness miss was corrected with two Enter-based trials).
