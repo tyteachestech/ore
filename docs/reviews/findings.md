@@ -27,7 +27,7 @@ A sweep prompt names the surface and the commit under test, points at this file 
 | F1 | 2026-11-01 | Notes | A note's own ⌘Z history is lost when an outside edit is merged in: the editor remounts (`Notes.tsx` `key={notes.version}`) | open | — |
 | F2 | 2026-11-01 | Video | A player that stalls mid-play is not detected or shown | open | — |
 | F3 | 2026-11-08 | Reader | A drag that starts inside link text selects nothing; maybe Chromium only, unchecked in the macOS webview | open | — |
-| F4 | 2026-11-08 | Import | A binary file named .md or .txt is saved as a source of junk instead of refused (D96) | open | — |
+| F4 | 2026-11-08 | Import | A binary file named .md or .txt is saved as a source of junk instead of refused (D96) | fixed #PRNUM | `Finder's own files are refused, not saved as a source` |
 | F5 | 2026-11-08 | Import | Reimport after the kept original was deleted gives the wrong reason ("only a source added from a link or a file") | open | — |
 | F6 | 2026-11-08 | Reader | The reader's shown-text map (`apps/desktop/src/text.ts`) and core anchoring are two maps of one text | open | — |
 | F7 | 2026-11-09 | Undo | `batch` has no rollback when a write fails midway | known limit: accepted in the 2026-11-09 code reviews | — |

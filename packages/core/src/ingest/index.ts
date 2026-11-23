@@ -204,6 +204,8 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     return { type: "article", title: fileStem(name), url, body: vttToBody(vtt), source: { ext: "vtt", data: vtt } };
   }
   if (kind === "markdown") {
+    // A picture or a PDF renamed .md is not text: saved, it would be a source of junk (D96, F4).
+    if (/[\0-\x08\x0e-\x1a]/.test(text.slice(0, 4096))) throw new Error(`“${basename(name)}” isn’t text, though its name says it is. If it is a PDF or a picture, give it its real ending and add it again; otherwise copy its text and paste it here.`);
     const ext = /\.(md|markdown|txt|text)$/i.exec(name)?.[1]?.toLowerCase() ?? "md";
     return { type: "markdown", ...(await markdownFile(text, fileStem(name))), url, source: { ext, data: text } };
   }
