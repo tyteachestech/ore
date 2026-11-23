@@ -64,7 +64,7 @@ const ICON_ONLY_OK: Record<string, string> = {
   "IconPicker.tsx label(icon)": "one of hundreds of cells in the icon grid; the filter field names them, and a tooltip each would cost the grid its speed",
   "phone/PhoneApp.tsx Open menu": "the phone app: a touch screen has no hover",
   "phone/PhoneApp.tsx Search": "the phone app: a touch screen has no hover",
-  "phone/PhoneApp.tsx Add a link": "the phone app: a touch screen has no hover",
+  "phone/PhoneApp.tsx Add a source": "the phone app: a touch screen has no hover",
   "phone/PhoneApp.tsx Close menu": "the phone app: a touch screen has no hover",
   "Menu.tsx label": "the phone's action sheet trigger (ActionSheet, PHONE): a touch screen has no hover",
   "editor/KeyboardBar.tsx Hide the keyboard": "the phone's keyboard bar (PHONE): a touch screen has no hover",

@@ -1,11 +1,14 @@
 // Adding a source on the iPhone (D235): the link is saved to the library's inbox at once, then the phone
 // imports it itself with the Mac's importer; what it can't read (a video's transcript) the Mac brings in.
 // The sheet is one field, as Raindrop's add-a-link is; a link already on the clipboard is offered by the
-// field's own Paste (iOS), never read without his tap.
+// field's own Paste (iOS), never read without his tap. Any other words pasted there are a text source, as in
+// the Mac's Add box (paste.ts `entries`): added here at once, its exercises written by the Mac's catch-up.
 import { Working } from "../Working";
 import { useEffect, useRef, useState } from "react";
+import { Grow } from "../Grow";
 import { Trap } from "../Trap";
-import { ore, queuePicked } from "../ore";
+import { ore, oreWith, queuePicked } from "../ore";
+import { addArgs, entries, pastedHtml, withHtml, type Pasted } from "../paste";
 import { errorText, useFocusWhileMounted } from "../util";
 import { letDown, sheetLayer, useSwipeDown } from "./sheet";
 
@@ -19,13 +22,25 @@ export type Waiting = { id: string; url: string; skills: string[]; error?: strin
  *  his words (D342). In memory only: gone once it goes in. */
 const leftLinks = new Map<string, string>();
 
+/** A text source the sheet added, to open (as the Mac opens one added by hand, D109). */
+export type AddedText = { id: string; title: string; kept?: boolean };
+
+/** What the field holds: links (a pasted list too) are queued; anything else is the whole text, one source. */
+export function phoneEntries(raw: string, pasted: Pasted | null) {
+  const list = entries(raw);
+  if (list.every((e) => e.kind === "link")) return list;
+  // A file path is the Mac's to read; on the phone it is words like any other.
+  return withHtml([{ kind: "text" as const, text: raw.trim() }], pasted);
+}
+
 /** `skill`: added from a skill's page, it is filed there. */
-export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: () => void; onAdded: () => void }) {
+export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: () => void; onAdded: (text?: AddedText) => void }) {
   const [url, setUrl] = useState(() => leftLinks.get(skill ?? "") ?? "");
+  const [pasted, setPasted] = useState<Pasted | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const box = useRef<HTMLFormElement>(null);
-  const field = useRef<HTMLInputElement>(null);
+  const field = useRef<HTMLTextAreaElement>(null);
   useSwipeDown(box, onClose, true);
   // Focus goes back where it was when the sheet closes, however it closes (a tap outside too).
   useFocusWhileMounted(field);
@@ -33,10 +48,18 @@ export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: 
   const add = async () => {
     if (!url.trim() || busy) return;
     setBusy(true);
+    const to = skill ? ["--skill", skill] : [];
     try {
-      await ore("inbox", "--add", url.trim(), ...(skill ? ["--skill", skill] : []));
+      let text: AddedText | undefined;
+      for (const e of phoneEntries(url, pasted)) {
+        if (e.kind === "link") await ore("inbox", "--add", e.url, ...to);
+        else if (e.kind === "text") {
+          const { args, stdin } = addArgs(e);
+          text = await oreWith<AddedText>(stdin, ...args, ...to);
+        }
+      }
       leftLinks.delete(skill ?? "");
-      onAdded();
+      onAdded(text);
       onClose();
     } catch (e) {
       setError(errorText(e));
@@ -61,22 +84,28 @@ export function AddLink({ skill, onClose, onAdded }: { skill?: string; onClose: 
   return sheetLayer(
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && letDown(box.current, onClose)}>
       <Trap>
-        <form ref={box} noValidate className="panel sheet add-link" role="dialog" aria-modal="true" aria-label="Add a link" onSubmit={(e) => (e.preventDefault(), void add())} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onClose())}>
-          <input
+        <form ref={box} noValidate className="panel sheet add-link" role="dialog" aria-modal="true" aria-label="Add a source" onSubmit={(e) => (e.preventDefault(), void add())} onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), onClose())}>
+          <Grow
             ref={field}
             className="field"
-            type="url"
-            inputMode="url"
             autoCapitalize="off"
             autoCorrect="off"
+            spellCheck={false}
             enterKeyHint="go"
-            placeholder="Paste a link"
-            aria-label="Link"
+            placeholder="Paste a link or any text"
+            aria-label="Link or text"
             aria-invalid={!!error}
             aria-describedby={error ? "add-link-error" : undefined}
             value={url}
             readOnly={busy}
-            onChange={(e) => (setUrl(e.target.value), leftLinks.set(skill ?? "", e.target.value), setError(null))}
+            onChange={(e) => (setUrl(e.target.value), leftLinks.set(skill ?? "", e.target.value), e.target.value.trim() || setPasted(null), setError(null))}
+            // The paste as it came, so a page's headings, tables and pictures come in with it, as on the Mac.
+            onPaste={(e) => {
+              const f = e.currentTarget;
+              if (!f.value.trim() || f.selectionEnd - f.selectionStart === f.value.length) setPasted({ text: e.clipboardData.getData("text/plain"), html: pastedHtml(e.clipboardData) });
+            }}
+            // The keyboard's Go adds, as the one-line field's did; pasted text keeps its lines.
+            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && (e.preventDefault(), void add())}
           />
           {error && <p className="phone-error" id="add-link-error" role="alert">{error}</p>}
           <button className="pill-btn" type="submit" disabled={!url.trim() || busy}>
