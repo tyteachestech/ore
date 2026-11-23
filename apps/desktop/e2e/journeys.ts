@@ -11377,6 +11377,12 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
     await until("the second ⌘Z takes the first off", async () => (await item()).skills.join() === start.join());
     if (!closeFirst) await page.keyboard.press("Escape");
   }
+  // The source's own read after the last ⌘Z has landed: until then the header (and the picker it opens) can still
+  // show a skill that read began with, and ↵ on it would untick it (F-new-ci-picker-stale-read).
+  await until("the header shows only the skills he started with", async () => {
+    const head = await page.locator(".doc-head").innerText();
+    return others.every((k) => !head.includes(k.name));
+  });
   // By keys: he types to filter and ticks with ↵, so focus stays in the filter field, which has
   // nothing typed since the tick: ⌘Z is the app's (macOS keeps one undo run per window).
   await page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` }).click();
