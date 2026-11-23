@@ -86,7 +86,7 @@ When a sweep's triage is done, add a row per tester here.
 | 11-23 | [ux sweep 7](2026-11-23-codex-ux-sweep-7/) mac | Codex | Round 7: other content (book, video, PDF, Spanish) | Mac | 3 | #504 |
 | 11-23 | [ux sweep 7](2026-11-23-codex-ux-sweep-7/) phone | Codex | Round 7: other content | iPhone | 3 | #504 |
 | 11-23 | [ux sweep 8](2026-11-23-codex-ux-sweep-8/) mac | Codex | Round 8: features no round had used (courses, Feed, Ask, Dig, quick quiz, audio) | Mac | 1 (to an intake thread) | — |
-| 11-23 | [ux sweep 8](2026-11-23-codex-ux-sweep-8/) phone | Codex | Round 8: the same on the iPhone | iPhone | 3 | #PRNUM |
+| 11-23 | [ux sweep 8](2026-11-23-codex-ux-sweep-8/) phone | Codex | Round 8: the same on the iPhone | iPhone | 3 | #506 |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
