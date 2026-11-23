@@ -1290,7 +1290,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // A long text is drawn in slices, and can be ready a second after it opened: a click into the note meanwhile keeps
     // the keys there, or what he types next lands in the source (CI, F396).
     if (clicked.current && document.activeElement && document.activeElement !== document.body) return;
-    scrollRef.current.focus({ preventScroll: true });
+    // A box open over the source (⌘N pressed again while what he just added opens) keeps the keys; the
+    // source takes them when the box goes and leaves them nowhere.
+    const text = scrollRef.current;
+    const boxOpen = () => !!document.querySelector('[aria-modal="true"]');
+    if (!boxOpen()) return void text.focus({ preventScroll: true });
+    const gone = new MutationObserver(() => {
+      if (boxOpen()) return;
+      gone.disconnect();
+      if (!document.activeElement || document.activeElement === document.body) text.focus({ preventScroll: true });
+    });
+    gone.observe(document.body, { childList: true, subtree: true });
+    return () => gone.disconnect();
   }, [ready, scrollKey]);
 
   // Paint highlights with the CSS Custom Highlight API; the Markdown DOM is never mutated.

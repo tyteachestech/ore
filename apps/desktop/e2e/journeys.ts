@@ -16894,6 +16894,38 @@ journey("add: what he typed and left with Esc is there, selected, at the next âŒ
   }
 });
 
+// F478: a source he just added is still opening when he presses âŒ˜N again; once its text was ready the
+// reader took the keys from the Add box, so what he typed next went nowhere and Esc did not close the box.
+journey("add: a source that finishes opening under the Add box leaves the keys in the box (F478)", async (page) => {
+  const box = page.getByRole("dialog", { name: "Add a source" });
+  const field = box.getByLabel("Link, file path or text");
+  const title = `Opens under the box ${Date.now()}`;
+  const slow = (ms?: number) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { show: ms } : undefined), ms);
+  try {
+    await page.keyboard.press("Meta+KeyN");
+    await field.fill(`# ${title}\n\nThe keys stay where he is typing.`);
+    await slow(700);
+    await page.keyboard.press("Enter");
+    await box.waitFor({ state: "detached" });
+    await page.keyboard.press("Meta+KeyN");
+    await field.waitFor();
+    await page.locator(".reader-scroll .doc").getByText("The keys stay where he is typing.").waitFor();
+    await Bun.sleep(300); // a long text is ready a little after it shows
+    await slow();
+    if (!(await field.evaluate((f) => document.activeElement === f))) throw new Error(`the keys left the Add box for ${await page.evaluate(() => document.activeElement?.className)}`);
+    await page.keyboard.type("still here");
+    if ((await field.inputValue()) !== "still here") throw new Error("typing did not reach the Add box");
+    await field.fill("");
+    await page.keyboard.press("Escape");
+    await box.waitFor({ state: "detached" });
+    await until("with the box gone the keys are the source's", () => page.evaluate(() => !!document.activeElement?.closest(".reader-scroll")));
+  } finally {
+    await slow();
+    const made = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === title);
+    if (made) await ore("archive", made.id).catch(() => {});
+  }
+});
+
 // F450: with the sidebar folded in a narrow window the reading column starts at the window's edge, and the
 // ambience radio's corner sat over the first letters of its lines.
 journey("ambience: in a narrow window with the sidebar folded the radio sits in the top bar, clear of the source's text, and still opens (F450)", async (page) => {
