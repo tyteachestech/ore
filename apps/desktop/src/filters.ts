@@ -29,6 +29,9 @@ const BY_EXT: Record<string, string> = {
 /** A source's kind as shown and filtered: its stored type, or for an article, what its kept original is. */
 export const kindOf = (i: Pick<Item, "type" | "source_file">) => (i.type === "article" && i.source_file ? BY_EXT[i.source_file.split(".").pop()!.toLowerCase()] : undefined) ?? i.type;
 
+/** The line under a source's title on the iPhone's rows: its author and kind, as the Mac's row says them. */
+export const rowLine = (i: Pick<Item, "type" | "source_file" | "author">) => [i.author, kindLabel(kindOf(i))].filter(Boolean).join(" · ");
+
 /** No skill is a value of its own, so the unfiled can be found. */
 export const NO_SKILL = "";
 
