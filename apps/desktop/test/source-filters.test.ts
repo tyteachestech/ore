@@ -63,3 +63,12 @@ describe("filters after review (D286)", () => {
     expect(src("FilterBar.tsx")).toContain("const opts = open && field ? options(");
   });
 });
+
+// Codex UX sweep 6: a deck, a spreadsheet, a notebook and an RTF file all read "Article", in the rows and in Kind.
+test("a file that imports as an article shows and filters as what its kept original is", () => {
+  const f = (id: string, file?: string) => ({ ...item(id, "article", []), source_file: file ? `/lib/items/${id}/source.${file}` : undefined }) as unknown as Item;
+  const files = [f("deck", "pptx"), f("sheet", "csv"), f("nb", "ipynb"), f("doc", "rtf"), f("page", "html"), f("web")];
+  expect(options(files, "kind", (s) => s).map((o) => o.label).sort()).toEqual(["Article", "Document", "Notebook", "Slides", "Spreadsheet"]);
+  expect(files.filter((i) => passes(i, [{ field: "kind", values: ["slides"] }])).map((i) => i.id)).toEqual(["deck"]);
+  expect(files.filter((i) => passes(i, [{ field: "kind", values: ["article"] }])).map((i) => i.id)).toEqual(["page", "web"]);
+});

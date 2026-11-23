@@ -52,7 +52,7 @@ import { askDig } from "./Dig";
 import { Sidebar } from "./Sidebar";
 import { Thumb } from "./Thumb";
 import { FilterButton, FilterTags } from "./FilterBar";
-import { kindLabel, NO_SKILL, onlyNoSkill, passes, type Filter } from "./filters";
+import { kindLabel, kindOf, NO_SKILL, onlyNoSkill, passes, type Filter } from "./filters";
 import { importanceActions, LEVELS, sourceImportanceActions } from "./importance";
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import type { Sub } from "./Forge";
@@ -2231,7 +2231,7 @@ export function App() {
                 <>
                   {!bare && <span className="row-line">{by}{picker}</span>}
                   {/* A skill page's rows are Reader's (D130): a third line says what kind it is (its length joins once import records one). */}
-                  <span className={`kind-line${bare ? " row-line" : ""}`}>{kindLabel(r.type)}{bare && picker}</span>
+                  <span className={`kind-line${bare ? " row-line" : ""}`}>{kindLabel(kindOf(r))}{bare && picker}</span>
                 </>
               );
             })()}
@@ -2244,7 +2244,7 @@ export function App() {
             </span>
           </Hint>
         )}
-        {details.includes("type") && <span className="col kind">{kindLabel(r.type)}</span>}
+        {details.includes("type") && <span className="col kind">{kindLabel(kindOf(r))}</span>}
         {detailCols(r, [r.captured_at])}
         <MoreButton label={pickN > 1 ? `Actions for ${count(pickN, "source")}` : `Actions for ${r.title}`} actions={acts} hoverOnly inRow />
       </DragRow>

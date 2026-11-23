@@ -14,8 +14,18 @@ export const FIELDS: { id: Field; label: string; plural: string }[] = [
 ];
 
 /** Source kinds as he would say them, on the rows, in Add and in the filter alike. */
-const KINDS: Record<string, string> = { article: "Article", youtube: "Video", pdf: "PDF", epub: "Book", markdown: "Text", snippet: "Snippet" };
+const KINDS: Record<string, string> = { article: "Article", youtube: "Video", pdf: "PDF", epub: "Book", markdown: "Text", snippet: "Snippet", slides: "Slides", sheet: "Spreadsheet", notebook: "Notebook", document: "Document", image: "Image", audio: "Audio", video: "Video", transcript: "Transcript" };
 export const kindLabel = (type: string) => KINDS[type] ?? type.charAt(0).toUpperCase() + type.slice(1);
+
+/** What a file kept as its original says it is, for the many that import as an article (Codex UX sweep 5: a deck,
+ *  a spreadsheet and a notebook all read "Article", and the Kind filter couldn't tell them apart). */
+const BY_EXT: Record<string, string> = {
+  pptx: "slides", key: "slides", xlsx: "sheet", csv: "sheet", tsv: "sheet", ipynb: "notebook", docx: "document", rtf: "document",
+  png: "image", jpg: "image", jpeg: "image", heic: "image", tiff: "image", webp: "image", gif: "image",
+  mp3: "audio", m4a: "audio", wav: "audio", aac: "audio", aiff: "audio", flac: "audio", mp4: "video", mov: "video", m4v: "video", vtt: "transcript", srt: "transcript",
+};
+/** A source's kind as shown and filtered: its stored type, or for an article, what its kept original is. */
+export const kindOf = (i: Pick<Item, "type" | "source_file">) => (i.type === "article" && i.source_file ? BY_EXT[i.source_file.split(".").pop()!.toLowerCase()] : undefined) ?? i.type;
 
 /** No skill is a value of its own, so the unfiled can be found. */
 export const NO_SKILL = "";
@@ -24,7 +34,7 @@ export const NO_SKILL = "";
 export const onlyNoSkill = (filters: Filter[]) => filters.length === 1 && filters[0]!.field === "skill" && filters[0]!.values.length === 1 && filters[0]!.values[0] === NO_SKILL;
 
 function valuesOf(i: Item, field: Field): string[] {
-  if (field === "kind") return [i.type];
+  if (field === "kind") return [kindOf(i)];
   if (field === "skill") return i.skills.length ? i.skills : [NO_SKILL];
   return i.author?.trim() ? [i.author.trim()] : [];
 }
