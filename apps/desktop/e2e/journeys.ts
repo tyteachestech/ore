@@ -5095,6 +5095,39 @@ journey("peeked sidebar: it stays while its own menu is open, and slides away on
   await page.getByRole("button", { name: "Show sidebar" }).click();
 });
 
+// F-new-settings-first: Settings lists General first (D347) but a first open landed on Reading, one section down.
+journey("Settings: a first open lands on General, the first section in its list", async (page) => {
+  await page.evaluate(() => localStorage.removeItem("ore.settings"));
+  await page.keyboard.press("Meta+Comma");
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await settings.waitFor();
+  const on = await settings.getByRole("tab", { selected: true }).innerText();
+  await page.keyboard.press("Escape");
+  if (on.trim() !== "General") throw new Error(`a first open of Settings lands on ${on.trim()}, not General`);
+});
+
+// F-new-end-done: with three skills kept the end screen ran past a 1280×800 window and Done sat under its foot.
+// A shorter window shows the same with one skill row.
+journey("review: the end screen's Done stays in sight when the screen runs longer than the window", async (page) => {
+  const app = oreCalls(page);
+  await page.setViewportSize({ width: 1280, height: 640 });
+  await startReview(page, null);
+  try {
+    await reveal(page);
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await page.waitForTimeout(400);
+    await page.keyboard.press("Escape");
+    const done = page.locator(".review-foot").getByRole("button", { name: "Done" });
+    await done.waitFor();
+    await page.waitForTimeout(3000); // the end screen's moment settles
+    const box = (await done.boundingBox())!;
+    if (process.env.ORE_E2E_SHOT) await page.screenshot({ path: process.env.ORE_E2E_SHOT });
+    if (box.y + box.height > 640) throw new Error(`Done's foot is at ${Math.round(box.y + box.height)}px in a 640px window`);
+  } finally {
+    await app.undoAll();
+  }
+});
+
 journey("Settings: ⌘K and ⌘/ still work over it, leaving it for the palette or the shortcuts sheet (Linear)", async (page) => {
   const settings = page.getByRole("dialog", { name: "Settings" });
   await page.keyboard.press("Meta+Comma");

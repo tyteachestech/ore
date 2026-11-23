@@ -28,7 +28,7 @@ if (typeof document !== "undefined") document.documentElement.dataset.chips = ch
 export function SkillChip({ skill }: { skill: Skill }) {
   const chip = (
     <span className="chip" data-color={skill.color}>
-      <SkillIcon icon={skill.icon} color={skill.color} className="icon" />
+      <SkillIcon icon={skill.icon} color={skill.color} dot className="icon" />
       <span className="chip-name">{skill.name}</span>
     </span>
   );
