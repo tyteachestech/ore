@@ -418,7 +418,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
                   <kbd>↵</kbd> {page.kind === "source" ? "Run" : page.kind === "collection" ? "Next" : "Create"}
                 </span>
                 <span>
-                  <kbd>Esc</kbd> Back
+                  <kbd>Esc</kbd> {q ? "Clear" : "Back"}
                 </span>
               </>
             ) : (
@@ -434,7 +434,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
                   </span>
                 )}
                 <span>
-                  <kbd>Esc</kbd> Close
+                  <kbd>Esc</kbd> {q ? "Clear" : "Close"}
                 </span>
               </>
             )}
