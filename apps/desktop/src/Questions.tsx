@@ -34,7 +34,7 @@ const drafts = new Map<string, string>();
 
 /** The answer box under a question. ↵ adds what he wrote to the answer and keeps the question open;
  *  Answered closes it; ⌘↵ closes it and asks for a card. Esc closes the box and keeps the draft. */
-export function AnswerBox({ q, item, quote, onSaved, onRewrite, onClose, notify }: {
+export function AnswerBox({ q, item, quote, onSaved, onRewrite, onWriting, onClose, notify }: {
   q: Question;
   /** The source he is reading, credited with what he writes. */
   item?: string;
@@ -43,6 +43,9 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onClose, notify 
   onSaved: (s: Saved, how: "contribution" | "done" | "card") => void;
   /** A piece of his answer rewritten or removed and saved: the page reads the question again (Codex UX sweep 2). */
   onRewrite?: () => void;
+  /** A write the page does not read again after (Undo of a removed piece) starts or ends: a read of the questions
+   *  that was out across either is older than what he sees, and is made again. */
+  onWriting?: () => void;
   onClose: () => void;
   notify: Notify;
 }) {
@@ -83,13 +86,13 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onClose, notify 
     if (record)
       (gone
         ? notify("Removed from your answer", "info", async () => {
-            // Out like a rewrite, and the page reads again after it: the read made when the removal landed may still
-            // be on its way, and would show the answer without the piece (F-new-answer-undo-stale-read).
+            // Out like a rewrite, and the page is told at both ends: the read made when the removal landed may still be
+            // on its way, and would show the answer without the piece (F-new-answer-undo-stale-read).
             out.current++;
-            const r = await ore<Saved["question"]>("answer", q.id, opt("text", from), ...(was.item ? [opt("item", was.item)] : []), ...(was.quote ? [opt("quote", was.quote)] : [])).finally(() => out.current--);
+            onWriting?.();
+            const r = await ore<Saved["question"]>("answer", q.id, opt("text", from), ...(was.item ? [opt("item", was.item)] : []), ...(was.quote ? [opt("quote", was.quote)] : [])).finally(() => (out.current--, onWriting?.()));
             back = r.answers?.at(-1)?.ts ?? back;
             setAnswers((l) => [...l, { ...was, ts: back }]);
-            onRewrite?.();
           }, () => rewrite(back, "", from, false))
         : notify("Changed your answer", "quiet", () => rewrite(ts, from, to, false), () => rewrite(ts, to, from, false))
       ).hold(write);
