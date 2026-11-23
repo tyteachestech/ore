@@ -11428,7 +11428,7 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
     if (!closeFirst) await page.keyboard.press("Escape");
   }
   // The source's own read after the last ⌘Z has landed: until then the header (and the picker it opens) can still
-  // show a skill that read began with, and ↵ on it would untick it (F493).
+  // show a skill that read began with, and ↵ on it would untick it (F498).
   await until("the header shows only the skills he started with", async () => {
     const head = await page.locator(".doc-head").innerText();
     return others.every((k) => !head.includes(k.name));
@@ -14806,7 +14806,7 @@ journey("source rename: ⌘Z leaves a title set outside since, and says so (F175
 journey("source note: after leaving, ⌘Z takes back the note's edits, not the source added before (F157)", async (page) => {
   const title = `Source with a note ${Date.now()}`;
   await page.reload();
-  await page.locator(".side-item").first().waitFor(); // ⌘N before the app is up after a reload goes nowhere (F492)
+  await page.locator(".side-item").first().waitFor(); // ⌘N before the app is up after a reload goes nowhere (F497)
   await page.keyboard.press("Meta+n");
   await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nThis source must survive undoing its note.`);
   await page.keyboard.press("Enter");

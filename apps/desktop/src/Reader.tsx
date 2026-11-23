@@ -1934,7 +1934,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     try {
       const made = ore<Annotation>("highlight", p.id, "--at", String(at), opt("note", line));
       wake(made);
-      const ann = await whileOut(made); // ⌘Z meanwhile waits for its step (F474)
+      const ann = await whileOut(made); // ⌘Z meanwhile waits for its step (F479)
       keptFromFeed(ann);
       savedIds.current.set(tmp, ann.id); // so a read again landing before the swap doesn't list it twice
       setAnns((l) => l.map((a) => (a.id === tmp ? ann : a)));

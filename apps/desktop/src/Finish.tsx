@@ -296,7 +296,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   }
 
   // Its step goes on the history only after the write and the moment (App's onDone): ⌘Z meanwhile waits for it
-  // (F474), so it takes back the finish, not the step before it.
+  // (F479), so it takes back the finish, not the step before it.
   const finish = (then?: () => void) => whileOut(finishNow(then));
   async function finishNow(then?: () => void) {
     setBusy(true);
