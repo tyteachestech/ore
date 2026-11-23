@@ -815,7 +815,10 @@ export function PhoneApp() {
     };
   }, []);
 
-  const open = (id: string, at?: string) => {
+  /** Sources a note's link left, newest last: Back returns to each one's note (Codex UX sweep 9), as iOS pushes. */
+  const backTo = useRef<string[]>([]);
+  const open = (id: string, at?: string, fromLink = false) => {
+    if (!fromLink) backTo.current = [];
     // A source he opens himself is never held back, the saved one included.
     setStartKnown(true);
     setJumpTo(at);
@@ -832,11 +835,23 @@ export function PhoneApp() {
     [skills, items],
   );
   // The note it was tapped in closes (a skill's note sits over everything), so what it names is what shows.
-  const openLink = (t: { kind: "item" | "skill"; id: string }) => {
+  // From a source's note, Back comes back to it; a Linked from row (`note`) opens the note it quotes.
+  const openLink = (t: { kind: "item" | "skill"; id: string }, note = false) => {
+    const from = noting && openId && openId !== t.id ? openId : null;
     setSkillNote(false);
     setNoting(false);
-    if (t.kind === "item") open(t.id);
-    else (setOpenId(null), setSkill(t.id));
+    if (t.kind === "item") {
+      open(t.id, undefined, true);
+      if (from) backTo.current.push(from);
+      if (note) setNoting(true);
+    } else (setOpenId(null), setSkill(t.id));
+  };
+  /** Back from a source: to the note a link left, else out of the source. */
+  const backFromSource = () => {
+    const prev = backTo.current.pop();
+    if (!prev) return setOpenId(null);
+    setOpenId(prev);
+    setNoting(true);
   };
   // What the share card's Open asked for, as soon as it is in the list; given up after half a minute (it
   // couldn't be read here, or another device took it), so it never pulls him out of something later.
@@ -1159,9 +1174,9 @@ export function PhoneApp() {
         </Boundary>
       </Screen>
     ) : openId && (startKnown || openId !== start.openId) ? (
-      <Screen className="phone-full phone-reader phone-source" onBack={() => setOpenId(null)} onForward={setNoting}>
+      <Screen className="phone-full phone-reader phone-source" onBack={backFromSource} onForward={setNoting}>
         {/* From the note, Back returns to the source, as the left-edge swipe does. */}
-        <Back label={noting ? "Source" : "Back"} title={noting && side === "questions" ? "Collected" : undefined} stay={noting} onClick={() => (noting ? setNoting(false) : setOpenId(null))} />
+        <Back label={noting ? "Source" : "Back"} title={noting && side === "questions" ? "Collected" : undefined} stay={noting} onClick={() => (noting ? setNoting(false) : backFromSource())} />
         <Boundary onBack={() => setOpenId(null)}>
           <Reader
             key={openId}

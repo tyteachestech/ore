@@ -1914,6 +1914,9 @@ button.try-stone:hover .stone { opacity: 1; }
 .skill-recall-foot button:not(.pill-btn) { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 6px; color: var(--muted); font-size: 13px; }
 .skill-recall-foot button:not(.pill-btn):hover { background: var(--bg-hover); color: var(--text); }
 .skill-recall-foot button:disabled { opacity: 0.5; }
+/* The phone's review history: the line is a 44 pt tap that lists each review's rating and date (Codex UX sweep 9). */
+.timeline-tap { display: block; width: 100%; min-height: 44px; padding: 18px 0; margin: -18px 0; background: none; border: 0; }
+.timeline-list { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
 /* The Dig's Close, Cancel and Done are 44 pt taps on the phone (Codex UX sweep 8). */
 .phone .skill-recall-close { width: 44px; height: 44px; margin: -9px -9px -9px auto; }
 .phone .skill-recall-foot button { min-height: 44px; }

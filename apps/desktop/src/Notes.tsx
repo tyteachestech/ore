@@ -335,7 +335,7 @@ export function NoteBody({ notes, editorRef, targets, onOpen, placeholder, label
 }
 
 /** "Linked from" (D39): lines in other notes that link to this source or skill. */
-export function LinkedFrom({ target, onOpen }: { target: NoteRef; onOpen: (t: Omit<LinkTarget, "title">) => void }) {
+export function LinkedFrom({ target, onOpen }: { target: NoteRef; /** `note`: the row is his writing in that note, so where it goes is the note (the phone opens it; Codex UX sweep 9). */ onOpen: (t: Omit<LinkTarget, "title">, note?: boolean) => void }) {
   const [links, setLinks] = useState<Backlink[]>([]);
   const peek = usePeek(onOpen);
   const key = args(target).join(" ");
@@ -356,7 +356,7 @@ export function LinkedFrom({ target, onOpen }: { target: NoteRef; onOpen: (t: Om
     <section className="linked-from" aria-label="Linked from">
       <h3>Linked from</h3>
       {links.map((l, i) => (
-        <button key={i} className="backlink" onClick={() => (peek.close(), onOpen(l.from))} onPointerEnter={(e) => peek.hover(e.currentTarget, l.from)} onPointerLeave={peek.leave}>
+        <button key={i} className="backlink" onClick={() => (peek.close(), onOpen(l.from, true))} onPointerEnter={(e) => peek.hover(e.currentTarget, l.from)} onPointerLeave={peek.leave}>
           <span className="from">
             {l.from.kind === "skill" ? `${l.from.title} notes` : l.from.title}
             {l.heading && <span className="sub"> › {l.heading}</span>}

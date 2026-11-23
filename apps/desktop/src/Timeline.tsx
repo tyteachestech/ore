@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { Hint } from "./Hint";
-import type { CardHistory } from "./ore";
+import { PHONE, type CardHistory } from "./ore";
 import { count } from "./util";
 
 const RATINGS = ["Again", "Hard", "Good", "Easy"] as const;
@@ -32,8 +33,10 @@ export function inWords(iso: string, now = Date.now()): string {
  *  the line's end. Hovering a dot names it. Nothing animates: he sees this on every card. */
 export function Timeline({ history, rating }: { history: CardHistory; rating: 1 | 2 | 3 | 4 }) {
   const { dots, nextX } = layout(history.reviews, history.next[rating], history.next[4]);
-  return (
-    <>
+  // A touch has no hover: on the phone a tap on the line lists each review's rating and date under it (Codex UX sweep 9).
+  const [listed, setListed] = useState(false);
+  const said = dots.map((d) => `${RATINGS[d.rating - 1]} · ${day(d.ts)}`);
+  const line = (
     <div className="timeline" role="img" aria-label={`${count(dots.length, "review")}; next ${inWords(history.next[rating])} if ${RATINGS[rating - 1]}`}>
       {dots.map((d, i) => (
         <Hint key={i} text={`${RATINGS[d.rating - 1]} · ${day(d.ts)}`} side="top">
@@ -44,8 +47,19 @@ export function Timeline({ history, rating }: { history: CardHistory; rating: 1 
         <i className={`next rate-${rating}`} style={{ left: `${nextX}%` }} />
       </Hint>
     </div>
+  );
+  return (
+    <>
+    {PHONE && dots.length ? (
+      <button className="timeline-tap" aria-expanded={listed} aria-label={`${count(dots.length, "review")}: ${listed ? "hide" : "show"} each one's rating and date`} onClick={() => setListed((v) => !v)}>
+        {line}
+      </button>
+    ) : (
+      line
+    )}
     {/* What the hollow dot means, in words (F134): the line's own label says the same to VoiceOver. */}
     <span className="timeline-next" aria-hidden="true">next {inWords(history.next[rating])}</span>
+    {listed && <p className="timeline-list">{said.join(", ")}</p>}
     </>
   );
 }
