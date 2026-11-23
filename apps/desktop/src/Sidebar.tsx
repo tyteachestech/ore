@@ -46,7 +46,7 @@ const SETTLE: DropAnimation = { duration: 180, easing: "cubic-bezier(0.2, 0, 0, 
  *  where it will land and the other rows slide aside; a skill drops into, out of and within any
  *  collection. Icons sit bare (Dia, Notion); the open skill's row takes its color, as Dia tints a space,
  *  and holds a fainter tint while one of its sources is open. */
-export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loose, noSkill, onNoSkill, hidden, peek, drop, onPointer, onOpen, menu, onCreated, newSkill: asked, onArrange, onDeleteCollection }: {
+export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loose, noSkill, onNoSkill, hidden, peek, drop, onPointer, onOpen, menu, onCreated, onError, newSkill: asked, onArrange, onDeleteCollection }: {
   skills: Skill[];
   skill: string | null;
   /** A source is open: the selected row is where it sits, so it takes a quieter tint than its own page. */
@@ -71,12 +71,15 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loo
   onOpen: (id: string | null) => void;
   /** A skill's actions, on right-click and its ⋯. */
   menu: (s: Skill) => MenuAction[];
-  onCreated: (s: Skill) => void;
+  /** `open` false: made after he left its name field, so its page doesn't open over where he went. */
+  onCreated: (s: Skill, open?: boolean) => void;
+  /** Says why a write failed once the field that asked for it has gone. */
+  onError?: (why: string) => void;
   /** Counts up each time the command palette's New skill… is run: the name field opens at the top. */
   newSkill?: number;
   /** A new sidebar layout: a skill or collection moved, or a collection renamed. `step` names a step
    *  taken from a menu or a name field, which gets a toast with Undo (a drag shows its result in place). */
-  onArrange: (layout: SkillLayout, step?: string) => void;
+  onArrange: (layout: SkillLayout, step?: string) => Promise<boolean> | void;
   /** Removes a collection; its skills move to the ungrouped ones. */
   onDeleteCollection: (collection: string) => void;
 }) {
@@ -88,7 +91,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loo
   const groups = useMemo((): Group[] => sidebarGroups(skills).map(({ bare: _, ...g }) => g), [skills]);
   const archived = skills.filter((s) => s.archived);
   const [archivedOpen, setArchivedOpen] = useState(() => load(ARCHIVED_OPEN) === "1");
-  const arrange = (layout: SkillLayout, step?: string, renamed?: { from: string; to: string }) => {
+  const arrange = (layout: SkillLayout, step?: string, renamed?: { from: string; to: string }): Promise<boolean> | void => {
     const out = layout.map((g) => ({ ...g, skills: [...g.skills] }));
     for (const s of archived) {
       const c = s.collection && renamed?.from === s.collection ? renamed.to : (s.collection ?? "");
@@ -96,7 +99,7 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loo
       if (g) g.skills.push(s.id);
       else out.push({ collection: c, skills: [s.id] });
     }
-    onArrange(out, step);
+    return onArrange(out, step);
   };
   // While dragging: the layout as it would be if dropped now.
   const [draft, setDraft] = useState<Group[] | null>(null);
@@ -106,6 +109,18 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loo
   // under it (the lone "Skills" group becomes "Other" once the skills load), a collection can't.
   const [adding, setAdding] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
+  /** A rename that was refused: the field opens again with what he typed (Codex UX sweep 5). */
+  const [renameDraft, setRenameDraft] = useState<string | null>(null);
+  /** A collection just renamed: its name takes focus once its section is there under that name. */
+  const focusName = useRef<string | null>(null);
+  useEffect(() => {
+    const want = focusName.current;
+    if (!want) return;
+    const head = [...document.querySelectorAll<HTMLElement>(".sidebar .side-label")].find((h) => h.querySelector(".side-label-text")?.textContent === want);
+    if (!head) return;
+    focusName.current = null;
+    if (!document.activeElement || document.activeElement === document.body) head.focus({ preventScroll: true });
+  });
   // A group that exists only while its first skill is named: a new collection, or "Other" when
   // every skill is in one ("" names it). It is saved with that skill, so Esc leaves nothing behind.
   const [fresh, setFresh] = useState<string | null>(null);
@@ -185,10 +200,21 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loo
 
   const rename = (g: Group, name: string) => {
     setRenaming(null);
+    setRenameDraft(null);
     const v = tidyCollection(name);
     if (!v || v === g.collection) return;
-    if (closed.includes(g.name)) setClosedSaved(closed.map((n) => (n === g.name ? v : n)));
-    arrange(layoutOf(groups.map((x) => (x === g ? { ...x, collection: v } : x))), `Renamed collection “${g.collection}” to “${v}”`, { from: g.collection, to: v });
+    const wasClosed = closed.includes(g.name);
+    if (wasClosed) setClosedSaved(closed.map((n) => (n === g.name ? v : n)));
+    // The section remounts under its new name: focus goes to that name once it is there (not to <body>).
+    focusName.current = v;
+    void Promise.resolve(arrange(layoutOf(groups.map((x) => (x === g ? { ...x, collection: v } : x))), `Renamed collection “${g.collection}” to “${v}”`, { from: g.collection, to: v })).then((ok) => {
+      if (ok !== false) return;
+      // Refused: the old name is back, folded as it was, and the field opens again with what he typed.
+      if (wasClosed) setClosedSaved(closedGroups().map((n) => (n === v ? g.name : n)));
+      focusName.current = null;
+      setRenameDraft(v);
+      setRenaming(g.collection);
+    });
   };
   // Finder's New Folder: the name field opens where collections end, Enter makes it and names its
   // first skill (a collection is the skills in it), Esc or clicking away drops it (a click away can't
@@ -312,12 +338,13 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loo
               open={isOpen(g)}
               target={active !== null && !isGroup(active) && groupOf(shown, active) === shown.indexOf(g) && groupOf(groups, active) !== groups.findIndex((x) => x.collection === g.collection)}
               renaming={renaming === g.collection && !!g.collection}
+              draft={renaming === g.collection ? renameDraft : null}
               menu={g === freshGroup ? [] : groupMenu(g)}
               onToggle={() => toggle(g.name)}
               onAdd={() => setAdding(g.collection)}
               taken={(name) => isOther(name) || groups.some((x) => x !== g && !!x.collection && x.collection.toLowerCase() === name.toLowerCase())}
               onRename={(name) => rename(g, name)}
-              onCancelRename={() => setRenaming(null)}
+              onCancelRename={() => (setRenaming(null), setRenameDraft(null))}
             >
               <SortableContext items={g.skills.map((s) => s.id)} strategy={verticalListSortingStrategy}>
                 {isOpen(g) &&
@@ -335,6 +362,8 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loo
                     setFresh(null);
                     if (s) onCreated(s);
                   }}
+                  onLanded={(s) => onCreated(s, false)}
+                  onFailed={(why) => onError?.(why)}
                 />
               )}
             </Section>
@@ -379,13 +408,15 @@ export function Sidebar({ skills, skill, within, home, onHome, feed, onFeed, loo
 
 /** A sidebar section: a collection, or the skills in none. The whole section drags by its header to
  *  reorder collections; while a skill from elsewhere hovers it, it lights up (Notion). */
-function Section({ group, bare, open, target, renaming, menu, onToggle, onAdd, taken, onRename, onCancelRename, children }: {
+function Section({ group, bare, open, target, renaming, draft, menu, onToggle, onAdd, taken, onRename, onCancelRename, children }: {
   group: Group;
   /** No header: the skills in no collection, when there are collections under them. */
   bare: boolean;
   open: boolean;
   target: boolean;
   renaming: boolean;
+  /** What a refused rename had typed, to try again. */
+  draft?: string | null;
   menu: MenuAction[];
   onToggle: () => void;
   onAdd: () => void;
@@ -395,6 +426,14 @@ function Section({ group, bare, open, target, renaming, menu, onToggle, onAdd, t
   onCancelRename: () => void;
   children: ReactNode;
 }) {
+  // A rename field that closes (saved, kept, refused and opened again, or Esc) leaves focus on the collection's name,
+  // not on <body>, wherever it was opened from (Codex UX sweep 5).
+  const head = useRef<HTMLButtonElement>(null);
+  const wasRenaming = useRef(renaming);
+  useEffect(() => {
+    if (wasRenaming.current && !renaming) setTimeout(() => (!document.activeElement || document.activeElement === document.body) && head.current?.focus({ preventScroll: true }));
+    wasRenaming.current = renaming;
+  }, [renaming]);
   const { setNodeRef, setActivatorNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
     id: groupId(group.collection),
     disabled: { draggable: !group.collection, droppable: false },
@@ -415,9 +454,9 @@ function Section({ group, bare, open, target, renaming, menu, onToggle, onAdd, t
       {!bare && <WithMenu actions={menu}>
         <div className="side-head" ref={setActivatorNodeRef} {...a11y} {...listeners}>
           {renaming ? (
-            <RenameField value={group.collection} taken={taken} onSave={onRename} onCancel={onCancelRename} />
+            <RenameField value={group.collection} initial={draft ?? undefined} taken={taken} onSave={onRename} onCancel={onCancelRename} />
           ) : (
-            <button className="side-label" aria-expanded={open} onClick={onToggle}>
+            <button ref={head} className="side-label" aria-expanded={open} onClick={onToggle}>
               <span className="side-label-text">{group.name}</span>
               <CaretRight className="caret" size={10} weight="bold" aria-hidden="true" />
             </button>
@@ -442,8 +481,8 @@ function Section({ group, bare, open, target, renaming, menu, onToggle, onAdd, t
 /** A collection's name, edited in place like a Finder folder: Enter or clicking away saves, Esc keeps the old one. */
 /** A collection's name field. A name another collection has is refused in place, as Finder refuses
  *  a folder name that is taken: the field stays open and says so (Tyler, 2026-11-07). */
-function RenameField({ value, label = "Collection name", placeholder, taken, blurSaves = true, onSave, onCancel }: { value: string; label?: string; placeholder?: string; taken?: (v: string) => boolean; blurSaves?: boolean; onSave: (v: string) => void; onCancel: () => void }) {
-  const [v, setV] = useState(value);
+function RenameField({ value, initial, label = "Collection name", placeholder, taken, blurSaves = true, onSave, onCancel }: { value: string; /** What it opens with, when not the name (a refused rename's words). */ initial?: string; label?: string; placeholder?: string; taken?: (v: string) => boolean; blurSaves?: boolean; onSave: (v: string) => void; onCancel: () => void }) {
+  const [v, setV] = useState(initial ?? value);
   const [refused, setRefused] = useState<string | null>(null);
   return (
     <>
@@ -630,12 +669,14 @@ function ArchivedRow({ s, on, drop, marked, onOpen, menu }: { s: Skill; on: bool
 
 /** Names a new skill in place, like a new page in Notion's sidebar: Enter creates it through
  *  `ore skills add`, as clicking away with a name does (D211); Esc or an empty name drops it. */
-function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; collection: string; marked: boolean; onDone: (s: Skill | null) => void }) {
+function NewSkill({ skills, collection, marked, onDone, onLanded, onFailed }: { skills: Skill[]; collection: string; marked: boolean; onDone: (s: Skill | null) => void; /** Made after he left with Esc while it was saving: it joins the list, its page unopened, and the field he may have opened since stays. */ onLanded: (s: Skill) => void; /** That save refused: said in a toast, since its field is gone. */ onFailed: (why: string) => void }) {
   // What opened it, read before its field takes focus: Esc gives focus back there.
   const [opener] = useState(() => document.activeElement as HTMLElement | null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** He pressed Esc while it was saving (Codex UX sweep 5). */
+  const left = useRef(false);
 
   const create = async () => {
     if (!name.trim() || busy) return;
@@ -645,8 +686,11 @@ function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; col
     if (other) return setError(`“${other.name}” is taken`);
     setBusy(true);
     try {
-      onDone(await ore<Skill>("skills", "add", name, opt("collection", collection)));
+      const made = await ore<Skill>("skills", "add", name, opt("collection", collection));
+      if (left.current) onLanded(made);
+      else onDone(made);
     } catch (e) {
+      if (left.current) return onFailed(errorText(e));
       setError(errorText(e));
       setBusy(false);
     }
@@ -684,6 +728,8 @@ function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; col
                 // The + shows only on hover, so from it (or when what opened it is gone) focus goes to the collection's name.
                 const head = e.currentTarget.closest(".side-section")?.querySelector<HTMLElement>(".side-label");
                 const back = opener?.isConnected && opener !== document.body && !opener.closest(".side-head-tools") ? opener : head;
+                // Already being made, it can't be called back: it lands in the list (with its Undo), its page unopened.
+                if (busy) left.current = true;
                 onDone(null);
                 // Only if focus has nowhere else to go: a ⌘K pressed in the same instant keeps its field.
                 setTimeout(() => {
@@ -696,7 +742,7 @@ function NewSkill({ skills, collection, marked, onDone }: { skills: Skill[]; col
           />
         </span>
       </div>
-      <div className={`side-new-foot${error ? " err" : ""}`}>{error ?? "↵ to add · Esc to cancel"}</div>
+      <div className={`side-new-foot${error ? " err" : ""}`}>{error ?? (busy ? "Saving…" : "↵ to add · Esc to cancel")}</div>
     </div>
   );
 }

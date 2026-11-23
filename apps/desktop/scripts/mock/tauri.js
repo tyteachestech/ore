@@ -24,7 +24,8 @@ window.__ORE_RELEASE = (key) => {
 };
 async function ore(args) {
   // window.__ORE_FAIL = { enrich: "why" }: that command fails with that reason (a test of the failure path).
-  const fail = window.__ORE_FAIL && window.__ORE_FAIL[args.args[0]];
+  // A key of two words ({ "skills arrange": "why" }) fails only that subcommand, so the reads around it still answer.
+  const fail = window.__ORE_FAIL && (window.__ORE_FAIL[args.args.slice(0, 2).join(" ")] ?? window.__ORE_FAIL[args.args[0]]);
   if (fail) throw fail;
   // window.__ORE_REPLY = { grade: {...} }: that command answers with that, as the AI would (no canned file needed).
   const reply = window.__ORE_REPLY && window.__ORE_REPLY[args.args[0]];

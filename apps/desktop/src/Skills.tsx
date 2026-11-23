@@ -98,9 +98,15 @@ export function SkillPicker({ skills, value, title, onChange, onCreate, returnFo
   const typed = query.trim().replace(/\s+/g, " ");
   // Matched by name, in sidebar order, with Create last (Linear): no fuzzy matches to skim past.
   const shown = skillsFirst(skills, first).filter((k) => k.name.toLowerCase().includes(typed.toLowerCase()));
+  // The selection as it is now, not as a render saw it: a skill picked while a new one was being made stays picked
+  // when the new one lands (Codex UX sweep 5).
+  const selNow = useRef(sel);
+  selNow.current = sel;
   const toggle = (k: Skill) => {
-    const next = sel.includes(k.id) ? sel.filter((s) => s !== k.id) : [...sel, k.id];
-    onChange(next, sel, k);
+    const was = selNow.current;
+    const next = was.includes(k.id) ? was.filter((s) => s !== k.id) : [...was, k.id];
+    onChange(next, was, k);
+    selNow.current = next;
     setSel(next);
   };
   const create = async () => {
