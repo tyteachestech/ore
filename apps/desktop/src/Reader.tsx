@@ -1266,8 +1266,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     if (p.jumpTo?.startsWith("find:")) {
       // The words, then (on a line of its own) the passage the result showed them in: Find starts there. A video's
       // transcript folded away opens, since Find looks only at what shows (Codex UX sweep 10).
-      showTranscriptFor(null);
       const [query = "", near] = p.jumpTo.slice(5).split("\n");
+      showTranscriptFor(null, query);
       setFind((f) => ({ open: true, focus: f.focus + 1, query, near }));
     }
     else if (p.jumpTo?.startsWith("note:")) {
@@ -3536,18 +3536,24 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       p.notify(errorText(e), "error");
     }
   };
-  /** Folds the whole card or its transcript, kept for this source. Folding the card pauses the video;
-   *  opening the transcript brings the spoken word back into it. */
-  /** Opens a video's transcript that is folded away: for `node` when it is inside it, or (null) whenever there is one.
-   *  True when it had to open. */
-  function showTranscriptFor(node: Node | null): boolean {
-    const box = document.querySelector<HTMLElement>(".doc .vc-transcript");
-    if (!box || !box.hidden || (node && !box.contains(node))) return false;
-    foldCard({ open: true, transcript: true });
+  /** Opens a video's transcript that is folded away, for `node` when it is inside it, or for `query` when its words
+   *  are in it (Codex UX sweep 10): not saved as his choice, and not scrolled to the spoken word, so where he was
+   *  taken stays in sight. True when it had to open. */
+  function showTranscriptFor(node: Node | null, query?: string): boolean {
+    const box = boxRef.current;
+    if (!box || !box.hidden) return false;
+    if (node && !box.contains(node)) return false;
+    // Search matches the words apart (F443): each of them is in the transcript.
+    const text = (box.textContent ?? "").toLowerCase();
+    if (!node && !(query?.trim() && query.toLowerCase().split(/\s+/).filter(Boolean).every((w) => text.includes(w)))) return false;
+    foldCard({ open: true, transcript: true }, false);
     return true;
   }
-  const foldCard = (next: typeof vc) => {
+  /** Folds the whole card or its transcript, kept for this source. Folding the card pauses the video;
+   *  opening the transcript brings the spoken word back into it. */
+  const foldCard = (next: typeof vc, his = true) => {
     setVc(next);
+    if (!his) return;
     try {
       localStorage.setItem(`ore.videoCard.${p.id}`, JSON.stringify(next));
     } catch {}
