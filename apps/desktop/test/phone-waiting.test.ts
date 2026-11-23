@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { FROM_TAB, refusal } from "../../../packages/core/src/ingest/check";
-import { MAC_WAY, phoneReason } from "../src/phone/AddLink";
+import { MAC_WAY, macOnly, phoneReason } from "../src/phone/AddLink";
 
 // A link the phone couldn't read says why, then that the Mac tries it: never the Mac's own next steps
 // (its Browser tab, `ore add --tab`, "paste its text here"), which the phone doesn't have.
@@ -25,4 +25,11 @@ test("phone: a refused link's reason leaves out the Mac's next steps", () => {
   for (const r of [refusal("Just a moment...", "Checking your browser", "example.com"), refusal("Article", "Sign in to read", "example.com")]) {
     if (r) expect(phoneReason(r)).not.toMatch(/Browser tab|ore add|paste its text/);
   }
+});
+
+// Codex UX sweep 8: a playlist added on the phone said to "add it as a course (in the app it's offered as one…)",
+// an action the phone doesn't have, then that the Mac would try it, through the path that refuses playlists.
+test("a playlist from the phone says the Mac adds it as a course", () => {
+  const refused = "That link is a playlist. Add it as a course (in the app it’s offered as one; in Terminal, `ore add <link> --course`) to get each video as a lesson.";
+  expect(macOnly(refused)).toBe("Your Mac adds a playlist as a course, each video a lesson.");
 });

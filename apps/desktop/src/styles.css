@@ -1914,6 +1914,9 @@ button.try-stone:hover .stone { opacity: 1; }
 .skill-recall-foot button:not(.pill-btn) { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 6px; color: var(--muted); font-size: 13px; }
 .skill-recall-foot button:not(.pill-btn):hover { background: var(--bg-hover); color: var(--text); }
 .skill-recall-foot button:disabled { opacity: 0.5; }
+/* The Dig's Close, Cancel and Done are 44 pt taps on the phone (Codex UX sweep 8). */
+.phone .skill-recall-close { width: 44px; height: 44px; margin: -9px -9px -9px auto; }
+.phone .skill-recall-foot button { min-height: 44px; }
 
 /* Quiz panel (D52 to D56): the finish step and chapter recalls float at the right of the reader;
    the source is blurred past reading until an answer is checked, then passages show like find. */

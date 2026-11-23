@@ -414,14 +414,40 @@ function SourceList({ title, items, onOpen, row, head, tools, flat, empty = "Not
   );
 }
 
+/** Where he was in each skill's note, by skill, for as long as the app is open. */
+const skillNoteAt = new Map<string, number>();
+
 /** A skill's note on its own screen (Tyler 2026-11-06, B): the whole page to write in, as in Apple
  *  Notes, with the keyboard bar under it; Back or the edge swipe returns to the skill. */
 function SkillNote({ skill, notify, targets, onOpen }: { skill: string; notify: Notify; targets: LinkTarget[]; onOpen: (t: Omit<LinkTarget, "title">) => void }) {
   const ref = useMemo(() => ({ skill }), [skill]);
   const notes = useNotes(ref, notify);
   const editor = useRef<NoteEditorHandle>(null);
+  // Back to the skill and in again: the note opens where he was in it, as a source's note does (Codex UX sweep 8).
+  const page = useRef<HTMLDivElement>(null);
+  const restoring = useRef(false);
+  const loaded = notes.text !== null;
+  useLayoutEffect(() => {
+    const el = page.current;
+    const at = skillNoteAt.get(skill);
+    if (!loaded || !el || !at) return;
+    // The editor fills in over a few frames: put the place back once the note is tall enough to hold it.
+    // Its scrolls meanwhile are the restore's, not his: they don't overwrite the place.
+    let frames = 0, id = 0;
+    restoring.current = true;
+    const put = () => {
+      el.scrollTop = at;
+      if (el.scrollTop < at - 1 && frames++ < 120) id = requestAnimationFrame(put);
+      else restoring.current = false;
+    };
+    put();
+    return () => {
+      cancelAnimationFrame(id);
+      restoring.current = false;
+    };
+  }, [loaded, skill]);
   return (
-    <div className="phone-page phone-note">
+    <div className="phone-page phone-note" ref={page} onScroll={(e) => restoring.current || skillNoteAt.set(skill, e.currentTarget.scrollTop)}>
       <NoteBody notes={notes} editorRef={editor} targets={targets} onOpen={onOpen} label="Skill note" placeholder="What you know so far. Type / for blocks." />
     </div>
   );
