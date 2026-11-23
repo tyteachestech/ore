@@ -15474,8 +15474,9 @@ journey("Settings: each section opens at its top, however far the last one was s
   await settings.waitFor();
   await settings.getByRole("tab", { name: "Review" }).click();
   const main = settings.locator(".settings-main");
-  await main.evaluate((el) => (el.scrollTop = el.scrollHeight));
-  await until("Review scrolls", () => main.evaluate((el) => el.scrollTop > 0));
+  // Scrolled again on each look: the section's settings come in a moment after the tab opens, and a scroll made
+  // before then had nowhere to go (F-new-ci-settings-scroll).
+  await until("Review scrolls", () => main.evaluate((el) => ((el.scrollTop = el.scrollHeight), el.scrollTop > 0)));
   await settings.getByRole("tab", { name: "Keyboard shortcuts" }).click();
   await until("Keyboard shortcuts opens at its top", () => main.evaluate((el) => el.scrollTop === 0));
   await settings.getByRole("tab", { name: "Review" }).click();
