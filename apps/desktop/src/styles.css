@@ -2257,15 +2257,13 @@ button.home-plan:hover { color: var(--text); }
 /* A row is Readwise Reader's (D341): one picture box, the title, and under it one quiet line of what he
    picks a source by. The box is the source lists' 96×54 for every picture, so the pictures and the titles line up:
    a wide picture fills it, a page or a tall capture fills it from its top, and a cover or square art is shown
-   whole on a blurred copy of itself (data-fit, set once the picture loads). On the iPhone the row keeps its own
-   layout: the title beside the picture, the course under it. */
-.home-text, .home-meta { display: contents; }
-.home-meta > :is(.home-left, .home-site, .home-by) { display: none; }
+   whole on a blurred copy of itself (data-fit, set once the picture loads). The iPhone's row is the same one at
+   its own sizes (`.phone .home-text`, below). */
 :root:not(.phone) .home-read { height: 70px; }
 :root:not(.phone) .home-read .thumb { width: 96px; height: 54px; }
-:root:not(.phone) .home-read img.thumb[data-fit="top"] { object-position: top; }
-:root:not(.phone) .home-read img.thumb[data-fit="whole"] { position: relative; object-fit: contain; background: none; outline: 0; }
-:root:not(.phone) .home-read .thumb-at:has(img[data-fit="whole"])::before { content: ""; position: absolute; inset: -12px; background: var(--pic) center / cover; filter: blur(10px) brightness(0.55) saturate(1.2); }
+.home-read img.thumb[data-fit="top"] { object-position: top; }
+.home-read img.thumb[data-fit="whole"] { position: relative; object-fit: contain; background: none; outline: 0; }
+.home-read .thumb-at:has(img[data-fit="whole"])::before { content: ""; position: absolute; inset: -12px; background: var(--pic) center / cover; filter: blur(10px) brightness(0.55) saturate(1.2); }
 :root:not(.phone) .home-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 :root:not(.phone) .home-text > :is(.title, .row-rename) { flex: none; max-width: 100%; }
 :root:not(.phone) .home-text > .row-rename { align-self: stretch; }
@@ -3072,16 +3070,22 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
    big as a two-line row allows, and how far he is sits on its bottom edge: the line over a slim dark shade
    (D326, after D262's dots), so it reads on a white page and a dark picture alike and takes no
    room of its own. A source not opened yet says New in the same corner. */
-.phone .home-read { display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px; align-content: center; height: auto; min-height: 56px; padding: 7px 0; }
-.phone .home-read .thumb { grid-area: 1 / 1 / 3 / 2; width: 112px; height: 63px; }
-.phone .home-read :is(.title, .row-rename) { grid-column: 2; grid-row: 1 / 3; align-self: center; }
+.phone .home-read { display: grid; grid-template-columns: 112px minmax(0, 1fr); column-gap: 12px; align-items: center; height: auto; min-height: 56px; padding: 7px 0; }
+.phone .home-read .thumb { width: 112px; height: 63px; }
+/* Beside the picture, the Mac's two parts (D341): the title, and under it one quiet line of how long is left, where
+   it is from and who made it. What doesn't fit the line drops whole, from the end. Its skills stay off the phone's
+   row: a chip there would be a tap under 44 pt that opens a picker instead of the source. */
+.phone .home-text { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.phone .home-text > :is(.title, .row-rename) { flex: none; }
+.phone .home-meta { display: flex; flex-wrap: wrap; height: 1.4em; overflow: hidden; color: var(--faint); font-size: 13px; line-height: 1.4; white-space: nowrap; }
+.phone .home-meta > :is(.home-left, .home-site, .home-by, .course-of) { flex: none; max-width: 100%; font-size: inherit; overflow: hidden; text-overflow: ellipsis; }
+.phone .home-meta > :is(.home-left, .home-site, .home-by, .course-of) ~ :is(.home-left, .home-site, .home-by, .course-of)::before { content: "·"; margin: 0 6px; }
+.phone .home-meta > :is(.chips-button, .chips-add) { display: none; }
 /* The clamp is on the button's text: WebKit draws a clamped <button> whole. */
 .phone .home-read .title { white-space: normal; line-height: 1.3; }
 .phone .home-read .title > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.phone .home-read:has(.course-of) .title { grid-row: 1; align-self: end; }
-.phone .home-read .course-of { grid-area: 2 / 2; max-width: none; align-self: start; }
-.phone .home-read .thumb-at { grid-area: 1 / 1 / 3 / 2; }
-.phone .home-read .home-new { grid-area: 1 / 1 / 3 / 2; align-self: end; justify-self: start; z-index: 1; width: auto; margin: 0 0 5px 5px; padding: 3px 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.72); color: #fff; font: 500 11px/1 var(--mono); }
+.phone .home-read .thumb-at { align-self: start; }
+.phone .home-read .home-new { position: absolute; left: 5px; top: 65px; transform: translateY(-100%); z-index: 1; width: auto; padding: 3px 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.72); color: #fff; font: 500 11px/1 var(--mono); }
 .phone .home-skills { display: flex; flex-direction: column; gap: 0; }
 .phone .home-skill { flex-direction: row; align-items: center; gap: 12px; border: 0; margin: 0; padding: 0; min-height: 52px; }
 .phone .home-skill-top { flex: 1; gap: 12px; }

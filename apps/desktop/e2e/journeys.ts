@@ -11428,7 +11428,7 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
     if (!closeFirst) await page.keyboard.press("Escape");
   }
   // The source's own read after the last ⌘Z has landed: until then the header (and the picker it opens) can still
-  // show a skill that read began with, and ↵ on it would untick it (F498).
+  // show a skill that read began with, and ↵ on it would untick it (F499).
   await until("the header shows only the skills he started with", async () => {
     const head = await page.locator(".doc-head").innerText();
     return others.every((k) => !head.includes(k.name));
@@ -11436,6 +11436,9 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
   // By keys: he types to filter and ticks with ↵, so focus stays in the filter field, which has
   // nothing typed since the tick: ⌘Z is the app's (macOS keeps one undo run per window).
   await page.locator(".doc-head").getByRole("button", { name: `Skills for ${TESTING}` }).click();
+  // The keys go to the filter field, so it must have focus first: sent as the picker was still opening, "AI"
+  // was typed at the page and nothing was filed (F479, CI twice on #497).
+  await until("the picker's filter field has focus", () => page.evaluate(() => !!document.activeElement?.closest(".skill-picker") && document.activeElement.matches("input")));
   for (const k of others) {
     await page.keyboard.press("ControlOrMeta+a");
     await page.keyboard.press("Backspace");
@@ -12730,6 +12733,32 @@ journey("phone: a long title on Today and in Sources shows on two lines, with th
   await check("Sources", ".phone-sources li button", ".phone-title:not(.phone-two)");
 }, "phone");
 
+journey("phone: under a Today title one line says how long is left and where the source is from, as the Mac's rows do (D341)", async (page) => {
+  await page.locator(".home-read .title").first().waitFor();
+  for (const t of [1, 28 / 17]) {
+    await page.evaluate((t) => document.documentElement.style.setProperty("--type", String(t)), t);
+    const rows = await page.locator(".home-read").evaluateAll((els) => els.map((row) => {
+      const [title, meta, r] = [row.querySelector(".title")!.getBoundingClientRect(), row.querySelector(".home-meta")!.getBoundingClientRect(), row.getBoundingClientRect()];
+      const parts = [...row.querySelectorAll<HTMLElement>(".home-meta > :is(.home-left, .home-site, .home-by, .course-of)")].map((c) => ({ text: c.textContent ?? "", box: c.getBoundingClientRect() }));
+      const onLine = parts.filter((c) => c.box.top < meta.bottom - 2);
+      return {
+        name: row.querySelector(".title")!.textContent!.slice(0, 30),
+        line: onLine.map((c) => c.text).join(" | "),
+        // Under the title, in the row, and nothing on the line cut to a stub: what doesn't fit drops whole.
+        under: meta.top >= title.bottom - 1 && Math.abs(meta.left - title.left) <= 1 && meta.bottom <= r.bottom + 1,
+        stubs: onLine.filter((c) => c.box.right > meta.right + 1).map((c) => c.text),
+        // No chip to mis-tap: a skill chip here would be a tap under 44 pt.
+        chips: [...row.querySelectorAll<HTMLElement>(".chips-button, .chips-add")].filter((c) => c.getBoundingClientRect().width > 0).length,
+      };
+    }));
+    const bad = rows.filter((r) => !r.under || r.stubs.length || r.chips);
+    if (bad.length) throw new Error(`Today at ${t.toFixed(2)}: the detail line is off: ${JSON.stringify(bad)}`);
+    if (!rows.some((r) => /\d+ (min|h)/.test(r.line))) throw new Error(`Today at ${t.toFixed(2)}: no row says how long is left: ${rows.map((r) => `"${r.line}"`).join(", ")}`);
+    if (!rows.some((r) => r.line.includes("anthropic.com"))) throw new Error(`Today at ${t.toFixed(2)}: no row says where its source is from: ${rows.map((r) => `"${r.line}"`).join(", ")}`);
+  }
+  await page.evaluate(() => document.documentElement.style.setProperty("--type", "1"));
+}, "phone");
+
 journey("phone: an episode on a phone that can't hear speech says the Mac fills its transcript, not that it is on its way (F77)", async (page) => {
   // With no speech model (the Simulator, an older phone) the episode said “on its way” for good: the Mac fills it.
   const cors = { "access-control-allow-origin": "*" };
@@ -12770,6 +12799,45 @@ journey("phone: a long press on a Today source opens its menu", async (page) => 
   await renamed.waitFor();
   await press(page, renamed);
   await page.getByRole("menuitem", { name: "Pin to top" }).waitFor();
+}, "phone");
+
+journey("phone: the drawer's No skill lists the sources with no skill, only while there are some, and a held source sets its Importance (D345)", async (page) => {
+  const drawer = page.locator(".phone-drawer");
+  const noSkill = drawer.locator("button").filter({ hasText: /^No skill$/ });
+  const menu = () => tap(page, page.getByRole("button", { name: "Open menu" }));
+  await menu();
+  await drawer.locator("button").filter({ hasText: "Sources" }).waitFor();
+  if (await noSkill.count()) throw new Error("the drawer has a No skill row with every source under a skill");
+  const { createItem } = (await import(join(import.meta.dir, "../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ dir: string }> };
+  await phoneWith(page, async () => (await createItem({ root: PHONE_LIB }, { type: "article", title: "A values guide", body: "Write down the five things you would defend." })).dir, async () => {
+    await menu();
+    await tap(page, noSkill);
+    const rows = page.locator(".phone-sources li button");
+    await until("only the source with no skill is listed", async () => (await rows.count()) === 1 && (await rows.first().innerText()).includes("A values guide"));
+    // Held, Importance ▸ ticks Normal with no skill; Focus is set and ticked the next time.
+    const levels = async () => {
+      await press(page, rows.first());
+      await tap(page, page.getByRole("menuitem", { name: "Importance" }));
+      await page.getByRole("menuitemcheckbox", { name: "Focus" }).waitFor();
+      return page.getByRole("menuitemcheckbox").evaluateAll((els) => els.map((e) => `${e.textContent}${e.getAttribute("aria-checked") === "true" ? "✓" : ""}`).join(" "));
+    };
+    if ((await levels()) !== "Focus Normal✓ Light") throw new Error(`with no skill and nothing set: ${await levels()}`);
+    await tap(page, page.getByRole("menuitemcheckbox", { name: "Focus" }));
+    await page.getByText("A values guide: Focus").waitFor();
+    await until("Focus is ticked", async () => {
+      const now = await levels();
+      await page.keyboard.press("Escape");
+      await page.keyboard.press("Escape");
+      return now === "Focus✓ Normal Light";
+    });
+  });
+  // Gone, the row stays only while its list is open; from Today it is gone.
+  await page.reload();
+  await menu();
+  await tap(page, drawer.locator("button").filter({ hasText: "Today" }));
+  await menu();
+  await drawer.locator("button").filter({ hasText: "Sources" }).waitFor();
+  if (await noSkill.count()) throw new Error("the No skill row stayed after its last source went");
 }, "phone");
 
 journey("phone: a held row in a skill's list opens its own menu only; Return in Rename opens nothing; Rename… is on Today's rows too (F46–F48)", async (page) => {
@@ -14231,6 +14299,21 @@ journey("phone: a selection handle held at the bottom of the screen turns the pa
       return Number(p.textContent!.match(/Passage (\d+)/)![1]);
     });
     await page.waitForTimeout(150); // a change of its own: a new selection alone never turns the page
+    // The word the handle is dragged to must be there to drag to: as the first phone journey of a CI shard, on a
+    // phone build just started, nothing answered at that point yet and the drag below threw on null (F475).
+    let under = "";
+    await until("there is text at the foot of the reader to drag the handle to", async () => {
+      under = await page.evaluate(() => {
+        const b = document.querySelector<HTMLElement>(".phone-reader .reader-scroll")!.getBoundingClientRect();
+        const end = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")].find((q) => q.getBoundingClientRect().bottom > b.bottom - 40);
+        if (!end) return "no paragraph reaches the reader's foot";
+        const [x, y] = [end.getBoundingClientRect().left + 20, Math.min(end.getBoundingClientRect().bottom, b.bottom) - 30];
+        if (document.caretRangeFromPoint(x, y)) return "";
+        const at = document.elementFromPoint(x, y);
+        return `no text at ${Math.round(x)},${Math.round(y)} (window ${innerWidth}×${innerHeight}, reader ends at ${Math.round(b.bottom)}): ${at ? `${at.tagName}.${at.className}` : "nothing there"}`;
+      });
+      return !under;
+    }, 5000).catch((e) => { throw new Error(`${(e as Error).message}: ${under}`); });
     const from = await page.evaluate((n) => {
       const b = document.querySelector<HTMLElement>(".phone-reader .reader-scroll")!.getBoundingClientRect();
       const ps = [...document.querySelectorAll<HTMLElement>(".phone-reader .doc p")];
@@ -14806,7 +14889,7 @@ journey("source rename: ⌘Z leaves a title set outside since, and says so (F175
 journey("source note: after leaving, ⌘Z takes back the note's edits, not the source added before (F157)", async (page) => {
   const title = `Source with a note ${Date.now()}`;
   await page.reload();
-  await page.locator(".side-item").first().waitFor(); // ⌘N before the app is up after a reload goes nowhere (F497)
+  await page.locator(".side-item").first().waitFor(); // ⌘N before the app is up after a reload goes nowhere (F498)
   await page.keyboard.press("Meta+n");
   await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nThis source must survive undoing its note.`);
   await page.keyboard.press("Enter");

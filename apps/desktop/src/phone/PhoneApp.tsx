@@ -2,7 +2,7 @@
 // and the skills, as in Obsidian; a source and Review open full screen over it, with a way back.
 // Everything inside the screens is the Mac app's own code.
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Archive, BookOpen, CaretLeft, CaretRight, Check, GearSix, GraduationCap, House, MagnifyingGlass, Plus, SidebarSimple } from "../icons";
+import { Archive, BookOpen, CaretLeft, CaretRight, Check, FileText, GearSix, GraduationCap, House, MagnifyingGlass, Plus, SidebarSimple } from "../icons";
 import { flushSync } from "react-dom";
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Boundary } from "../Boundary";
@@ -28,7 +28,8 @@ import { Palette } from "../Palette";
 import { SkillEditor, sidebarGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
-import { courseThumb, pinBetween, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, whileOut, shareOpen, shareSkills, type CardSkills, type Item, type Skill, touched } from "../ore";
+import { LEVELS, sourceImportanceActions } from "../importance";
+import { courseThumb, pinBetween, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, whileOut, shareOpen, shareSkills, type CardSkills, type Item, type Priority, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -218,7 +219,8 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
   }, [mainRef, cueRef]);
 }
 
-type TabId = "today" | "sources" | "archive";
+/** `loose`: the sources filed under no skill, the Mac sidebar's No skill row (D345). */
+type TabId = "today" | "sources" | "loose" | "archive";
 
 /** Where he was, so a relaunch comes back to it, as Apple's apps do. */
 type Place = { tab: TabId; skill: string | null; skillNote?: boolean; course?: string | null; settings?: boolean; openId: string | null; noting?: boolean; side?: SideTab; finishing?: boolean; review: { pick: string[] | null; source?: string } | null };
@@ -498,6 +500,8 @@ export function PhoneApp() {
   const [tab, setTab] = useState<TabId>(start.tab);
   const [items, setItems] = useState<Item[] | null>(null);
   const [archived, setArchived] = useState<Item[] | null>(null);
+  /** Live sources filed under no skill, as the Mac's No skill row counts them. */
+  const loose = useMemo(() => items?.filter((i) => !i.archived_at && !i.preview && !i.skills.length) ?? null, [items]);
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skill, setSkill] = useState<string | null>(start.skill);
   const skillNow = useRef(skill);
@@ -850,6 +854,25 @@ export function PhoneApp() {
     }
   };
   const fileUnder = (item: Item, k: Skill) => refile(item, item.skills.includes(k.id) ? item.skills.filter((s) => s !== k.id) : [...item.skills, k.id], item.skills, k);
+  /** How much a source matters, over its skills' ("" hands it back to them): at once, with Undo (the Mac's setSourceImportance). */
+  const setImportance = async (item: Item, p: Priority | "", undoable = true) => {
+    const before = item.priority ?? "";
+    setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, priority: p || undefined } : i)) ?? all);
+    const write = inOrder(item.id, () => ore("edit", item.id, opt("priority", p)));
+    const said = p ? LEVELS.find((l) => l.p === p)!.label : item.skills.length ? "same as its skills" : "Normal";
+    const forget = undoable
+      ? notify(`${item.title}: ${said}`, "quiet", () => write.catch(() => {}).then(() => setImportance({ ...item, priority: p || undefined }, before, false)), () => setImportance({ ...item, priority: before || undefined }, p, false))
+      : undefined;
+    try {
+      await write;
+    } catch (e) {
+      forget?.();
+      if (!undoable) throw e;
+      notify(errorText(e), "error");
+    } finally {
+      void refresh();
+    }
+  };
   /** From the Archive list, at once and with Undo, as archiving is. */
   const restore = (item: Item) => {
     setArchived((all) => all?.filter((i) => i.id !== item.id) ?? all);
@@ -970,6 +993,7 @@ export function PhoneApp() {
       ...(skills.length
         ? [{ id: "skills", label: "Skills", run: () => {}, sub: skills.map((k) => ({ id: k.id, label: k.name, icon: <SkillIcon icon={k.icon} color={k.color} dot className="palette-icon" />, checked: item.skills.includes(k.id), run: () => void fileUnder(item, k) })) }]
         : []),
+      { id: "importance", label: "Importance", run: () => {}, sub: sourceImportanceActions(item, skills, (p) => void setImportance(item, p)) },
       { id: "archive", label: "Archive", danger: true, divider: true, run: () => row.archive(item) },
     ],
   };
@@ -1019,6 +1043,8 @@ export function PhoneApp() {
             onCloseSide={() => setNoting(false)}
             onToggleSide={() => setNoting((v) => !v)}
             renameSource={0}
+            priority={items?.find((i) => i.id === openId)?.priority}
+            onImportance={(item, p) => void setImportance(item, p)}
             actionsRef={actions}
             onArchive={(item) => (item.archived_at ? (setOpenId(null), restore(item)) : void archive(item))}
             lessons={(() => {
@@ -1124,8 +1150,8 @@ export function PhoneApp() {
               />
             ) : (
               <SourceList
-                title={tab === "archive" ? "Archive" : "Sources"}
-                items={tab === "archive" ? archived : items}
+                title={tab === "archive" ? "Archive" : tab === "loose" ? "No skill" : "Sources"}
+                items={tab === "archive" ? archived : tab === "loose" ? loose : items}
                 onOpen={open}
                 row={row}
                 flat={tab === "archive"}
@@ -1145,6 +1171,13 @@ export function PhoneApp() {
             <BookOpen size={16} weight={tab === "sources" ? "fill" : "regular"} aria-hidden="true" />
             <span className="phone-title">Sources</span>
           </button>
+          {/* Only while some source has no skill, as on the Mac: one read with no skill behind it has a place to be found. */}
+          {(loose?.length || tab === "loose") ? (
+            <button className={tab === "loose" ? "on" : ""} onClick={() => go("loose")}>
+              <FileText size={16} weight={tab === "loose" ? "fill" : "regular"} aria-hidden="true" />
+              <span className="phone-title">No skill</span>
+            </button>
+          ) : null}
           <button className={tab === "archive" ? "on" : ""} onClick={() => go("archive")}>
             <Archive size={16} aria-hidden="true" />
             <span className="phone-title">Archive</span>
@@ -1226,7 +1259,7 @@ export function PhoneApp() {
       {/* A skill's page (D46 in one column), pushed from Today or the drawer; a source opens over it. */}
       {skill && skillOf && (
         <Screen className="phone-full" onBack={skillBack} stay={!!skillSub}>
-          <Back label={skillSub === "forge" ? skillOf.name : skillSub ? "Forge" : tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} stay={!!skillSub} onClick={skillBack} />
+          <Back label={skillSub === "forge" ? skillOf.name : skillSub ? "Forge" : tab === "today" ? "Today" : tab === "archive" ? "Archive" : tab === "loose" ? "No skill" : "Sources"} stay={!!skillSub} onClick={skillBack} />
           <div className="phone-page phone-skill">
             <SkillPage
               key={skill}
@@ -1299,7 +1332,7 @@ export function PhoneApp() {
       )}
       {settings && (
         <Screen className="phone-full" onBack={() => setSettings(false)}>
-          <Back label={tab === "today" ? "Today" : tab === "archive" ? "Archive" : "Sources"} title="Settings" onClick={() => setSettings(false)} />
+          <Back label={tab === "today" ? "Today" : tab === "archive" ? "Archive" : tab === "loose" ? "No skill" : "Sources"} title="Settings" onClick={() => setSettings(false)} />
           <PhoneSettings reload={tick} onPulled={pulled} notify={notify} />
         </Screen>
       )}
@@ -1310,6 +1343,7 @@ export function PhoneApp() {
             { id: "review", label: "Start review", keywords: ["cards", "quiz"], run: () => setReviewing({ pick: null, run: 0 }) },
             { id: "today", label: "Today", keywords: ["home"], run: () => setTab("today") },
             { id: "sources", label: "Sources", keywords: ["library"], run: () => setTab("sources") },
+            ...(loose?.length ? [{ id: "loose", label: "No skill", keywords: ["unfiled", "sources"], run: () => setTab("loose") }] : []),
           ]}
           recent={[...(items ?? [])].sort((a, b) => touched(b).localeCompare(touched(a))).slice(0, 8)}
           items={items ?? []}

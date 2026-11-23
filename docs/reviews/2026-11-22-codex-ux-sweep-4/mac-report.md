@@ -79,7 +79,7 @@ A **fresh page** below means a newly opened page with the prescribed bridge and 
 ## Known rows seen again
 
 - **F301's source-filing pending-Undo failure remains observable**, on the reader's header picker (MAC-1). This run adds a skill rather than removing it; it demonstrates the same late-history registration. F301's recorded resolution changed the journey's timing. It should not be counted as an unrelated new undo mechanism.
-- Round 3's `F479` guard does not cover this reader filing handler. The ordinary delayed-author Undo control passed; no regression is claimed for the specific key-point, Finish, or Settings paths fixed in that round.
+- Round 3's `F480` guard does not cover this reader filing handler. The ordinary delayed-author Undo control passed; no regression is claimed for the specific key-point, Finish, or Settings paths fixed in that round.
 - F449's actual text-retention fix held. MAC-3 concerns the omitted skill selection.
 - No other known row was confirmed as a recurrence. The explicitly excluded issues were not re-reported.
 

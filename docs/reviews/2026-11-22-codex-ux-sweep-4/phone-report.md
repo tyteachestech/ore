@@ -118,8 +118,8 @@ Tested the supplied iPhone app at `http://localhost:1766/` through the shared We
 
 ## Known rows checked
 
-- **F484:** Its missing collection/skill ordering controls are now present in the supplied changes. Rename, collection up/down, delete/Undo and skill up/down worked. The new failures above are narrower issues in those controls, not a re-report that the actions are missing.
-- **F479:** The delayed phone Pin check passed. A 1,600 ms reply delay followed by hardware ⌘Z produced `pin`, then `pin --undo`; the preceding **Bus practice** skill remained. See `pending-pin-result.json` and `pending-pin-undone.png`. Native gesture delivery was not tested.
+- **F485:** Its missing collection/skill ordering controls are now present in the supplied changes. Rename, collection up/down, delete/Undo and skill up/down worked. The new failures above are narrower issues in those controls, not a re-report that the actions are missing.
+- **F480:** The delayed phone Pin check passed. A 1,600 ms reply delay followed by hardware ⌘Z produced `pin`, then `pin --undo`; the preceding **Bus practice** skill remained. See `pending-pin-result.json` and `pending-pin-undone.png`. Native gesture delivery was not tested.
 - No repaired registry row was observed returning in its original reproduction. The explicitly excluded open rows were not re-reported.
 
 ## Mac/phone action comparison
