@@ -5473,6 +5473,22 @@ journey("answer pieces: Undo of a removed piece keeps it when the read after the
     await settled(page);
     await page.waitForTimeout(300);
     if (!(await piece.isVisible())) throw new Error("the piece Undo put back went again when an older read of the questions answered");
+    // And an edit made straight after an Undo, while that older read is still out, is not lost to the read made again.
+    await piece.click();
+    await page.getByLabel("Edit this part of your answer").fill("");
+    await slow(1200);
+    await page.keyboard.press("Enter");
+    await until("emptied, it goes", async () => (await piece.count()) === 0);
+    await page.locator(".toast").filter({ hasText: "Removed from your answer" }).getByRole("button", { name: "Undo" }).click();
+    await piece.waitFor();
+    await piece.click();
+    await page.getByLabel("Edit this part of your answer").fill("");
+    await page.keyboard.press("Enter");
+    await until("emptied straight after the Undo, it goes", async () => (await piece.count()) === 0);
+    await slow(null);
+    await settled(page);
+    await page.waitForTimeout(1500);
+    if ((await piece.count()) !== 0) throw new Error("a piece removed straight after its Undo came back when the questions were read again");
   } finally {
     await slow(null);
     const k = await kids();

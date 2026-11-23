@@ -43,8 +43,8 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onWriting, onClo
   onSaved: (s: Saved, how: "contribution" | "done" | "card") => void;
   /** A piece of his answer rewritten or removed and saved: the page reads the question again (Codex UX sweep 2). */
   onRewrite?: () => void;
-  /** A write the page does not read again after (Undo of a removed piece) starts or ends: a read of the questions
-   *  that was out across either is older than what he sees, and is made again. */
+  /** A write to his answer's pieces starts or ends: a read of the questions that was out across either is older
+   *  than what he sees, and the page makes it again instead of showing it. */
   onWriting?: () => void;
   onClose: () => void;
   notify: Notify;
@@ -78,7 +78,8 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onWriting, onClo
     if (!was) return false;
     setAnswers((l) => (gone ? l.filter((c) => c.ts !== ts) : l.map((c) => (c.ts === ts ? { ...c, text: to } : c))));
     out.current++;
-    const write = ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)])).finally(() => out.current--);
+    onWriting?.(); // a read of the questions still out from before this write is older than it: the page makes it again
+    const write = ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)])).finally(() => (out.current--, onWriting?.()));
     // On the history at once, as the piece changes: a ⌘Z while the write is out takes back this step, not the one
     // before it. The history holds its Undo and Redo until this write has landed (history.ts `hold`).
     // A removed piece comes back as it was written (its source and passage), at the end of his answer.

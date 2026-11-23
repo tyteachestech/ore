@@ -631,7 +631,7 @@ function Questions({ skill, onQuestion, onOpenSource, onAdded, notify }: { skill
   const [version, setVersion] = useState(0);
   const changes = useLibraryChanges();
   const reload = () => setVersion((v) => v + 1);
-  /** Goes up when a write the list is not read again after starts or ends (AnswerBox `onWriting`). */
+  /** Goes up when a write to an answer's pieces starts or ends (AnswerBox `onWriting`): a read out across one is made again. */
   const writes = useRef(0);
   const writing = useCallback(() => void writes.current++, []);
 
