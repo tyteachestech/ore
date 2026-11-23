@@ -12910,6 +12910,7 @@ journey("phone: Settings in the drawer changes the daily goal and the reminder, 
   await tap(page, page.getByRole("switch", { name: "Reminder" }));
   await page.locator(".phone-time").waitFor();
   await page.locator(".phone-settings").getByText("isn’t in iCloud").waitFor();
+  await settled(page); // the reload drops a save still on its way to the mock, which a real relaunch does not (F-new-phone-settings-reload)
   await page.reload();
   await page.locator(".phone-settings h1").waitFor();
   await until("the goal stayed 20", async () => (await page.getByRole("radiogroup", { name: "Minutes a day" }).getByRole("radio", { name: "20" }).getAttribute("aria-checked")) === "true");
