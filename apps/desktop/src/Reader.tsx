@@ -3719,7 +3719,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                 {/* Who, when and its skills wrap as one group, so the original link after them starts flush when it drops to a line of its own. */}
                 <span className="byline">
                   {authoring ? (
-                    <TitleField className="author-edit" label="Author" placeholder="Author" value={doc.author ?? ""} size={Math.max(12, (doc.author ?? "").length + 2)} onSave={(a) => reauthor(doc.id, doc.author, a.replace(/\s+/g, " ").trim() || undefined)} onClose={() => setAuthoring(false)} />
+                    <TitleField className="author-edit" label="Author" placeholder="Author" value={doc.author ?? ""} fit onSave={(a) => reauthor(doc.id, doc.author, a.replace(/\s+/g, " ").trim() || undefined)} onClose={() => setAuthoring(false)} />
                   ) : (
                     doc.author ?
                     (PHONE ? (
@@ -3744,7 +3744,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                   {published && <span className="when">{published}</span>}
                   {PHONE ? (
                     doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)
-                  ) : (
+                  ) : suggested && !doc.skills.length ? null : (
+                    // In no skill, a suggested one stands in the skill's place by itself: the faint "Skill" beside it read as empty and filled at once. Dismissed, the blank is back.
                     <SkillPicker skills={p.skills} value={doc.skills} title={doc.title} onChange={(next, _, k) => void fileUnder(next, k)} onCreate={createSkill} blank="Skill">
                       {doc.skills.length > 0 &&
                         doc.skills.map((s) => <SkillChip key={s} skill={p.skills.find((k) => k.id === s) ?? { id: s, name: s }} />)}

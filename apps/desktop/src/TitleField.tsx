@@ -1,17 +1,25 @@
 import { useRef, useState } from "react";
 import { keepKeysIn } from "./keys";
 
+/** Sets a field to its text's width (its CSS min-width holds an empty one open for the placeholder); 1px more keeps the caret after the last letter in view. */
+const fitted = (field: HTMLInputElement | null) => {
+  if (!field) return;
+  field.style.width = "0";
+  field.style.width = `${field.scrollWidth + 1}px`;
+};
+
 /** A title edited in place (Finder's Rename, Notion's page title), one field for every list and the reader.
  *  (The author's byline too.) Enter or clicking away saves (D211), Esc keeps the old one. The field
  *  stays until the save lands: one that fails leaves what he typed in it, to try again. `onSave` resolves
  *  false when the write failed (and has said why). `onClose(byKey)`: true when Enter or Esc closed it, so
  *  focus goes back to the row; false when he clicked away, and focus stays where he put it. */
-export function TitleField({ value, label = "Title", className = "row-rename", placeholder, size, onSave, onClose }: {
+export function TitleField({ value, label = "Title", className = "row-rename", placeholder, fit, onSave, onClose }: {
   value: string;
   label?: string;
   className?: string;
   placeholder?: string;
-  size?: number;
+  /** As wide as what it holds, so a name edited in a line of things moves nothing after it until he types. */
+  fit?: boolean;
   onSave: (title: string) => Promise<boolean>;
   onClose: (byKey: boolean) => void;
 }) {
@@ -37,7 +45,8 @@ export function TitleField({ value, label = "Title", className = "row-rename", p
       className={className}
       aria-label={label}
       placeholder={placeholder}
-      size={size}
+      ref={fit ? fitted : undefined}
+      onInput={fit ? (e) => fitted(e.currentTarget) : undefined}
       autoFocus
       defaultValue={value}
       readOnly={saving}
