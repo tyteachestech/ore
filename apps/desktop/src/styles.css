@@ -3524,6 +3524,8 @@ body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44
 /* "How did it go?" on a try and at the check-in: its buttons are thumb-sized, under the field. */
 .phone .try-did { flex-direction: column; align-items: stretch; }
 .phone :is(.try-did, .forge-add) .settings-btn { height: 44px; padding: 0 16px; font-size: 15px; }
+/* The new try's fields are 44 pt taps too (Codex UX sweep 5). */
+.phone .forge-add .field { min-height: 44px; }
 .phone .checkin { margin-top: 2vh; }
 .phone .phone-settings .phone-time { height: 44px; padding: 0 10px; color: var(--text); }
 /* iOS's switch size. */

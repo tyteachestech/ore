@@ -9271,6 +9271,76 @@ journey("tutor: a chat whose save keeps failing stays at the first New chat, and
   }
 });
 
+journey("skill picker: a skill picked while a new one is being made stays picked when it lands (Codex UX sweep 5)", async (page) => {
+  const item = () => ore("ls").then((ls) => (ls as { id: string; title: string; skills: string[] }[]).find((i) => i.title === AGENTS)!);
+  const start = (await item()).skills;
+  const name = `Made meanwhile ${Date.now() % 100000}`;
+  const learning = ((await ore("skills")) as { id: string; name: string }[]).find((k) => k.name === "Learning")!;
+  await openSource(page, AGENTS);
+  try {
+    await page.locator(".doc-head").getByRole("button", { name: `Skills for ${AGENTS}` }).click();
+    const picker = page.locator(".skill-picker");
+    await picker.locator("input").fill(name);
+    await hold(page, "skills add");
+    await picker.getByRole("option", { name: new RegExp(`Create`) }).click();
+    await until("the new skill's write is out", () => isHeld(page, "skills add"));
+    await picker.locator("input").fill("Learning");
+    await picker.getByRole("option").filter({ has: page.locator(".menu-label", { hasText: "Learning" }) }).click();
+    await release(page, "skills add");
+    await until("both are filed", async () => { const s = (await item()).skills; return s.includes(learning.id) && s.some((id) => !start.includes(id) && id !== learning.id); });
+    await Bun.sleep(800);
+    if (!(await item()).skills.includes(learning.id)) throw new Error("the skill made meanwhile took Learning off");
+  } finally {
+    await page.keyboard.press("Escape").catch(() => {});
+    await ore("edit", (await item()).id, "--skills", start.join(","));
+    const made = ((await ore("skills")) as { id: string; name: string }[]).find((k) => k.name === name);
+    if (made) await ore("skills", "rm", made.id);
+  }
+});
+
+journey("sidebar: New skill says Saving… while it is made, and Esc meanwhile leaves its page unopened (Codex UX sweep 5)", async (page) => {
+  const name = `Left while saving ${Date.now() % 100000}`;
+  await page.keyboard.press("Meta+k");
+  await page.keyboard.type("New skill");
+  await page.keyboard.press("Enter");
+  const field = page.locator('[aria-label="New skill name"]');
+  await field.fill(name);
+  await hold(page, "skills add");
+  await page.keyboard.press("Enter");
+  await until("its write is out", () => isHeld(page, "skills add"));
+  await page.locator(".side-new-foot").filter({ hasText: "Saving…" }).waitFor({ timeout: 2000 });
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await release(page, "skills add");
+  await page.locator(".sidebar .side-item", { hasText: name }).waitFor();
+  await Bun.sleep(500);
+  try {
+    if (await page.locator(".skill-hero").count()) throw new Error("the skill's page opened over Home after he left its field");
+  } finally {
+    const made = ((await ore("skills")) as { id: string; name: string }[]).find((k) => k.name === name);
+    if (made) await ore("skills", "rm", made.id);
+  }
+});
+
+journey("sidebar: a collection rename that is refused opens its field again with the name he typed (Codex UX sweep 5)", async (page) => {
+  const head = page.locator(".sidebar .side-label", { hasText: "Craft" }).first();
+  await head.click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Rename…" }).click();
+  const field = page.getByLabel("Collection name");
+  await field.fill("Workshop shelf");
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { "skills arrange": "Test: collection write refused" }));
+  try {
+    await field.press("Enter");
+    await until("the field is back with his words", async () => (await field.count()) > 0 && (await field.inputValue()) === "Workshop shelf");
+  } finally {
+    await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  }
+  // The name it had, saved as it was: nothing changes.
+  await field.fill("Craft");
+  await field.press("Enter");
+  await head.waitFor();
+});
+
 /** Holds the next `ore <key>` until `release(key)` (the mock's manual hold), so a test decides when it lands. */
 const hold = (page: Page, key: string, calls = 1) => page.evaluate(([k, n]) => {
   const w = window as unknown as { __ORE_HOLD?: Record<string, unknown[]> };
@@ -17399,6 +17469,48 @@ journey("phone: a pinned source moves up among the pinned from its long press, w
   await page.keyboard.press("Meta+z");
   await until("Undo put it back", async () => (await order()) === "AT");
 }, "phone");
+journey("phone: a try typed and left with Back is there when the Forge's + opens again, in 44 pt fields (Codex UX sweep 5)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
+  await tap(page, page.locator(".phone-skill .forge-door"));
+  await tap(page, page.getByRole("button", { name: "Add something to try" }));
+  const plan = page.getByLabel("I’ll…");
+  const h = await plan.evaluate((e) => e.getBoundingClientRect().height);
+  if (h < 44) throw new Error(`the new try's field is ${h} pt tall`);
+  await plan.fill("Explain one idea before opening my notes");
+  await page.getByLabel("When…").fill("On the bus home");
+  await tap(page, page.locator(".phone-full .phone-back").first());
+  await page.locator(".phone-skill .forge-door").waitFor();
+  await tap(page, page.locator(".phone-skill .forge-door"));
+  await tap(page, page.getByRole("button", { name: "Add something to try" }));
+  if ((await page.getByLabel("I’ll…").inputValue()) !== "Explain one idea before opening my notes") throw new Error("the try he typed is gone");
+  if ((await page.getByLabel("When…").inputValue()) !== "On the bus home") throw new Error("its When is gone");
+}, "phone");
+
+journey("phone: a plan line whose save fails as he goes Back opens on his words again (Codex UX sweep 5)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
+  await tap(page, page.locator(".phone-skill .forge-door"));
+  await tap(page, page.getByRole("button", { name: "Add something to try" }));
+  await page.getByLabel("I’ll…").fill("Explain one idea");
+  await page.getByLabel("When…").fill("On the bus");
+  await tap(page, page.locator(".forge-add").getByRole("button", { name: "Add", exact: true }));
+  await tap(page, page.locator(".phone-skill .forge-open").filter({ hasText: "Explain one idea" }).first());
+  const when = page.locator(".plan-line", { hasText: /^When/ }).locator("textarea");
+  await when.fill("After I board the train");
+  await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = { try: "disk full" }));
+  try {
+    await tap(page, page.locator(".phone-full .phone-back").first());
+    await page.locator(".phone-skill .forge-open").first().waitFor();
+    await Bun.sleep(400);
+  } finally {
+    await page.evaluate(() => ((window as unknown as { __ORE_FAIL: Record<string, string> }).__ORE_FAIL = {}));
+  }
+  await tap(page, page.locator(".phone-skill .forge-open").filter({ hasText: "Explain one idea" }).first());
+  const v = await page.locator(".plan-line", { hasText: /^When/ }).locator("textarea").inputValue();
+  if (v !== "After I board the train") throw new Error(`the correction is gone: When reads "${v}"`);
+}, "phone");
+
 
 
 

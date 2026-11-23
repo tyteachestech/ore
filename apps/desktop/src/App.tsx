@@ -1612,7 +1612,8 @@ export function App() {
    *  still saves waits for it, or the two `ore skills arrange` runs race and the rename can land last. The
    *  skills are read again once the latest settles, so an earlier read never shows a step already taken back. */
   const layoutWrites = useRef<{ last: Promise<unknown>; queued: number }>({ last: Promise.resolve(), queued: 0 });
-  const arrange = async (layout: SkillLayout, fromHistory = false) => {
+  /** Resolves false when the write was refused (said in a toast), so a rename field can open again with his words. */
+  const arrange = async (layout: SkillLayout, fromHistory = false): Promise<boolean> => {
     const byId = new Map(skills.map((s) => [s.id, s]));
     setSkills(layout.flatMap((g) => g.skills.flatMap((id) => {
       const s = byId.get(id);
@@ -1624,10 +1625,12 @@ export function App() {
     q.last = write.catch(() => {});
     try {
       await write;
+      return true;
     } catch (e) {
       // From the history (undo or redo): it puts the step back and says why.
       if (fromHistory) throw e;
       notify(errorText(e), "error");
+      return false;
     } finally {
       if (n === q.queued) reloadSkills();
     }
@@ -2504,16 +2507,17 @@ export function App() {
         onOpen={(id) => (id ? openSkill(id) : openAll())}
         menu={skillMenu}
         newSkill={newSkill}
-        onCreated={(s) => {
+        onCreated={(s, open = true) => {
           reloadSkills();
           madeSkill(s);
-          openSkill(s.id);
+          if (open) openSkill(s.id);
         }}
         onArrange={(layout, step) => {
           const before = layoutOf(skillGroups(skills));
-          void arrange(layout);
+          const saved = arrange(layout);
           // A drag is a step too, quietly (Finder): ⌘Z puts the skill or collection back where it was.
           notify(step ?? "Moved in the sidebar", step ? "info" : "quiet", () => arrange(before, true), () => arrange(layout, true));
+          return saved;
         }}
         onDeleteCollection={deleteCollection}
       />

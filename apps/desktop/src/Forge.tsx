@@ -396,16 +396,22 @@ export function Forge({ skill, tries, onSub }: { skill: Skill; tries: Tries; onS
       )}
       {tries.ts && !ts.length && !adding && <p className="quiet">Nothing here yet. Mark a technique with Try it while you read, or add one with +.</p>}
       {band("Trying now", now)}
-      {band("Waiting", waiting, adding ? <AddTry onAdd={(plan, when) => tries.add(plan, when)} onClose={() => setAdding(false)} /> : undefined)}
+      {band("Waiting", waiting, adding ? <AddTry skill={skill.id} onAdd={(plan, when) => tries.add(plan, when)} onClose={() => setAdding(false)} /> : undefined)}
       {band("Yours", mine)}
     </div>
   );
 }
 
 /** A try typed here, with no passage behind it: what he'll do, and when. Enter or Add adds it, Esc closes. */
-function AddTry({ onAdd, onClose }: { onAdd: (plan: string, when: string) => Promise<boolean>; onClose: () => void }) {
-  const [plan, setPlan] = useState("");
-  const [when, setWhen] = useState("");
+/** A try being typed and left (Back, or another screen), by skill: the form opens on it again (Codex UX sweep 5). */
+const addDrafts = new Map<string, { plan: string; when: string }>();
+
+function AddTry({ skill, onAdd, onClose }: { skill: string; onAdd: (plan: string, when: string) => Promise<boolean>; onClose: () => void }) {
+  const [plan, setPlanState] = useState(() => addDrafts.get(skill)?.plan ?? "");
+  const [when, setWhenState] = useState(() => addDrafts.get(skill)?.when ?? "");
+  const keep = (p: string, w: string) => (p.trim() || w.trim() ? addDrafts.set(skill, { plan: p, when: w }) : addDrafts.delete(skill));
+  const setPlan = (p: string) => (setPlanState(p), keep(p, when));
+  const setWhen = (w: string) => (setWhenState(w), keep(plan, w));
   const first = useRef<HTMLTextAreaElement>(null);
   useFocusWhileMounted(first, () => document.querySelector<HTMLElement>(".forge-head .icon-btn"));
   // One add at a time: a double-click or a second Enter while it is out would make the try twice.
@@ -413,7 +419,7 @@ function AddTry({ onAdd, onClose }: { onAdd: (plan: string, when: string) => Pro
   const add = () => {
     if (!plan.trim() || adding.current) return;
     adding.current = true;
-    void onAdd(plan.trim(), when.trim()).then((ok) => (ok ? onClose() : (adding.current = false)));
+    void onAdd(plan.trim(), when.trim()).then((ok) => (ok ? (addDrafts.delete(skill), onClose()) : (adding.current = false)));
   };
   const keys = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
     keepKeysIn(e);
@@ -438,10 +444,18 @@ function AddTry({ onAdd, onClose }: { onAdd: (plan: string, when: string) => Pro
 }
 
 /** One line of the plan, edited in place: Enter or a click away saves, Esc puts back what was there (D211). */
-function PlanField({ label, hint, value, onSave }: { label: string; hint: string; value: string; onSave: (v: string) => void }) {
-  const [v, setV] = useState(value);
-  useEffect(() => setV(value), [value]);
-  const save = () => v.trim() !== value && onSave(v.trim());
+/** A plan line whose save failed, by try and line: it opens on his words again (Codex UX sweep 5: Back dropped them). */
+const planDrafts = new Map<string, string>();
+
+function PlanField({ label, hint, value, draftKey, onSave }: { label: string; hint: string; value: string; draftKey: string; onSave: (v: string) => Promise<boolean> }) {
+  const [v, setV] = useState(() => planDrafts.get(draftKey) ?? value);
+  useEffect(() => void (planDrafts.has(draftKey) || setV(value)), [value]);
+  const save = () => {
+    const to = v.trim();
+    if (to === value) return;
+    planDrafts.set(draftKey, to);
+    void onSave(to).then((ok) => ok && planDrafts.delete(draftKey));
+  };
   return (
     <label className="plan-line">
       <span>{label}</span>
@@ -458,6 +472,7 @@ function PlanField({ label, hint, value, onSave }: { label: string; hint: string
             e.currentTarget.blur(); // the blur saves, once
           } else if (e.key === "Escape") {
             e.preventDefault();
+            planDrafts.delete(draftKey);
             setV(value);
           }
         }}
@@ -523,9 +538,9 @@ export function TryPage({ skill, t, tries, onSub, onPassage }: { skill: Skill; t
           <h1 className="try-title">{tryLabel(t)}</h1>
           <Path t={t} fresh={forged} />
           <div className="plan">
-            <PlanField label="When" hint="the moment that cues it" value={t.when ?? ""} onSave={(when) => void tries.plan(t, { when })} />
-            <PlanField label="I’ll" hint="what you’ll do then" value={t.note ?? ""} onSave={(plan) => void tries.plan(t, { plan })} />
-            <PlanField label="If" hint="what might get in the way, then what you’ll do" value={t.obstacle ?? ""} onSave={(obstacle) => void tries.plan(t, { obstacle })} />
+            <PlanField label="When" hint="the moment that cues it" value={t.when ?? ""} draftKey={`${t.id} when`} onSave={(when) => tries.plan(t, { when })} />
+            <PlanField label="I’ll" hint="what you’ll do then" value={t.note ?? ""} draftKey={`${t.id} plan`} onSave={(plan) => tries.plan(t, { plan })} />
+            <PlanField label="If" hint="what might get in the way, then what you’ll do" value={t.obstacle ?? ""} draftKey={`${t.id} if`} onSave={(obstacle) => tries.plan(t, { obstacle })} />
           </div>
           {rounds.length > 0 && (
             <section className="forge-band" aria-label="Uses">
