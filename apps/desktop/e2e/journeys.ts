@@ -9287,8 +9287,9 @@ journey("finish: ⌘Z during the Source finished moment takes back the finish, n
   }
 });
 
-journey("finish: a source opened during the Source finished moment stays open (Codex UX sweep 16)", async (page) => {
-  // The moment's second ran out and closed whatever source was open then: the next one he had already opened.
+journey("finish: a source opened during the Source finished moment stays open, and so does its own Finish (Codex UX sweeps 16, 17)", async (page) => {
+  // The moment's second ran out and closed whatever source was open then: the next one he had already opened, and
+  // then (sweep 17) the Finish he had already started on it.
   const LECTURE = "Lecture 4 the testing effect";
   const item = ((await ore("ls")) as { id: string; title: string; status: string }[]).find((i) => i.title === LECTURE)!;
   await openSource(page, LECTURE);
@@ -9306,9 +9307,13 @@ journey("finish: a source opened during the Source finished moment stays open (C
     await page.getByRole("button", { name: "Done", exact: true }).click();
     await page.getByText("Source finished").first().waitFor();
     await openSource(page, AGENTS);
+    await page.getByRole("button", { name: "Finish", exact: true }).click();
+    await page.getByLabel("Free recall").waitFor();
     await Bun.sleep(1800); // past the moment's second
     if (!(await page.locator(".doc-head").filter({ hasText: AGENTS }).isVisible())) throw new Error("the source opened during the moment closed by itself");
+    if (!(await page.getByLabel("Free recall").isVisible())) throw new Error("its Finish, started during the moment, closed by itself");
   } finally {
+    await page.keyboard.press("Escape").catch(() => {});
     await page.evaluate(() => ((window as unknown as { __ORE_REPLY: Record<string, unknown> }).__ORE_REPLY = {}));
     await ore("status", item.id, item.status);
   }
