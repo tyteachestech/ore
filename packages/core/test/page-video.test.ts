@@ -132,10 +132,10 @@ describe("reimporting a lesson added as a bare video", () => {
     });
     const hl = addHighlight(old, { exact: "Today we call the API.", intent: "keep" });
     serve({
-      [plan.url]: `<html><head><title>Platform 101 · Claude Academy</title><script src="/assets/v1/courses-abc.js"></script></head><body><h1>Platform 101</h1><a href="/courses/platform/what-is-it">What is it?</a></body></html>`,
-      "https://academy.claude.com/assets/v1/courses-abc.js": `import("assets/v1/content/courses/platform/lessons/01-what-is-it/index-x1.js")`,
+      [plan.url]: `<html><head><title>Platform 101 · Claude Academy</title></head><body><h1>Platform 101</h1><a href="/courses/platform/what-is-it">What is it?</a></body></html>`,
+      // The lesson's page preloads its own script, which names its video.
       "https://academy.claude.com/assets/v1/content/courses/platform/lessons/01-what-is-it/index-x1.js": `player({youtubeId:"abcdefghijk"})`,
-      [lessonUrl]: article(TEXT),
+      [lessonUrl]: article(TEXT).replace("</head>", `<link rel="modulepreload" href="/assets/v1/content/courses/platform/lessons/01-what-is-it/index-x1.js"></head>`),
     });
     const r = await reimportSource(lib, old.meta.id);
     expect(r.changed).toBe(true);
