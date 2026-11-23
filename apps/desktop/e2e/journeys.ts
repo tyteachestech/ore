@@ -5797,8 +5797,12 @@ journey("⌘K: Esc clears what was typed first, then closes", async (page) => {
   await page.keyboard.press("Meta+k");
   const input = page.locator("[cmdk-input]");
   await input.fill("review");
+  // The footer says what the next Esc does (Codex UX sweep 13: it said Close while a query was there to clear).
+  const esc = page.locator("[cmdk-root] .panel-foot span:has(> kbd:text-is('Esc'))");
+  await until("the footer says Esc clears", async () => (await esc.innerText()).trim() === "Esc Clear");
   await page.keyboard.press("Escape");
   await until("the query is cleared and ⌘K stays open", async () => (await input.count()) === 1 && (await input.inputValue()) === "");
+  await until("the footer says Esc closes", async () => (await esc.innerText()).trim() === "Esc Close");
   await page.keyboard.press("Escape");
   await until("a second Esc closes it", async () => (await input.count()) === 0);
 });
