@@ -5195,6 +5195,31 @@ journey("a small window: ⌘K, the Add box and the shortcuts sheet fit in it, an
   }
 });
 
+// F-new-palette-scrolls-past-top: typing in ⌘K left its list scrolled down, so the top results (⌘1, ⌘2) were out of
+// sight above it: for one paint cmdk still held the row picked before the keystroke and scrolled it into view.
+journey("⌘K: typing keeps the list at its top, with the first result selected and in sight", async (page) => {
+  await page.locator(".sidebar div.side-item").first().waitFor({ state: "attached" });
+  // A short window, so the rows run past the list's foot and a wrong scroll shows.
+  await page.setViewportSize({ width: 800, height: 400 });
+  try {
+    const palette = page.getByRole("dialog", { name: "Command palette" });
+    await page.keyboard.press("Meta+k");
+    await palette.waitFor();
+    const list = palette.locator("[cmdk-list]");
+    for (const key of ["a", "i"]) {
+      await page.keyboard.type(key);
+      await page.waitForTimeout(400); // past the text search's wait, so its rows have come in too
+      const at = await list.evaluate((l) => ({ top: l.scrollTop, first: l.querySelector("[cmdk-item]")?.getAttribute("aria-selected") }));
+      if (at.first !== "true") throw new Error(`after typing "${key}" the first row is not selected`);
+      if (at.top > 0) throw new Error(`after typing "${key}" the list is scrolled ${at.top}px down, hiding its top rows`);
+    }
+    await page.keyboard.press("Escape");
+    await palette.waitFor({ state: "detached" });
+  } finally {
+    await page.setViewportSize({ width: 1280, height: 800 });
+  }
+});
+
 journey("Review: ⌘K and ⌘/ open over it, Esc goes back to the card, and a palette action leaves Review as Esc does (controls-08)", async (page) => {
   await startReview(page, /Teaching/); // its one due card is an Explain card, answered by typing
   const question = await page.locator(".review-q").innerText();
