@@ -152,39 +152,61 @@ export function SkillStage({ row, here, leaving, size, was, now, skills }: { row
  *  stones fly to their medals in one volley. The dim dots ahead are the memories one good answer from a gem.
  *  Every medal's place is held from the start, so none slides when another arrives.
  *  `was` and `now` are each skill's strength before and after. */
-export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnType<typeof endPlan>; prog: EndProg; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
-  if (!plan.rows.length) return null;
+export function SkillRows({ plan, prog, stage, was, now, skills, run }: { plan: ReturnType<typeof endPlan>; prog: EndProg; /** The row that has the big ring now, if one has. */ stage: number; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
+  // More skills than the row shows at once roll through it like credits, one step at a time, and round again
+  // (Tyler, 2026-11-23, of five small medals with their names cut short: "why would it not just loop in a credits
+  // kind of way"). While the session's stones are still landing the row keeps the skill of the moment in view.
+  const n = plan.rows.length, rolls = n > SEEN && !still();
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    if (!rolls || !prog.done) return;
+    const id = setInterval(() => !document.hidden && setStep((x) => x + 1), ROLL_MS);
+    return () => clearInterval(id);
+  }, [rolls, prog.done]);
+  // Past the last one the row is back where it began: it jumps there unseen, the first ones standing in twice.
+  useEffect(() => {
+    if (step < n) return;
+    const id = setTimeout(() => setStep(0), 520);
+    return () => clearTimeout(id);
+  }, [step, n]);
+  if (!n) return null;
+  const focus = Math.max(stage, prog.shown.lastIndexOf(true));
+  const off = !rolls ? 0 : prog.done ? step : Math.max(0, Math.min(n - SEEN, focus - (SEEN - 1)));
   const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
   const said = (r: EndRow, lv: number) => [name(r.skill), `${r.kept} kept`, r.cut > 0 && `${r.cut} became ${r.cut === 1 ? "a gem" : "gems"}`, lv > 0 && `level ${lv}`].filter(Boolean).join(" · ");
   return (
     // Its room is held from the start, so the results under it never move when it comes in.
-    <div className="end-skills" data-wait={!run || undefined} data-many={plan.rows.length > 4 || undefined}>
+    <div className="end-skills" data-wait={!run || undefined} data-many={(!rolls && n > 4) || undefined} data-rolls={rolls || undefined}>
       <span className="sr-only">{plan.rows.map((r) => said(r, now.find((k) => k.skill === r.skill)!.level)).join(". ")}</span>
-      {plan.rows.map((r, i) => {
-        const s = skills.find((x) => x.id === r.skill), lv = levelAt(r, prog.cut[i]!, prog.done, was, now);
+      <div className="end-skills-track" data-jump={(rolls && prog.done && step === 0) || undefined} style={rolls ? { transform: `translateX(${-off * MEDAL_SLOT}px)` } : undefined}>
+      {(rolls && prog.done ? [...plan.rows, ...plan.rows.slice(0, SEEN)] : plan.rows).map((r, j) => {
+        const i = j % n, s = skills.find((x) => x.id === r.skill), lv = levelAt(r, prog.cut[i]!, prog.done, was, now);
         return (
-          <Hint key={r.skill} text={said(r, lv.lv)}>
+          <Hint key={j} text={said(r, lv.lv)}>
             <div className="end-medal" data-skill={r.skill} data-color={s?.color} data-wait={!prog.shown[i] || undefined} data-up={lv.up || undefined}>
-              <span className="end-medal-ring" data-row={i} aria-hidden="true">
+              <span className="end-medal-ring" data-row={j < n ? i : undefined} aria-hidden="true">
                 <span className="end-medal-core gem-ring" data-beat={prog.stone[i] || undefined} key={`in${prog.stone[i]}`}>
                   <DotRing size={MEDAL} share={lv.share} ghost={lv.soon} step />
                   <SkillIcon icon={s?.icon} color={s?.color} dot />
                 </span>
                 {lv.lv > 0 && <b className="gem-ring-lv" data-flip={lv.up || undefined}>{lv.lv}</b>}
                 {/* What flies, drawn once here so the flight can lift a copy of it. */}
-                <span className="end-medal-fliers">{r.slots.map((kind, d) => <span key={d} data-slot={r.first + d}><Gem kind={kind} size={kind === "cut" ? 28 : 24} /></span>)}</span>
+                <span className="end-medal-fliers">{j < n && r.slots.map((kind, d) => <span key={d} data-slot={r.first + d}><Gem kind={kind} size={kind === "cut" ? 28 : 24} /></span>)}</span>
               </span>
               <span className="end-medal-name">{name(r.skill)}</span>
             </div>
           </Hint>
         );
       })}
-      {/* Three at most; a session that fed more says how many. */}
+      </div>
+      {/* A session wider than the row can hold says how many are left out. */}
       {plan.more > 0 && <span className="end-skills-more" data-wait={!prog.shown.every(Boolean) || undefined}>+{plan.more}</span>}
     </div>
   );
 }
-const REEL_ROWS = 6, SOLOS = 2;
+const REEL_ROWS = 12, SOLOS = 2;
+/** The medals the row shows at once when it rolls, a medal's place in px, and how long it rests between steps. */
+const SEEN = 3, MEDAL_SLOT = 120, ROLL_MS = 2600;
 /** A medal's ring, in px. */
 const MEDAL = 64;
 

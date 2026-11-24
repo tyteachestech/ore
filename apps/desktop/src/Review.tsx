@@ -1843,6 +1843,9 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     const fly = (i: number, row: number, from: DOMRect, to: { x: number; y: number }, opts: { big: number; seen: boolean; ms: number }, land: () => void) => {
       const slot = host.querySelector<HTMLElement>(`[data-slot="${i}"]`), medal = host.querySelector<HTMLElement>(`.end-medal-ring[data-row="${row}"]`);
       if (!slot || !medal) return land();
+      // A medal the row is not showing now takes its stone unseen.
+      const view = host.querySelector(".end-skills")!.getBoundingClientRect(), mr = medal.getBoundingClientRect();
+      if (mr.right < view.left + 8 || mr.left > view.right - 8) return land();
       const w = slot.querySelector("svg")!.getBoundingClientRect().width || 24;
       const dx = from.left + from.width / 2 - to.x, dy = from.top + from.height / 2 - to.y;
       const ghost = slot.cloneNode(true) as HTMLElement;
@@ -1994,7 +1997,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
               {staged && <SkillStage key={staged.skill} row={staged} here={prog.cut[onStage!]!} leaving={leaving} size={END_RING} was={b?.skills ?? []} now={t.skills} skills={skills} />}
             </div>
           </div>
-          <SkillRows plan={rowPlan} prog={prog} was={b?.skills ?? []} now={t.skills} skills={skills} run={calm || rowsIn} />
+          <SkillRows plan={rowPlan} prog={prog} stage={onStage ?? -1} was={b?.skills ?? []} now={t.skills} skills={skills} run={calm || rowsIn} />
           <Tally tiles={tiles} go={rowed} onDone={() => setTallied(true)} />
           {held}
         </>
