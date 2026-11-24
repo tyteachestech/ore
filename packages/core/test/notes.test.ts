@@ -2,10 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { addHighlight } from "../src/annotations.ts";
 import { writeNewCard } from "../src/cards.ts";
-import { openIndex } from "../src/db.ts";
+import { openIndex, rebuildIndex } from "../src/db.ts";
 import { sha256 } from "../src/fsutil.ts";
 import { addSnippet } from "../src/ingest/index.ts";
-import { createItem, findItem, updateItemMeta } from "../src/items.ts";
+import { createItem, findItem, renameItem, updateItemMeta } from "../src/items.ts";
+import { addSkill, removeSkill, setSkillLook } from "../src/skills.ts";
 import { appendNote, appendNoteText, getNotes, notesPath, sectionLines, setChapterRecall, setNotes, setRecall } from "../src/notes.ts";
 import { libraryStats, recordReview } from "../src/study.ts";
 import { tempLibrary } from "./helpers.ts";
@@ -141,6 +142,49 @@ describe("My notes storage", () => {
     expect(idx.search("muddy")).toEqual([]);
     expect(idx.search("trails").map((h) => h.kind)).toEqual(["notes"]);
     idx.close();
+  });
+
+  test("search names a renamed source and skill at once, as a rebuild does (F-new-search-rename)", async () => {
+    const { lib, id } = await setup();
+    const skill = await addSkill(lib, "Memory");
+    await setNotes(lib, id, "uniqueneedle in my note");
+    await setNotes(lib, { skill: skill.id }, "uniqueneedle in the skill's note");
+    addHighlight(findItem(lib, id), { exact: findItem(lib, id).body.trim().split(/\s+/)[0]!, note: "uniqueneedle on a highlight", intent: "keep" });
+    const titles = () => {
+      const idx = openIndex(lib);
+      try {
+        return idx.search("uniqueneedle", 100).map((h) => h.title).sort();
+      } finally {
+        idx.close();
+      }
+    };
+    titles();
+    await renameItem(lib, id, "Renamed Source");
+    await setSkillLook(lib, skill.id, { name: "Renamed Skill" });
+    const cached = titles();
+    rebuildIndex(lib);
+    expect(cached).toEqual(titles());
+    expect(cached).toEqual(["Notes: Renamed Skill", "My notes: Renamed Source", "keep: Renamed Source"].sort());
+  });
+
+  test("a removed skill's notes leave search, which offers nothing it can't open (F-new-search-removed-skill)", async () => {
+    const { lib } = await setup();
+    const skill = await addSkill(lib, "Memory");
+    await setNotes(lib, { skill: skill.id }, "uniqueneedle in the skill's note");
+    const hits = () => {
+      const idx = openIndex(lib);
+      try {
+        return idx.search("uniqueneedle", 100).map((h) => h.kind);
+      } finally {
+        idx.close();
+      }
+    };
+    expect(hits()).toEqual(["skill-notes"]);
+    await removeSkill(lib, skill.id);
+    expect(() => getNotes(lib, { skill: skill.id })).toThrow(/unknown skill/);
+    expect(hits()).toEqual([]);
+    rebuildIndex(lib);
+    expect(hits()).toEqual([]);
   });
 });
 

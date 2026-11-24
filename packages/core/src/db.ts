@@ -71,7 +71,9 @@ function scan(lib: Library, dirs: Map<string, string>): FileStat[] {
     if (logs.length) out.push({ path: annotationsPath(dir), kind: "ann", mtime: Math.max(...logs.map((s) => s.mtimeMs)), size: logs.reduce((t, s) => t + s.size, 0) });
     add(join(dir, "notes.md"), "notes");
   }
-  for (const s of subdirs(paths.skillNotes(lib))) add(join(paths.skillNotes(lib), s, "notes.md"), "skill-notes");
+  // A removed skill's notes stay on disk for recovery, but out of search: they can't be opened.
+  const skills = new Set(loadSkills(lib).skills.map((s) => s.id));
+  for (const s of subdirs(paths.skillNotes(lib)).filter((s) => skills.has(s))) add(join(paths.skillNotes(lib), s, "notes.md"), "skill-notes");
   for (const f of ls(paths.cards(lib))) if (/^[0-9A-HJKMNP-TV-Z]{26}\.md$/.test(f)) add(join(paths.cards(lib), f), "card");
   for (const f of ls(paths.topics(lib))) if (f.endsWith(".md")) add(join(paths.topics(lib), f), "topic");
   for (const f of ls(paths.reviews(lib))) if (f.endsWith(".jsonl")) add(join(paths.reviews(lib), f), "review");
@@ -390,10 +392,16 @@ export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncRepo
   const was = new Map(db.query<{ id: string; path: string }, []>("select id, path from items").all().map((r) => [dirname(join(lib.root, r.path)), r.id]));
   const idOf = (dir: string) => dirs.get(dir) ?? was.get(dir) ?? dir.slice(-26);
   const current = scan(lib, dirs);
-  const changed = current.filter((f) => {
+  const own = current.filter((f) => {
     const k = known.get(f.path);
     return !k || k.mtime !== f.mtime || k.size !== f.size;
   });
+  // Search rows that carry their owner's name go again when it changes: a source's highlights and notes
+  // with its doc.md (its title), the skills' notes with skills.yaml (their names), so the index is a rebuild's.
+  const docs = new Set(own.filter((f) => f.kind === "doc").map((f) => dirname(f.path)));
+  const skillsChanged = own.some((f) => f.path === paths.skills(lib));
+  const mine = new Set(own);
+  const changed = current.filter((f) => mine.has(f) || ((f.kind === "ann" || f.kind === "notes") && docs.has(dirname(f.path))) || (f.kind === "skill-notes" && skillsChanged));
   const currentPaths = new Set(current.map((f) => f.path));
   const removed = [...known.values()].filter((k) => !currentPaths.has(k.path));
   const report: SyncReport = { changed: changed.length, removed: removed.length, errors: [] };
