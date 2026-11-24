@@ -8,7 +8,7 @@ import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 import { orderQueue, winFirst, type QueueEntry } from "./queue.ts";
 import { findVariant } from "./remix.ts";
-import { appendReview, appendUndo, readReviews, type FsrsState, type Review } from "./reviews.ts";
+import { appendReview, appendUndo, readReviews, reviewTimes, type FsrsState, type Review } from "./reviews.ts";
 import { emptyState, loadParams, nextState, replay, retrievability } from "./scheduler.ts";
 import { NO_SKILL } from "./no-skill.ts";
 import { openSessionId, readSessions } from "./sessions.ts";
@@ -63,7 +63,11 @@ export async function recordReview(lib: Library, cardRef: string, input: ReviewI
   return withLock(paths.lock(lib), () => {
     const card = findCard(lib, cardRef);
     if (card.meta.state === "retired") throw new Error(`card ${card.meta.id} is retired`);
-    const now = input.now ?? new Date();
+    // A time this card already has a review at (taken back or not, here or synced) moves on a millisecond:
+    // an undo names its review by card and time, so two reviews sharing one would stand or fall together.
+    let now = input.now ?? new Date();
+    const taken = reviewTimes(lib, card.meta.id);
+    while (taken.has(nowIso(now))) now = new Date(now.getTime() + 1);
     const { retention, w, prior, before, at } = stateBefore(lib, card, now);
     const after = nextState(before, at, input.rating, retention, w);
     // A draft's first review finishes it; it counts as live from then on (the index reads that from the

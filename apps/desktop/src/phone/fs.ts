@@ -168,6 +168,10 @@ const unsent = new Map<string, Op>();
 /** Paths this phone has sent or asked to delete since launch: a delete of one still goes to the folder
  *  even before the folder's stamp for it comes back (or a folder, which has no stamp). */
 const sent = new Set<string>();
+/** The flush that last sent each path: a failed batch keeps a path for the next try only while no newer
+ *  flush has taken it, or a retry would put back an older write over a newer one that went through. */
+const sentBy = new Map<string, number>();
+let flushes = 0;
 /** Files iCloud hasn't downloaded yet. Writing one would replace the real file with what the phone
  *  wrongly thinks is there (an empty log, say), so that waits until it arrives. */
 const downloading = new Set<string>();
@@ -197,7 +201,8 @@ export function flush(): Promise<void> {
   const ops = [...unsent].filter(([r, op]) => op !== null || known.has(r) || sent.has(r));
   unsent.clear();
   if (!ops.length || !disk) return sending;
-  for (const [r] of ops) sent.add(r);
+  const n = ++flushes;
+  for (const [r] of ops) sent.add(r), sentBy.set(r, n);
   const { root, invoke } = disk;
   sending = sending.then(async () => {
     try {
@@ -228,8 +233,8 @@ export function flush(): Promise<void> {
       [lastSync, lastError] = [Date.now(), null];
       for (const [r, op] of ops) if (op === null) for (const k of [...known.keys()]) if (k === r || k.startsWith(r + "/")) known.delete(k);
     } catch (e) {
-      // Kept for the next try, unless a newer write replaced it.
-      for (const [r, op] of ops) if (!unsent.has(r)) unsent.set(r, op);
+      // Kept for the next try, unless a newer write replaced it (still unsent, or sent since).
+      for (const [r, op] of ops) if (!unsent.has(r) && sentBy.get(r) === n) unsent.set(r, op);
       lastError = String(e);
       dispatchEvent(new CustomEvent("ore:save-failed", { detail: String(e) }));
     }
