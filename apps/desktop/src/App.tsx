@@ -92,7 +92,7 @@ type CourseAdd = {
   failed: { part: number; title: string; error: string }[];
   /** Adding it again: skills it was newly filed under, archived lessons brought back, its skills now, its first lesson. */
   filed: string[];
-  restored: number;
+  restored: string[];
   skills: string[];
   first?: { id: string; title: string; status: Item["status"] };
 };
@@ -523,7 +523,7 @@ export function App() {
               ? `Added ${count(r.lessons.length, "lesson")} of “${r.course.title}”${filled ? `; ${filled}` : ""}`
               : filled
                 ? `“${r.course.title}”: ${filled}`
-                : again(r.course.title, r.first?.status === "done", r.filed, r.restored > 0, (ids) => ore("course", "set", id, opt("skills", ids.join(","))), (on) => ore("course", "archive", id, ...(on ? [] : ["--undo"])), r.skills);
+                : again(r.course.title, r.first?.status === "done", r.filed, r.restored.length > 0, (ids) => ore("course", "set", id, opt("skills", ids.join(","))), (on) => ore("course", "archive", id, ...(on ? [] : ["--undo"]), opt("lessons", r.restored.join(","))), r.skills);
             if (!r.lessons.length && !filled) here++;
             if (!r.lessons.length && r.first) last = { ...r.first } as Item;
             if (r.failed.length) {

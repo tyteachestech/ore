@@ -12115,6 +12115,45 @@ journey("course: ⌘Z of a skill filed on it gives each lesson back its own skil
   }
 });
 
+journey("course added again: the toast's Undo archives only the lessons the add brought back, Redo brings back only those (F-new-mac-course-readd-undo)", async (page) => {
+  if (!LIB) throw new Error("this journey edits the library: set ORE_LIBRARY to the running mock's");
+  const { updateItemMeta } = (await import(join(import.meta.dir, "../../../packages/core/src/items.ts"))) as { updateItemMeta: (lib: { root: string }, id: string, patch: (m: object) => object) => Promise<unknown> };
+  const made = (await Promise.all(["A", "B"].map((n) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: `# Re-add part ${n}\n\nA lesson.` }) }).then((r) => r.json())))) as { id: string }[];
+  const link = "https://www.youtube.com/playlist?list=PLreaddcourse";
+  for (const [i, m] of made.entries()) await updateItemMeta({ root: LIB }, m.id, (x) => ({ ...x, course: { id: "readd-course", title: "Re-add course", part: i + 1, url: link } }));
+  await ore("archive", made[1]!.id);
+  const archivedOf = async () => {
+    const gone = (await ore("ls", "--archived")) as { id: string }[];
+    return made.map((m) => gone.some((i) => i.id === m.id)).join("/");
+  };
+  // The course page is on the web: the add answers as `ore add --course` does when the course is here, having
+  // brought back its archived lesson B.
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"--course"')) return route.fallback();
+    await ore("archive", made[1]!.id, "--undo");
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ course: { id: "readd-course", title: "Re-add course", url: link }, lessons: [], kept: 2, filled: [], failed: [], filed: [], restored: [made[1]!.id], enrich: "skipped", skills: [], first: { id: made[0]!.id, title: "Re-add part A", status: "inbox" } }) });
+  });
+  try {
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.getByLabel("Link, file path or text").fill(link);
+    await page.keyboard.press("Enter");
+    const toast = page.locator(".toast").filter({ hasText: "“Re-add course” is back from Archived" });
+    await toast.waitFor();
+    if ((await archivedOf()) !== "false/false") throw new Error("the add did not bring lesson B back");
+    await toast.getByRole("button", { name: "Undo" }).click();
+    await until("Undo archives only the lesson the add brought back", async () => (await archivedOf()) === "false/true");
+    await page.waitForTimeout(400);
+    if ((await archivedOf()) !== "false/true") throw new Error("Undo of the course added again archived a lesson it did not bring back");
+    await ore("archive", made[0]!.id);
+    await page.locator(".toast").getByRole("button", { name: "Redo" }).first().click();
+    await until("Redo brings back only that lesson", async () => (await archivedOf()) === "true/false");
+  } finally {
+    await page.unroute(/\/ore$/);
+    if (await page.getByLabel("Link, file path or text").count()) await page.keyboard.press("Escape");
+    for (const m of made) await ore("archive", m.id).catch(() => {});
+  }
+});
+
 journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the suggestion returns) and Dismiss", async (page) => {
   const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Why sleep consolidates memory\n\nSleep replays the day." }) }).then((r) => r.json())) as { id: string };
   // Undo of a dismiss puts a suggestion on it, as enrich would.

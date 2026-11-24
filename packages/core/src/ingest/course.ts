@@ -159,8 +159,8 @@ export interface CourseAdded {
   failed: { part: number; title: string; error: string }[];
   /** Skills the course was filed under by this add that it didn't have. */
   filed: string[];
-  /** Archived lessons this add brought back. */
-  restored: number;
+  /** The archived lessons this add brought back, by id: its Undo archives these, not every lesson. */
+  restored: string[];
 }
 
 /** Adds every lesson of a course as its own source, in order. Adding a course already in the library
@@ -209,5 +209,5 @@ export async function addCourse(lib: Library, plan: CoursePlan, opts: { skills?:
   const lessons = [...existing, ...added];
   if (lessons.length && !lessons.some(courseCoverFile)) await makeCourseCover(lessons[0]!, plan.url);
   if (skills.length && added.length) await withLock(paths.lock(lib), () => unarchiveFiled(lib, skills)); // D173
-  return { course: { id, title, url: plan.url }, added, kept: have.size, filled, failed, filed, restored: archived.length };
+  return { course: { id, title, url: plan.url }, added, kept: have.size, filled, failed, filed, restored: archived.map((i) => i.meta.id) };
 }

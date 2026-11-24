@@ -160,7 +160,7 @@ export const itemCommands: Record<string, Command> = {
   },
 
   course: {
-    usage: "preview <url> | set <course> [--title t] [--skills a,b] | archive <course> [--undo [--lessons a,b]] | lessons <course>   a course (D79): read a course link's lessons without adding them, rename it or file every lesson under these skills, archive every lesson (--undo --lessons: bring back only those, the ones an archive changed), or list its lessons in order",
+    usage: "preview <url> | set <course> [--title t] [--skills a,b] | archive <course> [--undo] [--lessons a,b] | lessons <course>   a course (D79): read a course link's lessons without adding them, rename it or file every lesson under these skills, archive every lesson, or bring them back with --undo (--lessons: only those, the ones a step changed), or list its lessons in order",
     options: { title: { type: "string" }, skills: { type: "string" }, undo: { type: "boolean" }, lessons: { type: "string" } },
     async run([sub, ref], f) {
       if (!["preview", "set", "archive", "lessons"].includes(sub ?? "")) throw new Error("give preview, set, archive or lessons");

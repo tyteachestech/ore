@@ -88,12 +88,27 @@ describe("adding a course", () => {
     serve(new Set());
     await addCourse(lib, plan);
     expect(courseLessons(lib, course.id).map((l) => l.meta.skills.join())).toEqual(["ai", "ai", "ai"]);
-    expect(await addCourse(lib, plan, { skills: ["teaching"] })).toMatchObject({ added: [], filed: ["teaching"], restored: 0 });
+    expect(await addCourse(lib, plan, { skills: ["teaching"] })).toMatchObject({ added: [], filed: ["teaching"], restored: [] });
     expect(courseLessons(lib, course.id).map((l) => l.meta.skills.join())).toEqual(["ai,teaching", "ai,teaching", "ai,teaching"]);
     // An archived course added again comes back.
     await setCourseArchived(lib, course.id, true);
-    expect(await addCourse(lib, plan, { skills: ["ai"] })).toMatchObject({ added: [], filed: [], restored: 3 });
+    expect((await addCourse(lib, plan, { skills: ["ai"] })).restored).toHaveLength(3);
     expect(courseLessons(lib, course.id)).toHaveLength(3);
+  });
+
+  test("a course added again says which lessons it brought back from Archived, so its Undo archives only those (F-new-mac-course-readd-undo)", async () => {
+    const lib = await tempLibrary();
+    serve(new Set());
+    const { course } = await addCourse(lib, plan);
+    const [one, two, three] = courseLessons(lib, course.id);
+    await setItemArchived(lib, two!.meta.id, true);
+    const again = await addCourse(lib, plan);
+    expect(again.restored).toEqual([two!.meta.id]);
+    // Undo of the add archives the lesson it brought back, the others as they were; Redo brings it back again.
+    await setCourseArchived(lib, course.id, true, again.restored);
+    expect(courseLessons(lib, course.id, { archived: true }).map((l) => !!l.meta.archived_at)).toEqual([false, true, false]);
+    await setCourseArchived(lib, course.id, false, again.restored);
+    expect(courseLessons(lib, course.id).map((l) => l.meta.id)).toEqual([one!.meta.id, two!.meta.id, three!.meta.id]);
   });
 
   test("the course page's own picture becomes the course's cover, saved once beside its first lesson", async () => {
