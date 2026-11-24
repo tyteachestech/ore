@@ -1851,8 +1851,12 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           if (src) (src.setAttribute("data-gone", ""), (src.style.visibility = "hidden"));
           const ghost = slot.cloneNode(true) as HTMLElement;
           ghost.removeAttribute("data-slot");
-          Object.assign(ghost.style, { position: "fixed", left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${w}px`, zIndex: "5", pointerEvents: "none", visibility: "visible", color: getComputedStyle(medal).color });
-          document.body.append(ghost);
+          Object.assign(ghost.style, { position: "fixed", left: `${x}px`, top: `${y}px`, width: `${w}px`, height: `${w}px`, zIndex: "5", pointerEvents: "none", visibility: "visible", display: "grid", placeItems: "center", color: getComputedStyle(medal).color });
+          // The gem's colours come from its skill's colour, which the copy has to carry out of the medal.
+          ghost.dataset.color = medal.closest<HTMLElement>("[data-color]")?.dataset.color ?? "";
+          // Beside the end screen, not in it: the screen's own entrance leaves a transform on it, which would
+          // move a fixed box off its mark; and under the page's body it would sit beneath the review.
+          (host.parentElement ?? host).append(ghost);
           // It lifts off, arcs over and drops into the medal, which takes it with a beat.
           ghost.animate([
             { transform: `translate(${dx}px, ${dy}px) scale(${src ? big : 0.3})`, opacity: src ? 1 : 0 },
