@@ -93,7 +93,7 @@ describe("ingest", () => {
     expect(item.meta.title).toBe("Make It Stick");
     expect(item.meta.author).toBe("Peter C. Brown");
     expect(item.body).toBe(
-      "<!-- chapter 1 -->\n\n# Learning Is Misunderstood\n\nRetrieval is *effortful* and **durable**.\n\n## Tips\n\n-   Space it\n-   Mix it\n\nSee chapter two.\n\n" +
+      "<!-- chapter 1 -->\n\n# Learning Is Misunderstood\n\nRetrieval is *effortful* and **durable**.\n\n## Tips\n\n-   Space it\n-   Mix it\n\n[missing figure: figure]\n\nSee chapter two.\n\n" +
         "<!-- chapter 2 -->\n\n# To Learn, Retrieve\n\nQuizzing beats rereading.\n",
     );
     expect(readFileSync(join(item.dir, "source.epub"))).toEqual(Buffer.from(epub));

@@ -1098,6 +1098,14 @@ describe("import coverage: EPUB", () => {
     expect(item.body.match(/<!-- chapter \d+ -->/g)).toHaveLength(2);
   });
 
+  test("EPUB: a picture missing from the book comes in as a marked gap with its alt text, not left out unsaid (F-new-epub-missing-figure, D-new-epub-missing-figure)", async () => {
+    const lib = await tempLibrary();
+    const path = join(lib.root, "missing.epub");
+    writeFileSync(path, book([{ id: "lesson", body: `<h1>Experiment</h1><p>The diagram explains the result.</p><img src="figure.png" alt="The diagram of the experiment"/><p>Then</p><img src="gone.png"/>` }]));
+    const item = await addSource(lib, path);
+    expect(item.body).toContain("The diagram explains the result.\n\n[missing figure: The diagram of the experiment]\n\nThen\n\n[missing figure]\n");
+  });
+
   test("EPUB: a chapter's saved recall follows its chapter when the book is reimported with its chapters reordered (F-new-epub-recall-reorder)", async () => {
     const lib = await tempLibrary();
     const chapters = [{ id: "forgetting", body: "<h1>Forgetting</h1><p>Memory fades quickly at first.</p>" }, { id: "practice", body: "<h1>Practice</h1><p>Testing strengthens a memory.</p>" }];
