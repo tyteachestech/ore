@@ -1934,8 +1934,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         if (!medal || !ring) return bump("stone", row);
         const z = medal.getBoundingClientRect(), c = ring.getBoundingClientRect();
         fly(r.first + d, row, new DOMRect(c.left + c.width / 2 - 10 + (d % 3 - 1) * 14, c.top + c.height / 2 - 10, 20, 20), { x: z.left + z.width / 2, y: z.top + z.height / 2 }, { big: 1.6, seen: false, ms: 420, end: 17 / 24 }, () => {
-          layer("tap", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.3 });
           bump("stone", row);
+          layer("tap", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.3 });
         });
       });
     }));
