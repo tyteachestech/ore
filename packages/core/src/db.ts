@@ -28,7 +28,35 @@ create virtual table fts using fts5(kind unindexed, ref unindexed, item unindexe
 type FileKind = "doc" | "ann" | "notes" | "skill-notes" | "card" | "topic" | "review" | "config";
 interface FileStat { path: string; kind: FileKind; mtime: number; size: number }
 
-function scan(lib: Library): FileStat[] {
+/** The source folders the index reads, each with its source's id: one folder per id, as `listItems` lists
+ *  them. A folder named as Ore names it (`<slug>-<id>`) is the one; a folder renamed in Finder, whose name
+ *  no longer ends in its id, is read for the id its doc.md names, and counts unless a folder ending in that
+ *  id is there (then it is a Finder or iCloud copy, "… 2", which would show every hit twice). `ore doctor`
+ *  names both. */
+function sourceDirs(lib: Library): Map<string, string> {
+  const dirs = new Map<string, string>();
+  const renamed: string[] = [];
+  for (const y of subdirs(paths.items(lib))) {
+    for (const d of subdirs(join(paths.items(lib), y))) {
+      const dir = join(paths.items(lib), y, d);
+      if (ID_END.test(d)) dirs.set(dir, d.slice(-26));
+      else if (existsSync(join(dir, "doc.md"))) renamed.push(dir);
+    }
+  }
+  const named = new Set(dirs.values());
+  for (const dir of renamed.sort()) {
+    let id: string;
+    try {
+      id = readItemDir(dir).meta.id;
+    } catch {
+      continue;
+    }
+    if (!named.has(id)) (named.add(id), dirs.set(dir, id));
+  }
+  return dirs;
+}
+
+function scan(lib: Library, dirs: Map<string, string>): FileStat[] {
   const out: FileStat[] = [];
   const add = (path: string, kind: FileKind) => {
     if (!existsSync(path)) return;
@@ -36,16 +64,12 @@ function scan(lib: Library): FileStat[] {
     out.push({ path, kind, mtime: s.mtimeMs, size: s.size });
   };
   const ls = visible;
-  for (const y of subdirs(paths.items(lib))) {
-    // Only folders named as Ore names them (`<slug>-<id>`): a Finder or iCloud copy ("… 2") would show
-    // every hit twice, and the index drops a folder's rows by the id its name ends in. `ore doctor` names the rest.
-    for (const d of subdirs(join(paths.items(lib), y)).filter((d) => ID_END.test(d))) {
-      add(join(paths.items(lib), y, d, "doc.md"), "doc");
-      // One entry for a source's highlight log however many device files it spans (they are indexed together).
-      const logs = logFiles(annotationsPath(join(paths.items(lib), y, d))).map((f) => statSync(f));
-      if (logs.length) out.push({ path: annotationsPath(join(paths.items(lib), y, d)), kind: "ann", mtime: Math.max(...logs.map((s) => s.mtimeMs)), size: logs.reduce((t, s) => t + s.size, 0) });
-      add(join(paths.items(lib), y, d, "notes.md"), "notes");
-    }
+  for (const dir of dirs.keys()) {
+    add(join(dir, "doc.md"), "doc");
+    // One entry for a source's highlight log however many device files it spans (they are indexed together).
+    const logs = logFiles(annotationsPath(dir)).map((f) => statSync(f));
+    if (logs.length) out.push({ path: annotationsPath(dir), kind: "ann", mtime: Math.max(...logs.map((s) => s.mtimeMs)), size: logs.reduce((t, s) => t + s.size, 0) });
+    add(join(dir, "notes.md"), "notes");
   }
   for (const s of subdirs(paths.skillNotes(lib))) add(join(paths.skillNotes(lib), s, "notes.md"), "skill-notes");
   for (const f of ls(paths.cards(lib))) if (/^[0-9A-HJKMNP-TV-Z]{26}\.md$/.test(f)) add(join(paths.cards(lib), f), "card");
@@ -303,9 +327,10 @@ function indexFile(db: Database, lib: Library, f: FileStat): void {
   }
 }
 
-function dropFile(db: Database, lib: Library, path: string, kind: FileKind): void {
+/** `idOf`: a source folder's id, from its name or, for a folder renamed in Finder, from its doc.md. */
+function dropFile(db: Database, lib: Library, path: string, kind: FileKind, idOf: (dir: string) => string): void {
   if (kind === "doc" || kind === "ann" || kind === "notes") {
-    const id = dirname(path).slice(-26);
+    const id = idOf(dirname(path));
     if (kind === "doc") {
       db.run("delete from items where id = ?", [id]);
       db.run("delete from fts where kind = 'item' and ref = ?", [id]);
@@ -360,7 +385,11 @@ export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncRepo
   const known = new Map(
     db.query<{ path: string; kind: FileKind; mtime: number; size: number }, []>("select * from files").all().map((r) => [r.path, r]),
   );
-  const current = scan(lib);
+  const dirs = sourceDirs(lib);
+  // A folder gone or renamed away is known by the id it was indexed under.
+  const was = new Map(db.query<{ id: string; path: string }, []>("select id, path from items").all().map((r) => [dirname(join(lib.root, r.path)), r.id]));
+  const idOf = (dir: string) => dirs.get(dir) ?? was.get(dir) ?? dir.slice(-26);
+  const current = scan(lib, dirs);
   const changed = current.filter((f) => {
     const k = known.get(f.path);
     return !k || k.mtime !== f.mtime || k.size !== f.size;
@@ -377,7 +406,7 @@ export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncRepo
       const set = () => db.query<{ p: string }, []>("select coalesce(group_concat(id || priority), '') as p from (select id, priority from items where priority is not null order by id)").get()!.p;
       const before = set();
       for (const k of removed) {
-        dropFile(db, lib, k.path, k.kind);
+        dropFile(db, lib, k.path, k.kind, idOf);
         db.run("delete from files where path = ?", [k.path]);
       }
       // An empty index has no rows to drop, and each drop scans the whole search table: on a first build they cost
@@ -386,7 +415,7 @@ export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncRepo
       for (const f of changed) {
         // Otherwise always, not only for files this process saw before: several `ore` processes sync at once (the
         // app's launch), and one that read the files table before another committed would index a file twice.
-        if (!fresh) dropFile(db, lib, f.path, f.kind);
+        if (!fresh) dropFile(db, lib, f.path, f.kind, idOf);
         try {
           indexFile(db, lib, f);
         } catch (e) {
