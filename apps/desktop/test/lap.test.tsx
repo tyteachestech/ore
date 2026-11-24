@@ -127,9 +127,10 @@ test("under the ring: each skill the session fed has a line: its medal and level
   expect([rows[0]!.getAttribute("data-color"), rows[0]!.hasAttribute("data-up"), rows[0]!.querySelector(".end-medal-name")!.textContent, rows[0]!.querySelector(".gem-ring-lv")!.textContent]).toEqual(["purple", true, "AI", "2"]);
   // What today added stands at the right: the gem it cut, then a stone for each other memory kept.
   expect(pips(rows[0]!)).toEqual(["cut", "rough", "rough"]);
-  // One that stayed on its level shows the level all the same; the stones one good answer from a gem come first.
+  // One that stayed on its level shows the level all the same. A memory kept and not cut is a rough stone: the
+  // skill's count of memories one answer from a gem is of the whole skill, not of this session (F-new-end-ready-guess).
   expect([rows[1]!.hasAttribute("data-up"), rows[1]!.querySelector(".end-medal-name")!.textContent, rows[1]!.querySelector(".gem-ring-lv")!.textContent]).toEqual([false, "Learning", "3"]);
-  expect(pips(rows[1]!)).toEqual(["ready", "ready", "rough", "rough", "rough"]);
+  expect(pips(rows[1]!)).toEqual(["rough", "rough", "rough", "rough", "rough"]);
   // No sentence in a line: the name is its only words.
   expect(rows.map((r) => r.textContent)).toEqual(["2AI", "3Learning"]);
   // A reader gets every line at once.
@@ -146,7 +147,9 @@ test("the plan: level-ups lead, then gems, then memories kept; a line holds five
   expect(plan.rows.map((r) => `${r.skill} ${r.cut}/${r.kept}${r.solo ? " solo" : ""}`)).toEqual(["a 1/2 solo", "b 2/2", "c 1/2", "d 0/9", "gone 0/1"]);
   expect(levelAt(plan.rows[4]!, 0, true, was, now)).toMatchObject({ lv: 0, up: false, share: 0 });
   // Nine memories kept draw five stones, so the name beside them keeps its room.
-  expect(plan.rows[3]!.slots).toEqual(["ready", "rough", "rough", "rough", "rough"]);
+  expect(plan.rows[3]!.slots).toEqual(["rough", "rough", "rough", "rough", "rough"]);
+  // One memory kept in a skill that has one other memory close to a gem: nothing says the kept one is that one.
+  expect(endPlan([], [{ skill: "d", n: 1 }], was, now).rows[0]!.slots).toEqual(["rough"]);
   // One flier for each stone drawn, in the lines' order.
   expect(plan.fliers.map((f) => f.skill).join("")).toBe("aabbccdddddgone");
   expect(plan.rows.map((r) => r.first)).toEqual([0, 2, 4, 6, 11]);

@@ -78,18 +78,19 @@ export function LapCentre({ min }: { min: number }) {
 
 /** What the end screen's rows show and what flies to them, worked out once so the screen and the flight agree.
  *  A row is a skill the session fed; its line is the session's own stones for it, one per memory kept: the ones
- *  that became gems first, then the ones one good answer from a gem, then the rest. A flier is one of those,
+ *  that became gems first, then the rest. A flier is one of those,
  *  leaving the ring for its place in the line. Skills that went up lead, then by gems, then by memories kept. */
-export type EndRow = { skill: string; cut: number; kept: number; slots: ("cut" | "ready" | "rough")[]; first: number; /** It has the big ring to itself for a turn. */ solo: boolean };
-export function endPlan(cut: string[], kept: { skill: string; n: number }[], was: Today["skills"], now: Today["skills"]): { rows: EndRow[]; fliers: { skill: string; kind: "cut" | "ready" | "rough"; row: number }[] } {
+export type EndRow = { skill: string; cut: number; kept: number; slots: ("cut" | "rough")[]; first: number; /** It has the big ring to itself for a turn. */ solo: boolean };
+export function endPlan(cut: string[], kept: { skill: string; n: number }[], was: Today["skills"], now: Today["skills"]): { rows: EndRow[]; fliers: { skill: string; kind: "cut" | "rough"; row: number }[] } {
   const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
   const up = (id: string) => (of(now, id)?.level ?? 0) > (of(was, id)?.level ?? of(now, id)?.level ?? 0);
   // A memory filed under no skill has its line too, named as the review picker names it, with no level.
   const ids = [...new Set([...cut, ...kept.map((k) => k.skill)])];
   const rows = ids.map((id) => {
     const c = cut.filter((x) => x === id).length, n = Math.max(c, kept.find((k) => k.skill === id)?.n ?? 0);
-    const near = Math.min(of(now, id)?.ready ?? 0, n - c);
-    const line = [...Array<"cut">(c).fill("cut"), ...Array<"ready">(near).fill("ready"), ...Array<"rough">(n - c - near).fill("rough")];
+    // A memory kept and not cut is a rough stone. Which of them stand one answer from a gem the session does not
+    // say (the skill's own count is of all its memories), so none is drawn as if it did.
+    const line = [...Array<"cut">(c).fill("cut"), ...Array<"rough">(n - c).fill("rough")];
     return { skill: id, cut: c, kept: n, slots: line.slice(0, LINE), first: 0, solo: false };
   }).sort((x, y) => Number(up(y.skill)) - Number(up(x.skill)) || y.cut - x.cut || y.kept - x.kept);
   // Every skill fed has its line (Tyler, 2026-11-23, of a "+3" that stood for the rest: "I don't get what the +3
