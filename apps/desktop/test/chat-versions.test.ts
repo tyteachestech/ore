@@ -56,3 +56,11 @@ test("asking a turn again keeps its source, section, @s and files; an @ edited o
   expect(edited.mentions).toEqual([paper]);
   expect(edited.pointed).toEqual([paper, page]);
 });
+
+test("flipping back to an earlier reply keeps the section he asked from, so Try another reply still sends it (F-new-chat-version-section)", () => {
+  const first = turn("Explain this part", "First explanation.", { item: "s1", at: "The second chapter" });
+  const second = { ...again1(first), reply: "Second explanation." };
+  const back = flip(second, 0);
+  expect(back.at).toBe("The second chapter");
+  expect(again1(back).at).toBe("The second chapter");
+});
