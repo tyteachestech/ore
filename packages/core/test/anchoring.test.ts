@@ -113,7 +113,7 @@ describe("anchoring", () => {
     expect(anchor(edited, sel)).toBeNull();
   });
 
-  test("fuzzy: a long highlight that held a page footer keeps its words when a better PDF read drops the footer and moves the paragraph (F-new-footer-highlight)", () => {
+  test("fuzzy: a long highlight that held a page footer keeps its words when a better PDF read drops the footer and moves the paragraph (F614)", () => {
     const start = "A crew may put up with a cold, wet shift because they care about the people downstream of the dam. That care gives the work its point,";
     const rest =
       "even when the hours are long. The survey found that crews who tie their work to something they hold dear, a town, a trade or a promise, report more pride in it. Crews whose work runs against what they hold dear report the opposite, however well it pays.";
