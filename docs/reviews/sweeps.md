@@ -106,6 +106,8 @@ When a sweep's triage is done, add a row per tester here.
 | 11-24 | [deep scan](2026-11-24-codex-deep-scan/) intake | Codex, diagnosing-bugs loop | Reimport and anchoring, the same input twice, refusals and killed imports, what doc.md claims, Mac vs phone imports | both | 8 | #522 |
 | 11-24 | [deep scan 2](2026-11-24-codex-deep-scan-2/) chat | Codex, diagnosing-bugs loop | Tutor chats and their versions, Claude chat import, search and ⌘K, skills and Importance, end screen counts, phone search | both | 8 | #525 |
 | 11-24 | [deep scan 2](2026-11-24-codex-deep-scan-2/) media | Codex, diagnosing-bugs loop | PDF reimport and background reread, diagrams, audio transcripts and podcast feeds, the phone's fs and rescan, F575/F577 | both | 6 + F577 | #525 |
+| 11-24 | [deep scan 3](2026-11-24-codex-deep-scan-3/) engine | Codex, diagnosing-bugs loop | AI drafts, checks and remixes under races and bad replies, D21, queue and FSRS replay, Undo across devices, sessions over midnight, DST, stats | both | 8 | this PR |
+| 11-24 | [deep scan 3](2026-11-24-codex-deep-scan-3/) library | Codex, diagnosing-bugs loop | Links and backlinks, the note editor's round-trips, cut and Undo, Feed previews, frontmatter and skills.yaml, CLI --json and init, Add edges, F575 | both | 11 | this PR |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
