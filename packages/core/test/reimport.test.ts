@@ -86,6 +86,18 @@ describe("reimport", () => {
     expect(back.meta.published).toBe("2024-01-01");
   });
 
+  test("the same text whose date is only written another way (a time added) is not news: nothing changes (F-new-reimport-metadata)", async () => {
+    const lib = await tempLibrary();
+    const doc = (date: string) => `---\ntitle: A learning guide\ndate: ${date}\n---\n\n# A learning guide\n\nSpaced retrieval supports durable memory.\n`;
+    page = doc("2024-01-01");
+    serve();
+    const item = await addSource(lib, URL_);
+    page = doc("2024-01-01T09:30:00Z");
+    const r = await reimportSource(lib, item.meta.id);
+    expect(r.changed).toBe(false);
+    expect(findItem(lib, item.meta.id).meta.published).toBe("2024-01-01");
+  });
+
   test("undo puts back the old text and highlights, and running it again redoes", async () => {
     const lib = await tempLibrary();
     page = V1;

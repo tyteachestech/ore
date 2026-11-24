@@ -897,6 +897,16 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   return turn(() => rewrite(lib, item, draft, regions, kept, stash));
 }
 
+/** A date's day (2024-01-01), however it is written; undefined when it is no date. */
+function day(d: string | undefined): string | undefined {
+  const s = cleanDate(d);
+  if (!s) return undefined;
+  const iso = s.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (iso) return iso;
+  const t = new Date(Date.parse(s));
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
 /** A file's pictures that sat beside it (a saved page's `figure.png`) are not beside its kept copy, so read
  *  again they can't be found: each one left as a `file://` link takes the picture the source already saved
  *  for it, the same alt text in the same turn (F-new-reimport-local-image). */
@@ -938,7 +948,8 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
   }
   // The same text under a new byline or date is still news: they come in, and the new original with them, as for
   // new text (F-new-reimport-metadata).
-  const byline = (item.meta.author ?? draft.author) !== item.meta.author || (draft.published ?? item.meta.published) !== item.meta.published;
+  // A date is news by its day, however it is written ("2024-01-01", "2024-01-01T09:30:00Z"); an empty one is none.
+  const byline = (!item.meta.author && !!draft.author?.trim()) || (!!day(draft.published) && day(draft.published) !== day(item.meta.published));
   if (draft.body === item.body && !byline) {
     // A better reader may learn something about the same text: a PDF's tables still to be read (D125).
     if (String(draft.structure ?? "") !== String(item.meta.structure ?? "")) item.meta = await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, structure: draft.structure }));
@@ -967,7 +978,7 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     // Read again under the lock: a background enrich may have written its questions while this one read.
     const now = readItemDir(item.dir).meta;
     const added = tail ? recordEnd(lib, item.meta.id, draft.body.length - tail.length, tail) : undefined;
-    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure, owed: undefined, owed_error: undefined, chapter_recalls: followChapters(now.chapter_recalls, item.body, draft.body, draft.type) };
+    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author || draft.author?.trim() || undefined, published: draft.published?.trim() || now.published, structure: draft.structure, owed: undefined, owed_error: undefined, chapter_recalls: followChapters(now.chapter_recalls, item.body, draft.body, draft.type) };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, draft.body));
   });
   const next = readItemDir(item.dir);
