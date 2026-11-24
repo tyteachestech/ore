@@ -283,8 +283,9 @@ function openDb(lib: Library): Database {
 const SNIPPETS = 60;
 
 /** Letters of scripts written without spaces between words (Chinese, Japanese, Thai and its neighbours),
- *  with the marks on them. The index reads a run of them as one word, so a word inside one was never found. */
-const UNSPACED = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Thai}\p{sc=Lao}\p{sc=Khmer}\p{sc=Myanmar}]\p{M}*/gu;
+ *  with the marks on them. The index reads a run of them as one word, so a word inside one was never found.
+ *  The long-vowel mark ー (and its half-width ｰ) belongs to no script but is part of a katakana word (コーヒー). */
+const UNSPACED = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Thai}\p{sc=Lao}\p{sc=Khmer}\p{sc=Myanmar}\u30FC\uFF70]\p{M}*/gu;
 /** Those letters one by one, so a word is found as the letters side by side (`chars`). */
 const spacedOut = (s: string) => s.match(UNSPACED)?.join(" ") ?? "";
 /** A text's runs of those letters spaced out, with a private-use mark between runs: the index reads it as a

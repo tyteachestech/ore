@@ -86,6 +86,14 @@ describe("search in other scripts (Codex sweep 4)", () => {
     expect([...new Set(search(lib, "日本語"))]).toEqual([wrapped]);
   });
 
+  test("a katakana word with the long-vowel mark is found (F-new-katakana-long-vowel)", async () => {
+    const lib = await tempLibrary();
+    const coffee = (await addSnippet(lib, { text: "毎朝コーヒーを飲みます。データも見ます。" })).item.meta.id;
+    const items = (q: string) => [...new Set(search(lib, q))];
+    expect(items("コーヒー")).toEqual([coffee]);
+    expect(items("データ")).toEqual([coffee]);
+  });
+
   test("an accent typed as its own mark finds the same words as one typed with its letter", async () => {
     const lib = await tempLibrary();
     const composed = (await addSnippet(lib, { text: "Η άλφα είναι το πρώτο γράμμα." })).item.meta.id;
