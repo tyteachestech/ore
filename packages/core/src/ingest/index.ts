@@ -149,9 +149,17 @@ async function audioTags(bytes: Uint8Array, ext: string): Promise<{ title?: stri
   }
 }
 
-/** Whether a saved reading of a PDF (`regions`) is of these bytes (Codex deep scan 2): one replaced at its link
- *  since has other pages, and the old tables laid on them took its text's place. */
-const fits = (opts: AddOptions, bytes: Uint8Array | string) => !opts.regionsOf || Buffer.from(opts.regionsOf).equals(Buffer.from(bytes));
+/** Whether a saved reading of a PDF (`regions`, read from `of`) is of these bytes (Codex deep scan 2): one replaced
+ *  at its link since has other pages, and the old tables laid on them took its text's place. The same pages with
+ *  the same words are the same file, though a host stamps each download (a trailer comment, a new date). */
+async function fits(of: Uint8Array, bytes: Uint8Array): Promise<boolean> {
+  const view = (b: Uint8Array) => Buffer.from(b.buffer, b.byteOffset, b.byteLength);
+  if (view(of).equals(view(bytes))) return true;
+  const { pageTexts } = await import("./pdf.ts");
+  const [a, b] = await Promise.all([pageTexts(of), pageTexts(bytes)]).catch(() => [[], []]);
+  // Pages with no words (a scan) say nothing about which file it is.
+  return a.some((t) => t.trim()) && a.length === b.length && a.every((t, i) => t === b[i]);
+}
 
 /** A source draft from a file's bytes, whatever it came from (a link or a file), by its kind. */
 async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: string, base = url, opts: AddOptions = {}): Promise<NewItem> {
@@ -167,12 +175,13 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     return { type: "article", title, author: tags.author, url, body: vttToBody(vtt, tags.chapters), source: { ext: kind, data: bytes }, transcript: vtt };
   }
   if (kind === "pdf") {
-    const p = await pdfToDoc(bytes, fits(opts, bytes) ? opts.regions : undefined).catch(async (e) => {
+    const stale = !!opts.regions?.length && !!opts.regionsOf && !(await fits(opts.regionsOf, bytes));
+    const p = await pdfToDoc(bytes, stale ? undefined : opts.regions).catch(async (e) => {
       // Scanned pages: read with the Mac's text recognition (D96).
       if (!(e instanceof (await import("./pdf.ts")).ScannedPdf)) throw e;
       return (await import("./ocr.ts")).scannedText(bytes, "pdf");
     });
-    return { type: "pdf", title: p.title ?? fileStem(name), author: "author" in p ? p.author : undefined, url, body: p.body, source: { ext: "pdf", data: bytes }, assets: "assets" in p ? p.assets : undefined, structure: "structure" in p ? p.structure : undefined };
+    return { type: "pdf", title: p.title ?? fileStem(name), author: "author" in p ? p.author : undefined, url, body: p.body, source: { ext: "pdf", data: bytes }, assets: "assets" in p ? p.assets : undefined, structure: "structure" in p ? p.structure : undefined, ...(stale ? { staleLayout: true as const } : {}) };
   }
   if (IMAGE_TYPES.includes(kind)) {
     // A screenshot or photo of text: its text to read, the image above it (D96).
@@ -903,8 +912,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   });
   if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
   if (kept) draft.body = savedPictures(draft.body, item);
-  const used = draft.source && savedPdf && !fits({ regionsOf: savedPdf }, draft.source.data) ? undefined : regions;
-  return turn(() => rewrite(lib, item, draft, used, kept, stash));
+  return turn(() => rewrite(lib, item, draft, draft.staleLayout ? undefined : regions, kept, stash));
 }
 
 /** A date's day (2024-01-01), however it is written; undefined when it is no date. */

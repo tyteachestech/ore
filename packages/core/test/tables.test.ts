@@ -116,6 +116,28 @@ describe("PDF tables and formulas (D125)", () => {
     }
   });
 
+  test("a PDF link that serves the same pages with a new download stamp keeps its saved reading (F-new-pdf-stale-layout)", async () => {
+    // Some hosts stamp each download (a trailer comment, a new date in its metadata): the pages and their words are the same.
+    const lib = await tempLibrary();
+    const saved = globalThis.fetch;
+    const stamped = (n: number) => new Uint8Array([...pdf("tables.pdf"), ...new TextEncoder().encode(`\n% downloaded ${n}\n`)]);
+    let n = 1;
+    globalThis.fetch = (async () => new Response(stamped(n), { headers: { "content-type": "application/pdf" } })) as unknown as typeof fetch;
+    try {
+      const item = await addSource(lib, "https://example.test/stamped.pdf");
+      process.env.ORE_PADDLE = fakePaddle();
+      await readTables(lib, item.meta.id);
+      delete process.env.ORE_PADDLE;
+      n = 2;
+      const r = await reimportSource(lib, item.meta.id);
+      expect(r.changed).toBe(false);
+      expect(findItem(lib, item.meta.id).body).toContain(TABLE);
+      expect(existsSync(join(r.item.dir, "layout.json"))).toBe(true);
+    } finally {
+      globalThis.fetch = saved;
+    }
+  });
+
   test("a PDF of prose has nothing to offer; one added before tables were spotted learns it on reimport", async () => {
     const lib = await tempLibrary();
     const prose = await addSource(lib, join(FIX, "paper.pdf"));

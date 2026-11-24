@@ -701,6 +701,16 @@ export async function pageViews(data: Uint8Array): Promise<number[][]> {
   return out;
 }
 
+/** Each page's words as pdf.js reads them: two files with the same are the same pages, whatever else differs. */
+export async function pageTexts(data: Uint8Array): Promise<string[]> {
+  const task = openPdf(data);
+  const doc = await task.promise;
+  const out: string[] = [];
+  for (let n = 1; n <= doc.numPages; n++) out.push((await (await doc.getPage(n)).getTextContent()).items.map((i) => ("str" in i ? i.str : "")).join(" "));
+  await task.destroy();
+  return out;
+}
+
 export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promise<PdfDoc> {
   const task = openPdf(data);
   const doc = await task.promise;

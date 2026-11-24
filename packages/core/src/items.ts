@@ -155,6 +155,8 @@ export interface NewItem {
   picture?: string;
   /** An owed episode's audio address, to play from until the file is kept; noted beside it, never in the meta. */
   listen?: string;
+  /** A PDF read again without its saved layout, which was of another file: layout.json goes. */
+  staleLayout?: true;
 }
 
 export type Asset = { name: string; data: Uint8Array };
