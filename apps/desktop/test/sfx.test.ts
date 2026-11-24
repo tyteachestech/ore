@@ -49,8 +49,8 @@ describe("review sounds", () => {
 
   test("a review's own sounds are these; undo, Later and an edit stay silent", () => {
     expect([...SFX]).toEqual(["tap", "right", "missed", "goal", "cart", "pop", "done"]);
-    const review = readFileSync(join(import.meta.dir, "../src/Review.tsx"), "utf8");
-    // Every call in Review, by the sound it plays.
+    // Every call in Review and its session (review-session.ts, which plays a saved rating's and the goal's), by the sound it plays.
+    const review = ["Review.tsx", "review-session.ts"].map((f) => readFileSync(join(import.meta.dir, "../src", f), "utf8")).join("\n");
     expect([...review.matchAll(/\b(?:sfx|once)\("(\w+)"/g)].map((m) => m[1]).sort()).toEqual(["cart", "done", "goal", "pop", "tap", "tap", "tap"]);
     expect(review.match(/\brated\(/g)?.length).toBe(1);
   });
