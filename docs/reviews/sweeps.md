@@ -102,6 +102,8 @@ When a sweep's triage is done, add a row per tester here.
 | 11-23 | [ux sweep 16](2026-11-23-codex-ux-sweep-16/) mac | Codex | Round 16: recheck of round 15, the typing guard everywhere, new paths | Mac | 1 | #515 |
 | 11-23 | [ux sweep 17](2026-11-23-codex-ux-sweep-17/) mac | Codex | Round 17: recheck of round 16, delayed actions on a left screen | Mac | 1 | #516 |
 | 11-23 | [ux sweep 18](2026-11-23-codex-ux-sweep-18/) mac | Codex | Round 18: recheck of round 17, note links, author edit, warm-up | Mac | 0 | — |
+| 11-24 | [deep scan](2026-11-24-codex-deep-scan/) data | Codex, diagnosing-bugs loop | Below the screens: review replay fuzz, two devices on one library, the index rebuilt, frontmatter round-trips, git restore, AI stamps | both | 8 | #PR |
+| 11-24 | [deep scan](2026-11-24-codex-deep-scan/) intake | Codex, diagnosing-bugs loop | Reimport and anchoring, the same input twice, refusals and killed imports, what doc.md claims, Mac vs phone imports | both | 8 | #PR |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
@@ -131,4 +133,5 @@ Ranked by likely yield.
 - **A first sweep on a new platform or harness finds a lot, then confirm rounds fade:** iPhone release loop 11, then 5, 3, 1. The 11-09 loop went 6, then down to 0. s4a found 7 on the phone's first edge pass.
 - **Real tasks beat checklists:** diagram tasks (d2) found 5 where the 80-item checklist (d1) found 2. The six UX-parity checklists averaged under 2, with reader 0 and lists 0.
 - **Walk-throughs find little:** persona 1, daily 2, looks 1, rehearsal 3 + 1. The rehearsal on his real library still found bugs a seed never shows (F194, F195).
+- **A red script per finding, below the screens:** the 11-24 deep scan asked Codex for a reproducing script before a finding counted, and drove core and the CLI instead of pages. 16 of 16 were real, after eighteen UX rounds had ended clean.
 - **Mock limits hide real bugs:** sweep 2 dropped empty AI replies as mock-only, and sweep 6 showed both were real (F329, F330). Prefer real AI or real-shaped faults over the mock's nulls.
