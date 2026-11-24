@@ -1073,54 +1073,62 @@ describe("import coverage: what the reader shows", () => {
 });
 
 describe("import coverage: EPUB", () => {
-  /** A small EPUB 3: each chapter a spine page, in order, and the pictures beside them. */
-  const book = (chapters: { id: string; body: string }[], images: Record<string, Uint8Array> = {}) =>
-    zipSync({
-      mimetype: [strToU8("application/epub+zip"), { level: 0 }],
-      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
-      "OEBPS/content.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Intake study book</dc:title></metadata><manifest>${chapters.map((c) => `<item id="${c.id}" href="${c.id}.xhtml" media-type="application/xhtml+xml"/>`).join("")}${Object.keys(images).map((n, i) => `<item id="img${i}" href="${n}" media-type="image/png"/>`).join("")}</manifest><spine>${chapters.map((c) => `<itemref idref="${c.id}"/>`).join("")}</spine></package>`),
-      ...Object.fromEntries(chapters.map((c) => [`OEBPS/${c.id}.xhtml`, strToU8(`<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>${c.id}</title></head><body>${c.body}</body></html>`)])),
-      ...Object.fromEntries(Object.entries(images).map(([n, b]) => [`OEBPS/${n}`, b])),
-    });
-  const FIGURE = () => new Uint8Array(readFileSync(join(FIX, "files", "screenshot.png")));
+  // make-study-epubs.ts: plates.epub (a cover page whose picture is missing, a missing figure, plate pages) and one
+  // two-chapter book as made, reordered and with a heading reworded.
+  const chapterOf = (body: string, n: number) => body.split(/<!-- chapter \d+ -->/)[n]!.match(/^# .+/m)?.[0];
+  const PNG_1PX = () => Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"); // the plate's own bytes
 
   test("EPUB: an illustration on its own page after the text begins stays in the book, in its place (F-new-epub-plate-page)", async () => {
-    const lib = await tempLibrary();
-    const path = join(lib.root, "plate.epub");
-    writeFileSync(path, book([{ id: "text", body: "<h1>Experiment</h1><p>Study the figure below.</p>" }, { id: "plate", body: `<img src="figure.png" alt="Experiment diagram"/>` }, { id: "after", body: "<h1>Results</h1><p>The figure shows the result.</p>" }], { "figure.png": FIGURE() }));
-    const item = await addSource(lib, path);
+    const item = await addSource(await tempLibrary(), file("plates.epub"));
     const [figure] = images(item.body);
-    expect(figure?.alt).toBe("Experiment diagram");
-    expect(readFileSync(join(item.dir, figure!.path))).toEqual(Buffer.from(FIGURE()));
+    expect(figure?.alt).toBe("The first nest we found");
+    expect(readFileSync(join(item.dir, figure!.path))).toEqual(PNG_1PX());
     // In its place, under the chapter it follows: a page with only a picture has no recall of its own.
-    expect(item.body.indexOf("Study the figure below.")).toBeLessThan(item.body.indexOf("![Experiment diagram]"));
-    expect(item.body.indexOf("![Experiment diagram]")).toBeLessThan(item.body.indexOf("# Results"));
+    expect(item.body.indexOf("The counts rose every year.")).toBeLessThan(item.body.indexOf("![The first nest we found]"));
+    expect(item.body.indexOf("![The first nest we found]")).toBeLessThan(item.body.indexOf("# Results"));
     expect(item.body.match(/<!-- chapter \d+ -->/g)).toHaveLength(2);
   });
 
+  test("EPUB: a plate whose file name holds \"cover\" inside a word (discovery.png) is a plate, not the cover (F-new-epub-plate-page)", async () => {
+    const item = await addSource(await tempLibrary(), file("plates.epub"));
+    expect(images(item.body).map((i) => i.alt)).toEqual(["The first nest we found"]);
+  });
+
   test("EPUB: a picture missing from the book comes in as a marked gap with its alt text, not left out unsaid (F-new-epub-missing-figure, D-new-epub-missing-figure)", async () => {
-    const lib = await tempLibrary();
-    const path = join(lib.root, "missing.epub");
-    writeFileSync(path, book([{ id: "lesson", body: `<h1>Experiment</h1><p>The diagram explains the result.</p><img src="figure.png" alt="The diagram of the experiment"/><p>Then</p><img src="gone.png"/>` }]));
-    const item = await addSource(lib, path);
-    expect(item.body).toContain("The diagram explains the result.\n\n[missing figure: The diagram of the experiment]\n\nThen\n\n[missing figure]\n");
+    const item = await addSource(await tempLibrary(), file("plates.epub"));
+    expect(item.body).toContain("Each spring we counted the herons along the river.\n\n[missing figure: Map of the river survey]\n\nThe counts rose every year.");
+  });
+
+  test("EPUB: a cover page whose picture the book doesn't hold is still the cover, and a last page of only a missing picture stays under its chapter: the chapters don't shift (F-new-epub-missing-figure)", async () => {
+    const item = await addSource(await tempLibrary(), file("plates.epub"));
+    expect(item.body).not.toContain("A Field Book of Herons]");
+    expect(item.body.match(/<!-- chapter \d+ -->/g)).toHaveLength(2);
+    expect(chapterOf(item.body, 1)).toBe("# The survey");
+    expect(chapterOf(item.body, 2)).toBe("# Results");
+    expect(item.body).toMatch(/The colony doubled in five years\.\n\n\[missing figure: A page of field notes\]\n$/);
   });
 
   test("EPUB: a chapter's saved recall follows its chapter when the book is reimported with its chapters reordered (F-new-epub-recall-reorder)", async () => {
     const lib = await tempLibrary();
-    const chapters = [{ id: "forgetting", body: "<h1>Forgetting</h1><p>Memory fades quickly at first.</p>" }, { id: "practice", body: "<h1>Practice</h1><p>Testing strengthens a memory.</p>" }];
-    const path = join(lib.root, "chapters.epub");
-    writeFileSync(path, book(chapters));
-    const item = await addSource(lib, path);
+    const item = await addSource(lib, file("chapters.epub"));
     await setChapterRecall(lib, item.meta.id, 1, "I remember that forgetting happens fast at first.", "Forgetting");
-    const chapterOf = (body: string, n: number) => body.split(/<!-- chapter \d+ -->/)[n]!.match(/^# .+/m)?.[0];
-    writeFileSync(join(item.dir, "source.epub"), book([...chapters].reverse()));
+    writeFileSync(join(item.dir, "source.epub"), readFileSync(file("chapters-reordered.epub")));
     const r = await reimportSource(lib, item.meta.id, { local: true });
     const [recall] = r.item.meta.chapter_recalls!;
     expect(chapterOf(r.item.body, recall!.n)).toBe("# Forgetting");
     // Undo takes the recall back to where its chapter is again.
     const back = await undoReimport(lib, item.meta.id, r.step);
     expect(chapterOf(back.body, back.meta.chapter_recalls![0]!.n)).toBe("# Forgetting");
+  });
+
+  test("EPUB: a chapter's saved recall stays with its chapter when the book is reimported with that chapter's heading reworded in the same place (F-new-epub-recall-reorder)", async () => {
+    const lib = await tempLibrary();
+    const item = await addSource(lib, file("chapters.epub"));
+    await setChapterRecall(lib, item.meta.id, 1, "I remember that forgetting happens fast at first.", "Forgetting");
+    writeFileSync(join(item.dir, "source.epub"), readFileSync(file("chapters-renamed.epub")));
+    const r = await reimportSource(lib, item.meta.id, { local: true });
+    expect(chapterOf(r.item.body, 1)).toBe("# How fast we forget");
+    expect(r.item.meta.chapter_recalls?.map((c) => c.n)).toEqual([1]);
   });
 
   test("EPUB: the book's date, and its footnotes and endnotes as Markdown footnotes under the chapter that cites them", async () => {
@@ -1937,14 +1945,13 @@ describe("import coverage: figures and slide pictures", () => {
   });
 
   test("a saved web page read again from its kept copy keeps the pictures it saved, its doc.md the same (F-new-reimport-local-image)", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ore-saved-"));
-    writeFileSync(join(dir, "figure.png"), readFileSync(join(FIX, "files", "screenshot.png")));
-    const text = "A saved lesson needs its diagram to explain the experiment. ".repeat(8);
-    writeFileSync(join(dir, "lesson.html"), `<html><head><title>Saved illustrated lesson</title></head><body><article><h1>Saved illustrated lesson</h1><p>${text}</p><img src="figure.png" alt="Experiment diagram"><p>${"We compare the observations and draw a conclusion. ".repeat(8)}</p></article></body></html>`);
+    // files/saved-lesson: a page saved as HTML only, its picture beside it.
     const lib = await tempLibrary();
-    const item = await addSource(lib, join(dir, "lesson.html"));
+    const item = await addSource(lib, join(FIX, "files", "saved-lesson", "lesson.html"));
+    expect(item.meta.title).toBe("Watching a seed sprout");
     const [figure] = images(item.body);
-    expect(figure?.path).toMatch(/^assets\/[0-9a-f]{16}\.png$/);
+    expect(figure?.alt).toBe("The bean jar on day three");
+    expect(readFileSync(join(item.dir, figure!.path))).toEqual(readFileSync(join(FIX, "files", "saved-lesson", "figure.png")));
     const r = await reimportSource(lib, item.meta.id, { local: true });
     expect(r.changed).toBe(false);
     expect(readFileSync(findItem(lib, item.meta.id).docPath, "utf8")).toBe(readFileSync(item.docPath, "utf8"));

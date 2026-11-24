@@ -831,8 +831,8 @@ function chapterTexts(body: string, type: ItemType): string[] {
 
 /** A chapter's saved recall (D115) follows its chapter, known by its first line (its heading), when the text
  *  it was read from changes to `to`: reordered, added to or cut. Of chapters starting alike, the one that reads
- *  the same, then the one in its old place, wins. One whose chapter is gone leaves chapter_recalls; its words
- *  stay in the source's note (F-new-epub-recall-reorder). */
+ *  the same, then the one in its old place, wins; with none, its old place, if that holds no other old chapter.
+ *  One whose chapter is gone leaves chapter_recalls; its words stay in the source's note (F-new-epub-recall-reorder). */
 function followChapters(recalls: ItemMeta["chapter_recalls"], from: string, to: string, type: ItemType): ItemMeta["chapter_recalls"] {
   if (!recalls?.length) return recalls;
   const first = (t: string) => t.split("\n").find((l) => l.trim())?.trim() ?? "";
@@ -840,14 +840,23 @@ function followChapters(recalls: ItemMeta["chapter_recalls"], from: string, to: 
   const now = chapterTexts(to, type);
   const taken = new Set<number>();
   const out: NonNullable<ItemMeta["chapter_recalls"]> = [];
+  const unmatched: typeof recalls = [];
   for (const r of recalls) {
     const text = old[r.n - 1];
     if (text === undefined) continue;
     const hits = now.flatMap((t, i) => (!taken.has(i) && first(t) === first(text) ? [i] : []));
     const i = hits.find((i) => now[i] === text) ?? (hits.includes(r.n - 1) ? r.n - 1 : hits[0]);
-    if (i === undefined) continue;
+    if (i === undefined) unmatched.push(r);
+    else (taken.add(i), out.push({ ...r, n: i + 1 }));
+  }
+  // A chapter whose heading was reworded is still the one in its place, unless that place now holds another of
+  // the old chapters, moved there; a recall leaves only when its place is gone.
+  const headings = new Set(old.map(first));
+  for (const r of unmatched) {
+    const i = r.n - 1;
+    if (i >= now.length || taken.has(i) || headings.has(first(now[i]!))) continue;
     taken.add(i);
-    out.push({ ...r, n: i + 1 });
+    out.push(r);
   }
   return out.length ? out.sort((a, b) => a.n - b.n) : undefined;
 }
