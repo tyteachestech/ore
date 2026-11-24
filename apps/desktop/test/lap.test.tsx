@@ -128,7 +128,7 @@ test("under the ring: each skill the session fed has a line: its medal and level
   // What today added stands at the right: the gem it cut, then a stone for each other memory kept.
   expect(pips(rows[0]!)).toEqual(["cut", "rough", "rough"]);
   // One that stayed on its level shows the level all the same. A memory kept and not cut is a rough stone: the
-  // skill's count of memories one answer from a gem is of the whole skill, not of this session (F-new-end-ready-guess).
+  // skill's count of memories one answer from a gem is of the whole skill, not of this session (F579).
   expect([rows[1]!.hasAttribute("data-up"), rows[1]!.querySelector(".end-medal-name")!.textContent, rows[1]!.querySelector(".gem-ring-lv")!.textContent]).toEqual([false, "Learning", "3"]);
   expect(pips(rows[1]!)).toEqual(["rough", "rough", "rough", "rough", "rough"]);
   // No sentence in a line: the name is its only words.
