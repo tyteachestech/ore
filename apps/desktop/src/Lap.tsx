@@ -104,7 +104,10 @@ export function endPlan(cut: string[], kept: { skill: string; n: number }[], was
   // does"); only a session wider than the row can hold leaves any out. The big ring is given to two at most,
   // the ones that went up first, so the wait does not grow with the skills.
   const rows = all.slice(0, REEL_ROWS);
-  rows.filter((r) => r.cut > 0).slice(0, SOLOS).forEach((r) => (r.solo = true));
+  // The big ring is a level's: a skill that went up has it for a turn. A day with no new level gives it to the
+  // one skill that won most, so every day has one turn and none is handed out unevenly.
+  const risen = rows.filter((r) => r.cut > 0 && up(r.skill)).slice(0, SOLOS);
+  (risen.length ? risen : rows.filter((r) => r.cut > 0).slice(0, 1)).forEach((r) => (r.solo = true));
   const fliers = rows.flatMap((r, row) => ((r.first = rows.slice(0, row).reduce((n, x) => n + x.slots.length, 0)), r.slots.map((kind) => ({ skill: r.skill, kind, row }))));
   return { rows, fliers, more: all.length - rows.length };
 }
@@ -113,7 +116,7 @@ const LINE = 8;
 
 /** How far a session's fliers have got, row by row of its plan: the gems that have landed on the skill's ring,
  *  the rough stones that have landed on its medal, and whether its medal is out. */
-export type EndProg = { cut: number[]; stone: number[]; shown: boolean[]; done: boolean };
+export type EndProg = { cut: number[]; stone: number[]; shown: boolean[]; done: boolean; /** The row whose medal is still on its way down from the big ring. */ landing?: number };
 /** Where a skill's level stands with `here` of the session's gems landed (all of them once `done`): the level,
  *  whether that is a new one, the share of the way to the next, and the share one good answer away (`soon`). */
 export function levelAt(r: EndRow, here: number, done: boolean, was: Today["skills"], now: Today["skills"]) {
@@ -159,13 +162,15 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
   // (Tyler, 2026-11-23, of five small medals with their names cut short: "why would it not just loop in a credits
   // kind of way").
   // A short window has room for two lines over the results, not three.
-  const seen = typeof window !== "undefined" && window.innerHeight < 860 ? SEEN - 1 : SEEN;
+  const seen = typeof window === "undefined" ? SEEN : Math.max(2, Math.min(5, Math.floor((window.innerHeight - 710) / MEDAL_SLOT)));
   const n = plan.rows.length, rolls = n > seen && !still();
   const [step, setStep] = useState(0);
   useEffect(() => {
     if (!rolls || !prog.done) return;
-    const id = setInterval(() => !document.hidden && setStep((x) => x + 1), ROLL_MS);
-    return () => clearInterval(id);
+    // The first ones, which had the big ring, stay a while longer before the roll begins.
+    let id: ReturnType<typeof setInterval>;
+    const first = setTimeout(() => (id = setInterval(() => !document.hidden && setStep((x) => x + 1), ROLL_MS)), 2200);
+    return () => (clearTimeout(first), clearInterval(id));
   }, [rolls, prog.done]);
   // Past the last one the row is back where it began: it jumps there unseen, the first ones standing in twice.
   useEffect(() => {
@@ -189,7 +194,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
         return (
           <Hint key={j} text={said(r, lv.lv)}>
             <div className="end-medal" data-skill={r.skill} data-color={s?.color} data-wait={!prog.shown[i] || undefined} data-up={lv.up || undefined}>
-              <span className="end-medal-ring" data-row={j < n ? i : undefined} aria-hidden="true">
+              <span className="end-medal-ring" data-row={j < n ? i : undefined} style={prog.landing === i ? { visibility: "hidden" } : undefined} aria-hidden="true">
                 <span className="end-medal-core gem-ring" data-beat={prog.stone[i] || undefined} key={`in${prog.stone[i]}`}>
                   <DotRing size={MEDAL} share={lv.share} since={lv.since} ghost={lv.soon} step />
                   <SkillIcon icon={s?.icon} color={s?.color} dot />
