@@ -56,11 +56,19 @@ export function reviewLogFiles(lib: Library): string[] {
 }
 
 // All reviews, oldest first, without the ones taken back. The log is the source of truth for
-// scheduling. A review is named by its card and time, so one read twice (a conflicted copy) counts once.
+// scheduling. A review is counted once per distinct line, so one read twice (a conflicted copy) counts
+// once, while two devices' ratings of a card in the same millisecond both count. An undo names its
+// review by card and time; a new review never takes a time its card already has (`reviewTimes`).
 /** The last read, kept while no log file changed (the logs only grow): one command often reads them
  *  several times (Home's Today, a skill page's stats), and 4,000 reviews take ~25 ms to parse.
  *  Callers share its Review objects, so they read them and never change them. */
-let last: { key: string; reviews: Review[] } | null = null;
+let last: { key: string; reviews: Review[]; times: Map<string, Set<string>> } | null = null;
+
+/** Every time a card has a review at in the logs, taken back or not. */
+export function reviewTimes(lib: Library, card: string): ReadonlySet<string> {
+  readReviews(lib);
+  return last!.times.get(card) ?? new Set();
+}
 
 export function readReviews(lib: Library): Review[] {
   const files = reviewLogFiles(lib);
@@ -73,11 +81,11 @@ export function readReviews(lib: Library): Review[] {
       return `${f}|gone`;
     }
   })].join("\n");
-  if (last?.key !== key) last = { key, reviews: parseReviews(files) };
+  if (last?.key !== key) last = { key, ...parseReviews(files) };
   return [...last.reviews];
 }
 
-function parseReviews(files: string[]): Review[] {
+function parseReviews(files: string[]): { reviews: Review[]; times: Map<string, Set<string>> } {
   // A line that isn't a whole review or undo (a hand edit, a rating of 5, a state cut off) can't be
   // replayed, so it is skipped rather than stopping every screen; `ore doctor` names it.
   const lines = files
@@ -85,15 +93,20 @@ function parseReviews(files: string[]): Review[] {
     .filter((l): l is Review | Undo => (l && typeof l === "object" && "undo" in l ? UndoSchema : Replayable).safeParse(l).success);
   const undone = new Set(lines.flatMap((l) => ("undo" in l ? [`${l.card}|${l.undo}`] : [])));
   const seen = new Set<string>();
-  return lines
+  const times = new Map<string, Set<string>>();
+  const reviews = lines
     .filter((l): l is Review => {
       if ("undo" in l) return false;
-      const key = `${l.card}|${l.ts}`;
-      if (undone.has(key) || seen.has(key)) return false;
-      seen.add(key);
+      const own = times.get(l.card);
+      if (own) own.add(l.ts);
+      else times.set(l.card, new Set([l.ts]));
+      const line = JSON.stringify(l);
+      if (undone.has(`${l.card}|${l.ts}`) || seen.has(line)) return false;
+      seen.add(line);
       return true;
     })
     .sort((a, b) => a.ts.localeCompare(b.ts));
+  return { reviews, times };
 }
 
 export function appendReview(lib: Library, r: Review): void {

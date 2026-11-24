@@ -36,6 +36,7 @@ const invoke = async <T,>(cmd: string, args: Record<string, unknown> | Uint8Arra
   }
   if (cmd === "library_bytes") return (shared.get(args.path as string) ?? null) as T;
   if (cmd === "library_apply") {
+    if (applyHook) await applyHook();
     const out: [string, number, string][] = [];
     for (const [rel, text, b64] of args.ops as [string, string | null, boolean][]) {
       sent.push(b64 ? [rel, text, true] : [rel, text]);
@@ -49,6 +50,8 @@ const invoke = async <T,>(cmd: string, args: Record<string, unknown> | Uint8Arra
   }
   throw new Error(cmd);
 };
+/** Runs before each `library_apply`: holds or fails a save. */
+let applyHook: (() => Promise<void>) | null = null;
 /** An edit on the Mac, as iCloud brings it to the phone's folder. */
 const mac = (rel: string, text: string | null) => (text === null ? folder.delete(rel) : folder.set(rel, { text, mtime: ++clock }));
 
@@ -222,4 +225,25 @@ test("a big folder is read in parts asked for together, not one after another", 
   expect(reading.most).toBe(3);
   expect(fs.readFileSync(`${P}/items/big-0/doc.md`)).toBe("# Big 0");
   expect(fs.readFileSync(`${P}/items/big-899/doc.md`)).toBe("# Big 899");
+});
+
+test("a failed save's retry never writes over a newer save of the same file that went through (F559)", async () => {
+  // DATA-01 (deep scan 2026-11-24): the first save is held, a second save of the same note is queued behind
+  // it, the first fails and the second lands; the next flush resent the first and the folder lost the second.
+  mac("items/e-05/notes.md", "Base.");
+  await rescan();
+  let fail: (e: Error) => void = () => {};
+  applyHook = () => new Promise<void>((_, reject) => (fail = reject));
+  fs.writeFileSync(`${P}/items/e-05/notes.md`, "First draft.");
+  const first = flush();
+  await new Promise((r) => setTimeout(r, 0));
+  applyHook = null;
+  fs.writeFileSync(`${P}/items/e-05/notes.md`, "Second complete draft.");
+  const second = flush();
+  fail(new Error("offline"));
+  await first;
+  await second;
+  expect(folder.get("items/e-05/notes.md")!.text).toBe("Second complete draft.");
+  await flush();
+  expect(folder.get("items/e-05/notes.md")!.text).toBe("Second complete draft.");
 });

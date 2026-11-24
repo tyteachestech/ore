@@ -6,7 +6,7 @@ import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 import { readReviews } from "./reviews.ts";
 import { findCard } from "./cards.ts";
-import { loadParams, retrievability } from "./scheduler.ts";
+import { loadParams, merged, retrievability } from "./scheduler.ts";
 import { desiredRetention, loadSkills, reviewSettings, sourcePriority } from "./skills.ts";
 import { ACTIVE_CAP_MS } from "./study.ts";
 import { gemGrade, type GemGrade } from "./today.ts";
@@ -132,21 +132,28 @@ export function endSession(lib: Library, now = new Date(), caughtUp = false, whi
 function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null): SessionReceipt {
   if (!id) throw new Error("no open session (ore session start)");
   if (!readSessions(lib).some((r) => r.type === "start" && r.id === id)) throw new Error(`no session ${id}`);
-  const all = readReviews(lib);
+  const w = loadParams(lib);
+  const skills = loadSkills(lib).skills;
+  const known = new Map<string, number | undefined>();
+  const retention = (card: string) => {
+    if (known.has(card)) return known.get(card);
+    let k: number | undefined;
+    try {
+      const { skills: own, item } = findCard(lib, card).meta;
+      k = desiredRetention(own, skills, sourcePriority(lib, item));
+    } catch {
+      k = undefined;
+    }
+    known.set(card, k);
+    return k;
+  };
+  const target = (card: string) => retention(card) ?? 0.9; // a card file gone since: the default target
+  // Its gems read the merged history (`merged`), as Home's do.
+  const all = merged(readReviews(lib), retention, w);
   const own = all.filter((x) => x.session === id);
   // A card counts once, by its first answer this session; a relearn pass doesn't make it kept.
   const first = new Map([...own].reverse().map((x) => [x.card, x]));
-  const w = loadParams(lib);
   const kept = [...first.values()].filter((x) => x.rating > 1);
-  const skills = loadSkills(lib).skills;
-  const target = (card: string) => {
-    try {
-      const { skills: own, item } = findCard(lib, card).meta;
-      return desiredRetention(own, skills, sourcePriority(lib, item));
-    } catch {
-      return 0.9; // a card file gone since: the default target
-    }
-  };
   const rescued = kept.filter((x) => x.state_before.reps > 0 && retrievability(x.state_before, new Date(x.ts), 0.9, w) < rescuedAt(target(x.card)));
   // Solid before its first answer this session, or not; solid after its last one.
   const last = new Map(own.map((x) => [x.card, x]));

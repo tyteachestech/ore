@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { doctor } from "../src/doctor.ts";
 import { cardStates, findCard, readCardFile, writeNewCard } from "../src/cards.ts";
@@ -125,6 +125,47 @@ describe("review loop", () => {
       expect(Object.fromEntries(idx.cards().map((c) => [c.id, c.state]))).toEqual({ [a.meta.id]: "live", [b.meta.id]: "draft" });
       idx.close();
       expect((await doctor(lib)).errors).toBe(0);
+    } finally {
+      if (was === undefined) delete process.env.ORE_DEVICE;
+      else process.env.ORE_DEVICE = was;
+    }
+  });
+
+  test("ratings of one exercise in the same millisecond all count, on one device or two offline, and a copy still counts once (F560)", async () => {
+    const { lib, a, b } = await setup();
+    const now = new Date(Date.now() + 864e5);
+    const was = process.env.ORE_DEVICE;
+    try {
+      const dir = join(lib.root, "reviews");
+      const month = now.toISOString().slice(0, 7);
+      // One device: rated, taken back and rated again within one millisecond, the new rating stands.
+      process.env.ORE_DEVICE = "mac";
+      const first = await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, now });
+      await undoReview(lib, a.meta.id, first.ts, now);
+      const again = await recordReview(lib, a.meta.id, { rating: 3, confidence: 3, now });
+      expect(readReviews(lib).map((r) => r.rating)).toEqual([3]);
+      // Rated again in that millisecond: both count, and what came back is what the log replays to.
+      const third = await recordReview(lib, a.meta.id, { rating: 3, confidence: 3, now });
+      expect(readReviews(lib).filter((r) => r.card === a.meta.id)).toHaveLength(2);
+      let idx = openIndex(lib);
+      expect(idx.cards().find((c) => c.id === a.meta.id)?.fsrs).toEqual(third.state_after);
+      idx.close();
+      expect(again.ts < third.ts).toBe(true);
+      // Two devices offline, each rating b in the same millisecond without the other's log: both count.
+      await recordReview(lib, b.meta.id, { rating: 1, confidence: 1, now, answer: "On the Mac" });
+      const macLog = join(dir, `${month}.mac.jsonl`);
+      const held = readFileSync(macLog, "utf8");
+      rmSync(macLog);
+      process.env.ORE_DEVICE = "iphone";
+      await recordReview(lib, b.meta.id, { rating: 3, confidence: 3, now, answer: "On the phone" });
+      writeFileSync(macLog, held);
+      expect(readReviews(lib).filter((r) => r.card === b.meta.id).map((r) => r.rating).sort()).toEqual([1, 3]);
+      // A synced folder's copy of a log still counts once.
+      writeFileSync(join(dir, `${month}.mac 2.jsonl`), held);
+      expect(readReviews(lib).filter((r) => r.card === b.meta.id)).toHaveLength(2);
+      idx = openIndex(lib);
+      expect(idx.cards().find((c) => c.id === b.meta.id)?.fsrs?.reps).toBe(2);
+      idx.close();
     } finally {
       if (was === undefined) delete process.env.ORE_DEVICE;
       else process.env.ORE_DEVICE = was;

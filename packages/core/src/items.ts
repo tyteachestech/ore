@@ -165,7 +165,9 @@ export const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
 /** A title as one line: a PDF's metadata or a pasted rename can carry line breaks and runs of spaces. */
 const oneLine = (title: string) => title.replace(/\s+/g, " ").trim();
 
-export async function createItem(lib: Library, input: NewItem): Promise<Item> {
+/** `already`, asked under the write lock, finds a source that is this one (its link, its text) saved while this
+ *  one was read: that one comes back instead, and nothing is written (F572). */
+export async function createItem(lib: Library, input: NewItem, already?: () => Item | undefined): Promise<Item & { already?: true }> {
   // Line ends as every read sees them (Windows and old-Mac files too), so offsets and the hash hold.
   const body = input.body.replace(/\r\n?/g, "\n");
   const title = oneLine(input.title) || "Untitled";
@@ -193,15 +195,18 @@ export async function createItem(lib: Library, input: NewItem): Promise<Item> {
     preview: input.preview ? nowIso(now) : undefined,
   };
   const docPath = join(dir, "doc.md");
-  madeThisRun(dir);
+  let had: Item | undefined;
   await withLock(paths.lock(lib), () => {
+    had = already?.();
+    if (had) return;
+    madeThisRun(dir);
     if (input.source) writeAtomic(join(dir, `source.${input.source.ext}`), input.source.data);
     if (input.transcript) writeAtomic(join(dir, "transcript.vtt"), input.transcript);
     if (input.page) writeAtomic(join(dir, "page.html"), input.page);
     for (const a of input.assets ?? []) writeAtomic(join(dir, "assets", a.name), a.data);
     writeAtomic(docPath, stringifyFrontmatter(meta, body));
   });
-  return { meta, body, dir, docPath };
+  return had ? { ...had, already: true } : { meta, body, dir, docPath };
 }
 
 export function readItemDir(dir: string): Item {

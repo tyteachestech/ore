@@ -30,10 +30,12 @@ const kind = (e: Element) => `${e.getAttribute("epub:type") ?? ""} ${e.getAttrib
 const NOTE = /\b(?:doc-)?(?:foot|end|rear)note\b/;
 const BACKLINK = /\b(?:doc-)?backlink\b/;
 
-/** A chapter as Markdown, its images pointed at saved copies; `image` saves one by its path in the book.
+/** A chapter as Markdown, its images pointed at saved copies; `image` saves one by its path in the book
+ *  (undefined: not one to keep, null: the book names it but doesn't hold it).
  *  A link to a note (`note` finds it, in this file or the book's endnotes) becomes a Markdown footnote,
- *  numbered from `next`, and the note is written under the chapter. */
-function chapterMarkdown(document: Document, image: (src: string) => string | undefined, note: (href: string) => Element | undefined, next: () => number): string {
+ *  numbered from `next`, and the note is written under the chapter. `pictures`: the page holds only pictures,
+ *  saved or missing (a cover, a plate), and no text. */
+function chapterMarkdown(document: Document, image: (src: string) => string | null | undefined, note: (href: string) => Element | undefined, next: () => number): { md: string; pictures: boolean } {
   // An SVG wrapper around a cover or plate (<svg><image xlink:href>) becomes a plain image.
   for (const svg of Array.from(document.querySelectorAll("svg"))) {
     const href = svg.querySelector("image")?.getAttribute("xlink:href") ?? svg.querySelector("image")?.getAttribute("href");
@@ -42,10 +44,18 @@ function chapterMarkdown(document: Document, image: (src: string) => string | un
     img.setAttribute("src", href);
     svg.replaceWith(img);
   }
+  // A picture the book names but doesn't hold is a marked gap with its alt text, so the text that points at it
+  // isn't left pointing at nothing (D351).
+  const gaps: string[] = [];
   for (const img of Array.from(document.querySelectorAll("img"))) {
     const saved = image(img.getAttribute("src") ?? "");
     if (saved) img.setAttribute("src", saved);
-    else img.remove();
+    else if (saved === null) {
+      const alt = (img.getAttribute("alt") ?? "").replace(/\s+/g, " ").trim();
+      const p = document.createElement("p");
+      p.textContent = `OREGAP${gaps.push(alt ? `[missing figure: ${alt}]` : "[missing figure]") - 1}OREGAP`;
+      img.replaceWith(p);
+    } else img.remove();
   }
   const notes: string[] = [];
   for (const a of Array.from(document.querySelectorAll("a[href]"))) {
@@ -62,8 +72,10 @@ function chapterMarkdown(document: Document, image: (src: string) => string | un
   }
   // A notes section left with only its heading is not text to read.
   for (const box of Array.from(document.querySelectorAll("section, aside, div, ol"))) if (/\b(?:doc-)?(?:foot|end|rear)notes\b/.test(kind(box)) && !box.querySelector("li, p, aside")) box.remove();
-  const md = td.turndown(document.body as unknown as HTMLElement).trim().replace(/ORENOTE(\d+)ORENOTE/g, "[^$1]");
-  return notes.length ? `${md}\n\n${notes.join("\n\n")}` : md;
+  const raw = td.turndown(document.body as unknown as HTMLElement).trim();
+  const pictures = !notes.length && !raw.replace(/!\[[^\]]*\]\([^)]*\)|OREGAP\d+OREGAP/g, "").trim();
+  const md = raw.replace(/ORENOTE(\d+)ORENOTE/g, "[^$1]").replace(/OREGAP(\d+)OREGAP/g, (_, i) => gaps[Number(i)]!);
+  return { md: notes.length ? `${md}\n\n${notes.join("\n\n")}` : md, pictures };
 }
 
 export function epubToDoc(data: Uint8Array): EpubDoc {
@@ -90,18 +102,31 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
     .filter((item) => item && /html/.test(item.type) && !item.nav)
     .map((item) => posix.join(dir, decodeURIComponent(item!.href.split("#")[0]!)));
   const docs = new Map(spine.map((path) => [path, parse(read(path))]));
+  // The cover picture as the book names it: EPUB 3's cover-image, EPUB 2's <meta name="cover">, or a picture
+  // the book calls cover (cover.jpg, id="cover", coverImage), as many older books do: cover as a word of its
+  // name, not inside one (discovery.png, recovery-curve.png). Known by path, held in the book or not.
+  const coverId = Array.from(opf.getElementsByTagName("meta")).find((m) => m.getAttribute("name") === "cover")?.getAttribute("content");
+  const coverWord = (name: string) => /(?:^|[^a-z])cover(?![a-z])/i.test(name.replace(/([a-z])([A-Z])/g, "$1 $2"));
+  const covers = new Set(
+    Array.from(opf.getElementsByTagName("item"))
+      .filter((e) => /\bcover-image\b/.test(e.getAttribute("properties") ?? "") || (coverId && e.getAttribute("id") === coverId) || (/^image\//.test(e.getAttribute("media-type") ?? "") && coverWord(`${e.getAttribute("id")} ${posix.basename(e.getAttribute("href") ?? "")}`)))
+      .map((e) => posix.normalize(posix.join(dir, decodeURIComponent(e.getAttribute("href") ?? "")))),
+  );
   let notes = 0;
   for (const path of spine) {
     const image = (src: string) => {
       const file = posix.normalize(posix.join(posix.dirname(path), decodeURIComponent(src.split("#")[0]!)));
       const ext = IMAGE_EXT[posix.extname(file).slice(1).toLowerCase()];
       const data = files[file];
-      if (!ext || !data || /^[a-z]+:/i.test(src)) return undefined;
+      if (!ext || /^[a-z]+:/i.test(src)) return undefined;
+      seen.add(file);
+      if (!data) return null;
       const name = assetName(data, ext);
       used.set(name, { name, data });
       return `assets/${name}`;
     };
     const used = new Map<string, Asset>();
+    const seen = new Set<string>(); // the pictures this page names, held or missing
     const note = (href: string) => {
       const [file, id] = href.split("#");
       if (!id || /^[a-z]+:/i.test(href)) return undefined;
@@ -109,11 +134,21 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
       const target = doc?.getElementById(decodeURIComponent(id));
       return target && NOTE.test(kind(target)) ? target : undefined;
     };
-    const md = chapterMarkdown(docs.get(path)!, image, note, () => ++notes);
-    // A page with only an image (the cover, a title plate) is not a chapter to read.
-    if (!md.replace(/!\[[^\]]*\]\([^)]*\)/g, "").trim()) continue;
+    const page = docs.get(path)!;
+    const { md, pictures } = chapterMarkdown(page, image, note, () => ++notes);
+    if (pictures) {
+      // A page with only an image before the text begins (the cover, a title plate), or one the book marks
+      // as its cover, is not part of the book to read. One after the text has begun is an illustration on a
+      // page of its own: it stays where it is, under the chapter it follows, with no recall of its own
+      // (F569). A picture missing from the book is such a page too, its gap in its place.
+      const cover = /\bcover\b/.test(kind(page.body ?? page.documentElement)) || [...seen].some((f) => covers.has(f));
+      if (!md || !chapters.length || cover) continue;
+      for (const [k, v] of used) assets.set(k, v);
+      chapters[chapters.length - 1] += `\n\n${md}`;
+      continue;
+    }
     for (const [k, v] of used) assets.set(k, v);
-    if (md) chapters.push(`<!-- chapter ${chapters.length + 1} -->\n\n${md}`);
+    chapters.push(`<!-- chapter ${chapters.length + 1} -->\n\n${md}`);
   }
   if (!chapters.length) throw new Error("EPUB has no readable text (DRM-protected?)");
   const creators = text("dc:creator");

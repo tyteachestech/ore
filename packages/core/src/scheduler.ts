@@ -68,6 +68,34 @@ export function replay(reviews: Review[], retention: number, w?: number[]): Fsrs
   return s;
 }
 
+const sameState = (a: FsrsState, b: FsrsState) =>
+  a.due === b.due && a.stability === b.stability && a.difficulty === b.difficulty && a.reps === b.reps && a.lapses === b.lapses && a.state === b.state;
+
+/** The reviews in time order, each with the states the merged log replays to before and after it. A review
+ *  keeps the states it saved while its saved "before" is where the merged history stood (nearly always, so
+ *  this costs one comparison each); one made on a device that hadn't seen another's reviews yet (offline,
+ *  then synced) is replayed, at its card's `retention` (undefined: a card gone since, kept as saved). The
+ *  history every count of solid memories reads (D63), so it agrees with the schedule's own replay. */
+export function merged(reviews: Review[], retention: (card: string) => number | undefined, w?: number[]): Review[] {
+  const at = new Map<string, FsrsState>();
+  return [...reviews]
+    .sort((a, b) => a.ts.localeCompare(b.ts))
+    .map((r) => {
+      const prev = at.get(r.card);
+      const k = prev ? sameState(prev, r.state_before) : r.state_before.reps === 0;
+      const target = k ? undefined : retention(r.card);
+      if (target === undefined) {
+        at.set(r.card, r.state_after);
+        return r;
+      }
+      const when = new Date(r.ts);
+      const before = prev ?? emptyState(when);
+      const after = nextState(before, when, r.rating as Grade, target, w);
+      at.set(r.card, after);
+      return { ...r, state_before: before, state_after: after };
+    });
+}
+
 export function retrievability(s: FsrsState | null, now: Date, retention: number, w?: number[]): number {
   if (!s || s.reps === 0) return 0;
   return scheduler(retention, w).get_retrievability(fromState(s), now, false);

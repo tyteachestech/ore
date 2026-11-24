@@ -2285,6 +2285,15 @@ journey("menus: every item of a source's right-click and ⋯ menu has an icon, i
   await page.keyboard.press("Escape");
 });
 
+journey("Collected: a new question is typed in place, with no line over it and no box (F578)", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.locator(".cp-head.question").hover();
+  await page.getByRole("button", { name: "Ask a question" }).click();
+  await askFieldIsPlain(page, page.locator(".cp"));
+  await page.keyboard.press("Escape");
+});
+
 journey("Collected: a key point he is typing survives closing its group and switching to the note and back", async (page) => {
   await openSource(page, TESTING);
   await page.getByRole("tab", { name: "Collected" }).click();
@@ -12118,6 +12127,45 @@ journey("course: ⌘Z of a skill filed on it gives each lesson back its own skil
   }
 });
 
+journey("course added again: the toast's Undo archives only the lessons the add brought back, Redo brings back only those (F576)", async (page) => {
+  if (!LIB) throw new Error("this journey edits the library: set ORE_LIBRARY to the running mock's");
+  const { updateItemMeta } = (await import(join(import.meta.dir, "../../../packages/core/src/items.ts"))) as { updateItemMeta: (lib: { root: string }, id: string, patch: (m: object) => object) => Promise<unknown> };
+  const made = (await Promise.all(["A", "B"].map((n) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: `# Re-add part ${n}\n\nA lesson.` }) }).then((r) => r.json())))) as { id: string }[];
+  const link = "https://www.youtube.com/playlist?list=PLreaddcourse";
+  for (const [i, m] of made.entries()) await updateItemMeta({ root: LIB }, m.id, (x) => ({ ...x, course: { id: "readd-course", title: "Re-add course", part: i + 1, url: link } }));
+  await ore("archive", made[1]!.id);
+  const archivedOf = async () => {
+    const gone = (await ore("ls", "--archived")) as { id: string }[];
+    return made.map((m) => gone.some((i) => i.id === m.id)).join("/");
+  };
+  // The course page is on the web: the add answers as `ore add --course` does when the course is here, having
+  // brought back its archived lesson B.
+  await page.route(/\/ore$/, async (route) => {
+    if (!(route.request().postData() ?? "").includes('"--course"')) return route.fallback();
+    await ore("archive", made[1]!.id, "--undo");
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ course: { id: "readd-course", title: "Re-add course", url: link }, lessons: [], kept: 2, filled: [], failed: [], filed: [], restored: [made[1]!.id], enrich: "skipped", skills: [], first: { id: made[0]!.id, title: "Re-add part A", status: "inbox" } }) });
+  });
+  try {
+    await page.getByRole("button", { name: "+ Add" }).click();
+    await page.getByLabel("Link, file path or text").fill(link);
+    await page.keyboard.press("Enter");
+    const toast = page.locator(".toast").filter({ hasText: "“Re-add course” is back from Archived" });
+    await toast.waitFor();
+    if ((await archivedOf()) !== "false/false") throw new Error("the add did not bring lesson B back");
+    await toast.getByRole("button", { name: "Undo" }).click();
+    await until("Undo archives only the lesson the add brought back", async () => (await archivedOf()) === "false/true");
+    await page.waitForTimeout(400);
+    if ((await archivedOf()) !== "false/true") throw new Error("Undo of the course added again archived a lesson it did not bring back");
+    await ore("archive", made[0]!.id);
+    await page.locator(".toast").getByRole("button", { name: "Redo" }).first().click();
+    await until("Redo brings back only that lesson", async () => (await archivedOf()) === "true/false");
+  } finally {
+    await page.unroute(/\/ore$/);
+    if (await page.getByLabel("Link, file path or text").count()) await page.keyboard.press("Escape");
+    for (const m of made) await ore("archive", m.id).catch(() => {});
+  }
+});
+
 journey("suggested skill: ⌘Z takes back Accept (the new skill goes, the suggestion returns) and Dismiss", async (page) => {
   const made = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Why sleep consolidates memory\n\nSleep replays the day." }) }).then((r) => r.json())) as { id: string };
   // Undo of a dismiss puts a suggestion on it, as enrich would.
@@ -13447,6 +13495,43 @@ journey("phone: text added, undone and added again says it is back from Archived
   const back = page.locator(".toast").filter({ hasText: "“Interleaving notes” is back from Archived" });
   await back.waitFor();
   await back.locator("button").filter({ hasText: "Undo" }).waitFor();
+}, "phone");
+
+journey("phone: Undo of Archive course brings back the lessons it archived, not one archived before (F573)", async (page) => {
+  // Codex deep scan 2026-11-24 (intake 6): Undo ran the whole course's restore, so a lesson archived before came back too.
+  type Core = { run: <T>(args: string[], input: string | null) => Promise<T> };
+  const ids = await page.evaluate(async (root) => {
+    const core = (await import("/src/phone/core.ts" as string)) as Core;
+    await core.run(["ls", "--json"], null);
+    const items = (await import(`/@fs${root}/packages/core/src/items.ts`)) as { createItem: (lib: { root: string }, input: object) => Promise<{ meta: { id: string } }> };
+    const made = [];
+    for (const part of [1, 2]) made.push((await items.createItem({ root: "/lib" }, { type: "markdown", title: `Undo course lesson ${part}`, body: `Lesson ${part} of the undo course.`, course: { id: "undo-course", title: "Undo course", part } })).meta.id);
+    await core.run(["archive", made[1]!, "--json"], null);
+    return made;
+  }, join(import.meta.dir, "../../.."));
+  const archivedOf = () => page.evaluate(async (ids) => {
+    const core = (await import("/src/phone/core.ts" as string)) as Core;
+    return (await Promise.all(ids.map(async (id) => !!(await core.run<{ archived_at?: string }>(["show", id, "--json"], null)).archived_at))).join("/");
+  }, ids);
+  await Bun.sleep(1000); // the page's writes reach IndexedDB in the background
+  await page.reload();
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const course = page.locator(".phone-course").filter({ hasText: "Undo course" });
+  await press(page, course);
+  await tap(page, page.getByRole("menuitem", { name: "Archive course" }));
+  await until("the course is archived", async () => (await archivedOf()) === "true/true");
+  await tap(page, page.locator(".toast").filter({ hasText: "Archived “Undo course”" }).getByRole("button", { name: "Undo" }));
+  await until("Undo brings back only the lesson it archived", async () => (await archivedOf()) === "false/true");
+  await Bun.sleep(400);
+  if ((await archivedOf()) !== "false/true") throw new Error("Undo of Archive course also brought back a lesson archived before it");
+  // Undo tapped before the Archive's answer is back: it waits for it, and still brings back the lesson it put away.
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = { course: 1500 }));
+  await press(page, course);
+  await tap(page, page.getByRole("menuitem", { name: "Archive course" }));
+  await tap(page, page.locator(".toast").filter({ hasText: "Archived “Undo course”" }).getByRole("button", { name: "Undo" }));
+  await page.evaluate(() => delete (window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW);
+  await until("a quick Undo brings back the lesson it archived", async () => (await archivedOf()) === "false/true");
 }, "phone");
 
 journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {
@@ -17730,6 +17815,30 @@ journey("phone: a source's Collected page has its title, as Sources and Settings
   const collected = page.locator('aside.mynotes[aria-label="Collected"]');
   await collected.waitFor();
   await collected.getByRole("heading", { level: 1, name: "Collected" }).waitFor();
+}, "phone");
+/** A new question typed in Collected sits where its row will: no line above it, no box around it, and the Questions
+ *  label as tall as its neighbours (F578: Review's `.ask` and the skill page's `.question` styled them). */
+async function askFieldIsPlain(page: Page, panel: Locator) {
+  const field = panel.getByRole("textbox", { name: "New question" });
+  await field.waitFor();
+  const drawn = await field.evaluate((el) => {
+    const box = (e: Element) => { const s = getComputedStyle(e); return { line: s.borderTopWidth, edge: s.boxShadow, gap: s.marginTop }; };
+    const row = document.querySelector(".cp-row .cp-text")!.getBoundingClientRect();
+    return { wrap: box(el.parentElement!), field: box(el), left: el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft) - row.left, heads: [...document.querySelectorAll(".cp-head")].map((h) => h.getBoundingClientRect().height) };
+  });
+  if (drawn.wrap.line !== "0px" || drawn.wrap.gap !== "0px") throw new Error(`a line or a gap sits over the new question: ${JSON.stringify(drawn.wrap)}`);
+  if (drawn.field.line !== "0px" || drawn.field.edge !== "none") throw new Error(`the new question is typed in a box: ${JSON.stringify(drawn.field)}`);
+  if (Math.abs(drawn.left) > 0.5) throw new Error(`the new question's words start ${drawn.left}px off the rows' words`);
+  if (new Set(drawn.heads).size > 1) throw new Error(`Collected's labels are not one height: ${drawn.heads}`);
+}
+journey("phone: a new question in Collected is typed in place, with no line over it and no box (F578)", async (page) => {
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  const collected = page.locator('aside.mynotes[aria-label="Collected"]');
+  await collected.waitFor();
+  await tap(page, collected.getByRole("button", { name: "Ask a question" }));
+  await askFieldIsPlain(page, collected);
+  await page.keyboard.press("Escape");
 }, "phone");
 journey("phone: a link typed into Add a link and left with a tap outside is there when it opens again (Codex UX sweep, D342)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));

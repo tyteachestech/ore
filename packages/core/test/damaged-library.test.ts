@@ -7,7 +7,9 @@ import { openIndex, rebuildIndex } from "../src/db.ts";
 import { doctor } from "../src/doctor.ts";
 import { appendJsonl, readJsonl } from "../src/fsutil.ts";
 import { addSnippet } from "../src/ingest/index.ts";
-import { findItem, listItems } from "../src/items.ts";
+import { findItem, listItems, setItemPriority } from "../src/items.ts";
+import { setNotes } from "../src/notes.ts";
+import { recordReview } from "../src/study.ts";
 import { openLibrary, paths } from "../src/library.ts";
 import { readReviews } from "../src/reviews.ts";
 import { loadParams } from "../src/scheduler.ts";
@@ -111,6 +113,31 @@ describe("a damaged library", () => {
     renameSync(item.dir, join(dirname(item.dir), "My agents notes"));
     expect(findItem(lib, item.meta.id).meta.title).toBe(item.meta.title);
     expect((await doctor(lib)).issues.some((i) => i.message.includes(`rename it back to end in -${item.meta.id}`))).toBe(true);
+  });
+
+  test("a source folder renamed in Finder stays in the index, with its notes and the importance its exercises are scheduled by (F561)", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Retrieval practice beats rereading.", skills: ["learning"] });
+    await setItemPriority(lib, item.meta.id, "P3");
+    const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: ["learning"], topics: [], content_type: "fact", question: "What beats rereading?", answer: "Retrieval practice.", rubric: [] });
+    await recordReview(lib, card.meta.id, { rating: 3, confidence: 2, now: new Date("2026-06-01T12:00:00Z") });
+    await setNotes(lib, item.meta.id, "uniqueneedle in my note");
+    const look = () => {
+      const index = openIndex(lib);
+      try {
+        return { items: index.items().map((i) => i.id), hits: index.search("uniqueneedle").length, card: index.cards().find((c) => c.id === card.meta.id)?.fsrs?.due };
+      } finally {
+        index.close();
+      }
+    };
+    const before = look();
+    renameSync(item.dir, join(dirname(item.dir), "My renamed source"));
+    expect(look()).toEqual(before);
+    rebuildIndex(lib);
+    expect(look()).toEqual(before);
+    // Named back as Ore names it: still the one source.
+    renameSync(join(dirname(item.dir), "My renamed source"), item.dir);
+    expect(look()).toEqual(before);
   });
 
   test("a copied source folder or card file lists once, and search finds it once", async () => {
