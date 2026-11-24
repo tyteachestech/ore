@@ -100,6 +100,9 @@ function keepLines(original: string, base: string, edited: string): string {
   return tree(kept) === tree(edited) ? kept : edited;
 }
 
+/** The editor read a note that has text as empty (it could not parse it): it must not be edited as if empty. */
+export const unreadable = (original: string, base: string) => blocks(original).text.length > 0 && !blocks(base).text.length;
+
 /**
  * `original` is the file as loaded, `base` the editor's Markdown for it before any edit, and
  * `edited` the editor's Markdown now. Returns `edited` with every untouched block restored to
@@ -111,7 +114,7 @@ export function keepUnedited(original: string, base: string, edited: string): st
   const b = blocks(base);
   const e = blocks(edited);
   // An editor that opened a note with text as empty failed to read it: what it saves would erase it.
-  if (o.text.length && !b.text.length) return original;
+  if (!b.text.length && o.text.length) return original;
   // Blocks of the original and of its re-serialization pair up by position; if the editor
   // merged or split one (rare), fall back to its own output.
   if (o.text.length !== b.text.length || !e.text.length) return keepDefinitions(original, edited);

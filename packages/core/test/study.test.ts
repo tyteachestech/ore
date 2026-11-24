@@ -458,4 +458,17 @@ describe("two sessions open at once (D76)", () => {
     expect(owed()).toBe(true);
     expect(openSessionId(lib)).toBe(main.id); // a review given no session goes to the main one again
   });
+
+  test("a session left open when the app quit doesn't carry into the next morning's session or take its reviews (F-new-quick-session-pointer)", async () => {
+    const { lib, a } = await setup();
+    const old = await startSession(lib, new Date(2026, 5, 1, 21, 0));
+    await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, session: old.id, now: new Date(2026, 5, 1, 21, 10) });
+    // ⌘Q: no end receipt. Next morning:
+    const now = new Date(2026, 5, 2, 8, 0);
+    const morning = await startSession(lib, now);
+    expect(dueQueue(lib, now).some((e) => e.id === a.meta.id && e.relearn)).toBe(false);
+    await endSession(lib, now, false, morning.id);
+    expect(openSessionId(lib)).toBeNull();
+    expect((await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: new Date(2026, 5, 2, 8, 5) })).session).toBeNull();
+  });
 });

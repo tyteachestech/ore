@@ -6,6 +6,7 @@ import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex } from "@noble/hashes/utils";
 import { parseArgs } from "@pkgjs/parseargs";
 import * as YAML from "yaml";
+import * as Mdast from "mdast-util-from-markdown";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setLibraryRoot } from "./tauri-core";
@@ -35,6 +36,7 @@ g.process = {
 };
 g.require = (m: string) => {
   if (m === "yaml") return YAML;
+  if (m === "mdast-util-from-markdown") return Mdast;
   throw new Error(`require(${m}) on iPhone`);
 };
 g.Bun = {

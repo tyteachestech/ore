@@ -12,11 +12,12 @@ for (const k of ["window", "document", "HTMLElement", "Node", "MutationObserver"
 let ed: typeof import("../src/editor/editor");
 let core: typeof import("@milkdown/kit/core");
 let keep: typeof import("../src/editor/preserve").keepUnedited;
+let unreadable: typeof import("../src/editor/preserve").unreadable;
 let blocks: typeof import("../src/editor/blocks");
 beforeAll(async () => {
   ed = await import("../src/editor/editor");
   core = await import("@milkdown/kit/core");
-  keep = (await import("../src/editor/preserve")).keepUnedited;
+  ({ keepUnedited: keep, unreadable } = await import("../src/editor/preserve"));
   blocks = await import("../src/editor/blocks");
 });
 
@@ -187,6 +188,14 @@ describe("note editor (D38)", () => {
   test("an editor that opened a note empty never saves over the note's text (F-new-adjacent-toggles)", () => {
     const md = "Some writing.\n\n<details><summary>A</summary>\n\na\n\n</details>\n";
     expect(keep(md, "", "New writing.\n")).toBe(md);
+  });
+
+  test("a note with text the editor read as empty is unreadable, so it opens read-only, never as an empty note to type in (F-new-adjacent-toggles)", () => {
+    const md = "Some writing.\n";
+    expect(unreadable(md, "")).toBe(true);
+    expect(unreadable(md, md)).toBe(false);
+    expect(unreadable("", "")).toBe(false);
+    expect(unreadable("\n\n", "")).toBe(false);
   });
 
   test("editing one list item keeps the list's other lines as written: bullets, indents and trailing spaces (F-new-list-edit-keeps-lines)", async () => {

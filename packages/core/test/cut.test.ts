@@ -135,4 +135,15 @@ describe("cuts while the source changes", () => {
     await restoreCut(lib, item.meta.id, beta.id);
     expect(findItem(lib, item.meta.id).body).toBe("# Source\n\nBeta paragraph.\n\nGamma paragraph that is long enough to remain beyond the old cut position.\n");
   });
+
+  test("Redo after an Undo that found the text a new place takes it out again from there (F-new-cut-undo-shifted)", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, TEXT);
+    const beta = await cutText(lib, item.meta.id, item.body.indexOf("Beta"), item.body.indexOf("Beta") + 1);
+    const mid = findItem(lib, item.meta.id).body;
+    await cutText(lib, item.meta.id, mid.indexOf("Alpha"), mid.indexOf("Alpha") + 1);
+    await restoreCut(lib, item.meta.id, beta.id);
+    await redoCut(lib, item.meta.id, beta.id);
+    expect(findItem(lib, item.meta.id).body).toBe("# Source\n\nGamma paragraph that is long enough to remain beyond the old cut position.\n");
+  });
 });

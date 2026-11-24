@@ -291,4 +291,19 @@ describe("the Feed and what he saved meanwhile", () => {
     await addSource(lib, "http://www.howiai.example.com/p/agents");
     expect(feedView(lib).posts.map((p) => p.url)).toEqual(["https://howiai.example.com/p/newest"]);
   });
+
+  test("one post listed by two feeds under links written two ways shows once, read in both (F-new-feed-equivalent-url)", async () => {
+    const other = RSS.replace("<title>How I AI</title>", "<title>Mirror</title>").replaceAll("https://howiai.example.com/p/", "http://www.howiai.example.com/p/");
+    serve(new Set(), { "https://mirror.example.com/": ["<html><body>Mirror</body></html>", "text/html"], "https://mirror.example.com/feed": [other, "application/rss+xml"] });
+    const lib = await tempLibrary();
+    await followFeed(lib, "https://howiai.example.com/");
+    await followFeed(lib, "https://mirror.example.com/");
+    await refreshFeeds(lib);
+    expect(feedView(lib).posts.map((p) => p.url).sort()).toEqual(["https://howiai.example.com/p/agents", "https://howiai.example.com/p/newest"]);
+    markRead(lib, ["http://www.howiai.example.com/p/agents"]);
+    const item = await openPost(lib, "http://www.howiai.example.com/p/newest");
+    const posts = feedView(lib).posts;
+    expect(posts.every((p) => p.read)).toBe(true);
+    expect(posts.find((p) => p.url.endsWith("/newest"))!.preview).toBe(item.meta.id);
+  });
 });

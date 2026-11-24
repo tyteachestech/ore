@@ -335,10 +335,11 @@ type ReadMark = { url: string; at: string; unread?: boolean };
 function readSet(lib: Library): Set<string> {
   const last = new Map<string, ReadMark>();
   for (const m of readLog<ReadMark>(readPath(lib))) {
-    const prev = last.get(m.url);
-    if (!prev || m.at >= prev.at) last.set(m.url, m);
+    const key = linkKey(m.url);
+    const prev = last.get(key);
+    if (!prev || m.at >= prev.at) last.set(key, m);
   }
-  return new Set([...last.values()].filter((m) => !m.unread).map((m) => m.url));
+  return new Set([...last.entries()].filter(([, m]) => !m.unread).map(([key]) => key));
 }
 
 export function markRead(lib: Library, urls: string[], read = true): void {
@@ -356,14 +357,14 @@ export function feedView(lib: Library, now = new Date()): FeedView {
   const read = readSet(lib);
   // The same link written another way (http, www, tags) is the same post, as when adding it.
   const kept = new Set(allItems(lib).flatMap((i) => (i.meta.url ? [linkKey(i.meta.url)] : [])));
-  const previews = new Map(listItems(lib, { preview: true }).map((i) => [i.meta.url, i.meta.id]));
+  const previews = new Map(listItems(lib, { preview: true }).flatMap((i) => (i.meta.url ? [[linkKey(i.meta.url), i.meta.id] as const] : [])));
   const since = now.getTime() - FEED_DAYS * 86400_000;
   const seen = new Set<string>();
   const posts = feeds
     .flatMap((f) => (cache.feeds[f.url]?.posts ?? []).map((p) => ({ ...p, feed_title: f.title })))
     // A post with no date counts as new until the feed stops listing it.
-    .filter((p) => !kept.has(linkKey(p.url)) && (!p.published || Date.parse(p.published) >= since) && !seen.has(p.url) && seen.add(p.url))
-    .map((p) => ({ ...p, read: read.has(p.url), ...(previews.has(p.url) ? { preview: previews.get(p.url) } : {}) }))
+    .filter((p) => !kept.has(linkKey(p.url)) && (!p.published || Date.parse(p.published) >= since) && !seen.has(linkKey(p.url)) && seen.add(linkKey(p.url)))
+    .map((p) => ({ ...p, read: read.has(linkKey(p.url)), ...(previews.has(linkKey(p.url)) ? { preview: previews.get(linkKey(p.url)) } : {}) }))
     .sort((a, b) => (b.published ?? "").localeCompare(a.published ?? ""));
   return { feeds: feeds.map((f) => ({ ...f, checked_at: cache.feeds[f.url]?.checked_at, error: cache.feeds[f.url]?.error })), posts };
 }

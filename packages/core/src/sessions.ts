@@ -106,8 +106,22 @@ export function openSessionId(lib: Library): string | null {
   return openSessionIds(lib).at(-1) ?? null;
 }
 
-/** A session left open over a day (a window that crashed, as doctor warns) is dropped when the next one starts. */
-const OPEN_FOR_MS = 864e5;
+/** An open session with nothing in this long (no start, no review) is taken as left open (⌘Q with Review up, a
+ *  crash): the next start or end drops it, so its misses aren't owed again next morning and a review with no
+ *  session doesn't go to it. A window still reviewing under the quick quiz has a review minutes ago. Core can't
+ *  tell the main window's session from the quick quiz's (both run `ore session start`), so it goes by activity. */
+const IDLE_MS = 60 * 60_000;
+
+/** The open sessions, but the ones idle over `IDLE_MS` at `now`. */
+function stillOpen(lib: Library, now: Date): string[] {
+  const last = new Map<string, string>();
+  for (const x of readSessions(lib)) if (x.type === "start") last.set(x.id, x.ts);
+  for (const r of readReviews(lib)) if (r.session && r.ts > (last.get(r.session) ?? "")) last.set(r.session, r.ts);
+  return openSessionIds(lib).filter((id) => {
+    const at = last.get(id);
+    return at !== undefined && now.getTime() - Date.parse(at) < IDLE_MS;
+  });
+}
 
 // Starting, ending and reopening read and write .ore/session under the library lock, so one window's
 // end never removes the pointer another window's start has just written.
@@ -115,9 +129,7 @@ export function startSession(lib: Library, now = new Date()): Promise<SessionRec
   return withLock(paths.lock(lib), () => {
     const r: SessionReceipt = { type: "start", id: ulid(now.getTime()), ts: nowIso(now) };
     appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
-    const began = new Map(readSessions(lib).filter((x) => x.type === "start").map((x) => [x.id, Date.parse(x.ts)]));
-    const still = openSessionIds(lib).filter((id) => now.getTime() - (began.get(id) ?? 0) < OPEN_FOR_MS);
-    writeAtomic(paths.openSession(lib), [...still, r.id].join("\n"));
+    writeAtomic(paths.openSession(lib), [...stillOpen(lib, now).filter((id) => id !== r.id), r.id].join("\n"));
     return r;
   });
 }
@@ -230,9 +242,8 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
   const keptSkills = [...bySkill].map(([skill, n]) => ({ skill, n })).sort((x, y) => y.n - x.n);
   const r: SessionReceipt = { type: "end", id, ts: nowIso(now), ...(thenNow ? { then_now: thenNow } : {}), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(keptSkills.length ? { kept_skills: keptSkills } : {}), ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
-  const ids = openSessionIds(lib);
-  if (ids.includes(id)) {
-    const rest = ids.filter((x) => x !== id);
+  if (openSessionIds(lib).includes(id)) {
+    const rest = stillOpen(lib, now).filter((x) => x !== id);
     if (rest.length) writeAtomic(paths.openSession(lib), rest.join("\n"));
     else unlinkSync(paths.openSession(lib));
   }
