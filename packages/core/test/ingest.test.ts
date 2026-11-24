@@ -194,4 +194,26 @@ describe("tracking links", () => {
       globalThis.fetch = real;
     }
   });
+
+  test("the same link added twice at once is one source: the second, read while the first was, finds it under the lock (F-new-concurrent-add)", async () => {
+    const lib = await tempLibrary();
+    const real = globalThis.fetch;
+    // Both reads wait until both have started, so each add has looked for the link before either saves it.
+    let release!: () => void;
+    const started = new Promise<void>((r) => (release = r));
+    let reads = 0;
+    globalThis.fetch = (async () => {
+      if (++reads === 2) release();
+      await started;
+      return new Response("# Concurrent lesson\n\nThis source should be captured only once.\n", { headers: { "content-type": "text/markdown" } });
+    }) as unknown as typeof fetch;
+    try {
+      const [a, b] = await Promise.all([addSource(lib, "https://example.com/lesson.md"), addSource(lib, "https://example.com/lesson.md", { skills: ["ai"] })]);
+      expect(listItems(lib).length).toBe(1);
+      expect(b.meta.id).toBe(a.meta.id);
+      expect(findItem(lib, a.meta.id).meta.skills).toEqual(["ai"]);
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
 });
