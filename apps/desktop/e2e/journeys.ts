@@ -9688,7 +9688,10 @@ journey("the end of a review closes the session: no try line even with a try ope
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await page.waitForTimeout(300);
   await page.keyboard.press("Escape");
-  await page.locator(".review-end .end-skill").first().waitFor();
+  await page.locator(".review-end .end-medal").first().waitFor();
+  // F-new-end-names-cut: a skill's name stands whole on its line, never cut short.
+  const cutNames = await page.locator(".end-medal-name").evaluateAll((els) => els.filter((n) => n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1).map((n) => n.textContent));
+  if (cutNames.length) throw new Error(`the end screen cut a skill's name short: ${cutNames.join(", ")}`);
   if (!/\d+ kept/.test((await page.locator(".end-skills .sr-only").textContent()) ?? "")) throw new Error(`the skills' rows read ${await page.locator(".end-skills .sr-only").textContent()}`);
   const open = ((await ore("tries")) as { status: string }[]).filter((t) => t.status === "open").length;
   if (!open) throw new Error("the seed has no open try, so this journey proves nothing");
