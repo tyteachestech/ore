@@ -926,7 +926,10 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     draft.body += tail;
     draft.assets = [...(draft.assets ?? []), ...section.assets];
   }
-  if (draft.body === item.body) {
+  // The same text under a new byline or date is still news: they come in, and the new original with them, as for
+  // new text (F-new-reimport-metadata).
+  const byline = (item.meta.author ?? draft.author) !== item.meta.author || (draft.published ?? item.meta.published) !== item.meta.published;
+  if (draft.body === item.body && !byline) {
     // A better reader may learn something about the same text: a PDF's tables still to be read (D125).
     if (String(draft.structure ?? "") !== String(item.meta.structure ?? "")) item.meta = await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, structure: draft.structure }));
     return { item, changed: false, moved: 0, removed: [], unplaced: [] };

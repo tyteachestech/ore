@@ -68,6 +68,24 @@ describe("reimport", () => {
     expect(kept.exact).toBe(target);
   });
 
+  test("an original whose text is the same but whose author and date are new brings them in, and keeps the new original (F-new-reimport-metadata)", async () => {
+    const lib = await tempLibrary();
+    const doc = (meta: string) => `---\ntitle: A learning guide\n${meta}---\n\n# A learning guide\n\nSpaced retrieval supports durable memory.\n`;
+    page = doc("date: 2024-01-01\n");
+    serve();
+    const item = await addSource(lib, URL_);
+    expect(item.meta.published).toBe("2024-01-01");
+    page = doc("author: Ada Learner\ndate: 2025-02-03\n");
+    const r = await reimportSource(lib, item.meta.id);
+    expect(r.item.meta).toMatchObject({ author: "Ada Learner", published: "2025-02-03" });
+    expect(r.item.body).toBe(item.body);
+    expect(readFileSync(join(r.item.dir, "source.md"), "utf8")).toBe(page);
+    // Undo puts the byline and date back as they were.
+    const back = await undoReimport(lib, item.meta.id, r.step);
+    expect(back.meta.author).toBeUndefined();
+    expect(back.meta.published).toBe("2024-01-01");
+  });
+
   test("undo puts back the old text and highlights, and running it again redoes", async () => {
     const lib = await tempLibrary();
     page = V1;
