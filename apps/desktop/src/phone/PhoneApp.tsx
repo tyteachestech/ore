@@ -1245,15 +1245,18 @@ export function PhoneApp() {
     // Off the list at once: the remove waits its turn behind a link being read, which can take a while. Put back,
     // it is a new link with its own id.
     let id = l.id;
+    // Every id it has had: a Redo pressed before the Undo's write is back still names the old one.
+    const ids = new Set([id]);
+    const clear = () => ids.forEach((x) => removing.current.delete(x));
     return change(notify, {
       message: "Removed the link",
       show: (on) => {
-        if (!on) return void removing.current.delete(id);
+        if (!on) return clear();
         removing.current.add(id);
         setWaiting((all) => all.filter((w) => w.id !== id));
       },
-      write: async (on) => (on ? ore("inbox", "--remove", id) : (id = (await ore<Waiting>("inbox", "--add", l.url, ...l.skills.flatMap((s) => ["--skill", s]))).id)),
-      settled: () => (removing.current.delete(id), void refresh()),
+      write: async (on) => (on ? ore("inbox", "--remove", id) : void ids.add((id = (await ore<Waiting>("inbox", "--add", l.url, ...l.skills.flatMap((s) => ["--skill", s]))).id))),
+      settled: () => (clear(), void refresh()),
     }).then((ok) => ok || void refresh());
   };
 

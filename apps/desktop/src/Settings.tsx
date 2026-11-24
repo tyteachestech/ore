@@ -142,8 +142,8 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
   /** A setting he changed (change.ts): shown at once, ⌘Z takes it back, and it goes back if the CLI refuses it.
    *  Resolves false then, so a field can keep what he typed. `put` gives the form with this one field changed
    *  (true) or as it was (false), so a failure never rolls back a newer choice in another field. */
-  const setting = (message: string, put: (d: Data, on: boolean) => Data, write: (on: boolean) => Promise<unknown>): Promise<boolean> =>
-    change(notify, {
+  const setting = async (message: string, put: (d: Data, on: boolean) => Data, write: (on: boolean) => Promise<unknown>): Promise<boolean> => {
+    const ok = await change(notify, {
       message,
       kind: "quiet",
       key: SETTINGS,
@@ -153,6 +153,13 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
       },
       write,
     });
+    // Two choices for one field that both failed each go back to what stood before them, the second to the first's
+    // value, which was never saved. So a failed one reads the form as saved, behind the writes still queued, and
+    // never over a choice made since.
+    const shown = dataRef.current;
+    if (!ok) void inOrder(SETTINGS, () => ore<Data>("settings")).then((saved) => dataRef.current === shown && setData((dataRef.current = saved)), () => {});
+    return ok;
+  };
   /** What each goal setting is called in an Undone toast. */
   const NAMES: Record<string, string> = { minutes: "Minutes a day", "weekdays-only": "Weekdays only", "new-per-day": "New exercises a day", plan: "When you review", remix: "Remix exercises" };
   const setGoal = async <K extends keyof Review>(key: K, flag: string, value: Review[K]): Promise<boolean> => {

@@ -3340,15 +3340,24 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const revived = skills.filter((k) => !before.includes(k) && p.skills.some((s) => s.id === k && s.archived));
     // Each exercise's own skills as they were, from the first write: Undo puts those back too.
     let cards: CardSkills | undefined;
+    let refused = false;
     return change(p.notify, {
       message: skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`,
       key: id,
-      // Only this filing goes back: another he made meanwhile stays.
-      show: (on) => setDoc((cur) => (cur && cur.id === id ? { ...cur, skills: on ? unfile(cur.skills, before, skills) : unfile(cur.skills, skills, before) } : cur)),
-      write: async (on) => {
-        // A read of the source begun before this write keeps the skills shown here (`filings`).
+      show: (on) => {
+        // A read of the source begun before this (its write may wait its turn) keeps the skills shown here.
         filings.current++;
-        const r = await ore<{ cards_before?: CardSkills }>("edit", id, "--skills", (on ? skills : before).join(","), ...(!on && cards ? [opt("cards", JSON.stringify(cards))] : [])).finally(() => filings.current++);
+        // Undo and Redo show the list their write saves. A write that failed takes only its own skill back:
+        // another filing he made meanwhile stays.
+        const [to, from] = on ? [skills, before] : [before, skills];
+        const back = refused;
+        refused = false;
+        setDoc((cur) => (cur && cur.id === id ? { ...cur, skills: back ? unfile(cur.skills, from, to) : to } : cur));
+      },
+      write: async (on) => {
+        const r = await ore<{ cards_before?: CardSkills }>("edit", id, "--skills", (on ? skills : before).join(","), ...(!on && cards ? [opt("cards", JSON.stringify(cards))] : []))
+          .catch((e) => ((refused = true), Promise.reject(e)))
+          .finally(() => filings.current++);
         if (on) cards ??= r?.cards_before;
         else await p.rearchive?.(revived);
         setFiled((on ? skills : before).join());

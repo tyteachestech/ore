@@ -200,7 +200,8 @@ export function useNotes(ref: NoteRef, notify: Notify, onKept?: () => void): MyN
         };
         // Only when the text it was added to is known is it a step: an undo from a guess would take more than it added.
         if (before === undefined) return (await add(), true);
-        // His typing before it is a step of its own, under this one.
+        // His typing before it is a step of its own, under this one: so it goes on first, and stays (it is saved)
+        // if the append then fails.
         checkpoint(key, before);
         // The step writes the file itself (--base keeps what he has typed since).
         let after: string | undefined;

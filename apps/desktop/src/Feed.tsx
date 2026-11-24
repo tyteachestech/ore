@@ -172,10 +172,21 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
 
   const unfollow = (f: FeedInfo) => {
     const before = data;
+    if (!before) return;
     let was: { feed: FeedInfo; at: number } | undefined;
     return change(notify, {
       message: `Unfollowed ${f.title}`,
-      show: (on) => setData((d) => (on ? d && { feeds: d.feeds.filter((x) => x.url !== f.url), posts: d.posts.filter((p) => p.feed !== f.url) } : before)),
+      // Back, it is only this feed and its posts that return, where they were: what he has marked read, renamed or
+      // reordered since stays as it is.
+      show: (on) =>
+        setData((d) => {
+          if (!d) return d;
+          if (on) return { feeds: d.feeds.filter((x) => x.url !== f.url), posts: d.posts.filter((p) => p.feed !== f.url) };
+          if (d.feeds.some((x) => x.url === f.url)) return d;
+          const at = before.feeds.findIndex((x) => x.url === f.url);
+          const posts = before.posts.flatMap((p) => (p.feed === f.url ? [p] : d.posts.filter((x) => x.url === p.url)));
+          return { feeds: [...d.feeds.slice(0, at), f, ...d.feeds.slice(at)], posts: [...posts, ...d.posts.filter((p) => !posts.includes(p))] };
+        }),
       write: async (on) => (on ? (was = await ore<{ feed: FeedInfo; at: number }>("feed", "unfollow", f.url)) : was && ore("feed", "restore", JSON.stringify(was.feed), "--at", String(was.at))),
       settled: () => void read(),
     });
@@ -206,13 +217,20 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   const refile = (f: FeedInfo, next: string[], before = f.skills) => {
     const put = (s: (now: string[]) => string[]) => setData((d) => d && { ...d, feeds: d.feeds.map((x) => (x.url === f.url ? { ...x, skills: s(x.skills) } : x)) });
     const flags = (to: string[]) => (to.length ? to.map((k) => opt("skill", k)) : [opt("skill", "")]);
+    let refused = false;
     return change(notify, {
       message: `Changed the skills for ${f.title}`,
       kind: "quiet",
       key: f.url,
-      // Only this change's skills go back: another he made meanwhile stays.
-      show: (on) => put((now) => (on ? unfile(now, before, next) : unfile(now, next, before))),
-      write: (on) => ore("feed", "set", f.url, ...flags(on ? next : before)),
+      // Undo and Redo show the list their write saves. A write that failed takes only its own skills back:
+      // another change he made meanwhile stays.
+      show: (on) => {
+        const [to, from] = on ? [next, before] : [before, next];
+        const back = refused;
+        refused = false;
+        put((now) => (back ? unfile(now, from, to) : to));
+      },
+      write: (on) => ore("feed", "set", f.url, ...flags(on ? next : before)).catch((e) => ((refused = true), Promise.reject(e))),
     });
   };
 
