@@ -3354,8 +3354,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .cp { gap: 20px; }
 .phone :is(.cp-input, .cp .q-ask .field) { min-height: 44px; font-size: 17px !important; }
 /* A narrow screen cuts one line after a few words, so a row runs to three (Books' highlight list). */
-.phone :is(.cp-row, .qp-row) { padding-block: 10px; }
+.phone .cp :is(.cp-row:not(.cp-add), .qp-row) { padding-block: 10px; }
 .phone .cp :is(.cp-text, .qp-text) { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; white-space: normal; overflow-wrap: anywhere; }
+.phone .cp .qp-q.open .qp-text { -webkit-line-clamp: none; }
 .phone .cp .qp-sub { padding-left: 8px; }
 .phone :is(.cp-row, .qp-row):active { background: var(--bg-hover); }
 /* The collected count sits in the top bar, beside Back, not over the text. */

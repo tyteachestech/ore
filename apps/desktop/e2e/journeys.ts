@@ -2285,7 +2285,7 @@ journey("menus: every item of a source's right-click and ⋯ menu has an icon, i
   await page.keyboard.press("Escape");
 });
 
-journey("Collected: a new question is typed in place, with no line over it and no box (F-new-collected-ask-line)", async (page) => {
+journey("Collected: a new question is typed in place, with no line over it and no box (F578)", async (page) => {
   await openSource(page, TESTING);
   await page.getByRole("tab", { name: "Collected" }).click();
   await page.locator(".cp-head.question").hover();
@@ -17814,7 +17814,7 @@ journey("phone: a source's Collected page has its title, as Sources and Settings
   await collected.getByRole("heading", { level: 1, name: "Collected" }).waitFor();
 }, "phone");
 /** A new question typed in Collected sits where its row will: no line above it, no box around it, and the Questions
- *  label as tall as its neighbours (F-new-collected-ask-line: Review's `.ask` and the skill page's `.question` styled them). */
+ *  label as tall as its neighbours (F578: Review's `.ask` and the skill page's `.question` styled them). */
 async function askFieldIsPlain(page: Page, panel: Locator) {
   const field = panel.getByRole("textbox", { name: "New question" });
   await field.waitFor();
@@ -17828,7 +17828,7 @@ async function askFieldIsPlain(page: Page, panel: Locator) {
   if (Math.abs(drawn.left) > 0.5) throw new Error(`the new question's words start ${drawn.left}px off the rows' words`);
   if (new Set(drawn.heads).size > 1) throw new Error(`Collected's labels are not one height: ${drawn.heads}`);
 }
-journey("phone: a new question in Collected is typed in place, with no line over it and no box (F-new-collected-ask-line)", async (page) => {
+journey("phone: a new question in Collected is typed in place, with no line over it and no box (F578)", async (page) => {
   await phoneSource(page, TESTING);
   await tap(page, page.locator(".phone-tools > :first-child"));
   const collected = page.locator('aside.mynotes[aria-label="Collected"]');
