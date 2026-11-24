@@ -4,7 +4,7 @@ import type { TutorTurn } from "./Tutor";
 // replacing them, so he can flip back (ChatGPT's and Claude's ‹ 2 / 2 ›). The turn itself holds the version
 // shown; `alts` holds the others in order, and `alt` is where the shown one sits among them all.
 
-const PARTS = ["message", "mentions", "pointed", "files", "item", "title", "reply", "citations", "general", "hint", "exercise", "card", "ai", "steps", "marks", "stopped", "kept", "error"] as const;
+const PARTS = ["message", "mentions", "pointed", "at", "files", "item", "title", "reply", "citations", "general", "hint", "exercise", "card", "ai", "steps", "marks", "stopped", "kept", "error"] as const;
 /** One message as he sent it and the reply it got. */
 export type Version = Pick<TutorTurn, (typeof PARTS)[number]>;
 

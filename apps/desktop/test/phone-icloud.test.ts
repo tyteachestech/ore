@@ -14,6 +14,8 @@ let other: string[] = [];
 /** Files the folder holds that the phone lists but doesn't load, as base64. */
 const shared = new Map<string, string>();
 
+/** Files whose next read fails once, as lib.rs's `library_read` answers any failed read: null. */
+const unreadable = new Set<string>();
 /** How many `library_read` calls are open at once, and the most there have been. */
 const reading = { now: 0, most: 0 };
 
@@ -32,7 +34,7 @@ const invoke = async <T,>(cmd: string, args: Record<string, unknown> | Uint8Arra
     reading.most = Math.max(reading.most, ++reading.now);
     await new Promise((r) => setTimeout(r, 1));
     reading.now--;
-    return (args.paths as string[]).map((r) => folder.get(r)?.text ?? null) as T;
+    return (args.paths as string[]).map((r) => (unreadable.delete(r) ? null : (folder.get(r)?.text ?? null))) as T;
   }
   if (cmd === "library_bytes") return (shared.get(args.path as string) ?? null) as T;
   if (cmd === "library_apply") {
@@ -246,4 +248,22 @@ test("a failed save's retry never writes over a newer save of the same file that
   expect(folder.get("items/e-05/notes.md")!.text).toBe("Second complete draft.");
   await flush();
   expect(folder.get("items/e-05/notes.md")!.text).toBe("Second complete draft.");
+});
+
+test("a Mac edit the phone failed to read once is read on the next scan, not left stale (F-new-phone-read-retry)", async () => {
+  folder.set("items/r-01/doc.md", { text: "Old source text.", mtime: ++clock });
+  await rescan();
+  expect(fs.readFileSync(`${P}/items/r-01/doc.md`, "utf8")).toBe("Old source text.");
+  mac("items/r-01/doc.md", "New source text from the Mac.");
+  unreadable.add("items/r-01/doc.md");
+  await rescan();
+  expect(fs.readFileSync(`${P}/items/r-01/doc.md`, "utf8")).toBe("Old source text.");
+  expect(await rescan()).toBe(true);
+  expect(fs.readFileSync(`${P}/items/r-01/doc.md`, "utf8")).toBe("New source text from the Mac.");
+  // One that never reads (not UTF-8) is asked again, but a scan that read nothing new says nothing changed.
+  folder.set("items/r-01/notes.md", { text: "\uFFFD", mtime: ++clock });
+  unreadable.add("items/r-01/notes.md");
+  await rescan();
+  unreadable.add("items/r-01/notes.md");
+  expect(await rescan()).toBe(false);
 });

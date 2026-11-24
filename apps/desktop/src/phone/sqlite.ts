@@ -10,11 +10,13 @@ export async function ready(wasmUrl: string) {
 }
 
 const open = new Map<string, SqlJsDb>();
-/** FTS4 spells FTS5's `name unindexed` columns as a `notindexed=name` option. */
+/** FTS4 spells FTS5's `name unindexed` columns as a `notindexed=name` option. FTS4's default
+ * tokenizer folds only ASCII case; FTS5's default is unicode61, which folds every letter's case and
+ * removes accents, so it is named here to find "cafe" and "μνημη" as the Mac does. */
 const fts4Columns = (cols: string) => {
   const list = cols.split(",").map((c) => c.trim());
   const hidden = list.filter((c) => / unindexed$/i.test(c)).map((c) => `notindexed=${c.split(" ")[0]}`);
-  return `using fts4(${[...list.map((c) => c.split(" ")[0]), ...hidden].join(", ")})`;
+  return `using fts4(${[...list.map((c) => c.split(" ")[0]), ...hidden, "tokenize=unicode61"].join(", ")})`;
 };
 const fix = (sql: string) =>
   sql

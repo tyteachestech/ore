@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { landing } from "../src/ore";
+import { findRanges } from "../src/Find";
 import { foundIn } from "../src/search-landing";
 
 const hit = (snippet: string) => ({ kind: "item", ref: "a", title: "T", snippet });
@@ -30,4 +31,10 @@ test("landing carries the passage after the words, on a line of its own", () => 
   expect(landing(hit("## [Why] it [works]"), "why works")).toBe("find:Why it works\nWhy it works");
   expect(landing(hit(""), "plain")).toBe("find:plain");
   expect(landing({ ...hit("x"), kind: "notes" }, "q")).toBe("note:q");
+});
+
+test("a match found without its accent lands Find on the word as the source spells it (F-new-search-landing-accent)", () => {
+  const to = foundIn("Learn at a [café] every day.", "cafe");
+  expect(to).toEqual({ words: "café", near: "Learn at a café every day." });
+  expect(findRanges("Learn at a café every day.", to.words)).toEqual([[11, 15]]);
 });

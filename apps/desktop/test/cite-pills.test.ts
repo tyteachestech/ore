@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { citeRuns, siteName } from "../src/cite-pills";
+import { citedRange, citeJump, citeRuns, siteName } from "../src/cite-pills";
 
 const has = (...ns: number[]) => (n: number) => ns.includes(n);
 
@@ -25,4 +25,33 @@ test("arr[2], a formula's brackets and a block still open keep their brackets; t
   expect(citeRuns("Take arr[2] here [1].", has(1))).toBe("Take arr[2] here [·](#cite-1).");
   expect(citeRuns("So $$x_{[1]}$$ holds [1].")).toBe("So $$x_{[1]}$$ holds [·](#cite-1).");
   expect(citeRuns("Like so [1].\n\n```py\nm[1]")).toBe("Like so [·](#cite-1).\n\n```py\nm[1]");
+});
+
+// Codex deep scan 2: a saved chat's citation, opened after its source was reimported, marked whatever now
+// sat at its old offsets.
+test("a citation opened after its source changed marks the words it quoted where they now are, or nothing when they are gone (F-new-citation-reimport)", () => {
+  const quote = "Retrieval improves durable memory.";
+  const before = `# Memory\n\n${quote}\n`;
+  const start = before.indexOf(quote);
+  const at = citeJump({ start, end: start + quote.length, quote }, 1);
+  const slice = (body: string) => {
+    const r = citedRange(body, at);
+    return r && body.slice(...r);
+  };
+  expect(slice(before)).toBe(quote);
+  // Moved: a paragraph put in above it.
+  expect(slice(`# Memory\n\nA new introductory paragraph was inserted here.\n\n${quote}\n`)).toBe(quote);
+  // Twice: the one nearest where it was.
+  const twice = `# Memory\n\n${quote}\n\nLater, again: ${quote}\n`;
+  expect(citedRange(twice, at)).toEqual([start, start + quote.length]);
+  const twiceMoved = `# Intro\n\nMore words.\n\n# Memory\n\n${quote}\n\n${"Filler. ".repeat(40)}\n\n${quote}\n`;
+  expect(citedRange(twiceMoved, at)).toEqual([twiceMoved.indexOf(quote), twiceMoved.indexOf(quote) + quote.length]);
+  // Gone: nothing marked.
+  expect(citedRange("# Memory\n\nWriting things repeatedly consumes a lot of time.\n", at)).toBeNull();
+  // A quote across lines comes through whole.
+  const lines = "First line\nsecond line.";
+  expect(citedRange(`x\n\n${lines}`, citeJump({ start: 0, end: lines.length, quote: lines }, 2))).toEqual([3, 3 + lines.length]);
+  // A jump with no quote (an exercise's evidence) keeps its offsets; one that isn't a quote isn't this.
+  expect(citedRange("abcdef", "q:1:3")).toEqual([1, 3]);
+  expect(citedRange("abcdef", "find:abc")).toBeUndefined();
 });
