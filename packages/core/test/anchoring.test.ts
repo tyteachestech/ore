@@ -77,6 +77,20 @@ describe("anchoring", () => {
     expect(anchor(edited, sel)).toBeNull();
   });
 
+  test("fuzzy: a deleted passage does not move onto a passage merely written like it, while a small edit to it still anchors (F-new-fuzzy-other-passage)", () => {
+    const target = "The blue heron nests beside the river each spring.";
+    const rival = "The grey heron nests beside the marsh each spring.";
+    const river = "# River habitat\n\nObserve the northern river colony.\n\n" + target + "\n\nThese notes belong to the river survey.\n\n";
+    const marsh = "# Marsh habitat\n\nObserve the southern marsh colony.\n\n" + rival + "\n\nThese notes belong to the marsh survey.\n";
+    const sel = selectorFor(river + marsh, target);
+    expect(anchor(marsh, sel)).toBeNull();
+    // The same passage reworded a little, its neighbours as they were: still found, as fuzzy.
+    const edited = (river + marsh).replace(target, "The blue heron nests beside the wide river every spring.");
+    const a = anchor(edited, sel)!;
+    expect(a.method).toBe("fuzzy");
+    expect(edited.slice(a.start, a.end)).toBe("The blue heron nests beside the wide river every spring.");
+  });
+
   test("locate: whitespace-insensitive and nearest to hint", () => {
     expect(locate(DOC, "Retrieval practice beats\nrereading")).not.toBeNull();
     expect(locate("Split **workflows** and **agents** here", "workflows and agents")).toEqual({ start: 8, end: 32 });

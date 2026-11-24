@@ -15,6 +15,7 @@ import { withLock } from "../lock.ts";
 import { loadSkills, setItemSkills, unarchiveFiled } from "../skills.ts";
 import { saveImages, withImages } from "./assets.ts";
 import { recordEnd } from "../cut.ts";
+import { chapterLines } from "../ai/recall.ts";
 import { BOT, cleanAuthor, cleanDate, FROM_TAB, refusal, wordCount } from "./check.ts";
 import { academyVideo, isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./course.ts";
 import { dropTitle, hasText, pageDraft } from "./page.ts";
@@ -558,8 +559,11 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   if (!draft.body.trim() && !draft.owed?.length) throw new Error("Found no text to read in that. Copy the text and paste it here instead.");
   const ready = await withImages(draft);
   // The same file added again (dropped twice, or a copy) is the source already here.
-  const same = !isUrl && sameText(lib, ready.body);
-  const item = same ? await keep(lib, same, opts) : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview });
+  let same = !isUrl && sameText(lib, ready.body);
+  // Looked for again under the write lock: the same link or file added at once by another add (F-new-concurrent-add).
+  const made = same ? undefined : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview }, () => (isUrl ? byLink(lib, input, true) : sameText(lib, ready.body)));
+  if (made?.already) same = made;
+  const item = same ? await keep(lib, same, opts) : made!;
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
   if (!same && ready.owed?.length) {
     mkdirSync(paths.inbox(lib), { recursive: true });
@@ -803,10 +807,48 @@ function swapFiles(item: Item, from: string) {
   const was = ItemMetaSchema.parse(old.data);
   for (const f of readdirSync(item.dir).filter(REPLACED)) unlinkSync(join(item.dir, f));
   for (const f of readdirSync(from).filter((f) => REPLACED(f) && f !== "doc.md")) keepFile(join(from, f), join(item.dir, f));
-  const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, page_added: was.page_added, author: was.author, published: was.published, structure: was.structure, text_sha256: was.text_sha256 };
+  // Each chapter's recall goes back with its chapter; one whose chapter the newer version lost comes back as it was.
+  const back = followChapters(item.meta.chapter_recalls, item.body, old.body, was.type) ?? [];
+  const lost = (was.chapter_recalls ?? []).filter((r) => !back.some((b) => b.n === r.n || (b.at === r.at && b.text === r.text)));
+  const recalls = [...back, ...lost].sort((a, b) => a.n - b.n);
+  const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, page_added: was.page_added, author: was.author, published: was.published, structure: was.structure, text_sha256: was.text_sha256, chapter_recalls: recalls.length ? recalls : undefined };
   writeAtomic(item.docPath, stringifyFrontmatter(meta, old.body));
   rmSync(from, { recursive: true, force: true });
   return tmp;
+}
+
+/** A source's chapters as their text, without their markers: an EPUB's marked ones, a video's `###` ones (D115). */
+function chapterTexts(body: string, type: ItemType): string[] {
+  const lines = body.split("\n");
+  const out: string[] = [];
+  for (let n = 1; ; n++) {
+    const at = chapterLines(body, n, type);
+    if (!at) return out;
+    out.push(lines.slice(at.from - 1, at.to).filter((l) => !/^<!-- chapter \d+ -->$/.test(l.trim())).join("\n").trim());
+  }
+}
+
+/** A chapter's saved recall (D115) follows its chapter, known by its first line (its heading), when the text
+ *  it was read from changes to `to`: reordered, added to or cut. Of chapters starting alike, the one that reads
+ *  the same, then the one in its old place, wins. One whose chapter is gone leaves chapter_recalls; its words
+ *  stay in the source's note (F-new-epub-recall-reorder). */
+function followChapters(recalls: ItemMeta["chapter_recalls"], from: string, to: string, type: ItemType): ItemMeta["chapter_recalls"] {
+  if (!recalls?.length) return recalls;
+  const first = (t: string) => t.split("\n").find((l) => l.trim())?.trim() ?? "";
+  const old = chapterTexts(from, type);
+  const now = chapterTexts(to, type);
+  const taken = new Set<number>();
+  const out: NonNullable<ItemMeta["chapter_recalls"]> = [];
+  for (const r of recalls) {
+    const text = old[r.n - 1];
+    if (text === undefined) continue;
+    const hits = now.flatMap((t, i) => (!taken.has(i) && first(t) === first(text) ? [i] : []));
+    const i = hits.find((i) => now[i] === text) ?? (hits.includes(r.n - 1) ? r.n - 1 : hits[0]);
+    if (i === undefined) continue;
+    taken.add(i);
+    out.push({ ...r, n: i + 1 });
+  }
+  return out.length ? out.sort((a, b) => a.n - b.n) : undefined;
 }
 
 /** A course lesson as it is read again. A lesson added as a bare video (before D92) keeps only its
@@ -841,7 +883,21 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
     throw PASTE_STEP.test(e.message) ? new Error(e.message.replace(PASTE_STEP, " Its transcript is as it was.")) : e;
   });
   if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
+  if (kept) draft.body = savedPictures(draft.body, item);
   return turn(() => rewrite(lib, item, draft, regions, kept, stash));
+}
+
+/** A file's pictures that sat beside it (a saved page's `figure.png`) are not beside its kept copy, so read
+ *  again they can't be found: each one left as a `file://` link takes the picture the source already saved
+ *  for it, the same alt text in the same turn (F-new-reimport-local-image). */
+function savedPictures(body: string, item: Item): string {
+  const IMG = /!\[([^\]\n]*)\]\(([^)\s]+)\)/g;
+  const saved = [...item.body.matchAll(IMG)].filter((m) => m[2]!.startsWith("assets/") && existsSync(join(item.dir, m[2]!))).map((m) => ({ alt: m[1]!, path: m[2]! }));
+  return body.replace(IMG, (all, alt: string, src: string) => {
+    if (!src.startsWith("file:")) return all;
+    const i = saved.findIndex((p) => p.alt === alt);
+    return i < 0 ? all : `![${alt}](${saved.splice(i, 1)[0]!.path})`;
+  });
 }
 
 /** The original a file source is read again from: the copy kept beside it (source.*), so a better reader
@@ -870,7 +926,10 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     draft.body += tail;
     draft.assets = [...(draft.assets ?? []), ...section.assets];
   }
-  if (draft.body === item.body) {
+  // The same text under a new byline or date is still news: they come in, and the new original with them, as for
+  // new text (F-new-reimport-metadata).
+  const byline = (item.meta.author ?? draft.author) !== item.meta.author || (draft.published ?? item.meta.published) !== item.meta.published;
+  if (draft.body === item.body && !byline) {
     // A better reader may learn something about the same text: a PDF's tables still to be read (D125).
     if (String(draft.structure ?? "") !== String(item.meta.structure ?? "")) item.meta = await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, structure: draft.structure }));
     return { item, changed: false, moved: 0, removed: [], unplaced: [] };
@@ -898,7 +957,7 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     // Read again under the lock: a background enrich may have written its questions while this one read.
     const now = readItemDir(item.dir).meta;
     const added = tail ? recordEnd(lib, item.meta.id, draft.body.length - tail.length, tail) : undefined;
-    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure, owed: undefined, owed_error: undefined };
+    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure, owed: undefined, owed_error: undefined, chapter_recalls: followChapters(now.chapter_recalls, item.body, draft.body, draft.type) };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, draft.body));
   });
   const next = readItemDir(item.dir);

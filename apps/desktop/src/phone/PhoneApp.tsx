@@ -1069,9 +1069,15 @@ export function PhoneApp() {
     review: (s) => (setDrawer(false), setReviewing({ pick: [s.id], run: 0 })),
     edit: (s) => (setDrawer(false), setEditingSkill(s.id)),
   });
-  /** A course archived from its menu: every lesson, at once, with Undo (the Mac's course Archive). */
+  /** A course archived from its menu: every lesson, at once, with Undo (the Mac's course Archive). Undo brings
+   *  back the lessons this Archive put away, not one archived before it (F-new-course-archive-undo). */
   const archiveCourse = (c: Extract<Line, { kind: "course" }>) => {
-    const apply = (on: boolean) => ore("course", "archive", c.id, ...(on ? [] : ["--undo"])).finally(refresh);
+    let changed: string[] = [];
+    const apply = (on: boolean) =>
+      (on
+        ? ore<{ lessons: string[] }>("course", "archive", c.id).then((r) => void (changed = r.lessons))
+        : ore("course", "archive", c.id, "--undo", "--lessons", changed.join(","))
+      ).finally(refresh);
     setItems((all) => all?.filter((i) => i.course?.id !== c.id) ?? all);
     setCourse((now) => (now === c.id ? null : now));
     notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));

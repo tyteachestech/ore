@@ -13420,6 +13420,36 @@ journey("phone: text added, undone and added again says it is back from Archived
   await back.locator("button").filter({ hasText: "Undo" }).waitFor();
 }, "phone");
 
+journey("phone: Undo of Archive course brings back the lessons it archived, not one archived before (F-new-course-archive-undo)", async (page) => {
+  // Codex deep scan 2026-11-24 (intake 6): Undo ran the whole course's restore, so a lesson archived before came back too.
+  type Core = { run: <T>(args: string[], input: string | null) => Promise<T> };
+  const ids = await page.evaluate(async (root) => {
+    const core = (await import("/src/phone/core.ts" as string)) as Core;
+    await core.run(["ls", "--json"], null);
+    const items = (await import(`/@fs${root}/packages/core/src/items.ts`)) as { createItem: (lib: { root: string }, input: object) => Promise<{ meta: { id: string } }> };
+    const made = [];
+    for (const part of [1, 2]) made.push((await items.createItem({ root: "/lib" }, { type: "markdown", title: `Undo course lesson ${part}`, body: `Lesson ${part} of the undo course.`, course: { id: "undo-course", title: "Undo course", part } })).meta.id);
+    await core.run(["archive", made[1]!, "--json"], null);
+    return made;
+  }, join(import.meta.dir, "../../.."));
+  const archivedOf = () => page.evaluate(async (ids) => {
+    const core = (await import("/src/phone/core.ts" as string)) as Core;
+    return (await Promise.all(ids.map(async (id) => !!(await core.run<{ archived_at?: string }>(["show", id, "--json"], null)).archived_at))).join("/");
+  }, ids);
+  await Bun.sleep(1000); // the page's writes reach IndexedDB in the background
+  await page.reload();
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+  const course = page.locator(".phone-course").filter({ hasText: "Undo course" });
+  await press(page, course);
+  await tap(page, page.getByRole("menuitem", { name: "Archive course" }));
+  await until("the course is archived", async () => (await archivedOf()) === "true/true");
+  await tap(page, page.locator(".toast").filter({ hasText: "Archived “Undo course”" }).getByRole("button", { name: "Undo" }));
+  await until("Undo brings back only the lesson it archived", async () => (await archivedOf()) === "false/true");
+  await Bun.sleep(400);
+  if ((await archivedOf()) !== "false/true") throw new Error("Undo of Archive course also brought back a lesson archived before it");
+}, "phone");
+
 journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {
   // D235: the file is saved to the inbox beside its item, then imported here like a link.
   const files = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files");
