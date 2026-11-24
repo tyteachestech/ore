@@ -24,6 +24,21 @@ export type Change = {
 
 let changes = 0;
 
+/** A change made of several writes, as one: each step in turn, and if one fails the ones already written are
+ *  written back before it says so. So a `change` whose write fails has changed nothing, as it tells him. */
+export async function allOrNone(steps: ((on: boolean) => Promise<unknown>)[], on: boolean): Promise<void> {
+  const done: typeof steps = [];
+  try {
+    for (const step of steps) {
+      await step(on);
+      done.push(step);
+    }
+  } catch (e) {
+    for (const step of done.reverse()) await step(!on).catch(() => {});
+    throw e;
+  }
+}
+
 /** Makes a change he can take back: shows it at once, puts its step on the history before its write starts (so a
  *  ⌘Z pressed meanwhile takes back this change, never the one before it: F146, F156, F459 to F487), and writes it
  *  and every Undo and Redo of it one after another. A first write that fails takes the change off the screen and
@@ -34,6 +49,8 @@ export function change(notify: Notify, c: Change): Promise<boolean> {
   let asked = 0;
   let failed = false;
   const run = (on: boolean) => {
+    // A Redo whose turn comes after the first write failed: there is nothing to do again.
+    if (failed) return Promise.resolve();
     const n = ++asked;
     c.show?.(on);
     // An Undo asked for before the first write failed has nothing to take back.
@@ -51,6 +68,8 @@ export function change(notify: Notify, c: Change): Promise<boolean> {
   return first.then(() => true, (e) => {
     failed = true;
     forget();
+    // Whatever was pressed meanwhile (an Undo, then a Redo): it was never written, so it is off the screen.
+    if (asked > 1) c.show?.(false);
     // In the slot of the toast that said it was done.
     notify(errorText(e), "error", undefined, undefined, undefined, undefined, c.slot);
     return false;

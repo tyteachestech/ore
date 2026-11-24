@@ -38,7 +38,7 @@ import { Thumb } from "../Thumb";
 import { ThumbLine } from "../Ring";
 import { useToast } from "../Toast";
 import { Working } from "../Working";
-import { change, type Change } from "../change";
+import { allOrNone, change, type Change } from "../change";
 import { count, errorText, load, stepLanded, usable, useKeptScroll, wakeScreens, type Notify } from "../util";
 
 // The reading page's Auto follows the iPhone's Light or Dark mode (D311).
@@ -926,6 +926,7 @@ export function PhoneApp() {
     setOpenId(null);
     void listChange({
       message: `Archived “${item.title}”`,
+      key: item.id,
       show: (on) => setItems((all) => (on ? all?.filter((i) => i.id !== item.id) : all && (all.some((i) => i.id === item.id) ? all : [item, ...all])) ?? all),
       write: (on) => ore("archive", item.id, ...(on ? [] : ["--undo"])),
     });
@@ -1033,7 +1034,7 @@ export function PhoneApp() {
     const lessons = (items ?? []).filter((i) => i.course?.id === c.id);
     void listChange({
       message: `Archived “${c.title}”`,
-      show: (on) => setItems((all) => (on ? all?.filter((i) => i.course?.id !== c.id) : all && [...lessons.filter((l) => changed.includes(l.id) && !all.some((i) => i.id === l.id)), ...all]) ?? all),
+      show: (on) => setItems((all) => (on ? all?.filter((i) => i.course?.id !== c.id) : all && [...lessons.filter((l) => (!changed.length || changed.includes(l.id)) && !all.some((i) => i.id === l.id)), ...all]) ?? all),
       // Undo brings back the lessons the Archive's answer names: its write waits for that answer.
       write: (on) => (on ? ore<{ lessons: string[] }>("course", "archive", c.id).then((r) => void (changed = r.lessons)) : ore("course", "archive", c.id, "--undo", "--lessons", changed.join(","))),
     });
@@ -1050,9 +1051,7 @@ export function PhoneApp() {
         if (patch) setItems((all) => all?.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) ?? all);
         else setArchived((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
       },
-      write: async (forward) => {
-        for (const i of sel) await write(i, forward);
-      },
+      write: (forward) => allOrNone(sel.map((i) => (on: boolean) => write(i, on)), forward),
     });
   };
   /** What the picked sources can do together: the Mac's pick bar (Mark done or To read, Skills, Archive; Restore in Archive). */

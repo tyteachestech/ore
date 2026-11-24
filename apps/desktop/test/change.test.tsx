@@ -168,3 +168,32 @@ test("every write is told to `out` as it is asked for, so a list read begun befo
   expect(lib.calls.length).toBe(1);
   expect(out.length).toBe(2);
 });
+
+test("⌘Z then ⇧⌘Z before a save that then fails leaves the change off the screen", async () => {
+  const t = await mount();
+  const lib = library();
+  const shown: boolean[] = [];
+  await act(async () => {
+    void change(t.notify, { message: "Renamed to “B”", kind: "quiet", show: (on) => shown.push(on), write: (on) => lib.write(on ? "title B" : "title A") });
+  });
+  await act(async () => t.undo());
+  await act(async () => t.redo());
+  lib.calls[0]!.fail("no");
+  await tick();
+  // The Redo's turn came after the failure: it shows nothing again.
+  expect(shown.slice(1).includes(true)).toBe(false);
+  expect(t.history.canRedo).toBe(false);
+  expect(lib.calls.map((c) => c.what)).toEqual(["title B"]);
+  expect(t.history.canUndo).toBe(false);
+});
+
+test("a change of several writes that fails part-way writes back the ones that landed", async () => {
+  const { allOrNone } = await import("../src/change");
+  const wrote: string[] = [];
+  const step = (name: string, fails = false) => async (on: boolean) => {
+    if (fails) throw new Error("locked");
+    wrote.push(`${name} ${on ? "archive" : "restore"}`);
+  };
+  await expect(allOrNone([step("a"), step("b"), step("c", true), step("d")], true)).rejects.toThrow("locked");
+  expect(wrote).toEqual(["a archive", "b archive", "b restore", "a restore"]);
+});

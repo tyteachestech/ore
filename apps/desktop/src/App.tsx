@@ -45,7 +45,7 @@ import { useToast } from "./Toast";
 import { lineAfter, lineKey, type Line } from "./lines";
 import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
 import { readGuard } from "./reads";
-import { change, type Change } from "./change";
+import { allOrNone, change, type Change } from "./change";
 import { listenMenu, setMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
@@ -1561,6 +1561,7 @@ export function App() {
     if (archived && openId === item.id) setOpenId(null);
     return listChange({
       message: `${archived ? "Archived" : "Restored"} “${item.title}”`,
+      key: item.id,
       show: (on) => {
         mark(on === archived);
         // Undo selects the source it put back, as Finder selects what it puts back.
@@ -1620,11 +1621,11 @@ export function App() {
       kind,
       key: `skill ${id}`,
       show: (on) => setSkills((all) => all.map((k) => (k.id === id ? { ...k, ...(on ? after : before) } : k))),
-      write: async (on) => {
-        const patch = on ? after : before;
-        if (patch.priority) await ore("skills", "set", id, opt("priority", patch.priority));
-        if (patch.archived !== undefined) await ore("skills", "archive", id, ...(patch.archived ? [] : ["--undo"]));
-      },
+      write: (on) =>
+        allOrNone([
+          async (to) => void ((to ? after : before).priority && (await ore("skills", "set", id, opt("priority", (to ? after : before).priority!)))),
+          async (to) => void ((to ? after : before).archived !== undefined && (await ore("skills", "archive", id, ...((to ? after : before).archived ? [] : ["--undo"])))),
+        ], on),
       settled: reloadSkills,
     });
   /** Picks a level; picking one on an archived skill brings it back too. */
@@ -1711,10 +1712,7 @@ export function App() {
         if (patch) setItems((all) => all && (forward ? all.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) : [...all.filter((i) => !ids.has(i.id)), ...sel]));
         if (!forward) setCursor(was);
       },
-      write: async (forward) => {
-        for (const i of sel) await write(i, forward);
-        await after?.(forward);
-      },
+      write: (forward) => allOrNone([...sel.map((i) => (on: boolean) => write(i, on)), async (on) => void (await after?.(on))], forward),
     });
   };
   const copySources = (list: Item[]) =>
@@ -1825,9 +1823,11 @@ export function App() {
     // Filing under an archived skill brings it back (D173): the sidebar shows it in its place again, and Undo archives it again.
     const revived = next.filter((id) => !before.includes(id) && skills.some((s) => s.id === id && s.archived));
     const slot = `refile:${[...what.ids].join(",")}`;
+    // Either way round: an Undo that files it under an archived skill again brings that skill back too.
+    const archivedOne = [...next, ...before].some((id) => skills.some((s) => s.id === id && s.archived));
     const settled = () => {
       void refresh();
-      if (revived.length) reloadSkills();
+      if (archivedOne) reloadSkills();
     };
     if (!changed) {
       show(next);
@@ -1838,6 +1838,8 @@ export function App() {
     void change(notify, {
       message: next.includes(changed.id) ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`,
       slot,
+      // One source's filings are written in the order he ticked them.
+      key: [...what.ids].join(","),
       show: (on) => show(on ? next : before),
       write: (on) => (on ? what.write(next).then((r) => void (cards = (r as { cards_before?: CardSkills } | undefined)?.cards_before)) : what.write(before, cards).then(() => rearchive(revived))),
       out: writing,

@@ -4,7 +4,7 @@ import type { MenuAction } from "../Menu";
 import { layoutOf, skillGroups } from "../Skills";
 import { opt, ore, type Priority, type Skill } from "../ore";
 import { isOther, tidyCollection } from "../../../../packages/core/src/collection-name";
-import { change } from "../change";
+import { allOrNone, change } from "../change";
 import type { Notify } from "../util";
 
 /** A skill's long-press menu on the iPhone: the Mac's right-click (App.tsx skillMenu), less Delete, which stays on
@@ -37,11 +37,11 @@ export function skillMenu({ skills, refresh, notify, open, review, edit }: {
       message,
       kind,
       key: `skill ${id}`,
-      write: async (on) => {
-        const patch = on ? after : before;
-        if (patch.priority) await ore("skills", "set", id, opt("priority", patch.priority));
-        if (patch.archived !== undefined) await ore("skills", "archive", id, ...(patch.archived ? [] : ["--undo"]));
-      },
+      write: (on) =>
+        allOrNone([
+          async (to) => void ((to ? after : before).priority && (await ore("skills", "set", id, opt("priority", (to ? after : before).priority!)))),
+          async (to) => void ((to ? after : before).archived !== undefined && (await ore("skills", "archive", id, ...((to ? after : before).archived ? [] : ["--undo"])))),
+        ], on),
       settled: () => void refresh(),
     });
   const setImportance = (s: Skill, p: Priority) => {
