@@ -1,0 +1,4 @@
+{ "testers": [
+  { "name": "ux", "seed": "seed" },
+  { "name": "edges", "seed": "seed" }
+] }

@@ -447,7 +447,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
       {/* An empty library: the one thing to do next, as the empty source list says it. */}
       {empty && today && (
         <p className="empty-state">
-          {PHONE ? "Nothing to read yet. Add a link, a file or a photo with +." : <>Nothing to read yet. Paste a link, a file or any text with <b>{label(keys.add)}</b>, or drop files here.</>}
+          {PHONE ? "Nothing to read yet. Add a link, any text, a file or a photo with +." : <>Nothing to read yet. Paste a link, a file or any text with <b>{label(keys.add)}</b>, or drop files here.</>}
         </p>
       )}
 

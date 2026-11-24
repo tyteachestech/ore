@@ -5184,12 +5184,38 @@ journey("a small window: ⌘K, the Add box and the shortcuts sheet fit in it, an
     await page.keyboard.press("Escape");
     await sheet.waitFor({ state: "detached" });
     await page.getByRole("button", { name: "+ Add" }).click();
-    const add = page.getByRole("dialog", { name: "Add a source" });
+    const add = page.getByRole("dialog", { name: "Add a source", exact: true });
     await add.getByLabel("Link, file path or text").fill(Array.from({ length: 40 }, (_, i) => `Line ${i + 1}`).join("\n"));
     await inWindow("the Add box", add);
     await inWindow("the Add box's footer", add.locator(".panel-foot"));
     await page.keyboard.press("Escape");
     await add.waitFor({ state: "detached" });
+  } finally {
+    await page.setViewportSize({ width: 1280, height: 800 });
+  }
+});
+
+// F558: typing in ⌘K left its list scrolled down, so the top results (⌘1, ⌘2) were out of
+// sight above it: for one paint cmdk still held the row picked before the keystroke and scrolled it into view.
+journey("⌘K: typing keeps the list at its top, with the first result selected and in sight (F558)", async (page) => {
+  await page.locator(".sidebar div.side-item").first().waitFor({ state: "attached" });
+  // A short window, so the rows run past the list's foot and a wrong scroll shows.
+  await page.setViewportSize({ width: 800, height: 400 });
+  try {
+    const palette = page.getByRole("dialog", { name: "Command palette" });
+    await page.keyboard.press("Meta+k");
+    await palette.waitFor();
+    const list = palette.locator("[cmdk-list]");
+    for (const key of ["a", "i"]) {
+      await page.keyboard.type(key);
+      await page.waitForTimeout(400); // past the text search's wait, so its rows have come in too
+      const at = await list.evaluate((l) => ({ top: l.scrollTop, first: l.querySelector("[cmdk-item]")?.getAttribute("aria-selected") }));
+      if (at.first !== "true") throw new Error(`after typing "${key}" the first row is not selected`);
+      if (at.top > 0) throw new Error(`after typing "${key}" the list is scrolled ${at.top}px down, hiding its top rows`);
+    }
+    await page.keyboard.press("Escape"); // clears what he typed
+    await page.keyboard.press("Escape");
+    await palette.waitFor({ state: "detached" });
   } finally {
     await page.setViewportSize({ width: 1280, height: 800 });
   }
@@ -9353,7 +9379,7 @@ journey("finish: a source opened during the Source finished moment stays open, a
 });
 
 journey("add: a draft left with Esc comes back with the skills he picked for it (Codex UX sweep 4)", async (page) => {
-  const box = page.getByRole("dialog", { name: "Add a source" });
+  const box = page.getByRole("dialog", { name: "Add a source", exact: true });
   const field = box.getByLabel("Link, file path or text");
   await page.keyboard.press("Meta+KeyN");
   await field.fill("a thought to file under Learning");
@@ -12891,8 +12917,8 @@ journey("phone: Remove on a link still being read takes it off at once (F79)", a
   // The remove waited its turn behind the read of a link that hung, so the tap showed nothing for 15 s.
   const held: Route[] = [];
   await page.route("https://example.com/articles/slow", (r) => void held.push(r)); // never answers
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input.field").fill("https://example.com/articles/slow");
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").fill("https://example.com/articles/slow");
   await tap(page, page.getByRole("button", { name: "Add", exact: true }));
   await page.locator(".add-link").waitFor({ state: "detached" });
   const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/slow" });
@@ -12929,7 +12955,7 @@ journey("phone: Today in a library with nothing to read says to add a first sour
   await Bun.sleep(1000); // the page's writes reach IndexedDB in the background
   await page.reload();
   await page.locator(".phone-app").waitFor();
-  await page.locator(".empty-state").filter({ hasText: "Nothing to read yet. Add a link, a file or a photo with +." }).waitFor();
+  await page.locator(".empty-state").filter({ hasText: "Nothing to read yet. Add a link, any text, a file or a photo with +." }).waitFor();
   if (await page.getByText("Read something new").count()) throw new Error("Today says to read something new in a library with nothing to read");
 }, "phone");
 
@@ -13085,8 +13111,8 @@ journey("phone: an episode on a phone that can't hear speech says the Mac fills 
   const audio = "https://media.example.com/quiet-rooms.mp3";
   await page.route("https://itunes.apple.com/lookup?**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: cors, body: JSON.stringify({ results: [{ trackId: 1000670069360, episodeUrl: audio, trackName: "Quiet rooms", collectionName: "Ride Home", releaseDate: "2024-09-19T08:00:00Z" }] }) }));
   await page.route(audio, (r) => r.fulfill({ status: 200, contentType: "audio/mpeg", headers: cors, body: Buffer.alloc(200_000) }));
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input.field").fill("https://podcasts.apple.com/us/podcast/quiet-rooms/id1355212895?i=1000670069360");
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").fill("https://podcasts.apple.com/us/podcast/quiet-rooms/id1355212895?i=1000670069360");
   await tap(page, page.getByRole("button", { name: "Add", exact: true }));
   await page.getByText("Added “Quiet rooms”").waitFor();
   await tap(page, page.getByRole("button", { name: "Open menu" }));
@@ -13243,11 +13269,11 @@ journey("phone: a link added is read on the phone itself; one it can't read wait
   const article = `<html><head><title>Interleaving in practice</title></head><body><article><h1>Interleaving in practice</h1>${`<p>${para.repeat(5)}</p>`.repeat(4)}</article></body></html>`;
   await page.route("https://example.com/articles/interleaving", (r) => r.fulfill({ status: 200, contentType: "text/html; charset=utf-8", headers: { "access-control-allow-origin": "*" }, body: article }));
   await page.route("https://example.com/articles/offline", (r) => r.abort());
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input.field").fill("not a link");
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").fill("https://notalink");
   await tap(page, page.locator(".add-link button"));
   await page.locator(".add-link .phone-error").filter({ hasText: "isn’t a link" }).waitFor();
-  await page.locator(".add-link input.field").fill("https://example.com/articles/interleaving");
+  await page.locator(".add-link .field").fill("https://example.com/articles/interleaving");
   await tap(page, page.locator(".add-link button"));
   await page.locator(".add-link").waitFor({ state: "detached" });
   await page.getByText("Added “Interleaving in practice”").waitFor();
@@ -13256,8 +13282,8 @@ journey("phone: a link added is read on the phone itself; one it can't read wait
   await page.locator(".phone-sources").getByText("Interleaving in practice").first().waitFor();
   if (await page.locator(".phone-waiting").count()) throw new Error("the link it read is still listed as coming in");
   // One the phone can't reach keeps its reason, and the Mac tries it.
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input.field").fill("https://example.com/articles/offline");
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").fill("https://example.com/articles/offline");
   await tap(page, page.locator(".add-link button"));
   await page.locator(".add-link").waitFor({ state: "detached" });
   const row = page.locator(".phone-waiting").filter({ hasText: "example.com/articles/offline" });
@@ -13274,8 +13300,8 @@ journey("phone: a YouTube link is in the library at once and says its transcript
   // D235: no yt-dlp on a phone, so the video comes in with its title and plays; the Mac fills the transcript.
   await page.route("https://www.youtube.com/oembed?**", (r) => r.fulfill({ status: 200, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ title: "How spacing works", author_name: "Learning Lab" }) }));
   await page.route(/ytimg\.com|youtube(-nocookie)?\.com\/(embed|iframe_api)/, (r) => r.abort());
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input.field").fill("https://youtu.be/abcdefghijk");
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").fill("https://youtu.be/abcdefghijk");
   await tap(page, page.locator(".add-link button"));
   await page.locator(".add-link").waitFor({ state: "detached" });
   await page.getByText("Added “How spacing works”").waitFor();
@@ -13299,8 +13325,8 @@ journey("phone: an episode is in at once, says how far its transcript is, and fi
   await page.route(audio, (r) => r.fulfill({ status: 200, contentType: "audio/wav", headers: cors, body: wav }));
   // The iPhone's speech, standing in: it hears nothing until the journey lets it.
   await page.evaluate(() => void ((window as unknown as { __ORE_HEAR: { vtt: string; hold: boolean } }).__ORE_HEAR = { vtt: "WEBVTT\n\n00:00:00.000 --> 00:00:04.000\nWelcome back to the show.\n\n00:01:00.000 --> 00:01:05.000\nThanks for listening.\n\n", hold: true }));
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input.field").fill("https://podcasts.apple.com/us/podcast/master-your-sleep/id1545953110?i=1000560143046");
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").fill("https://podcasts.apple.com/us/podcast/master-your-sleep/id1545953110?i=1000560143046");
   await tap(page, page.locator(".add-link button"));
   await page.locator(".add-link").waitFor({ state: "detached" });
   await page.getByText("Added “Master your sleep”").waitFor();
@@ -13326,11 +13352,105 @@ journey("phone: an episode is in at once, says how far its transcript is, and fi
   if (process.env.ORE_SHOT) await page.screenshot({ path: process.env.ORE_SHOT.replace(".png", "-after.png") });
 }, "phone");
 
+journey("phone: words pasted into Add are a text source at once, which opens, as in the Mac's Add box", async (page) => {
+  // Impeccable eval round 10: the iPhone's Add took only links, so pasted notes went nowhere.
+  const words = "Spacing beats cramming\n\nReviews spread over days keep what one long sitting loses within a week.";
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  const field = page.locator(".add-link .field");
+  await field.fill(words);
+  // The keyboard's Go adds it, though the field takes lines now.
+  await field.press("Enter");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await page.getByText("Added “Spacing beats cramming”").waitFor();
+  await page.locator(".phone-reader .doc").filter({ hasText: "keep what one long sitting loses" }).first().waitFor();
+  if (await page.locator(".phone-waiting").count()) throw new Error("the text is listed as coming in, as a link would be");
+}, "phone");
+
+/** A paste into a field as Safari sends one: the clipboard's plain text and HTML on the event, then the words in the field. */
+async function pasteInto(field: Locator, text: string, html?: string) {
+  await field.focus();
+  await field.evaluate((el, [text, html]) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", text!);
+    if (html) data.setData("text/html", html);
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  }, [text, html ?? ""]);
+  await field.fill(text);
+}
+
+const RICH_TEXT = "Spacing in practice\nSpread reviews out\nMix the kinds\nconst gap = days(3);";
+const RICH_HTML = "<h2>Spacing in practice</h2><ul><li>Spread reviews out</li><li>Mix the kinds</li></ul><pre><code>const gap = days(3);</code></pre>";
+
+journey("phone: a text add finishing after its sheet was closed leaves the next sheet and its words alone, and says Adding… while it works (F551, F552)", async (page) => {
+  // Codex test of #519 (UX-1, UX-4, E4): the first add's end closed the new sheet and emptied its draft; the wait showed no sign.
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  await page.route("https://example.com/held.png", async (r) => (await held, r.fulfill({ status: 200, contentType: "image/png", headers: { "access-control-allow-origin": "*" }, body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", "base64") })));
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  const field = page.locator(".add-link .field");
+  await pasteInto(field, "A held picture\nWords under it.", '<h2>A held picture</h2><img src="https://example.com/held.png"><p>Words under it.</p>');
+  await field.press("Enter");
+  await page.locator(".add-link [role=status]").filter({ hasText: "Adding" }).waitFor();
+  await page.keyboard.press("Escape");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").fill("My next note, half written");
+  release();
+  await page.getByText("Added “A held picture”").waitFor();
+  await Bun.sleep(300);
+  if (!(await page.locator(".add-link").count())) throw new Error("the first add's end closed the sheet he was writing in");
+  const v = await page.locator(".add-link .field").inputValue();
+  if (v !== "My next note, half written") throw new Error(`the next note's words are gone: "${v}"`);
+}, "phone");
+
+journey("phone: a rich paste left in Add keeps its headings, list and code when it is added later (F553)", async (page) => {
+  // Codex test of #519 (UX-2, E1): a sheet closed and opened again kept the words but not the paste's HTML.
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await pasteInto(page.locator(".add-link .field"), RICH_TEXT, RICH_HTML);
+  await page.keyboard.press("Escape");
+  await page.locator(".add-link").waitFor({ state: "detached" });
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").press("Enter");
+  const doc = page.locator(".phone-reader .doc").first();
+  await doc.locator("li").filter({ hasText: "Mix the kinds" }).waitFor();
+  await doc.locator("pre").filter({ hasText: "const gap" }).waitFor();
+}, "phone");
+
+journey("phone: dragging down in a long paste scrolls it back up instead of closing Add (F554)", async (page) => {
+  // Codex test of #519 (UX-3): the sheet's swipe down took a drag meant for the text, and closed the sheet.
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  const field = page.locator(".add-link .field");
+  await field.fill(Array.from({ length: 80 }, (_, i) => `Line ${i + 1} of a long pasted article.`).join("\n"));
+  await field.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  const box = (await field.boundingBox())!;
+  await swipe(page, [box.x + box.width / 2, box.y + 30], [box.x + box.width / 2, box.y + box.height - 10], 300, true);
+  await Bun.sleep(400);
+  if (!(await page.locator(".add-link").count())) throw new Error("a drag inside the scrolled text closed Add");
+}, "phone");
+
+journey("phone: text added, undone and added again says it is back from Archived, with Undo, as on the Mac (F555)", async (page) => {
+  // Codex test of #519 (E3): the phone said only "Already here", with no Undo for bringing it back.
+  const add = async () => {
+    await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+    await page.locator(".add-link .field").fill("Interleaving notes\n\nMix problem kinds in one sitting.");
+    await page.locator(".add-link .field").press("Enter");
+    await page.locator(".add-link").waitFor({ state: "detached" });
+  };
+  await add();
+  await tap(page, page.locator(".toast button").filter({ hasText: "Undo" }));
+  // Undo takes back the add, and the page it opened, as on the Mac.
+  await page.locator(".phone-reader").waitFor({ state: "detached" });
+  await add();
+  const back = page.locator(".toast").filter({ hasText: "“Interleaving notes” is back from Archived" });
+  await back.waitFor();
+  await back.locator("button").filter({ hasText: "Undo" }).waitFor();
+}, "phone");
+
 journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {
   // D235: the file is saved to the inbox beside its item, then imported here like a link.
   const files = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files");
   const pick = async (name: string) => {
-    await tap(page, page.getByRole("button", { name: "Add a link" }));
+    await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
     const chooser = page.waitForEvent("filechooser");
     await tap(page, page.getByRole("button", { name: "Choose a file or photo" }));
     await (await chooser).setFiles(join(files, name));
@@ -13864,8 +13984,8 @@ journey("phone: a source added on the phone and a new skill each take ⌘Z (F160
   const words = "Spacing out practice sessions makes what is learned last longer than cramming it into one sitting. ".repeat(12);
   const article = `<html><head><title>Spacing on the phone</title></head><body><article><h1>Spacing on the phone</h1>${`<p>${words}</p>`.repeat(3)}</article></body></html>`;
   await page.route("https://example.com/articles/spacing-phone", (r) => r.fulfill({ status: 200, contentType: "text/html; charset=utf-8", headers: { "access-control-allow-origin": "*" }, body: article }));
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input.field").fill("https://example.com/articles/spacing-phone");
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").fill("https://example.com/articles/spacing-phone");
   await tap(page, page.locator(".add-link button"));
   const added = page.locator(".toast").filter({ hasText: "Added “Spacing on the phone”" });
   await added.waitFor();
@@ -14001,9 +14121,9 @@ journey("phone: VoiceOver hears Explain's answer and that marking is his, its ma
 }, "phone");
 
 journey("phone: a refused link is read out and focus stays on the field; + Note puts focus on the note, with the source page out of reach (Codex sweep 3, a11y)", async (page) => {
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  const field = page.locator(".add-link input.field");
-  await field.fill("not a valid url");
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  const field = page.locator(".add-link .field");
+  await field.fill("https://notalink");
   await tap(page, page.getByRole("button", { name: "Add", exact: true }));
   const error = page.locator(".add-link [role=alert]");
   await error.waitFor();
@@ -15514,7 +15634,7 @@ journey("feed: Esc back from a post low in a long list keeps that post in view (
 
 journey("add: the footer's ↵ Add is a button, so a pointer adds typed text; ↵ Follow follows a feed's own link (sweep 5, F306)", async (page) => {
   await page.getByRole("button", { name: "+ Add" }).click();
-  const box = page.getByRole("dialog", { name: "Add a source" });
+  const box = page.getByRole("dialog", { name: "Add a source", exact: true });
   await box.getByLabel("Link, file path or text").fill("# Added by pointer\n\nA pointer user adds what he typed with one click on the footer's Add.");
   await box.getByRole("button", { name: /^↵\s*Add$/ }).click();
   await page.locator(".doc").getByText("A pointer user adds what he typed").waitFor();
@@ -15847,7 +15967,7 @@ journey("highlight: a drag that turns into a native text drag arms nothing for a
 journey("add: after a click on ↵ Add that fails, the caret is back in the box (sweep 5 review)", async (page) => {
   await page.evaluate(() => ((window as unknown as { __ORE_FAIL?: Record<string, string> }).__ORE_FAIL = { add: "The disk is full" }));
   await page.getByRole("button", { name: "+ Add" }).click();
-  const box = page.getByRole("dialog", { name: "Add a source" });
+  const box = page.getByRole("dialog", { name: "Add a source", exact: true });
   const field = box.getByLabel("Link, file path or text");
   await field.fill("# Will fail\n\nThis text fails to add.");
   await box.getByRole("button", { name: /^↵\s*Add$/ }).click();
@@ -16406,7 +16526,7 @@ journey("add: a refused link says why on a line of its own, as wide as the box (
   const gone = Bun.serve({ port: 0, fetch: () => new Response("gone", { status: 404 }) });
   try {
     await page.getByRole("button", { name: "+ Add" }).click();
-    const box = page.getByRole("dialog", { name: "Add a source" });
+    const box = page.getByRole("dialog", { name: "Add a source", exact: true });
     await box.getByLabel("Link, file path or text").fill(`http://localhost:${gone.port}/a/long/path/to/an-article-about-spacing-and-memory?utm_source=newsletter`);
     await page.keyboard.press("Enter");
     const why = box.getByRole("alert");
@@ -16564,7 +16684,7 @@ journey("Feed: Follow opens a box that takes a link only, and never saves what i
   await box.waitFor({ state: "detached" });
   // The ordinary add box is itself again.
   await page.getByRole("button", { name: "+ Add" }).click();
-  if (!/any text/.test((await page.getByRole("dialog", { name: "Add a source" }).getByLabel("Link, file path or text").getAttribute("placeholder")) ?? "")) throw new Error("+ Add opened the follow box");
+  if (!/any text/.test((await page.getByRole("dialog", { name: "Add a source", exact: true }).getByLabel("Link, file path or text").getAttribute("placeholder")) ?? "")) throw new Error("+ Add opened the follow box");
   await page.keyboard.press("Escape");
 });
 
@@ -17061,12 +17181,12 @@ journey("phone: every field on every screen stays in sight when the keyboard com
   await page.locator(".phone-time").waitFor();
   note(...(await coveredFields(page, "Settings")));
   await back();
-  // Search and Add a link.
+  // Search and Add.
   await tap(page, page.getByRole("button", { name: "Search" }));
   note(...(await coveredFields(page, "Search")));
   await tap(page, page.locator(".palette-close"));
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  note(...(await coveredFields(page, "Add a link")));
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  note(...(await coveredFields(page, "Add")));
   await esc();
   await page.goto(page.url());
   await page.locator(".phone-app").waitFor();
@@ -17469,7 +17589,7 @@ journey("reader: a source with pictures above his place reopens on the passage h
 // F449: Esc or a click outside threw away what was typed in the Add box, where the tutor's field, a Finish
 // recall and a Review answer keep theirs.
 journey("add: what he typed and left with Esc is there, selected, at the next ⌘N; it goes once added or cleared (F449)", async (page) => {
-  const box = page.getByRole("dialog", { name: "Add a source" });
+  const box = page.getByRole("dialog", { name: "Add a source", exact: true });
   const field = box.getByLabel("Link, file path or text");
   const openBox = async () => { await page.keyboard.press("Meta+KeyN"); await field.waitFor(); };
   const title = `Kept words ${Date.now()}`;
@@ -17510,7 +17630,7 @@ journey("add: what he typed and left with Esc is there, selected, at the next �
 // F478: a source he just added is still opening when he presses ⌘N again; once its text was ready the
 // reader took the keys from the Add box, so what he typed next went nowhere and Esc did not close the box.
 journey("add: a source that finishes opening under the Add box leaves the keys in the box (F478)", async (page) => {
-  const box = page.getByRole("dialog", { name: "Add a source" });
+  const box = page.getByRole("dialog", { name: "Add a source", exact: true });
   const field = box.getByLabel("Link, file path or text");
   const title = `Opens under the box ${Date.now()}`;
   const slow = (ms?: number) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { show: ms } : undefined), ms);
@@ -17609,12 +17729,12 @@ journey("phone: a source's Collected page has its title, as Sources and Settings
   await collected.getByRole("heading", { level: 1, name: "Collected" }).waitFor();
 }, "phone");
 journey("phone: a link typed into Add a link and left with a tap outside is there when it opens again (Codex UX sweep, D342)", async (page) => {
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  await page.locator(".add-link input.field").fill("https://example.com/learning-on-the-bus");
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  await page.locator(".add-link .field").fill("https://example.com/learning-on-the-bus");
   await page.mouse.click(195, 40); // the dimmed page above the sheet
   await page.locator(".add-link").waitFor({ state: "detached" });
-  await tap(page, page.getByRole("button", { name: "Add a link" }));
-  const v = await page.locator(".add-link input.field").inputValue();
+  await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
+  const v = await page.locator(".add-link .field").inputValue();
   if (v !== "https://example.com/learning-on-the-bus") throw new Error(`the link he typed is gone: "${v}"`);
   await page.keyboard.press("Escape");
   // Kept for where it was typed: a skill's own Add a link (which files it there) opens empty.
@@ -17622,7 +17742,7 @@ journey("phone: a link typed into Add a link and left with a tap outside is ther
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
   await tap(page, page.getByRole("button", { name: "Add a source to Learning" }));
-  const there = await page.locator(".add-link input.field").inputValue();
+  const there = await page.locator(".add-link .field").inputValue();
   if (there) throw new Error(`a link typed on Today came back on a skill's page, to be filed there: "${there}"`);
   await page.keyboard.press("Escape");
 }, "phone");

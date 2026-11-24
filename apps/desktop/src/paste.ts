@@ -45,7 +45,8 @@ function one(line: string): Entry | null {
  *  files chosen in the file panel, whose lines go in as those files beside the text, never as part of it. */
 export function entries(raw: string, picked: string[] = []): Entry[] {
   const text = raw.trim();
-  if (!text) return [];
+  // Only invisible characters (zero-width, a BOM) is nothing to add, as only spaces is.
+  if (!/[^\s\p{Cf}]/u.test(text)) return [];
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const each = lines.map(one);
   if (each.every((e) => e)) return each as Entry[];
@@ -58,11 +59,11 @@ export function entries(raw: string, picked: string[] = []): Entry[] {
 /** What a paste is, plain and as HTML. */
 export type Pasted = { text: string; html: string | null };
 
-/** The clipboard's HTML when it holds what its plain text loses (images, tables, headings, code, math);
+/** The clipboard's HTML when it holds what its plain text loses (images, tables, headings, lists, code, math);
  *  null for plain or lightly styled text, which reads the same as typed. */
 export function pastedHtml(d: DataTransfer | null): string | null {
   const html = d?.getData("text/html") ?? "";
-  return /<(img|table|h[1-6]|pre|math)[\s>]/i.test(html) ? html : null;
+  return /<(img|table|h[1-6]|pre|math|ol|ul)[\s>]/i.test(html) ? html : null;
 }
 
 /** The entries, with the paste's HTML on its text when the text is still the paste as it came. */

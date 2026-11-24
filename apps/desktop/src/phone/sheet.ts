@@ -47,8 +47,9 @@ export function useSwipeDown(ref: RefObject<HTMLElement | null>, onClose: () => 
     const start = (e: TouchEvent) => {
       list = (e.target as HTMLElement).closest<HTMLElement>(".pick-list, [cmdk-list]") ?? el.querySelector<HTMLElement>(".pick-list");
       one = e.touches.length === 1;
-      // A list scrolled down scrolls back up first, as in iOS.
-      live = one && !(list && list.scrollTop > 0 && list.contains(e.target as Node));
+      // A list scrolled down scrolls back up first, as in iOS; so does a field of text (a long paste in Add).
+      const text = (e.target as HTMLElement).closest?.("textarea");
+      live = one && !(list && list.scrollTop > 0 && list.contains(e.target as Node)) && !(text && text.scrollTop > 0);
       growing = false;
       [y0, t0, dy] = [e.touches[0]!.clientY, e.timeStamp, 0];
       if (list && !tall()) {

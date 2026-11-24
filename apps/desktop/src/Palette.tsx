@@ -290,8 +290,14 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
 
   // Keep the highlight on the top row when late search results change what that is.
   const first = groups[0]?.rows[0]?.value ?? "";
+  // Set in the same render, not an effect after it: for one paint cmdk held the old row, scrolled it into
+  // view, and the list stayed scrolled past its top rows once the highlight moved back up.
   const [selected, setSelected] = useState(first);
-  useEffect(() => setSelected(first), [first]);
+  const [shownFirst, setShownFirst] = useState(first);
+  if (shownFirst !== first) {
+    setShownFirst(first);
+    setSelected(first);
+  }
 
   const run = async (f: () => void) => {
     onClose();
