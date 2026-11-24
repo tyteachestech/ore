@@ -9,7 +9,7 @@ import { withLock } from "./lock.ts";
 import { orderQueue, winFirst, type QueueEntry } from "./queue.ts";
 import { findVariant } from "./remix.ts";
 import { appendReview, appendUndo, readReviews, reviewTimes, type FsrsState, type Review } from "./reviews.ts";
-import { emptyState, loadParams, nextState, replay, retrievability } from "./scheduler.ts";
+import { emptyState, loadParams, merged, nextState, replay, retrievability } from "./scheduler.ts";
 import { NO_SKILL } from "./no-skill.ts";
 import { openSessionId, readSessions } from "./sessions.ts";
 import { archivedOnly, cardPriority, unfiled, desiredRetention, loadSkills, reviewSettings, sourcePriority } from "./skills.ts";
@@ -114,6 +114,14 @@ export async function undoReview(lib: Library, cardRef: string, ts: string, now 
 }
 
 
+/** New exercises he met on `day`: drafts whose first review in the merged logs is a finishing one that day. A draft
+ *  finished on two devices offline counts once, and on the day it was first finished (D65). */
+export function firstSeenToday(reviews: Review[], day: string): number {
+  const first = new Map<string, Review>();
+  for (const r of reviews) if (!first.has(r.card)) first.set(r.card, r);
+  return [...first.values()].filter((r) => r.finishing && localDay(r.ts) === day).length;
+}
+
 export const ACTIVE_CAP_MS = 3 * 60_000; // one card adds at most 3 minutes of active time
 const DEFAULT_MS = { card: 20_000, prompt: 90_000 }; // per card until 50 reviews of that kind
 /** Active review time of these reviews (D60). */
@@ -154,7 +162,6 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const items = new Map(index.items().map((i) => [i.id, i]));
     const reviews = readReviews(lib);
     const today = localDay(now);
-    const doneToday = reviews.filter((r) => localDay(r.ts) === today);
     // Relearn passes are owed for misses today, or since the open session began if that was earlier (a
     // session running past midnight).
     const session = openSessionId(lib);
@@ -168,7 +175,7 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     }
     const settings = reviewSettings(lib);
     const limit = opts.newLimit !== false;
-    const newLeft = limit ? Math.max(0, settings.new_per_day - doneToday.filter((r) => r.finishing).length) : Infinity;
+    const newLeft = limit ? Math.max(0, settings.new_per_day - firstSeenToday(reviews, today)) : Infinity;
     const picked = opts.skills && new Set(opts.skills);
 
     const entries: QueueEntry[] = [];
@@ -308,7 +315,7 @@ export function cardHistory(lib: Library, cardRef: string, now = new Date()): { 
   const was = prior.length ? before.stability : 0;
   // Its past by the one rule (`gemPast`), read from the log; where it stands now is the schedule's own state.
   // The two can differ after the schedule is re-fitted, so "missed since" needs both to say it isn't solid.
-  const past = gemPast(prior);
+  const past = gemPast(merged(prior, () => retention, w));
   const polished = past.applied || undefined;
   const near = (state: FsrsState, when: Date) => solid(nextState(state, when, 3, retention, w).stability);
   // The rim is gold once it has fallen and been cut again; a first miss has none yet.

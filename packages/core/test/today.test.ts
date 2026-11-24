@@ -1,17 +1,17 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { copyFileSync, cpSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { findCard, writeCardContent, writeCardMeta, writeNewCard } from "../src/cards.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { setItemStatus } from "../src/items.ts";
 import { appendJsonl } from "../src/fsutil.ts";
 import { paths } from "../src/library.ts";
 import { DEPTH_CAP_DAYS, endSession, firstEndThisWeek, startSession } from "../src/sessions.ts";
-import { readReviews, type Review } from "../src/reviews.ts";
+import { readReviews, reviewLogFiles, type Review } from "../src/reviews.ts";
 import { calibration, raterStats } from "../src/stats.ts";
 import { addSkill, archiveSkill, loadSkills, reviewSettings, setAiVendor, setReviewSettings, setSkillLook } from "../src/skills.ts";
 import { NO_SKILL } from "../src/no-skill.ts";
-import { dueQueue, recordReview } from "../src/study.ts";
+import { cardHistory, dueQueue, recordReview } from "../src/study.ts";
 import { level, nextLevelAt, reminderNote, skillGrowth, skillStrength, SOLID_DAYS, today } from "../src/today.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -24,6 +24,28 @@ async function library(n: number, skills = ["learning"]) {
   const cards = Array.from({ length: n }, (_, i) =>
     writeNewCard(lib, { kind: "card", item: item.meta.id, skills, topics: ["spacing"], content_type: "fact", question: `Q${i}?`, answer: "A", rubric: [] }));
   return { lib, item, cards };
+}
+
+/** A second device: a copy of the library that hasn't seen the first's reviews since. Its logs come back with `merge`. */
+function offline(lib: { root: string }) {
+  const phone = { root: `${lib.root}-phone` };
+  cpSync(lib.root, phone.root, { recursive: true });
+  const merge = () => {
+    for (const f of reviewLogFiles(phone)) copyFileSync(f, join(paths.reviews(lib), basename(f)));
+  };
+  return { phone, merge };
+}
+
+/** Rates on the named device. */
+async function on(device: string, rate: () => Promise<unknown>) {
+  const was = process.env.ORE_DEVICE;
+  process.env.ORE_DEVICE = device;
+  try {
+    await rate();
+  } finally {
+    if (was === undefined) delete process.env.ORE_DEVICE;
+    else process.env.ORE_DEVICE = was;
+  }
 }
 
 describe("daily review settings (D60)", () => {
@@ -116,6 +138,20 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(dueQueue(lib, at)).toHaveLength(6); // 10 − 4 introduced today
     await setReviewSettings(lib, { new_per_day: 0 });
     expect(dueQueue(lib, at)).toHaveLength(0);
+  });
+
+  test("one draft reviewed offline on two devices takes one of the day's new places (F-new-offline-new-slots)", async () => {
+    const { lib, cards } = await library(2);
+    await setReviewSettings(lib, { new_per_day: 2 });
+    const at = T();
+    const { phone, merge } = offline(lib);
+    await on("mac", () => recordReview(lib, cards[0]!.meta.id, { rating: 3, confidence: 2, now: at }));
+    await on("iphone", () => recordReview(phone, cards[0]!.meta.id, { rating: 3, confidence: 2, now: new Date(at.getTime() + 60_000) }));
+    merge();
+    const later = new Date(at.getTime() + 120_000);
+    const t = today(lib, later);
+    expect({ new_today: t.new_today, caught_up: t.caught_up }).toEqual({ new_today: 1, caught_up: false });
+    expect(dueQueue(lib, later).map((e) => e.id)).toContain(cards[1]!.meta.id);
   });
 
   test("a draft waits until the day after it was written (D65)", async () => {
@@ -424,6 +460,23 @@ describe("strength breakdown and peak level (D63)", () => {
     expect(s).toMatchObject({ solid: 4, win_back: 1, peak: 5, level: 1 });
     expect(s.explain.map((e) => e.id)).not.toContain(prompts[0]!.meta.id);
     expect(today(lib, at).skills.find((k) => k.skill === "learning")).toMatchObject({ solid: 4, level: 1, win_back: 1 });
+  });
+
+  test("logs merged from a device that was offline keep the level his reviews earned, and what he missed waits to be won back (F-new-offline-level)", async () => {
+    // Each device saved its own review's state; the merged history is what they replay to (D63).
+    const { lib, cards } = await library(5);
+    const { phone, merge } = offline(lib);
+    for (const c of cards) {
+      await on("mac", () => recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: new Date("2026-06-01T12:00:00Z") }));
+      await on("iphone", () => recordReview(phone, c.meta.id, { rating: 3, confidence: 2, now: new Date("2026-06-12T12:00:00Z") }));
+    }
+    merge();
+    const now = new Date("2026-06-13T12:00:00Z");
+    expect(skillStrength(lib, "learning", now)).toMatchObject({ solid: 5, peak: 5, level: 1 });
+    expect(skillGrowth(lib, "learning", new Date("2026-06-12T13:00:00Z"), 1)[0]!.solid).toBe(5);
+    for (const c of cards) await on("mac", () => recordReview(lib, c.meta.id, { rating: 1, confidence: 2, now }));
+    expect(skillStrength(lib, "learning", now)).toMatchObject({ solid: 0, win_back: 5, peak: 5, level: 1 });
+    expect(cardHistory(lib, cards[0]!.meta.id, now).gem.kind).toBe("dull");
   });
 
   test("retiring a solid exercise lowers the count, not the level it earned (Codex sweep 3, numbers)", async () => {
