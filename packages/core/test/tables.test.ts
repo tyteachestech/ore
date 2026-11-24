@@ -88,6 +88,34 @@ describe("PDF tables and formulas (D125)", () => {
     expect(r.unplaced).toEqual([{ id: asked.id, exact: asked.exact, intent: "question" }]);
   });
 
+  test("a PDF link whose file was replaced reads the new file whole: the old file's reading is not laid on it (F-new-pdf-stale-layout)", async () => {
+    // The publisher replaced the PDF at the same address: what the reader saw in the old file describes other pages.
+    const lib = await tempLibrary();
+    const saved = globalThis.fetch;
+    let file = "tables.pdf";
+    globalThis.fetch = (async () => new Response(pdf(file), { headers: { "content-type": "application/pdf" } })) as unknown as typeof fetch;
+    try {
+      const item = await addSource(lib, "https://example.test/revised.pdf");
+      process.env.ORE_PADDLE = fakePaddle();
+      await readTables(lib, item.meta.id);
+      expect(findItem(lib, item.meta.id).body).toContain(TABLE);
+      delete process.env.ORE_PADDLE;
+      file = "paper.pdf";
+      const r = await reimportSource(lib, item.meta.id);
+      const fresh = await pdfToDoc(pdf("paper.pdf"));
+      expect(r.item.body).toBe(fresh.body);
+      expect(r.item.body).not.toContain("| Spaced | 412");
+      expect(existsSync(join(r.item.dir, "layout.json"))).toBe(false);
+      // The same file again keeps its reading.
+      file = "tables.pdf";
+      await undoReimport(lib, item.meta.id);
+      expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
+      expect(findItem(lib, item.meta.id).body).toContain(TABLE);
+    } finally {
+      globalThis.fetch = saved;
+    }
+  });
+
   test("a PDF of prose has nothing to offer; one added before tables were spotted learns it on reimport", async () => {
     const lib = await tempLibrary();
     const prose = await addSource(lib, join(FIX, "paper.pdf"));
