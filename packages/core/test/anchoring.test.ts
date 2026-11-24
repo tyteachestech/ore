@@ -91,6 +91,28 @@ describe("anchoring", () => {
     expect(edited.slice(a.start, a.end)).toBe("The blue heron nests beside the wide river every spring.");
   });
 
+  test("fuzzy: a transcript heard again, with a few words corrected in the passage and on both sides of it, keeps its highlight (F-new-fuzzy-other-passage)", () => {
+    const quote = "what we found was the model kind of learns faster when you space the practise out";
+    const heard =
+      "So last week we ran the trail again with to groups. And " + quote + ". Then the resolts helled up across every group we tested, honestly.";
+    const sel = selectorFor(heard, quote);
+    const again =
+      "So last week we ran the trial again with two groups. And what we found was that the model kind of learns faster when you space the practice out. Then the results held up across every group we tested, honestly.";
+    const a = anchor(again, sel)!;
+    expect(a).not.toBeNull();
+    expect(again.slice(a.start, a.end)).toBe("what we found was that the model kind of learns faster when you space the practice out");
+  });
+
+  test("fuzzy: a first paragraph deleted does not move onto a later one written like it; its missing side before it is no evidence (F-new-fuzzy-other-passage)", () => {
+    const first = "Bees visit the clover field at dawn for nectar.";
+    const later = "Bees visit the clover rows at dusk for nectar.";
+    const doc = first + "\n\nA note on the weather that week followed.\n\nThe second survey moved to the garden.\n\n" + later + "\n\nNothing else was counted that day.\n";
+    const sel = selectorFor(doc, first);
+    expect(sel.prefix).toBe("");
+    const edited = doc.slice(doc.indexOf("The second survey"));
+    expect(anchor(edited, sel)).toBeNull();
+  });
+
   test("locate: whitespace-insensitive and nearest to hint", () => {
     expect(locate(DOC, "Retrieval practice beats\nrereading")).not.toBeNull();
     expect(locate("Split **workflows** and **agents** here", "workflows and agents")).toEqual({ start: 8, end: 32 });
