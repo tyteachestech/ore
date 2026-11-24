@@ -1302,13 +1302,16 @@ body.resizing iframe { pointer-events: none; }
 .qp-x:hover { background: var(--bg-hover); color: var(--text); }
 
 /* The Collected tab: Cards, Questions, Keeps as collapsible groups; one line per row. */
-.cp { display: flex; flex-direction: column; gap: 14px; padding-top: 6px; }
-.cp-head { display: flex; align-items: center; margin: 0 0 2px; padding: 0; }
+.cp { display: flex; flex-direction: column; gap: 24px; padding-top: 6px; }
+.cp-head { display: flex; align-items: center; margin: 0 0 4px; padding: 0; }
 .cp-head.question { padding: 0; } /* not the skill page's .question row */
 .cp-head .icon-btn { width: 20px; height: 20px; margin-left: auto; opacity: 0; }
 .cp-head:hover .icon-btn, .cp-head .icon-btn:focus-visible, .cp-head .icon-btn[aria-expanded="true"] { opacity: 1; }
-.cp-toggle { display: flex; align-items: center; gap: 6px; padding: 2px 4px; margin-left: -4px; border-radius: 6px; font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--faint); }
-.cp-toggle:hover { color: var(--muted); }
+/* A group's name is a header, as the skill page's are (D226): 16px mono in text with its icon; the caret that folds it follows the name. */
+.cp-toggle { display: flex; align-items: center; gap: 8px; padding: 2px 4px; margin-left: -4px; border-radius: 6px; font-family: var(--mono); font-size: 16px; font-weight: 400; letter-spacing: 0.02em; color: var(--text); }
+.cp-toggle svg:not(.cp-caret) { width: 20px; height: 20px; flex: none; }
+.cp-caret { order: 1; color: var(--faint); }
+.cp-toggle:hover .cp-caret { color: var(--muted); }
 .cp-toggle:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--focus); }
 .cp-caret { transition: transform var(--t-1) ease-out; }
 .cp-toggle[aria-expanded="true"] .cp-caret { transform: rotate(90deg); }
@@ -3402,7 +3405,9 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone :is(.cp-row, .qp-row, .cp-empty) { min-height: 44px; align-items: center; font-size: 17px; }
 .phone .cp-toggle { min-height: 44px; }
 .phone .cp-head .icon-btn { opacity: 1; width: 44px; height: 44px; margin-right: -12px; }
-.phone .cp { gap: 20px; }
+.phone .cp { gap: 28px; }
+.phone .cp-toggle { font-size: 17px; gap: 10px; }
+.phone .cp-toggle svg:not(.cp-caret) { width: 24px; height: 24px; }
 .phone :is(.cp-input, .cp .q-ask .field) { min-height: 44px; font-size: 17px !important; }
 /* A narrow screen cuts one line after a few words, so a row runs to three (Books' highlight list). */
 .phone .cp :is(.cp-row:not(.cp-add), .qp-row) { padding-block: 10px; }
