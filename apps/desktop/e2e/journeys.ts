@@ -5195,9 +5195,9 @@ journey("a small window: ⌘K, the Add box and the shortcuts sheet fit in it, an
   }
 });
 
-// F-new-palette-scrolls-past-top: typing in ⌘K left its list scrolled down, so the top results (⌘1, ⌘2) were out of
+// F558: typing in ⌘K left its list scrolled down, so the top results (⌘1, ⌘2) were out of
 // sight above it: for one paint cmdk still held the row picked before the keystroke and scrolled it into view.
-journey("⌘K: typing keeps the list at its top, with the first result selected and in sight", async (page) => {
+journey("⌘K: typing keeps the list at its top, with the first result selected and in sight (F558)", async (page) => {
   await page.locator(".sidebar div.side-item").first().waitFor({ state: "attached" });
   // A short window, so the rows run past the list's foot and a wrong scroll shows.
   await page.setViewportSize({ width: 800, height: 400 });
