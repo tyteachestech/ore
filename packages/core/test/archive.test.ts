@@ -68,6 +68,16 @@ describe("search in other scripts (Codex sweep 4)", () => {
     index.close();
   });
 
+  test("a Japanese word is not found from letters that stand apart in the text (F-new-cjk-phantom-hit)", async () => {
+    // Punctuation or a Latin word between letters ends a run: 日本。語。 does not say 日本語.
+    const lib = await tempLibrary();
+    const apart = (await addSnippet(lib, { text: "日本。語。そしてx本語のメモ。" })).item.meta.id;
+    const word = (await addSnippet(lib, { text: "毎朝、日本語を勉強しています。" })).item.meta.id;
+    const items = (q: string) => [...new Set(search(lib, q))];
+    expect(items("日本語")).toEqual([word]);
+    expect(items("本語").sort()).toEqual([apart, word].sort());
+  });
+
   test("an accent typed as its own mark finds the same words as one typed with its letter", async () => {
     const lib = await tempLibrary();
     const composed = (await addSnippet(lib, { text: "Η άλφα είναι το πρώτο γράμμα." })).item.meta.id;

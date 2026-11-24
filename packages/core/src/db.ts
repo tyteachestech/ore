@@ -14,7 +14,7 @@ import { desiredRetention, loadSkills, type Priority } from "./skills.ts";
 // .index/library.sqlite is a disposable cache of the files: FTS5 search plus
 // card states replayed from the review log. Every open syncs it by comparing
 // file mtimes and sizes, so direct file edits by agents are picked up.
-const SCHEMA_VERSION = "9"; // 9: items.priority, the importance he set on a source; 5: card_state.sig, so a new review replays only its own card; 6: rebuilt once to drop doubled search rows; 7: again, for rows from copied folders; 8: fts.chars, words inside Chinese, Japanese and Thai
+const SCHEMA_VERSION = "10"; // 10: fts.chars keeps runs apart; 9: items.priority, the importance he set on a source; 5: card_state.sig, so a new review replays only its own card; 6: rebuilt once to drop doubled search rows; 7: again, for rows from copied folders; 8: fts.chars, words inside Chinese, Japanese and Thai
 
 const SCHEMA = `
 create table meta(key text primary key, value text);
@@ -182,7 +182,7 @@ export class LibraryIndex {
     const unspaced = terms.filter((t) => spacedOut(t));
     const ask = (t: string) => {
       const rest = t.replace(UNSPACED, " ").trim();
-      return [`"${spacedOut(t)}"`, ...(rest ? rest.split(/\s+/).map((w) => `"${w}"*`) : [])].join(" ");
+      return [...runsOf(t).map((r) => `"${spacedOut(r)}"`), ...(rest ? rest.split(/\s+/).map((w) => `"${w}"*`) : [])].join(" ");
     };
     const match = terms.map((t) => (spacedOut(t) ? ask(t) : /[+#]$/.test(t) ? `"${t.replace(/[+#]+$/, "")}"` : `"${t}"*`)).join(" ");
     const spelled = literal.map((t) => new RegExp(`(?<![\\p{L}\\p{N}_])${t.replace(/\+/g, "\\+")}(?![+#])`, "iu"));
@@ -287,11 +287,18 @@ const SNIPPETS = 60;
 const UNSPACED = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Thai}\p{sc=Lao}\p{sc=Khmer}\p{sc=Myanmar}]\p{M}*/gu;
 /** Those letters one by one, so a word is found as the letters side by side (`chars`). */
 const spacedOut = (s: string) => s.match(UNSPACED)?.join(" ") ?? "";
+/** A text's runs of those letters spaced out, with a private-use mark between runs: the index reads it as a
+ *  word no query can spell, so a phrase never joins letters that punctuation or other words keep apart
+ *  (日本。語。 does not say 日本語, Codex deep scan 2). */
+const RUN = new RegExp(`(?:${UNSPACED.source})+`, "gu");
+const BETWEEN = " \uE000 ";
+const runsOf = (s: string) => s.match(RUN) ?? [];
+const spacedRuns = (s: string) => runsOf(s).map(spacedOut).join(BETWEEN);
 
 /** A search row, in one Unicode form (an accent typed as its own mark finds the same text, Codex sweep 4). */
 function addFts(db: Database, [kind, ref, item, title, body]: [string, string, string | null, string, string]): void {
   const [t, b] = [title.normalize("NFC"), body.normalize("NFC")];
-  db.run("insert into fts values (?, ?, ?, ?, ?, ?)", [kind, ref, item, t, b, spacedOut(`${t}\n${b}`)]);
+  db.run("insert into fts values (?, ?, ?, ?, ?, ?)", [kind, ref, item, t, b, spacedRuns(`${t}\n${b}`)]);
 }
 
 function indexFile(db: Database, lib: Library, f: FileStat): void {
