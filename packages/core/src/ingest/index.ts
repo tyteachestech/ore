@@ -15,6 +15,7 @@ import { withLock } from "../lock.ts";
 import { loadSkills, setItemSkills, unarchiveFiled } from "../skills.ts";
 import { saveImages, withImages } from "./assets.ts";
 import { recordEnd } from "../cut.ts";
+import { chapterLines } from "../ai/recall.ts";
 import { BOT, cleanAuthor, cleanDate, FROM_TAB, refusal, wordCount } from "./check.ts";
 import { academyVideo, isCourseUrl, lessonDraft, planCourse, type CourseLesson } from "./course.ts";
 import { dropTitle, hasText, pageDraft } from "./page.ts";
@@ -803,10 +804,48 @@ function swapFiles(item: Item, from: string) {
   const was = ItemMetaSchema.parse(old.data);
   for (const f of readdirSync(item.dir).filter(REPLACED)) unlinkSync(join(item.dir, f));
   for (const f of readdirSync(from).filter((f) => REPLACED(f) && f !== "doc.md")) keepFile(join(from, f), join(item.dir, f));
-  const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, page_added: was.page_added, author: was.author, published: was.published, structure: was.structure, text_sha256: was.text_sha256 };
+  // Each chapter's recall goes back with its chapter; one whose chapter the newer version lost comes back as it was.
+  const back = followChapters(item.meta.chapter_recalls, item.body, old.body, was.type) ?? [];
+  const lost = (was.chapter_recalls ?? []).filter((r) => !back.some((b) => b.n === r.n || (b.at === r.at && b.text === r.text)));
+  const recalls = [...back, ...lost].sort((a, b) => a.n - b.n);
+  const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, page_added: was.page_added, author: was.author, published: was.published, structure: was.structure, text_sha256: was.text_sha256, chapter_recalls: recalls.length ? recalls : undefined };
   writeAtomic(item.docPath, stringifyFrontmatter(meta, old.body));
   rmSync(from, { recursive: true, force: true });
   return tmp;
+}
+
+/** A source's chapters as their text, without their markers: an EPUB's marked ones, a video's `###` ones (D115). */
+function chapterTexts(body: string, type: ItemType): string[] {
+  const lines = body.split("\n");
+  const out: string[] = [];
+  for (let n = 1; ; n++) {
+    const at = chapterLines(body, n, type);
+    if (!at) return out;
+    out.push(lines.slice(at.from - 1, at.to).filter((l) => !/^<!-- chapter \d+ -->$/.test(l.trim())).join("\n").trim());
+  }
+}
+
+/** A chapter's saved recall (D115) follows its chapter, known by its first line (its heading), when the text
+ *  it was read from changes to `to`: reordered, added to or cut. Of chapters starting alike, the one that reads
+ *  the same, then the one in its old place, wins. One whose chapter is gone leaves chapter_recalls; its words
+ *  stay in the source's note (F-new-epub-recall-reorder). */
+function followChapters(recalls: ItemMeta["chapter_recalls"], from: string, to: string, type: ItemType): ItemMeta["chapter_recalls"] {
+  if (!recalls?.length) return recalls;
+  const first = (t: string) => t.split("\n").find((l) => l.trim())?.trim() ?? "";
+  const old = chapterTexts(from, type);
+  const now = chapterTexts(to, type);
+  const taken = new Set<number>();
+  const out: NonNullable<ItemMeta["chapter_recalls"]> = [];
+  for (const r of recalls) {
+    const text = old[r.n - 1];
+    if (text === undefined) continue;
+    const hits = now.flatMap((t, i) => (!taken.has(i) && first(t) === first(text) ? [i] : []));
+    const i = hits.find((i) => now[i] === text) ?? (hits.includes(r.n - 1) ? r.n - 1 : hits[0]);
+    if (i === undefined) continue;
+    taken.add(i);
+    out.push({ ...r, n: i + 1 });
+  }
+  return out.length ? out.sort((a, b) => a.n - b.n) : undefined;
 }
 
 /** A course lesson as it is read again. A lesson added as a bare video (before D92) keeps only its
@@ -912,7 +951,7 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     // Read again under the lock: a background enrich may have written its questions while this one read.
     const now = readItemDir(item.dir).meta;
     const added = tail ? recordEnd(lib, item.meta.id, draft.body.length - tail.length, tail) : undefined;
-    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure, owed: undefined, owed_error: undefined };
+    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author ?? draft.author, published: draft.published ?? now.published, structure: draft.structure, owed: undefined, owed_error: undefined, chapter_recalls: followChapters(now.chapter_recalls, item.body, draft.body, draft.type) };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, draft.body));
   });
   const next = readItemDir(item.dir);

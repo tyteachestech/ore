@@ -90,6 +90,15 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
     .filter((item) => item && /html/.test(item.type) && !item.nav)
     .map((item) => posix.join(dir, decodeURIComponent(item!.href.split("#")[0]!)));
   const docs = new Map(spine.map((path) => [path, parse(read(path))]));
+  // The cover picture as the book names it: EPUB 3's cover-image, EPUB 2's <meta name="cover">, or a picture
+  // the book calls cover (cover.jpg, id="cover"), as many older books do.
+  const coverId = Array.from(opf.getElementsByTagName("meta")).find((m) => m.getAttribute("name") === "cover")?.getAttribute("content");
+  const covers = new Set<unknown>(
+    Array.from(opf.getElementsByTagName("item"))
+      .filter((e) => /\bcover-image\b/.test(e.getAttribute("properties") ?? "") || (coverId && e.getAttribute("id") === coverId) || (/^image\//.test(e.getAttribute("media-type") ?? "") && /cover/i.test(`${e.getAttribute("id")} ${posix.basename(e.getAttribute("href") ?? "")}`)))
+      .map((e) => files[posix.join(dir, decodeURIComponent(e.getAttribute("href") ?? ""))])
+      .filter((f) => !!f),
+  );
   let notes = 0;
   for (const path of spine) {
     const image = (src: string) => {
@@ -109,11 +118,21 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
       const target = doc?.getElementById(decodeURIComponent(id));
       return target && NOTE.test(kind(target)) ? target : undefined;
     };
-    const md = chapterMarkdown(docs.get(path)!, image, note, () => ++notes);
-    // A page with only an image (the cover, a title plate) is not a chapter to read.
-    if (!md.replace(/!\[[^\]]*\]\([^)]*\)/g, "").trim()) continue;
+    const page = docs.get(path)!;
+    const md = chapterMarkdown(page, image, note, () => ++notes);
+    if (!md.replace(/!\[[^\]]*\]\([^)]*\)/g, "").trim()) {
+      // A page with only an image before the text begins (the cover, a title plate), or one the book marks
+      // as its cover, is not part of the book to read. One after the text has begun is an illustration on a
+      // page of its own: it stays where it is, under the chapter it follows, with no recall of its own
+      // (F-new-epub-plate-page).
+      const cover = /\bcover\b/.test(kind(page.body ?? page.documentElement)) || [...used.values()].some((a) => covers.has(a.data));
+      if (!md || !chapters.length || cover) continue;
+      for (const [k, v] of used) assets.set(k, v);
+      chapters[chapters.length - 1] += `\n\n${md}`;
+      continue;
+    }
     for (const [k, v] of used) assets.set(k, v);
-    if (md) chapters.push(`<!-- chapter ${chapters.length + 1} -->\n\n${md}`);
+    chapters.push(`<!-- chapter ${chapters.length + 1} -->\n\n${md}`);
   }
   if (!chapters.length) throw new Error("EPUB has no readable text (DRM-protected?)");
   const creators = text("dc:creator");
