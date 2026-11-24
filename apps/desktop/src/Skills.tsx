@@ -8,8 +8,9 @@ import { isOther } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
 import { onBackdrop, Trap } from "./Trap";
 import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
-import { ore, opt, whileOut, type Skill, type SkillColor } from "./ore";
-import { count, errorText, load, save, settleFocus, usable, useFocusWhileMounted, type Notify } from "./util";
+import { change } from "./change";
+import { ore, opt, type Skill, type SkillColor } from "./ore";
+import { count, load, save, settleFocus, usable, useFocusWhileMounted, type Notify } from "./util";
 
 /** How skill tags show in lists (Settings → General): icon and name, or the icon alone for a small
  *  screen or less to read; the name is then said on hover and to VoiceOver. */
@@ -256,29 +257,15 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, co
     const close = () => ((refocus.current = byKey), setDraft(null), true);
     if (v === skill.name) return close();
     setSaving((busy.current = true));
-    let landed = false;
-    const write = ore("skills", "set", skill.id, opt("name", v)).then(() => { landed = true; onRenamed(); });
-    let chain = write.catch(() => {});
-    // Reserve this action before waiting: Undo must never take the preceding import instead.
-    // Replays run in order behind the original write, including a quick Undo then Redo.
-    const to = (name: string) => () => {
-      const next = chain.then(() => landed ? ore("skills", "set", skill.id, opt("name", name)).then(onRenamed) : Promise.reject(new Error("The rename didn’t save, so there is nothing to undo")));
-      chain = next.catch(() => {});
-      return next;
-    };
     // One slot: a failed write's error takes the place of this toast.
-    const slot = `rename-${skill.id}`;
-    const forget = notify(`Renamed “${skill.name}” to “${v}”`, "info", to(skill.name), to(v), undefined, undefined, slot);
-    try {
-      await write;
-      return close();
-    } catch (e) {
-      forget();
-      notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot);
-      return false;
-    } finally {
-      setSaving((busy.current = false));
-    }
+    const ok = await change(notify, {
+      message: `Renamed “${skill.name}” to “${v}”`,
+      key: `skill ${skill.id}`,
+      slot: `rename-${skill.id}`,
+      write: (on) => ore("skills", "set", skill.id, opt("name", on ? v : skill.name)).then(onRenamed),
+    });
+    setSaving((busy.current = false));
+    return ok && close();
   };
   if (commitRef)
     commitRef.current = async () => {
@@ -361,20 +348,17 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
   const commitName = useRef<(() => Promise<boolean>) | null>(null);
   useFocusWhileMounted(rename ? nameRef : iconRef);
 
-  const set = async <K extends keyof Look>(key: K, value: Look[K], undoable = true) => {
-    const before = look;
-    setLook((l) => ({ ...l, [key]: value }));
-    try {
-      await whileOut(ore("skills", "set", skill.id, opt(key, value)));
-      onSaved();
-      const what = { icon: "icon", color: "colour", collection: "collection" }[key];
-      if (undoable && before[key] !== value) notify(`Changed the ${what} of ${skill.name}`, "quiet", () => set(key, before[key], false), () => set(key, value, false));
-    } catch (e) {
-      setLook(before);
-      // From the history (undo or redo): it puts the step back and says why.
-      if (!undoable) throw e;
-      notify(errorText(e), "error");
-    }
+  const set = <K extends keyof Look>(key: K, value: Look[K]) => {
+    const before = look[key];
+    if (before === value) return;
+    const what = { icon: "icon", color: "colour", collection: "collection" }[key];
+    return change(notify, {
+      message: `Changed the ${what} of ${skill.name}`,
+      kind: "quiet",
+      key: `skill ${skill.id}`,
+      show: (on) => setLook((l) => ({ ...l, [key]: on ? value : before })),
+      write: (on) => ore("skills", "set", skill.id, opt(key, on ? value : before)).then(onSaved),
+    });
   };
 
   // Esc closes the editor from inside the panel, and from the body: Radix hands focus back to the
@@ -543,37 +527,15 @@ export function DeleteSkill({ skill, sources, onDone, onChanged, onFailed, notif
   const remove = () => {
     if (busy) return;
     setBusy(true);
-    const rm = () => ore<{ removed: unknown }>("skills", "rm", skill.id, ...(archive ? ["--archive"] : []));
-    const write = rm();
     let removed: unknown = null;
-    // The history puts a failed step back and says why; the screens reload either way.
-    const fail = (e: unknown) => {
-      onChanged();
-      throw e;
-    };
-    const slot = `delete-skill:${skill.id}`;
-    const forget = notify(
-      `Deleted ${skill.name}`,
-      "info",
-      () => ore("skills", "restore", JSON.stringify(removed)).then(onChanged, fail),
-      () => rm().then((r) => ((removed = r.removed), onChanged()), fail),
-      undefined,
-      undefined,
-      slot,
-    );
-    // Its undo and redo wait for this write; one that fails takes the step off.
-    forget.hold(write);
-    write.then(
-      (r) => {
-        removed = r.removed;
-        onChanged();
-      },
-      (e) => {
-        // In place of the toast that said it was deleted; the skill comes back, and Delete skill… tries again.
-        notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot);
-        onFailed();
-      },
-    );
+    // In the slot of the toast that said it was deleted; a delete that fails brings the skill back, and Delete
+    // skill… tries again.
+    void change(notify, {
+      message: `Deleted ${skill.name}`,
+      slot: `delete-skill:${skill.id}`,
+      write: async (on) => (on ? (removed = (await ore<{ removed: unknown }>("skills", "rm", skill.id, ...(archive ? ["--archive"] : []))).removed) : ore("skills", "restore", JSON.stringify(removed))),
+      settled: onChanged,
+    }).then((ok) => ok || onFailed());
     // Focus is often on the skill's own sidebar row (the menu gives it back there), which goes now: it moves
     // to the sidebar's current place instead of falling to <body>.
     const was = document.activeElement;

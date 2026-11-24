@@ -17,6 +17,7 @@ import { escTaken, Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, GEM_WORD, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
+import { change } from "./change";
 import { depthText, levelProgress, ore, opt, PHONE, type Question, type Research, type Skill, type SkillStats } from "./ore";
 import { AnswerBox, AskQuestion, announce, questionText, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
@@ -289,21 +290,17 @@ function BadgePicker({ skill, onChanged, notify }: { skill: Skill; onChanged: ()
   // What each was last set to here: two picks in a row, the second before the first's re-read, undo to the first.
   const shown = useRef({ icon: skill.icon ?? "", color: skill.color ?? "" });
   useEffect(() => void (shown.current = { icon: skill.icon ?? "", color: skill.color ?? "" }), [skill.icon, skill.color]);
-  const set = async (key: "icon" | "color", value: string, undoable = true) => {
+  const set = (key: "icon" | "color", value: string) => {
     const before = shown.current[key];
-    shown.current[key] = value;
-    const write = ore("skills", "set", skill.id, opt(key, value));
-    // On the history at once: a ⌘Z while the write is out takes back this change, not the one before it.
-    if (undoable && before !== value) notify(`Changed the ${key === "icon" ? "icon" : "colour"} of ${skill.name}`, "quiet", () => set(key, before, false), () => set(key, value, false)).hold(write);
-    try {
-      await write;
-      onChanged();
-    } catch (e) {
-      shown.current[key] = before;
-      // From the history (undo or redo): it puts the step back and says why.
-      if (!undoable) throw e;
-      notify(errorText(e), "error");
-    }
+    if (before === value) return;
+    return change(notify, {
+      message: `Changed the ${key === "icon" ? "icon" : "colour"} of ${skill.name}`,
+      kind: "quiet",
+      key: `skill ${skill.id}`,
+      show: (on) => void (shown.current[key] = on ? value : before),
+      write: (on) => ore("skills", "set", skill.id, opt(key, on ? value : before)),
+      settled: onChanged,
+    });
   };
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -425,29 +422,18 @@ function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skil
     setDraft(null);
     const before = shownGoal.current;
     if (v === before) return;
-    shownGoal.current = v;
-    const to = (goal: string) => () => {
-      const was = shownGoal.current;
-      shownGoal.current = goal;
-      // One that fails leaves the goal as it was, so typing this goal again still saves it.
-      return ore("skills", "set", skill.id, opt("goal", goal)).then(onChanged, (e) => {
-        shownGoal.current = was;
-        throw e;
-      });
-    };
-    const write = ore("skills", "set", skill.id, opt("goal", v));
-    // On the history at once: a ⌘Z while the write is out takes back this goal, not the one before it.
     // Emptying the field throws the goal away: say so, with Undo.
-    (!v ? notify(`Cleared the goal for ${skill.name}`, "info", to(before), to("")) : notify(`Goal for ${skill.name}`, "quiet", to(before), to(v))).hold(write);
-    try {
-      await write;
-      onChanged();
-    } catch (e) {
-      // The field opens again with what he typed, so a failed save loses nothing.
-      shownGoal.current = before;
-      setDraft(v);
-      notify(errorText(e), "error");
-    }
+    const ok = await change(notify, {
+      message: v ? `Goal for ${skill.name}` : `Cleared the goal for ${skill.name}`,
+      kind: v ? "quiet" : "info",
+      key: `skill ${skill.id}`,
+      // One that fails leaves the goal as it was, so typing this goal again still saves it.
+      show: (on) => void (shownGoal.current = on ? v : before),
+      write: (on) => ore("skills", "set", skill.id, opt("goal", on ? v : before)),
+      settled: onChanged,
+    });
+    // The field opens again with what he typed, so a failed save loses nothing.
+    if (!ok) setDraft(v);
   };
   if (draft !== null)
     return (
@@ -799,6 +785,7 @@ function QuestionRow({ q, skill, onQuestion, onOpenSource, onAdded, onStatus, on
         ore("archive", r.id, ...(on ? ["--undo"] : [])).then(() => (setAdded((a) => (on ? [...a, url] : a.filter((u) => u !== url))), onAdded(), onChanged()));
       // One already in the library stays: only what this added can be taken back.
       if (r.kept) notify(`“${r.title}” is already in your library`);
+      // An import can take a minute: ⌘Z meanwhile acts on the steps already made, and this one goes on once it lands.
       else notify(`Added “${r.title}”`, "info", () => keep(false), () => keep(true));
       onAdded();
       onChanged();

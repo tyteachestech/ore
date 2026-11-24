@@ -4,6 +4,7 @@ import { Grow } from "./Grow";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Hint } from "./Hint";
 import { is, label, useKeymap, keepKeysIn } from "./keys";
+import { change } from "./change";
 import { ore, opt, PHONE, whileOut, type Annotation, type Question } from "./ore";
 import { rankScore } from "./match";
 import { errorText, focusQuietly, usable, useFocusBack, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
@@ -73,45 +74,59 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onWriting, onClo
   const hasAnswer = answers.length > 0;
   /** Rewrites one piece of his answer (Notion: click the text, type); empty removes it. On the history.
    *  False when the save failed (his words are put back in the piece's field). */
-  const rewrite = async (ts: string, to: string, from: string, record = true): Promise<boolean> => {
+  const rewrite = (ts: string, to: string, from: string): Promise<boolean> => {
     const gone = !to;
-    const before = now.current;
-    const was = before.find((c) => c.ts === ts);
-    if (!was) return false;
-    setAnswers((l) => (gone ? l.filter((c) => c.ts !== ts) : l.map((c) => (c.ts === ts ? { ...c, text: to } : c))));
-    out.current++;
-    onWriting?.(); // a read of the questions still out from before this write is older than it: the page makes it again
-    const write = ore<Saved["question"]>("answer", q.id, ...(gone ? [opt("remove", ts)] : [opt("edit", ts), opt("text", to)])).finally(() => (out.current--, onWriting?.()));
-    // On the history at once, as the piece changes: a ⌘Z while the write is out takes back this step, not the one
-    // before it. The history holds its Undo and Redo until this write has landed (history.ts `hold`).
-    // A removed piece comes back as it was written (its source and passage), at the end of his answer.
-    let back = ts;
-    if (record)
-      (gone
-        ? notify("Removed from your answer", "info", async () => {
-            // Out like a rewrite, and the page is told at both ends: the read made when the removal landed may still be
-            // on its way, and would show the answer without the piece (F476).
-            out.current++;
-            onWriting?.();
-            const r = await ore<Saved["question"]>("answer", q.id, opt("text", from), ...(was.item ? [opt("item", was.item)] : []), ...(was.quote ? [opt("quote", was.quote)] : [])).finally(() => (out.current--, onWriting?.()));
-            back = r.answers?.at(-1)?.ts ?? back;
-            setAnswers((l) => [...l, { ...was, ts: back }]);
-          }, () => rewrite(back, "", from, false))
-        : notify("Changed your answer", "quiet", () => rewrite(ts, from, to, false), () => rewrite(ts, to, from, false))
-      ).hold(write);
-    try {
-      const r = await write;
-      setAnswers((l) => r.answers?.map((c) => ({ ...c, item_title: l.find((x) => x.ts === c.ts)?.item_title })) ?? []);
-      onRewrite?.();
-    } catch (e) {
-      // Only this piece goes back: another piece saved meanwhile keeps its new words.
-      const at = before.indexOf(was);
-      setAnswers((l) => (gone ? (l.some((c) => c.ts === ts) ? l : [...l.slice(0, at), was, ...l.slice(at)]) : l.map((c) => (c.ts === ts ? was : c))));
-      if (!record) throw e;
-      notify(errorText(e), "error");
-      return false;
-    }
-    return true;
+    const was = now.current.find((c) => c.ts === ts);
+    if (!was) return Promise.resolve(false);
+    const index = now.current.indexOf(was);
+    // A removed piece comes back as it was written (its source and passage), at the end of his answer, under a new ts.
+    let at = ts;
+    let removed = false;
+    let saved: Saved["question"] | undefined;
+    const answer = (...args: string[]) => ore<Saved["question"]>("answer", q.id, ...args);
+    return change(notify, {
+      message: gone ? "Removed from your answer" : "Changed your answer",
+      kind: gone ? "info" : "quiet",
+      key: `answer ${q.id}`,
+      show: (on) =>
+        setAnswers((l) => {
+          if (!gone) return l.map((c) => (c.ts === at ? { ...c, text: on ? to : from } : c));
+          if (on) return l.filter((c) => c.ts !== at);
+          if (l.some((c) => c.ts === at)) return l;
+          // Only this piece goes back: another saved meanwhile keeps its new words. Where it was if the removal
+          // never saved, else at the end, where the library puts it.
+          const i = removed ? l.length : index;
+          return [...l.slice(0, i), { ...was, ts: at }, ...l.slice(i)];
+        }),
+      write: async (on) => {
+        // Out, and the page is told at both ends: a read of the questions still on its way from before this write
+        // is older than it, and would show the answer as it was (F476). The page makes it again.
+        out.current++;
+        onWriting?.();
+        saved = undefined;
+        try {
+          if (!gone) saved = await answer(opt("edit", at), opt("text", on ? to : from));
+          else if (on) {
+            saved = await answer(opt("remove", at));
+            removed = true;
+          } else {
+            saved = await answer(opt("text", from), ...(was.item ? [opt("item", was.item)] : []), ...(was.quote ? [opt("quote", was.quote)] : []));
+            const back = saved.answers?.at(-1)?.ts ?? at;
+            setAnswers((l) => l.map((c) => (c.ts === at ? { ...c, ts: back } : c)));
+            at = back;
+          }
+        } finally {
+          out.current--;
+          onWriting?.();
+        }
+      },
+      settled: () => {
+        const r = saved;
+        if (!r) return;
+        setAnswers((l) => r.answers?.map((c) => ({ ...c, item_title: l.find((x) => x.ts === c.ts)?.item_title })) ?? []);
+        onRewrite?.();
+      },
+    });
   };
 
   /** Piece edits still open, by piece: saved before the answer is sent or the box closes, so a correction
@@ -310,48 +325,35 @@ export function announce(q: Question, s: Saved, how: "contribution" | "done" | "
  *  its toast with Undo, and Undo puts it back where it was. */
 export function useQuestionEdits(setQs: Dispatch<SetStateAction<Question[] | null>>, notify: Notify) {
   const setStatus = useCallback(
-    async (q: Question, status: "open" | "done", undoable = true) => {
-      setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, status } : x)));
+    (q: Question, status: "open" | "done") => {
       const was = q.status === "done" ? "done" : "open";
-      const forget = undoable
-        ? notify(status === "done" ? "Marked answered" : "Reopened", "quiet", () => setStatus({ ...q, status }, was, false), () => setStatus(q, status, false))
-        : null;
-      try {
-        await ore("annotate", q.id, "--status", status);
-      } catch (e) {
-        forget?.();
-        setQs((l) => l && l.map((x) => (x.id === q.id ? q : x)));
-        // From the history (undo or redo): it puts the step back and says why.
-        if (!undoable) throw e;
-        notify(errorText(e), "error");
-      }
+      return change(notify, {
+        message: status === "done" ? "Marked answered" : "Reopened",
+        kind: "quiet",
+        key: q.id,
+        show: (on) => setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, status: on ? status : q.status } : x))),
+        write: (on) => ore("annotate", q.id, "--status", on ? status : was),
+      });
     },
     [notify, setQs],
   );
   const remove = useCallback(
-    async (q: Question) => {
+    (q: Question) => {
       let at = -1;
-      const back = () => setQs((l) => l && (l.some((x) => x.id === q.id) ? l : [...l.slice(0, at < 0 ? l.length : at), q, ...l.slice(at < 0 ? l.length : at)]));
-      setQs((l) => {
-        at = l ? l.findIndex((x) => x.id === q.id) : -1;
-        return l && l.filter((x) => x.id !== q.id);
+      return change(notify, {
+        message: "Question deleted",
+        key: q.id,
+        // Undo puts it back where it was.
+        show: (on) =>
+          setQs((l) => {
+            if (!l) return l;
+            const i = l.findIndex((x) => x.id === q.id);
+            if (on) return i < 0 ? l : ((at = i), l.filter((x) => x.id !== q.id));
+            const to = at < 0 ? l.length : at;
+            return i < 0 ? [...l.slice(0, to), q, ...l.slice(to)] : l;
+          }),
+        write: (on) => ore("annotate", q.id, "--status", on ? "deleted" : q.status),
       });
-      // On the history at once, so a ⌘Z pressed before the write lands still takes it back, after it.
-      const write = ore("annotate", q.id, "--status", "deleted");
-      const forget = notify(
-        "Question deleted",
-        "info",
-        // The list follows the write, so one that fails leaves no row that isn't in the library.
-        () => write.catch(() => {}).then(() => ore("annotate", q.id, "--status", q.status)).then(back),
-        () => ore("annotate", q.id, "--status", "deleted").then(() => setQs((l) => l && l.filter((x) => x.id !== q.id))),
-      );
-      try {
-        await write;
-      } catch (e) {
-        forget?.();
-        back();
-        notify(errorText(e), "error");
-      }
     },
     [notify, setQs],
   );
@@ -391,7 +393,8 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
     if (!text.trim() || busy) return;
     setBusy(true);
     try {
-      // Counted as one change being written, so a ⌘Z meanwhile waits for its step (F481).
+      // Not a `change` (change.ts): a failure is said in the field, not a toast, and its step needs the id the write
+      // gives. Counted as one change being written instead, so a ⌘Z meanwhile waits for its step (F481).
       const r = await whileOut((async () => {
         const r = await ore<{ annotation: { id: string } }>("snippet", opt("text", text.trim()), "--intent=question", ...skills.map((s) => opt("skill", s)));
         // Two writes: if the second fails, the first is taken back, so a retry never leaves a question nobody can see.
@@ -495,19 +498,13 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
     };
   }, [item, version, changes, marked]);
 
-  const dismiss = async (q: Question) => {
-    setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, here: "skill", matches: x.matches.filter((m) => m.item !== item) } : x)));
-    // On the history at once, as the row moves: its Undo and Redo wait for the drop to land (history.ts `hold`).
-    const write = ore("match", item, q.id, "--drop");
-    const set = (drop: boolean) => ore("match", item, q.id, ...(drop ? ["--drop"] : [])).then(reload);
-    notify("Not answered here", "info", () => set(false), () => set(true)).hold(write);
-    try {
-      await write;
-    } catch (e) {
-      notify(errorText(e), "error");
-      reload();
-    }
-  };
+  const dismiss = (q: Question) =>
+    change(notify, {
+      message: "Not answered here",
+      show: (on) => on && setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, here: "skill", matches: x.matches.filter((m) => m.item !== item) } : x))),
+      write: (on) => ore("match", item, q.id, ...(on ? ["--drop"] : [])),
+      settled: reload,
+    });
 
   const find = filter?.trim();
   const listed = (qs ?? []).filter((q) => !find || rankScore([questionText(q), ...q.answers.map((a) => a.text)], find) > 0);

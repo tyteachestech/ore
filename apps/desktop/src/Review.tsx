@@ -16,6 +16,7 @@ import { MoreButton } from "./Menu";
 import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
+import { change } from "./change";
 import { afterAnswer, cardQuotes, lastWin, ore, opt, PHONE, putOff, rescuedWorthSaying, type Annotation, type CardFull, type CardGem, type DueEntry, type Grade, type SessionEnd, type Skill, type Today, type Try } from "./ore";
 import { tick } from "./phone/haptics";
 import { askMole, Did, Stone, tryLabel, useOf, usesOf } from "./Forge";
@@ -2148,15 +2149,7 @@ export function Review(props: Parameters<typeof Session>[0]) {
   if (!t) return <Session {...props} />;
   const save = async (text: string, mine: boolean) => {
     const use = useOf(t, text, mine);
-    // On the history at once: a ⌘Z while the write is out takes back this use, not the step before it.
-    const write = use.run();
-    props.notify(use.msg, "quiet", use.undo, use.run).hold(write);
-    try {
-      await write;
-    } catch (e) {
-      props.notify(errorText(e), "error");
-      return false;
-    }
+    if (!(await change(props.notify, { message: use.msg, kind: "quiet", write: (on) => (on ? use.run() : use.undo()) }))) return false;
     if (text) askMole(t.id);
     return true;
   };
