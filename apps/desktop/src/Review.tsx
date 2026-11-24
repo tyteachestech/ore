@@ -1948,10 +1948,12 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         });
       });
     }));
+    // The ring is free for the minutes as soon as the last one has left it, while they are still in the air.
+    const cleared = t + (stones ? (stones - 1) * gap + 200 : 0);
     t += stones ? (stones - 1) * gap + 480 : 0;
     // A gem still in the ring (one the ring had no room to show until others left) goes down to the list too,
     // so none is left behind to vanish.
-    at(t - 200, () => host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone])").forEach((src, n) => {
+    at(cleared - 180, () => host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone])").forEach((src, n) => {
       const view = host.querySelector(".end-skills")?.getBoundingClientRect();
       if (!view) return;
       const a = src.getBoundingClientRect();
@@ -1959,7 +1961,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
       src.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${view.right - 40 - (a.left + a.width / 2)}px, ${view.bottom - 6 - (a.top + a.height / 2)}px) scale(0.4)`, opacity: 0 }], { duration: 320, delay: n * 40, easing: "cubic-bezier(0.5, 0, 0.25, 1)", fill: "forwards" });
     }));
     t += stones ? 60 : 0;
-    at(t, () => (setProg((p) => ({ ...p, done: true })), setOnStage(-1)));
+    at(cleared + 140, () => setOnStage(-1));
+    at(t, () => setProg((p) => ({ ...p, done: true })));
     return () => ids.forEach(clearTimeout);
   }, [rowsIn, host]);
   useEffect(() => {
