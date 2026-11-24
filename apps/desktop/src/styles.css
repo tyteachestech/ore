@@ -2519,22 +2519,22 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .end-lap { animation: none; } }
 /* Under the ring: the skills the session fed, a row each (`SkillRows`). */
-.end-skills { display: flex; justify-content: center; align-items: flex-start; width: 100%; min-height: 104px; margin: 36px auto 0; }
-.end-skills-track { display: flex; justify-content: center; align-items: flex-start; min-width: 0; }
+.end-skills { display: flex; flex-direction: column; width: min(100%, 350px); min-height: 204px; margin: 28px auto 0; }
+.end-skills-track { display: flex; flex-direction: column; min-width: 0; }
 /* More than three: a window three medals wide that the row rolls through, its edges fading out. */
-.end-skills[data-rolls] { width: 360px; max-width: 100%; overflow: hidden; justify-content: flex-start; padding: 12px 0 0; margin-top: 24px; -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
-.end-skills[data-rolls] .end-skills-track { justify-content: flex-start; transition: transform 400ms cubic-bezier(0.5, 0, 0.2, 1); }
+.end-skills[data-rolls] { height: 220px; overflow: hidden; padding: 8px 0; margin-top: 20px; -webkit-mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 14px), transparent); }
+.end-skills[data-rolls] .end-skills-track { transition: transform 400ms cubic-bezier(0.5, 0, 0.2, 1); }
 .end-skills[data-rolls] .end-skills-track[data-jump] { transition: none; }
-.end-skills[data-rolls] .end-medal { flex: none; width: 120px; }
-.end-skills[data-rolls] .end-medal-name { max-width: 100px; }
+
+
 .end-skills[data-wait] { visibility: hidden; }
 /* A medal: the skill's icon in the ring of its level. Its place is held until it comes out. */
-.end-medal { display: flex; flex-direction: column; align-items: center; gap: 12px; flex: 0 1 120px; min-width: 0; color: var(--skill, var(--text)); animation: end-medal-in var(--t-3) var(--ease-out) both; }
-.end-skills[data-many] .end-medal { flex-basis: 88px; }
-.end-skills[data-many] .end-medal-name { max-width: 76px; }
+.end-medal { display: flex; align-items: center; gap: 14px; flex: none; height: 56px; margin-bottom: 12px; min-width: 0; color: var(--skill, var(--text)); animation: end-medal-in var(--t-3) var(--ease-out) both; }
+
+
 /* The one that went up a level stands a size larger, for as long as the screen is up. */
-.end-medal[data-up] .end-medal-ring { transform: scale(1.25); }
-.end-medal[data-up] .end-medal-name { color: var(--text); margin-top: 6px; }
+.end-medal[data-up] .end-medal-ring { transform: scale(1.12); }
+
 .end-medal[data-wait], .end-skills-more[data-wait] { visibility: hidden; animation: none; }
 @keyframes end-medal-in { from { opacity: 0.4; } }
 /* A skill's turn in the big ring: the ring is the skill's, its icon and level in the middle. */
@@ -2561,9 +2561,9 @@ button.home-plan:hover { color: var(--text); }
 .end-stage[data-up] .end-stage-ring { animation: end-stage-swell 700ms var(--ease-spring); }
 @keyframes end-stage-swell { 35% { transform: scale(1.22); } }
 .end-stage-pop { position: fixed; z-index: 5; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: var(--skill, var(--text)); pointer-events: none; }
-.end-medal-ring { position: relative; display: inline-grid; place-items: center; width: 64px; height: 64px; }
-.end-medal-core { width: 64px; height: 64px; }
-.end-medal-core > .skill-icon.glyph { width: 28px; height: 28px; -webkit-mask-size: 28px; mask-size: 28px; }
+.end-medal-ring { position: relative; flex: none; display: inline-grid; place-items: center; width: 48px; height: 48px; }
+.end-medal-core { width: 48px; height: 48px; }
+.end-medal-core > .skill-icon.glyph { width: 22px; height: 22px; -webkit-mask-size: 22px; mask-size: 22px; }
 .end-medal-core > .skill-icon.dot { width: 10px; height: 10px; }
 .end-medal-core[data-beat] { animation: end-ring-beat 320ms var(--ease-spring); }
 @keyframes end-ring-beat { 35% { transform: scale(1.16); } }
@@ -2572,7 +2572,7 @@ button.home-plan:hover { color: var(--text); }
 .end-medal-fliers { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 .end-medal-fliers > span { position: absolute; display: grid; place-items: center; visibility: hidden; }
 /* Under a medal: what today added. Before today's part of its ring is dim, today's bright. */
-.end-medal-pips { display: flex; align-items: center; justify-content: center; gap: 2px; height: 16px; margin-top: 2px; }
+.end-medal-pips { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
 .end-medal-pips > span { display: grid; place-items: center; animation: end-stone-in 320ms var(--ease-spring); }
 @keyframes end-stone-in { from { transform: scale(0.4); } 55% { transform: scale(1.35); } }
 .end-medal-pips > [data-wait] { visibility: hidden; animation: none; }
@@ -2581,8 +2581,8 @@ button.home-plan:hover { color: var(--text); }
 .end-medal .dot-ring .on:not(.fresh) { opacity: 0.4; }
 .end-medal .dot-ring .fresh, .end-stage .dot-ring .fresh { fill: color-mix(in oklab, var(--ring), white 35%); }
 .end-stage .dot-ring .on:not(.fresh) { opacity: 0.55; }
-.end-medal { gap: 8px; }
-.end-medal-name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 12px/1.3 var(--mono); color: var(--muted); }
+
+.end-medal-name { flex: 1; min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-align: left; text-wrap: balance; font-size: 16px; font-weight: 500; line-height: 1.25; color: var(--text); }
 .end-skills-more { align-self: center; margin: 0 0 28px 4px; font: 400 14px/1.3 var(--mono); color: var(--text); border-radius: 4px; }
 .end-skills-more:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) { .end-medal, .end-medal *, .end-stage, .end-stage * { animation: none !important; transition: none; } .end-stage-burst { display: none; } }

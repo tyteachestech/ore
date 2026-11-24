@@ -1845,7 +1845,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
       if (!slot || !medal) return land();
       // A medal the row is not showing now takes its stone unseen.
       const view = host.querySelector(".end-skills")!.getBoundingClientRect(), mr = medal.getBoundingClientRect();
-      if (mr.right < view.left + 8 || mr.left > view.right - 8) return land();
+      if (mr.bottom < view.top + 8 || mr.top > view.bottom - 8) return land();
       const w = slot.querySelector("svg")!.getBoundingClientRect().width || 24;
       const dx = from.left + from.width / 2 - to.x, dy = from.top + from.height / 2 - to.y;
       const ghost = slot.cloneNode(true) as HTMLElement;
@@ -1917,14 +1917,14 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         // A gem of a skill that had no turn of its own goes from where it was cut straight to its medal.
         const src = kind === "cut" ? host.querySelector<HTMLElement>(`.review-cut > span[data-fly][data-skill="${CSS.escape(r.skill)}"]:not([data-gone])`) : null;
         if (kind === "cut") {
-          const m = host.querySelector(`.end-medal-ring[data-row="${row}"]`)?.getBoundingClientRect();
+          const m = host.querySelector(`[data-pip="${row}-${d}"]`)?.getBoundingClientRect();
           if (!src || !m) return bump("cut", row);
           const from = src.getBoundingClientRect();
           src.setAttribute("data-gone", "");
           src.style.visibility = "hidden";
           return fly(r.first + d, row, from, { x: m.left + m.width / 2, y: m.top + m.height / 2 }, { big: from.width / 28, seen: true, ms: 520 }, () => (layer("right", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.5 }), bump("cut", row)));
         }
-        const medal = host.querySelector(`.end-medal-ring[data-row="${row}"]`), ring = host.querySelector(".end-ring");
+        const medal = host.querySelector(`[data-pip="${row}-${d}"]`), ring = host.querySelector(".end-ring");
         if (!medal || !ring) return bump("stone", row);
         const z = medal.getBoundingClientRect(), c = ring.getBoundingClientRect();
         fly(r.first + d, row, new DOMRect(c.left + c.width / 2 - 10 + (d % 3 - 1) * 14, c.top + c.height / 2 - 10, 20, 20), { x: z.left + z.width / 2, y: z.top + z.height / 2 }, { big: 1.6, seen: false, ms: 420 }, () => {

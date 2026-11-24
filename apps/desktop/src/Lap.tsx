@@ -179,9 +179,9 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
   const said = (r: EndRow, lv: number) => [name(r.skill), `${r.kept} kept`, r.cut > 0 && `${r.cut} became ${r.cut === 1 ? "a gem" : "gems"}`, lv > 0 && `level ${lv}`].filter(Boolean).join(" · ");
   return (
     // Its room is held from the start, so the results under it never move when it comes in.
-    <div className="end-skills" data-wait={!run || undefined} data-many={(!rolls && n > 4) || undefined} data-rolls={rolls || undefined}>
+    <div className="end-skills" data-wait={!run || undefined} data-rolls={rolls || undefined}>
       <span className="sr-only">{plan.rows.map((r) => said(r, now.find((k) => k.skill === r.skill)!.level)).join(". ")}</span>
-      <div className="end-skills-track" data-jump={(rolls && prog.done && step === 0) || undefined} style={rolls ? { transform: `translateX(${-off * MEDAL_SLOT}px)` } : undefined}>
+      <div className="end-skills-track" data-jump={(rolls && prog.done && step === 0) || undefined} style={rolls ? { transform: `translateY(${-off * MEDAL_SLOT}px)` } : undefined}>
       {(rolls && prog.done ? [...plan.rows, ...plan.rows.slice(0, SEEN)] : plan.rows).map((r, j) => {
         const i = j % n, s = skills.find((x) => x.id === r.skill), lv = levelAt(r, prog.cut[i]!, prog.done, was, now);
         return (
@@ -196,17 +196,17 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
                 {/* What flies, drawn once here so the flight can lift a copy of it. */}
                 <span className="end-medal-fliers">{j < n && r.slots.map((kind, d) => <span key={d} data-slot={r.first + d}><Gem kind={kind} size={kind === "cut" ? 28 : 24} /></span>)}</span>
               </span>
+              <span className="end-medal-name">{name(r.skill)}</span>
               {/* What today added, under what the skill now is (Tyler, 2026-11-23: "I just am not sure what I gained
                   today versus just the status of the skill before"): the session's own gems and stones, each
                   there once it has landed. */}
               <span className="end-medal-pips" aria-hidden="true">
                 {r.slots.map((kind, d) => {
                   const cuts = r.slots.filter((x) => x === "cut").length, here = prog.done || (kind === "cut" ? d < prog.cut[i]! : d - cuts < prog.stone[i]!);
-                  return <span key={d} data-wait={!here || undefined}><Gem kind={kind} size={kind === "cut" ? 16 : 12} /></span>;
+                  return <span key={d} data-pip={j < n ? `${i}-${d}` : undefined} data-wait={!here || undefined}><Gem kind={kind} size={kind === "cut" ? 20 : 14} /></span>;
                 })}
                 {r.extra > 0 && <small data-wait={!prog.done || undefined}>+{r.extra}</small>}
               </span>
-              <span className="end-medal-name">{name(r.skill)}</span>
             </div>
           </Hint>
         );
@@ -219,9 +219,9 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
 }
 const REEL_ROWS = 12, SOLOS = 2;
 /** The medals the row shows at once when it rolls, a medal's place in px, and how long it rests between steps. */
-const SEEN = 3, MEDAL_SLOT = 120, ROLL_MS = 1700;
+const SEEN = 3, MEDAL_SLOT = 68, ROLL_MS = 1700;
 /** A medal's ring, in px. */
-const MEDAL = 64;
+const MEDAL = 48;
 
 /** White sparkles over the ring's bonus dots, for as long as the end screen is up: small crosses of dots that
  *  open and fade, only on the stretch past the goal, so they also say how far it went. A few past the goal,
