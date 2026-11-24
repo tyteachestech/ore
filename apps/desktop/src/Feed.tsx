@@ -11,7 +11,8 @@ import { Article, CaretDown, Plus, Tick, YoutubeLogo } from "./icons";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
-import { ore, opt, whileOut, type Skill } from "./ore";
+import { change } from "./change";
+import { ore, opt, type Skill } from "./ore";
 import { SkillChips, SkillPicker, unfile } from "./Skills";
 import { count, errorText, load, save, singleFlight, typedLast, useLibraryChanges, type Notify } from "./util";
 import { Working } from "./Working";
@@ -158,47 +159,48 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   };
   if (stepOut) stepOut.current = reading ? step : null;
 
-  /** Marks one post, or a pick of them at once with one Undo (F9). */
-  const setRead = (post: FeedPost | FeedPost[], on: boolean, toast = true): Promise<void> => {
+  /** Marks one post, or a pick of them at once with one Undo (F9). One write for the whole pick. */
+  const setRead = (post: FeedPost | FeedPost[], on: boolean) => {
     const urls = new Set((Array.isArray(post) ? post : [post]).map((p) => p.url));
-    const put = (v: boolean) => setData((d) => d && { ...d, posts: d.posts.map((p) => (urls.has(p.url) ? { ...p, read: v } : p)) });
-    put(on);
     const what = urls.size > 1 ? ` ${urls.size} posts` : "";
-    // From the history (toast false), a failure goes back to it, which says why. One write for the whole pick.
-    return whileOut(ore("feed", on ? "read" : "unread", ...urls)).then(
-      () => void (toast && notify(on ? `Marked${what} read` : `Marked${what} unread`, "info", () => setRead(post, !on, false), () => setRead(post, on, false))),
-      (e) => {
-        put(!on);
-        if (!toast) throw e;
-        notify(errorText(e), "error");
-      },
-    );
+    return change(notify, {
+      message: on ? `Marked${what} read` : `Marked${what} unread`,
+      show: (v) => setData((d) => d && { ...d, posts: d.posts.map((p) => (urls.has(p.url) ? { ...p, read: v === on } : p)) }),
+      write: (v) => ore("feed", v === on ? "read" : "unread", ...urls),
+    });
   };
 
   const unfollow = (f: FeedInfo) => {
     const before = data;
-    setData((d) => d && { feeds: d.feeds.filter((x) => x.url !== f.url), posts: d.posts.filter((p) => p.feed !== f.url) });
-    whileOut(ore<{ feed: FeedInfo; at: number }>("feed", "unfollow", f.url)).then(
-      (r) => {
-        const back = () => ore("feed", "restore", JSON.stringify(r.feed), "--at", String(r.at)).then(() => read());
-        notify(`Unfollowed ${f.title}`, "info", back, () => ore("feed", "unfollow", f.url).then(() => read()));
-      },
-      (e) => (setData(before), notify(errorText(e), "error")),
-    );
+    if (!before) return;
+    let was: { feed: FeedInfo; at: number } | undefined;
+    return change(notify, {
+      message: `Unfollowed ${f.title}`,
+      // Back, it is only this feed and its posts that return, where they were: what he has marked read, renamed or
+      // reordered since stays as it is.
+      show: (on) =>
+        setData((d) => {
+          if (!d) return d;
+          if (on) return { feeds: d.feeds.filter((x) => x.url !== f.url), posts: d.posts.filter((p) => p.feed !== f.url) };
+          if (d.feeds.some((x) => x.url === f.url)) return d;
+          const at = before.feeds.findIndex((x) => x.url === f.url);
+          const posts = before.posts.flatMap((p) => (p.feed === f.url ? [p] : d.posts.filter((x) => x.url === p.url)));
+          return { feeds: [...d.feeds.slice(0, at), f, ...d.feeds.slice(at)], posts: [...posts, ...d.posts.filter((p) => !posts.includes(p))] };
+        }),
+      write: async (on) => (on ? (was = await ore<{ feed: FeedInfo; at: number }>("feed", "unfollow", f.url)) : was && ore("feed", "restore", JSON.stringify(was.feed), "--at", String(was.at))),
+      settled: () => void read(),
+    });
   };
 
-  const arrange = (next: FeedInfo[], undoable = true) => {
-    const before = data;
-    setData((d) => d && { ...d, feeds: next });
-    // From the history (undoable false), a failure goes back to it, which says why.
-    return ore("feed", "arrange", JSON.stringify(next.map((f) => f.url))).then(
-      () => void (undoable && before && notify("Reordered feeds", "quiet", () => arrange(before.feeds, false), () => arrange(next, false))),
-      (e) => {
-        setData(before);
-        if (!undoable) throw e;
-        notify(errorText(e), "error");
-      },
-    );
+  const arrange = (next: FeedInfo[]) => {
+    const before = feeds;
+    return change(notify, {
+      message: "Reordered feeds",
+      kind: "quiet",
+      key: "feeds order",
+      show: (on) => setData((d) => d && { ...d, feeds: on ? next : before }),
+      write: (on) => ore("feed", "arrange", JSON.stringify((on ? next : before).map((x) => x.url))),
+    });
   };
   const move = (f: FeedInfo, by: -1 | 1) => {
     const i = feeds.indexOf(f);
@@ -206,32 +208,30 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   };
 
   /** False when the write failed (and a toast said why), so the field keeps what he typed. */
-  const retitle = async (f: FeedInfo, before: string, t: string, undoable = true): Promise<boolean> => {
+  const retitle = async (f: FeedInfo, before: string, t: string): Promise<boolean> => {
     if (!t || t === before) return true;
     const put = (name: string) => setData((d) => d && { feeds: d.feeds.map((x) => (x.url === f.url ? { ...x, title: name } : x)), posts: d.posts.map((p) => (p.feed === f.url ? { ...p, feed_title: name } : p)) });
-    put(t);
-    return ore("feed", "set", f.url, opt("name", t)).then(
-      () => (undoable && notify(`Renamed to “${t}”`, "quiet", () => retitle(f, t, before, false), () => retitle(f, before, t, false)), true),
-      (e) => {
-        put(before);
-        if (!undoable) throw e;
-        notify(errorText(e), "error");
-        return false;
-      },
-    );
+    return change(notify, { message: `Renamed to “${t}”`, kind: "quiet", key: f.url, show: (on) => put(on ? t : before), write: (on) => ore("feed", "set", f.url, opt("name", on ? t : before)) });
   };
 
-  const refile = (f: FeedInfo, next: string[], before = f.skills, undoable = true) => {
+  const refile = (f: FeedInfo, next: string[], before = f.skills) => {
     const put = (s: (now: string[]) => string[]) => setData((d) => d && { ...d, feeds: d.feeds.map((x) => (x.url === f.url ? { ...x, skills: s(x.skills) } : x)) });
-    put(() => next);
-    return ore("feed", "set", f.url, ...(next.length ? next.map((k) => opt("skill", k)) : [opt("skill", "")])).then(
-      () => void (undoable && notify(`Changed the skills for ${f.title}`, "quiet", () => refile(f, before, next, false), () => refile(f, next, before, false))),
-      (e) => {
-        put((now) => unfile(now, next, before));
-        if (!undoable) throw e;
-        notify(errorText(e), "error");
+    const flags = (to: string[]) => (to.length ? to.map((k) => opt("skill", k)) : [opt("skill", "")]);
+    let refused = false;
+    return change(notify, {
+      message: `Changed the skills for ${f.title}`,
+      kind: "quiet",
+      key: f.url,
+      // Undo and Redo show the list their write saves. A write that failed takes only its own skills back:
+      // another change he made meanwhile stays.
+      show: (on) => {
+        const [to, from] = on ? [next, before] : [before, next];
+        const back = refused;
+        refused = false;
+        put((now) => (back ? unfile(now, from, to) : to));
       },
-    );
+      write: (on) => ore("feed", "set", f.url, ...flags(on ? next : before)).catch((e) => ((refused = true), Promise.reject(e))),
+    });
   };
 
   /** A post as its linked title, as a source row copies (⌘C). */

@@ -107,6 +107,22 @@ test("a change whose save fails goes back, says why and leaves nothing to undo",
   expect(said().some((s) => s.includes("Undo"))).toBe(false);
 });
 
+test("a change whose save fails takes down the toast that said it was done, and reads nothing again", async () => {
+  const t = await mount();
+  const lib = library();
+  let reads = 0;
+  await act(async () => {
+    void change(t.notify, { message: "Filed under AI", write: () => lib.write("file"), settled: () => reads++ });
+  });
+  expect(said().some((s) => s.includes("Filed under AI"))).toBe(true);
+  lib.calls[0]!.fail("The disk is full.");
+  await tick();
+  expect(said().some((s) => s.includes("Filed under AI"))).toBe(false);
+  expect(said().some((s) => s.includes("The disk is full."))).toBe(true);
+  // Nothing was written, and `show(false)` put the screen back: a read now would only fail beside it.
+  expect(reads).toBe(0);
+});
+
 test("⌘Z pressed before a save that then fails writes no inverse", async () => {
   const t = await mount();
   const lib = library();

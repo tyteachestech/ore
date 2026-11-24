@@ -39,6 +39,7 @@ import { clickBelow, SidePanel, SidePanelFrame, SourceNoteBody, useSourceNote, t
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
 import { openOriginal, playerLink, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
+import { change } from "./change";
 import { INTENTS, ore, opt, PHONE, visible, whileOut, type Annotation, type CardFull, type CardSkills, type ChapterFeedback, type Doc, type Intent, type Item, type Priority, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { sourceImportanceActions } from "./importance";
@@ -419,6 +420,7 @@ function DocTable({ children }: { children?: ReactNode }) {
     const row = cellText((td.parentElement as HTMLTableRowElement).cells[0]);
     const column = cellText(table.current.tHead?.rows[0]?.cells[td.cellIndex]);
     try {
+      // Not a `change` (change.ts): its failure is said in its own words.
       const c = await whileOut(ore<CardFull>("card", "cell", ctx.item, opt("row", row), opt("column", column), opt("answer", cellText(td))));
       ctx.notify("Exercise made", "info", () => ore("card", "retire", c.id), () => ore("card", "restore", c.id, "--state=draft"));
     } catch (e) {
@@ -1589,6 +1591,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         notes.apply(r.notes);
         setDoc((cur) => cur && cur.id === id ? { ...cur, chapter_recalls: [...(cur.chapter_recalls ?? []).filter((x) => x.n !== c.n), { n: c.n, ...r.recall }] } : cur);
       };
+      // Not a `change` (change.ts): its failure is said in its own words, and closes the feedback.
       await whileOut(record());
       // On the history (Codex UX sweep 7): ⌘Z offers the chapter again; what he wrote stays in his note. A feedback
       // still on its way for it is dropped; ⇧⌘Z records it again and asks for feedback again.
@@ -2390,6 +2393,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         made.current.get(rid)?.();
         await annotate(rid, "--status", "deleted");
       }
+      // Not a `change` (change.ts): what its toast says (the words and highlights that went) comes from the write.
       const c = await whileOut(ore<{ id: string; words: number; section: boolean; removed: unknown[] }>("cut", d.id, "--from", String(a.start), "--to", String(a.end), ...(section ? ["--section"] : [])));
       p.reload();
       p.onChanged();
@@ -3251,49 +3255,41 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   };
 
   /** Saves a new title in place (Notion's page title): optimistic, put back if the write fails. */
-  async function retitle(id: string, before: string, t: string, undoable = true) {
+  async function retitle(id: string, before: string, t: string) {
     if (!t || t === before) return true;
-    setDoc((cur) => cur && cur.id === id ? { ...cur, title: t } : cur);
-    // On the history at once, so a quick ⌘Z takes it back (F156); taken off again if the write fails.
-    const forget = undoable ? p.notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false)) : () => {};
-    let now = before;
-    try {
-      await inOrder(id, async () => {
+    const put = (title: string) => setDoc((cur) => (cur && cur.id === id ? { ...cur, title } : cur));
+    let first = true;
+    let since: string | undefined;
+    return change(p.notify, {
+      message: `Renamed to “${t}”`,
+      kind: "quiet",
+      key: id,
+      show: (on) => put(on ? t : before),
+      write: async (on) => {
+        const [to, from] = on ? [t, before] : [before, t];
+        since = undefined;
         // Undo or redo: a title set outside since (`ore edit`, the phone) is newer, and stays (F175).
-        if (!undoable && (now = (await ore<{ title: string }>("show", id)).title) !== before) throw new Error(`Left as “${now}”: it was renamed since`);
-        return ore("edit", id, "--title", t);
-      });
-      p.onChanged();
-      return true;
-    } catch (e) {
-      forget();
-      setDoc((cur) => cur && cur.id === id ? { ...cur, title: now } : cur);
-      // From the history (undo or redo): it puts the step back and says why.
-      if (!undoable) throw e;
-      p.notify(errorText(e), "error");
-      return false;
-    }
+        if (!first && (since = (await ore<{ title: string }>("show", id)).title) !== from) throw new Error(`Left as “${since}”: it was renamed since`);
+        first = false;
+        since = undefined;
+        await ore("edit", id, "--title", to);
+      },
+      settled: () => (since === undefined ? p.onChanged() : put(since)),
+    });
   }
 
   /** Sets the author by hand, in place where the byline sits (Readwise Reader's "Edit metadata"): one
    *  that ingest and its PDF metadata missed. Empty clears it. Optimistic, on the history. */
-  async function reauthor(id: string, before: string | undefined, a: string | undefined, undoable = true) {
+  async function reauthor(id: string, before: string | undefined, a: string | undefined) {
     if ((a ?? "") === (before ?? "")) return true;
-    setDoc((cur) => cur && cur.id === id ? { ...cur, author: a } : cur);
-    // On the history at once, so a quick ⌘Z takes it back; taken off again if the write fails.
-    const forget = undoable ? p.notify(a ? `Author set to “${a}”` : "Author removed", "quiet", () => reauthor(id, a, before, false), () => reauthor(id, before, a, false)) : () => {};
-    try {
-      await inOrder(id, () => ore("edit", id, "--author", a ?? ""));
-      p.onChanged();
-      return true;
-    } catch (e) {
-      forget();
-      setDoc((cur) => cur && cur.id === id ? { ...cur, author: before } : cur);
-      // From the history (undo or redo): it puts the step back and says why.
-      if (!undoable) throw e;
-      p.notify(errorText(e), "error");
-      return false;
-    }
+    return change(p.notify, {
+      message: a ? `Author set to “${a}”` : "Author removed",
+      kind: "quiet",
+      key: id,
+      show: (on) => setDoc((cur) => (cur && cur.id === id ? { ...cur, author: on ? a : before } : cur)),
+      write: (on) => ore("edit", id, "--author", (on ? a : before) ?? ""),
+      settled: p.onChanged,
+    });
   }
 
   /** Fetches the original again (a file: reads its kept copy again) and puts its new text in this source (Readwise's "Re-import"): highlights
@@ -3336,25 +3332,39 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   /** Files the source under exactly `skills` (its cards follow), with Undo naming the one that changed. */
   /** The skills as last saved from here: the Questions list reads again once a filing has landed. */
   const [filed, setFiled] = useState("");
-  const fileUnder = async (skills: string[], changed?: Skill, fromHistory = false, cards?: CardSkills) => {
+  const fileUnder = (skills: string[], changed: Skill) => {
     if (!doc) return;
+    const id = doc.id;
     const before = doc.skills;
     // Filing under an archived skill brings it back (D173, as App's refile); Undo archives it again.
-    const revived = skills.filter((id) => !before.includes(id) && p.skills.some((s) => s.id === id && s.archived));
-    setDoc((cur) => cur && { ...cur, skills });
-    filings.current++;
-    try {
-      const r = await whileOut(ore<{ cards_before?: CardSkills }>("edit", doc.id, "--skills", skills.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : [])).finally(() => filings.current++));
-      setFiled(skills.join());
-      p.onChanged();
-      if (revived.length) p.onSkillsChanged();
-      if (changed) p.notify(skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`, "info", () => fileUnder(before, undefined, true, r?.cards_before).then(() => p.rearchive?.(revived)), () => fileUnder(skills, undefined, true));
-    } catch (e) {
-      setDoc((cur) => cur && { ...cur, skills: unfile(cur.skills, skills, before) });
-      // From the history (undo or redo): it puts the step back and says why.
-      if (fromHistory) throw e;
-      p.notify(errorText(e), "error");
-    }
+    const revived = skills.filter((k) => !before.includes(k) && p.skills.some((s) => s.id === k && s.archived));
+    // Each exercise's own skills as they were, from the first write: Undo puts those back too.
+    let cards: CardSkills | undefined;
+    let refused = false;
+    return change(p.notify, {
+      message: skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`,
+      key: id,
+      show: (on) => {
+        // A read of the source begun before this (its write may wait its turn) keeps the skills shown here.
+        filings.current++;
+        // Undo and Redo show the list their write saves. A write that failed takes only its own skill back:
+        // another filing he made meanwhile stays.
+        const [to, from] = on ? [skills, before] : [before, skills];
+        const back = refused;
+        refused = false;
+        setDoc((cur) => (cur && cur.id === id ? { ...cur, skills: back ? unfile(cur.skills, from, to) : to } : cur));
+      },
+      write: async (on) => {
+        const r = await ore<{ cards_before?: CardSkills }>("edit", id, "--skills", (on ? skills : before).join(","), ...(!on && cards ? [opt("cards", JSON.stringify(cards))] : []))
+          .catch((e) => ((refused = true), Promise.reject(e)))
+          .finally(() => filings.current++);
+        if (on) cards ??= r?.cards_before;
+        else await p.rearchive?.(revived);
+        setFiled((on ? skills : before).join());
+        if (revived.length) p.onSkillsChanged();
+      },
+      settled: p.onChanged,
+    });
   };
   /** A skill typed into the skill picker: made at once, so the picker can tick it. */
   const createSkill = async (name: string) => {
@@ -3532,6 +3542,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     };
     try {
       if (action === "accept") {
+        // Not a `change` (change.ts): what its toast says, and what its Undo takes back, come from the write.
         const r = await whileOut(ore<{ skill: Skill; created: boolean; item: Item; undo: object }>("suggested-skill", id, "accept"));
         setDoc((cur) => cur && cur.id === id ? { ...cur, skills: r.item.skills, suggested_skill: undefined } : cur);
         p.onSkillsChanged();

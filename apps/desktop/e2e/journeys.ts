@@ -15410,6 +15410,7 @@ journey("source rename: pending Undo takes back the rename, not the source added
 journey("source rename: ⌘Z leaves a title set outside since, and says so (F175)", async (page) => {
   const title = `Source renamed twice ${Date.now()}`;
   await page.reload();
+  await page.locator(".side-item").first().waitFor(); // ⌘N before the app is up after a reload goes nowhere (F499)
   await page.keyboard.press("Meta+n");
   await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nRenamed in the app, then outside it.`);
   await page.keyboard.press("Enter");

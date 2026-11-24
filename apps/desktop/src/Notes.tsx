@@ -7,7 +7,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, use
 import { NoteEditor, type LinkTarget, type NoteEditorHandle } from "./editor/NoteEditor";
 import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
-import { ore, opt, oreWith, whileOut, type Backlink, type Notes } from "./ore";
+import { change } from "./change";
+import { ore, opt, oreWith, type Backlink, type Notes } from "./ore";
 import { errorText, LIBRARY_BACK, load, save, useLibraryChanges, type Notify } from "./util";
 
 /** Which note: a source note (D31) or a skill note (D41). */
@@ -191,15 +192,24 @@ export function useNotes(ref: NoteRef, notify: Notify, onKept?: () => void): MyN
       try {
         // The file as it is now (not what this editor last based a save on, which a merge can leave behind).
         const before = (await queue(() => ore<Notes>("notes", ...key.split(" "))).catch(() => undefined))?.text;
-        const r = await whileOut(queue(() => ore<Notes>("notes", ...key.split(" "), opt("append", t), opt("heading", heading))));
-        if (r.kept_from_feed) kept.current?.();
-        // His typing before it is a step of its own, under this one.
-        if (before !== undefined) checkpoint(key, before);
-        if (owner.current === key) apply(r.text);
-        // On the history, as every change is. The step writes the file itself (--base keeps what he has typed since).
-        // (Only when the text it was added to is known: an undo from a guess would take more than it added.)
-        if (before !== undefined) notify(`Added “${heading}” to the note`, "quiet", put(key, before, r.text), put(key, r.text, before));
-        return true;
+        const add = async () => {
+          const r = await queue(() => ore<Notes>("notes", ...key.split(" "), opt("append", t), opt("heading", heading)));
+          if (r.kept_from_feed) kept.current?.();
+          if (owner.current === key) apply(r.text);
+          return r.text;
+        };
+        // Only when the text it was added to is known is it a step: an undo from a guess would take more than it added.
+        if (before === undefined) return (await add(), true);
+        // His typing before it is a step of its own, under this one: so it goes on first, and stays (it is saved)
+        // if the append then fails.
+        checkpoint(key, before);
+        // The step writes the file itself (--base keeps what he has typed since).
+        let after: string | undefined;
+        return await change(notify, {
+          message: `Added “${heading}” to the note`,
+          kind: "quiet",
+          write: async (on) => (after === undefined ? void (after = await add()) : put(key, on ? after : before, on ? before : after)()),
+        });
       } catch (e) {
         notify(errorText(e), "error");
         return false;

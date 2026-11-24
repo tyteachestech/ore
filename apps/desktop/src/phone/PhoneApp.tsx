@@ -1241,23 +1241,23 @@ export function PhoneApp() {
   // A course archived or gone (on the Mac) closes its screen.
   const courseGone = loaded && !!course && !courseOf.length;
   useEffect(() => void (courseGone && setCourse(null)), [courseGone]);
-  const removeWaiting = async (l: Waiting) => {
-    // Off the list at once: the remove waits its turn behind a link being read, which can take a while.
-    removing.current.add(l.id);
-    setWaiting((all) => all.filter((w) => w.id !== l.id));
-    // On the history at once too, so an undo meanwhile takes back this step, not the one before it; the history
-    // holds its Undo until the remove has landed (history.ts `hold`).
-    const write = ore("inbox", "--remove", l.id);
-    notify("Removed the link", "info", () => ore("inbox", "--add", l.url, ...l.skills.flatMap((s) => ["--skill", s])).then(refresh)).hold(write);
-    try {
-      await write;
-      removing.current.delete(l.id);
-      void refresh();
-    } catch (e) {
-      removing.current.delete(l.id);
-      void refresh();
-      notify(errorText(e), "error");
-    }
+  const removeWaiting = (l: Waiting) => {
+    // Off the list at once: the remove waits its turn behind a link being read, which can take a while. Put back,
+    // it is a new link with its own id.
+    let id = l.id;
+    // Every id it has had: a Redo pressed before the Undo's write is back still names the old one.
+    const ids = new Set([id]);
+    const clear = () => ids.forEach((x) => removing.current.delete(x));
+    return change(notify, {
+      message: "Removed the link",
+      show: (on) => {
+        if (!on) return clear();
+        removing.current.add(id);
+        setWaiting((all) => all.filter((w) => w.id !== id));
+      },
+      write: async (on) => (on ? ore("inbox", "--remove", id) : void ids.add((id = (await ore<Waiting>("inbox", "--add", l.url, ...l.skills.flatMap((s) => ["--skill", s]))).id))),
+      settled: () => (clear(), void refresh()),
+    }).then((ok) => ok || void refresh());
   };
 
   return (

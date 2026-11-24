@@ -10,14 +10,15 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { escTaken, Hint } from "./Hint";
 import { onBackdrop, Trap } from "./Trap";
 import { comboOf, label, rebind, useKeymap } from "./keys";
-import { ore, opt, PHONE, whileOut } from "./ore";
+import { change } from "./change";
+import { ore, opt, PHONE } from "./ore";
 import { setSounds, setVoice, useSounds, useVoice } from "./sfx";
 import { TablesSetting } from "./Tables";
 import { setTray, trayOn } from "./quick";
 import { ShortcutEditor } from "./Shortcuts";
 import { setStyleControls, STYLE_CONTROLS, useStyleControls, type StyleControls } from "./draw/quick";
 import { CHIP_LOOKS, chipLook, setChipLook, type ChipLook } from "./Skills";
-import { errorText, load, save, useFocusWhileMounted, useLibraryChanges, useNarrow, type Notify } from "./util";
+import { errorText, inOrder, load, save, useFocusWhileMounted, useLibraryChanges, useNarrow, type Notify } from "./util";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setSpacing, setWidth, SIZES, smaller, SPACINGS, useReading, WIDTHS, type Font, type Page, type Spacing, type Width } from "./reading";
 import * as RadioGroup from "@radix-ui/react-radio-group";
 
@@ -54,16 +55,9 @@ const VENDORS: { id: Vendor; label: string }[] = [
 const TIMES = Array.from({ length: 33 }, (_, i) => `${String(6 + Math.floor(i / 2)).padStart(2, "0")}:${i % 2 ? "30" : "00"}`);
 const clock = (t: string) => new Date(`2000-01-01T${t}:00`).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
-// Settings share one file and native side effects. Keep their order even when the panel
-// closes and opens again; a failed write must not stop the choices queued behind it.
-let settingsWrites: Promise<unknown> = Promise.resolve();
-/** A queued write failed since the form last matched the file, so the next one to land reads it back. */
-let settingsFailed = false;
-function queueSettings<T>(run: () => Promise<T>): Promise<T> {
-  const next = settingsWrites.then(run, run);
-  settingsWrites = next.catch(() => {});
-  return next;
-}
+// Settings share one file and native side effects: their writes, and the form's read, go one after another
+// (util.ts `inOrder`), also when the panel closes and opens again.
+const SETTINGS = "settings";
 
 const LAST = "ore.settings";
 const home = (p: string) => p.replace(/^\/Users\/[^/]+/, "~");
@@ -105,7 +99,7 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
   useEffect(() => {
     let live = true;
     const before = dataRef.current;
-    queueSettings(() => ore<Data>("settings")).then(
+    inOrder(SETTINGS, () => ore<Data>("settings")).then(
       (r) => { if (live && dataRef.current === before) { dataRef.current = r; setData(r); } },
       (e) => live && setError(errorText(e)),
     );
@@ -145,83 +139,70 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
   /** The settings as now shown, for an undo that runs after Settings has moved on. */
   const dataRef = useRef(data);
   dataRef.current = data;
-  /** Shows the change at once and rolls it back if the CLI refuses it. Once it lands it goes on the
-   *  app history, so ⌘Z takes it back (and ⇧⌘Z gives it again) like any other change he makes;
-   *  those replays pass no `step`. */
-  /** Resolves false when the write failed (and said so), so a field can keep what he typed. */
-  const change = async (next: Data, run: () => Promise<unknown>, step?: { message: string; undo: () => Promise<unknown>; redo: () => Promise<unknown> }): Promise<boolean> => {
-    const prev = dataRef.current;
-    setData(next);
-    dataRef.current = next;
-    return whileOut(queueSettings(async () => {
-      try {
-        await run();
-      } catch (e) {
-        settingsFailed = true;
-        // An older failure must not roll back a newer choice. If this is still the newest,
-        // read what actually saved: another queued choice may itself have failed.
-        if (dataRef.current === next) {
-          const restored = await ore<Data>("settings").catch(() => prev);
-          if (dataRef.current === next) { setData(restored); dataRef.current = restored; }
-        }
-        if (!step) throw e;
-        notify(errorText(e), "error");
-        return false;
-      }
-      // Once the latest choice lands, reconcile the whole form. Its optimistic copy may
-      // still include another field whose earlier write failed. Never overwrite a newer edit.
-      if (settingsFailed && dataRef.current === next) {
-        settingsFailed = false;
-        const saved = await ore<Data>("settings").catch(() => null);
-        if (saved && dataRef.current === next) { setData(saved); dataRef.current = saved; }
-      }
-      if (step) notify(step.message, "quiet", step.undo, step.redo);
-      return true;
-    }));
+  /** A setting he changed (change.ts): shown at once, ⌘Z takes it back, and it goes back if the CLI refuses it.
+   *  Resolves false then, so a field can keep what he typed. `put` gives the form with this one field changed
+   *  (true) or as it was (false), so a failure never rolls back a newer choice in another field. */
+  const setting = async (message: string, put: (d: Data, on: boolean) => Data, write: (on: boolean) => Promise<unknown>): Promise<boolean> => {
+    const ok = await change(notify, {
+      message,
+      kind: "quiet",
+      key: SETTINGS,
+      show: (on) => {
+        const d = dataRef.current;
+        if (d) setData((dataRef.current = put(d, on)));
+      },
+      write,
+    });
+    // Two choices for one field that both failed each go back to what stood before them, the second to the first's
+    // value, which was never saved. So a failed one reads the form as saved, behind the writes still queued, and
+    // never over a choice made since.
+    const shown = dataRef.current;
+    if (!ok) void inOrder(SETTINGS, () => ore<Data>("settings")).then((saved) => dataRef.current === shown && setData((dataRef.current = saved)), () => {});
+    return ok;
   };
   /** What each goal setting is called in an Undone toast. */
   const NAMES: Record<string, string> = { minutes: "Minutes a day", "weekdays-only": "Weekdays only", "new-per-day": "New exercises a day", plan: "When you review", remix: "Remix exercises" };
-  const setGoal = async <K extends keyof Review>(key: K, flag: string, value: Review[K], record = true): Promise<boolean> => {
+  const setGoal = async <K extends keyof Review>(key: K, flag: string, value: Review[K]): Promise<boolean> => {
     const d = dataRef.current;
     if (!d) return false;
     const was = d.review[key];
-    return change({ ...d, review: { ...d.review, [key]: value } }, () => ore("goal", opt(flag, String(value))), record ? { message: `Changed “${NAMES[flag] ?? flag}”`, undo: () => setGoal(key, flag, was, false), redo: () => setGoal(key, flag, value, false) } : undefined);
+    return setting(`Changed “${NAMES[flag] ?? flag}”`, (now, on) => ({ ...now, review: { ...now.review, [key]: on ? value : was } }), (on) => ore("goal", opt(flag, String(on ? value : was))));
   };
 
   /** The reminder lives in skills.yaml and in a LaunchAgent that fires with the app closed (D67). */
-  const setReminder = async (t: string, record = true): Promise<boolean> => {
+  const setReminder = async (t: string): Promise<boolean> => {
     const d = dataRef.current;
     if (!d) return false;
     const was = d.review.reminder;
-    return change(
-      { ...d, review: { ...d.review, reminder: t } },
-      async () => {
-        await ore("goal", opt("reminder", t || "off"));
-        // macOS refused it: put skills.yaml back, or a relaunch shows a time that never fires.
-        await invoke("set_reminder", { time: t || null }).catch(async (e) => {
-          await ore("goal", opt("reminder", was || "off")).catch(() => {});
-          throw new Error(`macOS didn’t take the reminder (${errorText(e)}). Pick the time again to retry.`);
-        });
-        save(AGENT_AT, t);
-      },
-      record ? { message: "Changed the reminder", undo: () => setReminder(was, false), redo: () => setReminder(t, false) } : undefined,
-    );
+    return setting("Changed the reminder", (now, on) => ({ ...now, review: { ...now.review, reminder: on ? t : was } }), async (on) => {
+      const [to, from] = on ? [t, was] : [was, t];
+      await ore("goal", opt("reminder", to || "off"));
+      // macOS refused it: put skills.yaml back, or a relaunch shows a time that never fires.
+      await invoke("set_reminder", { time: to || null }).catch(async (e) => {
+        await ore("goal", opt("reminder", from || "off")).catch(() => {});
+        throw new Error(`macOS didn’t take the reminder (${errorText(e)}). Pick the time again to retry.`);
+      });
+      save(AGENT_AT, to);
+    });
   };
-  const setVendor = async (v: Vendor, record = true): Promise<boolean> => {
+  const setVendor = async (v: Vendor): Promise<boolean> => {
     const d = dataRef.current;
     if (!d) return false;
     const was = { ai: d.ai, model: d.model };
-    const next = { ...d, ai: v, model: v === "claude" ? "sonnet" : "" };
-    return change(next, async () => {
+    const first = v === "claude" ? "sonnet" : "";
+    return setting("Changed the AI provider", (now, on) => ({ ...now, ai: on ? v : was.ai, model: on ? first : was.model }), async (on) => {
+      if (!on) return ore("settings", opt("ai", was.ai)).then(() => ore("settings", opt("model", was.model)));
+      // The provider's own model, unless he has picked another since.
       const r = await ore<Data>("settings", opt("ai", v));
-      if (dataRef.current === next) { setData(r); dataRef.current = r; }
-    }, record ? { message: "Changed the AI provider", undo: () => setVendor(was.ai, false).then(() => setModel(was.model, false)), redo: () => setVendor(v, false) } : undefined);
+      const now = dataRef.current;
+      if (now && now.ai === v && now.model === first) setData((dataRef.current = { ...now, model: r.model }));
+    });
   };
-  const setModel = async (m: string, record = true): Promise<boolean> => {
+  const setModel = async (m: string): Promise<boolean> => {
     const d = dataRef.current;
     if (!d) return false;
     const was = d.model;
-    return change({ ...d, model: m }, () => ore("settings", opt("model", m)), record ? { message: "Changed the model", undo: () => setModel(was, false), redo: () => setModel(m, false) } : undefined);
+    return setting("Changed the model", (now, on) => ({ ...now, model: on ? m : was }), (on) => ore("settings", opt("model", on ? m : was)));
   };
 
   const { width, size, page, font, spacing } = useReading();

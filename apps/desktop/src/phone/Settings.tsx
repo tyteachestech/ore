@@ -5,7 +5,8 @@ import * as Switch from "@radix-ui/react-switch";
 import { useEffect, useRef, useState } from "react";
 import { goalOptions, Group, newOptions, PlanField, REMINDER_TEXT, Row, Seg, VOICE_TEXT } from "../Settings";
 import { setSounds, setVoice, useSounds, useVoice } from "../sfx";
-import { ore, opt, pullFromMac, whileOut } from "../ore";
+import { change } from "../change";
+import { ore, opt, pullFromMac } from "../ore";
 import { errorText, type Notify } from "../util";
 import { syncState } from "./fs";
 import { allowReminders, planReminders } from "./reminder";
@@ -75,22 +76,17 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
   now.current = review;
 
   /** At once, put back if the write fails; on the history so Undo takes it back. */
-  const set = async <K extends Key>(key: K, value: Review[K], record = true): Promise<boolean> => {
+  const set = <K extends Key>(key: K, value: Review[K]): Promise<boolean> => {
     const r = now.current;
-    if (!r) return false;
+    if (!r) return Promise.resolve(false);
     const was = r[key];
-    setReview({ ...r, [key]: value });
-    try {
-      await whileOut(ore("goal", opt(FLAG[key], key === "reminder" ? String(value) || "off" : String(value))));
-      void planReminders();
-      if (record) notify(`Changed “${NAME[key]}”`, "quiet", () => set(key, was, false), () => set(key, value, false));
-      return true;
-    } catch (e) {
-      setReview((x) => x && { ...x, [key]: was });
-      if (!record) throw e;
-      notify(errorText(e), "error");
-      return false;
-    }
+    return change(notify, {
+      message: `Changed “${NAME[key]}”`,
+      kind: "quiet",
+      key: "goal",
+      show: (on) => setReview((x) => x && { ...x, [key]: on ? value : was }),
+      write: (on) => ore("goal", opt(FLAG[key], key === "reminder" ? String(on ? value : was) || "off" : String(on ? value : was))).then(() => void planReminders()),
+    });
   };
   /** On asks iOS first, from his tap; refused, the switch stays off and says where to allow it. */
   const remind = async (on: boolean) => {

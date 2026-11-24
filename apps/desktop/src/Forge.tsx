@@ -6,6 +6,7 @@ import { SkillIcon } from "./IconPicker";
 import { keepKeysIn } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Mole } from "./Mole";
+import { change } from "./change";
 import { ore, opt, PHONE, type CardFull, type Skill, type Try } from "./ore";
 import { passageText } from "./text";
 import { errorText, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
@@ -138,20 +139,12 @@ export function useTries(skill: string, notify: Notify) {
     };
   }, [skill, notify, changes]);
 
-  // On the history at once, as the change is asked: a ⌘Z while its write is out takes back this step, not the one
-  // before it (which, after an add, removed the whole try). Its Undo waits for the write; one that fails is taken off.
   const step = async (msg: string, run: () => Promise<unknown>, undo: () => Promise<unknown>, kind: "quiet" | "info" = "quiet") => {
-    const write = run();
-    notify(msg, kind, () => undo().then(reload), () => run().then(reload)).hold(write);
-    try {
-      await write;
-    } catch (e) {
-      notify(errorText(e), "error");
-      return false;
-    }
+    let read: Promise<unknown> | undefined;
     // The write stands even if the re-read fails: he can undo it, and a second Enter must not write it twice.
-    await reload().catch((e) => notify(errorText(e), "error"));
-    return true;
+    const ok = await change(notify, { message: msg, kind, write: (on) => (on ? run() : undo()), settled: () => void (read = reload().catch((e) => notify(errorText(e), "error"))) });
+    await read;
+    return ok;
   };
   const active = ts?.find((t) => t.active);
   return {

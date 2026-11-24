@@ -12,13 +12,15 @@ export type Change = {
   /** Writes the change (true) or its inverse (false). */
   write: (on: boolean) => Promise<unknown>;
   /** Once the newest write of this change has settled: read the screen's data again. Never between an action
-   *  and an Undo pressed during its save, whose read would show the action still standing. */
+   *  and an Undo pressed during its save, whose read would show the action still standing; and not after a first
+   *  write that failed, which changed nothing (`show(false)` has put the screen back). */
   settled?: () => void;
   /** Changes with one key (a source's id) are written in the order he made them. */
   key?: string;
   /** Told of each write as it is asked for, before its turn comes (a list's `readGuard().writing`). */
   out?: (write: Promise<unknown>) => unknown;
-  /** One toast at a time for it (util.ts `Notify`). */
+  /** One toast at a time for it (util.ts `Notify`). Its own by default, so a failed save's reason takes the
+   *  place of the toast that said it was done. */
   slot?: string;
 };
 
@@ -45,7 +47,9 @@ export async function allOrNone(steps: ((on: boolean) => Promise<unknown>)[], on
  *  the history and says why; resolves false then. An Undo or Redo that fails shows what stands again, and the
  *  history says why and keeps the step (history.ts). */
 export function change(notify: Notify, c: Change): Promise<boolean> {
-  const key = c.key ?? `change ${++changes}`;
+  const id = `change ${++changes}`;
+  const key = c.key ?? id;
+  const slot = c.slot ?? id;
   let asked = 0;
   let failed = false;
   const run = (on: boolean) => {
@@ -54,24 +58,31 @@ export function change(notify: Notify, c: Change): Promise<boolean> {
     const n = ++asked;
     c.show?.(on);
     // An Undo asked for before the first write failed has nothing to take back.
-    const write = inOrder(key, () => (failed ? Promise.resolve() : c.write(on)));
+    const write = inOrder(key, async () => {
+      if (failed) return;
+      try {
+        await c.write(on);
+      } catch (e) {
+        if (n === 1) failed = true;
+        throw e;
+      }
+    });
     c.out?.(write);
     void write.then(() => true, () => false).then((ok) => {
       if (n !== asked) return;
       if (!ok) c.show?.(!on);
-      c.settled?.();
+      if (!failed) c.settled?.();
     });
     return write;
   };
   const first = run(true);
-  const forget = notify(c.message, c.kind ?? "info", () => run(false), () => run(true), undefined, undefined, c.slot);
+  const forget = notify(c.message, c.kind ?? "info", () => run(false), () => run(true), undefined, undefined, slot);
   return first.then(() => true, (e) => {
-    failed = true;
     forget();
     // Whatever was pressed meanwhile (an Undo, then a Redo): it was never written, so it is off the screen.
     if (asked > 1) c.show?.(false);
     // In the slot of the toast that said it was done.
-    notify(errorText(e), "error", undefined, undefined, undefined, undefined, c.slot);
+    notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot);
     return false;
   });
 }
