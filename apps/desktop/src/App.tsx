@@ -16,7 +16,7 @@ import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, whileOut, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, oreWith, searchFieldsOf, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, oreWith, searchFieldsOf, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
@@ -45,6 +45,7 @@ import { useToast } from "./Toast";
 import { lineAfter, lineKey, type Line } from "./lines";
 import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
 import { readGuard } from "./reads";
+import { change, type Change } from "./change";
 import { listenMenu, setMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
@@ -57,7 +58,7 @@ import { importanceActions, LEVELS, sourceImportanceActions } from "./importance
 import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
 import type { Sub } from "./Forge";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
-import { count, errorText, focusQuietly, inOrder as inTurn, keepScroll, keptScrolls, load, save, usable, wakeScreens, useNarrow } from "./util";
+import { count, errorText, focusQuietly, keepScroll, keptScrolls, load, save, usable, wakeScreens, useNarrow } from "./util";
 import { questionText } from "./Questions";
 import { byline, DETAILS, loadDetails, saveDetails, siteOf, type Detail } from "./details";
 import { bigger, DEFAULT_SIZE, FONTS, PAGES, setFont, setPage, setSize, setSpacing, setWidth, smaller, SPACINGS, useReading, WIDTHS } from "./reading";
@@ -334,25 +335,9 @@ export function App() {
   // Which list reads land, against the writes around them (reads.ts).
   const guard = useRef(readGuard()).current;
   const writing = guard.writing;
-  /** One action's writes, one after another: an Undo pressed while its archive still saves waits for it,
-   *  or the two `ore` runs race and the archive can land last, leaving it archived. Once the action's
-   *  latest write settles, the list is read again; an earlier one's read would begin before a later one
-   *  (an Undo) reached the library, could come back first with the row still archived, and move the
-   *  selection off the row the Undo put back. */
-  const inOrder = () => {
-    let last: Promise<unknown> = Promise.resolve();
-    let queued = 0;
-    return <T,>(write: () => Promise<T>): Promise<T> => {
-      const n = ++queued;
-      const p = last.then(write);
-      last = p.catch(() => {});
-      // After `writing`'s own count of the settle, or the read would begin before it and never land.
-      writing(p);
-      const read = () => void (n === queued && refresh());
-      p.then(read, read);
-      return p;
-    };
-  };
+  /** A change to the lists he can take back (change.ts): its writes count against the list's reads, and the list
+   *  is read again once the newest of them settles. */
+  const listChange = (c: Change) => change(notify, { out: writing, settled: () => void refresh(), ...c });
   const refresh = useCallback(async () => {
     const read = guard.begin();
     try {
@@ -1554,24 +1539,10 @@ export function App() {
     if (byKey) listRef.current?.focus({ preventScroll: true });
   };
   /** False when the write failed (and a toast said why), so the field keeps what he typed. */
-  const retitle = async (id: string, before: string, t: string, undoable = true) => {
-    if (!t || t === before) return true;
-    setItems((all) => all?.map((i) => (i.id === id ? { ...i, title: t } : i)) ?? all);
-    // On the history at once, so a quick ⌘Z takes this back, never the step before it (F146, F156); off it again if the write fails.
-    const forget = undoable ? notify(`Renamed to “${t}”`, "quiet", () => retitle(id, t, before, false), () => retitle(id, before, t, false)) : () => {};
-    try {
-      await inTurn(id, () => ore("edit", id, "--title", t));
-      return true;
-    } catch (e) {
-      forget();
-      setItems((all) => all?.map((i) => (i.id === id ? { ...i, title: before } : i)) ?? all);
-      // From the history (undo or redo): it puts the step back and says why.
-      if (!undoable) throw e;
-      notify(errorText(e), "error");
-      return false;
-    } finally {
-      void refresh();
-    }
+  const retitle = (id: string, before: string, t: string) => {
+    if (!t || t === before) return Promise.resolve(true);
+    const show = (title: string) => setItems((all) => all?.map((i) => (i.id === id ? { ...i, title } : i)) ?? all);
+    return listChange({ message: `Renamed to “${t}”`, kind: "quiet", key: id, show: (on) => show(on ? t : before), write: (on) => ore("edit", id, "--title", on ? t : before) });
   };
 
   const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id };
@@ -1581,59 +1552,44 @@ export function App() {
   const archiveSource = (item: Item) => fileAway(item, true);
   /** Brings an archived source back to its tab, with Undo. */
   const restoreSource = (item: Item) => fileAway(item, false);
-  const fileAway = async (item: Item, archived: boolean) => {
+  const fileAway = (item: Item, archived: boolean) => {
     const mark = (on: boolean) => {
       const moved = { ...item, archived_at: on ? new Date().toISOString() : undefined };
       setItems((all) => (on ? all?.filter((i) => i.id !== item.id) : all && [moved, ...all.filter((i) => i.id !== item.id)]) ?? all);
       setArchived((all) => (on ? [moved, ...all.filter((i) => i.id !== item.id)] : all.filter((i) => i.id !== item.id)));
     };
-    const queue = inOrder();
-    const save = (on: boolean) => queue(() => ore("archive", item.id, ...(on ? [] : ["--undo"])));
-    mark(archived);
     if (archived && openId === item.id) setOpenId(null);
-    // Returns the write, so an undo that fails says so and stays undoable (history.ts).
-    const apply = (on: boolean) => {
-      mark(on);
-      // Undo selects the source it put back, as Finder selects what it puts back.
-      if (on !== archived) setCursor(item.id);
-      return save(on);
-    };
-    notify(`${archived ? "Archived" : "Restored"} “${item.title}”`, "info", () => apply(!archived), () => apply(archived));
-    try {
-      await save(archived);
-    } catch (e) {
-      notify(errorText(e), "error");
-    }
+    return listChange({
+      message: `${archived ? "Archived" : "Restored"} “${item.title}”`,
+      show: (on) => {
+        mark(on === archived);
+        // Undo selects the source it put back, as Finder selects what it puts back.
+        if (!on) setCursor(item.id);
+      },
+      write: (on) => ore("archive", item.id, ...(on === archived ? [] : ["--undo"])),
+    });
   };
 
-  /** Lays out the sidebar at once (optimistic), then saves through `ore skills arrange`; a failure
-   *  puts the old layout back. */
-  /** The sidebar's layout writes, one after another, as a source's are (inOrder): a ⌘Z pressed while a rename
-   *  still saves waits for it, or the two `ore skills arrange` runs race and the rename can land last. The
-   *  skills are read again once the latest settles, so an earlier read never shows a step already taken back. */
-  const layoutWrites = useRef<{ last: Promise<unknown>; queued: number }>({ last: Promise.resolve(), queued: 0 });
-  /** Resolves false when the write was refused (said in a toast), so a rename field can open again with his words. */
-  const arrange = async (layout: SkillLayout, fromHistory = false): Promise<boolean> => {
+  /** Lays out the sidebar at once, then saves through `ore skills arrange`, as a step he can take back
+   *  (change.ts): a failure puts the old layout back. Resolves false when the write was refused (said in a toast),
+   *  so a rename field can open again with his words. */
+  const arrange = (message: string, layout: SkillLayout, kind: "info" | "quiet" = "info") => {
+    const before = layoutOf(skillGroups(skills));
     const byId = new Map(skills.map((s) => [s.id, s]));
-    setSkills(layout.flatMap((g) => g.skills.flatMap((id) => {
-      const s = byId.get(id);
-      return s ? [{ ...s, collection: g.collection || undefined }] : [];
-    })));
-    const q = layoutWrites.current;
-    const n = ++q.queued;
-    const write = skillReads.writing(q.last.then(() => ore("skills", "arrange", JSON.stringify(layout))));
-    q.last = write.catch(() => {});
-    try {
-      await write;
-      return true;
-    } catch (e) {
-      // From the history (undo or redo): it puts the step back and says why.
-      if (fromHistory) throw e;
-      notify(errorText(e), "error");
-      return false;
-    } finally {
-      if (n === q.queued) reloadSkills();
-    }
+    const show = (l: SkillLayout) =>
+      setSkills(l.flatMap((g) => g.skills.flatMap((id) => {
+        const s = byId.get(id);
+        return s ? [{ ...s, collection: g.collection || undefined }] : [];
+      })));
+    return change(notify, {
+      message,
+      kind,
+      key: "sidebar layout",
+      show: (on) => show(on ? layout : before),
+      write: (on) => ore("skills", "arrange", JSON.stringify(on ? layout : before)),
+      out: skillReads.writing,
+      settled: reloadSkills,
+    });
   };
   /** Removes a collection: its skills join the ones in none, with Undo. */
   const deleteCollection = (collection: string) => {
@@ -1642,8 +1598,7 @@ export function App() {
     const freed = before.find((g) => g.collection === collection)?.skills ?? [];
     const rest = kept.find((g) => !g.collection);
     const next = rest ? kept.map((g) => (g === rest ? { ...g, skills: [...freed, ...g.skills] } : g)) : [...kept, { collection: "", skills: freed }];
-    void arrange(next);
-    notify(`Deleted collection “${collection}”`, "info", () => arrange(before, true), () => arrange(next, true));
+    void arrange(`Deleted collection “${collection}”`, next);
   };
   /** Files a skill under another collection (or none), at the end of it, with Undo. */
   const moveSkill = (s: Skill, collection: string) => {
@@ -1652,38 +1607,35 @@ export function App() {
     const into = out.find((g) => g.collection === collection);
     const next = into ? out.map((g) => (g === into ? { ...g, skills: [...g.skills, s.id] } : g)) : [...out, { collection, skills: [s.id] }];
     const after = next.filter((g) => g.skills.length);
-    void arrange(after);
-    notify(collection ? `Moved “${s.name}” to ${collection}` : `Moved “${s.name}” out of ${s.collection}`, "info", () => arrange(before, true), () => arrange(after, true));
+    void arrange(collection ? `Moved “${s.name}” to ${collection}` : `Moved “${s.name}” out of ${s.collection}`, after);
   };
   const collections = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
 
-  /** Writes a skill's importance or archived flag (D173) at once, then saves through `ore`; a failure
-   *  puts it back. On the history, with a toast for Archive and Bring back (they move it in the sidebar). */
-  const changeSkill = async (id: string, patch: Pick<Skill, "priority" | "archived">, fromHistory = false) => {
-    setSkills((all) => all.map((k) => (k.id === id ? { ...k, ...patch } : k)));
-    try {
-      if (patch.priority) await ore("skills", "set", id, opt("priority", patch.priority));
-      if (patch.archived !== undefined) await ore("skills", "archive", id, ...(patch.archived ? [] : ["--undo"]));
-    } catch (e) {
-      if (fromHistory) throw e;
-      notify(errorText(e), "error");
-    } finally {
-      reloadSkills();
-    }
-  };
+  /** Writes a skill's importance or archived flag (D173) at once, then saves through `ore`, as a step he can take
+   *  back; a failure puts it back. A toast for Archive and Bring back (they move it in the sidebar). */
+  type SkillPatch = Pick<Skill, "priority" | "archived">;
+  const changeSkill = (message: string, kind: "info" | "quiet", id: string, before: SkillPatch, after: SkillPatch) =>
+    void change(notify, {
+      message,
+      kind,
+      key: `skill ${id}`,
+      show: (on) => setSkills((all) => all.map((k) => (k.id === id ? { ...k, ...(on ? after : before) } : k))),
+      write: async (on) => {
+        const patch = on ? after : before;
+        if (patch.priority) await ore("skills", "set", id, opt("priority", patch.priority));
+        if (patch.archived !== undefined) await ore("skills", "archive", id, ...(patch.archived ? [] : ["--undo"]));
+      },
+      settled: reloadSkills,
+    });
   /** Picks a level; picking one on an archived skill brings it back too. */
   const setImportance = (s: Skill, p: Priority) => {
     // Archived only when it changes: a live skill's level is one write.
     const before = { priority: s.priority ?? "P2", ...(s.archived && { archived: true }) };
     const after = { priority: p, ...(s.archived && { archived: false }) };
     if (before.priority === p && !s.archived) return;
-    void changeSkill(s.id, after);
-    notify(`${s.name}: ${LEVELS.find((l) => l.p === p)!.label}`, before.archived ? "info" : "quiet", () => changeSkill(s.id, before, true), () => changeSkill(s.id, after, true));
+    changeSkill(`${s.name}: ${LEVELS.find((l) => l.p === p)!.label}`, before.archived ? "info" : "quiet", s.id, before, after);
   };
-  const archiveSkill = (s: Skill, on: boolean) => {
-    void changeSkill(s.id, { archived: on });
-    notify(on ? `Archived “${s.name}”` : `Brought back “${s.name}”`, "info", () => changeSkill(s.id, { archived: !on }, true), () => changeSkill(s.id, { archived: on }, true));
-  };
+  const archiveSkill = (s: Skill, on: boolean) => changeSkill(on ? `Archived “${s.name}”` : `Brought back “${s.name}”`, "info", s.id, { archived: !on }, { archived: on });
 
   /** A skill's actions: the sidebar's right-click and ⋯. */
   const skillMenu = (s: Skill): MenuAction[] => [
@@ -1708,24 +1660,10 @@ export function App() {
 
   type CourseLine = Extract<Line, { kind: "course" }>;
   /** Renames a course on every lesson: optimistic, put back if the write fails. On the history, as a source's rename is. */
-  const recourse = async (id: string, before: string, t: string, undoable = true) => {
-    if (!t || t === before) return true;
-    setItems((all) => all?.map((i) => (i.course?.id === id ? { ...i, course: { ...i.course, title: t } } : i)) ?? all);
-    // On the history at once, so a quick ⌘Z takes this back, never the step before it (F146, F156); off it again if the write fails.
-    const forget = undoable ? notify(`Renamed to “${t}”`, "quiet", () => recourse(id, t, before, false), () => recourse(id, before, t, false)) : () => {};
-    try {
-      await inTurn(`course ${id}`, () => ore("course", "set", id, opt("title", t)));
-      return true;
-    } catch (e) {
-      forget();
-      setItems((all) => all?.map((i) => (i.course?.id === id ? { ...i, course: { ...i.course, title: before } } : i)) ?? all);
-      // From the history (undo or redo): it puts the step back and says why.
-      if (!undoable) throw e;
-      notify(errorText(e), "error");
-      return false;
-    } finally {
-      void refresh();
-    }
+  const recourse = (id: string, before: string, t: string) => {
+    if (!t || t === before) return Promise.resolve(true);
+    const show = (title: string) => setItems((all) => all?.map((i) => (i.course?.id === id ? { ...i, course: { ...i.course, title } } : i)) ?? all);
+    return listChange({ message: `Renamed to “${t}”`, kind: "quiet", key: `course ${id}`, show: (on) => show(on ? t : before), write: (on) => ore("course", "set", id, opt("title", on ? t : before)) });
   };
   const courseSkills = (c: CourseLine) => [...new Set(c.lessons.flatMap((l) => l.skills))];
   /** Files every lesson of a course under a skill, or takes them all off it. Lesson by lesson, as for a
@@ -1766,23 +1704,18 @@ export function App() {
   const batch = (message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null, after?: (forward: boolean) => unknown, sel = many) => {
     const ids = new Set(sel.map((i) => i.id));
     const was = cursor;
-    const queue = inOrder();
-    const go = async (forward: boolean, fromHistory = false) => {
-      if (patch) setItems((all) => all && (forward ? all.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) : [...all.filter((i) => !ids.has(i.id)), ...sel]));
-      if (!forward) setCursor(was);
-      try {
-        await queue(async () => {
-          for (const i of sel) await write(i, forward);
-          await after?.(forward);
-        });
-      } catch (e) {
-        if (fromHistory) throw e;
-        notify(errorText(e), "error");
-      }
-    };
     if (sel === many) unpick();
-    void go(true);
-    notify(message, "info", () => go(false, true), () => go(true, true));
+    void listChange({
+      message,
+      show: (forward) => {
+        if (patch) setItems((all) => all && (forward ? all.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) : [...all.filter((i) => !ids.has(i.id)), ...sel]));
+        if (!forward) setCursor(was);
+      },
+      write: async (forward) => {
+        for (const i of sel) await write(i, forward);
+        await after?.(forward);
+      },
+    });
   };
   const copySources = (list: Item[]) =>
     void copyCited(citeSources(list)).then(() => notify(list.length > 1 ? `Copied ${count(list.length, "source")} as Markdown` : "Copied as Markdown"), (e) => notify(errorText(e), "error"));
@@ -1838,126 +1771,78 @@ export function App() {
 
 
   /** Moves a source between To read and Done, with Undo (the finish step stays the way to finish one). */
-  const moveSource = useCallback(
-    async (item: Item, to: Item["status"], undoable = true) => {
-      const write = ore("status", item.id, ...back(item, to));
-      // On the history at once, as a pin is (F20): a ⌘Z pressed before the write answers (a slow `ore`, CI under
-      // load) must take this move back once it lands, not the step before it.
-      const forget = undoable
-        ? notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => write.then(() => moveSource(item, item.status, false)), () => write.then(() => moveSource(item, to, false)))
-        : undefined;
-      try {
-        await write;
-      } catch (e) {
-        forget?.();
-        // From the history (undo or redo): it puts the step back and says why.
-        if (!undoable) throw e;
-        notify(errorText(e), "error");
-        return;
-      }
-      await refresh();
-    },
-    [refresh, notify],
-  );
+  const moveSource = (item: Item, to: Item["status"]) =>
+    void listChange({ message: to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, key: item.id, write: (on) => writeStatus(item, on ? to : item.status) });
+  const writeStatus = (item: Item, to: Item["status"]) => ore("status", item.id, ...back(item, to));
 
-  /** Pins a source to the top of its lists, or unpins it: optimistic, put back if the write fails. */
-  const pinSource = async (item: Item, undoable = true) => {
-    const pinned_at = item.pinned_at ? undefined : new Date().toISOString();
-    setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at } : i)) ?? all);
-    const write = ore("pin", item.id, ...(pinned_at ? [] : ["--undo"]));
-    // On the history at once, so ⌘Z before the write lands still takes it back (F20).
-    const flip = (on: boolean) => () => write.then(() => pinSource({ ...item, pinned_at: on ? undefined : "x" }, false));
-    const forget = undoable ? notify(pinned_at ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`, "quiet", flip(!pinned_at), flip(!!pinned_at)) : undefined;
-    try {
-      await write;
-    } catch (e) {
-      forget?.();
-      // From the history (undo or redo): it puts the step back and says why.
-      if (!undoable) throw e;
-      notify(errorText(e), "error");
-    } finally {
-      void refresh();
-    }
+  /** Pins a source to the top of its lists, or unpins it: at once, put back if the write fails. Undoing an unpin
+   *  puts it back where it was among the pinned. */
+  const pinSource = (item: Item) => {
+    const was = item.pinned_at;
+    const now = was ? undefined : new Date().toISOString();
+    void listChange({
+      message: now ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`,
+      kind: "quiet",
+      key: item.id,
+      show: (on) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: on ? now : was } : i)) ?? all),
+      write: (on) => ore("pin", item.id, ...(on ? (now ? [] : ["--undo"]) : was ? ["--at", was] : ["--undo"])),
+    });
   };
   /** Sets how much a source matters, over its skills' importance ("" hands it back to them): at once, then
    *  through `ore`; on the history, as a skill's importance is. */
-  const setSourceImportance = async (item: Item, p: Priority | "", undoable = true) => {
+  const setSourceImportance = (item: Item, p: Priority | "") => {
     const before = item.priority ?? "";
-    setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, priority: p || undefined } : i)) ?? all);
-    const write = ore("edit", item.id, opt("priority", p));
-    // Undo and redo wait for this write, then write the other way; a failure there is the history's to tell.
-    const undo = () => write.catch(() => {}).then(() => setSourceImportance({ ...item, priority: p || undefined }, before, false));
-    const redo = () => setSourceImportance({ ...item, priority: before || undefined }, p, false);
     const said = p ? LEVELS.find((l) => l.p === p)!.label : item.skills.length ? "same as its skills" : "Normal";
-    const forget = undoable ? notify(`${item.title}: ${said}`, "quiet", undo, redo) : undefined;
-    try {
-      await write;
-    } catch (e) {
-      forget?.();
-      if (!undoable) throw e;
-      notify(errorText(e), "error");
-    } finally {
-      void refresh();
-    }
+    void listChange({
+      message: `${item.title}: ${said}`,
+      kind: "quiet",
+      key: item.id,
+      show: (on) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, priority: (on ? p : before) || undefined } : i)) ?? all),
+      write: (on) => ore("edit", item.id, opt("priority", on ? p : before)),
+    });
   };
   /** A pinned source moved among the pinned of this list (drag, or Move up/down), to `to` among them. */
-  const movePinned = async (item: Item, to: number) => {
+  const movePinned = (item: Item, to: number) => {
     const pinned = tabRows.filter((i) => i.pinned_at);
     const from = pinned.findIndex((i) => i.id === item.id);
     if (from < 0 || to === from) return;
     const rest = pinned.filter((i) => i.id !== item.id);
     const at = pinBetween(rest[to - 1]?.pinned_at, rest[to]?.pinned_at);
-    const repin = async (t: string, fromHistory = false) => {
-      setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: t } : i)) ?? all);
-      try {
-        await ore("pin", item.id, "--at", t);
-      } catch (e) {
-        if (fromHistory) throw e;
-        notify(errorText(e), "error");
-      } finally {
-        void refresh();
-      }
-    };
-    await whileOut(repin(at));
-    notify(`Moved “${item.title}”`, "quiet", () => repin(item.pinned_at!, true), () => repin(at, true));
+    void listChange({
+      message: `Moved “${item.title}”`,
+      kind: "quiet",
+      key: item.id,
+      show: (on) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: on ? at : item.pinned_at } : i)) ?? all),
+      write: (on) => ore("pin", item.id, "--at", on ? at : item.pinned_at!),
+    });
   };
 
 
   /** Files a source, or every lesson of a course, under exactly `next` skills (their cards follow):
    *  optimistic, with Undo back to `before`. */
-  const refile = async (what: { title: string; ids: Set<string>; write: (skills: string[], cards?: CardSkills) => Promise<unknown> }, next: string[], before: string[], changed?: Skill, fromHistory = false, cards?: CardSkills) => {
-    setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: next } : i)) ?? all);
-    // Filing under an archived skill brings it back (D173); Undo archives it again.
+  const refile = (what: { title: string; ids: Set<string>; write: (skills: string[], cards?: CardSkills) => Promise<unknown> }, next: string[], before: string[], changed?: Skill) => {
+    const show = (to: string[]) => setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: to } : i)) ?? all);
+    // Filing under an archived skill brings it back (D173): the sidebar shows it in its place again, and Undo archives it again.
     const revived = next.filter((id) => !before.includes(id) && skills.some((s) => s.id === id && s.archived));
-    const write = what.write(next, cards);
     const slot = `refile:${[...what.ids].join(",")}`;
-    // The step goes on the history at once, so ⌘Z pressed before the write lands still takes it back
-    // (F20); its undo waits for the write first.
-    const forget = changed
-      ? notify(
-          next.includes(changed.id) ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`,
-          "info",
-          // Each exercise gets back its own skills, not every skill the source had (Codex sweep 3).
-          () => write.then((r) => refile(what, before, next, undefined, true, (r as { cards_before?: CardSkills } | undefined)?.cards_before)).then(() => rearchive(revived)),
-          () => refile(what, next, before, undefined, true),
-          undefined,
-          undefined,
-          slot,
-        )
-      : undefined;
-    try {
-      await write;
-    } catch (e) {
-      forget?.();
-      // From the history (undo or redo): it puts the step back and says why.
-      if (fromHistory) throw e;
-      // In place of the toast that said it was filed.
-      notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot);
-    } finally {
+    const settled = () => {
       void refresh();
-      // Filing under an archived skill brings it back (D173): the sidebar shows it in its place again.
-      if (next.some((id) => skills.some((s) => s.id === id && s.archived))) reloadSkills();
+      if (revived.length) reloadSkills();
+    };
+    if (!changed) {
+      show(next);
+      return void writing(what.write(next)).catch((e) => notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot)).finally(settled);
     }
+    // Each exercise gets back its own skills, not every skill the source had (Codex sweep 3): the write says which.
+    let cards: CardSkills | undefined;
+    void change(notify, {
+      message: next.includes(changed.id) ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`,
+      slot,
+      show: (on) => show(on ? next : before),
+      write: (on) => (on ? what.write(next).then((r) => void (cards = (r as { cards_before?: CardSkills } | undefined)?.cards_before)) : what.write(before, cards).then(() => rearchive(revived))),
+      out: writing,
+      settled,
+    });
   };
   const sourceFiling = (item: Item) => ({ title: item.title, ids: new Set([item.id]), write: (ids: string[], cards?: CardSkills) => ore("edit", item.id, "--skills", ids.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : [])) });
   /** Files a source under a skill, or takes it off one, from its ⋯ menu. */
@@ -2513,13 +2398,8 @@ export function App() {
           if (open) openSkill(s.id);
         }}
         onError={(why) => notify(why, "error")}
-        onArrange={(layout, step) => {
-          const before = layoutOf(skillGroups(skills));
-          const saved = arrange(layout);
-          // A drag is a step too, quietly (Finder): ⌘Z puts the skill or collection back where it was.
-          notify(step ?? "Moved in the sidebar", step ? "info" : "quiet", () => arrange(before, true), () => arrange(layout, true));
-          return saved;
-        }}
+        // A drag is a step too, quietly (Finder): ⌘Z puts the skill or collection back where it was.
+        onArrange={(layout, step) => arrange(step ?? "Moved in the sidebar", layout, step ? "info" : "quiet")}
         onDeleteCollection={deleteCollection}
       />
 
@@ -2622,7 +2502,7 @@ export function App() {
                 setFinishing(false);
               }
               void refresh();
-              if (item) notify(`Finished “${item.title}” · exercises start tomorrow`, "info", () => moveSource(item, "reading", false), () => moveSource(item, "done", false));
+              if (item) notify(`Finished “${item.title}” · exercises start tomorrow`, "info", () => writeStatus(item, "reading").finally(() => void refresh()), () => writeStatus(item, "done").finally(() => void refresh()));
             }}
             notify={notify}
           />

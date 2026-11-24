@@ -51,7 +51,8 @@ export function change(notify: Notify, c: Change): Promise<boolean> {
   return first.then(() => true, (e) => {
     failed = true;
     forget();
-    notify(errorText(e), "error");
+    // In the slot of the toast that said it was done.
+    notify(errorText(e), "error", undefined, undefined, undefined, undefined, c.slot);
     return false;
   });
 }
