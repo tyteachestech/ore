@@ -1290,9 +1290,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }, []);
   useLayoutEffect(() => {
     if (!ready || !scrollRef.current) return;
-    // The passage he left at the top (F444); the distance down the page for a place saved before that.
+    // The passage he left at the top (F444); the distance down the page for a place saved before that. A quote
+    // no longer in the source (citedRange null) jumps nowhere, so it opens there too.
     const y = Number(load(scrollKey) ?? 0);
-    if (y > 0 && !p.jumpTo && !(docEl.current && toPlace(scrollRef.current, docEl.current, load(placeKey) ?? ""))) scrollRef.current.scrollTop = y;
+    const jumps = !!p.jumpTo && !(body !== undefined && citedRange(body, p.jumpTo) === null);
+    if (y > 0 && !jumps && !(docEl.current && toPlace(scrollRef.current, docEl.current, load(placeKey) ?? ""))) scrollRef.current.scrollTop = y;
     // A long text is drawn in slices, and can be ready a second after it opened: a click into the note meanwhile keeps
     // the keys there, or what he types next lands in the source (CI, F396).
     if (clicked.current && document.activeElement && document.activeElement !== document.body) return;

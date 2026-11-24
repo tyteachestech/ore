@@ -1227,8 +1227,16 @@ journey("tutor citation: a numbered source in a reply opens that source at the q
     // A citation whose source changed since: its quote where it now is, and nothing for one that is gone.
     await tutor.getByRole("button", { name: `Source 3: ${TESTING}` }).click();
     await until("a quote that moved is marked where it now is", async () => (await active()) === quote);
+    // Opened afresh, one that is gone opens at the place he left, as with no citation, not at the top.
+    const scroll = page.locator(".reader-scroll");
+    await scroll.evaluate((e) => (e.scrollTop = 120));
+    await page.waitForTimeout(400);
+    await page.getByRole("button", { name: "Back", exact: true }).first().click();
+    await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor({ state: "detached" });
     await tutor.getByRole("button", { name: `Source 4: ${TESTING}` }).click();
+    await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
     await until("a quote that is gone marks nothing", async () => (await active()) === "");
+    await until("a quote that is gone opens the source where he left it", async () => Math.abs((await scroll.evaluate((e) => e.scrollTop)) - 120) < 30);
   } finally {
     await page.unroute(/\/ore$/); // a failure here mustn't answer later journeys' tutor calls
   }
