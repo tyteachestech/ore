@@ -78,6 +78,14 @@ describe("search in other scripts (Codex sweep 4)", () => {
     expect(items("本語").sort()).toEqual([apart, word].sort());
   });
 
+  test("a Japanese word broken by a line break inside its paragraph is still found", async () => {
+    // A wrapped line (a PDF, a hard-wrapped text) joins the letters on both sides; a blank line does not.
+    const lib = await tempLibrary();
+    const wrapped = (await addSnippet(lib, { text: "毎朝、日本\n語を勉強しています。" })).item.meta.id;
+    await addSnippet(lib, { text: "毎朝、日本\n\n語を勉強しています。" });
+    expect([...new Set(search(lib, "日本語"))]).toEqual([wrapped]);
+  });
+
   test("an accent typed as its own mark finds the same words as one typed with its letter", async () => {
     const lib = await tempLibrary();
     const composed = (await addSnippet(lib, { text: "Η άλφα είναι το πρώτο γράμμα." })).item.meta.id;

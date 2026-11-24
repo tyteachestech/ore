@@ -289,8 +289,9 @@ const UNSPACED = /[\p{sc=Han}\p{sc=Hiragana}\p{sc=Katakana}\p{sc=Thai}\p{sc=Lao}
 const spacedOut = (s: string) => s.match(UNSPACED)?.join(" ") ?? "";
 /** A text's runs of those letters spaced out, with a private-use mark between runs: the index reads it as a
  *  word no query can spell, so a phrase never joins letters that punctuation or other words keep apart
- *  (日本。語。 does not say 日本語, Codex deep scan 2). */
-const RUN = new RegExp(`(?:${UNSPACED.source})+`, "gu");
+ *  (日本。語。 does not say 日本語, Codex deep scan 2). Spaces and one line break inside a paragraph join
+ *  the letters on both sides (a wrapped line); a blank line ends the run. */
+const RUN = new RegExp(`(?:${UNSPACED.source})+(?:[^\\S\\n]*\\n?[^\\S\\n]*(?:${UNSPACED.source})+)*`, "gu");
 const BETWEEN = " \uE000 ";
 const runsOf = (s: string) => s.match(RUN) ?? [];
 const spacedRuns = (s: string) => runsOf(s).map(spacedOut).join(BETWEEN);
