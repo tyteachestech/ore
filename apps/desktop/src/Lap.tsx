@@ -158,7 +158,9 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
   // More skills than the row shows at once roll through it like credits, one step at a time, and round again
   // (Tyler, 2026-11-23, of five small medals with their names cut short: "why would it not just loop in a credits
   // kind of way").
-  const n = plan.rows.length, rolls = n > SEEN && !still();
+  // A short window has room for two lines over the results, not three.
+  const seen = typeof window !== "undefined" && window.innerHeight < 860 ? SEEN - 1 : SEEN;
+  const n = plan.rows.length, rolls = n > seen && !still();
   const [step, setStep] = useState(0);
   useEffect(() => {
     if (!rolls || !prog.done) return;
@@ -179,10 +181,10 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
   const said = (r: EndRow, lv: number) => [name(r.skill), `${r.kept} kept`, r.cut > 0 && `${r.cut} became ${r.cut === 1 ? "a gem" : "gems"}`, lv > 0 && `level ${lv}`].filter(Boolean).join(" · ");
   return (
     // Its room is held from the start, so the results under it never move when it comes in.
-    <div className="end-skills" data-wait={!run || undefined} data-rolls={rolls || undefined}>
+    <div className="end-skills" style={{ "--seen": seen } as React.CSSProperties} data-wait={!run || undefined} data-rolls={rolls || undefined}>
       <span className="sr-only">{plan.rows.map((r) => said(r, now.find((k) => k.skill === r.skill)!.level)).join(". ")}</span>
       <div className="end-skills-track" data-jump={(rolls && prog.done && step === 0) || undefined} style={rolls ? { transform: `translateY(${-off * MEDAL_SLOT}px)` } : undefined}>
-      {(rolls && prog.done ? [...plan.rows, ...plan.rows.slice(0, SEEN)] : plan.rows).map((r, j) => {
+      {(rolls && prog.done ? [...plan.rows, ...plan.rows.slice(0, seen)] : plan.rows).map((r, j) => {
         const i = j % n, s = skills.find((x) => x.id === r.skill), lv = levelAt(r, prog.cut[i]!, prog.done, was, now);
         return (
           <Hint key={j} text={said(r, lv.lv)}>

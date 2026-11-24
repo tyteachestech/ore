@@ -2519,10 +2519,10 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .end-lap { animation: none; } }
 /* Under the ring: the skills the session fed, a row each (`SkillRows`). */
-.end-skills { display: flex; flex-direction: column; width: min(100%, 350px); min-height: 168px; margin: 20px auto 0; }
+.end-skills { display: flex; flex-direction: column; width: min(100%, 350px); min-height: calc(var(--seen, 3) * 56px); margin: 20px auto 0; }
 .end-skills-track { display: flex; flex-direction: column; min-width: 0; }
 /* More than three: a window three medals wide that the row rolls through, its edges fading out. */
-.end-skills[data-rolls] { height: 184px; overflow: hidden; padding: 8px 0; margin-top: 12px; -webkit-mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 14px), transparent); }
+.end-skills[data-rolls] { height: calc(var(--seen, 3) * 56px + 16px); overflow: hidden; padding: 8px 0; margin-top: 12px; -webkit-mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 14px), transparent); }
 .end-skills[data-rolls] .end-skills-track { transition: transform 400ms cubic-bezier(0.5, 0, 0.2, 1); }
 .end-skills[data-rolls] .end-skills-track[data-jump] { transition: none; }
 
