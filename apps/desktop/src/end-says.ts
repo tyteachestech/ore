@@ -40,8 +40,7 @@ export function endSays(o: { session: SessionEnd; today: Today; closed: boolean;
     // The session that met the day's goal says so in words. Only two things lead it: a skill's new level, the
     // rarest thing a session has and small on its line under the ring (Tyler, 2026-11-19: "go" to his saying it
     // again), and then and now, which points at what stands under the ring.
-    // A new level is the row's own moment now, flipped by the gem that earned it, so he never says it after it.
-    rare.splice(0, rare.length, ...rare.filter((l) => l.rare!.kind !== "level" && (!o.closed || l.rare!.kind === "then")));
+    rare.splice(0, rare.length, ...rare.filter((l) => !o.closed || l.rare!.kind === "level" || l.rare!.kind === "then"));
     depth.length = 0;
   }
   const common: Said[] = o.minutesLeft ? [{ text: `${o.minutesLeft} min to today’s goal. Your call.` }] : [];
