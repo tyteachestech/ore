@@ -55,6 +55,9 @@ export const RESCUE_BELOW = 0.85;
 /** A card is rescued when its recall chance had fallen under 85% and at least 5 points under the
  *  retention its skill aims for. Without the second part, every on-time P3 review (aimed at 0.80, D22)
  *  would count as a rescue. */
+/** A session's end receipt: its counts are always written. */
+export type EndReceipt = SessionReceipt & { type: "end"; reviews: number; kept: number; rescued: number };
+
 export const rescuedAt = (target: number) => Math.min(RESCUE_BELOW, target - 0.05);
 
 export function readSessions(lib: Library): SessionReceipt[] {
@@ -133,11 +136,11 @@ export function firstEndThisWeek(lib: Library, now = new Date()): boolean {
 export const DEPTH_CAP_DAYS = 30;
 
 /** Ends session `id` (the last one opened by default), taking only its own id out of the open file. */
-export function endSession(lib: Library, now = new Date(), caughtUp = false, which?: string): Promise<SessionReceipt> {
+export function endSession(lib: Library, now = new Date(), caughtUp = false, which?: string): Promise<EndReceipt> {
   return withLock(paths.lock(lib), () => receipt(lib, now, caughtUp, which ?? openSessionId(lib)));
 }
 
-function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null): SessionReceipt {
+function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null): EndReceipt {
   if (!id) throw new Error("no open session (ore session start)");
   if (!readSessions(lib).some((r) => r.type === "start" && r.id === id)) throw new Error(`no session ${id}`);
   const w = loadParams(lib);
@@ -225,7 +228,7 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
     bySkill.set(skill, (bySkill.get(skill) ?? 0) + 1);
   }
   const keptSkills = [...bySkill].map(([skill, n]) => ({ skill, n })).sort((x, y) => y.n - x.n);
-  const r: SessionReceipt = { type: "end", id, ts: nowIso(now), ...(thenNow ? { then_now: thenNow } : {}), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(keptSkills.length ? { kept_skills: keptSkills } : {}), ...(caughtUp ? { caught_up: true } : {}) };
+  const r: EndReceipt = { type: "end", id, ts: nowIso(now), ...(thenNow ? { then_now: thenNow } : {}), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(keptSkills.length ? { kept_skills: keptSkills } : {}), ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
   const ids = openSessionIds(lib);
   if (ids.includes(id)) {

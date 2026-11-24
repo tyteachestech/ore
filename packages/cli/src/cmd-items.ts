@@ -21,7 +21,7 @@ import {
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, wordCount, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
   appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, tryingNow, tryLine, markTried, planTry, addTry, useCount, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemPriority, checkPriority, setItemArchived, setItemPinned, setItemSkills, itemCardSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
-  type AnchoredAnnotation, type AnnotationPatch,
+  type AnchoredAnnotation, type Annotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
 
@@ -63,6 +63,27 @@ async function keptFromFeed(lib: Library, item: Item): Promise<boolean> {
   startEnrich(lib, item.meta.id);
   return true;
 }
+
+/** `ore ls`: one source as a list row. */
+const listedJson = (lib: Library, logs: ReturnType<typeof enrichLogs>, i: Item) => ({
+  ...i.meta, path: relative(lib.root, i.docPath), dir: i.dir, source_file: sourceFile(i), thumbnail: thumbnailFile(i), course_cover: i.meta.course ? courseCoverFile(i) : undefined, words: wordCount(i.body), has_notes: readNotes(i).trim() !== "", ...enrichFailure(logs, i),
+});
+export type ListedSource = ReturnType<typeof listedJson>;
+
+/** `ore show`: one source with its text and highlights, as the reader opens it. */
+const shownJson = async (lib: Library, item: Item, annotations: AnchoredAnnotation[]) => ({
+  ...item.meta, prequestions: item.meta.prequestions ?? [], path: relative(lib.root, item.docPath), dir: item.dir, source_file: sourceFile(item), thumbnail: thumbnailFile(item), ...enrichFailure(enrichLogs(lib), item), ...tablesState(lib, item),
+  body: item.body, annotations,
+  ...((item.meta.type === "youtube" || item.meta.video) && { transcript: transcriptOf(item) }),
+  ...(item.meta.type !== "youtube" && !item.meta.video && { audio: audioOf(item, lib) ?? undefined }),
+  ...(hasPageText(item) && { page_text: true }),
+  ...(canReimport(item) && { reimport: true }),
+  ...(item.meta.owed?.length && { fills_here: await canFill(item) }),
+});
+export type ShownSource = Awaited<ReturnType<typeof shownJson>>;
+
+/** `ore highlight`: the highlight as written; `kept_from_feed` when it kept a Feed post as a source. */
+export type Highlighted = Annotation & { kept_from_feed?: true };
 
 /** A highlight or question as a reimport reports it. */
 const brief = (a: { id: string; exact: string; intent: string }) => ({ id: a.id, exact: a.exact, intent: a.intent });
@@ -222,7 +243,7 @@ export const itemCommands: Record<string, Command> = {
         (i) => !isQuestionOnly(i) && (!status || i.meta.status === status) && (!f.skill || i.meta.skills.includes(f.skill as string)) && (!f.topic || i.meta.topics.includes(f.topic as string)),
       );
       const logs = enrichLogs(lib);
-      const data = items.map((i) => ({ ...i.meta, path: relative(lib.root, i.docPath), dir: i.dir, source_file: sourceFile(i), thumbnail: thumbnailFile(i), course_cover: i.meta.course ? courseCoverFile(i) : undefined, words: wordCount(i.body), has_notes: readNotes(i).trim() !== "", ...enrichFailure(logs, i) }));
+      const data = items.map((i) => listedJson(lib, logs, i));
       const text = items.length
         ? table(items.map((i) => [i.meta.id, i.meta.status, i.meta.type, i.meta.enriched_at ? "enriched" : "-", i.meta.title]))
         : f.archived ? "No archived sources." : status || f.skill || f.topic ? "No sources match."
@@ -260,15 +281,7 @@ export const itemCommands: Record<string, Command> = {
       const lib = openLibrary();
       const item = findItem(lib, need(ref, "<item>"));
       const annotations = anchorAnnotations(item);
-      const data = {
-        ...item.meta, prequestions: item.meta.prequestions ?? [], path: relative(lib.root, item.docPath), dir: item.dir, source_file: sourceFile(item), thumbnail: thumbnailFile(item), ...enrichFailure(enrichLogs(lib), item), ...tablesState(lib, item),
-        body: item.body, annotations,
-        ...((item.meta.type === "youtube" || item.meta.video) && { transcript: transcriptOf(item) }),
-        ...(item.meta.type !== "youtube" && !item.meta.video && { audio: audioOf(item, lib) ?? undefined }),
-        ...(hasPageText(item) && { page_text: true }),
-        ...(canReimport(item) && { reimport: true }),
-        ...(item.meta.owed?.length && { fills_here: await canFill(item) }),
-      };
+      const data = await shownJson(lib, item, annotations);
       const text = f.annotations
         ? annotations.map(annotationLine).join("\n") || "No annotations."
         : stringifyFrontmatter(item.meta, item.body);
