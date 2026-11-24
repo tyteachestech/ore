@@ -89,8 +89,8 @@ export function reopenSession(lib: Library, id: string): Promise<void> {
 
 // The sessions open now live in .ore/session, one id a line, the last started last: a review given no session
 // attaches to that one. Two windows can each have one open (the main window and the quick quiz, D76), so the
-// app names its own by id, and the quick quiz ending leaves the main window's open beneath it (its relearn
-// passes past midnight, Codex deep scan 3). Read without the lock (a review asks which session it belongs to),
+// app names its own by id, and the quick quiz (a `stack` start) ending leaves the main window's open beneath it
+// (its relearn passes past midnight, Codex deep scan 3). Read without the lock (a review asks which session it belongs to),
 // so the file may go between a check and the read: an end in another window, or the one before it, removing it
 // (CI, a review that opened on "ENOENT … .ore/session"). Gone is the same as none.
 export function openSessionIds(lib: Library): string[] {
@@ -106,30 +106,15 @@ export function openSessionId(lib: Library): string | null {
   return openSessionIds(lib).at(-1) ?? null;
 }
 
-/** An open session with nothing in this long (no start, no review) is taken as left open (⌘Q with Review up, a
- *  crash): the next start or end drops it, so its misses aren't owed again next morning and a review with no
- *  session doesn't go to it. A window still reviewing under the quick quiz has a review minutes ago. Core can't
- *  tell the main window's session from the quick quiz's (both run `ore session start`), so it goes by activity. */
-const IDLE_MS = 60 * 60_000;
-
-/** The open sessions, but the ones idle over `IDLE_MS` at `now`. */
-function stillOpen(lib: Library, now: Date): string[] {
-  const last = new Map<string, string>();
-  for (const x of readSessions(lib)) if (x.type === "start") last.set(x.id, x.ts);
-  for (const r of readReviews(lib)) if (r.session && r.ts > (last.get(r.session) ?? "")) last.set(r.session, r.ts);
-  return openSessionIds(lib).filter((id) => {
-    const at = last.get(id);
-    return at !== undefined && now.getTime() - Date.parse(at) < IDLE_MS;
-  });
-}
-
 // Starting, ending and reopening read and write .ore/session under the library lock, so one window's
 // end never removes the pointer another window's start has just written.
-export function startSession(lib: Library, now = new Date()): Promise<SessionReceipt> {
+// A plain start (the main window, the phone, /ore) replaces the list, so a session left open by ⌘Q or a crash goes
+// at the next start. `stack` (the quick quiz, D76) keeps the sessions open beneath it, so the main window's stays open.
+export function startSession(lib: Library, now = new Date(), opts: { stack?: boolean } = {}): Promise<SessionReceipt> {
   return withLock(paths.lock(lib), () => {
     const r: SessionReceipt = { type: "start", id: ulid(now.getTime()), ts: nowIso(now) };
     appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
-    writeAtomic(paths.openSession(lib), [...stillOpen(lib, now).filter((id) => id !== r.id), r.id].join("\n"));
+    writeAtomic(paths.openSession(lib), [...(opts.stack ? openSessionIds(lib) : []), r.id].join("\n"));
     return r;
   });
 }
@@ -242,8 +227,9 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
   const keptSkills = [...bySkill].map(([skill, n]) => ({ skill, n })).sort((x, y) => y.n - x.n);
   const r: SessionReceipt = { type: "end", id, ts: nowIso(now), ...(thenNow ? { then_now: thenNow } : {}), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(keptSkills.length ? { kept_skills: keptSkills } : {}), ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
-  if (openSessionIds(lib).includes(id)) {
-    const rest = stillOpen(lib, now).filter((x) => x !== id);
+  const ids = openSessionIds(lib);
+  if (ids.includes(id)) {
+    const rest = ids.filter((x) => x !== id);
     if (rest.length) writeAtomic(paths.openSession(lib), rest.join("\n"));
     else unlinkSync(paths.openSession(lib));
   }

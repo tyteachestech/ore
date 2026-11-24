@@ -276,7 +276,7 @@ export async function restoreCut(lib: Library, ref: string, cutId: string): Prom
     }
     writeAtomic(item.docPath, stringifyFrontmatter({ ...item.meta, text_sha256: sha256(next) }, next));
     // Put back somewhere new: the record says where, so Redo takes it out from there.
-    if (moved) writeAtomic(join(stashDir(lib, item.meta.id), `${cut.id}.json`), JSON.stringify({ ...cut, at }));
+    if (moved) writeAtomic(join(stashDir(lib, item.meta.id), `${cut.id}.json`), JSON.stringify({ ...cut, at, removed: cut.removed.map((a) => ({ ...a, start: a.start + moved, end: a.end + moved })) }));
   });
   return readItemDir(dir);
 }

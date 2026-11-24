@@ -267,7 +267,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       try {
         // Try again after `due` failed keeps the session already started: a second would be left open.
         if (!session.current?.open) {
-          const started = ore<{ id: string }>("session", "start");
+          const started = ore<{ id: string }>("session", "start", ...(quick ? ["--stack"] : []));
           sessionReady.current = started.catch(() => {});
           const s = await started;
           // Closed before the session began: it ends at once, as leaving would have ended it.

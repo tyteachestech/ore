@@ -452,11 +452,23 @@ describe("two sessions open at once (D76)", () => {
     const now = new Date(2026, 5, 2, 0, 1);
     const owed = () => dueQueue(lib, now).some((e) => e.id === a.meta.id && e.relearn);
     expect(owed()).toBe(true);
-    const quick = await startSession(lib, now);
+    const quick = await startSession(lib, now, { stack: true });
     expect(owed()).toBe(true);
     await endSession(lib, now, false, quick.id);
     expect(owed()).toBe(true);
     expect(openSessionId(lib)).toBe(main.id); // a review given no session goes to the main one again
+  });
+
+  test("a quick quiz opened after the main window sat idle over an hour still leaves its relearn pass owed past midnight (F-new-quick-session-pointer)", async () => {
+    const { lib, a } = await setup();
+    const main = await startSession(lib, new Date(2026, 5, 1, 23, 20));
+    await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, session: main.id, now: new Date(2026, 5, 1, 23, 30) });
+    const now = new Date(2026, 5, 2, 0, 40);
+    const owed = () => dueQueue(lib, now).some((e) => e.id === a.meta.id && e.relearn);
+    const quick = await startSession(lib, now, { stack: true });
+    await endSession(lib, now, false, quick.id);
+    expect(owed()).toBe(true);
+    expect(openSessionId(lib)).toBe(main.id);
   });
 
   test("a session left open when the app quit doesn't carry into the next morning's session or take its reviews (F-new-quick-session-pointer)", async () => {

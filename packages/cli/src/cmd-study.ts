@@ -290,11 +290,12 @@ export const studyCommands: Record<string, Command> = {
   },
 
   session: {
-    usage: "start|end [<id>]|reopen <id>  review session receipts; end: that session (the last one started by default); reopen: an ended session again (an undo on its end screen)",
-    async run([sub, id]) {
+    usage: "start [--stack]|end [<id>]|reopen <id>  review session receipts; start --stack: keep the sessions already open (the quick quiz over the main window, D76); end: that session (the last one started by default); reopen: an ended session again (an undo on its end screen)",
+    options: { stack: { type: "boolean" } },
+    async run([sub, id], f) {
       const lib = openLibrary();
       if (sub === "start") {
-        const r = await startSession(lib);
+        const r = await startSession(lib, new Date(), { stack: Boolean(f.stack) });
         // Catch up on variants missed while the Mac slept (D8); this session shows the originals.
         startRemix(lib, cardsToRemix(lib, listCards(lib)));
         startCatchUp(lib);
@@ -312,7 +313,7 @@ export const studyCommands: Record<string, Command> = {
         await reopenSession(lib, need(id, "<id>"));
         return { data: { id }, text: `Session ${id} reopened` };
       }
-      throw new Error("usage: ore session start|end [<id>]|reopen <id>");
+      throw new Error("usage: ore session start [--stack]|end [<id>]|reopen <id>");
     },
   },
 
