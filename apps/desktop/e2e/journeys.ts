@@ -7972,7 +7972,7 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   // The cart plays only with something to tip (a ring dot this session lit, or a gem it cut).
   // Whether this library has that depends on the journeys before it, so that the cart mounts at all is
   // checked in test/end-screen.test.tsx; here it is checked in a real browser when it does play.
-  const first = await page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip .cart"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length }));
+  const first = await page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip .cart"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .end-ring > .ring .dot-ring .on").length }));
   if (first.cart) {
     if (first.mole) throw new Error("the mole is up while the cart is still on the rail");
     // Its layer never widens the page or takes a click: Done is still his.
@@ -7980,7 +7980,7 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
     if (layer.events !== "none" || layer.scroll > 0) throw new Error(`the cart's layer is in the way: ${JSON.stringify(layer)}`);
     await until("the cart has gone", async () => (await page.locator(".cart-tip").count()) === 0, 8000);
   }
-  const after = await page.evaluate(() => ({ mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length, waiting: document.querySelectorAll(".review-cut > span[data-wait]").length, ore: document.querySelectorAll(".cart-ore").length }));
+  const after = await page.evaluate(() => ({ mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .end-ring > .ring .dot-ring .on").length, waiting: document.querySelectorAll(".review-cut > span[data-wait]").length, ore: document.querySelectorAll(".cart-ore").length }));
   if (!after.mole || after.waiting || after.ore || after.on < first.on) throw new Error(`the end screen didn't settle: ${JSON.stringify({ first, after })}`);
   // Its sounds (D277): the cart's roll if it came, the jingle as the ring fills, the mole's pop as he comes up.
   await until("the end screen's sounds played in order", async () => (await endSounds()) === (first.cart ? "cart done pop" : "done pop"));
@@ -7990,7 +7990,7 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   // Set back whatever happens, or every journey after a failure here would run with Reduce Motion on.
   const still = await (async () => {
     await finish();
-    return page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length }));
+    return page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .end-ring > .ring .dot-ring .on").length }));
   })().finally(() => page.emulateMedia({ reducedMotion: null }));
   // A second session only adds minutes, so the ring is at least as full.
   if (still.cart || !still.mole || still.on < after.on) throw new Error(`Reduce Motion: ${JSON.stringify({ still, after })}`);
