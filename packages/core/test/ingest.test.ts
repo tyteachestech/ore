@@ -50,7 +50,7 @@ describe("ingest", () => {
     expect(body).toEqual(words.map((w) => w.w));
   });
 
-  test("a sentence said again a minute later stays in the transcript, with its own time (F-new-repeat-speech-dropped)", () => {
+  test("a sentence said again a minute later stays in the transcript, with its own time (F582)", () => {
     // Only a rolling caption's carried-over line is a duplicate; the same words heard again later are speech.
     const vtt = readFileSync(join(import.meta.dir, "fixtures/intake/audio/repeated-speech.vtt"), "utf8");
     expect(vttToBody(vtt)).toBe("[00:00] Practice retrieval.\n\n[01:10] Practice retrieval.\n");

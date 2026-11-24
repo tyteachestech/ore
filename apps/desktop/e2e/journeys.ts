@@ -1199,7 +1199,7 @@ journey("tutor citation: a numbered source in a reply opens that source at the q
     if (!(route.request().postData() ?? "").includes('"tutor",')) return route.fallback();
     const cite = { n: 1, item: item.id, title: TESTING, heading: "", quote, text: quote, start, end: start + quote.length };
     const cite2 = { n: 2, item: item.id, title: TESTING, heading: "Using it well", quote: quote2, text: quote2, start: start2, end: start2 + quote2.length };
-    // Saved before the source was reimported (F-new-citation-reimport): one quote now sits elsewhere, one is gone.
+    // Saved before the source was reimported (F589): one quote now sits elsewhere, one is gone.
     const moved = { ...cite, n: 3, start: start2, end: start2 + quote.length };
     const gone = { ...cite, n: 4, quote: "Words this source no longer holds.", text: "Words this source no longer holds." };
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Retrieval changes the memory [1]. Confidence counts too [2]. Moved [3]. Gone [4].", citations: [cite, cite2, moved, gone], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@4" } }) });

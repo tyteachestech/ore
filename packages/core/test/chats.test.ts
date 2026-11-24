@@ -83,7 +83,7 @@ describe("tutor chats", () => {
     expect(t.alt).toBeLessThanOrEqual(t.alts.length);
   });
 
-  test("two windows' replies in the same words from different AIs both stay, each with its own stamp (F-new-chat-merge-drops-stamp)", async () => {
+  test("two windows' replies in the same words from different AIs both stay, each with its own stamp (F587)", async () => {
     const { save, turn } = await twoWindows();
     const claude = { vendor: "claude", model: "claude-model", prompt_version: "tutor@16" };
     const codex = { vendor: "codex", model: "codex-model", prompt_version: "tutor@16" };

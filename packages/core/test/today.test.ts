@@ -598,7 +598,7 @@ describe("strength breakdown and peak level (D63)", () => {
     expect(end.depth_extra_days).toBe(extra);
   });
 
-  test("a session past midnight counts what came after the new day's goal as extra (F-new-extra-after-midnight)", async () => {
+  test("a session past midnight counts what came after the new day's goal as extra (F585)", async () => {
     const { lib, cards } = await library(3);
     const [a, b, c] = cards.map((x) => x.meta.id) as [string, string, string];
     await setReviewSettings(lib, { goal_minutes: 1 });

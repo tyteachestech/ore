@@ -29,7 +29,7 @@ test("arr[2], a formula's brackets and a block still open keep their brackets; t
 
 // Codex deep scan 2: a saved chat's citation, opened after its source was reimported, marked whatever now
 // sat at its old offsets.
-test("a citation opened after its source changed marks the words it quoted where they now are, or nothing when they are gone (F-new-citation-reimport)", () => {
+test("a citation opened after its source changed marks the words it quoted where they now are, or nothing when they are gone (F589)", () => {
   const quote = "Retrieval improves durable memory.";
   const before = `# Memory\n\n${quote}\n`;
   const start = before.indexOf(quote);

@@ -1477,7 +1477,7 @@ describe("import coverage: audio and podcasts", () => {
     await expect(addSource(await tempLibrary(), url)).rejects.toThrow(/Couldn’t find that episode’s audio on Apple Podcasts/);
   });
 
-  test("an older Apple Podcasts episode whose title the show reused plays its own day's audio (F-new-feed-same-title)", async () => {
+  test("an older Apple Podcasts episode whose title the show reused plays its own day's audio (F583)", async () => {
     // A daily show names two episodes alike: the one of the page's day is the episode, not the first in the feed.
     const url = "https://podcasts.apple.com/us/podcast/daily-practice/id123?i=456";
     const feed = "https://feeds.example.com/daily";
@@ -1489,7 +1489,7 @@ describe("import coverage: audio and podcasts", () => {
     expect((await episode(url)).audio).toBe("https://traffic.example.com/jan-1.mp3");
   });
 
-  test("an older Apple Podcasts episode is found when its feed quotes the audio's address with single quotes (F-new-feed-single-quote)", async () => {
+  test("an older Apple Podcasts episode is found when its feed quotes the audio's address with single quotes (F584)", async () => {
     const url = "https://podcasts.apple.com/us/podcast/retrieval/id123?i=456";
     const feed = "https://feeds.example.com/show";
     serve({

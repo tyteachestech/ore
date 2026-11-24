@@ -254,7 +254,7 @@ test("a failed save's retry never writes over a newer save of the same file that
   expect(folder.get("items/e-05/notes.md")!.text).toBe("Second complete draft.");
 });
 
-test("a Mac edit the phone failed to read once is read on the next scan, not left stale (F-new-phone-read-retry)", async () => {
+test("a Mac edit the phone failed to read once is read on the next scan, not left stale (F593)", async () => {
   folder.set("items/r-01/doc.md", { text: "Old source text.", mtime: ++clock });
   await rescan();
   expect(fs.readFileSync(`${P}/items/r-01/doc.md`, "utf8")).toBe("Old source text.");

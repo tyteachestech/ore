@@ -53,6 +53,6 @@ test("a word inside Japanese is found from its letters side by side, as on the M
   expect(search('"勉 朝"')).toEqual([]);
 });
 
-test("a word is found without its accent or in another letter case, Greek and Cyrillic too, as on the Mac (F-new-phone-fts-unicode)", () => {
+test("a word is found without its accent or in another letter case, Greek and Cyrillic too, as on the Mac (F590)", () => {
   for (const q of ["café", "cafe", "ΜΝΗΜΗ", "μνημη", "Привет", "привет"]) expect([q, search(q).map((h) => h.ref)]).toEqual([q, ["u"]]);
 });

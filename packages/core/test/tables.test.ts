@@ -88,7 +88,7 @@ describe("PDF tables and formulas (D125)", () => {
     expect(r.unplaced).toEqual([{ id: asked.id, exact: asked.exact, intent: "question" }]);
   });
 
-  test("a PDF link whose file was replaced reads the new file whole: the old file's reading is not laid on it (F-new-pdf-stale-layout)", async () => {
+  test("a PDF link whose file was replaced reads the new file whole: the old file's reading is not laid on it (F581)", async () => {
     // The publisher replaced the PDF at the same address: what the reader saw in the old file describes other pages.
     const lib = await tempLibrary();
     const saved = globalThis.fetch;
@@ -116,7 +116,7 @@ describe("PDF tables and formulas (D125)", () => {
     }
   });
 
-  test("a PDF link that serves the same pages with a new download stamp keeps its saved reading (F-new-pdf-stale-layout)", async () => {
+  test("a PDF link that serves the same pages with a new download stamp keeps its saved reading (F581)", async () => {
     // Some hosts stamp each download (a trailer comment, a new date in its metadata): the pages and their words are the same.
     const lib = await tempLibrary();
     const saved = globalThis.fetch;

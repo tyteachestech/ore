@@ -68,7 +68,7 @@ describe("search in other scripts (Codex sweep 4)", () => {
     index.close();
   });
 
-  test("a Japanese word is not found from letters that stand apart in the text (F-new-cjk-phantom-hit)", async () => {
+  test("a Japanese word is not found from letters that stand apart in the text (F586)", async () => {
     // Punctuation or a Latin word between letters ends a run: 日本。語。 does not say 日本語.
     const lib = await tempLibrary();
     const apart = (await addSnippet(lib, { text: "日本。語。そしてx本語のメモ。" })).item.meta.id;
@@ -86,7 +86,7 @@ describe("search in other scripts (Codex sweep 4)", () => {
     expect([...new Set(search(lib, "日本語"))]).toEqual([wrapped]);
   });
 
-  test("a katakana word with the long-vowel mark is found (F-new-katakana-long-vowel)", async () => {
+  test("a katakana word with the long-vowel mark is found (F594)", async () => {
     const lib = await tempLibrary();
     const coffee = (await addSnippet(lib, { text: "毎朝コーヒーを飲みます。データも見ます。" })).item.meta.id;
     const items = (q: string) => [...new Set(search(lib, q))];

@@ -104,7 +104,7 @@ describe("Ask about this (D61)", () => {
     expect(`claude:${b![b!.indexOf("--resume") + 1]}`).toBe(first.session);
   });
 
-  test("after he switches AI, a follow-up starts a new conversation with the card, never the other vendor's session (F-new-ask-vendor-switch)", async () => {
+  test("after he switches AI, a follow-up starts a new conversation with the card, never the other vendor's session (F588)", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Retrieval practice changes what is stored." });
     const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "What does retrieval change?", answer: "What is stored.", rubric: [] });
