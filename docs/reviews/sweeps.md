@@ -104,6 +104,8 @@ When a sweep's triage is done, add a row per tester here.
 | 11-23 | [ux sweep 18](2026-11-23-codex-ux-sweep-18/) mac | Codex | Round 18: recheck of round 17, note links, author edit, warm-up | Mac | 0 | — |
 | 11-24 | [deep scan](2026-11-24-codex-deep-scan/) data | Codex, diagnosing-bugs loop | Below the screens: review replay fuzz, two devices on one library, the index rebuilt, frontmatter round-trips, git restore, AI stamps | both | 8 | #522 |
 | 11-24 | [deep scan](2026-11-24-codex-deep-scan/) intake | Codex, diagnosing-bugs loop | Reimport and anchoring, the same input twice, refusals and killed imports, what doc.md claims, Mac vs phone imports | both | 8 | #522 |
+| 11-24 | [deep scan 2](2026-11-24-codex-deep-scan-2/) chat | Codex, diagnosing-bugs loop | Tutor chats and their versions, Claude chat import, search and ⌘K, skills and Importance, end screen counts, phone search | both | 8 | #PR |
+| 11-24 | [deep scan 2](2026-11-24-codex-deep-scan-2/) media | Codex, diagnosing-bugs loop | PDF reimport and background reread, diagrams, audio transcripts and podcast feeds, the phone's fs and rescan, F575/F577 | both | 6 + F577 | #PR |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
