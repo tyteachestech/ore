@@ -152,10 +152,10 @@ export function SkillStage({ row, here, leaving, size, was, now, skills }: { row
  *  stones fly to their medals in one volley. The dim dots ahead are the memories one good answer from a gem.
  *  Every medal's place is held from the start, so none slides when another arrives.
  *  `was` and `now` are each skill's strength before and after. */
-export function SkillRows({ plan, prog, stage, was, now, skills, run }: { plan: ReturnType<typeof endPlan>; prog: EndProg; /** The row that has the big ring now, if one has. */ stage: number; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
+export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnType<typeof endPlan>; prog: EndProg; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
   // More skills than the row shows at once roll through it like credits, one step at a time, and round again
   // (Tyler, 2026-11-23, of five small medals with their names cut short: "why would it not just loop in a credits
-  // kind of way"). While the session's stones are still landing the row keeps the skill of the moment in view.
+  // kind of way").
   const n = plan.rows.length, rolls = n > SEEN && !still();
   const [step, setStep] = useState(0);
   useEffect(() => {
@@ -170,8 +170,9 @@ export function SkillRows({ plan, prog, stage, was, now, skills, run }: { plan: 
     return () => clearTimeout(id);
   }, [step, n]);
   if (!n) return null;
-  const focus = Math.max(stage, prog.shown.lastIndexOf(true));
-  const off = !rolls ? 0 : prog.done ? step : Math.max(0, Math.min(n - SEEN, focus - (SEEN - 1)));
+  // Until the session's stones have landed the row stays on its first three, which are the ones that had the
+  // big ring: it never darts ahead and back.
+  const off = rolls && prog.done ? step : 0;
   const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
   const said = (r: EndRow, lv: number) => [name(r.skill), `${r.kept} kept`, r.cut > 0 && `${r.cut} became ${r.cut === 1 ? "a gem" : "gems"}`, lv > 0 && `level ${lv}`].filter(Boolean).join(" · ");
   return (

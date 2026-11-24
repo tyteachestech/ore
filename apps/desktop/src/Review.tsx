@@ -1997,7 +1997,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
               {staged && <SkillStage key={staged.skill} row={staged} here={prog.cut[onStage!]!} leaving={leaving} size={END_RING} was={b?.skills ?? []} now={t.skills} skills={skills} />}
             </div>
           </div>
-          <SkillRows plan={rowPlan} prog={prog} stage={onStage ?? -1} was={b?.skills ?? []} now={t.skills} skills={skills} run={calm || rowsIn} />
+          <SkillRows plan={rowPlan} prog={prog} was={b?.skills ?? []} now={t.skills} skills={skills} run={calm || rowsIn} />
           <Tally tiles={tiles} go={rowed} onDone={() => setTallied(true)} />
           {held}
         </>
