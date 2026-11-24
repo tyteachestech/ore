@@ -12,11 +12,12 @@ for (const k of ["window", "document", "HTMLElement", "Node", "MutationObserver"
 let ed: typeof import("../src/editor/editor");
 let core: typeof import("@milkdown/kit/core");
 let keep: typeof import("../src/editor/preserve").keepUnedited;
+let unreadable: typeof import("../src/editor/preserve").unreadable;
 let blocks: typeof import("../src/editor/blocks");
 beforeAll(async () => {
   ed = await import("../src/editor/editor");
   core = await import("@milkdown/kit/core");
-  keep = (await import("../src/editor/preserve")).keepUnedited;
+  ({ keepUnedited: keep, unreadable } = await import("../src/editor/preserve"));
   blocks = await import("../src/editor/blocks");
 });
 
@@ -148,6 +149,60 @@ describe("note editor (D38)", () => {
     expect(out).toContain("[p]: https://example.com");
     expect(out).toContain("* A star bullet.\n");
     expect(out).toMatch(/^Now Read \[the paper\]\(https:\/\/example\.com\)\./);
+  });
+
+  /** Opens `md`, types `text` before the first text that starts with `at`, and returns what the note saves. */
+  async function editAt(md: string, at: string, text: string) {
+    const { editor, base } = await open(md);
+    editor.action((ctx) => {
+      const view = ctx.get(core.editorViewCtx);
+      let pos = -1;
+      view.state.doc.descendants((n: { isText: boolean; text?: string }, p: number) => {
+        if (pos < 0 && n.isText && n.text?.startsWith(at)) pos = p;
+      });
+      view.dispatch(view.state.tr.insertText(text, pos));
+    });
+    return keep(md, base, ed.markdownOf(editor));
+  }
+
+  const toggleTypes = async (md: string) => {
+    const types: string[] = [];
+    (await open(md)).editor.action((ctx) =>
+      ctx.get(core.editorViewCtx).state.doc.descendants((n: { type: { name: string } }) => void types.push(n.type.name)),
+    );
+    return types.filter((t) => t === "toggle");
+  };
+
+  test("two toggles with no blank line between them open as two toggles, and an edit after them keeps both (F604)", async () => {
+    const md = "<details><summary>A</summary>\n\na\n\n</details>\n<details><summary>B</summary>\n\nb\n\n</details>\n\nAfter.\n";
+    expect(await toggleTypes(md)).toEqual(["toggle", "toggle"]);
+    expect(await editAt(md, "After", "Still ")).toBe(md.replace("After.", "Still After."));
+  });
+
+  test("a toggle holding raw HTML opens as a toggle with the HTML as a literal inside it (F604)", async () => {
+    const md = "<details><summary>A</summary>\n\n<div>x</div>\n\n</details>\n\nAfter.\n";
+    expect(await toggleTypes(md)).toEqual(["toggle"]);
+    expect(await editAt(md, "After", "Still ")).toBe(md.replace("After.", "Still After."));
+  });
+
+  test("an editor that opened a note empty never saves over the note's text (F604)", () => {
+    const md = "Some writing.\n\n<details><summary>A</summary>\n\na\n\n</details>\n";
+    expect(keep(md, "", "New writing.\n")).toBe(md);
+  });
+
+  test("a note with text the editor read as empty is unreadable, so it opens read-only, never as an empty note to type in (F604)", () => {
+    const md = "Some writing.\n";
+    expect(unreadable(md, "")).toBe(true);
+    expect(unreadable(md, md)).toBe(false);
+    expect(unreadable("", "")).toBe(false);
+    expect(unreadable("\n\n", "")).toBe(false);
+  });
+
+  test("editing one list item keeps the list's other lines as written: bullets, indents and trailing spaces (F612)", async () => {
+    const md = "* Keep this.  \n* EDIT here.\n    + Nested old.\n";
+    expect(await editAt(md, "EDIT", "NEW ")).toBe("* Keep this.  \n* NEW EDIT here.\n    + Nested old.\n");
+    const quote = "> [!note]\n> EDIT here.\n> Keep this.  \n";
+    expect(await editAt(quote, "EDIT", "NEW ")).toBe(quote.replace("EDIT", "NEW EDIT"));
   });
 
   test("menu triggers: / at a line start, after a space or after an inline node (a diagram), never mid-word", async () => {

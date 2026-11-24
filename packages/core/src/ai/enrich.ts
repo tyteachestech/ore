@@ -5,11 +5,11 @@ import { readAnnotations, type Annotation } from "../annotations.ts";
 import { reflections } from "../tries.ts";
 import { locate } from "../anchoring.ts";
 import { listQuestions } from "../questions.ts";
-import { blankProblem, cardTextProblem, ContentType, CardKind, listCards, writeNewCard, type Card } from "../cards.ts";
+import { blankProblem, cardTextProblem, ContentType, CardKind, listCards, rubricProblem, writeNewCard, type Card } from "../cards.ts";
 import { stringifyFrontmatter } from "../frontmatter.ts";
 import { sha256, writeAtomic } from "../fsutil.ts";
 import { nowIso, slugify } from "../ids.ts";
-import { findItem, hasAttempts, listItems, ItemMetaSchema, type Item } from "../items.ts";
+import { findItem, hasAttempts, listItems, parseItemMeta, type Item } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { withLock } from "../lock.ts";
 import { pendingNotes } from "../notes.ts";
@@ -249,7 +249,9 @@ async function enrichOnce(lib: Library, ref: string, now: Date): Promise<EnrichR
       const points = new Set(pending.filter((a) => a.point).map((a) => a.id));
       const ungrounded = d.drafts.filter((x) => x.annotation && points.has(x.annotation) && !anchorEvidence(item.body, x.evidence).length).map((x) => x.annotation);
       if (ungrounded.length) return `drafts for point highlights need evidence: sentences copied exactly from the document (none found for ${ungrounded.join(", ")})`;
-      const unreadable = d.drafts.map((x) => cardTextProblem(x) ?? blankProblem(x)).find(Boolean);
+      // Only what the exercise file reads back as written is saved (a key point is one line).
+      for (const x of d.drafts) x.rubric = x.rubric.map((p) => p.trim());
+      const unreadable = d.drafts.map((x) => cardTextProblem(x) ?? blankProblem(x) ?? (x.kind === "prompt" ? rubricProblem("prompt", x.rubric) : null)).find(Boolean);
       if (unreadable) return unreadable;
       const prompts = d.drafts.filter((x) => x.kind === "prompt" && (x.rubric.length < 2 || x.rubric.length > 4));
       if (prompts.length) return "every prompt draft needs 2–4 rubric points";
@@ -298,18 +300,20 @@ async function enrichOnce(lib: Library, ref: string, now: Date): Promise<EnrichR
     if (notes !== null) meta = { ...meta, notes_drafted: sha256(notes) };
     if (plain.length) meta = { ...meta, planned: [...new Set([...(meta.planned ?? []), ...plain.map((a) => a.id)])] };
     if (meta !== fresh.meta) {
-      meta = ItemMetaSchema.parse(meta);
+      meta = parseItemMeta(meta);
       writeAtomic(fresh.docPath, stringifyFrontmatter(meta, fresh.body));
     }
-    // Highlights and prequestions drafted by an earlier run are skipped; one run may give a highlight two drafts.
+    // Highlights (as a card's own or one it groups), the note version and prequestions drafted by an earlier
+    // run, or one that overlapped this one, are skipped; one run may give a highlight two drafts.
     const existing = listCards(lib);
-    const already = new Set(existing.flatMap((c) => (c.meta.annotation ? [c.meta.annotation] : [])));
+    const already = new Set(existing.flatMap((c) => [c.meta.annotation, ...(c.meta.also ?? [])]).filter(Boolean));
+    const notesDone = notes !== null && fresh.meta.notes_drafted === sha256(notes);
     const preqOpen = new Set(pendingPrequestions(fresh, existing).map((p) => p.n));
     const points = new Set(pending.filter((a) => a.point).map((a) => a.id));
     const source = (d: EnrichOutput["drafts"][number]) =>
       d.from_notes ? { from: "notes" as const } : d.prequestion !== null ? { from: "prequestion" as const, prequestion: d.prequestion } : { annotation: d.annotation! };
     const cards = data.drafts
-      .filter((d) => d.from_notes || (d.prequestion !== null ? preqOpen.has(d.prequestion) : !already.has(d.annotation!)))
+      .filter((d) => (d.from_notes ? !notesDone : d.prequestion !== null ? preqOpen.has(d.prequestion) : !already.has(d.annotation!)))
       .map((d) => {
         const ts = d.topics.map(slugify).filter((s) => slugs.includes(s) || meta.topics.includes(s));
         return writeNewCard(lib, {

@@ -82,31 +82,39 @@ export function reopenSession(lib: Library, id: string): Promise<void> {
   return withLock(paths.lock(lib), () => {
     if (!readSessions(lib).some((r) => r.type === "start" && r.id === id)) throw new Error(`no session ${id}`);
     // Another window's session open meanwhile (the quick quiz) stays the default; the app names its own.
-    if (!openSessionId(lib)) writeAtomic(paths.openSession(lib), id);
+    const ids = openSessionIds(lib);
+    if (!ids.includes(id)) writeAtomic(paths.openSession(lib), [id, ...ids].join("\n"));
   });
 }
 
-// The last session started lives in .ore/session: a review given no session attaches to it. Two windows
-// can each have one open (the main window and the quick quiz, D76), so the app names its own by id.
-// Read without the lock (a review asks which session it belongs to), so the file may go between a check and the read:
-// an end in another window, or the one before it, removing it (CI, a review that opened on "ENOENT … .ore/session").
-// Gone is the same as none.
-export function openSessionId(lib: Library): string | null {
+// The sessions open now live in .ore/session, one id a line, the last started last: a review given no session
+// attaches to that one. Two windows can each have one open (the main window and the quick quiz, D76), so the
+// app names its own by id, and the quick quiz (a `stack` start) ending leaves the main window's open beneath it
+// (its relearn passes past midnight, Codex deep scan 3). Read without the lock (a review asks which session it belongs to),
+// so the file may go between a check and the read: an end in another window, or the one before it, removing it
+// (CI, a review that opened on "ENOENT … .ore/session"). Gone is the same as none.
+export function openSessionIds(lib: Library): string[] {
   try {
-    return readFileSync(paths.openSession(lib), "utf8").trim() || null;
+    return readFileSync(paths.openSession(lib), "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw e;
   }
 }
 
+export function openSessionId(lib: Library): string | null {
+  return openSessionIds(lib).at(-1) ?? null;
+}
+
 // Starting, ending and reopening read and write .ore/session under the library lock, so one window's
 // end never removes the pointer another window's start has just written.
-export function startSession(lib: Library, now = new Date()): Promise<SessionReceipt> {
+// A plain start (the main window, the phone, /ore) replaces the list, so a session left open by ⌘Q or a crash goes
+// at the next start. `stack` (the quick quiz, D76) keeps the sessions open beneath it, so the main window's stays open.
+export function startSession(lib: Library, now = new Date(), opts: { stack?: boolean } = {}): Promise<SessionReceipt> {
   return withLock(paths.lock(lib), () => {
     const r: SessionReceipt = { type: "start", id: ulid(now.getTime()), ts: nowIso(now) };
     appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
-    writeAtomic(paths.openSession(lib), r.id);
+    writeAtomic(paths.openSession(lib), [...(opts.stack ? openSessionIds(lib) : []), r.id].join("\n"));
     return r;
   });
 }
@@ -124,7 +132,7 @@ export function firstEndThisWeek(lib: Library, now = new Date()): boolean {
  *  generous his ratings were. Capped, it follows how many memories the session made stronger. */
 export const DEPTH_CAP_DAYS = 30;
 
-/** Ends session `id` (the open one by default); the open file goes only when it names this session. */
+/** Ends session `id` (the last one opened by default), taking only its own id out of the open file. */
 export function endSession(lib: Library, now = new Date(), caughtUp = false, which?: string): Promise<SessionReceipt> {
   return withLock(paths.lock(lib), () => receipt(lib, now, caughtUp, which ?? openSessionId(lib)));
 }
@@ -219,6 +227,11 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
   const keptSkills = [...bySkill].map(([skill, n]) => ({ skill, n })).sort((x, y) => y.n - x.n);
   const r: SessionReceipt = { type: "end", id, ts: nowIso(now), ...(thenNow ? { then_now: thenNow } : {}), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(keptSkills.length ? { kept_skills: keptSkills } : {}), ...(caughtUp ? { caught_up: true } : {}) };
   appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
-  if (openSessionId(lib) === id) unlinkSync(paths.openSession(lib));
+  const ids = openSessionIds(lib);
+  if (ids.includes(id)) {
+    const rest = ids.filter((x) => x !== id);
+    if (rest.length) writeAtomic(paths.openSession(lib), rest.join("\n"));
+    else unlinkSync(paths.openSession(lib));
+  }
   return r;
 }

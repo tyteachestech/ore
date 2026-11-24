@@ -31,10 +31,28 @@ function callout(n: MdNode): MdNode | null {
   text.value = text.value!.slice(m[0].length);
   if (!text.value) para.children!.shift();
   const children = para.children!.length ? n.children! : n.children!.slice(1);
-  return { type: "callout", kind: m[1]!.toLowerCase(), children: group(children) };
+  return { type: "callout", kind: m[1]!.toLowerCase(), children: blocksOf(children) };
 }
 
-function group(children: MdNode[]): MdNode[] {
+const isTag = (line: string) => OPEN.test(line.trim()) || line.trim() === "</details>";
+const asBlock = (value: string): MdNode => ({ type: "paragraph", children: [{ type: "html", value }] });
+
+/** An HTML block made only of toggle tags, one per line (`</details>` then the next `<details>`
+ *  with no blank line between is one HTML block to Markdown), as one block per tag; any other
+ *  HTML block whole. */
+export function splitTags(html: string): string[] {
+  const lines = html.split("\n");
+  return lines.length > 1 && lines.every(isTag) ? lines : [html];
+}
+
+/** A toggle's or callout's children as blocks: raw HTML inside one is a literal in its own paragraph, as at the top level. */
+const blocksOf = (children: MdNode[]) => group(children).map((n) => (n.type === "html" ? asBlock(n.value ?? "") : n));
+
+function group(all: MdNode[]): MdNode[] {
+  const children = all.flatMap((n) => {
+    const parts = splitTags(htmlOf(n) ?? "");
+    return parts.length > 1 ? parts.map(asBlock) : [n];
+  });
   const out: MdNode[] = [];
   for (let i = 0; i < children.length; i++) {
     const n = children[i]!;
@@ -50,7 +68,7 @@ function group(children: MdNode[]): MdNode[] {
       if (j < children.length) {
         const h = open[1]!.trim().match(HEADING);
         const summary = decode(h ? h[2]!.trim() : open[1]!.trim());
-        out.push({ type: "details", summary, level: h ? Number(h[1]) : 0, children: group(children.slice(i + 1, j)) });
+        out.push({ type: "details", summary, level: h ? Number(h[1]) : 0, children: blocksOf(children.slice(i + 1, j)) });
         i = j;
         continue;
       }

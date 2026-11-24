@@ -6,7 +6,7 @@ import { listCards, writeCardMeta } from "./cards.ts";
 import { parseYaml, stringifyFrontmatter, loadYaml } from "./frontmatter.ts";
 import { isOther, tidyCollection } from "./collection-name.ts";
 import { writeAtomic } from "./fsutil.ts";
-import { allItems, findItem, ItemMetaSchema, SuggestedSkill, updateItemMeta, type ItemMeta } from "./items.ts";
+import { allItems, findItem, parseItemMeta, SuggestedSkill, updateItemMeta, type ItemMeta } from "./items.ts";
 import { nowIso, slugify } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
@@ -393,7 +393,7 @@ export async function acceptSuggestedSkill(lib: Library, ref: string): Promise<{
     unarchiveFiled(lib, [id]);
     const cards: string[] = [], topics: string[] = [];
     const undo = { suggestion: s, skill: id, created, filed: !item.meta.skills.includes(id), cards, topics };
-    const meta = ItemMetaSchema.parse({ ...item.meta, skills: [...new Set([...item.meta.skills, id])], suggested_skill: undefined });
+    const meta = parseItemMeta({ ...item.meta, skills: [...new Set([...item.meta.skills, id])], suggested_skill: undefined });
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
     for (const c of listCards(lib).filter((c) => c.meta.item === meta.id && !c.meta.skills.includes(id))) {
       writeCardMeta(c, { ...c.meta, skills: [...c.meta.skills, id] });
@@ -429,7 +429,7 @@ export async function undoSuggestedSkill(lib: Library, ref: string, input: Sugge
     const item = findItem(lib, ref);
     const id = r.skill;
     const off = (skills: string[]) => skills.filter((x) => x !== id);
-    const meta = ItemMetaSchema.parse({ ...item.meta, skills: id && r.filed ? off(item.meta.skills) : item.meta.skills, suggested_skill: r.suggestion });
+    const meta = parseItemMeta({ ...item.meta, skills: id && r.filed ? off(item.meta.skills) : item.meta.skills, suggested_skill: r.suggestion });
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
     if (!id) return meta;
     const cards = new Set(r.cards);
@@ -474,7 +474,7 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[], ca
     const next = [...new Set(ids)];
     const added = next.filter((id) => !item.meta.skills.includes(id));
     const removed = item.meta.skills.filter((id) => !next.includes(id));
-    const meta = ItemMetaSchema.parse({ ...item.meta, skills: next });
+    const meta = parseItemMeta({ ...item.meta, skills: next });
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
     unarchiveFiled(lib, added);
     for (const c of listCards(lib).filter((c) => c.meta.item === meta.id)) {
@@ -498,6 +498,7 @@ const Place = z.number().int().min(0).optional();
 const Untagged = z.union([z.string().transform((id) => ({ id, at: undefined })), z.object({ id: z.string(), at: Place })]);
 export const RemovedSkillSchema = z.object({
   skill: SkillSchema,
+  yaml: z.string().optional(), // the skill as skills.yaml had it, with keys and comments he wrote by hand
   at: z.number().int().min(0),
   items: z.array(z.object({ id: z.string(), archived: z.boolean(), at: Place })),
   cards: z.array(Untagged),
@@ -514,12 +515,14 @@ export async function removeSkill(lib: Library, id: string, opts: { archive?: bo
     const i = list.items.findIndex((m) => m.get("id") === id);
     if (i < 0) throw new Error(`unknown skill "${id}"`);
     const skill = parseSkillsFile(doc.toJSON()).file.skills[i]!;
-    const removed: RemovedSkill = { skill, at: i, items: [], cards: [], topics: [] };
+    const one = new (loadYaml().Document)([]);
+    (one.contents as YAMLLib.YAMLSeq).items.push(list.items[i]!);
+    const removed: RemovedSkill = { skill, yaml: one.toString({ lineWidth: 0 }), at: i, items: [], cards: [], topics: [] };
     for (const item of allItems(lib)) {
       if (!item.meta.skills.includes(id)) continue;
       const skills = item.meta.skills.filter((s) => s !== id);
       const archive = !!opts.archive && !skills.length && !item.meta.archived_at;
-      const meta = ItemMetaSchema.parse({ ...item.meta, skills, ...(archive ? { archived_at: nowIso() } : {}) });
+      const meta = parseItemMeta({ ...item.meta, skills, ...(archive ? { archived_at: nowIso() } : {}) });
       writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
       removed.items.push({ id: item.meta.id, archived: archive, at: item.meta.skills.indexOf(id) });
     }
@@ -547,14 +550,17 @@ export async function restoreSkill(lib: Library, input: RemovedSkill): Promise<S
     const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
     const list = doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>;
     if (list.items.some((m) => m.get("id") === id)) throw new Error(`a skill "${id}" already exists`);
-    list.items.splice(Math.min(r.at, list.items.length), 0, doc.createNode(r.skill) as YAMLLib.YAMLMap);
+    const kept = r.yaml === undefined ? undefined : (loadYaml().parseDocument(r.yaml).contents as YAMLLib.YAMLSeq<YAMLLib.YAMLMap> | null)?.items?.[0];
+    const node = kept && typeof kept.get === "function" && kept.get("id") === id ? kept : (doc.createNode(r.skill) as YAMLLib.YAMLMap);
+    if (!list.items.length) list.flow = false; // a list the delete emptied was written `[]`; it goes back as lines
+    list.items.splice(Math.min(r.at, list.items.length), 0, node);
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     const back = new Map(r.items.map((x) => [x.id, x]));
     for (const item of allItems(lib)) {
       const was = back.get(item.meta.id);
       if (!was || item.meta.skills.includes(id)) continue;
       const { archived_at, ...rest } = item.meta;
-      const meta = ItemMetaSchema.parse({ ...rest, skills: putBack(item.meta.skills, id, was.at), ...(was.archived ? {} : archived_at ? { archived_at } : {}) });
+      const meta = parseItemMeta({ ...rest, skills: putBack(item.meta.skills, id, was.at), ...(was.archived ? {} : archived_at ? { archived_at } : {}) });
       writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
     }
     const cards = new Map(r.cards.map((c) => [c.id, c.at]));

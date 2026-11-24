@@ -11,7 +11,7 @@ import { readReviews, reviewLogFiles, type Review } from "../src/reviews.ts";
 import { calibration, raterStats } from "../src/stats.ts";
 import { addSkill, archiveSkill, loadSkills, reviewSettings, setAiVendor, setReviewSettings, setSkillLook } from "../src/skills.ts";
 import { NO_SKILL } from "../src/no-skill.ts";
-import { cardHistory, dueQueue, recordReview } from "../src/study.ts";
+import { cardHistory, dueQueue, libraryStats, recordReview, undoReview } from "../src/study.ts";
 import { level, nextLevelAt, reminderNote, skillGrowth, skillStrength, SOLID_DAYS, today } from "../src/today.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -729,4 +729,35 @@ test("today counts the exercises he has, so a first day says how to get one, not
   expect(today(lib).exercises).toBe(2);
   writeCardMeta(cards[0]!, { ...cards[0]!.meta, state: "retired" });
   expect(today(lib).exercises).toBe(1);
+});
+
+describe("two devices' reviews of one exercise, merged (Codex deep scan 3)", () => {
+  test("an Undo takes back only this device's rating when another device rated the exercise in the same millisecond (F595)", async () => {
+    const { lib, cards } = await library(1);
+    const id = cards[0]!.meta.id;
+    const { phone, merge } = offline(lib);
+    const t = new Date(2026, 5, 1, 12);
+    let mine = "";
+    await on("mac", async () => {
+      mine = (await recordReview(lib, id, { rating: 1, confidence: 1, now: t })).ts;
+    });
+    await on("iphone", () => recordReview(phone, id, { rating: 4, confidence: 3, now: t }));
+    merge();
+    expect(readReviews(lib).map((r) => r.rating).sort()).toEqual([1, 4]);
+    await on("mac", () => undoReview(lib, id, mine, new Date(2026, 5, 1, 13)));
+    expect(readReviews(lib).map((r) => r.rating)).toEqual([4]);
+  });
+
+  test("stats replay the merged history, so an offline answer given before the exercise was due is not a retention test (F602)", async () => {
+    const { lib, cards } = await library(1);
+    const id = cards[0]!.meta.id;
+    const { phone, merge } = offline(lib);
+    await on("mac", () => recordReview(lib, id, { rating: 3, confidence: 2, now: new Date(2026, 5, 1, 12) }));
+    // The phone hasn't seen the Mac's Good, so its review looks like a first one, due that day.
+    await on("iphone", () => recordReview(phone, id, { rating: 4, confidence: 3, now: new Date(2026, 5, 2, 12) }));
+    merge();
+    const second = readReviews(lib)[1]!;
+    expect(new Date(second.state_before.due).getDate()).toBe(2); // the phone's saved "before": due June 2
+    expect(libraryStats(lib).total.retention_n).toBe(0); // merged: due June 3, so June 2 was early
+  });
 });

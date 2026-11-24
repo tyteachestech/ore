@@ -1,9 +1,13 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { addHighlight, anchorAnnotations, readAnnotations } from "../src/annotations.ts";
 import { blocks, cutSpan, cutText, redoCut, restoreCut } from "../src/cut.ts";
 import { sha256 } from "../src/fsutil.ts";
 import { addText } from "../src/ingest/index.ts";
-import { findItem } from "../src/items.ts";
+import { findItem, renameItem } from "../src/items.ts";
+import { paths } from "../src/library.ts";
+import { withLock } from "../src/lock.ts";
 import { tempLibrary } from "./helpers.ts";
 
 // Removing junk from a source's text (a site's table of contents, a footer): whole blocks go, highlights
@@ -103,5 +107,49 @@ describe("cutText", () => {
     await restoreCut(lib, item.meta.id, c.id);
     await redoCut(lib, item.meta.id, c.id);
     expect(findItem(lib, item.meta.id).body.endsWith("Page text.\n")).toBe(true);
+  });
+});
+
+describe("cuts while the source changes", () => {
+  const TEXT = "# Source\n\nAlpha paragraph.\n\nBeta paragraph.\n\nGamma paragraph that is long enough to remain beyond the old cut position.\n";
+
+  test("a cut that waited for the library keeps the title a rename just saved (F605)", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, TEXT);
+    const at = item.body.indexOf("Beta");
+    let release!: () => void;
+    const held = withLock(paths.lock(lib), () => new Promise<void>((r) => (release = r)));
+    const rename = renameItem(lib, item.meta.id, "Renamed while cutting");
+    const cut = cutText(lib, item.meta.id, at, at + 1);
+    release();
+    await Promise.all([held, rename, cut]);
+    const now = findItem(lib, item.meta.id);
+    expect(now.meta.title).toBe("Renamed while cutting");
+    expect(now.body).not.toContain("Beta");
+  });
+
+  test("Undo of a cut after another cut above it puts the text back between whole paragraphs, never mid-word (F606)", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, TEXT);
+    const beta = await cutText(lib, item.meta.id, item.body.indexOf("Beta"), item.body.indexOf("Beta") + 1);
+    const mid = findItem(lib, item.meta.id).body;
+    await cutText(lib, item.meta.id, mid.indexOf("Alpha"), mid.indexOf("Alpha") + 1);
+    await restoreCut(lib, item.meta.id, beta.id);
+    expect(findItem(lib, item.meta.id).body).toBe("# Source\n\nBeta paragraph.\n\nGamma paragraph that is long enough to remain beyond the old cut position.\n");
+  });
+
+  test("Redo after an Undo that found the text a new place takes it out again from there (F606)", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, TEXT);
+    addHighlight(item, { exact: "Beta paragraph", intent: "keep" });
+    const beta = await cutText(lib, item.meta.id, item.body.indexOf("Beta"), item.body.indexOf("Beta") + 1);
+    const mid = findItem(lib, item.meta.id).body;
+    await cutText(lib, item.meta.id, mid.indexOf("Alpha"), mid.indexOf("Alpha") + 1);
+    const back = await restoreCut(lib, item.meta.id, beta.id);
+    const record = JSON.parse(readFileSync(join(lib.root, ".ore", "cuts", item.meta.id, `${beta.id}.json`), "utf8"));
+    expect(record.at).toBe(back.body.indexOf("Beta"));
+    expect(record.removed.map((a: { start: number }) => a.start)).toEqual([back.body.indexOf("Beta")]);
+    await redoCut(lib, item.meta.id, beta.id);
+    expect(findItem(lib, item.meta.id).body).toBe("# Source\n\nGamma paragraph that is long enough to remain beyond the old cut position.\n");
   });
 });

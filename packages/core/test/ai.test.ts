@@ -671,6 +671,63 @@ describe("AI adapter", () => {
     expect(listCards(lib)).toEqual([]);
   });
 
+  test("a draft with a blank question or a key point over two lines is asked again, never saved unreadable (F598)", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Workflows follow predefined code paths. Agents direct their own tool use." });
+    const id = item.meta.id;
+    await setNotes(lib, id, "Agents are drivers.");
+    fakeClaude([enrichOut(["Q1?", "Q2?"], [noteDraft("   ")]), enrichOut(["Q1?", "Q2?"], [noteDraft("Why are agents drivers?")])]);
+    const r = await enrichItem(lib, id);
+    expect(listCards(lib).map((c) => c.question)).toEqual(["Why are agents drivers?"]);
+    expect(r.cards.map((c) => c.question)).toEqual(["Why are agents drivers?"]);
+    expect(calls()).toBe(2);
+
+    await setNotes(lib, id, "Agents are drivers. Workflows are trains.");
+    const twoLines = { ...noteDraft("Why are workflows trains?"), rubric: ["Fixed\npaths", "Predictable"] };
+    fakeClaude([enrichOut(["Q1?", "Q2?"], [twoLines]), enrichOut(["Q1?", "Q2?"], [twoLines])]);
+    await expect(enrichItem(lib, id)).rejects.toThrow(/one line/);
+    expect(listCards(lib)).toHaveLength(1);
+    // Nothing was drafted from the changed note, so it is still waiting to be.
+    expect(needsEnrich(findItem(lib, id), listCards(lib))).toBe(true);
+  });
+
+  // Another enrich of the same source (the app's catch-up, `ore enrich`) runs and saves while this one waits on the AI.
+  const enrichMeanwhile = (lib: { root: string }, id: string) =>
+    writeFileSync(join(binDir, "while.js"), `if (require("fs").readFileSync(${JSON.stringify(join(binDir, "count"))}, "utf8") === "1") require("child_process").execFileSync("bun", [${JSON.stringify(join(import.meta.dir, "../../cli/src/ore.ts"))}, "enrich", ${JSON.stringify(id)}], { env: { ...process.env, PATH: ${JSON.stringify(`${binDir}:${savedPath}`)}, ORE_AI: "claude", ORE_LIBRARY: ${JSON.stringify(lib.root)}, ORE_NO_ENRICH: "1" } });`);
+
+  test("two enrich runs that overlap save a draft from the same note once (F599)", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Workflows follow predefined code paths. Agents direct their own tool use." });
+    const id = item.meta.id;
+    await setNotes(lib, id, "Agents are drivers.");
+    fakeClaude([enrichOut(["Q1?", "Q2?"], [noteDraft("Why are agents drivers?")]), enrichOut(["Q1?", "Q2?"], [noteDraft("Why are agents drivers?")])]);
+    enrichMeanwhile(lib, id);
+    try {
+      await enrichItem(lib, id);
+    } finally {
+      rmSync(join(binDir, "while.js"), { force: true });
+    }
+    expect(calls()).toBe(2);
+    expect(listCards(lib).map((c) => c.question)).toEqual(["Why are agents drivers?"]);
+  });
+
+  test("two enrich runs that overlap save one draft for key points they group the other way round (F599)", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Workflows follow predefined code paths. Agents direct their own tool use." });
+    const id = item.meta.id;
+    const a = addHighlight(findItem(lib, id), { exact: "Workflows follow predefined code paths.", intent: "card" });
+    const b = addHighlight(findItem(lib, id), { exact: "Agents direct their own tool use.", intent: "card" });
+    fakeClaude([enrichOut(["Q1?", "Q2?"], [{ ...draft(a.id), also: [b.id] }]), enrichOut(["Q1?", "Q2?"], [{ ...draft(b.id), also: [a.id] }])]);
+    enrichMeanwhile(lib, id);
+    try {
+      await enrichItem(lib, id);
+    } finally {
+      rmSync(join(binDir, "while.js"), { force: true });
+    }
+    expect(calls()).toBe(2);
+    expect(listCards(lib).map((c) => [c.meta.annotation, c.meta.also])).toEqual([[b.id, [a.id]]]);
+  });
+
   test("chapter recall feedback covers one chapter, no prequestions, stored in chapter_recalls", async () => {
     const lib = await tempLibrary();
     const book = await createItem(lib, { type: "epub", title: "Book", body: "<!-- chapter 1 -->\n\nOne idea.\n\n<!-- chapter 2 -->\n\nTwo ideas.\n\n<!-- chapter 3 -->\n\nThree.\n" });
@@ -904,6 +961,25 @@ fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace("When does it pay off?", 
     expect((await setPrequestionAttempt(lib, id, 1, { after: "it strengthens memory" })).check).toBeDefined();
     expect((await setPrequestionAttempt(lib, id, 1, { after: "no idea" })).check).toBeUndefined();
     await expect(setPrequestionAttempt(lib, id, 1, { before: "x", confidence: 2 })).rejects.toThrow(/--confidence/);
+  });
+
+  test("marks he corrects while a second check runs are kept, not replaced by the late AI reply (F596)", async () => {
+    const { lib, id } = await quizItem();
+    await updateItemMeta(lib, id, (m) => ({ ...m, prequestions: m.prequestions!.map((p) => ({ ...p, points: [{ text: "A", evidence: [] }, { text: "B", evidence: [] }] })) }));
+    await setPrequestionAttempt(lib, id, 1, { after: "it strengthens memory" });
+    fakeClaude([{ covered: [false, false] }, { covered: [false, false] }, { covered: [false, false] }]);
+    await checkPrequestion(lib, id, 1);
+    // He flips both marks from another window while the second check is still out.
+    writeFileSync(join(binDir, "while.js"), `require("child_process").execFileSync("bun", [${JSON.stringify(join(import.meta.dir, "../../cli/src/ore.ts"))}, "check", ${JSON.stringify(id)}, "1", "--covered", "1,1"], { env: { ...process.env, ORE_LIBRARY: ${JSON.stringify(lib.root)}, ORE_NO_ENRICH: "1" } });`);
+    try {
+      await checkPrequestion(lib, id, 1);
+    } finally {
+      rmSync(join(binDir, "while.js"), { force: true });
+    }
+    expect(findItem(lib, id).meta.prequestions![0]!.check).toMatchObject({ covered: [true, true], edited: true });
+    // Asked again with nothing in between, the AI's marks replace his, as before.
+    await checkPrequestion(lib, id, 1);
+    expect(findItem(lib, id).meta.prequestions![0]!.check).toMatchObject({ covered: [false, false] });
   });
 });
 

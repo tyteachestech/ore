@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { openIndex } from "../src/db.ts";
@@ -162,6 +162,17 @@ describe("delete a skill", () => {
     await restoreSkill(lib, JSON.parse(JSON.stringify(r.removed)));
     expect(findItem(lib, item).meta.skills).toEqual(["habits", "focus-attention", "learning"]);
     expect(findCard(lib, card).meta.skills).toEqual(["focus-attention", "habits", "learning"]);
+  });
+
+  test("Undo of deleting a skill brings back its hand-written YAML keys and comments (F608)", async () => {
+    const lib = await tempLibrary();
+    writeFileSync(paths.skills(lib), "# My organization\ncustom: keep-root\nskills:\n  - id: zero\n    name: Zero\n    priority: P1\n  # Skill explanation\n  - id: one\n    name: \"One\" # my label\n    priority: P2\n    custom: keep-skill\n");
+    const r = await removeSkill(lib, "one");
+    expect(readFileSync(paths.skills(lib), "utf8")).not.toContain("keep-skill");
+    await restoreSkill(lib, JSON.parse(JSON.stringify(r.removed)));
+    const after = readFileSync(paths.skills(lib), "utf8");
+    for (const kept of ["keep-root", "custom: keep-skill", "# my label", "# Skill explanation"]) expect(after).toContain(kept);
+    expect(loadSkills(lib).skills.map((s) => [s.id, s.name])).toEqual([["zero", "Zero"], ["one", "One"]]);
   });
 
   test("restore still takes what a delete printed before it kept places", async () => {

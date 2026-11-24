@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { subdirs } from "./fsutil.ts";
-import { itemDirs, readItemDir } from "./items.ts";
+import { ID_END, itemDirs, readable, readItemDir } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 import { skillNotesPath } from "./notes.ts";
 import { loadSkills } from "./skills.ts";
@@ -18,6 +18,31 @@ export const linkUrl = (t: LinkTarget) => `ore:${t.kind}/${t.id}`;
 
 export function parseLinks(text: string): { text: string; target: LinkTarget; index: number }[] {
   return [...text.matchAll(LINK)].map((m) => ({ text: m[1]!, target: { kind: m[2] as LinkTarget["kind"], id: m[3]! }, index: m.index! }));
+}
+
+type MdNode = { type: string; url?: string; identifier?: string; value?: string; children?: MdNode[]; position?: { start: { line: number } } };
+const ORE_URL = /^ore:(item|skill)\/(\S+)$/;
+const textOf = (n: MdNode): string => n.value ?? (n.children ?? []).map(textOf).join("");
+
+/** The Ore links a note shows as links, as Markdown renders it: none in code or after an escaped bracket,
+ *  and a reference-style one (`[Text][t]` with `[t]: ore:item/…`) too. `line` is where each starts, 0-based. */
+export function renderedLinks(text: string): { text: string; target: LinkTarget; line: number }[] {
+  if (!text.includes("ore:")) return [];
+  const nodes: MdNode[] = [];
+  const walk = (n: MdNode) => {
+    nodes.push(n);
+    n.children?.forEach(walk);
+  };
+  // Loaded on first use, as `yaml` is: every command loads this file, few read links.
+  const { fromMarkdown } = require("mdast-util-from-markdown") as typeof import("mdast-util-from-markdown");
+  walk(fromMarkdown(text) as MdNode);
+  const defs = new Map<string, string>();
+  for (const n of nodes) if (n.type === "definition" && !defs.has(n.identifier!)) defs.set(n.identifier!, n.url!);
+  return nodes.flatMap((n) => {
+    const url = n.type === "link" ? n.url : n.type === "linkReference" ? defs.get(n.identifier!) : undefined;
+    const m = url?.match(ORE_URL);
+    return m ? [{ text: textOf(n), target: { kind: m[1] as LinkTarget["kind"], id: m[2]! }, line: n.position!.start.line - 1 }] : [];
+  });
 }
 
 // The note's lines, with those inside fenced code blocks emptied: a `# comment` or a link
@@ -38,8 +63,8 @@ export function proseLines(text: string): string[] {
   });
 }
 
-// A line as he reads it: links shown as their text.
-const plainLine = (line: string) => line.replace(LINK, "$1").trim();
+// A line as he reads it: links, reference-style ones too, shown as their text.
+const plainLine = (line: string) => line.replace(LINK, "$1").replace(/\[((?:[^\]\\]|\\.)*)\]\[[^\]]*\]/g, "$1").trim();
 
 export interface NoteFile {
   from: LinkTarget & { title: string };
@@ -77,11 +102,14 @@ export function backlinks(lib: Library, target: LinkTarget): Backlink[] {
   const out: Backlink[] = [];
   for (const f of noteFiles(lib)) {
     if (f.from.kind === target.kind && f.from.id === target.id) continue;
+    const text = readFileSync(f.path, "utf8");
+    const at = new Set(renderedLinks(text).filter((l) => l.target.kind === target.kind && l.target.id === target.id).map((l) => l.line));
+    if (!at.size) continue;
     let heading: string | null = null;
-    for (const line of proseLines(readFileSync(f.path, "utf8"))) {
+    for (const [n, line] of proseLines(text).entries()) {
       const h = line.match(/^#{1,6}\s+(.*)$/);
       if (h) heading = plainLine(h[1]!);
-      if (parseLinks(line).some((l) => l.target.kind === target.kind && l.target.id === target.id))
+      if (at.has(n))
         out.push({ from: f.from, heading: h ? null : heading, line: plainLine(line.replace(/^\s*(?:[-*+]|\d+[.)])\s+(?:\[[ xX]\]\s+)?|^\s*>\s?/, "")) });
     }
   }
@@ -90,10 +118,12 @@ export function backlinks(lib: Library, target: LinkTarget): Backlink[] {
 
 // Links whose target no longer exists, for `ore doctor`.
 export function brokenLinks(lib: Library): { path: string; text: string; target: LinkTarget }[] {
-  const items = new Set(itemDirs(lib).map((d) => d.slice(-26)));
+  // Each source's id as its folder ends in it, or as its doc.md names it when Finder renamed the folder (as findItem).
+  const dirs = itemDirs(lib);
+  const items = new Set([...dirs.filter((d) => ID_END.test(d)).map((d) => d.slice(-26)), ...readable(dirs.filter((d) => !ID_END.test(d)), readItemDir).map((i) => i.meta.id)]);
   const skills = new Set(loadSkills(lib).skills.map((s) => s.id));
   return noteFiles(lib).flatMap((f) =>
-    parseLinks(proseLines(readFileSync(f.path, "utf8")).join("\n"))
+    renderedLinks(readFileSync(f.path, "utf8"))
       .filter((l) => !(l.target.kind === "item" ? items : skills).has(l.target.id))
       .map((l) => ({ path: f.path, text: l.text, target: l.target })),
   );

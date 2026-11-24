@@ -5,7 +5,7 @@ import { readAnnotations } from "./annotations.ts";
 import { loadYaml, parseYaml } from "./frontmatter.ts";
 import { appendJsonl, deviceLog, readLog, writeAtomic } from "./fsutil.ts";
 import { nowIso } from "./ids.ts";
-import { addSource } from "./ingest/index.ts";
+import { addSource, linkKey } from "./ingest/index.ts";
 import { allItems, findItem, keepPreview, listItems, type Item } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
@@ -335,10 +335,11 @@ type ReadMark = { url: string; at: string; unread?: boolean };
 function readSet(lib: Library): Set<string> {
   const last = new Map<string, ReadMark>();
   for (const m of readLog<ReadMark>(readPath(lib))) {
-    const prev = last.get(m.url);
-    if (!prev || m.at >= prev.at) last.set(m.url, m);
+    const key = linkKey(m.url);
+    const prev = last.get(key);
+    if (!prev || m.at >= prev.at) last.set(key, m);
   }
-  return new Set([...last.values()].filter((m) => !m.unread).map((m) => m.url));
+  return new Set([...last.entries()].filter(([, m]) => !m.unread).map(([key]) => key));
 }
 
 export function markRead(lib: Library, urls: string[], read = true): void {
@@ -354,15 +355,16 @@ export function feedView(lib: Library, now = new Date()): FeedView {
   const feeds = listFeeds(lib);
   const cache = readCache(lib);
   const read = readSet(lib);
-  const kept = new Set(allItems(lib).map((i) => i.meta.url).filter(Boolean));
-  const previews = new Map(listItems(lib, { preview: true }).map((i) => [i.meta.url, i.meta.id]));
+  // The same link written another way (http, www, tags) is the same post, as when adding it.
+  const kept = new Set(allItems(lib).flatMap((i) => (i.meta.url ? [linkKey(i.meta.url)] : [])));
+  const previews = new Map(listItems(lib, { preview: true }).flatMap((i) => (i.meta.url ? [[linkKey(i.meta.url), i.meta.id] as const] : [])));
   const since = now.getTime() - FEED_DAYS * 86400_000;
   const seen = new Set<string>();
   const posts = feeds
     .flatMap((f) => (cache.feeds[f.url]?.posts ?? []).map((p) => ({ ...p, feed_title: f.title })))
     // A post with no date counts as new until the feed stops listing it.
-    .filter((p) => !kept.has(p.url) && (!p.published || Date.parse(p.published) >= since) && !seen.has(p.url) && seen.add(p.url))
-    .map((p) => ({ ...p, read: read.has(p.url), ...(previews.has(p.url) ? { preview: previews.get(p.url) } : {}) }))
+    .filter((p) => !kept.has(linkKey(p.url)) && (!p.published || Date.parse(p.published) >= since) && !seen.has(linkKey(p.url)) && seen.add(linkKey(p.url)))
+    .map((p) => ({ ...p, read: read.has(linkKey(p.url)), ...(previews.has(linkKey(p.url)) ? { preview: previews.get(linkKey(p.url)) } : {}) }))
     .sort((a, b) => (b.published ?? "").localeCompare(a.published ?? ""));
   return { feeds: feeds.map((f) => ({ ...f, checked_at: cache.feeds[f.url]?.checked_at, error: cache.feeds[f.url]?.error })), posts };
 }
@@ -380,23 +382,24 @@ export async function openPost(lib: Library, url: string): Promise<Item> {
 /** A preview with anything of his in it: a highlight or a line in its source note. */
 const hasHisWork = (item: Item) => readAnnotations(item).some((a) => a.status !== "deleted") || readNotes(item).trim() !== "";
 
-/** Leaving a previewed post: kept if he highlighted or wrote in it, else deleted. */
+/** Leaving a previewed post: kept if he highlighted or wrote in it, else deleted. Decided under the
+ *  lock from the source as it is then, so a note or highlight saved while this waited keeps it. */
 export async function closePost(lib: Library, id: string): Promise<"kept" | "dropped" | "source"> {
-  const item = findItem(lib, id);
-  if (!item.meta.preview) return "source";
-  if (hasHisWork(item)) {
-    await keepPreview(lib, id);
-    return "kept";
-  }
-  await withLock(paths.lock(lib), () => rmSync(item.dir, { recursive: true, force: true }));
-  return "dropped";
+  const r = await withLock(paths.lock(lib), () => {
+    const item = findItem(lib, id);
+    if (!item.meta.preview) return "source";
+    if (hasHisWork(item)) return "kept";
+    rmSync(item.dir, { recursive: true, force: true });
+    return "dropped";
+  });
+  if (r === "kept") await keepPreview(lib, id);
+  return r;
 }
 
 /** Previews the app left behind (it quit with one open): kept if they hold his work, else deleted. */
 export async function clearPreviews(lib: Library, now = Date.now()): Promise<void> {
   for (const item of listItems(lib, { preview: true })) {
     if (now - Date.parse(item.meta.preview!) < PREVIEW_MS) continue;
-    if (hasHisWork(item)) await keepPreview(lib, item.meta.id);
-    else await withLock(paths.lock(lib), () => rmSync(item.dir, { recursive: true, force: true }));
+    await closePost(lib, item.meta.id);
   }
 }

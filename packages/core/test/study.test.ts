@@ -443,3 +443,44 @@ describe("review loop", () => {
     expect(states()).toEqual(rebuilt());
   });
 });
+
+describe("two sessions open at once (D76)", () => {
+  test("starting and ending a quick quiz leaves the main session's relearn pass owed past midnight (F597)", async () => {
+    const { lib, a } = await setup();
+    const main = await startSession(lib, new Date(2026, 5, 1, 23, 58));
+    await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, session: main.id, now: new Date(2026, 5, 1, 23, 59) });
+    const now = new Date(2026, 5, 2, 0, 1);
+    const owed = () => dueQueue(lib, now).some((e) => e.id === a.meta.id && e.relearn);
+    expect(owed()).toBe(true);
+    const quick = await startSession(lib, now, { stack: true });
+    expect(owed()).toBe(true);
+    await endSession(lib, now, false, quick.id);
+    expect(owed()).toBe(true);
+    expect(openSessionId(lib)).toBe(main.id); // a review given no session goes to the main one again
+  });
+
+  test("a quick quiz opened after the main window sat idle over an hour still leaves its relearn pass owed past midnight (F597)", async () => {
+    const { lib, a } = await setup();
+    const main = await startSession(lib, new Date(2026, 5, 1, 23, 20));
+    await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, session: main.id, now: new Date(2026, 5, 1, 23, 30) });
+    const now = new Date(2026, 5, 2, 0, 40);
+    const owed = () => dueQueue(lib, now).some((e) => e.id === a.meta.id && e.relearn);
+    const quick = await startSession(lib, now, { stack: true });
+    await endSession(lib, now, false, quick.id);
+    expect(owed()).toBe(true);
+    expect(openSessionId(lib)).toBe(main.id);
+  });
+
+  test("a session left open when the app quit doesn't carry into the next morning's session or take its reviews (F597)", async () => {
+    const { lib, a } = await setup();
+    const old = await startSession(lib, new Date(2026, 5, 1, 21, 0));
+    await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, session: old.id, now: new Date(2026, 5, 1, 21, 10) });
+    // ⌘Q: no end receipt. Next morning:
+    const now = new Date(2026, 5, 2, 8, 0);
+    const morning = await startSession(lib, now);
+    expect(dueQueue(lib, now).some((e) => e.id === a.meta.id && e.relearn)).toBe(false);
+    await endSession(lib, now, false, morning.id);
+    expect(openSessionId(lib)).toBeNull();
+    expect((await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: new Date(2026, 5, 2, 8, 5) })).session).toBeNull();
+  });
+});

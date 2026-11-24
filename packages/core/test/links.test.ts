@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { openIndex } from "../src/db.ts";
 import { doctor } from "../src/doctor.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { backlinks, brokenLinks, linkUrl, parseLinks } from "../src/links.ts";
 import { removeSkill, restoreSkill } from "../src/skills.ts";
+import { findItem } from "../src/items.ts";
 import { appendNote, attachToNote, getNotes, setNotes, skillNotesPath } from "../src/notes.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -85,6 +86,23 @@ describe("backlinks (D39)", () => {
     expect(existsSync(skillNotesPath(lib, "teaching"))).toBe(true);
     await restoreSkill(lib, removed);
     expect(backlinks(lib, { kind: "item", id: a.id }).map((l) => l.from.title)).toEqual(["Teaching"]);
+  });
+
+  test("only links Markdown renders count: not in inline or indented code or after an escaped bracket, and a reference-style link does (F609)", async () => {
+    const { lib, a, b } = await setup();
+    const url = linkUrl({ kind: "item", id: a.id });
+    await setNotes(lib, b.id, `## Code\n\nExample: \`[Target](${url})\`\n\n    [Indented](${url})\n\nEscaped \\[Target](${url}) is text.\n\n## Real\n\nSee [Target][t].\n\n[t]: ${url}\n`);
+    expect(backlinks(lib, { kind: "item", id: a.id })).toEqual([{ from: { kind: "item", id: b.id, title: b.title }, heading: "Real", line: "See Target." }]);
+    await setNotes(lib, b.id, `\`[Gone](ore:skill/old)\` and [Gone][g].\n\n[g]: ore:skill/older\n`);
+    expect(brokenLinks(lib).map((l) => [l.text, l.target.id])).toEqual([["Gone", "older"]]);
+  });
+
+  test("a source folder renamed in Finder is no broken link: its id comes from its doc.md (F611)", async () => {
+    const { lib, a, b } = await setup();
+    await setNotes(lib, b.id, `See [spacing](ore:item/${a.id}).\n`);
+    const dir = findItem(lib, a.id).dir;
+    renameSync(dir, join(dirname(dir), "Renamed in Finder"));
+    expect(brokenLinks(lib)).toEqual([]);
   });
 
   test("doctor reports links that no longer resolve", async () => {

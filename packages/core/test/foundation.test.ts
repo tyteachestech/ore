@@ -147,6 +147,20 @@ describe("init", () => {
     expect(desiredRetention(["habits", "ai"], s)).toBe(0.92);
     expect(desiredRetention(["habits"], s)).toBe(0.8);
   });
+
+  test("two inits of the same new folder at once both finish, with one library (F613)", async () => {
+    const init = join(import.meta.dir, "../src/init.ts");
+    const run = (root: string) => {
+      const p = Bun.spawn(["bun", "-e", `await (await import(${JSON.stringify(init)})).initLibrary(${JSON.stringify(root)})`], { stdout: "pipe", stderr: "pipe" });
+      return Promise.all([p.exited, new Response(p.stderr).text()]);
+    };
+    for (let n = 0; n < 4; n++) {
+      const root = join(mkdtempSync(join(tmpdir(), "ore-init-race-")), "lib");
+      const results = await Promise.all([run(root), run(root)]);
+      expect(results.map(([code, err]) => (code === 0 ? "ok" : err.trim().split("\n")[0]))).toEqual(["ok", "ok"]);
+      for (const f of ["AGENTS.md", "CLAUDE.md", "skills.yaml", ".git/HEAD"]) expect(existsSync(join(root, f))).toBe(true);
+    }
+  }, 30_000);
 });
 
 describe("skill look", () => {

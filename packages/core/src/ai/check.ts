@@ -80,8 +80,11 @@ export async function checkPrequestion(lib: Library, ref: string, n: number) {
     input: { question: p.q, key_points: points.map((k) => k.text), answer: after },
     check: (d) => (d.covered.length === points.length ? null : `covered must have exactly ${points.length} entries, one per key point`),
   });
+  const before = JSON.stringify(p.check ?? null);
   return updatePrequestion(lib, item.meta.id, n, (cur) => {
     if (cur.after !== after) throw new Error("the answer changed while checking; check again");
+    // His own marks, set while this check ran, win over its late reply (D56).
+    if (cur.check?.edited && JSON.stringify(cur.check) !== before) return cur;
     return { ...cur, check: { covered: data.covered, ai } };
   });
 }

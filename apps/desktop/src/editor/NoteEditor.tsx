@@ -26,7 +26,7 @@ import { lastPaint, paint } from "./colors";
 import { mathBlockSchema, mathInlineSchema, mathViews } from "./math";
 import * as Popover from "@radix-ui/react-popover";
 import { dateRows } from "./dates";
-import { keepUnedited } from "./preserve";
+import { keepUnedited, unreadable } from "./preserve";
 import { BlockHandle, nearest, spot, type Spot } from "./BlockHandle";
 import { copiedFiles, pastesFiles } from "../copied";
 import { imageExt, noteImage } from "../paste";
@@ -180,6 +180,8 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
   const [dropLine, setDropLine] = useState<{ x: number; y: number; w: number } | null>(null);
   /** The diagram open in the overlay; `at` is where a new one goes once it has a drawing. */
   const [drawing, setDrawing] = useState<{ name: string; at?: number } | null>(null);
+  // The note's text when the editor could not read it: shown as written, never as an empty note to type over.
+  const [unread, setUnread] = useState<string | null>(null);
   // The editor's plugins live as long as it does; they read the latest props, rows and menu
   // through this. The menu here is set as the caret moves, ahead of React's render.
   const live = useRef<Live["current"]>({ p, menu, rowsFor: () => [], index, dismissed: { at: -1, ch: "" }, added: null, draw: (name) => setDrawing({ name }), askLink: () => setAskLink((n) => n + 1), linkNow: () => setLinkNow(true), bar: false, putImages: async () => {}, editMath: () => {}, renames: new Set() });
@@ -292,6 +294,11 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
       [menuPlugin(live, setMenu, setIndex), ...(PHONE ? [] : [selBarPlugin(host, showSel)]), ...(PHONE ? [barWatch] : []), imagePaste(live), imageView(live), ...mathViews((pos) => live.current.editMath(pos)), followRenames(live), toggleView, ghostPlugin, blockStartPlugin],
     ).then((e) => {
       if (gone) return void e.destroy();
+      if (unreadable(original, markdownOf(e))) {
+        void e.destroy();
+        el.remove();
+        return setUnread(original);
+      }
       editor.current = e;
       e.action((ctx) => {
         const dom = ctx.get(editorViewCtx).dom;
@@ -732,6 +739,12 @@ export const NoteEditor = forwardRef<NoteEditorHandle, Props>(function NoteEdito
     >
       {/* A diagram's preview has its own right-click menu (Excalidraw's embeds in Notion); the
           note's text keeps the Mac's (native-menu.ts). */}
+      {unread !== null && (
+        <>
+          <p className="note-unread">Couldn’t open this note to edit. The file is unchanged.</p>
+          <pre className="note-raw">{unread}</pre>
+        </>
+      )}
       <WithMenu actions={diagramActions}>
         <div ref={root} onContextMenuCapture={(e) => (rightClicked.current = (e.target as HTMLElement).closest?.(".note-diagram") ?? null)} />
       </WithMenu>
