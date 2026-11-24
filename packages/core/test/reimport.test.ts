@@ -51,6 +51,23 @@ describe("reimport", () => {
     expect(readFileSync(`${now.dir}/source.md`, "utf8")).toBe(V2);
   });
 
+  test("a question whose passage was deleted is reported unplaced, not moved onto a passage written like it (F-new-fuzzy-other-passage)", async () => {
+    const lib = await tempLibrary();
+    const target = "The blue heron nests beside the river each spring.";
+    const rival = "The grey heron nests beside the marsh each spring.";
+    const river = "# River habitat\n\nObserve the northern river colony.\n\n" + target + "\n\nThese notes belong to the river survey.\n\n";
+    const marsh = "# Marsh habitat\n\nObserve the southern marsh colony.\n\n" + rival + "\n\nThese notes belong to the marsh survey.\n";
+    page = river + marsh;
+    serve();
+    const item = await addSource(lib, URL_);
+    const q = addHighlight(item, { exact: target, intent: "question", note: "Why does the blue heron pick the river?" });
+    page = marsh;
+    const r = await reimportSource(lib, item.meta.id);
+    expect(r.unplaced.map((a) => a.id)).toEqual([q.id]);
+    const kept = readAnnotations(findItem(lib, item.meta.id)).find((a) => a.id === q.id)!;
+    expect(kept.exact).toBe(target);
+  });
+
   test("undo puts back the old text and highlights, and running it again redoes", async () => {
     const lib = await tempLibrary();
     page = V1;

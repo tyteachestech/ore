@@ -94,6 +94,10 @@ function contextScore(text: string, sel: Selector, start: number, end: number): 
 }
 
 export const MAX_FUZZY_ERROR_RATE = 0.25;
+// An edit to a passage is local: the text on at least one side of it still reads as it did. When the quote was
+// reworded and the text on both sides changed too, the match is another passage written alike (a deleted
+// passage's neighbour), and taking it would move a question onto words it was never about (F-new-fuzzy-other-passage).
+export const MIN_FUZZY_CONTEXT = 0.9;
 
 export function anchor(text: string, sel: Selector): Anchor | null {
   if (!sel.exact) return null;
@@ -119,7 +123,11 @@ export function anchor(text: string, sel: Selector): Anchor | null {
   const best = matches
     .map((m) => ({ m, score: 50 * (1 - m.errors / sel.exact.length) + contextScore(text, sel, m.start, m.end) }))
     .sort((a, b) => b.score - a.score)[0]!;
-  return { ...refineBounds(text, sel, best.m.start, best.m.end, 2 * maxErrors), method: "fuzzy" };
+  const span = refineBounds(text, sel, best.m.start, best.m.end, 2 * maxErrors);
+  const before = similarity(sel.prefix, text.slice(Math.max(0, span.start - sel.prefix.length), span.start));
+  const after = similarity(sel.suffix, text.slice(span.end, span.end + sel.suffix.length));
+  if (Math.max(before, after) < MIN_FUZZY_CONTEXT) return null;
+  return { ...span, method: "fuzzy" };
 }
 
 // A minimal-edit match can stop short of (or overrun) the real passage when
