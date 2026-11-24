@@ -1925,8 +1925,10 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     // The volley is over in the same time however many stones it has.
     const gap = Math.min(40, 520 / Math.max(1, rowPlan.rows.reduce((n, r) => n + r.slots.filter((k) => !(k === "cut" && r.solo)).length, 0)));
     let stones = 0;
-    rowPlan.rows.forEach((r, row) => r.slots.forEach((kind, d) => {
-      if (kind === "cut" && r.solo) return;
+    // The gems still in the ring leave first, then the stones from its middle, so the ring is soon free.
+    const volley = rowPlan.rows.flatMap((r, row) => r.slots.map((kind, d) => ({ r, row, kind, d }))).filter((x) => !(x.kind === "cut" && x.r.solo)).sort((x, y) => Number(y.kind === "cut") - Number(x.kind === "cut"));
+    const gemsOut = volley.filter((x) => x.kind === "cut").length;
+    volley.forEach(({ r, row, kind, d }) => {
       at(t + stones++ * gap, () => {
         // A gem of a skill that had no turn of its own goes from where it was cut straight to its medal.
         const src = kind === "cut" ? host.querySelector<HTMLElement>(`.review-cut > span[data-fly][data-skill="${CSS.escape(r.skill)}"]:not([data-gone])`) : null;
@@ -1948,13 +1950,13 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           layer("tap", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.3 });
         });
       });
-    }));
-    // The ring is free for the minutes as soon as the last one has left it, while they are still in the air.
-    const cleared = t + (stones ? (stones - 1) * gap + 200 : 0);
+    });
+    // The ring is free for the minutes as soon as the last gem has left it, while the stones are still in the air.
+    const cleared = t + gemsOut * gap + (stones ? 160 : 0);
     t += stones ? (stones - 1) * gap + 480 : 0;
     // A gem still in the ring (one the ring had no room to show until others left) goes down to the list too,
     // so none is left behind to vanish.
-    at(cleared - 180, () => host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone]):not([data-swept])").forEach((src, n) => {
+    at(cleared - 140, () => host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone]):not([data-swept])").forEach((src, n) => {
       const view = host.querySelector(".end-skills")?.getBoundingClientRect();
       if (!view) return;
       const a = src.getBoundingClientRect();
@@ -1962,7 +1964,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
       src.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${view.right - 40 - (a.left + a.width / 2)}px, ${view.bottom - 6 - (a.top + a.height / 2)}px) scale(0.4)`, opacity: 0 }], { duration: 320, delay: n * 40, easing: "cubic-bezier(0.5, 0, 0.25, 1)", fill: "forwards" });
     }));
     t += stones ? 60 : 0;
-    at(cleared + 140, () => setOnStage(-1));
+    at(cleared + 100, () => setOnStage(-1));
     at(t, () => setProg((p) => ({ ...p, done: true })));
     return () => ids.forEach(clearTimeout);
   }, [rowsIn, host]);
