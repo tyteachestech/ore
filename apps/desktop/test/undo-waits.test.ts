@@ -3,9 +3,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 // Codex UX sweeps 1 to 4 (F459, F467, F470, F481 and on): a change put on the Undo history only once its write had
-// landed let a ⌘Z (or the shake) pressed meanwhile take back the step before it. Each such write is now marked with
-// `whileOut` (ore.ts), which ⌘Z waits for, or its step goes on at once with `.hold(write)`. This finds a new one: a
-// notify with an Undo that comes after an `await` in the lines before it, with neither.
+// landed let a ⌘Z (or the shake) pressed meanwhile take back the step before it. A change is now made with `change()`
+// (change.ts), which puts the step on before the write. The few that can't be (CLAUDE.md, "Where things are") mark
+// the write with `whileOut` (ore.ts), which ⌘Z waits for, or put the step on at once with `.hold(write)`. This finds
+// a new hand-written one: a notify with an Undo that comes after an `await` in the lines before it, with neither.
 const ALLOWED = [
   // A source added in the background by the phone's inbox, not a change he just asked for.
   "phone/PhoneApp.tsx: else notify(`Added “${a.title}”`",

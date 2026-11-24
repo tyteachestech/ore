@@ -1254,7 +1254,7 @@ export function PhoneApp() {
       },
       write: async (on) => (on ? ore("inbox", "--remove", id) : (id = (await ore<Waiting>("inbox", "--add", l.url, ...l.skills.flatMap((s) => ["--skill", s]))).id)),
       settled: () => (removing.current.delete(id), void refresh()),
-    });
+    }).then((ok) => ok || void refresh());
   };
 
   return (

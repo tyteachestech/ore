@@ -79,9 +79,11 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onWriting, onClo
     const was = now.current.find((c) => c.ts === ts);
     if (!was) return Promise.resolve(false);
     const index = now.current.indexOf(was);
-    // A removed piece comes back as it was written (its source and passage), at the end of his answer, under a new ts.
+    // A removed piece comes back as it was written (its source and passage), at the end of his answer, under a new
+    // ts. So an Undo shows it once its write has landed, never before under the old ts: a click on that one would
+    // edit a piece the library no longer has (F476).
     let at = ts;
-    let removed = false;
+    let refused = false;
     let saved: Saved["question"] | undefined;
     const answer = (...args: string[]) => ore<Saved["question"]>("answer", q.id, ...args);
     return change(notify, {
@@ -91,38 +93,34 @@ export function AnswerBox({ q, item, quote, onSaved, onRewrite, onWriting, onClo
       show: (on) =>
         setAnswers((l) => {
           if (!gone) return l.map((c) => (c.ts === at ? { ...c, text: on ? to : from } : c));
-          if (on) return l.filter((c) => c.ts !== at);
-          if (l.some((c) => c.ts === at)) return l;
-          // Only this piece goes back: another saved meanwhile keeps its new words. Where it was if the removal
-          // never saved, else at the end, where the library puts it.
-          const i = removed ? l.length : index;
-          return [...l.slice(0, i), { ...was, ts: at }, ...l.slice(i)];
+          if (on) return ((refused = false), l.filter((c) => c.ts !== at));
+          // A removal that failed: only this piece goes back, where it was. Another saved meanwhile keeps its words.
+          if (!refused || l.some((c) => c.ts === at)) return l;
+          return [...l.slice(0, index), { ...was, ts: at }, ...l.slice(index)];
         }),
-      write: async (on) => {
-        // Out, and the page is told at both ends: a read of the questions still on its way from before this write
-        // is older than it, and would show the answer as it was (F476). The page makes it again.
+      // Out from when it is asked, behind another write or not, and the page is told at both ends: a read of the
+      // questions still on its way from before this write is older than it, and would show the answer as it was
+      // (F476). The page makes it again.
+      out: (write) => {
+        const done = () => (out.current--, onWriting?.());
         out.current++;
         onWriting?.();
+        void write.then(done, done);
+      },
+      write: async (on) => {
         saved = undefined;
-        try {
-          if (!gone) saved = await answer(opt("edit", at), opt("text", on ? to : from));
-          else if (on) {
-            saved = await answer(opt("remove", at));
-            removed = true;
-          } else {
-            saved = await answer(opt("text", from), ...(was.item ? [opt("item", was.item)] : []), ...(was.quote ? [opt("quote", was.quote)] : []));
-            const back = saved.answers?.at(-1)?.ts ?? at;
-            setAnswers((l) => l.map((c) => (c.ts === at ? { ...c, ts: back } : c)));
-            at = back;
-          }
-        } finally {
-          out.current--;
-          onWriting?.();
+        if (!gone) saved = await answer(opt("edit", at), opt("text", on ? to : from));
+        else if (on) saved = await answer(opt("remove", at)).catch((e) => ((refused = true), Promise.reject(e)));
+        else {
+          saved = await answer(opt("text", from), ...(was.item ? [opt("item", was.item)] : []), ...(was.quote ? [opt("quote", was.quote)] : []));
+          const back = (at = saved.answers?.at(-1)?.ts ?? at);
+          setAnswers((l) => (l.some((c) => c.ts === back) ? l : [...l, { ...was, ts: back }]));
         }
       },
       settled: () => {
         const r = saved;
-        if (!r) return;
+        // Another change to this answer is still to be written: what this one's write gave back is older than it.
+        if (!r || out.current) return;
         setAnswers((l) => r.answers?.map((c) => ({ ...c, item_title: l.find((x) => x.ts === c.ts)?.item_title })) ?? []);
         onRewrite?.();
       },
@@ -504,7 +502,7 @@ export function QuestionsPanel({ item, skills, quote, onClearQuote, onJumpQuote,
       show: (on) => on && setQs((l) => l && l.map((x) => (x.id === q.id ? { ...x, here: "skill", matches: x.matches.filter((m) => m.item !== item) } : x))),
       write: (on) => ore("match", item, q.id, ...(on ? ["--drop"] : [])),
       settled: reload,
-    });
+    }).then((ok) => ok || reload());
 
   const find = filter?.trim();
   const listed = (qs ?? []).filter((q) => !find || rankScore([questionText(q), ...q.answers.map((a) => a.text)], find) > 0);
