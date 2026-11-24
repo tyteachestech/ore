@@ -131,7 +131,7 @@ describe("review loop", () => {
     }
   });
 
-  test("ratings of one exercise in the same millisecond all count, on one device or two offline, and a copy still counts once (F-new-same-ms-ratings)", async () => {
+  test("ratings of one exercise in the same millisecond all count, on one device or two offline, and a copy still counts once (F560)", async () => {
     const { lib, a, b } = await setup();
     const now = new Date(Date.now() + 864e5);
     const was = process.env.ORE_DEVICE;

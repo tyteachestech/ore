@@ -45,7 +45,7 @@ function chapterMarkdown(document: Document, image: (src: string) => string | nu
     svg.replaceWith(img);
   }
   // A picture the book names but doesn't hold is a marked gap with its alt text, so the text that points at it
-  // isn't left pointing at nothing (D-new-epub-missing-figure).
+  // isn't left pointing at nothing (D351).
   const gaps: string[] = [];
   for (const img of Array.from(document.querySelectorAll("img"))) {
     const saved = image(img.getAttribute("src") ?? "");
@@ -140,7 +140,7 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
       // A page with only an image before the text begins (the cover, a title plate), or one the book marks
       // as its cover, is not part of the book to read. One after the text has begun is an illustration on a
       // page of its own: it stays where it is, under the chapter it follows, with no recall of its own
-      // (F-new-epub-plate-page). A picture missing from the book is such a page too, its gap in its place.
+      // (F569). A picture missing from the book is such a page too, its gap in its place.
       const cover = /\bcover\b/.test(kind(page.body ?? page.documentElement)) || [...seen].some((f) => covers.has(f));
       if (!md || !chapters.length || cover) continue;
       for (const [k, v] of used) assets.set(k, v);

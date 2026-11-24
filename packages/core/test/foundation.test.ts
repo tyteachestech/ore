@@ -51,7 +51,7 @@ describe("frontmatter round-trip", () => {
   test("no frontmatter → whole text is body", () => {
     expect(parseFrontmatter("hello\n")).toEqual({ data: {}, body: "hello\n" });
   });
-  test("text with a line of only spaces and a carriage return elsewhere reads back as written (F-new-recall-line-endings)", () => {
+  test("text with a line of only spaces and a carriage return elsewhere reads back as written (F564)", () => {
     // DATA-04 (deep scan 2026-11-24): `yaml` folded such a value over several lines and the space-only line
     // came back as a backslash.
     const shapes = [

@@ -77,7 +77,7 @@ describe("anchoring", () => {
     expect(anchor(edited, sel)).toBeNull();
   });
 
-  test("fuzzy: a deleted passage does not move onto a passage merely written like it, while a small edit to it still anchors (F-new-fuzzy-other-passage)", () => {
+  test("fuzzy: a deleted passage does not move onto a passage merely written like it, while a small edit to it still anchors (F567)", () => {
     const target = "The blue heron nests beside the river each spring.";
     const rival = "The grey heron nests beside the marsh each spring.";
     const river = "# River habitat\n\nObserve the northern river colony.\n\n" + target + "\n\nThese notes belong to the river survey.\n\n";
@@ -91,7 +91,7 @@ describe("anchoring", () => {
     expect(edited.slice(a.start, a.end)).toBe("The blue heron nests beside the wide river every spring.");
   });
 
-  test("fuzzy: a transcript heard again, with a few words corrected in the passage and on both sides of it, keeps its highlight (F-new-fuzzy-other-passage)", () => {
+  test("fuzzy: a transcript heard again, with a few words corrected in the passage and on both sides of it, keeps its highlight (F567)", () => {
     const quote = "what we found was the model kind of learns faster when you space the practise out";
     const heard =
       "So last week we ran the trail again with to groups. And " + quote + ". Then the resolts helled up across every group we tested, honestly.";
@@ -103,7 +103,7 @@ describe("anchoring", () => {
     expect(again.slice(a.start, a.end)).toBe("what we found was that the model kind of learns faster when you space the practice out");
   });
 
-  test("fuzzy: a first paragraph deleted does not move onto a later one written like it; its missing side before it is no evidence (F-new-fuzzy-other-passage)", () => {
+  test("fuzzy: a first paragraph deleted does not move onto a later one written like it; its missing side before it is no evidence (F567)", () => {
     const first = "Bees visit the clover field at dawn for nectar.";
     const later = "Bees visit the clover rows at dusk for nectar.";
     const doc = first + "\n\nA note on the weather that week followed.\n\nThe second survey moved to the garden.\n\n" + later + "\n\nNothing else was counted that day.\n";

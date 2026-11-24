@@ -29,7 +29,7 @@ export async function setCourseSkills(lib: Library, id: string, skills: string[]
 }
 
 /** Archives every lesson (files and cards kept), or brings them all back; `only` keeps it to these lessons, so
- *  an Undo given what its Archive changed brings back those, not one archived before (F-new-course-archive-undo).
+ *  an Undo given what its Archive changed brings back those, not one archived before (F573).
  *  Returns the ids of the lessons it changed. */
 export async function setCourseArchived(lib: Library, id: string, archived: boolean, only?: string[]): Promise<string[]> {
   const lessons = courseLessons(lib, id, { archived: true }).filter((l) => !!l.meta.archived_at !== archived && (!only || only.includes(l.meta.id)));

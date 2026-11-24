@@ -166,7 +166,7 @@ export const wordCount = (s: string) => s.split(/\s+/).filter(Boolean).length;
 const oneLine = (title: string) => title.replace(/\s+/g, " ").trim();
 
 /** `already`, asked under the write lock, finds a source that is this one (its link, its text) saved while this
- *  one was read: that one comes back instead, and nothing is written (F-new-concurrent-add). */
+ *  one was read: that one comes back instead, and nothing is written (F572). */
 export async function createItem(lib: Library, input: NewItem, already?: () => Item | undefined): Promise<Item & { already?: true }> {
   // Line ends as every read sees them (Windows and old-Mac files too), so offsets and the hash hold.
   const body = input.body.replace(/\r\n?/g, "\n");

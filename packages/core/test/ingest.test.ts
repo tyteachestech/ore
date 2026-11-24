@@ -195,7 +195,7 @@ describe("tracking links", () => {
     }
   });
 
-  test("the same link added twice at once is one source: the second, read while the first was, finds it under the lock (F-new-concurrent-add)", async () => {
+  test("the same link added twice at once is one source: the second, read while the first was, finds it under the lock (F572)", async () => {
     const lib = await tempLibrary();
     const real = globalThis.fetch;
     // Both reads wait until both have started, so each add has looked for the link before either saves it.
@@ -217,7 +217,7 @@ describe("tracking links", () => {
     }
   });
 
-  test("one Feed post opened twice at once stays a preview: the second open finds it under the lock and does not keep it (F-new-concurrent-add)", async () => {
+  test("one Feed post opened twice at once stays a preview: the second open finds it under the lock and does not keep it (F572)", async () => {
     const lib = await tempLibrary();
     const real = globalThis.fetch;
     let release!: () => void;

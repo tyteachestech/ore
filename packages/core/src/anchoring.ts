@@ -96,7 +96,7 @@ function contextScore(text: string, sel: Selector, start: number, end: number): 
 export const MAX_FUZZY_ERROR_RATE = 0.25;
 // An edit to a passage is local: the text on at least one side of it still reads as it did. When the quote was
 // reworded and the text on both sides changed too, the match is another passage written alike (a deleted
-// passage's neighbour), and taking it would move a question onto words it was never about (F-new-fuzzy-other-passage).
+// passage's neighbour), and taking it would move a question onto words it was never about (F567).
 export const MIN_FUZZY_CONTEXT = 0.9;
 // Or the quote and both its sides, taken together, still read as they did: a few words corrected all through
 // the text. Another passage written alike differs more than that (the heron test reads 0.82).

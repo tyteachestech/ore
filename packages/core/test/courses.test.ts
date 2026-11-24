@@ -96,7 +96,7 @@ describe("adding a course", () => {
     expect(courseLessons(lib, course.id)).toHaveLength(3);
   });
 
-  test("a course added again says which lessons it brought back from Archived, so its Undo archives only those (F-new-mac-course-readd-undo)", async () => {
+  test("a course added again says which lessons it brought back from Archived, so its Undo archives only those (F576)", async () => {
     const lib = await tempLibrary();
     serve(new Set());
     const { course } = await addCourse(lib, plan);
@@ -145,7 +145,7 @@ describe("adding a course", () => {
   });
 });
 
-test("Undo of Archive course brings back only the lessons it archived, not one archived before (F-new-course-archive-undo)", async () => {
+test("Undo of Archive course brings back only the lessons it archived, not one archived before (F573)", async () => {
   const lib = await tempLibrary();
   serve(new Set());
   const { course } = await addCourse(lib, plan);

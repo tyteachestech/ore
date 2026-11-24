@@ -227,7 +227,7 @@ test("a big folder is read in parts asked for together, not one after another", 
   expect(fs.readFileSync(`${P}/items/big-899/doc.md`)).toBe("# Big 899");
 });
 
-test("a failed save's retry never writes over a newer save of the same file that went through (F-new-phone-retry-order)", async () => {
+test("a failed save's retry never writes over a newer save of the same file that went through (F559)", async () => {
   // DATA-01 (deep scan 2026-11-24): the first save is held, a second save of the same note is queued behind
   // it, the first fails and the second lands; the next flush resent the first and the folder lost the second.
   mac("items/e-05/notes.md", "Base.");

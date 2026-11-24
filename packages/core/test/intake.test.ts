@@ -1078,7 +1078,7 @@ describe("import coverage: EPUB", () => {
   const chapterOf = (body: string, n: number) => body.split(/<!-- chapter \d+ -->/)[n]!.match(/^# .+/m)?.[0];
   const PNG_1PX = () => Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64"); // the plate's own bytes
 
-  test("EPUB: an illustration on its own page after the text begins stays in the book, in its place (F-new-epub-plate-page)", async () => {
+  test("EPUB: an illustration on its own page after the text begins stays in the book, in its place (F569)", async () => {
     const item = await addSource(await tempLibrary(), file("plates.epub"));
     const [figure] = images(item.body);
     expect(figure?.alt).toBe("The first nest we found");
@@ -1089,17 +1089,17 @@ describe("import coverage: EPUB", () => {
     expect(item.body.match(/<!-- chapter \d+ -->/g)).toHaveLength(2);
   });
 
-  test("EPUB: a plate whose file name holds \"cover\" inside a word (discovery.png) is a plate, not the cover (F-new-epub-plate-page)", async () => {
+  test("EPUB: a plate whose file name holds \"cover\" inside a word (discovery.png) is a plate, not the cover (F569)", async () => {
     const item = await addSource(await tempLibrary(), file("plates.epub"));
     expect(images(item.body).map((i) => i.alt)).toEqual(["The first nest we found"]);
   });
 
-  test("EPUB: a picture missing from the book comes in as a marked gap with its alt text, not left out unsaid (F-new-epub-missing-figure, D-new-epub-missing-figure)", async () => {
+  test("EPUB: a picture missing from the book comes in as a marked gap with its alt text, not left out unsaid (F571, D351)", async () => {
     const item = await addSource(await tempLibrary(), file("plates.epub"));
     expect(item.body).toContain("Each spring we counted the herons along the river.\n\n[missing figure: Map of the river survey]\n\nThe counts rose every year.");
   });
 
-  test("EPUB: a cover page whose picture the book doesn't hold is still the cover, and a last page of only a missing picture stays under its chapter: the chapters don't shift (F-new-epub-missing-figure)", async () => {
+  test("EPUB: a cover page whose picture the book doesn't hold is still the cover, and a last page of only a missing picture stays under its chapter: the chapters don't shift (F571)", async () => {
     const item = await addSource(await tempLibrary(), file("plates.epub"));
     expect(item.body).not.toContain("A Field Book of Herons]");
     expect(item.body.match(/<!-- chapter \d+ -->/g)).toHaveLength(2);
@@ -1108,7 +1108,7 @@ describe("import coverage: EPUB", () => {
     expect(item.body).toMatch(/The colony doubled in five years\.\n\n\[missing figure: A page of field notes\]\n$/);
   });
 
-  test("EPUB: a chapter's saved recall follows its chapter when the book is reimported with its chapters reordered (F-new-epub-recall-reorder)", async () => {
+  test("EPUB: a chapter's saved recall follows its chapter when the book is reimported with its chapters reordered (F570)", async () => {
     const lib = await tempLibrary();
     const item = await addSource(lib, file("chapters.epub"));
     await setChapterRecall(lib, item.meta.id, 1, "I remember that forgetting happens fast at first.", "Forgetting");
@@ -1121,7 +1121,7 @@ describe("import coverage: EPUB", () => {
     expect(chapterOf(back.body, back.meta.chapter_recalls![0]!.n)).toBe("# Forgetting");
   });
 
-  test("EPUB: a chapter's saved recall stays with its chapter when the book is reimported with that chapter's heading reworded in the same place (F-new-epub-recall-reorder)", async () => {
+  test("EPUB: a chapter's saved recall stays with its chapter when the book is reimported with that chapter's heading reworded in the same place (F570)", async () => {
     const lib = await tempLibrary();
     const item = await addSource(lib, file("chapters.epub"));
     await setChapterRecall(lib, item.meta.id, 1, "I remember that forgetting happens fast at first.", "Forgetting");
@@ -1944,7 +1944,7 @@ describe("import coverage: figures and slide pictures", () => {
     expect(readFileSync(join(item.dir, curve!.path))).toEqual(readFileSync(join(FIX, "files", "screenshot.png")));
   });
 
-  test("a saved web page read again from its kept copy keeps the pictures it saved, its doc.md the same (F-new-reimport-local-image)", async () => {
+  test("a saved web page read again from its kept copy keeps the pictures it saved, its doc.md the same (F568)", async () => {
     // files/saved-lesson: a page saved as HTML only, its picture beside it.
     const lib = await tempLibrary();
     const item = await addSource(lib, join(FIX, "files", "saved-lesson", "lesson.html"));

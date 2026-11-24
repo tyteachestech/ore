@@ -12115,7 +12115,7 @@ journey("course: ⌘Z of a skill filed on it gives each lesson back its own skil
   }
 });
 
-journey("course added again: the toast's Undo archives only the lessons the add brought back, Redo brings back only those (F-new-mac-course-readd-undo)", async (page) => {
+journey("course added again: the toast's Undo archives only the lessons the add brought back, Redo brings back only those (F576)", async (page) => {
   if (!LIB) throw new Error("this journey edits the library: set ORE_LIBRARY to the running mock's");
   const { updateItemMeta } = (await import(join(import.meta.dir, "../../../packages/core/src/items.ts"))) as { updateItemMeta: (lib: { root: string }, id: string, patch: (m: object) => object) => Promise<unknown> };
   const made = (await Promise.all(["A", "B"].map((n) => fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: `# Re-add part ${n}\n\nA lesson.` }) }).then((r) => r.json())))) as { id: string }[];
@@ -13485,7 +13485,7 @@ journey("phone: text added, undone and added again says it is back from Archived
   await back.locator("button").filter({ hasText: "Undo" }).waitFor();
 }, "phone");
 
-journey("phone: Undo of Archive course brings back the lessons it archived, not one archived before (F-new-course-archive-undo)", async (page) => {
+journey("phone: Undo of Archive course brings back the lessons it archived, not one archived before (F573)", async (page) => {
   // Codex deep scan 2026-11-24 (intake 6): Undo ran the whole course's restore, so a lesson archived before came back too.
   type Core = { run: <T>(args: string[], input: string | null) => Promise<T> };
   const ids = await page.evaluate(async (root) => {

@@ -140,7 +140,7 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(dueQueue(lib, at)).toHaveLength(0);
   });
 
-  test("one draft reviewed offline on two devices takes one of the day's new places (F-new-offline-new-slots)", async () => {
+  test("one draft reviewed offline on two devices takes one of the day's new places (F566)", async () => {
     const { lib, cards } = await library(2);
     await setReviewSettings(lib, { new_per_day: 2 });
     const at = T();
@@ -462,7 +462,7 @@ describe("strength breakdown and peak level (D63)", () => {
     expect(today(lib, at).skills.find((k) => k.skill === "learning")).toMatchObject({ solid: 4, level: 1, win_back: 1 });
   });
 
-  test("logs merged from a device that was offline keep the level his reviews earned, and what he missed waits to be won back (F-new-offline-level)", async () => {
+  test("logs merged from a device that was offline keep the level his reviews earned, and what he missed waits to be won back (F565)", async () => {
     // Each device saved its own review's state; the merged history is what they replay to (D63).
     const { lib, cards } = await library(5);
     const { phone, merge } = offline(lib);

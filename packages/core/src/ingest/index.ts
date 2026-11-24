@@ -560,7 +560,7 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   const ready = await withImages(draft);
   // The same file added again (dropped twice, or a copy) is the source already here.
   let same = !isUrl && sameText(lib, ready.body);
-  // Looked for again under the write lock: the same link or file added at once by another add (F-new-concurrent-add).
+  // Looked for again under the write lock: the same link or file added at once by another add (F572).
   const made = same ? undefined : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview }, () => (isUrl ? byLink(lib, input, true) : sameText(lib, ready.body)));
   if (made?.already && opts.preview) return made; // a Feed post opened twice at once is still only being read
   if (made?.already) same = made;
@@ -832,7 +832,7 @@ function chapterTexts(body: string, type: ItemType): string[] {
 /** A chapter's saved recall (D115) follows its chapter, known by its first line (its heading), when the text
  *  it was read from changes to `to`: reordered, added to or cut. Of chapters starting alike, the one that reads
  *  the same, then the one in its old place, wins; with none, its old place, if that holds no other old chapter.
- *  One whose chapter is gone leaves chapter_recalls; its words stay in the source's note (F-new-epub-recall-reorder). */
+ *  One whose chapter is gone leaves chapter_recalls; its words stay in the source's note (F570). */
 function followChapters(recalls: ItemMeta["chapter_recalls"], from: string, to: string, type: ItemType): ItemMeta["chapter_recalls"] {
   if (!recalls?.length) return recalls;
   const first = (t: string) => t.split("\n").find((l) => l.trim())?.trim() ?? "";
@@ -909,7 +909,7 @@ function day(d: string | undefined): string | undefined {
 
 /** A file's pictures that sat beside it (a saved page's `figure.png`) are not beside its kept copy, so read
  *  again they can't be found: each one left as a `file://` link takes the picture the source already saved
- *  for it, the same alt text in the same turn (F-new-reimport-local-image). */
+ *  for it, the same alt text in the same turn (F568). */
 function savedPictures(body: string, item: Item): string {
   const IMG = /!\[([^\]\n]*)\]\(([^)\s]+)\)/g;
   const saved = [...item.body.matchAll(IMG)].filter((m) => m[2]!.startsWith("assets/") && existsSync(join(item.dir, m[2]!))).map((m) => ({ alt: m[1]!, path: m[2]! }));
@@ -947,7 +947,7 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     draft.assets = [...(draft.assets ?? []), ...section.assets];
   }
   // The same text under a new byline or date is still news: they come in, and the new original with them, as for
-  // new text (F-new-reimport-metadata).
+  // new text (F574).
   // A date is news by its day, however it is written ("2024-01-01", "2024-01-01T09:30:00Z"); an empty one is none.
   const byline = (!item.meta.author && !!draft.author?.trim()) || (!!day(draft.published) && day(draft.published) !== day(item.meta.published));
   if (draft.body === item.body && !byline) {

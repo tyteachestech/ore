@@ -115,7 +115,7 @@ describe("a damaged library", () => {
     expect((await doctor(lib)).issues.some((i) => i.message.includes(`rename it back to end in -${item.meta.id}`))).toBe(true);
   });
 
-  test("a source folder renamed in Finder stays in the index, with its notes and the importance its exercises are scheduled by (F-new-renamed-folder)", async () => {
+  test("a source folder renamed in Finder stays in the index, with its notes and the importance its exercises are scheduled by (F561)", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Retrieval practice beats rereading.", skills: ["learning"] });
     await setItemPriority(lib, item.meta.id, "P3");

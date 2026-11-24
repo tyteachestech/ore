@@ -1070,7 +1070,7 @@ export function PhoneApp() {
     edit: (s) => (setDrawer(false), setEditingSkill(s.id)),
   });
   /** A course archived from its menu: every lesson, at once, with Undo (the Mac's course Archive). Undo brings
-   *  back the lessons this Archive put away, not one archived before it (F-new-course-archive-undo). */
+   *  back the lessons this Archive put away, not one archived before it (F573). */
   const archiveCourse = (c: Extract<Line, { kind: "course" }>) => {
     let changed: string[] = [];
     const apply = (on: boolean) =>

@@ -51,7 +51,7 @@ describe("reimport", () => {
     expect(readFileSync(`${now.dir}/source.md`, "utf8")).toBe(V2);
   });
 
-  test("a question whose passage was deleted is reported unplaced, not moved onto a passage written like it (F-new-fuzzy-other-passage)", async () => {
+  test("a question whose passage was deleted is reported unplaced, not moved onto a passage written like it (F567)", async () => {
     const lib = await tempLibrary();
     const target = "The blue heron nests beside the river each spring.";
     const rival = "The grey heron nests beside the marsh each spring.";
@@ -68,7 +68,7 @@ describe("reimport", () => {
     expect(kept.exact).toBe(target);
   });
 
-  test("an original whose text is the same but whose author and date are new brings them in, and keeps the new original (F-new-reimport-metadata)", async () => {
+  test("an original whose text is the same but whose author and date are new brings them in, and keeps the new original (F574)", async () => {
     const lib = await tempLibrary();
     const doc = (meta: string) => `---\ntitle: A learning guide\n${meta}---\n\n# A learning guide\n\nSpaced retrieval supports durable memory.\n`;
     page = doc("date: 2024-01-01\n");
@@ -86,7 +86,7 @@ describe("reimport", () => {
     expect(back.meta.published).toBe("2024-01-01");
   });
 
-  test("the same text whose date is only written another way (a time added) is not news: nothing changes (F-new-reimport-metadata)", async () => {
+  test("the same text whose date is only written another way (a time added) is not news: nothing changes (F574)", async () => {
     const lib = await tempLibrary();
     const doc = (date: string) => `---\ntitle: A learning guide\ndate: ${date}\n---\n\n# A learning guide\n\nSpaced retrieval supports durable memory.\n`;
     page = doc("2024-01-01");

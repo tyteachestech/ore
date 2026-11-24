@@ -144,7 +144,7 @@ describe("My notes storage", () => {
     idx.close();
   });
 
-  test("search names a renamed source and skill at once, as a rebuild does (F-new-search-rename)", async () => {
+  test("search names a renamed source and skill at once, as a rebuild does (F562)", async () => {
     const { lib, id } = await setup();
     const skill = await addSkill(lib, "Memory");
     await setNotes(lib, id, "uniqueneedle in my note");
@@ -167,7 +167,7 @@ describe("My notes storage", () => {
     expect(cached).toEqual(["Notes: Renamed Skill", "My notes: Renamed Source", "keep: Renamed Source"].sort());
   });
 
-  test("a removed skill's notes leave search, which offers nothing it can't open (F-new-search-removed-skill)", async () => {
+  test("a removed skill's notes leave search, which offers nothing it can't open (F563)", async () => {
     const { lib } = await setup();
     const skill = await addSkill(lib, "Memory");
     await setNotes(lib, { skill: skill.id }, "uniqueneedle in the skill's note");
