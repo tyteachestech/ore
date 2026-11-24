@@ -121,13 +121,27 @@ describe("adding a course", () => {
     await renameCourse(lib, course.id, "  AI Fluency basics ");
     await setCourseSkills(lib, course.id, ["ai", "teaching"]);
     expect(courseLessons(lib, course.id).every((l) => l.meta.course!.title === "AI Fluency basics" && l.meta.skills.join() === "ai,teaching")).toBe(true);
-    expect(await setCourseArchived(lib, course.id, true)).toBe(3);
+    expect(await setCourseArchived(lib, course.id, true)).toHaveLength(3);
     expect(listItems(lib)).toEqual([]);
     expect(() => courseLessons(lib, course.id)).toThrow();
-    expect(await setCourseArchived(lib, course.id, false)).toBe(3);
+    expect(await setCourseArchived(lib, course.id, false)).toHaveLength(3);
     expect(courseLessons(lib, course.id)).toHaveLength(3);
     await expect(renameCourse(lib, course.id, " ")).rejects.toThrow("a course needs a title");
   });
+});
+
+test("Undo of Archive course brings back only the lessons it archived, not one archived before (F-new-course-archive-undo)", async () => {
+  const lib = await tempLibrary();
+  serve(new Set());
+  const { course } = await addCourse(lib, plan);
+  const [kept, put] = courseLessons(lib, course.id);
+  await setItemArchived(lib, put!.meta.id, true);
+  const archivedOf = () => courseLessons(lib, course.id, { archived: true }).map((l) => !!l.meta.archived_at);
+  const changed = await setCourseArchived(lib, course.id, true);
+  expect(archivedOf()).toEqual([true, true, true]);
+  await setCourseArchived(lib, course.id, false, changed);
+  expect(archivedOf()).toEqual([false, true, false]);
+  expect(findItem(lib, kept!.meta.id).meta.archived_at).toBeUndefined();
 });
 
 describe("adding a link again", () => {
