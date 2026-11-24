@@ -121,7 +121,9 @@ export function levelAt(r: EndRow, here: number, done: boolean, was: Today["skil
   const count = done ? Math.max(k.peak, b.peak + r.cut) : b.peak + here;
   const lv = Math.floor(Math.sqrt(count / 5)), from = 5 * lv ** 2, next = 5 * (lv + 1) ** 2, up = lv > b.level;
   // A skill that went up filled the level it was on: its ring stays full.
-  return { lv, up, share: up ? 1 : (count - from) / (next - from), soon: up ? 0 : Math.min(k.ready, next - count) / (next - from) };
+  // Where the ring stood before the session, on the level it shows (the one it filled, if it went up).
+  const base = up ? 5 * b.level ** 2 : from, top = up ? 5 * (b.level + 1) ** 2 : next;
+  return { lv, up, share: up ? 1 : (count - from) / (next - from), since: count > b.peak ? Math.max(0, (b.peak - base) / (top - base)) : undefined, soon: up ? 0 : Math.min(k.ready, next - count) / (next - from) };
 }
 
 /** A skill's turn in the end screen's big ring (Tyler, 2026-11-23: "I don't want to read it. I want to feel it
@@ -136,7 +138,7 @@ export function SkillStage({ row, here, leaving, size, was, now, skills }: { row
   const s = skills.find((x) => x.id === row.skill), lv = levelAt(row, here, false, was, now);
   return (
     <div className="end-stage" data-color={s?.color} data-leaving={!!leaving || undefined} data-up={lv.up || undefined} style={leaving ? ({ "--dx": `${leaving.dx}px`, "--dy": `${leaving.dy}px` } as React.CSSProperties) : undefined} aria-hidden="true">
-      <span className="end-stage-ring gem-ring" key={`in${here}`} data-beat={here || undefined} style={{ width: size, height: size }}><DotRing size={size} share={lv.share} ghost={lv.soon} step /></span>
+      <span className="end-stage-ring gem-ring" key={`in${here}`} data-beat={here || undefined} style={{ width: size, height: size }}><DotRing size={size} share={lv.share} since={lv.since} ghost={lv.soon} step /></span>
       {lv.up && <span className="end-stage-burst">{Array.from({ length: 24 }, (_, d) => <i key={d} style={{ "--a": `${d * 15}deg` } as React.CSSProperties} />)}</span>}
       <span className="end-stage-mid">
         <SkillIcon icon={s?.icon} color={s?.color} dot />
@@ -166,7 +168,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
   // Past the last one the row is back where it began: it jumps there unseen, the first ones standing in twice.
   useEffect(() => {
     if (step < n) return;
-    const id = setTimeout(() => setStep(0), 520);
+    const id = setTimeout(() => setStep(0), 400);
     return () => clearTimeout(id);
   }, [step, n]);
   if (!n) return null;
@@ -187,12 +189,22 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
             <div className="end-medal" data-skill={r.skill} data-color={s?.color} data-wait={!prog.shown[i] || undefined} data-up={lv.up || undefined}>
               <span className="end-medal-ring" data-row={j < n ? i : undefined} aria-hidden="true">
                 <span className="end-medal-core gem-ring" data-beat={prog.stone[i] || undefined} key={`in${prog.stone[i]}`}>
-                  <DotRing size={MEDAL} share={lv.share} ghost={lv.soon} step />
+                  <DotRing size={MEDAL} share={lv.share} since={lv.since} ghost={lv.soon} step />
                   <SkillIcon icon={s?.icon} color={s?.color} dot />
                 </span>
                 {lv.lv > 0 && <b className="gem-ring-lv" data-flip={lv.up || undefined}>{lv.lv}</b>}
                 {/* What flies, drawn once here so the flight can lift a copy of it. */}
                 <span className="end-medal-fliers">{j < n && r.slots.map((kind, d) => <span key={d} data-slot={r.first + d}><Gem kind={kind} size={kind === "cut" ? 28 : 24} /></span>)}</span>
+              </span>
+              {/* What today added, under what the skill now is (Tyler, 2026-11-23: "I just am not sure what I gained
+                  today versus just the status of the skill before"): the session's own gems and stones, each
+                  there once it has landed. */}
+              <span className="end-medal-pips" aria-hidden="true">
+                {r.slots.map((kind, d) => {
+                  const cuts = r.slots.filter((x) => x === "cut").length, here = prog.done || (kind === "cut" ? d < prog.cut[i]! : d - cuts < prog.stone[i]!);
+                  return <span key={d} data-wait={!here || undefined}><Gem kind={kind} size={kind === "cut" ? 16 : 12} /></span>;
+                })}
+                {r.extra > 0 && <small data-wait={!prog.done || undefined}>+{r.extra}</small>}
               </span>
               <span className="end-medal-name">{name(r.skill)}</span>
             </div>
@@ -207,7 +219,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
 }
 const REEL_ROWS = 12, SOLOS = 2;
 /** The medals the row shows at once when it rolls, a medal's place in px, and how long it rests between steps. */
-const SEEN = 3, MEDAL_SLOT = 120, ROLL_MS = 2600;
+const SEEN = 3, MEDAL_SLOT = 120, ROLL_MS = 1700;
 /** A medal's ring, in px. */
 const MEDAL = 64;
 

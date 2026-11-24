@@ -10,9 +10,10 @@ export const ringDots = (size: number) => (size > 60 ? 30 : size > 36 ? 20 : 14)
  *  for the goal), then `ghost` dimmer ones, the rest as the track. Each dot lights a beat after the one before.
  *  `over`: dots lit again on a lap past the full ring (the end screen's bonus minutes): each is a little bigger
  *  and carries a white centre, so where the bonus stops is plain; past a second full lap they grow again. */
-export function DotRing({ size, share, ghost = 0, over = 0, step = false }: { size: number; share: number; ghost?: number; over?: number; /** Lit one step at a time by its caller, so no dot waits its turn. */ step?: boolean }) {
+export function DotRing({ size, share, ghost = 0, over = 0, step = false, since }: { size: number; share: number; ghost?: number; over?: number; /** The share it stood at before today: the lit dots past it are marked `fresh` (at least one, when it grew at all). */ since?: number; /** Lit one step at a time by its caller, so no dot waits its turn. */ step?: boolean }) {
   const n = ringDots(size);
   const on = lit(share, n);
+  const old = since === undefined || since >= share ? on : Math.min(lit(since, n), on - 1);
   const soon = Math.min(n, on + (ghost > 0 ? Math.max(1, Math.round(ghost * n)) : 0));
   const r = Math.min(6.5, ((2 * Math.PI * 43) / n) * 0.36);
   const lap2 = Math.min(n, over), lap3 = Math.min(n, Math.max(0, over - n));
@@ -20,7 +21,7 @@ export function DotRing({ size, share, ghost = 0, over = 0, step = false }: { si
   return (
     <svg className="dot-ring" width={size} height={size} viewBox="0 0 100 100" aria-hidden="true">
       {Array.from({ length: n }, (_, i) => {
-        const lit = i < on ? "on" : i < soon ? "soon" : "";
+        const lit = i < on ? (i >= old ? "on fresh" : "on") : i < soon ? "soon" : "";
         return <circle key={i} className={`${lit}${i < lap3 ? " over2" : i < lap2 ? " over" : ""}` || undefined} {...at(i)} r={+r.toFixed(2)} style={{ transitionDelay: step ? "0ms" : `calc(${i} * var(--stagger))`, "--i": i } as React.CSSProperties} />;
       })}
       {Array.from({ length: lap2 }, (_, i) => <circle key={`core${i}`} className={i < lap3 ? "core big" : "core"} {...at(i)} r={+(r * 0.4).toFixed(2)} />)}
