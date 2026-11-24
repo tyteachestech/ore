@@ -33,6 +33,12 @@ export function parseFrontmatter<T = Record<string, unknown>>(text: string): Fro
 
 export function stringifyFrontmatter(data: object, body: string): string {
   const clean = Object.fromEntries(Object.entries(data).filter(([, v]) => v !== undefined));
-  const yaml = loadYaml().stringify(clean, { lineWidth: 0 });
+  // A double-quoted value stays on one line: folded over several, `yaml` wrote a line of only spaces as a
+  // backslash when the value also held a carriage return (F-new-recall-line-endings).
+  const opts = { lineWidth: 0, doubleQuotedMinMultiLineLength: Infinity };
+  let yaml = loadYaml().stringify(clean, opts);
+  // A value `yaml` can't write as a block that reads back the same (one starting with a line of only spaces)
+  // is written quoted instead, so every value reads back as written.
+  if (JSON.stringify(parseYaml(yaml) ?? {}) !== JSON.stringify(clean)) yaml = loadYaml().stringify(clean, { ...opts, blockQuote: false });
   return `${OPEN}${yaml}---\n${body}`;
 }

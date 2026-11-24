@@ -51,6 +51,29 @@ describe("frontmatter round-trip", () => {
   test("no frontmatter → whole text is body", () => {
     expect(parseFrontmatter("hello\n")).toEqual({ data: {}, body: "hello\n" });
   });
+  test("text with a line of only spaces and a carriage return elsewhere reads back as written (F-new-recall-line-endings)", () => {
+    // DATA-04 (deep scan 2026-11-24): `yaml` folded such a value over several lines and the space-only line
+    // came back as a backslash.
+    const shapes = [
+      "Retrieval practice strengthens long-term memory.\n \nSpacing helps.\rOne more idea.",
+      "Retrieval practice strengthens long-term memory.\n \nSpacing helps.\r\nOne more idea.",
+      "#\ton2026-01-01[\t\t]\n \n aשלום 😀\r ",
+      `${"a".repeat(45)}\n \nb\u0000`,
+      "\non2026-01-01'שלום[*\n \n\ranoשלום שלוםمرحبا2026-01-01nono\"nulla ",
+      "\u0000---&\nשלום]:2026-01-01\ufeffnull\"שלום \"\ufeff[:::#\n😀[null'\\\\\n \n",
+    ];
+    // And a seeded run over the pieces that make such values.
+    const pieces = ["a".repeat(45), "word", "\n", " ", "  ", "\r", "\r\n", "\t", "\u0000", "#", ": ", "\"", "'", "\\", "שלום", "😀", "\ufeff"];
+    let seed = 20261124;
+    const next = () => (seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+    for (let i = 0; i < 2000; i++) shapes.push(Array.from({ length: 2 + Math.floor(next() * 10) }, () => pieces[Math.floor(next() * pieces.length)]).join(""));
+    const changed = shapes.filter((text) => {
+      const once = stringifyFrontmatter({ text }, "");
+      const back = parseFrontmatter<{ text: string }>(once).data;
+      return back.text !== text || stringifyFrontmatter(back, "") !== once;
+    });
+    expect(changed.map((t) => JSON.stringify(t))).toEqual([]);
+  });
   test("undefined values are dropped, empty body allowed", () => {
     const t = stringifyFrontmatter({ a: 1, b: undefined }, "");
     expect(parseFrontmatter(t)).toEqual({ data: { a: 1 }, body: "" });
