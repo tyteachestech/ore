@@ -1303,7 +1303,8 @@ body.resizing iframe { pointer-events: none; }
 
 /* The Collected tab: Cards, Questions, Keeps as collapsible groups; one line per row. */
 .cp { display: flex; flex-direction: column; gap: 14px; padding-top: 6px; }
-.cp-head { display: flex; align-items: center; margin: 0 0 2px; }
+.cp-head { display: flex; align-items: center; margin: 0 0 2px; padding: 0; }
+.cp-head.question { padding: 0; } /* not the skill page's .question row */
 .cp-head .icon-btn { width: 20px; height: 20px; margin-left: auto; opacity: 0; }
 .cp-head:hover .icon-btn, .cp-head .icon-btn:focus-visible, .cp-head .icon-btn[aria-expanded="true"] { opacity: 1; }
 .cp-toggle { display: flex; align-items: center; gap: 6px; padding: 2px 4px; margin-left: -4px; border-radius: 6px; font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--faint); }
@@ -1328,8 +1329,12 @@ body.resizing iframe { pointer-events: none; }
 .cp-row:not(.point) .cp-text { color: var(--muted); }
 .cp-time { flex: none; font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
 .cp-add { padding: 0; }
-.cp-input { width: 100%; padding: 6px 8px; border-radius: 8px; border: 0; background: var(--bg-raised); color: var(--text); font: inherit; line-height: 1.4; box-shadow: 0 0 0 1px var(--border); }
-.cp-input:focus { outline: none; box-shadow: 0 0 0 2px var(--focus); }
+/* A new key point or question is typed where its row will sit, as a new line in Notes or Reminders: no box, the caret marks it. */
+.cp-input, .cp .q-ask .field { width: 100%; height: auto; min-height: 30px; padding: 6px 8px; border: 0; border-radius: 8px; background: none; box-shadow: none; color: var(--text); font: inherit; line-height: 1.4; transition: none; }
+:is(.cp-input, .cp .q-ask .field):focus { outline: none; border: 0; box-shadow: none; }
+:is(.cp-input, .cp .q-ask .field)::placeholder { color: var(--faint); }
+.cp .q-ask { padding: 0; }
+.cp .q-ask .ask-err { padding: 0 8px 6px; }
 .cp-empty { width: 100%; text-align: left; padding: 6px 8px; border-radius: 8px; color: var(--faint); }
 .cp-empty:hover { background: var(--bg-hover); color: var(--muted); }
 .cp .qp { padding-top: 0; gap: 8px; }
@@ -1627,8 +1632,8 @@ body:has(.hint) .full-text { display: none; }
 .pill-btn:active:not(:disabled) { transform: translateY(1px); box-shadow: 0 1px 0 color-mix(in srgb, var(--skill) 55%, #000); }
 .pill-btn:disabled { opacity: 0.45; }
 .pill-btn kbd { background: transparent; color: inherit; border-color: rgba(13, 17, 23, 0.3); }
-.ask { padding: 4px 8px 8px; }
-.ask .field { width: 100%; height: 32px; padding: 0 10px; }
+.q-ask { padding: 4px 8px 8px; }
+.q-ask .field { width: 100%; height: 32px; padding: 0 10px; }
 .ask-err { margin-top: 4px; color: var(--error); font-size: 12px; }
 .fold-head { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 30px; margin-left: -6px; padding: 0 6px; border-radius: 6px; text-align: left; }
 .fold-head:hover { background: var(--bg-hover); }
@@ -2519,27 +2524,76 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .end-lap { animation: none; } }
 /* Under the ring: the skills the session fed, a row each (`SkillRows`). */
-.end-skills { display: grid; gap: 16px; width: 100%; max-width: 340px; margin: 24px auto 0; text-align: left; }
+.end-skills { display: flex; flex-direction: column; width: min(100%, 350px); min-height: calc(var(--seen, 3) * 60px); margin: 20px auto 0; }
+.end-skills-track { display: flex; flex-direction: column; min-width: 0; }
+/* More than three: a window three medals wide that the row rolls through, its edges fading out. */
+/* The next line shows its top through the fade at the foot: there is more, and it is coming. */
+.end-skills[data-rolls] { height: calc(var(--seen, 3) * 60px + 14px); overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 8px, #000 calc(100% - 26px), transparent); mask-image: linear-gradient(transparent, #000 8px, #000 calc(100% - 26px), transparent); }
+.end-skills[data-rolls] .end-skills-track { transition: transform var(--t-moment) var(--ease-in-out); }
+.end-skills[data-rolls] .end-skills-track[data-jump] { transition: none; }
+
+
 .end-skills[data-wait] { visibility: hidden; }
-.end-skill { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; column-gap: 12px; row-gap: 6px; align-items: center; animation: end-lap-in var(--t-4) var(--ease-out) calc(var(--i) * 150ms) both; }
-.end-skills[data-wait] .end-skill, .end-skills[data-wait] .end-skill-bar i { animation: none; }
-.end-skill > .skill-icon { grid-row: 1 / span 2; justify-self: center; }
-.end-skill > .skill-icon.glyph { width: 28px; height: 28px; -webkit-mask-size: 28px; mask-size: 28px; }
-.end-skill > .skill-icon.dot { width: 8px; height: 8px; }
-.end-skill-name { grid-column: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 500 14px/20px var(--font); color: var(--text); }
-.end-skill > b { grid-column: 3; grid-row: 1 / span 2; display: flex; align-items: center; gap: 8px; font: 400 12px/1 var(--mono); color: var(--muted); }
-.end-skill > b .dot-number { color: var(--text); }
-.end-skill[data-up] > b, .end-skill[data-up] > b .dot-number { color: var(--skill, var(--text)); }
-.end-skill-level { grid-column: 2; display: flex; align-items: center; gap: 10px; font: 400 12px/1 var(--mono); color: var(--muted); white-space: nowrap; }
-.end-skill-bar { display: flex; gap: 4px; }
-.end-skill-bar i { width: 8px; height: 8px; border-radius: 50%; background: color-mix(in oklab, var(--text) 20%, transparent); }
-.end-skill-bar i[data-on] { background: var(--muted); }
-/* The dots this session lit come on one by one, once the row is in. */
-.end-skill-bar i[data-new] { background: var(--skill, var(--text)); animation: end-skill-dot var(--t-3) var(--ease-out) calc(var(--t-4) + var(--i) * 150ms + var(--d) * 60ms) backwards; }
-@keyframes end-skill-dot { from { background: color-mix(in oklab, var(--text) 20%, transparent); transform: scale(0.4); } }
-.end-skills-more { justify-self: center; font: 400 12px/1.3 var(--mono); color: var(--muted); border-radius: 4px; }
-.end-skills-more:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
-@media (prefers-reduced-motion: reduce) { .end-skill, .end-skill-bar i { animation: none !important; } }
+/* A medal: the skill's icon in the ring of its level. Its place is held until it comes out. */
+.end-medal { display: flex; align-items: center; gap: 14px; flex: none; height: 52px; margin-bottom: 8px; padding-bottom: 6px; box-sizing: border-box; min-width: 0; color: var(--skill, var(--text)); animation: end-medal-in var(--t-3) var(--ease-out) both; }
+
+
+/* The one that went up a level stands a size larger, for as long as the screen is up. */
+
+
+.end-medal[data-wait] { visibility: hidden; animation: none; }
+@keyframes end-medal-in { from { opacity: 0.4; } }
+/* A skill's turn in the big ring: the ring is the skill's, its icon and level in the middle. */
+.end-ring > .ring, .end-ring > .review-cut > b { transition: opacity var(--t-3) var(--ease-out); }
+.end-ring[data-staged] > .ring, .end-ring[data-staged] > .review-cut > b { opacity: 0; }
+.review-cut > span[data-off] { opacity: 0; }
+.review-cut > span[data-gone] { visibility: hidden; }
+.review-cut > span { transition: opacity var(--t-2) var(--ease-out); }
+.end-stage { position: relative; display: grid; place-items: center; color: var(--skill, var(--text)); pointer-events: none; animation: end-stage-in var(--t-3) var(--ease-spring) both; }
+.end-stage > * { grid-area: 1 / 1; }
+.end-stage[data-leaving] { animation: end-stage-out var(--t-4) var(--ease-in-out) both; }
+@keyframes end-stage-in { from { transform: scale(0.9); opacity: 0.6; } }
+@keyframes end-stage-out { 85% { opacity: 1; } to { transform: translate(var(--dx, 0), var(--dy, 150px)) scale(0.19); opacity: 0.6; } }
+.end-stage-ring[data-beat] { animation: end-ring-beat var(--t-4) var(--ease-spring); }
+.end-stage-mid { display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0.35; transition: opacity var(--t-3) var(--ease-out); }
+.end-stage-ring[data-beat] ~ .end-stage-mid { opacity: 1; }
+.end-stage-mid > .skill-icon.glyph { width: 88px; height: 88px; -webkit-mask-size: 88px; mask-size: 88px; }
+.end-stage-mid > .skill-icon.dot { width: 28px; height: 28px; }
+.end-stage-mid > b { min-width: 40px; height: 40px; padding: 0 12px; border-radius: 999px; display: grid; place-items: center; font: 800 24px/1 var(--round); font-variant-numeric: tabular-nums; color: var(--text); border: 1px solid var(--border); }
+.end-stage-mid > b[data-flip] { color: var(--bg); background: var(--skill, var(--text)); border-color: transparent; animation: end-stage-flip 700ms var(--ease-spring); }
+@keyframes end-stage-flip { from { transform: scale(0.3); } 40% { transform: scale(2); } }
+.end-stage-burst { position: absolute; inset: 0; pointer-events: none; }
+.end-stage-burst i { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: var(--skill, var(--text)); animation: end-stage-throw 900ms var(--ease-out) both; --r: 101px; --far: 120px; }
+@keyframes end-stage-throw { from { opacity: 1; transform: rotate(var(--a)) translateY(calc(-1 * var(--r))); } 60% { opacity: 1; } to { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--r) - var(--far))) scale(0.5); } }
+.end-stage[data-up] .end-stage-ring { animation: end-stage-swell 700ms var(--ease-spring); }
+@keyframes end-stage-swell { 35% { transform: scale(1.22); } }
+.end-stage-pop { position: fixed; z-index: 5; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: var(--skill, var(--text)); pointer-events: none; }
+.end-medal-ring { position: relative; flex: none; display: inline-grid; place-items: center; width: 44px; height: 44px; }
+.end-medal-core { width: 44px; height: 44px; }
+.end-skills ~ .end-tally { margin-top: 12px; }
+.end-emblem ~ .end-skills ~ .review-foot { margin-top: 24px; }
+.end-medal-core > .skill-icon.glyph { width: 22px; height: 22px; -webkit-mask-size: 22px; mask-size: 22px; }
+.end-medal-core > .skill-icon.dot { width: 10px; height: 10px; }
+.end-medal-core[data-beat] { animation: end-ring-beat var(--t-4) var(--ease-spring); }
+@keyframes end-ring-beat { 35% { transform: scale(1.16); } }
+.end-medal-ring .gem-ring-lv { color: var(--text); font-size: 11px; bottom: -6px; }
+.end-medal-ring .gem-ring-lv[data-flip] { color: var(--bg); background: var(--skill, var(--text)); border-color: transparent; }
+.end-medal-fliers { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+.end-medal-fliers > span { position: absolute; display: grid; place-items: center; visibility: hidden; }
+/* Under a medal: what today added. Before today's part of its ring is dim, today's bright. */
+.end-medal-pips { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
+.end-medal-pips > span { display: grid; place-items: center; animation: end-stone-in var(--t-4) var(--ease-spring); }
+@keyframes end-stone-in { from { transform: scale(1.3); } }
+.end-medal-pips > [data-wait] { visibility: hidden; animation: none; }
+.end-medal-pips .gem[data-kind="rough"] { opacity: 1; filter: brightness(1.5); }
+.end-medal-name[data-long] { -webkit-line-clamp: 3; font-size: 14px; line-height: 1.2; }
+
+.end-medal .dot-ring .on:not(.fresh) { opacity: 0.4; }
+.end-medal .dot-ring .fresh, .end-stage .dot-ring .fresh { fill: color-mix(in oklab, var(--ring), white 35%); }
+.end-stage .dot-ring .on:not(.fresh) { opacity: 0.55; }
+
+.end-medal-name { flex: 1; font-family: var(--font); min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-align: left; text-wrap: balance; font-size: 16px; font-weight: 500; line-height: 1.25; color: var(--text); }
+@media (prefers-reduced-motion: reduce) { .end-medal, .end-medal *, .end-stage, .end-stage * { animation: none !important; transition: none; } .end-stage-burst { display: none; } }
 /* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
    Each lands in hard steps, one after another, then is still. */
 .end-tally { list-style: none; display: flex; justify-content: center; gap: 16px; margin: 20px 0 0; padding: 0; }
@@ -2627,6 +2681,7 @@ button.home-plan:hover { color: var(--text); }
 .review-cut b { font-family: var(--round); font-size: 24px; color: var(--text); font-variant-numeric: tabular-nums; animation: pop var(--t-4) var(--ease-out) 700ms both; }
 /* A stone the cart dropped is cut in place (Cutting, D239): it arrives by landing, so it has no entrance of its own. */
 .review-cut > span[data-stone] { animation: none; }
+.review-cut b[data-gone] { visibility: hidden; }
 .gem-cutting { position: relative; display: inline-grid; place-items: center; }
 .gem-cutting > span { display: block; transform-origin: 50% 85%; will-change: transform; }
 .gem-cutting[data-cutting] .gem { opacity: 1; }
@@ -3283,8 +3338,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .says.end-says .says-line { font-size: 15px; text-wrap: balance; }
 .phone .says.end-says .says-block { display: none; }
 @keyframes end-says-phone { from { opacity: 0; transform: translate(-50%, 6px) scale(0.96); } }
-.phone .end-skill-name { font-size: 16px; }
-.phone .end-skills { max-width: none; }
+.phone .end-skills { width: 100%; }
 /* The results stand in equal columns as wide as the rows over them and Done under them, so the pair is even about
    the screen's middle whatever each one's words (two tiles of unlike width, centred as a group, leaned left). */
 .phone .end-tally { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; width: 100%; margin-top: 24px; }
@@ -3346,6 +3400,13 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone :is(.cp-row, .qp-row, .cp-empty) { min-height: 44px; align-items: center; font-size: 17px; }
 .phone .cp-toggle { min-height: 44px; }
 .phone .cp-head .icon-btn { opacity: 1; width: 44px; height: 44px; margin-right: -12px; }
+.phone .cp { gap: 20px; }
+.phone :is(.cp-input, .cp .q-ask .field) { min-height: 44px; font-size: 17px !important; }
+/* A narrow screen cuts one line after a few words, so a row runs to three (Books' highlight list). */
+.phone .cp :is(.cp-row:not(.cp-add), .qp-row) { padding-block: 10px; }
+.phone .cp :is(.cp-text, .qp-text) { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; white-space: normal; overflow-wrap: anywhere; }
+.phone .cp .qp-q.open .qp-text { -webkit-line-clamp: none; }
+.phone .cp .qp-sub { padding-left: 8px; }
 .phone :is(.cp-row, .qp-row):active { background: var(--bg-hover); }
 /* The collected count sits in the top bar, beside Back, not over the text. */
 .phone .collected .collected-chip { padding: 0 8px; flex: none; }

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Hint } from "./Hint";
-import { DotNumber, minutes } from "./Ring";
+import { DotNumber, DotRing, minutes } from "./Ring";
+import { Gem } from "./Gem";
 import { still } from "./SideCursor";
 import { SkillIcon } from "./IconPicker";
-import { levelProgress, type Skill, type Today } from "./ore";
+import { type Skill, type Today } from "./ore";
 
 /** The end screen's minutes: where the day stood before this session, where it stands now, and the goal they
  *  are measured against (0 when today has none: an off day under Weekdays only). */
@@ -75,56 +76,151 @@ export function LapCentre({ min }: { min: number }) {
   );
 }
 
-/** Under the end screen's ring: the skills this session kept memories in, a row each (Tyler, 2026-11-20, of
- *  the one small line that took turns: "very underwhelming. It almost looks like a subtitle rather than the
- *  reward"). A row is the skill, its level as a figure of dots at the right, and under the name the way to the
- *  next level beside the memories it kept: ten dots, the ones this session lit in the skill's colour. Every row
- *  has its level, so a level never looks like something only one skill has; a skill that went up has its new
- *  level and the whole bar it filled in its colour (an independent critic, 2026-11-20: the level-up was "the
- *  quietest thing in its own row" and "+9" had no unit).
- *  One that went up leads, then the ones fed most, three at most. A memory filed under no skill is named as the
- *  review picker names it, and has no level. `was` and `now` are each skill's strength before and after. */
-export function SkillRows({ kept, was, now, skills, run }: { kept: { skill: string; n: number }[]; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
+/** What the end screen's rows show and what flies to them, worked out once so the screen and the flight agree.
+ *  A row is a skill the session fed; its line is the session's own stones for it, one per memory kept: the ones
+ *  that became gems first, then the rest. A flier is one of those,
+ *  leaving the ring for its place in the line. Skills that went up lead, then by gems, then by memories kept. */
+export type EndRow = { skill: string; cut: number; kept: number; slots: ("cut" | "rough")[]; first: number; /** It has the big ring to itself for a turn. */ solo: boolean };
+export function endPlan(cut: string[], kept: { skill: string; n: number }[], was: Today["skills"], now: Today["skills"]): { rows: EndRow[]; fliers: { skill: string; kind: "cut" | "rough"; row: number }[] } {
   const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
   const up = (id: string) => (of(now, id)?.level ?? 0) > (of(was, id)?.level ?? of(now, id)?.level ?? 0);
-  const all = [...kept.filter((k) => up(k.skill)), ...kept.filter((k) => !up(k.skill))], rows = all.slice(0, REEL_ROWS);
-  if (!rows.length) return null;
-  const level = (id: string) => {
-    const k = of(now, id), b = of(was, id) ?? k;
-    if (!k || !b) return null;
-    // A skill that went up filled the level it was on: the bar is that level's, full.
-    const from = Math.round(levelProgress(b).share * BAR), to = up(id) ? BAR : Math.round(levelProgress(k).share * BAR);
-    return { from: up(id) ? 0 : Math.min(from, to), to, n: k.level, said: up(id) ? `level ${k.level}` : "" };
-  };
-  const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
-  const said = all.map((k) => [name(k.skill), `${k.n} kept`, level(k.skill)?.said].filter(Boolean).join(", ")).join(" · ");
-  const more = all.length - rows.length;
+  // A memory filed under no skill has its line too, named as the review picker names it, with no level.
+  const ids = [...new Set([...cut, ...kept.map((k) => k.skill)])];
+  const rows = ids.map((id) => {
+    const c = cut.filter((x) => x === id).length, n = Math.max(c, kept.find((k) => k.skill === id)?.n ?? 0);
+    // A memory kept and not cut is a rough stone. Which of them stand one answer from a gem the session does not
+    // say (the skill's own count is of all its memories), so none is drawn as if it did.
+    const line = [...Array<"cut">(c).fill("cut"), ...Array<"rough">(n - c).fill("rough")];
+    return { skill: id, cut: c, kept: n, slots: line.slice(0, LINE), first: 0, solo: false };
+  }).sort((x, y) => Number(up(y.skill)) - Number(up(x.skill)) || y.cut - x.cut || y.kept - x.kept);
+  // Every skill fed has its line (Tyler, 2026-11-23, of a "+3" that stood for the rest: "I don't get what the +3
+  // does"). The big ring is given to two at most, so the wait does not grow with the skills.
+  // The big ring is a level's: a skill that went up has it for a turn. A day with no new level gives it to the
+  // one skill that won most, so every day has one turn and none is handed out unevenly.
+  const risen = rows.filter((r) => r.cut > 0 && up(r.skill)).slice(0, SOLOS);
+  (risen.length ? risen : rows.filter((r) => r.cut > 0).slice(0, 1)).forEach((r) => (r.solo = true));
+  const fliers = rows.flatMap((r, row) => ((r.first = rows.slice(0, row).reduce((n, x) => n + x.slots.length, 0)), r.slots.map((kind) => ({ skill: r.skill, kind, row }))));
+  return { rows, fliers };
+}
+/** The most stones a row's line holds. */
+const LINE = 5;
+
+/** How far a session's fliers have got, row by row of its plan: the gems that have landed on the skill's ring,
+ *  the rough stones that have landed on its medal, and whether its medal is out. */
+export type EndProg = { cut: number[]; stone: number[]; shown: boolean[]; done: boolean; /** The row whose medal is still on its way down from the big ring. */ landing?: number };
+/** Where a skill's level stands with `here` of the session's gems landed (all of them once `done`): the level,
+ *  whether that is a new one, the share of the way to the next, and the share one good answer away (`soon`). */
+export function levelAt(r: EndRow, here: number, done: boolean, was: Today["skills"], now: Today["skills"]) {
+  const k = now.find((x) => x.skill === r.skill), b = was.find((x) => x.skill === r.skill) ?? k;
+  if (!k || !b) return { lv: 0, up: false, share: 0, since: undefined, soon: 0 };
+  // The level counts the most gems the skill has ever held, which a gem only adds to once the skill holds more
+  // than that again: one won back below its best adds nothing, and the count never passes where the day ended.
+  const count = done ? k.peak : Math.min(k.peak, Math.max(b.peak, b.solid + here));
+  const lv = Math.floor(Math.sqrt(count / 5)), from = 5 * lv ** 2, next = 5 * (lv + 1) ** 2, up = lv > b.level;
+  // A skill that went up filled the level it was on: its ring stays full.
+  // Where the ring stood before the session, on the level it shows (the one it filled, if it went up).
+  const base = up ? 5 * b.level ** 2 : from, top = up ? 5 * (b.level + 1) ** 2 : next;
+  return { lv, up, share: up ? 1 : (count - from) / (next - from), since: count > b.peak ? Math.max(0, (b.peak - base) / (top - base)) : undefined, soon: up ? 0 : Math.min(k.ready, next - count) / (next - from) };
+}
+
+/** A skill's turn in the end screen's big ring (Tyler, 2026-11-23: "I don't want to read it. I want to feel it
+ *  with an animation, like Duolingo does"; an independent critic the same day, of medals under the ring: "the
+ *  climax is the smallest event on screen"). For the length of its turn the ring is the skill's: its dots are the
+ *  way to the skill's next level in the skill's colour, its icon and level stand in the middle, and each gem the
+ *  session cut for it leaves its place and lands on the rim as the next dots. A new level throws the dots
+ *  outward and turns the number, and is held. Then it goes down to its medal (`leaving`). One thing at a time, in
+ *  the centre, the level a ring round the thing itself: Duolingo's lesson end and level up, Mimo, Finch, Brilliant
+ *  (Mobbin, 2026-11-23). */
+export function SkillStage({ row, here, leaving, size, was, now, skills }: { row: EndRow; here: number; leaving: { dx: number; dy: number } | null; size: number; was: Today["skills"]; now: Today["skills"]; skills: Skill[] }) {
+  const s = skills.find((x) => x.id === row.skill), lv = levelAt(row, here, false, was, now);
   return (
-    // Its room is held from the start, so the results under it never move when it comes in.
-    <div className="end-skills" data-wait={!run || undefined}>
-      <span className="sr-only">{said}</span>
-      {rows.map((k, i) => {
-        const s = skills.find((x) => x.id === k.skill), lv = level(k.skill);
-        return (
-          <div key={k.skill} className="end-skill" data-color={s?.color} data-up={up(k.skill) || undefined} aria-hidden="true" style={{ "--i": i } as React.CSSProperties}>
-            <SkillIcon icon={s?.icon} color={s?.color} dot />
-            <span className="end-skill-name">{name(k.skill)}</span>
-            {lv && <b>Level <DotNumber value={lv.n} height={24} /></b>}
-            <span className="end-skill-level">
-              {lv && <span className="end-skill-bar">{Array.from({ length: BAR }, (_, d) => <i key={d} data-on={d < lv.from || undefined} data-new={(d >= lv.from && d < lv.to) || undefined} style={{ "--d": d - lv.from } as React.CSSProperties} />)}</span>}
-              {k.n} kept
-            </span>
-          </div>
-        );
-      })}
-      {/* Three rows at most; a session that fed more says how many, and names them all on hover and focus. */}
-      {more > 0 && <Hint text={`Memories kept this session · ${said}`}><span className="end-skills-more" tabIndex={0}>and {more} more {more === 1 ? "skill" : "skills"}</span></Hint>}
+    <div className="end-stage" data-color={s?.color} data-leaving={!!leaving || undefined} data-up={lv.up || undefined} style={leaving ? ({ "--dx": `${leaving.dx}px`, "--dy": `${leaving.dy}px` } as React.CSSProperties) : undefined} aria-hidden="true">
+      <span className="end-stage-ring gem-ring" key={`in${here}`} data-beat={here || undefined} style={{ width: size, height: size }}><DotRing size={size} share={lv.share} since={lv.since} ghost={lv.soon} step /></span>
+      {lv.up && <span className="end-stage-burst">{Array.from({ length: 24 }, (_, d) => <i key={d} style={{ "--a": `${d * 15}deg` } as React.CSSProperties} />)}</span>}
+      <span className="end-stage-mid">
+        <SkillIcon icon={s?.icon} color={s?.color} dot />
+        {(lv.lv > 0 || lv.up) && <b key={`lv${lv.lv}`} data-flip={lv.up || undefined}>{lv.lv}</b>}
+      </span>
     </div>
   );
 }
-const REEL_ROWS = 3;
-/** The dots in a row's bar to the next level. */
-const BAR = 10;
+
+/** Under the end screen's ring: a medal for each skill the session fed, and no sentence in it. A medal is the
+ *  skill's icon inside the ring of its level, the level on its rim once it has one. A skill that won a gem comes
+ *  down here from its turn in the big ring (`SkillStage`); the rest come in together, and the session's rough
+ *  stones fly to their medals in one volley. The dim dots ahead are the memories one good answer from a gem.
+ *  Every medal's place is held from the start, so none slides when another arrives.
+ *  `was` and `now` are each skill's strength before and after. */
+export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnType<typeof endPlan>; prog: EndProg; was: Today["skills"]; now: Today["skills"]; skills: Skill[]; run: boolean }) {
+  // More skills than the row shows at once roll through it like credits, one step at a time, and round again
+  // (Tyler, 2026-11-23, of five small medals with their names cut short: "why would it not just loop in a credits
+  // kind of way").
+  // A short window has room for two lines over the results, not three.
+  const seen = typeof window === "undefined" ? SEEN : Math.max(2, Math.min(5, Math.floor((window.innerHeight - 710) / MEDAL_SLOT)));
+  const n = plan.rows.length, rolls = n > seen && !still();
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    if (!rolls || !prog.done) return;
+    // The first ones, which had the big ring, stay a while longer before the roll begins.
+    let id: ReturnType<typeof setInterval>;
+    const first = setTimeout(() => (setStep((x) => x + 1), (id = setInterval(() => !document.hidden && setStep((x) => x + 1), ROLL_MS))), 1500);
+    return () => (clearTimeout(first), clearInterval(id));
+  }, [rolls, prog.done]);
+  // Past the last one the row is back where it began: it jumps there unseen, the first ones standing in twice.
+  useEffect(() => {
+    if (step < n) return;
+    const id = setTimeout(() => setStep(0), 650);
+    return () => clearTimeout(id);
+  }, [step, n]);
+  if (!n) return null;
+  // Until the session's stones have landed the row stays on its first three, which are the ones that had the
+  // big ring: it never darts ahead and back.
+  const off = rolls && prog.done ? step : 0;
+  const name = (id: string) => skills.find((s) => s.id === id)?.name ?? "No skill";
+  const said = (r: EndRow, lv: number) => [name(r.skill), `${r.kept} kept`, r.cut > 0 && `${r.cut} became ${r.cut === 1 ? "a gem" : "gems"}`, lv > 0 && `level ${lv}`].filter(Boolean).join(" · ");
+  return (
+    // Its room is held from the start, so the results under it never move when it comes in.
+    <div className="end-skills" style={{ "--seen": Math.min(n, seen) } as React.CSSProperties} data-wait={!run || undefined} data-rolls={rolls || undefined}>
+      <span className="sr-only">{plan.rows.map((r) => said(r, now.find((k) => k.skill === r.skill)?.level ?? 0)).join(". ")}</span>
+      <div className="end-skills-track" data-jump={(rolls && prog.done && step === 0) || undefined} style={rolls ? { transform: `translateY(${-off * MEDAL_SLOT}px)` } : undefined}>
+      {(rolls && prog.done ? [...plan.rows, ...plan.rows.slice(0, seen)] : plan.rows).map((r, j) => {
+        const i = j % n, s = skills.find((x) => x.id === r.skill), lv = levelAt(r, prog.cut[i]!, prog.done, was, now);
+        return (
+          <Hint key={j} text={said(r, lv.lv)}>
+            <div className="end-medal" data-skill={r.skill} data-color={s?.color} data-wait={!prog.shown[i] || undefined} data-up={lv.up || undefined}>
+              <span className="end-medal-ring" data-row={j < n ? i : undefined} style={prog.landing === i ? { visibility: "hidden" } : undefined} aria-hidden="true">
+                <span className="end-medal-core gem-ring" data-beat={prog.stone[i] || undefined} key={`in${prog.stone[i]}`}>
+                  <DotRing size={MEDAL} share={lv.share} since={lv.since} ghost={lv.soon} step />
+                  <SkillIcon icon={s?.icon} color={s?.color} dot />
+                </span>
+                {lv.lv > 0 && <b className="gem-ring-lv" data-flip={lv.up || undefined}>{lv.lv}</b>}
+                {/* What flies, drawn once here so the flight can lift a copy of it. */}
+                <span className="end-medal-fliers">{j < n && r.slots.map((kind, d) => <span key={d} data-slot={r.first + d}><Gem kind={kind} size={kind === "cut" ? 28 : 24} /></span>)}</span>
+              </span>
+              <span className="end-medal-name" data-long={name(r.skill).length > 38 || undefined}>{name(r.skill)}</span>
+              {/* What today added, under what the skill now is (Tyler, 2026-11-23: "I just am not sure what I gained
+                  today versus just the status of the skill before"): the session's own gems and stones, each
+                  there once it has landed. */}
+              <span className="end-medal-pips" aria-hidden="true">
+                {r.slots.map((kind, d) => {
+                  const cuts = r.slots.filter((x) => x === "cut").length, here = prog.done || (kind === "cut" ? d < prog.cut[i]! : d - cuts < prog.stone[i]!);
+                  return <span key={d} data-pip={j < n ? `${i}-${d}` : undefined} data-wait={!here || undefined}><Gem kind={kind} size={kind === "cut" ? 20 : 17} /></span>;
+                })}
+              </span>
+            </div>
+          </Hint>
+        );
+      })}
+      </div>
+    </div>
+  );
+}
+/** The skills that get the big ring to themselves. */
+const SOLOS = 2;
+/** The medals the row shows at once when it rolls, a medal's place in px, and how long it rests between steps. */
+const SEEN = 3, MEDAL_SLOT = 60, ROLL_MS = 1700;
+/** A medal's ring, in px. */
+const MEDAL = 44;
 
 /** White sparkles over the ring's bonus dots, for as long as the end screen is up: small crosses of dots that
  *  open and fade, only on the stretch past the goal, so they also say how far it went. A few past the goal,

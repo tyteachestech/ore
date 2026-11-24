@@ -2301,6 +2301,15 @@ journey("menus: every item of a source's right-click and ⋯ menu has an icon, i
   await page.keyboard.press("Escape");
 });
 
+journey("Collected: a new question is typed in place, with no line over it and no box (F578)", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.locator(".cp-head.question").hover();
+  await page.getByRole("button", { name: "Ask a question" }).click();
+  await askFieldIsPlain(page, page.locator(".cp"));
+  await page.keyboard.press("Escape");
+});
+
 journey("Collected: a key point he is typing survives closing its group and switching to the note and back", async (page) => {
   await openSource(page, TESTING);
   await page.getByRole("tab", { name: "Collected" }).click();
@@ -7988,7 +7997,7 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   // The cart plays only with something to tip (a ring dot this session lit, or a gem it cut).
   // Whether this library has that depends on the journeys before it, so that the cart mounts at all is
   // checked in test/end-screen.test.tsx; here it is checked in a real browser when it does play.
-  const first = await page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip .cart"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length }));
+  const first = await page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip .cart"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .end-ring > .ring .dot-ring .on").length }));
   if (first.cart) {
     if (first.mole) throw new Error("the mole is up while the cart is still on the rail");
     // Its layer never widens the page or takes a click: Done is still his.
@@ -7996,7 +8005,7 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
     if (layer.events !== "none" || layer.scroll > 0) throw new Error(`the cart's layer is in the way: ${JSON.stringify(layer)}`);
     await until("the cart has gone", async () => (await page.locator(".cart-tip").count()) === 0, 8000);
   }
-  const after = await page.evaluate(() => ({ mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length, waiting: document.querySelectorAll(".review-cut > span[data-wait]").length, ore: document.querySelectorAll(".cart-ore").length }));
+  const after = await page.evaluate(() => ({ mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .end-ring > .ring .dot-ring .on").length, waiting: document.querySelectorAll(".review-cut > span[data-wait]").length, ore: document.querySelectorAll(".cart-ore").length }));
   if (!after.mole || after.waiting || after.ore || after.on < first.on) throw new Error(`the end screen didn't settle: ${JSON.stringify({ first, after })}`);
   // Its sounds (D277): the cart's roll if it came, the jingle as the ring fills, the mole's pop as he comes up.
   await until("the end screen's sounds played in order", async () => (await endSounds()) === (first.cart ? "cart done pop" : "done pop"));
@@ -8006,7 +8015,7 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
   // Set back whatever happens, or every journey after a failure here would run with Reduce Motion on.
   const still = await (async () => {
     await finish();
-    return page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .dot-ring .on").length }));
+    return page.evaluate(() => ({ cart: !!document.querySelector(".cart-tip"), mole: !!document.querySelector(".review-mole .mole"), on: document.querySelectorAll(".review-end .end-ring > .ring .dot-ring .on").length }));
   })().finally(() => page.emulateMedia({ reducedMotion: null }));
   // A second session only adds minutes, so the ring is at least as full.
   if (still.cart || !still.mole || still.on < after.on) throw new Error(`Reduce Motion: ${JSON.stringify({ still, after })}`);
@@ -9704,7 +9713,10 @@ journey("the end of a review closes the session: no try line even with a try ope
   await page.getByRole("button", { name: "Good", exact: true }).click();
   await page.waitForTimeout(300);
   await page.keyboard.press("Escape");
-  await page.locator(".review-end .end-skill").first().waitFor();
+  await page.locator(".review-end .end-medal").first().waitFor();
+  // F580: a skill's name stands whole on its line, never cut short.
+  const cutNames = await page.locator(".end-medal-name").evaluateAll((els) => els.filter((n) => n.scrollHeight > n.clientHeight + 1 || n.scrollWidth > n.clientWidth + 1).map((n) => n.textContent));
+  if (cutNames.length) throw new Error(`the end screen cut a skill's name short: ${cutNames.join(", ")}`);
   if (!/\d+ kept/.test((await page.locator(".end-skills .sr-only").textContent()) ?? "")) throw new Error(`the skills' rows read ${await page.locator(".end-skills .sr-only").textContent()}`);
   const open = ((await ore("tries")) as { status: string }[]).filter((t) => t.status === "open").length;
   if (!open) throw new Error("the seed has no open try, so this journey proves nothing");
@@ -17819,6 +17831,30 @@ journey("phone: a source's Collected page has its title, as Sources and Settings
   const collected = page.locator('aside.mynotes[aria-label="Collected"]');
   await collected.waitFor();
   await collected.getByRole("heading", { level: 1, name: "Collected" }).waitFor();
+}, "phone");
+/** A new question typed in Collected sits where its row will: no line above it, no box around it, and the Questions
+ *  label as tall as its neighbours (F578: Review's `.ask` and the skill page's `.question` styled them). */
+async function askFieldIsPlain(page: Page, panel: Locator) {
+  const field = panel.getByRole("textbox", { name: "New question" });
+  await field.waitFor();
+  const drawn = await field.evaluate((el) => {
+    const box = (e: Element) => { const s = getComputedStyle(e); return { line: s.borderTopWidth, edge: s.boxShadow, gap: s.marginTop }; };
+    const row = document.querySelector(".cp-row .cp-text")!.getBoundingClientRect();
+    return { wrap: box(el.parentElement!), field: box(el), left: el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft) - row.left, heads: [...document.querySelectorAll(".cp-head")].map((h) => h.getBoundingClientRect().height) };
+  });
+  if (drawn.wrap.line !== "0px" || drawn.wrap.gap !== "0px") throw new Error(`a line or a gap sits over the new question: ${JSON.stringify(drawn.wrap)}`);
+  if (drawn.field.line !== "0px" || drawn.field.edge !== "none") throw new Error(`the new question is typed in a box: ${JSON.stringify(drawn.field)}`);
+  if (Math.abs(drawn.left) > 0.5) throw new Error(`the new question's words start ${drawn.left}px off the rows' words`);
+  if (new Set(drawn.heads).size > 1) throw new Error(`Collected's labels are not one height: ${drawn.heads}`);
+}
+journey("phone: a new question in Collected is typed in place, with no line over it and no box (F578)", async (page) => {
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  const collected = page.locator('aside.mynotes[aria-label="Collected"]');
+  await collected.waitFor();
+  await tap(page, collected.getByRole("button", { name: "Ask a question" }));
+  await askFieldIsPlain(page, collected);
+  await page.keyboard.press("Escape");
 }, "phone");
 journey("phone: a link typed into Add a link and left with a tap outside is there when it opens again (Codex UX sweep, D342)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
