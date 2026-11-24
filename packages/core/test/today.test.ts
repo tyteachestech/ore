@@ -732,7 +732,7 @@ test("today counts the exercises he has, so a first day says how to get one, not
 });
 
 describe("two devices' reviews of one exercise, merged (Codex deep scan 3)", () => {
-  test("an Undo takes back only this device's rating when another device rated the exercise in the same millisecond (F-new-undo-same-ms)", async () => {
+  test("an Undo takes back only this device's rating when another device rated the exercise in the same millisecond (F595)", async () => {
     const { lib, cards } = await library(1);
     const id = cards[0]!.meta.id;
     const { phone, merge } = offline(lib);
@@ -748,7 +748,7 @@ describe("two devices' reviews of one exercise, merged (Codex deep scan 3)", () 
     expect(readReviews(lib).map((r) => r.rating)).toEqual([4]);
   });
 
-  test("stats replay the merged history, so an offline answer given before the exercise was due is not a retention test (F-new-stats-merged-replay)", async () => {
+  test("stats replay the merged history, so an offline answer given before the exercise was due is not a retention test (F602)", async () => {
     const { lib, cards } = await library(1);
     const id = cards[0]!.meta.id;
     const { phone, merge } = offline(lib);

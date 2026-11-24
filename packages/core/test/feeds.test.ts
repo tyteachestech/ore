@@ -267,7 +267,7 @@ describe("previews: a post is saved only once he keeps something from it", () =>
 });
 
 describe("the Feed and what he saved meanwhile", () => {
-  test("closing a preview keeps it when his first note saved while the close waited (F-new-feed-close-saved-note)", async () => {
+  test("closing a preview keeps it when his first note saved while the close waited (F603)", async () => {
     serve();
     const lib = await tempLibrary();
     await followFeed(lib, "https://howiai.example.com/");
@@ -283,7 +283,7 @@ describe("the Feed and what he saved meanwhile", () => {
     expect(findItem(lib, item.meta.id).meta.preview).toBeUndefined();
   });
 
-  test("a post saved under the same link written another way (http, www) leaves the Feed (F-new-feed-equivalent-url)", async () => {
+  test("a post saved under the same link written another way (http, www) leaves the Feed (F610)", async () => {
     serve();
     const lib = await tempLibrary();
     await followFeed(lib, "https://howiai.example.com/");
@@ -292,7 +292,7 @@ describe("the Feed and what he saved meanwhile", () => {
     expect(feedView(lib).posts.map((p) => p.url)).toEqual(["https://howiai.example.com/p/newest"]);
   });
 
-  test("one post listed by two feeds under links written two ways shows once, read in both (F-new-feed-equivalent-url)", async () => {
+  test("one post listed by two feeds under links written two ways shows once, read in both (F610)", async () => {
     const other = RSS.replace("<title>How I AI</title>", "<title>Mirror</title>").replaceAll("https://howiai.example.com/p/", "http://www.howiai.example.com/p/");
     serve(new Set(), { "https://mirror.example.com/": ["<html><body>Mirror</body></html>", "text/html"], "https://mirror.example.com/feed": [other, "application/rss+xml"] });
     const lib = await tempLibrary();

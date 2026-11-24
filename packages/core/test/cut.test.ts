@@ -113,7 +113,7 @@ describe("cutText", () => {
 describe("cuts while the source changes", () => {
   const TEXT = "# Source\n\nAlpha paragraph.\n\nBeta paragraph.\n\nGamma paragraph that is long enough to remain beyond the old cut position.\n";
 
-  test("a cut that waited for the library keeps the title a rename just saved (F-new-cut-stale-rename)", async () => {
+  test("a cut that waited for the library keeps the title a rename just saved (F605)", async () => {
     const lib = await tempLibrary();
     const item = await addText(lib, TEXT);
     const at = item.body.indexOf("Beta");
@@ -128,7 +128,7 @@ describe("cuts while the source changes", () => {
     expect(now.body).not.toContain("Beta");
   });
 
-  test("Undo of a cut after another cut above it puts the text back between whole paragraphs, never mid-word (F-new-cut-undo-shifted)", async () => {
+  test("Undo of a cut after another cut above it puts the text back between whole paragraphs, never mid-word (F606)", async () => {
     const lib = await tempLibrary();
     const item = await addText(lib, TEXT);
     const beta = await cutText(lib, item.meta.id, item.body.indexOf("Beta"), item.body.indexOf("Beta") + 1);
@@ -138,7 +138,7 @@ describe("cuts while the source changes", () => {
     expect(findItem(lib, item.meta.id).body).toBe("# Source\n\nBeta paragraph.\n\nGamma paragraph that is long enough to remain beyond the old cut position.\n");
   });
 
-  test("Redo after an Undo that found the text a new place takes it out again from there (F-new-cut-undo-shifted)", async () => {
+  test("Redo after an Undo that found the text a new place takes it out again from there (F606)", async () => {
     const lib = await tempLibrary();
     const item = await addText(lib, TEXT);
     addHighlight(item, { exact: "Beta paragraph", intent: "keep" });

@@ -173,24 +173,24 @@ describe("note editor (D38)", () => {
     return types.filter((t) => t === "toggle");
   };
 
-  test("two toggles with no blank line between them open as two toggles, and an edit after them keeps both (F-new-adjacent-toggles)", async () => {
+  test("two toggles with no blank line between them open as two toggles, and an edit after them keeps both (F604)", async () => {
     const md = "<details><summary>A</summary>\n\na\n\n</details>\n<details><summary>B</summary>\n\nb\n\n</details>\n\nAfter.\n";
     expect(await toggleTypes(md)).toEqual(["toggle", "toggle"]);
     expect(await editAt(md, "After", "Still ")).toBe(md.replace("After.", "Still After."));
   });
 
-  test("a toggle holding raw HTML opens as a toggle with the HTML as a literal inside it (F-new-adjacent-toggles)", async () => {
+  test("a toggle holding raw HTML opens as a toggle with the HTML as a literal inside it (F604)", async () => {
     const md = "<details><summary>A</summary>\n\n<div>x</div>\n\n</details>\n\nAfter.\n";
     expect(await toggleTypes(md)).toEqual(["toggle"]);
     expect(await editAt(md, "After", "Still ")).toBe(md.replace("After.", "Still After."));
   });
 
-  test("an editor that opened a note empty never saves over the note's text (F-new-adjacent-toggles)", () => {
+  test("an editor that opened a note empty never saves over the note's text (F604)", () => {
     const md = "Some writing.\n\n<details><summary>A</summary>\n\na\n\n</details>\n";
     expect(keep(md, "", "New writing.\n")).toBe(md);
   });
 
-  test("a note with text the editor read as empty is unreadable, so it opens read-only, never as an empty note to type in (F-new-adjacent-toggles)", () => {
+  test("a note with text the editor read as empty is unreadable, so it opens read-only, never as an empty note to type in (F604)", () => {
     const md = "Some writing.\n";
     expect(unreadable(md, "")).toBe(true);
     expect(unreadable(md, md)).toBe(false);
@@ -198,7 +198,7 @@ describe("note editor (D38)", () => {
     expect(unreadable("\n\n", "")).toBe(false);
   });
 
-  test("editing one list item keeps the list's other lines as written: bullets, indents and trailing spaces (F-new-list-edit-keeps-lines)", async () => {
+  test("editing one list item keeps the list's other lines as written: bullets, indents and trailing spaces (F612)", async () => {
     const md = "* Keep this.  \n* EDIT here.\n    + Nested old.\n";
     expect(await editAt(md, "EDIT", "NEW ")).toBe("* Keep this.  \n* NEW EDIT here.\n    + Nested old.\n");
     const quote = "> [!note]\n> EDIT here.\n> Keep this.  \n";

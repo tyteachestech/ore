@@ -15,7 +15,7 @@ describe("editing a source", () => {
     expect(renameItem(lib, meta.id, "  ")).rejects.toThrow("needs a title");
   });
 
-  test("rename keeps frontmatter he wrote by hand that Ore doesn't know, and still clears what it removes (F-new-rename-keeps-frontmatter)", async () => {
+  test("rename keeps frontmatter he wrote by hand that Ore doesn't know, and still clears what it removes (F607)", async () => {
     const lib = await tempLibrary();
     const { meta, docPath } = await createItem(lib, { type: "markdown", title: "Old", body: "Text.\n", author: "Someone" });
     writeFileSync(docPath, readFileSync(docPath, "utf8").replace("---\n", '---\ncustom: "0012"\nmine:\n  - a\n'));

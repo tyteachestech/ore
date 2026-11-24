@@ -445,7 +445,7 @@ describe("review loop", () => {
 });
 
 describe("two sessions open at once (D76)", () => {
-  test("starting and ending a quick quiz leaves the main session's relearn pass owed past midnight (F-new-quick-session-pointer)", async () => {
+  test("starting and ending a quick quiz leaves the main session's relearn pass owed past midnight (F597)", async () => {
     const { lib, a } = await setup();
     const main = await startSession(lib, new Date(2026, 5, 1, 23, 58));
     await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, session: main.id, now: new Date(2026, 5, 1, 23, 59) });
@@ -459,7 +459,7 @@ describe("two sessions open at once (D76)", () => {
     expect(openSessionId(lib)).toBe(main.id); // a review given no session goes to the main one again
   });
 
-  test("a quick quiz opened after the main window sat idle over an hour still leaves its relearn pass owed past midnight (F-new-quick-session-pointer)", async () => {
+  test("a quick quiz opened after the main window sat idle over an hour still leaves its relearn pass owed past midnight (F597)", async () => {
     const { lib, a } = await setup();
     const main = await startSession(lib, new Date(2026, 5, 1, 23, 20));
     await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, session: main.id, now: new Date(2026, 5, 1, 23, 30) });
@@ -471,7 +471,7 @@ describe("two sessions open at once (D76)", () => {
     expect(openSessionId(lib)).toBe(main.id);
   });
 
-  test("a session left open when the app quit doesn't carry into the next morning's session or take its reviews (F-new-quick-session-pointer)", async () => {
+  test("a session left open when the app quit doesn't carry into the next morning's session or take its reviews (F597)", async () => {
     const { lib, a } = await setup();
     const old = await startSession(lib, new Date(2026, 5, 1, 21, 0));
     await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, session: old.id, now: new Date(2026, 5, 1, 21, 10) });

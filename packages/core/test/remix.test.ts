@@ -205,7 +205,7 @@ describe("card remixing (D66)", () => {
   const ore = (lib: Library, ...args: string[]) =>
     `require("child_process").execFileSync("bun", [${JSON.stringify(join(import.meta.dir, "../../cli/src/ore.ts"))}, ${args.map((a) => JSON.stringify(a)).join(", ")}], { env: { ...process.env, PATH: ${JSON.stringify(`${binDir}:${savedPath}`)}, ORE_AI: "claude", ORE_LIBRARY: ${JSON.stringify(lib.root)}, ORE_NO_ENRICH: "1" } });`;
 
-  test("after he removes a key point or rewrites the exercise, versions made from the old one are no longer shown, and new ones are written (F-new-variant-stale-points)", async () => {
+  test("after he removes a key point or rewrites the exercise, versions made from the old one are no longer shown, and new ones are written (F600)", async () => {
     const lib = await tempLibrary();
     const c = await concept(lib);
     await review(lib, c.meta.id, 3);
@@ -219,7 +219,7 @@ describe("card remixing (D66)", () => {
     expect(cardsToRemix(lib, [findCard(lib, c.meta.id)])).toEqual([c.meta.id]);
   });
 
-  test("a version written while he edits the exercise is not saved (F-new-variant-stale-points)", async () => {
+  test("a version written while he edits the exercise is not saved (F600)", async () => {
     const lib = await tempLibrary();
     const c = await concept(lib);
     await review(lib, c.meta.id, 3);
@@ -232,7 +232,7 @@ describe("card remixing (D66)", () => {
     expect(reviewVersion(lib, findCard(lib, c.meta.id))).toBeNull();
   });
 
-  test("two remix runs that overlap never save the same version twice (F-new-remix-race-dupes)", async () => {
+  test("two remix runs that overlap never save the same version twice (F601)", async () => {
     const lib = await tempLibrary();
     const c = await concept(lib);
     await review(lib, c.meta.id, 3);

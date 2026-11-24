@@ -164,7 +164,7 @@ describe("delete a skill", () => {
     expect(findCard(lib, card).meta.skills).toEqual(["focus-attention", "habits", "learning"]);
   });
 
-  test("Undo of deleting a skill brings back its hand-written YAML keys and comments (F-new-skill-undo-keeps-yaml)", async () => {
+  test("Undo of deleting a skill brings back its hand-written YAML keys and comments (F608)", async () => {
     const lib = await tempLibrary();
     writeFileSync(paths.skills(lib), "# My organization\ncustom: keep-root\nskills:\n  - id: zero\n    name: Zero\n    priority: P1\n  # Skill explanation\n  - id: one\n    name: \"One\" # my label\n    priority: P2\n    custom: keep-skill\n");
     const r = await removeSkill(lib, "one");

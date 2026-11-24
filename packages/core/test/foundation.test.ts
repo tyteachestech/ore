@@ -148,7 +148,7 @@ describe("init", () => {
     expect(desiredRetention(["habits"], s)).toBe(0.8);
   });
 
-  test("two inits of the same new folder at once both finish, with one library (F-new-init-race)", async () => {
+  test("two inits of the same new folder at once both finish, with one library (F613)", async () => {
     const init = join(import.meta.dir, "../src/init.ts");
     const run = (root: string) => {
       const p = Bun.spawn(["bun", "-e", `await (await import(${JSON.stringify(init)})).initLibrary(${JSON.stringify(root)})`], { stdout: "pipe", stderr: "pipe" });

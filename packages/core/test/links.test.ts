@@ -88,7 +88,7 @@ describe("backlinks (D39)", () => {
     expect(backlinks(lib, { kind: "item", id: a.id }).map((l) => l.from.title)).toEqual(["Teaching"]);
   });
 
-  test("only links Markdown renders count: not in inline or indented code or after an escaped bracket, and a reference-style link does (F-new-links-rendered-only)", async () => {
+  test("only links Markdown renders count: not in inline or indented code or after an escaped bracket, and a reference-style link does (F609)", async () => {
     const { lib, a, b } = await setup();
     const url = linkUrl({ kind: "item", id: a.id });
     await setNotes(lib, b.id, `## Code\n\nExample: \`[Target](${url})\`\n\n    [Indented](${url})\n\nEscaped \\[Target](${url}) is text.\n\n## Real\n\nSee [Target][t].\n\n[t]: ${url}\n`);
@@ -97,7 +97,7 @@ describe("backlinks (D39)", () => {
     expect(brokenLinks(lib).map((l) => [l.text, l.target.id])).toEqual([["Gone", "older"]]);
   });
 
-  test("a source folder renamed in Finder is no broken link: its id comes from its doc.md (F-new-broken-links-folder-rename)", async () => {
+  test("a source folder renamed in Finder is no broken link: its id comes from its doc.md (F611)", async () => {
     const { lib, a, b } = await setup();
     await setNotes(lib, b.id, `See [spacing](ore:item/${a.id}).\n`);
     const dir = findItem(lib, a.id).dir;

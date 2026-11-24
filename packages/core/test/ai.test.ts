@@ -671,7 +671,7 @@ describe("AI adapter", () => {
     expect(listCards(lib)).toEqual([]);
   });
 
-  test("a draft with a blank question or a key point over two lines is asked again, never saved unreadable (F-new-enrich-unreadable-draft)", async () => {
+  test("a draft with a blank question or a key point over two lines is asked again, never saved unreadable (F598)", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Workflows follow predefined code paths. Agents direct their own tool use." });
     const id = item.meta.id;
@@ -695,7 +695,7 @@ describe("AI adapter", () => {
   const enrichMeanwhile = (lib: { root: string }, id: string) =>
     writeFileSync(join(binDir, "while.js"), `if (require("fs").readFileSync(${JSON.stringify(join(binDir, "count"))}, "utf8") === "1") require("child_process").execFileSync("bun", [${JSON.stringify(join(import.meta.dir, "../../cli/src/ore.ts"))}, "enrich", ${JSON.stringify(id)}], { env: { ...process.env, PATH: ${JSON.stringify(`${binDir}:${savedPath}`)}, ORE_AI: "claude", ORE_LIBRARY: ${JSON.stringify(lib.root)}, ORE_NO_ENRICH: "1" } });`);
 
-  test("two enrich runs that overlap save a draft from the same note once (F-new-enrich-overlap-dupes)", async () => {
+  test("two enrich runs that overlap save a draft from the same note once (F599)", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Workflows follow predefined code paths. Agents direct their own tool use." });
     const id = item.meta.id;
@@ -711,7 +711,7 @@ describe("AI adapter", () => {
     expect(listCards(lib).map((c) => c.question)).toEqual(["Why are agents drivers?"]);
   });
 
-  test("two enrich runs that overlap save one draft for key points they group the other way round (F-new-enrich-overlap-dupes)", async () => {
+  test("two enrich runs that overlap save one draft for key points they group the other way round (F599)", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Workflows follow predefined code paths. Agents direct their own tool use." });
     const id = item.meta.id;
@@ -963,7 +963,7 @@ fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace("When does it pay off?", 
     await expect(setPrequestionAttempt(lib, id, 1, { before: "x", confidence: 2 })).rejects.toThrow(/--confidence/);
   });
 
-  test("marks he corrects while a second check runs are kept, not replaced by the late AI reply (F-new-late-check-marks)", async () => {
+  test("marks he corrects while a second check runs are kept, not replaced by the late AI reply (F596)", async () => {
     const { lib, id } = await quizItem();
     await updateItemMeta(lib, id, (m) => ({ ...m, prequestions: m.prequestions!.map((p) => ({ ...p, points: [{ text: "A", evidence: [] }, { text: "B", evidence: [] }] })) }));
     await setPrequestionAttempt(lib, id, 1, { after: "it strengthens memory" });
