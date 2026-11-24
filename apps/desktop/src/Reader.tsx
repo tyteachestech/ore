@@ -40,6 +40,7 @@ import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
 import { openOriginal, playerLink, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
 import { change } from "./change";
+import { highlights } from "./highlights";
 import { INTENTS, ore, opt, PHONE, visible, whileOut, type Annotation, type CardFull, type CardSkills, type ChapterFeedback, type Doc, type Intent, type Item, type Priority, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
 import { sourceImportanceActions } from "./importance";
@@ -51,8 +52,7 @@ import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from ".
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer, type Player } from "./Video";
 import { ownsMediaKey } from "./media-keys";
 import { FillingLine, useFilling } from "./Filling";
-import { errorText, focusQuietly, inOrder, kept, load, readingFor, save, useFocusBack, useLibraryChanges, wakeOnLanding, type Notify } from "./util";
-import { mergeAnns } from "./anns";
+import { errorText, focusQuietly, kept, load, readingFor, save, useFocusBack, useLibraryChanges, wakeOnLanding, type Notify } from "./util";
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
@@ -691,7 +691,14 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   /** In a course (D79), the first lesson after this one not done yet: the closing card offers it. */
   const nextUp = p.lessons?.slice(p.lessons.findIndex((l) => l.id === p.id) + 1).find((l) => l.status !== "done");
   const [error, setError] = useState<string | null>(null);
-  const [anns, setAnns] = useState<Annotation[]>([]);
+  const [anns, showAnns] = useState<Annotation[]>([]);
+  /** Highlight writes that have settled. A highlight shows its mark at once, but `ore questions` only
+   *  knows it once the write lands, so the Questions list reads again after each one (its `marked`). */
+  const [annWrites, setAnnWrites] = useState(0);
+  /** This source's highlights (highlights.ts): the list on screen, the stand-in id of one still being made, the
+   *  writes still out. Here stays only what is the page's: where each sits (`ranges`), its popup, `fresh`. */
+  const [hl] = useState(() => highlights({ annotate: (id, ...args) => ore("annotate", id, ...args), show: showAnns, landed: () => setAnnWrites((k) => k + 1) }));
+  const setAnns = hl.set;
   const [ready, setReady] = useState(false);
   const [popup, setPopup] = useState<Popup | null>(null);
   const [zoom, setZoom] = useState<Zoomed | null>(null);
@@ -832,34 +839,13 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const idx = useRef<TextIndex | null>(null);
   const docEl = useRef<HTMLElement | null>(null);
   const ranges = useRef(new Map<string, Range>());
-  const pending = useRef(new Map<string, Promise<Annotation>>());
-  /** A new highlight's stand-in id → the id its save came back with, from the moment it lands. A key or click
-   *  on its popup can come before the page has drawn the swap (a busy Mac), still naming the stand-in. */
-  const savedIds = useRef(new Map<string, string>());
-  /** A highlight's id as the library knows it: a stand-in whose save has landed is its saved id. The save's answer
-   *  moves `ranges` and `fresh` to the saved id at once, while the highlights and the popup say the stand-in until
-   *  the page draws again, so every lookup goes through these and either id finds the same highlight. */
-  const idOf = (id: string) => savedIds.current.get(id) ?? id;
-  const sameId = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && idOf(a) === idOf(b);
+  const { idOf, same: sameId, find: annOf, realId } = hl;
   const isAnn = (a: Annotation, id: string) => sameId(a.id, id);
-  const annOf = (id: string | null | undefined) => (id ? annsRef.current.find((a) => sameId(a.id, id)) : undefined);
+  /** Where a highlight sits, under either of its ids: the save's answer moves `ranges` and `fresh` to the saved id
+   *  at once, while the list and the popup say the stand-in until the page draws again. */
   const rangeOf = (id: string | null | undefined) => (id ? ranges.current.get(idOf(id)) ?? ranges.current.get(id) : undefined);
-  /** Highlights with a write of his still saving: a read again keeps his copy of them (mergeAnns). */
-  const busy = useRef(new Map<string, number>());
-  /** His highlight changes still saving, from his action (a type or note waits for its highlight's create first):
-   *  the closing card's count reads once they have landed. */
-  const writing = useRef(new Set<Promise<unknown>>());
-  const track = <T,>(p: Promise<T>) => {
-    const settled = p.then(() => {}, () => {});
-    writing.current.add(settled);
-    void settled.then(() => writing.current.delete(settled));
-    return p;
-  };
-  const highlightsSaved = async () => {
-    while (writing.current.size) await Promise.all([...writing.current]);
-  };
-  const annsRef = useRef(anns);
-  annsRef.current = anns;
+  /** The list as it is now, not as this render saw it. */
+  const annsRef = { get current() { return hl.list(); } };
   const frame = useRef(0);
   // The jump last made, so a repaint doesn't scroll back to it, and a new one (a second citation into this
   // source while it is open) still goes (F317).
@@ -1161,7 +1147,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || d.enrich_skipped || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);
         // Read again (a wake), what he made or changed here that is still saving stays as he has it.
         const server = (d.annotations ?? []).filter(visible);
-        setAnns(opened.current === p.id ? (l) => mergeAnns(server, l, new Set(busy.current.keys()), savedIds.current) : server);
+        hl.read(server, opened.current === p.id);
         // Opening starts it and moves it up To read (D110); a preview isn't listed, so it's left alone.
         if (!d.preview && opened.current !== p.id) ore("opened", p.id).then(p.onChanged, (e) => p.notify(errorText(e), "error"));
         opened.current = p.id;
@@ -1657,10 +1643,6 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   /** Each new highlight's `forget`, for a fresh one he drops before it counts. */
   const made = useRef(new Map<string, () => void>());
-  const realId = async (id: string) => {
-    const wait = pending.current.get(id);
-    return wait ? (await wait).id : id;
-  };
 
   /** Writes what he typed in the popup's note, however it closes: a click away, Esc, another
    *  highlight, leaving the source. Only Remove (and a selection dropped untouched) throws it away. */
@@ -1983,7 +1965,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       wake(made);
       const ann = await whileOut(made); // ⌘Z meanwhile waits for its step (F481)
       keptFromFeed(ann);
-      savedIds.current.set(tmp, ann.id); // so a read again landing before the swap doesn't list it twice
+      hl.made(tmp, ann.id); // so a read again landing before the swap doesn't list it twice
       setAnns((l) => l.map((a) => (a.id === tmp ? ann : a)));
       const s = annStep(ann.id);
       p.notify("Key point added", "quiet", s.remove, s.bring);
@@ -2009,9 +1991,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // Never without a place: the core saves the match nearest it, not the first one in the source.
     args.push("--start", String(q ? q.start : sourceHint(src, index, range)));
     const tmp = `pending-${Date.now()}`;
-    const promise = track(ore<Annotation>(...args));
+    const promise = hl.track(ore<Annotation>(...args));
     wakeOnLanding()(promise); // a skill page opened while it is made (4 on the focus is a try) reads it once it lands
-    pending.current.set(tmp, promise);
+    hl.make(tmp, promise);
     ranges.current.set(tmp, range);
     vein(range, intent);
     tick.saved();
@@ -2028,7 +2010,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const forget = p.notify("Highlighted", "quiet", act("remove"), act("bring"));
     promise.then(
       (ann) => {
-        savedIds.current.set(tmp, ann.id);
+        hl.made(tmp, ann.id);
         keptFromFeed(ann);
         if (fresh.current === tmp) fresh.current = ann.id;
         const r = ranges.current.get(tmp);
@@ -2122,26 +2104,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     setFocus({ anchor: focus.head, head: focus.head });
   }
 
-  /** `ore annotate`, one write at a time per highlight: quick changes and their ⌘Z land in the order
-   *  he made them, never an older one last. */
-  /** Highlight writes that have settled. A highlight shows its mark at once, but `ore questions` only
-   *  knows it once the write lands, so the Questions list reads again after each one (its `marked`). */
-  const [annWrites, setAnnWrites] = useState(0);
-  // A screen opened while it saves (he closes the popup and goes to the skill page at once) has read the library
-  // without it: once it lands, those screens read again (`wake`, taken at his action, before any wait).
-  const annotateWaking = <T = unknown,>(wake: (w: Promise<unknown>) => void, id: string, ...args: string[]) => {
-    busy.current.set(id, (busy.current.get(id) ?? 0) + 1);
-    const write = inOrder(`annotate ${id}`, () => ore<T>("annotate", id, ...args));
-    const landed = () => {
-      const n = (busy.current.get(id) ?? 1) - 1;
-      if (n) busy.current.set(id, n);
-      else busy.current.delete(id);
-      setAnnWrites((k) => k + 1);
-    };
-    write.then(landed, landed);
-    wake(write);
-    return write;
-  };
+  // A screen opened while a highlight saves (he closes the popup and goes to the skill page at once) has read the
+  // library without it: once it lands, those screens read again (`wake`, taken at his action, before any wait).
+  const annotateWaking = hl.annotate;
   const annotate = <T = unknown,>(id: string, ...args: string[]) => annotateWaking<T>(wakeOnLanding(), id, ...args);
 
   /** A digit that just set the type from an empty note (D133), and how to take that change back. */
@@ -2170,7 +2135,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }
 
   function setIntentOf(id: string, intent: Intent, undoable = true) {
-    return track(setIntentNow(id, intent, undoable));
+    return hl.track(setIntentNow(id, intent, undoable));
   }
   async function setIntentNow(id: string, intent: Intent, undoable: boolean) {
     const wake = wakeOnLanding();
@@ -2297,7 +2262,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }
 
   function setNoteOf(id: string, note: string, undoable = true) {
-    return track(setNoteNow(id, note, undoable));
+    return hl.track(setNoteNow(id, note, undoable));
   }
   async function setNoteNow(id: string, note: string, undoable: boolean) {
     const wake = wakeOnLanding();
@@ -4224,7 +4189,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           notify={p.notify}
           flushNotes={notes.flush}
           onNotes={notes.apply}
-          highlightsSaved={highlightsSaved}
+          highlightsSaved={hl.allSaved}
         />
       ) : null}
       {zoom && (PHONE ? <FigureView img={zoom.img} from={zoom.from} onClose={() => setZoom(null)} /> : <FigureZoom fig={zoom} item={doc?.id ?? ""} notify={p.notify} onClose={() => setZoom(null)} />)}
