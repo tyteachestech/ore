@@ -1885,6 +1885,20 @@ describe("import coverage: figures and slide pictures", () => {
     expect(readFileSync(join(item.dir, curve!.path))).toEqual(readFileSync(join(FIX, "files", "screenshot.png")));
   });
 
+  test("a saved web page read again from its kept copy keeps the pictures it saved, its doc.md the same (F-new-reimport-local-image)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ore-saved-"));
+    writeFileSync(join(dir, "figure.png"), readFileSync(join(FIX, "files", "screenshot.png")));
+    const text = "A saved lesson needs its diagram to explain the experiment. ".repeat(8);
+    writeFileSync(join(dir, "lesson.html"), `<html><head><title>Saved illustrated lesson</title></head><body><article><h1>Saved illustrated lesson</h1><p>${text}</p><img src="figure.png" alt="Experiment diagram"><p>${"We compare the observations and draw a conclusion. ".repeat(8)}</p></article></body></html>`);
+    const lib = await tempLibrary();
+    const item = await addSource(lib, join(dir, "lesson.html"));
+    const [figure] = images(item.body);
+    expect(figure?.path).toMatch(/^assets\/[0-9a-f]{16}\.png$/);
+    const r = await reimportSource(lib, item.meta.id, { local: true });
+    expect(r.changed).toBe(false);
+    expect(readFileSync(findItem(lib, item.meta.id).docPath, "utf8")).toBe(readFileSync(item.docPath, "utf8"));
+  });
+
   test("PDF: figures after their page's text; touching panels are one, logos and icons left out", async () => {
     const item = await addSource(await tempLibrary(), file("figures.pdf"));
     const pages = item.body.split(/<!-- page \d+ -->/).slice(1);
