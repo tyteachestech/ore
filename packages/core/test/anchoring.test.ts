@@ -113,6 +113,21 @@ describe("anchoring", () => {
     expect(anchor(edited, sel)).toBeNull();
   });
 
+  test("fuzzy: a long highlight that held a page footer keeps its words when a better PDF read drops the footer and moves the paragraph (F-new-footer-highlight)", () => {
+    const start = "A crew may put up with a cold, wet shift because they care about the people downstream of the dam. That care gives the work its point,";
+    const rest =
+      "even when the hours are long. The survey found that crews who tie their work to something they hold dear, a town, a trade or a promise, report more pride in it. Crews whose work runs against what they hold dear report the opposite, however well it pays.";
+    const notes = "[^7]: Field notes on the upper dam, first season.\n\n[^8]: Field notes on the lower dam, second season.\n\n[^9]: A county register of floods, kept by the mill at the lower dam for the forty years before the survey, with the height of each one and the week it came.";
+    // The first read: the page's footnotes, then its footer, break into the paragraph where the page ended.
+    const first = `# Dams\n\n${start}\n\n${notes}\n\n**Rivers** FIELD GUIDE 8 ${rest}\n\n<!-- page 10 -->\n\nThe next page turns to floods.\n`;
+    const sel = selectorFor(first, `Rivers** FIELD GUIDE 8 ${rest}`);
+    // The page reader's: the paragraph whole, the footer gone, the footnotes after it. Both sides of the quote changed.
+    const again = `# Dams\n\n${start} ${rest}\n\n${notes}\n\n<!-- page 10 -->\n\nThe next page turns to floods.\n`;
+    const a = anchor(again, sel)!;
+    expect(a).not.toBeNull();
+    expect(again.slice(a.start, a.end)).toBe(rest);
+  });
+
   test("locate: whitespace-insensitive and nearest to hint", () => {
     expect(locate(DOC, "Retrieval practice beats\nrereading")).not.toBeNull();
     expect(locate("Split **workflows** and **agents** here", "workflows and agents")).toEqual({ start: 8, end: 32 });
