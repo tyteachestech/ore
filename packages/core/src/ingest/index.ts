@@ -151,7 +151,7 @@ async function audioTags(bytes: Uint8Array, ext: string): Promise<{ title?: stri
 
 /** Whether a saved reading of a PDF (`regions`) is of these bytes (Codex deep scan 2): one replaced at its link
  *  since has other pages, and the old tables laid on them took its text's place. */
-const fits = (opts: AddOptions, bytes: Uint8Array) => !opts.regionsOf || Buffer.from(opts.regionsOf).equals(Buffer.from(bytes));
+const fits = (opts: AddOptions, bytes: Uint8Array | string) => !opts.regionsOf || Buffer.from(opts.regionsOf).equals(Buffer.from(bytes));
 
 /** A source draft from a file's bytes, whatever it came from (a link or a file), by its kind. */
 async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: string, base = url, opts: AddOptions = {}): Promise<NewItem> {
