@@ -112,7 +112,7 @@ export function endPlan(cut: string[], kept: { skill: string; n: number }[], was
   return { rows, fliers, more: all.length - rows.length };
 }
 /** The most stones a row's line holds; past it the line ends on "+N". */
-const LINE = 8;
+const LINE = 5;
 
 /** How far a session's fliers have got, row by row of its plan: the gems that have landed on the skill's ring,
  *  the rough stones that have landed on its medal, and whether its medal is out. */
@@ -203,7 +203,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
                 {/* What flies, drawn once here so the flight can lift a copy of it. */}
                 <span className="end-medal-fliers">{j < n && r.slots.map((kind, d) => <span key={d} data-slot={r.first + d}><Gem kind={kind} size={kind === "cut" ? 28 : 24} /></span>)}</span>
               </span>
-              <span className="end-medal-name">{name(r.skill)}</span>
+              <span className="end-medal-name" data-long={name(r.skill).length > 38 || undefined}>{name(r.skill)}</span>
               {/* What today added, under what the skill now is (Tyler, 2026-11-23: "I just am not sure what I gained
                   today versus just the status of the skill before"): the session's own gems and stones, each
                   there once it has landed. */}
@@ -212,7 +212,6 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
                   const cuts = r.slots.filter((x) => x === "cut").length, here = prog.done || (kind === "cut" ? d < prog.cut[i]! : d - cuts < prog.stone[i]!);
                   return <span key={d} data-pip={j < n ? `${i}-${d}` : undefined} data-wait={!here || undefined}><Gem kind={kind} size={kind === "cut" ? 20 : 17} /></span>;
                 })}
-                {r.extra > 0 && <small data-wait={!prog.done || undefined}>+{r.extra}</small>}
               </span>
             </div>
           </Hint>

@@ -1914,10 +1914,12 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     // Then every medal is out, and the rough stones go to them in one volley from the ring's middle.
     at(t, () => (setOnStage(-2), setProg((p) => ({ ...p, shown: p.shown.map(() => true) }))));
     t += 120;
+    // The volley is over in the same time however many stones it has.
+    const gap = Math.min(40, 520 / Math.max(1, rowPlan.rows.reduce((n, r) => n + r.slots.filter((k) => !(k === "cut" && r.solo)).length, 0)));
     let stones = 0;
     rowPlan.rows.forEach((r, row) => r.slots.forEach((kind, d) => {
       if (kind === "cut" && r.solo) return;
-      at(t + stones++ * 40, () => {
+      at(t + stones++ * gap, () => {
         // A gem of a skill that had no turn of its own goes from where it was cut straight to its medal.
         const src = kind === "cut" ? host.querySelector<HTMLElement>(`.review-cut > span[data-fly][data-skill="${CSS.escape(r.skill)}"]:not([data-gone])`) : null;
         if (kind === "cut") {
@@ -1945,7 +1947,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
       src.setAttribute("data-gone", "");
       src.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${more.left + more.width / 2 - (a.left + a.width / 2)}px, ${more.top + more.height / 2 - (a.top + a.height / 2)}px) scale(0.3)`, opacity: 0.2 }], { duration: 480, delay: n * 60, easing: "cubic-bezier(0.5, 0, 0.25, 1)", fill: "forwards" });
     }));
-    t += stones ? (stones - 1) * 40 + 480 + 60 : 0;
+    t += stones ? (stones - 1) * gap + 480 + 60 : 0;
     at(t, () => (setProg((p) => ({ ...p, done: true })), setOnStage(-1)));
     return () => ids.forEach(clearTimeout);
   }, [rowsIn, host]);
