@@ -1845,7 +1845,13 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
       if (!slot || !medal) return land();
       // A medal the row is not showing now takes its stone unseen.
       const view = host.querySelector(".end-skills")!.getBoundingClientRect(), mr = medal.getBoundingClientRect();
-      if (mr.bottom < view.top + 8 || mr.top > view.bottom - 8) return land();
+      // A line the list is not showing now takes its stone unseen; a gem bound for one leaves the ring all the
+      // same, down to the foot of the list where its line will roll in.
+      if (mr.bottom < view.top + 8 || mr.top > view.bottom - 8) {
+        if (!opts.seen) return land();
+        to = { x: view.right - 40, y: view.bottom - 6 };
+        opts = { ...opts, end: undefined };
+      }
       const w = slot.querySelector("svg")!.getBoundingClientRect().width || 24;
       const dx = from.left + from.width / 2 - to.x, dy = from.top + from.height / 2 - to.y;
       const ghost = slot.cloneNode(true) as HTMLElement;
@@ -1899,7 +1905,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           });
         });
       }
-      t += (cuts - 1) * 90 + 420 + (levelUp ? 650 : 200);
+      t += (cuts - 1) * 90 + 420 + (levelUp ? (t < 1000 ? 650 : 380) : 200);
       // It goes down to its own medal's place, in one move.
       at(t, () => {
         const m = host.querySelector(`.end-medal-ring[data-row="${row}"]`)?.getBoundingClientRect(), z = host.querySelector(".end-stage")?.getBoundingClientRect();
@@ -1942,15 +1948,17 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         });
       });
     }));
-    // Gems of the skills past the last medal go to the "+N" that stands for them.
-    at(t, () => host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone])").forEach((src, n) => {
-      const more = host.querySelector(".end-skills-more")?.getBoundingClientRect();
-      if (!more) return;
+    t += stones ? (stones - 1) * gap + 480 : 0;
+    // A gem still in the ring (one the ring had no room to show until others left) goes down to the list too,
+    // so none is left behind to vanish.
+    at(t - 200, () => host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone])").forEach((src, n) => {
+      const view = host.querySelector(".end-skills")?.getBoundingClientRect();
+      if (!view) return;
       const a = src.getBoundingClientRect();
       src.setAttribute("data-gone", "");
-      src.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${more.left + more.width / 2 - (a.left + a.width / 2)}px, ${more.top + more.height / 2 - (a.top + a.height / 2)}px) scale(0.3)`, opacity: 0.2 }], { duration: 480, delay: n * 60, easing: "cubic-bezier(0.5, 0, 0.25, 1)", fill: "forwards" });
+      src.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${view.right - 40 - (a.left + a.width / 2)}px, ${view.bottom - 6 - (a.top + a.height / 2)}px) scale(0.4)`, opacity: 0 }], { duration: 320, delay: n * 40, easing: "cubic-bezier(0.5, 0, 0.25, 1)", fill: "forwards" });
     }));
-    t += stones ? (stones - 1) * gap + 480 + 60 : 0;
+    t += stones ? 60 : 0;
     at(t, () => (setProg((p) => ({ ...p, done: true })), setOnStage(-1)));
     return () => ids.forEach(clearTimeout);
   }, [rowsIn, host]);

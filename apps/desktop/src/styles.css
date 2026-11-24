@@ -2578,7 +2578,7 @@ button.home-plan:hover { color: var(--text); }
 .end-medal-pips > span { display: grid; place-items: center; animation: end-stone-in 320ms var(--ease-spring); }
 @keyframes end-stone-in { from { transform: scale(1.3); } }
 .end-medal-pips > [data-wait] { visibility: hidden; animation: none; }
-.end-medal-pips .gem[data-kind="rough"], .end-medal-pips .gem[data-kind="ready"] { opacity: 1; }
+.end-medal-pips .gem[data-kind="rough"], .end-medal-pips .gem[data-kind="ready"] { opacity: 1; filter: brightness(1.5); }
 .end-medal-name[data-long] { -webkit-line-clamp: 3; font-size: 14px; line-height: 1.2; }
 .end-medal-pips > small { margin-left: 2px; font: 400 11px/1 var(--mono); color: var(--muted); }
 
