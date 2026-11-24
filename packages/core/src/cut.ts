@@ -94,6 +94,10 @@ export interface Cut {
   at: number;
   text: string;
   section: boolean;
+  /** The text just before and after it when it was cut, to find its place again for Undo after the
+   *  source changed above it (absent in older records). */
+  before?: string;
+  after?: string;
   /** Highlights inside the removed text, as they were; removed with it (their cards stay). */
   removed: Annotation[];
 }
@@ -106,38 +110,43 @@ const stashDir = (lib: Library, item: string) => join(lib.root, ".ore", "cuts", 
  *  as on Reimport). The video transcript part of a page can't be cut: its words carry the timings.
  *  The original file (source.*) is untouched, so Reimport brings the full text back. */
 export async function cutText(lib: Library, ref: string, start: number, end: number, opts: { section?: boolean } = {}): Promise<Cut> {
-  const item = findItem(lib, ref);
-  if (item.meta.type === "youtube") throw new Error("A video's transcript can't be cut: its words are timed to the video.");
-  const body = item.body;
-  if (start < 0 || end > body.length || end < start) throw new Error("That text is not in this source any more. Reopen it and try again.");
-  const video = body.indexOf(VIDEO_END);
-  const span = cutSpan(body, start, end, opts.section);
-  if (video >= 0 && span.start < video + VIDEO_END.length) throw new Error("The video transcript can't be cut: its words are timed to the video. Cut the page text below it.");
-  const cut = { id: ulid(), item: item.meta.id, at: span.start, text: body.slice(span.start, span.end), section: span.section };
-  if (!cut.text.trim()) throw new Error("Nothing to remove there.");
-  return apply(lib, item, cut);
+  const dir = findItem(lib, ref).dir;
+  // Read under the lock: a rename or another cut that finished while this waited is kept.
+  return withLock(paths.lock(lib), () => {
+    const item = readItemDir(dir);
+    if (item.meta.type === "youtube") throw new Error("A video's transcript can't be cut: its words are timed to the video.");
+    const body = item.body;
+    if (start < 0 || end > body.length || end < start) throw new Error("That text is not in this source any more. Reopen it and try again.");
+    const video = body.indexOf(VIDEO_END);
+    const span = cutSpan(body, start, end, opts.section);
+    if (video >= 0 && span.start < video + VIDEO_END.length) throw new Error("The video transcript can't be cut: its words are timed to the video. Cut the page text below it.");
+    const cut = { id: ulid(), item: item.meta.id, at: span.start, text: body.slice(span.start, span.end), section: span.section };
+    if (!cut.text.trim()) throw new Error("Nothing to remove there.");
+    return apply(lib, item, cut);
+  });
 }
 
-/** Cuts `cut.text` at `cut.at`, writes its record for Undo and Redo, and returns it with the highlights it took. */
-async function apply(lib: Library, item: Item, c: Omit<Cut, "removed">): Promise<Cut> {
-  const cut: Cut = { ...c, removed: [] };
+const CONTEXT = 40;
+
+/** Cuts `cut.text` at `cut.at`, writes its record for Undo and Redo, and returns it with the highlights
+ *  it took. Called under the lock with the source as it is then. */
+function apply(lib: Library, item: Item, c: Omit<Cut, "removed" | "before" | "after">): Cut {
   const body = item.body;
-  const end = cut.at + cut.text.length;
-  await withLock(paths.lock(lib), () => {
-    const next = body.slice(0, cut.at) + body.slice(end);
-    const len = cut.text.length;
-    for (const a of readAnnotations(item)) {
-      if (a.end <= cut.at) continue;
-      if (a.start >= end) reviseAnnotation(item, a, quoteSelector(next, a.start - len, a.end - len));
-      else if (a.intent !== "question") {
-        cut.removed.push(a);
-        reviseAnnotation(item, a, { status: "deleted" });
-      }
+  const end = c.at + c.text.length;
+  const cut: Cut = { ...c, before: body.slice(Math.max(0, c.at - CONTEXT), c.at), after: body.slice(end, end + CONTEXT), removed: [] };
+  const next = body.slice(0, cut.at) + body.slice(end);
+  const len = cut.text.length;
+  for (const a of readAnnotations(item)) {
+    if (a.end <= cut.at) continue;
+    if (a.start >= end) reviseAnnotation(item, a, quoteSelector(next, a.start - len, a.end - len));
+    else if (a.intent !== "question") {
+      cut.removed.push(a);
+      reviseAnnotation(item, a, { status: "deleted" });
     }
-    writeAtomic(item.docPath, stringifyFrontmatter({ ...item.meta, text_sha256: sha256(next) }, next));
-    mkdirSync(stashDir(lib, item.meta.id), { recursive: true });
-    writeAtomic(join(stashDir(lib, item.meta.id), `${cut.id}.json`), JSON.stringify(cut));
-  });
+  }
+  writeAtomic(item.docPath, stringifyFrontmatter({ ...item.meta, text_sha256: sha256(next) }, next));
+  mkdirSync(stashDir(lib, item.meta.id), { recursive: true });
+  writeAtomic(join(stashDir(lib, item.meta.id), `${cut.id}.json`), JSON.stringify(cut));
   return cut;
 }
 
@@ -221,28 +230,51 @@ const readCut = (lib: Library, item: Item, id: string): Cut => {
 
 /** Takes the same text out again after `restoreCut` (Redo). */
 export async function redoCut(lib: Library, ref: string, cutId: string): Promise<Cut> {
-  const item = findItem(lib, ref);
-  const { removed: _, ...cut } = readCut(lib, item, cutId);
-  if (item.body.slice(cut.at, cut.at + cut.text.length) !== cut.text) throw new Error("The text changed since; that part can't be removed again.");
-  return apply(lib, item, cut);
+  const dir = findItem(lib, ref).dir;
+  return withLock(paths.lock(lib), () => {
+    const item = readItemDir(dir);
+    const { removed: _, before: _b, after: _a, ...cut } = readCut(lib, item, cutId);
+    if (item.body.slice(cut.at, cut.at + cut.text.length) !== cut.text) throw new Error("The text changed since; that part can't be removed again.");
+    return apply(lib, item, cut);
+  });
+}
+
+/** Where a cut's text goes back in `body`: where it was if the text around it is still there, else
+ *  the one place the text around it (both sides, else either) now is; null if that is gone or not
+ *  one place, so Undo never puts it back at a stale position, mid-word. */
+function placeBack(body: string, cut: Cut): number | null {
+  const { at, before = "", after = "" } = cut;
+  if (at <= body.length && body.slice(at - before.length, at) === before && body.slice(at, at + after.length) === after) return at;
+  if (!before && !after) return null;
+  for (const [ctx, off] of [[before + after, before.length], [after, 0], [before, before.length]] as const) {
+    if (!ctx) continue;
+    const i = body.indexOf(ctx);
+    if (i >= 0 && body.indexOf(ctx, i + 1) < 0) return i + off;
+  }
+  return null;
 }
 
 /** Puts a cut's text back where it was, its highlights with it, and shifts the ones after it back. */
 export async function restoreCut(lib: Library, ref: string, cutId: string): Promise<Item> {
-  const item = findItem(lib, ref);
-  const cut = readCut(lib, item, cutId);
-  const body = item.body;
-  if (cut.at > body.length || body.slice(cut.at, cut.at + cut.text.length) === cut.text) throw new Error("That text is already back, or the source changed since.");
+  const dir = findItem(lib, ref).dir;
   await withLock(paths.lock(lib), () => {
-    const next = body.slice(0, cut.at) + cut.text + body.slice(cut.at);
+    const item = readItemDir(dir);
+    const cut = readCut(lib, item, cutId);
+    const body = item.body;
     const len = cut.text.length;
-    for (const a of readAnnotations(item)) if (a.start >= cut.at) reviseAnnotation(item, a, quoteSelector(next, a.start + len, a.end + len));
+    const { before = "", after = "" } = cut;
+    const back = before || after ? body.includes(before + cut.text + after) : body.slice(cut.at, cut.at + len) === cut.text;
+    const at = back ? null : placeBack(body, cut);
+    if (at === null) throw new Error("That text is already back, or the source changed since.");
+    const next = body.slice(0, at) + cut.text + body.slice(at);
+    const moved = at - cut.at;
+    for (const a of readAnnotations(item)) if (a.start >= at) reviseAnnotation(item, a, quoteSelector(next, a.start + len, a.end + len));
     const now = new Map(latestRevs(annotationRevs(item.dir)).map((a) => [a.id, a]));
     for (const was of cut.removed) {
       const c = now.get(was.id);
-      if (c?.status === "deleted") reviseAnnotation(item, c, { status: was.status, ...quoteSelector(next, was.start, was.end) });
+      if (c?.status === "deleted") reviseAnnotation(item, c, { status: was.status, ...quoteSelector(next, was.start + moved, was.end + moved) });
     }
     writeAtomic(item.docPath, stringifyFrontmatter({ ...item.meta, text_sha256: sha256(next) }, next));
   });
-  return readItemDir(item.dir);
+  return readItemDir(dir);
 }

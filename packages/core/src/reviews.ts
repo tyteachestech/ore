@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
@@ -39,9 +40,14 @@ export const ReviewSchema = z.object({
 export type Review = z.infer<typeof ReviewSchema>;
 
 /** A taken-back review (`ore review --undo`): appended, so the log is never rewritten (a synced
- *  folder would turn a rewrite racing another device's append into a conflicted copy). */
-export const UndoSchema = z.object({ ts: z.string(), card: z.string(), undo: z.string() });
+ *  folder would turn a rewrite racing another device's append into a conflicted copy). `of` names the one
+ *  review line it takes back (`lineId`), since two devices can rate a card in the same millisecond; an undo
+ *  without it (an older build) takes back every review of that card at that time. */
+export const UndoSchema = z.object({ ts: z.string(), card: z.string(), undo: z.string(), of: z.string().optional() });
 export type Undo = z.infer<typeof UndoSchema>;
+
+/** A short name for one review line, as read from the log. */
+export const lineId = (r: Review): string => createHash("sha1").update(JSON.stringify(r)).digest("hex").slice(0, 16);
 
 // What a review line needs to be replayed: looser than ReviewSchema, so a line from an older build still counts,
 // but a rating outside 1–4 or a missing state (which stopped every screen) doesn't.
@@ -58,7 +64,7 @@ export function reviewLogFiles(lib: Library): string[] {
 // All reviews, oldest first, without the ones taken back. The log is the source of truth for
 // scheduling. A review is counted once per distinct line, so one read twice (a conflicted copy) counts
 // once, while two devices' ratings of a card in the same millisecond both count. An undo names its
-// review by card and time; a new review never takes a time its card already has (`reviewTimes`).
+// review by card, time and line (`lineId`); a new review never takes a time its card already has here (`reviewTimes`).
 /** The last read, kept while no log file changed (the logs only grow): one command often reads them
  *  several times (Home's Today, a skill page's stats), and 4,000 reviews take ~25 ms to parse.
  *  Callers share its Review objects, so they read them and never change them. */
@@ -91,7 +97,9 @@ function parseReviews(files: string[]): { reviews: Review[]; times: Map<string, 
   const lines = files
     .flatMap((f) => readJsonl<unknown>(f))
     .filter((l): l is Review | Undo => (l && typeof l === "object" && "undo" in l ? UndoSchema : Replayable).safeParse(l).success);
-  const undone = new Set(lines.flatMap((l) => ("undo" in l ? [`${l.card}|${l.undo}`] : [])));
+  const undone = new Set(lines.flatMap((l) => ("undo" in l && !l.of ? [`${l.card}|${l.undo}`] : [])));
+  const undoneLines = new Map<string, Set<string>>();
+  for (const l of lines) if ("undo" in l && l.of) undoneLines.set(`${l.card}|${l.undo}`, (undoneLines.get(`${l.card}|${l.undo}`) ?? new Set()).add(l.of));
   const seen = new Set<string>();
   const times = new Map<string, Set<string>>();
   const reviews = lines
@@ -102,6 +110,7 @@ function parseReviews(files: string[]): { reviews: Review[]; times: Map<string, 
       else times.set(l.card, new Set([l.ts]));
       const line = JSON.stringify(l);
       if (undone.has(`${l.card}|${l.ts}`) || seen.has(line)) return false;
+      if (undoneLines.get(`${l.card}|${l.ts}`)?.has(lineId(l))) return false;
       seen.add(line);
       return true;
     })

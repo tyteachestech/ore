@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync, writeFileSync } from "node:fs";
+import { parseFrontmatter } from "../src/frontmatter.ts";
 import { findCard, writeNewCard } from "../src/cards.ts";
 import { createItem, findItem, renameItem, setItemAuthor } from "../src/items.ts";
 import { addSkill, itemCardSkills, setItemSkills } from "../src/skills.ts";
@@ -11,6 +13,17 @@ describe("editing a source", () => {
     expect((await renameItem(lib, meta.id, "  New title ")).title).toBe("New title");
     expect(findItem(lib, meta.id).meta.title).toBe("New title");
     expect(renameItem(lib, meta.id, "  ")).rejects.toThrow("needs a title");
+  });
+
+  test("rename keeps frontmatter he wrote by hand that Ore doesn't know, and still clears what it removes (F-new-rename-keeps-frontmatter)", async () => {
+    const lib = await tempLibrary();
+    const { meta, docPath } = await createItem(lib, { type: "markdown", title: "Old", body: "Text.\n", author: "Someone" });
+    writeFileSync(docPath, readFileSync(docPath, "utf8").replace("---\n", '---\ncustom: "0012"\nmine:\n  - a\n'));
+    await renameItem(lib, meta.id, "New title");
+    await setItemAuthor(lib, meta.id, "");
+    const data = parseFrontmatter(readFileSync(docPath, "utf8")).data;
+    expect(data).toMatchObject({ title: "New title", custom: "0012", mine: ["a"] });
+    expect("author" in data).toBe(false);
   });
 
   test("author: set by hand on one line, cleared when empty", async () => {

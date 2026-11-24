@@ -121,6 +121,11 @@ export const ItemMetaSchema = z.object({
 });
 export type ItemMeta = z.infer<typeof ItemMetaSchema>;
 
+/** Reads frontmatter as ItemMetaSchema but keeps keys Ore doesn't know (one he wrote by hand), so every
+ *  write that spreads `item.meta` puts them back as they were. A key Ore removes is one it knows. */
+const LooseItemMeta = z.looseObject(ItemMetaSchema.shape);
+export const parseItemMeta = (data: unknown): ItemMeta => LooseItemMeta.parse(data);
+
 export interface Item {
   meta: ItemMeta;
   body: string;
@@ -214,7 +219,7 @@ export async function createItem(lib: Library, input: NewItem, already?: () => I
 export function readItemDir(dir: string): Item {
   const docPath = join(dir, "doc.md");
   const { data, body } = parseFrontmatter(readFileSync(docPath, "utf8"));
-  const meta = ItemMetaSchema.parse(data);
+  const meta = parseItemMeta(data);
   return { meta, body, dir, docPath };
 }
 
@@ -300,7 +305,7 @@ export function allItems(lib: Library, opts: { preview?: boolean } = {}): Item[]
 export async function updateItemMeta(lib: Library, id: string, patch: (m: ItemMeta) => ItemMeta): Promise<ItemMeta> {
   return withLock(paths.lock(lib), () => {
     const item = findItem(lib, id);
-    const next = ItemMetaSchema.parse(patch(item.meta));
+    const next = parseItemMeta(patch(item.meta));
     writeAtomic(item.docPath, stringifyFrontmatter(next, item.body));
     return next;
   });

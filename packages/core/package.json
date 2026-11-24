@@ -15,6 +15,7 @@
     "fflate": "^0.8.3",
     "linkedom": "^0.18.13",
     "mammoth": "1.11.0",
+    "mdast-util-from-markdown": "2.1.0",
     "music-metadata": "11.16.1",
     "node-diff3": "3.1.2",
     "pdfjs-dist": "^6.4.299",

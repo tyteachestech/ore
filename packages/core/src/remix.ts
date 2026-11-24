@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { findAnnotation } from "./annotations.ts";
 import { findCard, hasBlank, rubricProblem, type Card } from "./cards.ts";
-import { appendJsonl, latestRevs, readJsonl } from "./fsutil.ts";
+import { appendJsonl, latestRevs, readJsonl, sha256 } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
 import { AiStamp } from "./items.ts";
 import { paths, type Library } from "./library.ts";
@@ -32,6 +32,7 @@ export const VariantSchema = z.object({
   created: z.string(),
   ai: AiStamp,
   check_ai: AiStamp.optional(),
+  from: z.string().optional(), // madeFrom() of the original it was written for
 });
 export type Variant = z.infer<typeof VariantSchema>;
 
@@ -53,6 +54,18 @@ export function remixTypes(c: Card): VariantType[] {
 
 /** What a variant may test: the card's key points, or its answer when it has none. */
 export const originalPoints = (c: Card) => (c.rubric.length ? c.rubric : [c.answer]);
+
+/** The original as a variant is written from: its question, answer and key points (D66.2). */
+const madeFrom = (c: Card) => sha256(JSON.stringify([c.question, c.answer, originalPoints(c)]));
+
+/** Variants written from the card as it is now: an edit to its question, answer or key points leaves the
+ *  old ones testing what it no longer says. One saved before `from` was recorded counts while each of its
+ *  points still names one of the card's. */
+function current(c: Card, variants: Variant[]): Variant[] {
+  const from = madeFrom(c);
+  const n = originalPoints(c).length;
+  return variants.filter((v) => (v.from ? v.from === from : v.maps.every((i) => i < n)));
+}
 
 export function readVariants(lib: Library, cardId: string): Variant[] {
   return latestRevs(readJsonl<Variant>(paths.variants(lib, cardId)).filter((v) => VariantSchema.safeParse(v).success));
@@ -88,7 +101,7 @@ export function pickVariant(c: Card, reviews: Review[], variants: Variant[]): Va
   if (lastTwo.length === 2 && lastTwo.every((r) => r.variant)) return null;
   const lastId = reviews.findLast((r) => r.variant)?.variant;
   const lastType = variants.find((v) => v.id === lastId)?.type;
-  const usable = variants.filter((v) => v.status === "ready" && v.id !== lastId && usesOf(v.id, reviews) < VARIANT_USES);
+  const usable = current(c, variants).filter((v) => v.status === "ready" && v.id !== lastId && usesOf(v.id, reviews) < VARIANT_USES);
   usable.sort((a, b) => Number(a.type === lastType) - Number(b.type === lastType) || usesOf(a.id, reviews) - usesOf(b.id, reviews) || a.created.localeCompare(b.created));
   return usable[0] ?? null;
 }
@@ -96,7 +109,7 @@ export function pickVariant(c: Card, reviews: Review[], variants: Variant[]): Va
 /** How many more variants to write ahead for this card: none until it is remixable. */
 export function variantsNeeded(c: Card, reviews: Review[], variants: Variant[]): number {
   if (!remixable(c, reviews)) return 0;
-  const ready = variants.filter((v) => v.status === "ready" && usesOf(v.id, reviews) < VARIANT_USES).length;
+  const ready = current(c, variants).filter((v) => v.status === "ready" && usesOf(v.id, reviews) < VARIANT_USES).length;
   return Math.max(0, AHEAD - ready);
 }
 
@@ -234,14 +247,21 @@ export async function remixCard(lib: Library, ref: string): Promise<{ card: stri
       created: nowIso(),
       ai: written.ai,
       check_ai: checked.ai,
+      from: madeFrom(card),
     };
-    // Two runs for one card can overlap; the second keeps only what is still needed.
+    // Two runs for one card can overlap, and he can edit the card meanwhile: a version of what the card no
+    // longer says is not kept, the second run keeps only what is still needed, and never the same one twice.
     const kept = await withLock(paths.lock(lib), () => {
-      if (ok && variantsNeeded(card, reviews(), readVariants(lib, id)) === 0) return false;
+      if (madeFrom(findCard(lib, id)) !== record.from) return "stale";
+      const now = readVariants(lib, id);
+      if (ok && variantsNeeded(card, reviews(), now) === 0) return "enough";
+      const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+      if (ok && now.some((e) => same(e.setting, record.setting) || same(e.question, record.question))) return "repeat";
       appendJsonl(paths.variants(lib, id), VariantSchema.parse(record));
-      return true;
+      return "kept";
     });
-    if (!kept) break;
+    if (kept === "repeat") continue;
+    if (kept !== "kept") break;
     if (ok) out.written.push(record);
     else out.rejected++;
   }

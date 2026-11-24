@@ -443,3 +443,19 @@ describe("review loop", () => {
     expect(states()).toEqual(rebuilt());
   });
 });
+
+describe("two sessions open at once (D76)", () => {
+  test("starting and ending a quick quiz leaves the main session's relearn pass owed past midnight (F-new-quick-session-pointer)", async () => {
+    const { lib, a } = await setup();
+    const main = await startSession(lib, new Date(2026, 5, 1, 23, 58));
+    await recordReview(lib, a.meta.id, { rating: 1, confidence: 1, session: main.id, now: new Date(2026, 5, 1, 23, 59) });
+    const now = new Date(2026, 5, 2, 0, 1);
+    const owed = () => dueQueue(lib, now).some((e) => e.id === a.meta.id && e.relearn);
+    expect(owed()).toBe(true);
+    const quick = await startSession(lib, now);
+    expect(owed()).toBe(true);
+    await endSession(lib, now, false, quick.id);
+    expect(owed()).toBe(true);
+    expect(openSessionId(lib)).toBe(main.id); // a review given no session goes to the main one again
+  });
+});

@@ -3,7 +3,7 @@ import { chmodSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gradeAnswer } from "../src/ai/grade.ts";
-import { findCard, writeNewCard, type NewCard } from "../src/cards.ts";
+import { findCard, writeCardContent, writeNewCard, type NewCard } from "../src/cards.ts";
 import { appendJsonl } from "../src/fsutil.ts";
 import { addSnippet } from "../src/ingest/index.ts";
 import { paths, type Library } from "../src/library.ts";
@@ -13,6 +13,7 @@ import {
 import { readReviews } from "../src/reviews.ts";
 import { setReviewSettings } from "../src/skills.ts";
 import { recordReview } from "../src/study.ts";
+import { withLock } from "../src/lock.ts";
 import { tempLibrary } from "./helpers.ts";
 
 let binDir = "";
@@ -29,6 +30,7 @@ const n = Number(fs.readFileSync(dir + "/count", "utf8"));
 fs.writeFileSync(dir + "/count", String(n + 1));
 fs.appendFileSync(dir + "/args.jsonl", JSON.stringify(process.argv.slice(2)) + "\\n");
 const out = JSON.parse(fs.readFileSync(dir + "/queue.json", "utf8"))[n];
+if (n === 0 && fs.existsSync(dir + "/while.js")) require(dir + "/while.js"); // what happens in the library while the first AI call runs
 console.log(JSON.stringify({ is_error: false, structured_output: out, modelUsage: { "claude-fake-1": { outputTokens: 10 } } }));
 `,
   );
@@ -198,6 +200,55 @@ describe("card remixing (D66)", () => {
     expect(calls[5]![1]).toContain("idea the card doesn't have");
     expect(calls[2]![1]).toContain(CONCEPT.rubric[0]);
     expect(cardsToRemix(lib, [findCard(lib, c.meta.id)])).toEqual([]);
+  });
+
+  const ore = (lib: Library, ...args: string[]) =>
+    `require("child_process").execFileSync("bun", [${JSON.stringify(join(import.meta.dir, "../../cli/src/ore.ts"))}, ${args.map((a) => JSON.stringify(a)).join(", ")}], { env: { ...process.env, PATH: ${JSON.stringify(`${binDir}:${savedPath}`)}, ORE_AI: "claude", ORE_LIBRARY: ${JSON.stringify(lib.root)}, ORE_NO_ENRICH: "1" } });`;
+
+  test("after he removes a key point or rewrites the exercise, versions made from the old one are no longer shown, and new ones are written (F-new-variant-stale-points)", async () => {
+    const lib = await tempLibrary();
+    const c = await concept(lib);
+    await review(lib, c.meta.id, 3);
+    await review(lib, c.meta.id, 3);
+    fakeClaude([goodWriter("a YouTube explainer"), pass, goodWriter("a creator newsletter", "predict"), pass]);
+    await remixCard(lib, c.meta.id);
+    expect(reviewVersion(lib, findCard(lib, c.meta.id))).not.toBeNull();
+    // He drops the second key point: each version's second point tested it, and now would test the third.
+    await withLock(paths.lock(lib), () => writeCardContent(findCard(lib, c.meta.id), { rubric: [CONCEPT.rubric[0], CONCEPT.rubric[2]] }));
+    expect(reviewVersion(lib, findCard(lib, c.meta.id))).toBeNull();
+    expect(cardsToRemix(lib, [findCard(lib, c.meta.id)])).toEqual([c.meta.id]);
+  });
+
+  test("a version written while he edits the exercise is not saved (F-new-variant-stale-points)", async () => {
+    const lib = await tempLibrary();
+    const c = await concept(lib);
+    await review(lib, c.meta.id, 3);
+    await review(lib, c.meta.id, 3);
+    fakeClaude([goodWriter("a YouTube explainer"), pass, goodWriter("a creator newsletter", "predict"), pass]);
+    writeFileSync(join(binDir, "while.js"), ore(lib, "card", "set", c.meta.id, "--question", "Why do prequestions help with some parts of a text and not others?"));
+    await remixCard(lib, c.meta.id);
+    expect(findCard(lib, c.meta.id).question).toBe("Why do prequestions help with some parts of a text and not others?");
+    expect(readVariants(lib, c.meta.id)).toEqual([]);
+    expect(reviewVersion(lib, findCard(lib, c.meta.id))).toBeNull();
+  });
+
+  test("two remix runs that overlap never save the same version twice (F-new-remix-race-dupes)", async () => {
+    const lib = await tempLibrary();
+    const c = await concept(lib);
+    await review(lib, c.meta.id, 3);
+    await review(lib, c.meta.id, 3);
+    const same = goodWriter("a YouTube explainer");
+    const noPoints = { ...goodWriter("a podcast"), points: [] };
+    fakeClaude([
+      same, // this run's writer, while the other run below...
+      same, pass, noPoints, noPoints, // ...saves the same version, then gives up on a second
+      pass, // this run's checker
+      goodWriter("a creator newsletter", "predict"), pass,
+    ]);
+    writeFileSync(join(binDir, "while.js"), ore(lib, "remix", c.meta.id));
+    await remixCard(lib, c.meta.id);
+    const ready = readVariants(lib, c.meta.id).filter((v) => v.status === "ready");
+    expect(ready.map((v) => v.setting)).toEqual(["a YouTube explainer", "a creator newsletter"]);
   });
 
   test("grading a variant uses its key points; stats compare variant and original pass rates", async () => {

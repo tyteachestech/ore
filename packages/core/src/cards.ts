@@ -64,9 +64,11 @@ export function parseCardBody(body: string): CardContent {
   return { question: hideBlanks(question), answer, rubric };
 }
 
-/** Why this text would not read back as the same card, or null: a `---` line in the question ends it,
- *  and a `## Rubric` line in the answer starts the rubric. */
+/** Why this text would not read back as the same card, or null: a blank question or answer can't be read,
+ *  a `---` line in the question ends it, and a `## Rubric` line in the answer starts the rubric. */
 export function cardTextProblem(c: { question: string; answer: string }): string | null {
+  if (!c.question.trim()) return "An exercise needs a question.";
+  if (!c.answer.trim()) return "An exercise needs an answer.";
   if (c.question.split("\n").some((l) => l.trim() === "---")) return "An exercise’s question can’t have a line of just “---”: that line is where the answer starts. Use *** for a rule instead.";
   if (c.answer.split("\n").some((l) => /^##\s+Rubric\s*$/i.test(l.trim()))) return "An exercise’s answer can’t have a “## Rubric” line: that heading is where the rubric starts. Name the heading something else.";
   return null;

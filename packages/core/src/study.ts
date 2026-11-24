@@ -1,20 +1,20 @@
 import { annotationRevs } from "./annotations.ts";
 import { findCard } from "./cards.ts";
 import { withIndex, type CardRow, type LibraryIndex } from "./db.ts";
-import { latestRevs } from "./fsutil.ts";
+import { deviceLog, latestRevs, readJsonl } from "./fsutil.ts";
 import { itemDirs, type AiStamp } from "./items.ts";
 import { localDay, nowIso } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 import { orderQueue, winFirst, type QueueEntry } from "./queue.ts";
 import { findVariant } from "./remix.ts";
-import { appendReview, appendUndo, readReviews, reviewTimes, type FsrsState, type Review } from "./reviews.ts";
+import { appendReview, appendUndo, lineId, readReviews, reviewTimes, type FsrsState, type Review } from "./reviews.ts";
 import { emptyState, loadParams, merged, nextState, replay, retrievability } from "./scheduler.ts";
 import { NO_SKILL } from "./no-skill.ts";
-import { openSessionId, readSessions } from "./sessions.ts";
+import { openSessionId, openSessionIds, readSessions } from "./sessions.ts";
 import { archivedOnly, cardPriority, unfiled, desiredRetention, loadSkills, reviewSettings, sourcePriority } from "./skills.ts";
 import { retentionMetric } from "./stats.ts";
-import { gemPast, SOLID_DAYS } from "./today.ts";
+import { gemPast, mergedReviews, SOLID_DAYS } from "./today.ts";
 
 export interface ReviewInput {
   rating: 1 | 2 | 3 | 4;
@@ -108,8 +108,16 @@ export async function undoReview(lib: Library, cardRef: string, ts: string, now 
     const card = findCard(lib, cardRef);
     const own = readReviews(lib).filter((r) => r.card === card.meta.id);
     const since = own.filter((r) => r.ts > ts && Date.parse(r.ts) <= now.getTime());
-    if (!own.some((r) => r.ts === ts) || since.length) throw new Error(`the review at ${ts} is not ${card.meta.id}'s latest`);
-    appendUndo(lib, { ts: nowIso(now), card: card.meta.id, undo: ts });
+    let at = own.filter((r) => r.ts === ts);
+    if (!at.length || since.length) throw new Error(`the review at ${ts} is not ${card.meta.id}'s latest`);
+    // Another device rated it in the same millisecond, offline (Codex deep scan 3): the one taken back is the one
+    // given here, in this device's own log, and the other stands.
+    if (at.length > 1) {
+      const mine = new Set(readJsonl<Review>(deviceLog(paths.reviewLog(lib, new Date(ts)))).map((r) => JSON.stringify(r)));
+      at = at.filter((r) => mine.has(JSON.stringify(r)));
+      if (at.length !== 1) throw new Error(`${card.meta.id} has two reviews at ${ts} from other devices; neither was given here`);
+    }
+    appendUndo(lib, { ts: nowIso(now), card: card.meta.id, undo: ts, of: lineId(at[0]!) });
   });
 }
 
@@ -162,10 +170,10 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const items = new Map(index.items().map((i) => [i.id, i]));
     const reviews = readReviews(lib);
     const today = localDay(now);
-    // Relearn passes are owed for misses today, or since the open session began if that was earlier (a
-    // session running past midnight).
-    const session = openSessionId(lib);
-    const began = session ? readSessions(lib).find((s) => s.type === "start" && s.id === session)?.ts : undefined;
+    // Relearn passes are owed for misses today, or since an open session began if that was earlier (a
+    // session running past midnight, even while the quick quiz has one open too).
+    const openIds = new Set(openSessionIds(lib));
+    const began = readSessions(lib).find((s) => s.type === "start" && openIds.has(s.id))?.ts;
     const ownToday = new Map<string, Review[]>();
     for (const r of reviews) {
       if (localDay(r.ts) !== today && !(began && r.ts >= began)) continue;
@@ -263,7 +271,9 @@ export function libraryStats(lib: Library, open?: LibraryIndex): { skills: Skill
   return withIndex(lib, open, (index) => {
     const items = index.items();
     const cards = index.cards();
-    const reviews = readReviews(lib);
+    // Retention reads each review's state before it as the merged logs replay it: a device that hadn't seen
+    // another's reviews yet saved its own (Codex deep scan 3).
+    const reviews = mergedReviews(cards, readReviews(lib), loadParams(lib));
     const starts = new Set(readSessions(lib).filter((s) => s.type === "start").map((s) => s.id));
     const skillsOf = new Map(cards.map((c) => [c.id, c.skills]));
     const notes = annotationNotes(lib);

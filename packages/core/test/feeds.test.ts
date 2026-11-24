@@ -6,6 +6,8 @@ import { arrangeFeeds, clearPreviews, closePost, feedView, findFeed, followFeed,
 import { addSource } from "../src/ingest/index.ts";
 import { allItems, findItem, listItems, updateItemMeta } from "../src/items.ts";
 import { setNotes } from "../src/notes.ts";
+import { paths } from "../src/library.ts";
+import { withLock } from "../src/lock.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const day = 86400_000;
@@ -261,5 +263,32 @@ describe("previews: a post is saved only once he keeps something from it", () =>
     await clearPreviews(lib);
     expect(() => findItem(lib, a.meta.id)).toThrow();
     expect(listItems(lib).map((i) => i.meta.id)).toEqual([b.meta.id]);
+  });
+});
+
+describe("the Feed and what he saved meanwhile", () => {
+  test("closing a preview keeps it when his first note saved while the close waited (F-new-feed-close-saved-note)", async () => {
+    serve();
+    const lib = await tempLibrary();
+    await followFeed(lib, "https://howiai.example.com/");
+    await refreshFeeds(lib);
+    const item = await openPost(lib, "https://howiai.example.com/p/agents");
+    let release!: () => void;
+    const held = withLock(paths.lock(lib), () => new Promise<void>((r) => (release = r)));
+    const save = setNotes(lib, item.meta.id, "My saved thought.");
+    const close = closePost(lib, item.meta.id);
+    release();
+    const [, , closed] = await Promise.all([held, save, close]);
+    expect(closed).toBe("kept");
+    expect(findItem(lib, item.meta.id).meta.preview).toBeUndefined();
+  });
+
+  test("a post saved under the same link written another way (http, www) leaves the Feed (F-new-feed-equivalent-url)", async () => {
+    serve();
+    const lib = await tempLibrary();
+    await followFeed(lib, "https://howiai.example.com/");
+    await refreshFeeds(lib);
+    await addSource(lib, "http://www.howiai.example.com/p/agents");
+    expect(feedView(lib).posts.map((p) => p.url)).toEqual(["https://howiai.example.com/p/newest"]);
   });
 });
