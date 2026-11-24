@@ -101,6 +101,11 @@ export const MIN_FUZZY_CONTEXT = 0.9;
 // Or the quote and both its sides, taken together, still read as they did: a few words corrected all through
 // the text. Another passage written alike differs more than that (the heron test reads 0.82).
 export const MIN_FUZZY_WINDOW = 0.85;
+// Or the quote is long and all but word for word: a page footer inside it dropped by a better PDF read, which
+// also rejoined its paragraph and moved the footnotes, so neither side reads as it did. A passage merely
+// written alike is short or differs more than this (the heron test: 50 letters, a fifth of them changed).
+export const SURE_FUZZY_LENGTH = 120;
+export const SURE_FUZZY_ERROR_RATE = 0.1;
 
 export function anchor(text: string, sel: Selector): Anchor | null {
   if (!sel.exact) return null;
@@ -135,8 +140,24 @@ export function anchor(text: string, sel: Selector): Anchor | null {
   // A text read again all through (a transcript heard again, D167; a better PDF reader) changes a few words
   // everywhere, its sides too: then the quote and its sides, taken together, still read alike.
   const whole = similarity(sel.prefix + sel.exact + sel.suffix, before + text.slice(span.start, span.end) + after) >= MIN_FUZZY_WINDOW;
-  if (!local && !whole) return null;
-  return { ...span, method: "fuzzy" };
+  const sure = sel.exact.length >= SURE_FUZZY_LENGTH && best.m.errors <= sel.exact.length * SURE_FUZZY_ERROR_RATE;
+  if (local || whole) return { ...span, method: "fuzzy" };
+  // Neither side reads as it did, so they say nothing about where the quote ends: the match's own ends stand.
+  return sure ? { ...trimLostEnd(text, sel.exact, best.m.start, best.m.end), method: "fuzzy" } : null;
+}
+
+/** A quote that lost words at one end (a page footer it began or ended with): the closest match pairs those
+ *  lost letters with the text beside it, so the highlight would start or stop mid-word in its neighbour. The
+ *  rest of the quote is there letter for letter, and that run is the highlight. */
+function trimLostEnd(text: string, exact: string, start: number, end: number): { start: number; end: number } {
+  const enough = exact.length * (1 - SURE_FUZZY_ERROR_RATE);
+  let tail = 0;
+  while (tail < exact.length && end - tail > 0 && text[end - 1 - tail] === exact[exact.length - 1 - tail]) tail++;
+  if (tail >= enough) return { start: end - tail + (text.slice(end - tail, end).match(/^\s*/)?.[0].length ?? 0), end };
+  let head = 0;
+  while (head < exact.length && text[start + head] === exact[head]) head++;
+  if (head >= enough) return { start, end: start + text.slice(start, start + head).trimEnd().length };
+  return { start, end };
 }
 
 const WORD = /[\p{L}\p{N}\p{M}_]/u;
