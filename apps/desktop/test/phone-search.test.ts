@@ -20,6 +20,7 @@ beforeAll(async () => {
   const add = "insert into fts (kind, ref, item, title, body) values (?, ?, ?, ?, ?)";
   db.run(add, ["item", "a", "a", "Spaced repetition", "Reviewing at growing intervals beats cramming."]);
   db.run(add, ["card", "c1", "b", "How the web works", "A browser asks a server for a page."]);
+  db.run(add, ["item", "u", "u", "Unicode", "We met at a café. ΜΝΗΜΗ. Привет."]);
   db.run("insert into fts (kind, ref, item, title, body, chars) values (?, ?, ?, ?, ?, ?)", ["item", "j", "j", "日本語", "毎朝勉強する。", "日 本 語 毎 朝 勉 強 す る"]);
 });
 
@@ -50,4 +51,8 @@ test("the kind, ref and item columns aren't searched", () => {
 test("a word inside Japanese is found from its letters side by side, as on the Mac (Codex sweep 4)", () => {
   expect(search('"勉 強"').map((h) => h.ref)).toEqual(["j"]);
   expect(search('"勉 朝"')).toEqual([]);
+});
+
+test("a word is found without its accent or in another letter case, Greek and Cyrillic too, as on the Mac (F590)", () => {
+  for (const q of ["café", "cafe", "ΜΝΗΜΗ", "μνημη", "Привет", "привет"]) expect([q, search(q).map((h) => h.ref)]).toEqual([q, ["u"]]);
 });

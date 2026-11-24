@@ -598,6 +598,19 @@ describe("strength breakdown and peak level (D63)", () => {
     expect(end.depth_extra_days).toBe(extra);
   });
 
+  test("a session past midnight counts what came after the new day's goal as extra (F585)", async () => {
+    const { lib, cards } = await library(3);
+    const [a, b, c] = cards.map((x) => x.meta.id) as [string, string, string];
+    await setReviewSettings(lib, { goal_minutes: 1 });
+    // Local times: one minute before midnight, then two answers on the new day; the second meets its goal.
+    await startSession(lib, new Date(2026, 5, 1, 23, 58));
+    await recordReview(lib, a, { rating: 4, confidence: 2, now: new Date(2026, 5, 1, 23, 59), elapsed_ms: 60_000 });
+    await recordReview(lib, b, { rating: 4, confidence: 2, now: new Date(2026, 5, 2, 0, 1), elapsed_ms: 60_000 });
+    const third = await recordReview(lib, c, { rating: 4, confidence: 2, now: new Date(2026, 5, 2, 0, 2), elapsed_ms: 60_000 });
+    const end = await endSession(lib, new Date(2026, 5, 2, 0, 3));
+    expect(end.depth_extra_days).toBe(Math.round(Math.min(DEPTH_CAP_DAYS, third.state_after.stability)));
+  });
+
   test("a session's end says how many memories each skill kept, most first", async () => {
     const { lib, cards } = await library(3);
     const [a, b, c] = cards.map((x) => x.meta.id) as [string, string, string];

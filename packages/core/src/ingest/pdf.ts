@@ -509,7 +509,7 @@ async function pdfMeta(doc: PdfDocument): Promise<{ title?: string; author?: str
 /** Opens a PDF quietly (pdf.js warns on stdout about any damage it works around), refusing one it
  *  can't open with the next step. */
 export function openPdf(data: Uint8Array) {
-  const task = getDocument({ data: data.slice(), BinaryDataFactory: CarriedData, useSystemFonts: true, fontExtraProperties: true, verbosity: 0, isOffscreenCanvasSupported: false, isImageDecoderSupported: false });
+  const task = getDocument({ data: new Uint8Array(data), BinaryDataFactory: CarriedData, useSystemFonts: true, fontExtraProperties: true, verbosity: 0, isOffscreenCanvasSupported: false, isImageDecoderSupported: false });
   const promise = task.promise.catch((e: Error) => {
     if (e.name === "PasswordException") throw new Error("That PDF is locked with a password. Open it in Preview, enter the password, choose File › Export as PDF, and add the copy.");
     throw new Error("That file isn’t a readable PDF: it may be damaged or only partly downloaded. Download it again, or open it in Preview and choose File › Export as PDF.");
@@ -697,6 +697,16 @@ export async function pageViews(data: Uint8Array): Promise<number[][]> {
   const doc = await task.promise;
   const out: number[][] = [];
   for (let n = 1; n <= doc.numPages; n++) out.push([...(await doc.getPage(n)).view]);
+  await task.destroy();
+  return out;
+}
+
+/** Each page's words as pdf.js reads them: two files with the same are the same pages, whatever else differs. */
+export async function pageTexts(data: Uint8Array): Promise<string[]> {
+  const task = openPdf(data);
+  const doc = await task.promise;
+  const out: string[] = [];
+  for (let n = 1; n <= doc.numPages; n++) out.push((await (await doc.getPage(n)).getTextContent()).items.map((i) => ("str" in i ? i.str : "")).join(" "));
   await task.destroy();
   return out;
 }

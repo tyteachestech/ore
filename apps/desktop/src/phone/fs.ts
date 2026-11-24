@@ -160,6 +160,10 @@ type Scan = { files: Stamped[]; waiting: string[]; other?: string[] };
 let disk: { root: string; prefix: string; invoke: Invoke } | null = null;
 /** Each file's stamp (mtime and size) as last read or written, to tell what the Mac changed since. */
 const known = new Map<string, string>();
+/** Files whose read came back null, by stamp, and how many times at it: a failed read may pass on the next
+ *  scan (iCloud still writing it), but one that never reads (not UTF-8) is asked again only once it changes. */
+const failed = new Map<string, { stamp: string; tries: number }>();
+const TRIES = 3;
 /** Writes and deletes (null) not sent yet, by library path. The last one for a path wins, so an atomic
  *  write's temp file never reaches iCloud. A picture, audio or other binary goes as its raw bytes, one
  *  call each (lib.rs `library_write`): as base64 text an hour's audio cost several times its size. */
@@ -296,7 +300,10 @@ function setDownloading(waiting: string[]) {
   for (const r of waiting) downloading.add(r);
 }
 
-async function read(list: Stamped[]) {
+/** Reads in `list`; how many came in. One that can't be read (gone, a failed read, not UTF-8: lib.rs answers
+ *  null for each) isn't marked as seen, so the next rescans ask again (TRIES in all) rather than keep stale text. */
+async function read(list: Stamped[]): Promise<number> {
+  let landed = 0;
   const parts: Stamped[][] = [];
   for (let i = 0; i < list.length; i += 400) parts.push(list.slice(i, i + 400));
   // Asked for together: one after another, seven parts of a 950-source library held the launch about 260 ms.
@@ -305,15 +312,21 @@ async function read(list: Stamped[]) {
     const texts = got[n]!;
     part.forEach(([r, mtime, stamp], j) => {
       if (unsent.has(r)) return;
-      // One that can't be read (not UTF-8) is still marked as seen, or every rescan would count it as changed.
-      known.set(r, stamp);
       const text = texts[j];
-      if (text == null) return;
+      if (text == null) {
+        const f = failed.get(r);
+        failed.set(r, { stamp, tries: f?.stamp === stamp ? f.tries + 1 : 1 });
+        return;
+      }
+      failed.delete(r);
+      known.set(r, stamp);
+      landed++;
       const p = `${disk!.prefix}/${r}`;
       files.set(p, { text, mtime });
       addDirs(p);
     });
   });
+  return landed;
 }
 
 /** Reads in what changed in the folder since (the Mac's edits, through iCloud); true if anything did.
@@ -324,17 +337,20 @@ export async function rescan(): Promise<boolean> {
   const scan = await disk.invoke<Scan>("library_scan", { root: disk.root });
   setDownloading(scan.waiting);
   const seen = new Set([...scan.files.map(([rel]) => rel), ...scan.waiting]);
-  const changed = scan.files.filter(([r, , stamp]) => known.get(r) !== stamp && !unsent.has(r));
+  const given = (r: string, stamp: string) => failed.get(r)?.stamp === stamp && failed.get(r)!.tries >= TRIES;
+  const changed = scan.files.filter(([r, , stamp]) => known.get(r) !== stamp && !unsent.has(r) && !given(r, stamp));
   const gone = [...known.keys()].filter((r) => !seen.has(r) && !unsent.has(r));
   for (const r of gone) {
     known.delete(r);
     files.delete(`${disk.prefix}/${r}`);
   }
   if (gone.length) pruneDirs();
-  await read(changed);
+  for (const r of failed.keys()) if (!seen.has(r)) failed.delete(r);
+  const landed = await read(changed);
   listOthers(scan.other);
   lastSync = Date.now();
-  return changed.length + gone.length > 0;
+  // Only what came in counts: a file that still can't be read is asked again, but changes nothing.
+  return landed + gone.length > 0;
 }
 
 /** Folders left with nothing in them (a source the Mac deleted) go, as they do on disk. */

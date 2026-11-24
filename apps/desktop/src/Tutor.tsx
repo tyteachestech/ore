@@ -5,7 +5,7 @@ import { ArrowClockwise, CaretLeft, CaretRight, ArrowDown, ArrowUp, BookOpen, Ca
 import { chatGroups } from "./chat-groups";
 import { askAgain, flip, versionCount, versionShown, type Version } from "./chat-versions";
 import { WithMenu } from "./Menu";
-import { citeRuns, siteName } from "./cite-pills";
+import { citeJump, citeRuns, siteName } from "./cite-pills";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -1066,7 +1066,7 @@ function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }
   opener.current = { onOpen, onLink };
   const cited = (n: number) => citations.some((c) => c.n === n);
   // A count on the end makes each click a new jump, so the same citation clicked again goes again.
-  const open = (c: AnyCitation) => ("url" in c ? opener.current.onLink(c.url) : opener.current.onOpen(c.item, `q:${c.start}:${c.end}:${++turnSeq}`));
+  const open = (c: AnyCitation) => ("url" in c ? opener.current.onLink(c.url) : opener.current.onOpen(c.item, citeJump(c, ++turnSeq)));
   // Made once per set of citations, so a re-render (a keystroke, a streaming reply) doesn't remount the pills and close an open card.
   const components = useMemo(() => ({
     pre: ({ children }: { children?: ReactNode }) => <CodeBlock>{children}</CodeBlock>,

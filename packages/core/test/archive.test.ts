@@ -68,6 +68,32 @@ describe("search in other scripts (Codex sweep 4)", () => {
     index.close();
   });
 
+  test("a Japanese word is not found from letters that stand apart in the text (F586)", async () => {
+    // Punctuation or a Latin word between letters ends a run: 日本。語。 does not say 日本語.
+    const lib = await tempLibrary();
+    const apart = (await addSnippet(lib, { text: "日本。語。そしてx本語のメモ。" })).item.meta.id;
+    const word = (await addSnippet(lib, { text: "毎朝、日本語を勉強しています。" })).item.meta.id;
+    const items = (q: string) => [...new Set(search(lib, q))];
+    expect(items("日本語")).toEqual([word]);
+    expect(items("本語").sort()).toEqual([apart, word].sort());
+  });
+
+  test("a Japanese word broken by a line break inside its paragraph is still found", async () => {
+    // A wrapped line (a PDF, a hard-wrapped text) joins the letters on both sides; a blank line does not.
+    const lib = await tempLibrary();
+    const wrapped = (await addSnippet(lib, { text: "毎朝、日本\n語を勉強しています。" })).item.meta.id;
+    await addSnippet(lib, { text: "毎朝、日本\n\n語を勉強しています。" });
+    expect([...new Set(search(lib, "日本語"))]).toEqual([wrapped]);
+  });
+
+  test("a katakana word with the long-vowel mark is found (F594)", async () => {
+    const lib = await tempLibrary();
+    const coffee = (await addSnippet(lib, { text: "毎朝コーヒーを飲みます。データも見ます。" })).item.meta.id;
+    const items = (q: string) => [...new Set(search(lib, q))];
+    expect(items("コーヒー")).toEqual([coffee]);
+    expect(items("データ")).toEqual([coffee]);
+  });
+
   test("an accent typed as its own mark finds the same words as one typed with its letter", async () => {
     const lib = await tempLibrary();
     const composed = (await addSnippet(lib, { text: "Η άλφα είναι το πρώτο γράμμα." })).item.meta.id;

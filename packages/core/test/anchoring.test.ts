@@ -126,4 +126,18 @@ describe("anchoring", () => {
     expect(locate(DOC, "beats rereading", second)!.start).toBe(second);
     expect(locate(DOC, "not in the doc")).toBeNull();
   });
+
+  test("a highlight whose last word grew on reimport keeps the whole word, never its first letters (F577)", () => {
+    // The suffix ".\n" scores alike after "memorie" and after "memories": a highlight that ended on a word's end
+    // still does, so the tie goes to the word's end.
+    const before = "# Notes\n\nLearning supports memory.\n";
+    const sel = selectorFor(before, "Learning supports memory");
+    for (const [after, want] of [
+      ["# Notes\n\nLearning supports memories\n", "Learning supports memories"],
+      ["# Notes\n\nLearning supports memory!\n", "Learning supports memory"],
+    ] as const) {
+      const a = anchor(after, sel)!;
+      expect(after.slice(a.start, a.end)).toBe(want);
+    }
+  });
 });

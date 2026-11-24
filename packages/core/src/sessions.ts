@@ -177,16 +177,19 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
   const polished = changed.filter((c) => c.before && c.before !== "polished" && c.after === "polished").map((c) => skillOf(c.card));
   const gain = (x: (typeof kept)[number]) => Math.min(DEPTH_CAP_DAYS, Math.max(0, last.get(x.card)!.state_after.stability - x.state_before.stability));
   const depth = Math.round(kept.reduce((n, x) => n + gain(x), 0));
-  // Past the goal (D246): answered once the day's active time had already reached it. An off day has no goal.
+  // Past the goal (D246): answered once its day's active time had already reached it, each local day
+  // of a session that runs past midnight on its own. An off day has no goal.
   const settings = reviewSettings(lib);
-  const day = own[0] ? localDay(own[0].ts) : "";
-  const off = settings.weekdays_only && [0, 6].includes(new Date(`${day}T12:00:00`).getDay());
+  const days = new Set(own.map((x) => localDay(x.ts)));
   const pastGoal = new Set<string>();
-  let active = 0;
+  const active = new Map<string, number>();
   for (const x of all) {
-    if (localDay(x.ts) !== day) continue;
-    if (!off && active >= settings.goal_minutes * 60_000) pastGoal.add(x.ts + x.card);
-    active += Math.min(x.elapsed_ms ?? 0, ACTIVE_CAP_MS);
+    const day = localDay(x.ts);
+    if (!days.has(day)) continue;
+    const off = settings.weekdays_only && [0, 6].includes(new Date(`${day}T12:00:00`).getDay());
+    const so = active.get(day) ?? 0;
+    if (!off && so >= settings.goal_minutes * 60_000) pastGoal.add(x.ts + x.card);
+    active.set(day, so + Math.min(x.elapsed_ms ?? 0, ACTIVE_CAP_MS));
   }
   const extra = Math.round(kept.filter((x) => pastGoal.has(x.ts + x.card)).reduce((n, x) => n + gain(x), 0));
   // Then and now (D248): the oldest typed answer he missed or guessed, on an exercise he typed and passed today.

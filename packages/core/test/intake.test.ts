@@ -13,7 +13,7 @@ import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
 import { rtfToDoc } from "../src/ingest/rtf.ts";
 import { xlsxToDoc } from "../src/ingest/sheets.ts";
-import { pageAudio, transcribe, transcribeFile } from "../src/ingest/audio.ts";
+import { episode, pageAudio, transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { htmlToDoc, inlineMath } from "../src/ingest/web.ts";
 import { chapterLines } from "../src/ai/recall.ts";
@@ -1475,6 +1475,29 @@ describe("import coverage: audio and podcasts", () => {
     // Apple answers a link it no longer knows with the show's page: never taken for an episode.
     serve({ ...pages("x"), [url]: { body: page("Ride Home").replace("PodcastEpisode", "CreativeWorkSeries"), type: HTML } });
     await expect(addSource(await tempLibrary(), url)).rejects.toThrow(/Couldn’t find that episode’s audio on Apple Podcasts/);
+  });
+
+  test("an older Apple Podcasts episode whose title the show reused plays its own day's audio (F583)", async () => {
+    // A daily show names two episodes alike: the one of the page's day is the episode, not the first in the feed.
+    const url = "https://podcasts.apple.com/us/podcast/daily-practice/id123?i=456";
+    const feed = "https://feeds.example.com/daily";
+    serve({
+      "https://itunes.apple.com/lookup?id=123&entity=podcastEpisode&limit=200": { body: JSON.stringify({ results: [{ wrapperType: "track", trackId: 123, collectionName: "Example", feedUrl: feed }] }), type: "application/json" },
+      [url]: { body: `<html><head><script type="application/ld+json">{"@type":"PodcastEpisode","datePublished":"2024-01-01","name":"Daily practice"}</script></head></html>`, type: HTML },
+      [feed]: { body: readFileSync(join(FIX, "audio", "same-title-feed.xml"), "utf8"), type: "application/rss+xml" },
+    });
+    expect((await episode(url)).audio).toBe("https://traffic.example.com/jan-1.mp3");
+  });
+
+  test("an older Apple Podcasts episode is found when its feed quotes the audio's address with single quotes (F584)", async () => {
+    const url = "https://podcasts.apple.com/us/podcast/retrieval/id123?i=456";
+    const feed = "https://feeds.example.com/show";
+    serve({
+      "https://itunes.apple.com/lookup?id=123&entity=podcastEpisode&limit=200": { body: JSON.stringify({ results: [{ wrapperType: "track", trackId: 123, collectionName: "Example", feedUrl: feed }] }), type: "application/json" },
+      [url]: { body: `<html><head><script type="application/ld+json">{"@type":"PodcastEpisode","datePublished":"2024-01-01","name":"Retrieval"}</script></head></html>`, type: HTML },
+      [feed]: { body: readFileSync(join(FIX, "audio", "single-quote-feed.xml"), "utf8"), type: "application/rss+xml" },
+    });
+    expect((await episode(url)).audio).toBe("https://traffic.example.com/episode.mp3?a=1&b=2");
   });
 
   test("an episode added with its transcript owed is in at once, then downloaded and heard with how far it is (F60)", async () => {

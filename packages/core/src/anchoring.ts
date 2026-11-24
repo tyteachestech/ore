@@ -139,20 +139,28 @@ export function anchor(text: string, sel: Selector): Anchor | null {
   return { ...span, method: "fuzzy" };
 }
 
+const WORD = /[\p{L}\p{N}\p{M}_]/u;
+/** Whether a boundary between two characters falls between words (either side missing counts). */
+const between = (a: string | undefined, b: string | undefined) => !(a && b && WORD.test(a) && WORD.test(b));
+
 // A minimal-edit match can stop short of (or overrun) the real passage when
 // words were inserted. Move each boundary within the error budget to where
-// the stored prefix/suffix agree best with the surrounding text.
+// the stored prefix/suffix agree best with the surrounding text. Where two places agree alike, the one that
+// falls between words as the highlight's own boundary did wins, then the nearer: a word that grew at the
+// highlight's end ("memory." → "memories") scores its suffix the same after "memorie" (F577).
 function refineBounds(text: string, sel: Selector, start: number, end: number, slack: number): { start: number; end: number } {
-  const pick = (from: number, score: (i: number) => number) => {
+  const pick = (from: number, wasBetween: boolean, score: (i: number) => number) => {
     let best = from;
+    const fits = (i: number) => between(text[i - 1], text[i]) === wasBetween;
     for (let i = from - slack; i <= from + slack; i++) {
       if (i < 0 || i > text.length) continue;
       const d = score(i) - score(best);
-      if (d > 1e-9 || (Math.abs(d) <= 1e-9 && Math.abs(i - from) < Math.abs(best - from))) best = i;
+      const tie = Math.abs(d) <= 1e-9;
+      if (d > 1e-9 || (tie && fits(i) && !fits(best)) || (tie && fits(i) === fits(best) && Math.abs(i - from) < Math.abs(best - from))) best = i;
     }
     return best;
   };
-  const s = sel.prefix ? pick(start, (i) => similarity(sel.prefix, text.slice(Math.max(0, i - sel.prefix.length), i))) : start;
-  const e = sel.suffix ? pick(end, (i) => similarity(sel.suffix, text.slice(i, i + sel.suffix.length))) : end;
+  const s = sel.prefix ? pick(start, between(sel.prefix.at(-1), sel.exact[0]), (i) => similarity(sel.prefix, text.slice(Math.max(0, i - sel.prefix.length), i))) : start;
+  const e = sel.suffix ? pick(end, between(sel.exact.at(-1), sel.suffix[0]), (i) => similarity(sel.suffix, text.slice(i, i + sel.suffix.length))) : end;
   return e > s ? { start: s, end: e } : { start, end };
 }

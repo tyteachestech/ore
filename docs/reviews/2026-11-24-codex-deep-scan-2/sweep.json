@@ -1,0 +1,4 @@
+{ "testers": [
+  { "name": "chat", "seed": "seed" },
+  { "name": "media", "seed": "seed" }
+] }

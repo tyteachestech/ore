@@ -66,19 +66,24 @@ function taggedWords(raw: string, start: number): Word[] | null {
 }
 
 // YouTube auto-captions roll: each cue repeats the previous line, so a line equal to the last
-// emitted one is dropped. Each kept line carries its words' start times: inline times when the
-// captions have them, otherwise the cue's duration spread over its characters.
+// emitted one is dropped when it is carried over: its cue follows straight on from the last one, or
+// it tops a cue that goes on to new lines. The same words heard again later are speech and stay.
+// Each kept line carries its words' start times: inline times when the captions have them,
+// otherwise the cue's duration spread over its characters.
 function captionLines(vtt: string): { t: number; text: string; words: Word[] }[] {
   const out: { t: number; text: string; words: Word[] }[] = [];
   let last = "";
+  let lastEnd = -Infinity;
   for (const cue of cues(vtt)) {
     const fresh: { raw: string; text: string }[] = [];
-    for (const raw of cue.lines) {
-      const text = clean(raw);
-      if (!text || text === last) continue;
-      fresh.push({ raw, text });
+    const texts = cue.lines.map(clean);
+    texts.forEach((text, i) => {
+      const rolls = cue.start <= lastEnd + 1 || texts.slice(i + 1).some((t) => t && t !== text);
+      if (!text || (text === last && rolls)) return;
+      fresh.push({ raw: cue.lines[i]!, text });
       last = text;
-    }
+    });
+    if (texts.some(Boolean)) lastEnd = cue.end;
     const total = fresh.reduce((n, l) => n + l.text.length + 1, 0);
     let done = 0;
     for (const { raw, text } of fresh) {

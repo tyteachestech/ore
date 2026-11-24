@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Example</title>
+    <item>
+      <title>Daily practice</title>
+      <pubDate>Tue, 02 Jan 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://traffic.example.com/jan-2.mp3" length="1" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Daily practice</title>
+      <pubDate>Mon, 01 Jan 2024 12:00:00 GMT</pubDate>
+      <enclosure url="https://traffic.example.com/jan-1.mp3" length="1" type="audio/mpeg"/>
+    </item>
+  </channel>
+</rss>

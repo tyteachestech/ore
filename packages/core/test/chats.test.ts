@@ -83,6 +83,19 @@ describe("tutor chats", () => {
     expect(t.alt).toBeLessThanOrEqual(t.alts.length);
   });
 
+  test("two windows' replies in the same words from different AIs both stay, each with its own stamp (F587)", async () => {
+    const { save, turn } = await twoWindows();
+    const claude = { vendor: "claude", model: "claude-model", prompt_version: "tutor@16" };
+    const codex = { vendor: "codex", model: "codex-model", prompt_version: "tutor@16" };
+    await save([shared, { id: "c-2", message: "What is 2+2?", reply: "4.", ai: claude }]);
+    await save([shared, { id: "c-2", message: "What is 2+2?", reply: "4.", ai: codex }]); // a window that never saw Claude's
+    const t = turn("c-2") as unknown as { ai: object; alts?: { ai: object }[] };
+    expect([t.ai, ...(t.alts ?? []).map((v) => v.ai)]).toEqual(expect.arrayContaining([claude, codex]));
+    // The same version saved again by both windows stays one.
+    await save([shared, { id: "c-2", message: "What is 2+2?", reply: "4.", ai: codex }]);
+    expect((turn("c-2") as unknown as { alts?: object[] }).alts).toHaveLength(1);
+  });
+
   test("a retry still being written is the saving window's: the reply it set aside stays a version, not back on top", async () => {
     const { save, turn } = await twoWindows();
     await save([shared, { id: "c-2", message: "why?", reply: "Because." }]);

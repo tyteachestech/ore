@@ -167,13 +167,13 @@ async function older(url: string, show: Record<string, string> | undefined, fetc
   return { audio: found.audio, title, show: show.collectionName, published: ld.datePublished, artwork: show.artworkUrl600 ?? show.artworkUrl160, language: found.language };
 }
 
-/** An episode's audio in its show's public feed: the item with that title, or the only one of that day
- *  when the title was edited since. */
+/** An episode's audio in its show's public feed: the item with that title (of that day, when the show
+ *  reused the title), or the only one of that day when the title was edited since. */
 async function inFeed(feed: string, title: string, published: string | undefined, fetcher: typeof fetch): Promise<{ audio?: string; language?: string }> {
   const xml = await (await fetcher(feed).catch(() => null))?.text().catch(() => "") ?? "";
   const items = [...xml.matchAll(/<item\b[\s\S]*?<\/item>/g)].map((m) => ({
     title: decodeXml(m[0].match(/<title\b[^>]*>([\s\S]*?)<\/title>/)?.[1] ?? ""),
-    audio: m[0].match(/<enclosure\b[^>]*\burl="([^"]+)"/)?.[1],
+    audio: m[0].match(/<enclosure\b[^>]*\burl\s*=\s*(?:"([^"]+)"|'([^']+)')/)?.slice(1).find(Boolean),
     day: (() => {
       const t = Date.parse(m[0].match(/<pubDate>([^<]+)<\/pubDate>/)?.[1] ?? "");
       return Number.isNaN(t) ? undefined : new Date(t).toISOString().slice(0, 10);
@@ -181,7 +181,8 @@ async function inFeed(feed: string, title: string, published: string | undefined
   }));
   const want = words(title);
   const sameDay = published ? items.filter((i) => i.audio && i.day === published.slice(0, 10)) : [];
-  const hit = items.find((i) => i.audio && words(i.title) === want) ?? (sameDay.length === 1 ? sameDay[0] : undefined);
+  const named = items.filter((i) => i.audio && words(i.title) === want);
+  const hit = named.find((i) => sameDay.includes(i)) ?? named[0] ?? (sameDay.length === 1 ? sameDay[0] : undefined);
   return { audio: hit?.audio && decodeXml(hit.audio), language: feedLanguage(xml) };
 }
 

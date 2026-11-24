@@ -43,6 +43,8 @@ export interface AddOptions {
   preview?: boolean;
   /** A PDF's tables and formulas as the page reader read them (D125), swapped into pdf.js's text. */
   regions?: Region[];
+  /** The PDF `regions` were read from: they describe its pages only, so other bytes are read without them. */
+  regionsOf?: Uint8Array;
   /** The speech's language when the episode names it (its feed's), so it is heard in it. */
   language?: string;
   /** A page that is an episode (D215): read as its episode (unset, a new add: when its audio comes),
@@ -147,6 +149,18 @@ async function audioTags(bytes: Uint8Array, ext: string): Promise<{ title?: stri
   }
 }
 
+/** Whether a saved reading of a PDF (`regions`, read from `of`) is of these bytes (Codex deep scan 2): one replaced
+ *  at its link since has other pages, and the old tables laid on them took its text's place. The same pages with
+ *  the same words are the same file, though a host stamps each download (a trailer comment, a new date). */
+async function fits(of: Uint8Array, bytes: Uint8Array): Promise<boolean> {
+  const view = (b: Uint8Array) => Buffer.from(b.buffer, b.byteOffset, b.byteLength);
+  if (view(of).equals(view(bytes))) return true;
+  const { pageTexts } = await import("./pdf.ts");
+  const [a, b] = await Promise.all([pageTexts(of), pageTexts(bytes)]).catch(() => [[], []]);
+  // Pages with no words (a scan) say nothing about which file it is.
+  return a.some((t) => t.trim()) && a.length === b.length && a.every((t, i) => t === b[i]);
+}
+
 /** A source draft from a file's bytes, whatever it came from (a link or a file), by its kind. */
 async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: string, base = url, opts: AddOptions = {}): Promise<NewItem> {
   if (AUDIO_TYPES.includes(kind)) {
@@ -161,12 +175,13 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     return { type: "article", title, author: tags.author, url, body: vttToBody(vtt, tags.chapters), source: { ext: kind, data: bytes }, transcript: vtt };
   }
   if (kind === "pdf") {
-    const p = await pdfToDoc(bytes, opts.regions).catch(async (e) => {
+    const stale = !!opts.regions?.length && !!opts.regionsOf && !(await fits(opts.regionsOf, bytes));
+    const p = await pdfToDoc(bytes, stale ? undefined : opts.regions).catch(async (e) => {
       // Scanned pages: read with the Mac's text recognition (D96).
       if (!(e instanceof (await import("./pdf.ts")).ScannedPdf)) throw e;
       return (await import("./ocr.ts")).scannedText(bytes, "pdf");
     });
-    return { type: "pdf", title: p.title ?? fileStem(name), author: "author" in p ? p.author : undefined, url, body: p.body, source: { ext: "pdf", data: bytes }, assets: "assets" in p ? p.assets : undefined, structure: "structure" in p ? p.structure : undefined };
+    return { type: "pdf", title: p.title ?? fileStem(name), author: "author" in p ? p.author : undefined, url, body: p.body, source: { ext: "pdf", data: bytes }, assets: "assets" in p ? p.assets : undefined, structure: "structure" in p ? p.structure : undefined, ...(stale ? { staleLayout: true as const } : {}) };
   }
   if (IMAGE_TYPES.includes(kind)) {
     // A screenshot or photo of text: its text to read, the image above it (D96).
@@ -884,17 +899,20 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const kept = url && !(local && copy) ? undefined : copy;
   // A file's source whose kept copy was deleted says so, not that it never came from a file (F5).
   if (!canReimport(item)) throw new Error(type === "markdown" || type === "snippet" || url ? "Only a source added from a link or a file can be reimported." : "The file it came from is no longer kept beside this source, so there is nothing to read again. Add the file again to read it fresh.");
+  // The saved reading is of the kept PDF (layout.json and source.pdf are replaced together): a link read
+  // again applies it only if it serves the same file.
+  const savedPdf = !read && existsSync(join(item.dir, "source.pdf")) ? new Uint8Array(readFileSync(join(item.dir, "source.pdf"))) : undefined;
   const regions = read ?? layoutOf(item.dir);
   // A pasted page (source.html beside a Markdown source) is read as it was pasted.
   const pasted = type === "markdown" && !url && kept === "source.html";
-  const draft = await (async () => withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, episode: existsSync(pageFile(item)), onProgress }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions })))().catch(async (e: Error) => {
+  const draft = await (async () => withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, regionsOf: savedPdf, episode: existsSync(pageFile(item)), onProgress }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions })))().catch(async (e: Error) => {
     // A recording that can't be heard again here, from its file or its link, keeps the transcript it has: nothing to paste.
     const { PASTE_STEP } = await import("./audio.ts");
     throw PASTE_STEP.test(e.message) ? new Error(e.message.replace(PASTE_STEP, " Its transcript is as it was.")) : e;
   });
   if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
   if (kept) draft.body = savedPictures(draft.body, item);
-  return turn(() => rewrite(lib, item, draft, regions, kept, stash));
+  return turn(() => rewrite(lib, item, draft, draft.staleLayout ? undefined : regions, kept, stash));
 }
 
 /** A date's day (2024-01-01), however it is written; undefined when it is no date. */

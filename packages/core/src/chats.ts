@@ -70,7 +70,12 @@ type Turn = Chat["turns"][number];
 /** One message and its reply, as a turn shows it or keeps it among its other versions (D201, the app's chat-versions.ts). */
 type Version = Record<string, unknown>;
 const hasReply = (v: Version) => typeof v.reply === "string";
-const key = (v: Version) => JSON.stringify([v.message, v.reply]);
+/** A version is its words and the AI that wrote them: the same words from another vendor, model or prompt
+ *  are another version, so neither's stamp is lost in a merge (Codex deep scan 2). */
+const key = (v: Version) => {
+  const ai = (v.ai ?? {}) as Record<string, unknown>;
+  return JSON.stringify([v.message, v.reply, ai.vendor, ai.model, ai.prompt_version]);
+};
 const shown = ({ id: _i, alts: _a, alt: _n, ...v }: Turn): Version => v;
 const versionsOf = (t: Turn): Version[] => [...((t.alts as Version[] | undefined) ?? []), ...(hasReply(t) ? [shown(t)] : [])];
 const keptOf = (v: Version) => (typeof v.kept === "string" && v.kept !== "adding" ? v.kept : undefined);

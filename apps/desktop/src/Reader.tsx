@@ -1,4 +1,5 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { citedRange } from "./cite-pills";
 import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as HoverCard from "@radix-ui/react-hover-card";
@@ -636,7 +637,7 @@ type Props = {
   onImportance?: (item: Item, p: Priority | "") => void;
   onMove: (item: Item, to: Item["status"]) => void;
   /** A highlight to scroll to once the text is ready (a question on the skill page, D47), or
-   *  `q:start:end[:n]`, a quote a card or citation points to (D99; n a count, so a repeat click jumps again), or a ⌘K match: `find:<words>` in the text (the find
+   *  `q:start:end[:n]`, a quote a card or citation points to (D99; n a count, so a repeat click jumps again; a citation's quote on the next line, `citedRange`), or a ⌘K match: `find:<words>` in the text (the find
    *  bar opens on those words at their first place), `note:<words>` in the source note (the note opens,
    *  the find bar on its words), `ann:<id>` a highlight (scrolled to, its popup open). */
   jumpTo?: string;
@@ -1289,9 +1290,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }, []);
   useLayoutEffect(() => {
     if (!ready || !scrollRef.current) return;
-    // The passage he left at the top (F444); the distance down the page for a place saved before that.
+    // The passage he left at the top (F444); the distance down the page for a place saved before that. A quote
+    // no longer in the source (citedRange null) jumps nowhere, so it opens there too.
     const y = Number(load(scrollKey) ?? 0);
-    if (y > 0 && !p.jumpTo && !(docEl.current && toPlace(scrollRef.current, docEl.current, load(placeKey) ?? ""))) scrollRef.current.scrollTop = y;
+    const jumps = !!p.jumpTo && !(body !== undefined && citedRange(body, p.jumpTo) === null);
+    if (y > 0 && !jumps && !(docEl.current && toPlace(scrollRef.current, docEl.current, load(placeKey) ?? ""))) scrollRef.current.scrollTop = y;
     // A long text is drawn in slices, and can be ready a second after it opened: a click into the note meanwhile keeps
     // the keys there, or what he types next lands in the source (CI, F396).
     if (clicked.current && document.activeElement && document.activeElement !== document.body) return;
@@ -1343,8 +1346,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // `q:start:end` is a quote a card points to (D99), not a highlight; a citation adds `:n`, a count, so each
     // click is a new jump. No jump (back or forward) forgets the last, so the same one can go again.
     if (!p.jumpTo) jumped.current = undefined;
-    const q = p.jumpTo?.match(/^q:(\d+):(\d+)(?::\d+)?$/);
-    const jump = jumped.current === p.jumpTo ? undefined : q ? rangeFor(index, src, body, { exact: body.slice(+q[1]!, +q[2]!), prefix: "", suffix: "", start: +q[1]! }) : p.jumpTo && map.get(p.jumpTo);
+    // A quote no longer in the source (reimported since) is null: it opens unmarked, never on other words.
+    const q = p.jumpTo ? citedRange(body, p.jumpTo) : undefined;
+    const jump = jumped.current === p.jumpTo ? undefined : q ? rangeFor(index, src, body, { exact: body.slice(...q), prefix: "", suffix: "", start: q[0] }) : q === undefined && p.jumpTo ? map.get(p.jumpTo) : undefined;
     const el = scrollRef.current;
     if (jump && el) {
       jumped.current = p.jumpTo;

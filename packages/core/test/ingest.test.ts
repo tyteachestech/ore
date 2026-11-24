@@ -50,6 +50,13 @@ describe("ingest", () => {
     expect(body).toEqual(words.map((w) => w.w));
   });
 
+  test("a sentence said again a minute later stays in the transcript, with its own time (F582)", () => {
+    // Only a rolling caption's carried-over line is a duplicate; the same words heard again later are speech.
+    const vtt = readFileSync(join(import.meta.dir, "fixtures/intake/audio/repeated-speech.vtt"), "utf8");
+    expect(vttToBody(vtt)).toBe("[00:00] Practice retrieval.\n\n[01:10] Practice retrieval.\n");
+    expect(vttWords(vtt).map((w) => w.t)).toEqual([0, 0.9, 70, 70.9]);
+  });
+
   test("youtubeId reads watch, youtu.be, shorts and live URLs", () => {
     expect(youtubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10")).toBe("dQw4w9WgXcQ");
     expect(youtubeId("https://youtu.be/dQw4w9WgXcQ?si=x")).toBe("dQw4w9WgXcQ");
