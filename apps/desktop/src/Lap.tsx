@@ -219,9 +219,9 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
 }
 const REEL_ROWS = 12, SOLOS = 2;
 /** The medals the row shows at once when it rolls, a medal's place in px, and how long it rests between steps. */
-const SEEN = 3, MEDAL_SLOT = 68, ROLL_MS = 1700;
+const SEEN = 3, MEDAL_SLOT = 56, ROLL_MS = 1700;
 /** A medal's ring, in px. */
-const MEDAL = 48;
+const MEDAL = 44;
 
 /** White sparkles over the ring's bonus dots, for as long as the end screen is up: small crosses of dots that
  *  open and fade, only on the stretch past the goal, so they also say how far it went. A few past the goal,
