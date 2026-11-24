@@ -1769,6 +1769,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   // the big ring, -3 between turns (the ring stays put away), -2 while the stones fly, -1 when it is over.
   const [onStage, setOnStage] = useState<number | null>(still() || quick ? -1 : null);
   const [leaving, setLeaving] = useState<{ dx: number; dy: number } | null>(null);
+  // The gems that have left the ring, by their place in it: kept here too, so one drawn again stays gone.
+  const [goneGems, setGoneGems] = useState<number[]>([]);
   const [prog, setProg] = useState<EndProg>(() => {
     const over = still() || !!quick;
     return { cut: rowPlan.rows.map((r) => (over ? r.cut : 0)), stone: rowPlan.rows.map(() => 0), shown: rowPlan.rows.map(() => over), done: over };
@@ -1784,7 +1786,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
             return (
               // With the cart, a gem is cut the moment its rough stone lands; its place is kept until then. A gem cut before today and polished now shows once the cart has poured.
               <Hint key={i} text={`${sk ? `${sk.name} · ` : ""}${g.polished ? "Polished: you passed it as a remix" : g.seam ? "Won back: you missed it once and cut it again" : "Cut: you'd still recall it three weeks from now"}`}>
-                <span data-color={sk?.color} data-fly={!g.old || undefined} data-skill={g.skill} data-off={(staged && staged.skill !== g.skill) || undefined} data-stone={(pour && !g.old) || undefined} data-wait={(g.old ? stage === "cart" : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
+                <span data-color={sk?.color} data-fly={!g.old || undefined} data-i={i} data-gone={goneGems.includes(i) ? "" : undefined} data-skill={g.skill} data-off={(staged && staged.skill !== g.skill) || undefined} data-stone={(pour && !g.old) || undefined} data-wait={(g.old ? stage === "cart" : i >= landed) || undefined} style={{ animationDelay: pour ? "0ms" : `${500 + i * 90}ms` }}>
                   {/* With the cart, the stone that lands is cut where it stands: its dots fuse into pixels (D239). */}
                   {pour && !g.old ? <Cutting go={i < landed} size={gemSize} seam={g.seam} polished={g.polished} /> : <Gem kind="cut" size={gemSize} seam={g.seam} polished={g.polished} />}
                 </span>
@@ -1871,6 +1873,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         opts.end ? { transform: `translate(0, 0) scale(${opts.end})`, opacity: 1 } : { transform: "translate(0, 0) scale(0.3)", opacity: 0 },
       ], { duration: opts.ms, easing: "cubic-bezier(0.5, 0, 0.25, 1)" }).onfinish = () => (ghost.remove(), land());
     };
+    const take = (src: HTMLElement) => (src.setAttribute("data-gone", ""), setGoneGems((g) => [...g, Number(src.dataset.i)]));
     const was = b?.skills ?? [];
     let t = 150;
     // A skill that won a gem has its turn in the big ring: it comes up, its gems go to the rim one on another's
@@ -1888,8 +1891,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           // It lands where the ring will be lit next: the end of the skill's share with this gem in.
           const z = ring.getBoundingClientRect(), a = Math.min(1, levelAt(r, d + 1, false, was, t0.skills).share) * 2 * Math.PI - Math.PI / 2;
           const from = src.getBoundingClientRect();
-          src.setAttribute("data-gone", "");
-          src.style.visibility = "hidden";
+          take(src);
           const to = { x: z.left + z.width / 2 + 0.43 * z.width * Math.cos(a), y: z.top + z.height / 2 + 0.43 * z.height * Math.sin(a) };
           fly(r.first + d, row, from, to, { big: from.width / 28, seen: true, ms: 420 }, () => {
             // Where it lands, the rim answers: a dot of the skill's colour opens and fades.
@@ -1932,8 +1934,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           const pip = host.querySelector(`[data-pip="${row}-${d}"]`), m = pip?.getBoundingClientRect();
           if (!src || !m) return bump("cut", row);
           const from = src.getBoundingClientRect();
-          src.setAttribute("data-gone", "");
-          src.style.visibility = "hidden";
+          take(src);
           return fly(r.first + d, row, from, { x: m.left + m.width / 2, y: m.top + m.height / 2 }, { big: from.width / 28, seen: true, ms: 480, end: 20 / 28 }, () => (pip?.removeAttribute("data-wait"), layer("right", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.5 }), bump("cut", row)));
         }
         const medal = host.querySelector(`[data-pip="${row}-${d}"]`), ring = host.querySelector(".end-ring");
@@ -1953,11 +1954,11 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     t += stones ? (stones - 1) * gap + 480 : 0;
     // A gem still in the ring (one the ring had no room to show until others left) goes down to the list too,
     // so none is left behind to vanish.
-    at(cleared - 180, () => host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone])").forEach((src, n) => {
+    at(cleared - 180, () => host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone]):not([data-swept])").forEach((src, n) => {
       const view = host.querySelector(".end-skills")?.getBoundingClientRect();
       if (!view) return;
       const a = src.getBoundingClientRect();
-      src.setAttribute("data-gone", "");
+      src.setAttribute("data-swept", "");
       src.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${view.right - 40 - (a.left + a.width / 2)}px, ${view.bottom - 6 - (a.top + a.height / 2)}px) scale(0.4)`, opacity: 0 }], { duration: 320, delay: n * 40, easing: "cubic-bezier(0.5, 0, 0.25, 1)", fill: "forwards" });
     }));
     t += stones ? 60 : 0;

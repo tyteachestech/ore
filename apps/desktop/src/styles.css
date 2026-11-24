@@ -2541,6 +2541,7 @@ button.home-plan:hover { color: var(--text); }
 .end-ring > .ring, .end-ring > .review-cut > b { transition: opacity var(--t-3) var(--ease-out); }
 .end-ring[data-staged] > .ring, .end-ring[data-staged] > .review-cut > b { opacity: 0; }
 .review-cut > span[data-off] { opacity: 0; }
+.review-cut > span[data-gone] { visibility: hidden; }
 .review-cut > span { transition: opacity var(--t-2) var(--ease-out); }
 .end-stage { position: relative; display: grid; place-items: center; color: var(--skill, var(--text)); pointer-events: none; animation: end-stage-in var(--t-4) var(--ease-spring) both; }
 .end-stage > * { grid-area: 1 / 1; }
