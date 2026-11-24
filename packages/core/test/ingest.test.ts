@@ -216,4 +216,25 @@ describe("tracking links", () => {
       globalThis.fetch = real;
     }
   });
+
+  test("one Feed post opened twice at once stays a preview: the second open finds it under the lock and does not keep it (F-new-concurrent-add)", async () => {
+    const lib = await tempLibrary();
+    const real = globalThis.fetch;
+    let release!: () => void;
+    const started = new Promise<void>((r) => (release = r));
+    let reads = 0;
+    globalThis.fetch = (async () => {
+      if (++reads === 2) release();
+      await started;
+      return new Response("# A feed post\n\nRead as a preview, not kept yet.\n", { headers: { "content-type": "text/markdown" } });
+    }) as unknown as typeof fetch;
+    try {
+      const [a, b] = await Promise.all([addSource(lib, "https://example.com/post.md", { preview: true }), addSource(lib, "https://example.com/post.md", { preview: true })]);
+      expect(b.meta.id).toBe(a.meta.id);
+      expect(findItem(lib, a.meta.id).meta.preview).toBeTruthy();
+      expect(listItems(lib).length).toBe(0);
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
 });

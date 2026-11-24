@@ -562,6 +562,7 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   let same = !isUrl && sameText(lib, ready.body);
   // Looked for again under the write lock: the same link or file added at once by another add (F-new-concurrent-add).
   const made = same ? undefined : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview }, () => (isUrl ? byLink(lib, input, true) : sameText(lib, ready.body)));
+  if (made?.already && opts.preview) return made; // a Feed post opened twice at once is still only being read
   if (made?.already) same = made;
   const item = same ? await keep(lib, same, opts) : made!;
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
