@@ -1768,7 +1768,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   // The end's own order (`SkillStage`, `SkillRows`): null before it starts, a row of the plan while that skill has
   // the big ring, -3 between turns (the ring stays put away), -2 while the stones fly, -1 when it is over.
   const [onStage, setOnStage] = useState<number | null>(still() || quick ? -1 : null);
-  const [leaving, setLeaving] = useState(false);
+  const [leaving, setLeaving] = useState<{ dx: number; dy: number } | null>(null);
   const [prog, setProg] = useState<EndProg>(() => {
     const over = still() || !!quick;
     return { cut: rowPlan.rows.map((r) => (over ? r.cut : 0)), stone: rowPlan.rows.map(() => 0), shown: rowPlan.rows.map(() => over), done: over };
@@ -1819,7 +1819,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   // time before he speaks"): once he has settled and the results are in. His voice goes with it.
   const speaks = settled && stage === "done" && (tallied || tiles.length === 0);
   useEffect(() => void (speaks && aloud && once(aloud, 0.1)), [speaks]);
-  const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : endMood(said[0], { session: s, closed, napped: nap, still: still() });
+  const cheering = !!staged && prog.cut[onStage!]! > 0 && levelAt(staged, prog.cut[onStage!]!, false, b?.skills ?? [], t.skills).up;
+  const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : cheering ? "cheer" : endMood(said[0], { session: s, closed, napped: nap, still: still() });
   // D274: the full end screen's ring holds the day's minutes, and minutes past the goal go round again.
   // Gems the session cut are cut in the ring first (D239), then make way for the minutes; they wait for the
   // last stone, and a beat more so each cut is seen. Then the count has no room to run up to the goal, so it
@@ -1867,7 +1868,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     rowPlan.rows.forEach((r, row) => {
       const cuts = r.slots.filter((k) => k === "cut").length, levelUp = ups.some((k) => k.skill === r.skill);
       if (!cuts) return;
-      at(t, () => (setLeaving(false), setOnStage(row)));
+      at(t, () => (setLeaving(null), setOnStage(row)));
       t += 400;
       for (let d = 0; d < cuts; d++) {
         at(t + d * 160, () => {
@@ -1878,18 +1879,30 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
           const from = src.getBoundingClientRect();
           src.setAttribute("data-gone", "");
           src.style.visibility = "hidden";
-          fly(r.first + d, row, from, { x: z.left + z.width / 2 + 0.43 * z.width * Math.cos(a), y: z.top + z.height / 2 + 0.43 * z.height * Math.sin(a) }, { big: from.width / 28, seen: true, ms: 520 }, () => {
+          const to = { x: z.left + z.width / 2 + 0.43 * z.width * Math.cos(a), y: z.top + z.height / 2 + 0.43 * z.height * Math.sin(a) };
+          fly(r.first + d, row, from, to, { big: from.width / 28, seen: true, ms: 520 }, () => {
+            // Where it lands, the rim answers: a dot of the skill's colour opens and fades.
+            const pop = document.createElement("i");
+            pop.className = "end-stage-pop";
+            pop.dataset.color = skills.find((x) => x.id === r.skill)?.color ?? "";
+            Object.assign(pop.style, { left: `${to.x}px`, top: `${to.y}px` });
+            (host.parentElement ?? host).append(pop);
+            pop.animate([{ transform: "scale(0.6)", opacity: 1 }, { transform: "scale(3.2)", opacity: 0 }], { duration: 420, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" }).onfinish = () => pop.remove();
             layer("right", { up: END_NOTES[Math.min(d, END_NOTES.length - 1)] ?? 0, level: 0.6 });
             bump("cut", row);
             if (d === cuts - 1 && levelUp) sfx("goal", { after: 0.05 });
           });
         });
       }
-      t += (cuts - 1) * 160 + 520 + (levelUp ? 1200 : 350);
-      at(t, () => setLeaving(true));
-      t += 260;
+      t += (cuts - 1) * 160 + 520 + (levelUp ? 1300 : 300);
+      // It goes down to its own medal's place, in one move.
+      at(t, () => {
+        const m = host.querySelector(`.end-medal-ring[data-row="${row}"]`)?.getBoundingClientRect(), z = host.querySelector(".end-stage")?.getBoundingClientRect();
+        setLeaving(m && z ? { dx: m.left + m.width / 2 - (z.left + z.width / 2), dy: m.top + m.height / 2 - (z.top + z.height / 2) } : { dx: 0, dy: 150 });
+      });
+      t += 340;
       at(t, () => (setProg((p) => ({ ...p, shown: p.shown.map((x, i) => x || i === row) })), setOnStage(-3)));
-      t += 60;
+      t += 30;
     });
     // Then every medal is out, and the rough stones go to them in one volley from the ring's middle.
     at(t, () => (setOnStage(-2), setProg((p) => ({ ...p, shown: p.shown.map(() => true) }))));
@@ -1901,19 +1914,27 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         const medal = host.querySelector(`.end-medal-ring[data-row="${row}"]`), ring = host.querySelector(".end-ring");
         if (!medal || !ring) return bump("stone", row);
         const z = medal.getBoundingClientRect(), c = ring.getBoundingClientRect();
-        fly(r.first + d, row, new DOMRect(c.left + c.width / 2 - 10 + (d % 3 - 1) * 14, c.top + c.height / 2 - 10, 20, 20), { x: z.left + z.width / 2, y: z.top + z.height / 2 }, { big: 1.5, seen: false, ms: 480 }, () => {
+        fly(r.first + d, row, new DOMRect(c.left + c.width / 2 - 10 + (d % 3 - 1) * 14, c.top + c.height / 2 - 10, 20, 20), { x: z.left + z.width / 2, y: z.top + z.height / 2 }, { big: 1.6, seen: false, ms: 520 }, () => {
           layer("tap", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.3 });
           bump("stone", row);
         });
       });
     }));
-    t += stones ? (stones - 1) * 70 + 480 + 250 : 0;
+    // Gems of the skills past the last medal go to the "+N" that stands for them.
+    at(t, () => host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone])").forEach((src, n) => {
+      const more = host.querySelector(".end-skills-more")?.getBoundingClientRect();
+      if (!more) return;
+      const a = src.getBoundingClientRect();
+      src.setAttribute("data-gone", "");
+      src.animate([{ transform: "none", opacity: 1 }, { transform: `translate(${more.left + more.width / 2 - (a.left + a.width / 2)}px, ${more.top + more.height / 2 - (a.top + a.height / 2)}px) scale(0.3)`, opacity: 0.2 }], { duration: 480, delay: n * 60, easing: "cubic-bezier(0.5, 0, 0.25, 1)", fill: "forwards" });
+    }));
+    t += stones ? (stones - 1) * 70 + 520 + 100 : 0;
     at(t, () => (setProg((p) => ({ ...p, done: true })), setOnStage(-1)));
     return () => ids.forEach(clearTimeout);
   }, [rowsIn, host]);
   useEffect(() => {
     if (away || !full || landed < shown.length || (fliers.length > 0 && onStage !== -1)) return;
-    const id = setTimeout(() => setAway(true), fliers.length ? 350 : pour ? 1100 : 1400 + gems.length * 90);
+    const id = setTimeout(() => setAway(true), fliers.length ? 120 : pour ? 1100 : 1400 + gems.length * 90);
     return () => clearTimeout(id);
   }, [away, full, landed, onStage]);
   const [plan] = useState(() => {

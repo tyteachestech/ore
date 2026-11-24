@@ -128,10 +128,10 @@ export function levelAt(r: EndRow, here: number, done: boolean, was: Today["skil
  *  outward and turns the number, and is held. Then it goes down to its medal (`leaving`). One thing at a time, in
  *  the centre, the level a ring round the thing itself: Duolingo's lesson end and level up, Mimo, Finch, Brilliant
  *  (Mobbin, 2026-11-23). */
-export function SkillStage({ row, here, leaving, size, was, now, skills }: { row: EndRow; here: number; leaving: boolean; size: number; was: Today["skills"]; now: Today["skills"]; skills: Skill[] }) {
+export function SkillStage({ row, here, leaving, size, was, now, skills }: { row: EndRow; here: number; leaving: { dx: number; dy: number } | null; size: number; was: Today["skills"]; now: Today["skills"]; skills: Skill[] }) {
   const s = skills.find((x) => x.id === row.skill), lv = levelAt(row, here, false, was, now);
   return (
-    <div className="end-stage" data-color={s?.color} data-leaving={leaving || undefined} aria-hidden="true">
+    <div className="end-stage" data-color={s?.color} data-leaving={!!leaving || undefined} data-up={lv.up || undefined} style={leaving ? ({ "--dx": `${leaving.dx}px`, "--dy": `${leaving.dy}px` } as React.CSSProperties) : undefined} aria-hidden="true">
       <span className="end-stage-ring gem-ring" key={`in${here}`} data-beat={here || undefined} style={{ width: size, height: size }}><DotRing size={size} share={lv.share} ghost={lv.soon} step /></span>
       {lv.up && <span className="end-stage-burst">{Array.from({ length: 24 }, (_, d) => <i key={d} style={{ "--a": `${d * 15}deg` } as React.CSSProperties} />)}</span>}
       <span className="end-stage-mid">
@@ -168,7 +168,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
                 </span>
                 {lv.lv > 0 && <b className="gem-ring-lv" data-flip={lv.up || undefined}>{lv.lv}</b>}
                 {/* What flies, drawn once here so the flight can lift a copy of it. */}
-                <span className="end-medal-fliers">{r.slots.map((kind, d) => <span key={d} data-slot={r.first + d}><Gem kind={kind} size={kind === "cut" ? 28 : 20} /></span>)}</span>
+                <span className="end-medal-fliers">{r.slots.map((kind, d) => <span key={d} data-slot={r.first + d}><Gem kind={kind} size={kind === "cut" ? 28 : 24} /></span>)}</span>
               </span>
               <span className="end-medal-name">{name(r.skill)}</span>
             </div>

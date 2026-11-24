@@ -2522,9 +2522,12 @@ button.home-plan:hover { color: var(--text); }
 .end-skills { display: flex; justify-content: center; align-items: flex-start; width: 100%; min-height: 104px; margin: 36px auto 0; }
 .end-skills[data-wait] { visibility: hidden; }
 /* A medal: the skill's icon in the ring of its level. Its place is held until it comes out. */
-.end-medal { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 120px; color: var(--skill, var(--text)); animation: end-medal-in var(--t-4) var(--ease-spring) both; }
+.end-medal { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 120px; color: var(--skill, var(--text)); animation: end-medal-in var(--t-3) var(--ease-out) both; }
+/* The one that went up a level stands a size larger, for as long as the screen is up. */
+.end-medal[data-up] .end-medal-ring { transform: scale(1.25); }
+.end-medal[data-up] .end-medal-name { color: var(--text); margin-top: 6px; }
 .end-medal[data-wait], .end-skills-more[data-wait] { visibility: hidden; animation: none; }
-@keyframes end-medal-in { from { transform: translateY(-28px) scale(1.6); opacity: 0; } }
+@keyframes end-medal-in { from { opacity: 0.4; } }
 /* A skill's turn in the big ring: the ring is the skill's, its icon and level in the middle. */
 .end-ring > .ring, .end-ring > .review-cut > b { transition: opacity var(--t-3) var(--ease-out); }
 .end-ring[data-staged] > .ring, .end-ring[data-staged] > .review-cut > b { opacity: 0; }
@@ -2532,19 +2535,23 @@ button.home-plan:hover { color: var(--text); }
 .review-cut > span { transition: opacity var(--t-2) var(--ease-out); }
 .end-stage { position: relative; display: grid; place-items: center; color: var(--skill, var(--text)); pointer-events: none; animation: end-stage-in var(--t-4) var(--ease-spring) both; }
 .end-stage > * { grid-area: 1 / 1; }
-.end-stage[data-leaving] { animation: end-stage-out var(--t-3) var(--ease-in, ease-in) both; }
-@keyframes end-stage-in { from { transform: scale(0.8); opacity: 0; } }
-@keyframes end-stage-out { to { transform: translateY(150px) scale(0.3); opacity: 0; } }
+.end-stage[data-leaving] { animation: end-stage-out 340ms cubic-bezier(0.5, 0, 0.3, 1) both; }
+@keyframes end-stage-in { from { transform: scale(0.85); opacity: 0.3; } }
+@keyframes end-stage-out { 85% { opacity: 1; } to { transform: translate(var(--dx, 0), var(--dy, 150px)) scale(0.27); opacity: 0.6; } }
 .end-stage-ring[data-beat] { animation: end-ring-beat 320ms var(--ease-spring); }
 .end-stage-mid { display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0.35; transition: opacity var(--t-3) var(--ease-out); }
 .end-stage-ring[data-beat] ~ .end-stage-mid { opacity: 1; }
 .end-stage-mid > .skill-icon.glyph { width: 88px; height: 88px; -webkit-mask-size: 88px; mask-size: 88px; }
 .end-stage-mid > .skill-icon.dot { width: 28px; height: 28px; }
-.end-stage-mid > b { min-width: 34px; height: 34px; padding: 0 10px; border-radius: 999px; display: grid; place-items: center; font: 800 20px/1 var(--round); font-variant-numeric: tabular-nums; color: var(--text); border: 1px solid var(--border); }
+.end-stage-mid > b { min-width: 40px; height: 40px; padding: 0 12px; border-radius: 999px; display: grid; place-items: center; font: 800 24px/1 var(--round); font-variant-numeric: tabular-nums; color: var(--text); border: 1px solid var(--border); }
 .end-stage-mid > b[data-flip] { color: var(--bg); background: var(--skill, var(--text)); border-color: transparent; animation: end-stage-flip 700ms var(--ease-spring); }
-@keyframes end-stage-flip { from { transform: scale(0.3); } 40% { transform: scale(1.9); } }
+@keyframes end-stage-flip { from { transform: scale(0.3); } 40% { transform: scale(2); } }
 .end-stage-burst { position: absolute; inset: 0; pointer-events: none; }
-.end-stage-burst i { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 50%; background: var(--skill, var(--text)); animation: ring-throw 800ms var(--ease-out) both; --r: 101px; --far: 56px; }
+.end-stage-burst i { position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: var(--skill, var(--text)); animation: end-stage-throw 900ms var(--ease-out) both; --r: 101px; --far: 120px; }
+@keyframes end-stage-throw { from { opacity: 1; transform: rotate(var(--a)) translateY(calc(-1 * var(--r))); } 60% { opacity: 1; } to { opacity: 0; transform: rotate(var(--a)) translateY(calc(-1 * var(--r) - var(--far))) scale(0.5); } }
+.end-stage[data-up] .end-stage-ring { animation: end-stage-swell 700ms var(--ease-spring); }
+@keyframes end-stage-swell { 35% { transform: scale(1.22); } }
+.end-stage-pop { position: fixed; z-index: 5; width: 12px; height: 12px; margin: -6px; border-radius: 50%; background: var(--skill, var(--text)); pointer-events: none; }
 .end-medal-ring { position: relative; display: inline-grid; place-items: center; width: 64px; height: 64px; }
 .end-medal-core { width: 64px; height: 64px; }
 .end-medal-core > .skill-icon.glyph { width: 28px; height: 28px; -webkit-mask-size: 28px; mask-size: 28px; }
