@@ -14,3 +14,22 @@ test("the phone's require answers every module the core loads on first use (F609
   const answered = new Set([...shim.matchAll(/m === (["'`])([^"'`]+)\1/g)].map((m) => m[2]!));
   expect([...wanted].filter((m) => !answered.has(m))).toEqual([]);
 });
+
+// The same for hashes: the phone's `node:crypto` (src/phone/node.ts) is real only for the kinds it implements, so
+// a core hash of another kind throws there (an Undo of a rating, whose line id was sha1, failed on the phone).
+test("the phone's createHash makes every kind of hash the core asks for (F595)", async () => {
+  const repo = join(import.meta.dir, "../../..");
+  const files = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? files(join(dir, e.name)) : /\.(ts|tsx|mts)$/.test(e.name) ? [join(dir, e.name)] : []));
+  const kinds = new Set(["packages/core/src", "packages/cli/src"].flatMap((d) => files(join(repo, d))).flatMap((f) => [...readFileSync(f, "utf8").matchAll(/\bcreateHash\((["'`])([^"'`]+)\1\)/g)].map((m) => m[2]!)));
+  const { createHash } = await import("../src/phone/node.ts");
+  const broken = [...kinds].filter((k) => {
+    try {
+      createHash(k).update("x").digest("hex");
+      return false;
+    } catch {
+      return true;
+    }
+  });
+  expect(broken).toEqual([]);
+});

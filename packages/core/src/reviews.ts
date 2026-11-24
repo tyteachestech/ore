@@ -47,7 +47,7 @@ export const UndoSchema = z.object({ ts: z.string(), card: z.string(), undo: z.s
 export type Undo = z.infer<typeof UndoSchema>;
 
 /** A short name for one review line, as read from the log. */
-export const lineId = (r: Review): string => createHash("sha1").update(JSON.stringify(r)).digest("hex").slice(0, 16);
+export const lineId = (r: Review): string => createHash("sha256").update(JSON.stringify(r)).digest("hex").slice(0, 16);
 
 // What a review line needs to be replayed: looser than ReviewSchema, so a line from an older build still counts,
 // but a rating outside 1–4 or a missing state (which stopped every screen) doesn't.
