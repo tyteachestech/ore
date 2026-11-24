@@ -98,9 +98,38 @@ describe("Ask about this (D61)", () => {
     const [a, b] = readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
     expect(a![1]).toContain("Retrieval practice changes what is stored.");
     expect(a![1]).toContain("effort");
-    expect(a![a!.indexOf("--session-id") + 1]).toBe(first.session);
+    // The session it hands out names its vendor (`claude:<id>`); claude is given the id.
+    expect(`claude:${a![a!.indexOf("--session-id") + 1]}`).toBe(first.session);
     expect(b![1]).toBe("Clearer card?");
-    expect(b![b!.indexOf("--resume") + 1]).toBe(first.session);
+    expect(`claude:${b![b!.indexOf("--resume") + 1]}`).toBe(first.session);
+  });
+
+  test("after he switches AI, a follow-up starts a new conversation with the card, never the other vendor's session (F-new-ask-vendor-switch)", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Retrieval practice changes what is stored." });
+    const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "What does retrieval change?", answer: "What is stored.", rubric: [] });
+    fakeClaude([{ reply: "Because effort strengthens it.", card: null }]);
+    const first = await askAboutCard(lib, card.meta.id, { message: "Why?", answer: "effort" });
+    // A fake codex: it reports a thread, writes its reply, and logs what it was asked.
+    writeFileSync(join(binDir, "codex"), `#!/usr/bin/env bun
+const fs = require("fs");
+const argv = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(binDir)} + "/codex.jsonl", JSON.stringify(argv) + "\\n");
+fs.writeFileSync(argv[argv.indexOf("-o") + 1], JSON.stringify({ reply: "From Codex.", card: null }));
+console.log(JSON.stringify({ type: "thread.started", thread_id: "codex-thread-1" }));
+`);
+    chmodSync(join(binDir, "codex"), 0o755);
+    process.env.ORE_AI = "codex";
+    const next = await askAboutCard(lib, card.meta.id, { message: "Sure?", answer: "effort", session: first.session });
+    expect(next).toMatchObject({ reply: "From Codex.", ai: { vendor: "codex" } });
+    const argv = JSON.parse(readFileSync(join(binDir, "codex.jsonl"), "utf8").trim()) as string[];
+    expect(argv).not.toContain("resume");
+    expect(argv.at(-1)).toContain("What does retrieval change?");
+    expect(argv.at(-1)).toContain("effort");
+    // Codex's own session is picked up on the next turn.
+    await askAboutCard(lib, card.meta.id, { message: "And?", session: next.session });
+    const again = JSON.parse(readFileSync(join(binDir, "codex.jsonl"), "utf8").trim().split("\n")[1]!) as string[];
+    expect(again[again.indexOf("resume") + 1]).toBe("codex-thread-1");
   });
 });
 

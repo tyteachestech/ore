@@ -67,7 +67,8 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
       if (p.stream === job && p.reply !== undefined) setChat((c) => (mine(c) ? { ...c, partial: p.reply } : c));
     }).catch(() => () => {});
     try {
-      const r = await oreJob<Reply>(job, null, "ask", card.id, opt("message", message), opt("stream", job), ...(chat.session ? [opt("session", chat.session)] : [opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : [])]));
+      // His answer goes with every turn: a session from the AI he used before he switched starts a new one with it.
+      const r = await oreJob<Reply>(job, null, "ask", card.id, opt("message", message), opt("stream", job), ...(chat.session ? [opt("session", chat.session)] : []), opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : []));
       // Checked here, outside the updater: a throw inside one escapes this catch and takes Review down with it.
       if (typeof r?.reply !== "string" || !r.reply.trim()) throw new TypeError("ask gave no reply");
       setChat((c) => (mine(c) ? { ...c, session: r.session, busy: false, failed: undefined, partial: undefined, job: undefined, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal, was: { question: card.question, answer: card.answer } }] } : c));

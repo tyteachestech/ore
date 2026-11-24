@@ -3,7 +3,7 @@ import { findAnnotation } from "../annotations.ts";
 import { findCard } from "../cards.ts";
 import type { Library } from "../library.ts";
 import { findVariant } from "../remix.ts";
-import { parseOutput, runChatTurn, vendorSchema } from "./adapter.ts";
+import { chooseVendor, parseOutput, runChatTurn, vendorSchema } from "./adapter.ts";
 import { loadPrompt } from "./prompts.ts";
 
 export const ChatOutput = z.strictObject({
@@ -11,8 +11,16 @@ export const ChatOutput = z.strictObject({
   card: z.strictObject({ question: z.string().min(1), answer: z.string().min(1) }).nullable(),
 });
 
+/** A session as "Ask about this" hands it out: `<vendor>:<id>`, so a follow-up after he switched AI (Settings › AI,
+ *  ORE_AI) never asks one vendor to resume the other's session (Codex deep scan 2). A bare id is the current vendor's. */
+const sessionOf = (s: string | undefined, vendor: string) => {
+  const m = s?.match(/^(claude|codex):(.+)$/);
+  return !s ? undefined : !m ? s : m[1] === vendor ? m[2] : undefined;
+};
+
 /** One message in "Ask about this" (D61), after he has answered the card (D34.3). The first turn
- *  sends the card, his answer and the passage; later turns pass `session` and only his message.
+ *  sends the card, his answer and the passage; later turns pass `session` and only his message. A session
+ *  from another vendor starts a new one, sent the card, his answer and the passage again.
  *  A proposed card is returned for him to apply (`ore card set`); nothing is written here, and no
  *  rating is suggested (D21). */
 // On a variant (D66) the chat sees the variant he answered and the original, so "why is this the
@@ -22,7 +30,9 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
   const card = findCard(lib, cardRef);
   const prompt = loadPrompt("chat");
   let message = a.message.trim();
-  if (!a.session) {
+  const vendor = chooseVendor(lib);
+  const session = sessionOf(a.session, vendor);
+  if (!session) {
     let passage: { source: string; text: string } | undefined;
     if (card.meta.annotation) {
       try {
@@ -38,7 +48,8 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
     const context = { ...shown, his_answer: a.answer?.trim() || "(no idea)", passage, ...original };
     message = `Exercise (JSON):\n${JSON.stringify(context, null, 2)}\n\nHis message:\n${message}`;
   }
-  const r = await runChatTurn(lib, { system: prompt.text, message, schema: vendorSchema(ChatOutput), session: a.session, cwd: lib.root, onProgress: a.onProgress });
+  const onProgress = a.onProgress && ((p: { reply: string; session: string }) => a.onProgress!({ ...p, session: `${vendor}:${p.session}` }));
+  const r = await runChatTurn(lib, { system: prompt.text, message, schema: vendorSchema(ChatOutput), session, cwd: lib.root, onProgress });
   const out = ChatOutput.parse(parseOutput(r.output));
-  return { card: card.meta.id, reply: out.reply, proposal: out.card, session: r.session, ai: { vendor: r.vendor, model: r.model, prompt_version: prompt.version } };
+  return { card: card.meta.id, reply: out.reply, proposal: out.card, session: `${r.vendor}:${r.session}`, ai: { vendor: r.vendor, model: r.model, prompt_version: prompt.version } };
 }
