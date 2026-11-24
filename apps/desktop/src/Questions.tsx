@@ -413,7 +413,7 @@ export function AskQuestion({ skills, item, onDone, notify }: { skills: string[]
     }
   };
   return (
-    <div className="ask">
+    <div className="q-ask">
       <input
         ref={field}
         autoFocus
