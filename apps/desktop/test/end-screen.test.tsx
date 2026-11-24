@@ -312,7 +312,7 @@ test("the end screen is one emblem over one row of results (D242, D252): the gem
   reduce = true;
   // One row, two at most, in one order: the memories kept, then the days the session added. The gems it cut are
   // on their skills' lines, so the row never counts them again.
-  const row = [...s.body.querySelectorAll(".end-emblem + .end-tally > li")];
+  const row = [...s.body.querySelectorAll(".end-emblem ~ .end-tally > li")];
   expect(row.map((li) => li.getAttribute("data-key"))).toEqual(["kept", "depth"]);
   // Each number is drawn in dots, and its text is the true number for a reader and for a test.
   expect(row.map((li) => li.querySelectorAll("b .dot-number circle").length > 5)).toEqual([true, true]);

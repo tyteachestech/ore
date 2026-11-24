@@ -84,10 +84,11 @@ export type EndRow = { skill: string; cut: number; kept: number; slots: ("cut" |
 export function endPlan(cut: string[], kept: { skill: string; n: number }[], was: Today["skills"], now: Today["skills"]): { rows: EndRow[]; fliers: { skill: string; kind: "cut" | "ready" | "rough"; row: number }[] } {
   const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
   const up = (id: string) => (of(now, id)?.level ?? 0) > (of(was, id)?.level ?? of(now, id)?.level ?? 0);
-  const ids = [...new Set([...cut, ...kept.map((k) => k.skill)])].filter((id) => of(now, id));
+  // A memory filed under no skill has its line too, named as the review picker names it, with no level.
+  const ids = [...new Set([...cut, ...kept.map((k) => k.skill)])];
   const rows = ids.map((id) => {
     const c = cut.filter((x) => x === id).length, n = Math.max(c, kept.find((k) => k.skill === id)?.n ?? 0);
-    const near = Math.min(of(now, id)!.ready, n - c);
+    const near = Math.min(of(now, id)?.ready ?? 0, n - c);
     const line = [...Array<"cut">(c).fill("cut"), ...Array<"ready">(near).fill("ready"), ...Array<"rough">(n - c - near).fill("rough")];
     return { skill: id, cut: c, kept: n, slots: line.slice(0, LINE), first: 0, solo: false };
   }).sort((x, y) => Number(up(y.skill)) - Number(up(x.skill)) || y.cut - x.cut || y.kept - x.kept);
@@ -109,8 +110,11 @@ export type EndProg = { cut: number[]; stone: number[]; shown: boolean[]; done: 
 /** Where a skill's level stands with `here` of the session's gems landed (all of them once `done`): the level,
  *  whether that is a new one, the share of the way to the next, and the share one good answer away (`soon`). */
 export function levelAt(r: EndRow, here: number, done: boolean, was: Today["skills"], now: Today["skills"]) {
-  const k = now.find((x) => x.skill === r.skill)!, b = was.find((x) => x.skill === r.skill) ?? k;
-  const count = done ? Math.max(k.peak, b.peak + r.cut) : b.peak + here;
+  const k = now.find((x) => x.skill === r.skill), b = was.find((x) => x.skill === r.skill) ?? k;
+  if (!k || !b) return { lv: 0, up: false, share: 0, since: undefined, soon: 0 };
+  // The level counts the most gems the skill has ever held, which a gem only adds to once the skill holds more
+  // than that again: one won back below its best adds nothing, and the count never passes where the day ended.
+  const count = done ? k.peak : Math.min(k.peak, Math.max(b.peak, b.solid + here));
   const lv = Math.floor(Math.sqrt(count / 5)), from = 5 * lv ** 2, next = 5 * (lv + 1) ** 2, up = lv > b.level;
   // A skill that went up filled the level it was on: its ring stays full.
   // Where the ring stood before the session, on the level it shows (the one it filled, if it went up).
@@ -175,8 +179,8 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
   const said = (r: EndRow, lv: number) => [name(r.skill), `${r.kept} kept`, r.cut > 0 && `${r.cut} became ${r.cut === 1 ? "a gem" : "gems"}`, lv > 0 && `level ${lv}`].filter(Boolean).join(" · ");
   return (
     // Its room is held from the start, so the results under it never move when it comes in.
-    <div className="end-skills" style={{ "--seen": seen } as React.CSSProperties} data-wait={!run || undefined} data-rolls={rolls || undefined}>
-      <span className="sr-only">{plan.rows.map((r) => said(r, now.find((k) => k.skill === r.skill)!.level)).join(". ")}</span>
+    <div className="end-skills" style={{ "--seen": Math.min(n, seen) } as React.CSSProperties} data-wait={!run || undefined} data-rolls={rolls || undefined}>
+      <span className="sr-only">{plan.rows.map((r) => said(r, now.find((k) => k.skill === r.skill)?.level ?? 0)).join(". ")}</span>
       <div className="end-skills-track" data-jump={(rolls && prog.done && step === 0) || undefined} style={rolls ? { transform: `translateY(${-off * MEDAL_SLOT}px)` } : undefined}>
       {(rolls && prog.done ? [...plan.rows, ...plan.rows.slice(0, seen)] : plan.rows).map((r, j) => {
         const i = j % n, s = skills.find((x) => x.id === r.skill), lv = levelAt(r, prog.cut[i]!, prog.done, was, now);

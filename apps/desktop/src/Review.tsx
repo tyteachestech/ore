@@ -1821,7 +1821,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   // time before he speaks"): once he has settled and the results are in. His voice goes with it.
   const speaks = settled && stage === "done" && (tallied || tiles.length === 0);
   useEffect(() => void (speaks && aloud && once(aloud, 0.1)), [speaks]);
-  const cheering = !!staged && prog.cut[onStage!]! > 0 && levelAt(staged, prog.cut[onStage!]!, false, b?.skills ?? [], t.skills).up;
+  const cheering = !!staged && prog.cut[onStage!]! > 0 && levelAt(staged, prog.cut[onStage!]!, false, b?.skills ?? t.skills, t.skills).up;
   const mood = nap && !fell ? "hole" : !settled ? (nap ? "pop" : "peek") : cheering ? "cheer" : endMood(said[0], { session: s, closed, napped: nap, still: still() });
   // D274: the full end screen's ring holds the day's minutes, and minutes past the goal go round again.
   // Gems the session cut are cut in the ring first (D239), then make way for the minutes; they wait for the
@@ -1876,7 +1876,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     // A gem of this skill still in the ring.
     const gemOf = (skill: string) => [...host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone])")].find((x) => x.dataset.skill === skill) ?? null;
     const take = (src: HTMLElement) => (src.setAttribute("data-gone", ""), setGoneGems((g) => [...g, Number(src.dataset.i)]));
-    const was = b?.skills ?? [];
+    const was = b?.skills ?? t0.skills;
     let t = 150;
     // A skill that won a gem has its turn in the big ring: it comes up, its gems go to the rim one on another's
     // heels, it is held a beat (longer for a new level) and goes down to its medal. So the wait grows with the
@@ -1904,7 +1904,9 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
             (host.parentElement ?? host).append(pop);
             pop.animate([{ transform: "scale(0.6)", opacity: 1 }, { transform: "scale(3.2)", opacity: 0 }], { duration: 420, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" }).onfinish = () => pop.remove();
             layer("right", { up: END_NOTES[Math.min(d, END_NOTES.length - 1)] ?? 0, level: 0.6 });
-            bump("cut", row);
+            // Its last gem stands for every gem the skill cut, also the ones past the five a line draws.
+            if (d === cuts - 1) setProg((p) => ({ ...p, cut: p.cut.map((n, i) => (i === row ? r.cut : n)) }));
+            else bump("cut", row);
             if (d === cuts - 1 && levelUp) layer("goal", { after: 0.05, level: 0.6 });
           });
         });
@@ -1979,7 +1981,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   }, [away, full, landed, onStage]);
   const [plan] = useState(() => {
     const p = lapPlan(b, t);
-    return away ? p : { ...p, from: Math.max(p.from, Math.min(p.to, p.goal || p.to)) };
+    // With no gem held in the ring the count has its whole run.
+    return away || gems.length === 0 ? p : { ...p, from: Math.max(p.from, Math.min(p.to, p.goal || p.to)) };
   });
   const lap = useLap(plan, !quick && full && away);
   const counted = lap.min === plan.to;
@@ -2021,10 +2024,10 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
             <div className="end-ring" data-staged={!!staged || onStage === -3 || undefined}>
               {ring}
               {away ? <LapCentre min={lap.min} /> : cluster}
-              {staged && <SkillStage key={staged.skill} row={staged} here={prog.cut[onStage!]!} leaving={leaving} size={END_RING} was={b?.skills ?? []} now={t.skills} skills={skills} />}
+              {staged && <SkillStage key={staged.skill} row={staged} here={prog.cut[onStage!]!} leaving={leaving} size={END_RING} was={b?.skills ?? t.skills} now={t.skills} skills={skills} />}
             </div>
           </div>
-          <SkillRows plan={rowPlan} prog={prog} was={b?.skills ?? []} now={t.skills} skills={skills} run={calm || rowsIn} />
+          <SkillRows plan={rowPlan} prog={prog} was={b?.skills ?? t.skills} now={t.skills} skills={skills} run={calm || rowsIn} />
           <Tally tiles={tiles} go={rowed} onDone={() => setTallied(true)} />
           {held}
         </>

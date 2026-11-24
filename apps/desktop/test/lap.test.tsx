@@ -111,6 +111,7 @@ test("the quick quiz keeps its small ring: no minutes in it", async () => {
 });
 
 // Tyler, 2026-11-20: the one small line was "very underwhelming. It almost looks like a subtitle rather than the reward".
+const waitingRoom = (body: Element) => body.querySelector(".end-skills")!.getAttribute("style")!;
 const str = (skill: string, solid: number, level: number, ready = 0) => ({ skill, solid, peak: solid, ready, level, next_level_at: 5 * (level + 1) ** 2 });
 // Tyler, 2026-11-23: "I don't want to read it. I want to feel it"; and of names cut short in a row of small medals: "a
 // fundementally bad layout".
@@ -141,13 +142,14 @@ test("the plan: level-ups lead, then gems, then memories kept; a line holds five
   const now = [str("a", 20, 2), str("b", 9, 1), str("c", 7, 1), str("d", 3, 0, 1)] as never, was = [str("a", 18, 1), str("b", 7, 1), str("c", 6, 1), str("d", 3, 0, 1)] as never;
   const kept = [{ skill: "d", n: 9 }, { skill: "c", n: 2 }, { skill: "b", n: 2 }, { skill: "a", n: 2 }, { skill: "gone", n: 1 }];
   const plan = endPlan(["b", "b", "a", "c"], kept, was, now);
-  // A memory filed under a skill that no longer exists has no line.
-  expect(plan.rows.map((r) => `${r.skill} ${r.cut}/${r.kept}${r.solo ? " solo" : ""}`)).toEqual(["a 1/2 solo", "b 2/2", "c 1/2", "d 0/9"]);
+  // A memory filed under no skill has its line too, last here with one memory kept; it has no level.
+  expect(plan.rows.map((r) => `${r.skill} ${r.cut}/${r.kept}${r.solo ? " solo" : ""}`)).toEqual(["a 1/2 solo", "b 2/2", "c 1/2", "d 0/9", "gone 0/1"]);
+  expect(levelAt(plan.rows[4]!, 0, true, was, now)).toMatchObject({ lv: 0, up: false, share: 0 });
   // Nine memories kept draw five stones, so the name beside them keeps its room.
   expect(plan.rows[3]!.slots).toEqual(["ready", "rough", "rough", "rough", "rough"]);
   // One flier for each stone drawn, in the lines' order.
-  expect(plan.fliers.map((f) => f.skill).join("")).toBe("aabbccddddd");
-  expect(plan.rows.map((r) => r.first)).toEqual([0, 2, 4, 6]);
+  expect(plan.fliers.map((f) => f.skill).join("")).toBe("aabbccdddddgone");
+  expect(plan.rows.map((r) => r.first)).toEqual([0, 2, 4, 6, 11]);
   // No new level: the big ring goes to the skill with most gems, and only to it.
   expect(endPlan(["b", "b", "c"], kept, now, now).rows.filter((r) => r.solo).map((r) => r.skill)).toEqual(["b"]);
   // No gem at all: no turn in the big ring.
@@ -155,6 +157,19 @@ test("the plan: level-ups lead, then gems, then memories kept; a line holds five
   // A level as the gems land: 18 solid is level 1; the second gem makes 20, level 2, and the ring it filled stays full.
   const a = plan.rows[0]!, two = { ...a, cut: 2 };
   expect([levelAt(two, 1, false, was, now).lv, levelAt(two, 1, false, was, now).up, levelAt(two, 2, false, was, now).lv, levelAt(two, 2, false, was, now).up, levelAt(two, 2, false, was, now).share]).toEqual([1, false, 2, true, 1]);
+});
+
+test("a line's level is the skill's true level: a gem won back below its best adds none, and a day with no 'before' adds nothing twice", () => {
+  // Its best was 19 gems (level 1, level 2 at 20) and it held 10; the session won one back: 11 held, best still 19.
+  const was = [{ ...str("a", 10, 1), peak: 19 }] as never, now = [{ ...str("a", 11, 1), peak: 19 }] as never;
+  const row = endPlan(["a"], [{ skill: "a", n: 1 }], was, now).rows[0]!;
+  expect([false, true].map((done) => { const l = levelAt(row, 1, done, was, now); return [l.lv, l.up]; })).toEqual([[1, false], [1, false]]);
+  // Where the day stood before is unknown: the after state stands for it, and the session's gems are not added again.
+  const after = [str("a", 18, 1)] as never, three = endPlan(["a", "a", "a"], [], after, after).rows[0]!;
+  expect([levelAt(three, 3, false, after, after).lv, levelAt(three, 3, false, after, after).up, levelAt(three, 3, true, after, after).lv]).toEqual([1, false, 1]);
+  // Six gems in one skill take it from 14 to 20, level 2: the line draws five, and the level counts all six.
+  const b6 = [str("a", 14, 1)] as never, n6 = [str("a", 20, 2)] as never, six = endPlan(Array(6).fill("a"), [], b6, n6).rows[0]!;
+  expect([six.slots.length, six.cut, levelAt(six, six.cut, false, b6, n6).up]).toEqual([5, 6, true]);
 });
 
 test("more lines than the window has room for roll like credits; Reduce Motion shows them all; the room is held until the lines come in", async () => {
@@ -168,6 +183,8 @@ test("more lines than the window has room for roll like credits; Reduce Motion s
   // Four lines in a window with room for two: they roll, and the first two stand in again after the last so the roll comes round.
   const rolling = await mount(<SkillRows plan={plan} prog={over} was={now} now={now} skills={named} run />);
   expect(rolling.querySelector(".end-skills")!.getAttribute("style")).toContain("--seen: 2");
+  // One line holds one line's room, however tall the window: no gap before the results.
+  expect(waitingRoom(await mount(<SkillRows plan={endPlan([], [{ skill: "a", n: 1 }], now, now)} prog={{ cut: [0], stone: [0], shown: [true], done: true }} was={now} now={now} skills={named} run />))).toContain("--seen: 1");
   expect([rolling.querySelectorAll(".end-skills[data-rolls]").length, rolling.querySelectorAll(".end-medal").length]).toEqual([1, 6]);
   // Until the session's stones have landed it stays on its first lines, and none is drawn twice.
   const early = await mount(<SkillRows plan={plan} prog={{ ...over, shown: plan.rows.map(() => false), done: false }} was={now} now={now} skills={named} run />);
