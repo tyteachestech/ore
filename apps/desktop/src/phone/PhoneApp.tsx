@@ -1080,8 +1080,10 @@ export function PhoneApp() {
       ).finally(refresh);
     setItems((all) => all?.filter((i) => i.course?.id !== c.id) ?? all);
     setCourse((now) => (now === c.id ? null : now));
-    notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
-    apply(true).catch((e) => notify(errorText(e), "error"));
+    // Undo waits for the Archive's answer: it brings back the lessons that answer names.
+    const write = apply(true);
+    notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true)).hold(write);
+    write.catch((e) => notify(errorText(e), "error"));
   };
   /** Writes each picked source in turn, as one step with one Undo and Redo (the Mac's `batch`). `patch` shows
    *  the result at once: the source as it will be, or null when it leaves the list. */

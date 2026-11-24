@@ -13474,6 +13474,13 @@ journey("phone: Undo of Archive course brings back the lessons it archived, not 
   await until("Undo brings back only the lesson it archived", async () => (await archivedOf()) === "false/true");
   await Bun.sleep(400);
   if ((await archivedOf()) !== "false/true") throw new Error("Undo of Archive course also brought back a lesson archived before it");
+  // Undo tapped before the Archive's answer is back: it waits for it, and still brings back the lesson it put away.
+  await page.evaluate(() => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = { course: 1500 }));
+  await press(page, course);
+  await tap(page, page.getByRole("menuitem", { name: "Archive course" }));
+  await tap(page, page.locator(".toast").filter({ hasText: "Archived “Undo course”" }).getByRole("button", { name: "Undo" }));
+  await page.evaluate(() => delete (window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW);
+  await until("a quick Undo brings back the lesson it archived", async () => (await archivedOf()) === "false/true");
 }, "phone");
 
 journey("phone: a file picked with + is read on the phone; a picture waits for the Mac's text recognition", async (page) => {
