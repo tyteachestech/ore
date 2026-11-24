@@ -5213,6 +5213,7 @@ journey("⌘K: typing keeps the list at its top, with the first result selected 
       if (at.first !== "true") throw new Error(`after typing "${key}" the first row is not selected`);
       if (at.top > 0) throw new Error(`after typing "${key}" the list is scrolled ${at.top}px down, hiding its top rows`);
     }
+    await page.keyboard.press("Escape"); // clears what he typed
     await page.keyboard.press("Escape");
     await palette.waitFor({ state: "detached" });
   } finally {
