@@ -16,6 +16,9 @@ const shared = new Map<string, string>();
 
 /** Files whose next read fails once, as lib.rs's `library_read` answers any failed read: null. */
 const unreadable = new Set<string>();
+/** Files no read ever gets (not UTF-8), and how many times each path was asked for. */
+const broken = new Set<string>();
+const asked = new Map<string, number>();
 /** How many `library_read` calls are open at once, and the most there have been. */
 const reading = { now: 0, most: 0 };
 
@@ -34,7 +37,8 @@ const invoke = async <T,>(cmd: string, args: Record<string, unknown> | Uint8Arra
     reading.most = Math.max(reading.most, ++reading.now);
     await new Promise((r) => setTimeout(r, 1));
     reading.now--;
-    return (args.paths as string[]).map((r) => (unreadable.delete(r) ? null : (folder.get(r)?.text ?? null))) as T;
+    for (const r of args.paths as string[]) asked.set(r, (asked.get(r) ?? 0) + 1);
+    return (args.paths as string[]).map((r) => (unreadable.delete(r) || broken.has(r) ? null : (folder.get(r)?.text ?? null))) as T;
   }
   if (cmd === "library_bytes") return (shared.get(args.path as string) ?? null) as T;
   if (cmd === "library_apply") {
@@ -266,4 +270,19 @@ test("a Mac edit the phone failed to read once is read on the next scan, not lef
   await rescan();
   unreadable.add("items/r-01/notes.md");
   expect(await rescan()).toBe(false);
+});
+
+test("a file that never reads is asked a few scans in a row, then again only once it changes", async () => {
+  const r = "items/r-02/doc.md";
+  broken.add(r);
+  folder.set(r, { text: "\uFFFD", mtime: ++clock });
+  for (let i = 0; i < 6; i++) await rescan();
+  expect(asked.get(r)).toBe(3);
+  mac(r, "\uFFFD\uFFFD");
+  await rescan();
+  expect(asked.get(r)).toBe(4);
+  broken.delete(r);
+  mac(r, "Readable now.");
+  await rescan();
+  expect(fs.readFileSync(`${P}/${r}`, "utf8")).toBe("Readable now.");
 });
