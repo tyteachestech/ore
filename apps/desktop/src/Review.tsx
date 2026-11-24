@@ -1867,7 +1867,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     // skills that won, not with the gems.
     rowPlan.rows.forEach((r, row) => {
       const cuts = r.slots.filter((k) => k === "cut").length, levelUp = ups.some((k) => k.skill === r.skill);
-      if (!cuts) return;
+      if (!cuts || !r.solo) return;
       at(t, () => (setLeaving(null), setOnStage(row)));
       t += 400;
       for (let d = 0; d < cuts; d++) {
@@ -1909,8 +1909,18 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     t += 260;
     let stones = 0;
     rowPlan.rows.forEach((r, row) => r.slots.forEach((kind, d) => {
-      if (kind === "cut") return;
+      if (kind === "cut" && r.solo) return;
       at(t + stones++ * 70, () => {
+        // A gem of a skill that had no turn of its own goes from where it was cut straight to its medal.
+        const src = kind === "cut" ? host.querySelector<HTMLElement>(`.review-cut > span[data-fly][data-skill="${CSS.escape(r.skill)}"]:not([data-gone])`) : null;
+        if (kind === "cut") {
+          const m = host.querySelector(`.end-medal-ring[data-row="${row}"]`)?.getBoundingClientRect();
+          if (!src || !m) return bump("cut", row);
+          const from = src.getBoundingClientRect();
+          src.setAttribute("data-gone", "");
+          src.style.visibility = "hidden";
+          return fly(r.first + d, row, from, { x: m.left + m.width / 2, y: m.top + m.height / 2 }, { big: from.width / 28, seen: true, ms: 520 }, () => (layer("right", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.5 }), bump("cut", row)));
+        }
         const medal = host.querySelector(`.end-medal-ring[data-row="${row}"]`), ring = host.querySelector(".end-ring");
         if (!medal || !ring) return bump("stone", row);
         const z = medal.getBoundingClientRect(), c = ring.getBoundingClientRect();

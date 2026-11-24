@@ -89,7 +89,7 @@ export function LapCentre({ min }: { min: number }) {
  *  A row is a skill the session fed; its line is the session's own stones for it, one per memory kept: the ones
  *  that became gems first, then the ones one good answer from a gem, then the rest. A flier is one of those,
  *  leaving the ring for its place in the line. Skills that went up lead, then by gems, then by memories kept. */
-export type EndRow = { skill: string; cut: number; kept: number; slots: ("cut" | "ready" | "rough")[]; extra: number; first: number };
+export type EndRow = { skill: string; cut: number; kept: number; slots: ("cut" | "ready" | "rough")[]; extra: number; first: number; /** It has the big ring to itself for a turn. */ solo: boolean };
 export function endPlan(cut: string[], kept: { skill: string; n: number }[], was: Today["skills"], now: Today["skills"]): { rows: EndRow[]; fliers: { skill: string; kind: "cut" | "ready" | "rough"; row: number }[]; more: number } {
   const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
   const up = (id: string) => (of(now, id)?.level ?? 0) > (of(was, id)?.level ?? of(now, id)?.level ?? 0);
@@ -98,9 +98,13 @@ export function endPlan(cut: string[], kept: { skill: string; n: number }[], was
     const c = cut.filter((x) => x === id).length, n = Math.max(c, kept.find((k) => k.skill === id)?.n ?? 0);
     const near = Math.min(of(now, id)!.ready, n - c);
     const line = [...Array<"cut">(c).fill("cut"), ...Array<"ready">(near).fill("ready"), ...Array<"rough">(n - c - near).fill("rough")];
-    return { skill: id, cut: c, kept: n, slots: line.slice(0, LINE), extra: Math.max(0, n - LINE), first: 0 };
+    return { skill: id, cut: c, kept: n, slots: line.slice(0, LINE), extra: Math.max(0, n - LINE), first: 0, solo: false };
   }).sort((x, y) => Number(up(y.skill)) - Number(up(x.skill)) || y.cut - x.cut || y.kept - x.kept);
-  const rows = all.slice(0, all.length > REEL_ROWS ? REEL_ROWS - 1 : REEL_ROWS);
+  // Every skill fed has its medal (Tyler, 2026-11-23, of a "+3" that stood for the rest: "I don't get what the +3
+  // does"); only a session wider than the row can hold leaves any out. The big ring is given to two at most,
+  // the ones that went up first, so the wait does not grow with the skills.
+  const rows = all.slice(0, REEL_ROWS);
+  rows.filter((r) => r.cut > 0).slice(0, SOLOS).forEach((r) => (r.solo = true));
   const fliers = rows.flatMap((r, row) => ((r.first = rows.slice(0, row).reduce((n, x) => n + x.slots.length, 0)), r.slots.map((kind) => ({ skill: r.skill, kind, row }))));
   return { rows, fliers, more: all.length - rows.length };
 }
@@ -154,7 +158,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
   const said = (r: EndRow, lv: number) => [name(r.skill), `${r.kept} kept`, r.cut > 0 && `${r.cut} became ${r.cut === 1 ? "a gem" : "gems"}`, lv > 0 && `level ${lv}`].filter(Boolean).join(" · ");
   return (
     // Its room is held from the start, so the results under it never move when it comes in.
-    <div className="end-skills" data-wait={!run || undefined}>
+    <div className="end-skills" data-wait={!run || undefined} data-many={plan.rows.length > 4 || undefined}>
       <span className="sr-only">{plan.rows.map((r) => said(r, now.find((k) => k.skill === r.skill)!.level)).join(". ")}</span>
       {plan.rows.map((r, i) => {
         const s = skills.find((x) => x.id === r.skill), lv = levelAt(r, prog.cut[i]!, prog.done, was, now);
@@ -180,7 +184,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
     </div>
   );
 }
-const REEL_ROWS = 3;
+const REEL_ROWS = 6, SOLOS = 2;
 /** A medal's ring, in px. */
 const MEDAL = 64;
 
