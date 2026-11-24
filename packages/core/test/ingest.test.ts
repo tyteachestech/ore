@@ -93,7 +93,7 @@ describe("ingest", () => {
     expect(item.meta.title).toBe("Make It Stick");
     expect(item.meta.author).toBe("Peter C. Brown");
     expect(item.body).toBe(
-      "<!-- chapter 1 -->\n\n# Learning Is Misunderstood\n\nRetrieval is *effortful* and **durable**.\n\n## Tips\n\n-   Space it\n-   Mix it\n\nSee chapter two.\n\n" +
+      "<!-- chapter 1 -->\n\n# Learning Is Misunderstood\n\nRetrieval is *effortful* and **durable**.\n\n## Tips\n\n-   Space it\n-   Mix it\n\n[missing figure: figure]\n\nSee chapter two.\n\n" +
         "<!-- chapter 2 -->\n\n# To Learn, Retrieve\n\nQuizzing beats rereading.\n",
     );
     expect(readFileSync(join(item.dir, "source.epub"))).toEqual(Buffer.from(epub));
@@ -190,6 +190,49 @@ describe("tracking links", () => {
       expect(findItem(lib, a.meta.id).meta.url).toBe("http://example.com/greatwork.html"); // kept as he first gave it
       // Another page of the site is another source.
       expect((await addSource(lib, "https://example.com/other.html")).kept).toBeUndefined();
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+
+  test("the same link added twice at once is one source: the second, read while the first was, finds it under the lock (F572)", async () => {
+    const lib = await tempLibrary();
+    const real = globalThis.fetch;
+    // Both reads wait until both have started, so each add has looked for the link before either saves it.
+    let release!: () => void;
+    const started = new Promise<void>((r) => (release = r));
+    let reads = 0;
+    globalThis.fetch = (async () => {
+      if (++reads === 2) release();
+      await started;
+      return new Response("# Concurrent lesson\n\nThis source should be captured only once.\n", { headers: { "content-type": "text/markdown" } });
+    }) as unknown as typeof fetch;
+    try {
+      const [a, b] = await Promise.all([addSource(lib, "https://example.com/lesson.md"), addSource(lib, "https://example.com/lesson.md", { skills: ["ai"] })]);
+      expect(listItems(lib).length).toBe(1);
+      expect(b.meta.id).toBe(a.meta.id);
+      expect(findItem(lib, a.meta.id).meta.skills).toEqual(["ai"]);
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+
+  test("one Feed post opened twice at once stays a preview: the second open finds it under the lock and does not keep it (F572)", async () => {
+    const lib = await tempLibrary();
+    const real = globalThis.fetch;
+    let release!: () => void;
+    const started = new Promise<void>((r) => (release = r));
+    let reads = 0;
+    globalThis.fetch = (async () => {
+      if (++reads === 2) release();
+      await started;
+      return new Response("# A feed post\n\nRead as a preview, not kept yet.\n", { headers: { "content-type": "text/markdown" } });
+    }) as unknown as typeof fetch;
+    try {
+      const [a, b] = await Promise.all([addSource(lib, "https://example.com/post.md", { preview: true }), addSource(lib, "https://example.com/post.md", { preview: true })]);
+      expect(b.meta.id).toBe(a.meta.id);
+      expect(findItem(lib, a.meta.id).meta.preview).toBeTruthy();
+      expect(listItems(lib).length).toBe(0);
     } finally {
       globalThis.fetch = real;
     }

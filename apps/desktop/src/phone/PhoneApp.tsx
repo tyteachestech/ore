@@ -1069,13 +1069,21 @@ export function PhoneApp() {
     review: (s) => (setDrawer(false), setReviewing({ pick: [s.id], run: 0 })),
     edit: (s) => (setDrawer(false), setEditingSkill(s.id)),
   });
-  /** A course archived from its menu: every lesson, at once, with Undo (the Mac's course Archive). */
+  /** A course archived from its menu: every lesson, at once, with Undo (the Mac's course Archive). Undo brings
+   *  back the lessons this Archive put away, not one archived before it (F573). */
   const archiveCourse = (c: Extract<Line, { kind: "course" }>) => {
-    const apply = (on: boolean) => ore("course", "archive", c.id, ...(on ? [] : ["--undo"])).finally(refresh);
+    let changed: string[] = [];
+    const apply = (on: boolean) =>
+      (on
+        ? ore<{ lessons: string[] }>("course", "archive", c.id).then((r) => void (changed = r.lessons))
+        : ore("course", "archive", c.id, "--undo", "--lessons", changed.join(","))
+      ).finally(refresh);
     setItems((all) => all?.filter((i) => i.course?.id !== c.id) ?? all);
     setCourse((now) => (now === c.id ? null : now));
-    notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true));
-    apply(true).catch((e) => notify(errorText(e), "error"));
+    // Undo waits for the Archive's answer: it brings back the lessons that answer names.
+    const write = apply(true);
+    notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true)).hold(write);
+    write.catch((e) => notify(errorText(e), "error"));
   };
   /** Writes each picked source in turn, as one step with one Undo and Redo (the Mac's `batch`). `patch` shows
    *  the result at once: the source as it will be, or null when it leaves the list. */

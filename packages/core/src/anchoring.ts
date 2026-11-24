@@ -94,6 +94,13 @@ function contextScore(text: string, sel: Selector, start: number, end: number): 
 }
 
 export const MAX_FUZZY_ERROR_RATE = 0.25;
+// An edit to a passage is local: the text on at least one side of it still reads as it did. When the quote was
+// reworded and the text on both sides changed too, the match is another passage written alike (a deleted
+// passage's neighbour), and taking it would move a question onto words it was never about (F567).
+export const MIN_FUZZY_CONTEXT = 0.9;
+// Or the quote and both its sides, taken together, still read as they did: a few words corrected all through
+// the text. Another passage written alike differs more than that (the heron test reads 0.82).
+export const MIN_FUZZY_WINDOW = 0.85;
 
 export function anchor(text: string, sel: Selector): Anchor | null {
   if (!sel.exact) return null;
@@ -119,7 +126,17 @@ export function anchor(text: string, sel: Selector): Anchor | null {
   const best = matches
     .map((m) => ({ m, score: 50 * (1 - m.errors / sel.exact.length) + contextScore(text, sel, m.start, m.end) }))
     .sort((a, b) => b.score - a.score)[0]!;
-  return { ...refineBounds(text, sel, best.m.start, best.m.end, 2 * maxErrors), method: "fuzzy" };
+  const span = refineBounds(text, sel, best.m.start, best.m.end, 2 * maxErrors);
+  const before = text.slice(Math.max(0, span.start - sel.prefix.length), span.start);
+  const after = text.slice(span.end, span.end + sel.suffix.length);
+  // Only a side the highlight had counts: one at the document's start or end has nothing to compare.
+  const sides = [sel.prefix ? similarity(sel.prefix, before) : -1, sel.suffix ? similarity(sel.suffix, after) : -1].filter((s) => s >= 0);
+  const local = !sides.length || Math.max(...sides) >= MIN_FUZZY_CONTEXT;
+  // A text read again all through (a transcript heard again, D167; a better PDF reader) changes a few words
+  // everywhere, its sides too: then the quote and its sides, taken together, still read alike.
+  const whole = similarity(sel.prefix + sel.exact + sel.suffix, before + text.slice(span.start, span.end) + after) >= MIN_FUZZY_WINDOW;
+  if (!local && !whole) return null;
+  return { ...span, method: "fuzzy" };
 }
 
 // A minimal-edit match can stop short of (or overrun) the real passage when

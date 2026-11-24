@@ -160,8 +160,8 @@ export const itemCommands: Record<string, Command> = {
   },
 
   course: {
-    usage: "preview <url> | set <course> [--title t] [--skills a,b] | archive <course> [--undo] | lessons <course>   a course (D79): read a course link's lessons without adding them, rename it or file every lesson under these skills, archive every lesson, or list its lessons in order",
-    options: { title: { type: "string" }, skills: { type: "string" }, undo: { type: "boolean" } },
+    usage: "preview <url> | set <course> [--title t] [--skills a,b] | archive <course> [--undo] [--lessons a,b] | lessons <course>   a course (D79): read a course link's lessons without adding them, rename it or file every lesson under these skills, archive every lesson, or bring them back with --undo (--lessons: only those, the ones a step changed), or list its lessons in order",
+    options: { title: { type: "string" }, skills: { type: "string" }, undo: { type: "boolean" }, lessons: { type: "string" } },
     async run([sub, ref], f) {
       if (!["preview", "set", "archive", "lessons"].includes(sub ?? "")) throw new Error("give preview, set, archive or lessons");
       const lib = openLibrary();
@@ -184,8 +184,8 @@ export const itemCommands: Record<string, Command> = {
         return { data: out(lessons), text: `${lessons[0]!.meta.course!.title}: ${lessons.length} lessons under ${lessons[0]!.meta.skills.join(", ") || "no skill"}` };
       }
       if (sub === "archive") {
-        const n = await setCourseArchived(lib, id, !f.undo);
-        return { data: { course: id, changed: n }, text: `${f.undo ? "Restored" : "Archived"} ${n} lessons` };
+        const changed = await setCourseArchived(lib, id, !f.undo, f.lessons === undefined ? undefined : strs(f.lessons));
+        return { data: { course: id, changed: changed.length, lessons: changed }, text: `${f.undo ? "Restored" : "Archived"} ${changed.length} lessons` };
       }
       throw new Error("give preview, set, archive or lessons");
     },

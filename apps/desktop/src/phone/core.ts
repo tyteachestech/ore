@@ -240,7 +240,12 @@ export async function run<T>(args: string[], input: string | null): Promise<T> {
   try {
     const lib = await boot();
     if (args[0] === "inbox" && args.includes("--import")) await loadShared();
-    return await exclusive(() => command<T>(lib, args, input));
+    const out = await exclusive(() => command<T>(lib, args, input));
+    // window.__ORE_SLOW = { course: 800 }, as the Mac's mock reads it: that command's answer comes back that much
+    // later, its write already made, so a journey can widen a race (an Undo tapped before its step's answer).
+    const slow = (globalThis as { __ORE_SLOW?: Record<string, number> }).__ORE_SLOW?.[args[0]!];
+    if (slow) await new Promise((ok) => setTimeout(ok, slow));
+    return out;
   } finally {
     void saved().finally(() => w.__ORE_PENDING!--);
   }

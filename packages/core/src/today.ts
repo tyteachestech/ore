@@ -7,8 +7,8 @@ import { readReviews, type Review } from "./reviews.ts";
 import { readSessions } from "./sessions.ts";
 import { loadSkills, reviewSettings, unfiled } from "./skills.ts";
 import { localDay } from "./ids.ts";
-import { loadParams, nextState } from "./scheduler.ts";
-import { activeMs as active, dueQueue, medians } from "./study.ts";
+import { loadParams, merged, nextState } from "./scheduler.ts";
+import { activeMs as active, dueQueue, firstSeenToday, medians } from "./study.ts";
 
 // Home's Today and Skills (D58, D60, D62): the daily goal, what is due, and skill strength.
 
@@ -70,6 +70,13 @@ export interface Strength {
   explain: { id: string; question: string }[];
 }
 
+/** The reviews as the merged logs replay them (`merged`), at each card's retention in the index. */
+export const mergedReviews = (cards: CardRow[], reviews: Review[], w?: number[]): Review[] => {
+  const retention = new Map(cards.map((c) => [c.id, c.retention]));
+  return merged(reviews, (card) => retention.get(card), w);
+};
+
+/** `reviews` as `mergedReviews` gives them: a review's saved state is where its own device stood. */
 export function strength(cards: CardRow[], reviews: Review[], skill: string, w?: number[], now = new Date()): Strength {
   const mine = cards.filter((c) => c.state !== "retired" && c.skills.includes(skill));
   // The peak counts retired exercises too: a level, once earned, never drops (D63).
@@ -196,8 +203,9 @@ export function today(lib: Library, now = new Date()): Today {
     const estimate = queue.reduce((t, e) => t + med[e.kind], 0);
     const w = loadParams(lib);
     const skillList = loadSkills(lib).skills;
+    const history = mergedReviews(cards, reviews, w);
     const skills = skillList.map((k) => {
-      const { explain: _, ...st } = strength(cards, reviews, k.id, w, now);
+      const { explain: _, ...st } = strength(cards, history, k.id, w, now);
       return { skill: k.id, due: k.archived ? 0 : queue.filter((e) => e.skills.includes(k.id)).length, ...st };
     });
     return {
@@ -209,7 +217,7 @@ export function today(lib: Library, now = new Date()): Today {
       caught_up: caughtUp,
       due: queue.length,
       no_skill_due: queue.filter((e) => unfiled(e.skills, skillList)).length,
-      new_today: done.filter((r) => r.finishing).length,
+      new_today: firstSeenToday(reviews, day),
       new_waiting: cards.filter((c) => c.state !== "retired" && !c.fsrs).length - queue.filter((e) => !e.due && !e.relearn).length,
       exercises: cards.filter((c) => c.state !== "retired").length,
       estimate_ms: estimate,
@@ -238,14 +246,19 @@ function unreadable(index: LibraryIndex): Today["unreadable"] {
 
 /** A skill's strength from the library (for `ore stats --skill`). */
 export function skillStrength(lib: Library, skill: string, now = new Date(), open?: LibraryIndex): Strength {
-  return withIndex(lib, open, (index) => strength(index.cards(), readReviews(lib), skill, loadParams(lib), now));
+  return withIndex(lib, open, (index) => {
+    const cards = index.cards();
+    const w = loadParams(lib);
+    return strength(cards, mergedReviews(cards, readReviews(lib), w), skill, w, now);
+  });
 }
 
 /** Solid memories of a skill at the end of each of the last `weeks` weeks, oldest first (D62's growth line). */
 export function skillGrowth(lib: Library, skill: string, now = new Date(), weeks = 12, open?: LibraryIndex): { week_end: string; solid: number }[] {
   return withIndex(lib, open, (index) => {
-    const ids = new Set(index.cards().filter((c) => c.state !== "retired" && c.skills.includes(skill)).map((c) => c.id));
-    const reviews = readReviews(lib).filter((r) => ids.has(r.card));
+    const cards = index.cards();
+    const ids = new Set(cards.filter((c) => c.state !== "retired" && c.skills.includes(skill)).map((c) => c.id));
+    const reviews = mergedReviews(cards, readReviews(lib).filter((r) => ids.has(r.card)), loadParams(lib));
     return Array.from({ length: weeks }, (_, i) => {
       const end = new Date(now.getTime() - (weeks - 1 - i) * 7 * 864e5);
       const last = new Map<string, Review>();
