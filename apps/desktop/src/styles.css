@@ -2521,12 +2521,30 @@ button.home-plan:hover { color: var(--text); }
 /* Under the ring: the skills the session fed, a row each (`SkillRows`). */
 .end-skills { display: flex; justify-content: center; align-items: flex-start; width: 100%; min-height: 104px; margin: 36px auto 0; }
 .end-skills[data-wait] { visibility: hidden; }
-/* A medal: the skill's icon in the ring of its level. It steps up large, takes its stones, and settles small. */
-.end-medal { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 104px; color: var(--skill, var(--text)); transform-origin: 50% 32px; transition: transform var(--t-4) var(--ease-spring), opacity var(--t-3) var(--ease-out); animation: end-medal-in var(--t-4) var(--ease-out) both; }
-.end-medal[data-on] { transform: scale(1.8); z-index: 1; }
-.end-skills:has([data-on]) .end-medal:not([data-on]) { opacity: 0.4; }
-.end-medal { width: 120px; }
-@keyframes end-medal-in { from { width: 0; opacity: 0; } }
+/* A medal: the skill's icon in the ring of its level. Its place is held until it comes out. */
+.end-medal { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 120px; color: var(--skill, var(--text)); animation: end-medal-in var(--t-4) var(--ease-spring) both; }
+.end-medal[data-wait], .end-skills-more[data-wait] { visibility: hidden; animation: none; }
+@keyframes end-medal-in { from { transform: translateY(-28px) scale(1.6); opacity: 0; } }
+/* A skill's turn in the big ring: the ring is the skill's, its icon and level in the middle. */
+.end-ring > .ring, .end-ring > .review-cut > b { transition: opacity var(--t-3) var(--ease-out); }
+.end-ring[data-staged] > .ring, .end-ring[data-staged] > .review-cut > b { opacity: 0; }
+.review-cut > span[data-off] { opacity: 0; }
+.review-cut > span { transition: opacity var(--t-2) var(--ease-out); }
+.end-stage { position: relative; display: grid; place-items: center; color: var(--skill, var(--text)); pointer-events: none; animation: end-stage-in var(--t-4) var(--ease-spring) both; }
+.end-stage > * { grid-area: 1 / 1; }
+.end-stage[data-leaving] { animation: end-stage-out var(--t-3) var(--ease-in, ease-in) both; }
+@keyframes end-stage-in { from { transform: scale(0.8); opacity: 0; } }
+@keyframes end-stage-out { to { transform: translateY(150px) scale(0.3); opacity: 0; } }
+.end-stage-ring[data-beat] { animation: end-ring-beat 320ms var(--ease-spring); }
+.end-stage-mid { display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0.35; transition: opacity var(--t-3) var(--ease-out); }
+.end-stage-ring[data-beat] ~ .end-stage-mid { opacity: 1; }
+.end-stage-mid > .skill-icon.glyph { width: 88px; height: 88px; -webkit-mask-size: 88px; mask-size: 88px; }
+.end-stage-mid > .skill-icon.dot { width: 28px; height: 28px; }
+.end-stage-mid > b { min-width: 34px; height: 34px; padding: 0 10px; border-radius: 999px; display: grid; place-items: center; font: 800 20px/1 var(--round); font-variant-numeric: tabular-nums; color: var(--text); border: 1px solid var(--border); }
+.end-stage-mid > b[data-flip] { color: var(--bg); background: var(--skill, var(--text)); border-color: transparent; animation: end-stage-flip 700ms var(--ease-spring); }
+@keyframes end-stage-flip { from { transform: scale(0.3); } 40% { transform: scale(1.9); } }
+.end-stage-burst { position: absolute; inset: 0; pointer-events: none; }
+.end-stage-burst i { position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 50%; background: var(--skill, var(--text)); animation: ring-throw 800ms var(--ease-out) both; --r: 101px; --far: 56px; }
 .end-medal-ring { position: relative; display: inline-grid; place-items: center; width: 64px; height: 64px; }
 .end-medal-core { width: 64px; height: 64px; }
 .end-medal-core > .skill-icon.glyph { width: 28px; height: 28px; -webkit-mask-size: 28px; mask-size: 28px; }
@@ -2534,18 +2552,13 @@ button.home-plan:hover { color: var(--text); }
 .end-medal-core[data-beat] { animation: end-ring-beat 320ms var(--ease-spring); }
 @keyframes end-ring-beat { 35% { transform: scale(1.16); } }
 .end-medal-ring .gem-ring-lv { color: var(--text); font-size: 11px; }
-.end-medal-ring .gem-ring-lv[data-flip] { color: var(--bg); background: var(--skill, var(--text)); border-color: transparent; animation: end-lv-flip var(--t-moment) var(--ease-spring); }
-@keyframes end-lv-flip { from { transform: translateX(-50%) scale(0.4); } 40% { transform: translateX(-50%) scale(1.7); } }
-/* A new level: the ring's dots are thrown outward, once. */
-.end-medal-burst { position: absolute; inset: 0; pointer-events: none; }
-.end-medal-burst i { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; background: var(--skill, var(--text)); animation: ring-throw var(--t-moment) var(--ease-out) both; --r: 28px; --far: 26px; }
+.end-medal-ring .gem-ring-lv[data-flip] { color: var(--bg); background: var(--skill, var(--text)); border-color: transparent; }
 .end-medal-fliers { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 .end-medal-fliers > span { position: absolute; display: grid; place-items: center; visibility: hidden; }
 .end-medal-name { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 400 12px/1.3 var(--mono); color: var(--muted); }
-.end-medal[data-on] .end-medal-name { color: var(--text); }
-.end-skills-more { align-self: center; margin: 0 0 28px 4px; font: 400 12px/1.3 var(--mono); color: var(--muted); border-radius: 4px; }
+.end-skills-more { align-self: center; margin: 0 0 28px 4px; font: 400 14px/1.3 var(--mono); color: var(--text); border-radius: 4px; }
 .end-skills-more:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
-@media (prefers-reduced-motion: reduce) { .end-medal, .end-medal * { animation: none !important; transition: none; } .end-medal-burst { display: none; } }
+@media (prefers-reduced-motion: reduce) { .end-medal, .end-medal *, .end-stage, .end-stage * { animation: none !important; transition: none; } .end-stage-burst { display: none; } }
 /* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
    Each lands in hard steps, one after another, then is still. */
 .end-tally { list-style: none; display: flex; justify-content: center; gap: 16px; margin: 20px 0 0; padding: 0; }
