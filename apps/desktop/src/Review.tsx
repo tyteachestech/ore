@@ -1849,7 +1849,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
       const view = host.querySelector(".end-skills")!.getBoundingClientRect(), mr = medal.getBoundingClientRect();
       // A line the list is not showing now takes its stone unseen; a gem bound for one leaves the ring all the
       // same, down to the foot of the list where its line will roll in.
-      if (mr.bottom < view.top + 8 || mr.top > view.bottom - 8) {
+      if (mr.bottom < view.top + 8 || mr.bottom > view.bottom) {
         if (!opts.seen) return land();
         to = { x: view.right - 40, y: view.bottom - 6 };
         opts = { ...opts, end: undefined };
@@ -1933,10 +1933,13 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         const src = kind === "cut" ? host.querySelector<HTMLElement>(`.review-cut > span[data-fly][data-skill="${CSS.escape(r.skill)}"]:not([data-gone])`) : null;
         if (kind === "cut") {
           const pip = host.querySelector(`[data-pip="${row}-${d}"]`), m = pip?.getBoundingClientRect();
-          if (!src || !m) return bump("cut", row);
-          const from = src.getBoundingClientRect();
-          take(src);
-          return fly(r.first + d, row, from, { x: m.left + m.width / 2, y: m.top + m.height / 2 }, { big: from.width / 28, seen: true, ms: 480, end: 20 / 28 }, () => (pip?.removeAttribute("data-wait"), layer("right", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.5 }), bump("cut", row)));
+          if (!m) return bump("cut", row);
+          // A gem the ring had no room to show comes from its middle, as the stones do.
+          const c = host.querySelector(".end-ring")?.getBoundingClientRect();
+          const from = src ? src.getBoundingClientRect() : c ? new DOMRect(c.left + c.width / 2 - 14, c.top + c.height / 2 - 14, 28, 28) : null;
+          if (!from) return bump("cut", row);
+          if (src) take(src);
+          return fly(r.first + d, row, from, { x: m.left + m.width / 2, y: m.top + m.height / 2 }, { big: from.width / 28, seen: !!src, ms: 480, end: 20 / 28 }, () => (pip?.removeAttribute("data-wait"), layer("right", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.5 }), bump("cut", row)));
         }
         const medal = host.querySelector(`[data-pip="${row}-${d}"]`), ring = host.querySelector(".end-ring");
         if (!medal || !ring) return bump("stone", row);
@@ -1969,7 +1972,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   }, [rowsIn, host]);
   useEffect(() => {
     if (away || !full || landed < shown.length || (fliers.length > 0 && onStage !== -1)) return;
-    const id = setTimeout(() => setAway(true), fliers.length ? 120 : pour ? 1100 : 1400 + gems.length * 90);
+    const id = setTimeout(() => setAway(true), fliers.length ? 0 : pour ? 1100 : 1400 + gems.length * 90);
     return () => clearTimeout(id);
   }, [away, full, landed, onStage]);
   const [plan] = useState(() => {

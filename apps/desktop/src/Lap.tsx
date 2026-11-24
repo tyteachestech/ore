@@ -169,7 +169,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
     if (!rolls || !prog.done) return;
     // The first ones, which had the big ring, stay a while longer before the roll begins.
     let id: ReturnType<typeof setInterval>;
-    const first = setTimeout(() => (id = setInterval(() => !document.hidden && setStep((x) => x + 1), ROLL_MS)), 1200);
+    const first = setTimeout(() => (setStep((x) => x + 1), (id = setInterval(() => !document.hidden && setStep((x) => x + 1), ROLL_MS))), 1500);
     return () => (clearTimeout(first), clearInterval(id));
   }, [rolls, prog.done]);
   // Past the last one the row is back where it began: it jumps there unseen, the first ones standing in twice.

@@ -2522,7 +2522,8 @@ button.home-plan:hover { color: var(--text); }
 .end-skills { display: flex; flex-direction: column; width: min(100%, 350px); min-height: calc(var(--seen, 3) * 60px); margin: 20px auto 0; }
 .end-skills-track { display: flex; flex-direction: column; min-width: 0; }
 /* More than three: a window three medals wide that the row rolls through, its edges fading out. */
-.end-skills[data-rolls] { height: calc(var(--seen, 3) * 60px); overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 5px, #000 calc(100% - 5px), transparent); mask-image: linear-gradient(transparent, #000 5px, #000 calc(100% - 5px), transparent); }
+/* The next line shows its top through the fade at the foot: there is more, and it is coming. */
+.end-skills[data-rolls] { height: calc(var(--seen, 3) * 60px + 14px); overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 8px, #000 calc(100% - 26px), transparent); mask-image: linear-gradient(transparent, #000 8px, #000 calc(100% - 26px), transparent); }
 .end-skills[data-rolls] .end-skills-track { transition: transform 400ms cubic-bezier(0.5, 0, 0.2, 1); }
 .end-skills[data-rolls] .end-skills-track[data-jump] { transition: none; }
 
