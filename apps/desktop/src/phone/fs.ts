@@ -296,7 +296,10 @@ function setDownloading(waiting: string[]) {
   for (const r of waiting) downloading.add(r);
 }
 
-async function read(list: Stamped[]) {
+/** Reads in `list`; how many came in. One that can't be read (gone, a failed read, not UTF-8: lib.rs answers
+ *  null for each) isn't marked as seen, so the next rescan asks again rather than keep stale text. */
+async function read(list: Stamped[]): Promise<number> {
+  let landed = 0;
   const parts: Stamped[][] = [];
   for (let i = 0; i < list.length; i += 400) parts.push(list.slice(i, i + 400));
   // Asked for together: one after another, seven parts of a 950-source library held the launch about 260 ms.
@@ -305,15 +308,16 @@ async function read(list: Stamped[]) {
     const texts = got[n]!;
     part.forEach(([r, mtime, stamp], j) => {
       if (unsent.has(r)) return;
-      // One that can't be read (not UTF-8) is still marked as seen, or every rescan would count it as changed.
-      known.set(r, stamp);
       const text = texts[j];
       if (text == null) return;
+      known.set(r, stamp);
+      landed++;
       const p = `${disk!.prefix}/${r}`;
       files.set(p, { text, mtime });
       addDirs(p);
     });
   });
+  return landed;
 }
 
 /** Reads in what changed in the folder since (the Mac's edits, through iCloud); true if anything did.
@@ -331,10 +335,11 @@ export async function rescan(): Promise<boolean> {
     files.delete(`${disk.prefix}/${r}`);
   }
   if (gone.length) pruneDirs();
-  await read(changed);
+  const landed = await read(changed);
   listOthers(scan.other);
   lastSync = Date.now();
-  return changed.length + gone.length > 0;
+  // Only what came in counts: a file that still can't be read is asked again, but changes nothing.
+  return landed + gone.length > 0;
 }
 
 /** Folders left with nothing in them (a source the Mac deleted) go, as they do on disk. */
