@@ -4,9 +4,8 @@ import type { MenuAction } from "../Menu";
 import { layoutOf, skillGroups } from "../Skills";
 import { opt, ore, type Priority, type Skill } from "../ore";
 import { isOther, tidyCollection } from "../../../../packages/core/src/collection-name";
-import { errorText, type Notify } from "../util";
-
-let arranging: Promise<unknown> = Promise.resolve();
+import { allOrNone, change } from "../change";
+import type { Notify } from "../util";
 
 /** A skill's long-press menu on the iPhone: the Mac's right-click (App.tsx skillMenu), less Delete, which stays on
  *  the Mac where a slip can't take a skill's exercises with it. Each change is at once, with Undo. With it, a
@@ -20,49 +19,38 @@ export function skillMenu({ skills, refresh, notify, open, review, edit }: {
   review: (s: Skill) => void;
   edit: (s: Skill) => void;
 }) {
-  // A failed write puts the step back (refresh) and says why; from the history it throws, so Undo says it.
-  const write = async (run: () => Promise<unknown>, fromHistory = false): Promise<boolean> => {
-    try {
-      await run();
-      return true;
-    } catch (e) {
-      if (fromHistory) throw e;
-      notify(errorText(e), "error");
-      return false;
-    } finally {
-      void refresh();
-    }
-  };
-  // One after another, as the Mac's are (App.tsx layoutWrites): an Undo tapped mid-write must land last.
-  const arrange = (layout: ReturnType<typeof layoutOf>, fromHistory = false) => {
-    const run = arranging.then(() => ore("skills", "arrange", JSON.stringify(layout)));
-    arranging = run.catch(() => {});
-    return write(() => run, fromHistory);
+  // The layout's writes go one after another, as the Mac's do (App.tsx arrange): an Undo tapped mid-write lands last.
+  /** A new layout, with Undo back to the one before. Resolves false when it was refused (a toast said why). */
+  const arrange = (message: string, after: ReturnType<typeof layoutOf>) => {
+    const before = layoutOf(skillGroups(skills));
+    return change(notify, { message, key: "sidebar layout", write: (on) => ore("skills", "arrange", JSON.stringify(on ? after : before)), settled: () => void refresh() });
   };
   const moveSkill = (s: Skill, collection: string) => {
-    const before = layoutOf(skillGroups(skills));
-    const out = before.map((g) => ({ ...g, skills: g.skills.filter((id) => id !== s.id) }));
+    const out = layoutOf(skillGroups(skills)).map((g) => ({ ...g, skills: g.skills.filter((id) => id !== s.id) }));
     const into = out.find((g) => g.collection === collection);
     const after = (into ? out.map((g) => (g === into ? { ...g, skills: [...g.skills, s.id] } : g)) : [...out, { collection, skills: [s.id] }]).filter((g) => g.skills.length);
-    void arrange(after);
-    notify(collection ? `Moved “${s.name}” to ${collection}` : `Moved “${s.name}” out of ${s.collection}`, "info", () => arrange(before, true), () => arrange(after, true));
+    void arrange(collection ? `Moved “${s.name}” to ${collection}` : `Moved “${s.name}” out of ${s.collection}`, after);
   };
-  const change = (id: string, patch: Pick<Skill, "priority" | "archived">, fromHistory = false) =>
-    write(async () => {
-      if (patch.priority) await ore("skills", "set", id, opt("priority", patch.priority));
-      if (patch.archived !== undefined) await ore("skills", "archive", id, ...(patch.archived ? [] : ["--undo"]));
-    }, fromHistory);
+  type Patch = Pick<Skill, "priority" | "archived">;
+  const set = (message: string, kind: "info" | "quiet", id: string, before: Patch, after: Patch) =>
+    void change(notify, {
+      message,
+      kind,
+      key: `skill ${id}`,
+      write: (on) =>
+        allOrNone([
+          async (to) => void ((to ? after : before).priority && (await ore("skills", "set", id, opt("priority", (to ? after : before).priority!)))),
+          async (to) => void ((to ? after : before).archived !== undefined && (await ore("skills", "archive", id, ...((to ? after : before).archived ? [] : ["--undo"])))),
+        ], on),
+      settled: () => void refresh(),
+    });
   const setImportance = (s: Skill, p: Priority) => {
     const before = { priority: s.priority ?? "P2", ...(s.archived && { archived: true }) };
     const after = { priority: p, ...(s.archived && { archived: false }) };
     if (before.priority === p && !s.archived) return;
-    void change(s.id, after);
-    notify(`${s.name}: ${LEVELS.find((l) => l.p === p)!.label}`, before.archived ? "info" : "quiet", () => change(s.id, before, true), () => change(s.id, after, true));
+    set(`${s.name}: ${LEVELS.find((l) => l.p === p)!.label}`, before.archived ? "info" : "quiet", s.id, before, after);
   };
-  const archive = (s: Skill, on: boolean) => {
-    void change(s.id, { archived: on });
-    notify(on ? `Archived “${s.name}”` : `Brought back “${s.name}”`, "info", () => change(s.id, { archived: !on }, true), () => change(s.id, { archived: on }, true));
-  };
+  const archive = (s: Skill, on: boolean) => set(on ? `Archived “${s.name}”` : `Brought back “${s.name}”`, "info", s.id, { archived: !on }, { archived: on });
   const collections = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
   /** The drawer as it shows: archived skills (D173) are out of it, so a move never swaps with one he can't see. */
   const layout = () => layoutOf(skillGroups(skills.filter((s) => !s.archived)));
@@ -76,14 +64,7 @@ export function skillMenu({ skills, refresh, notify, open, review, edit }: {
     }
     return out;
   };
-  /** A new layout, with Undo back to the one before. */
-  const relayout = (label: string, shown: ReturnType<typeof layoutOf>) => {
-    const before = layoutOf(skillGroups(skills));
-    const after = withArchived(shown);
-    const saved = arrange(after);
-    notify(label, "info", () => arrange(before, true), () => arrange(after, true)).hold(saved.then((ok) => ok || Promise.reject(new Error("not saved"))));
-    return saved;
-  };
+  const relayout = (label: string, shown: ReturnType<typeof layoutOf>) => arrange(label, withArchived(shown));
   const swap = <T,>(l: T[], i: number, j: number) => {
     const out = [...l];
     [out[i], out[j]] = [out[j]!, out[i]!];

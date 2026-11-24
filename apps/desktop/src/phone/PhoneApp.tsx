@@ -31,14 +31,15 @@ import { SkillEditor, sidebarGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
 import { LEVELS, sourceImportanceActions } from "../importance";
-import { courseThumb, pinBetween, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, whileOut, shareOpen, shareSkills, type CardSkills, type Item, type Priority, type Skill, touched } from "../ore";
+import { courseThumb, pinBetween, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, shareOpen, shareSkills, type CardSkills, type Item, type Priority, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
 import { ThumbLine } from "../Ring";
 import { useToast } from "../Toast";
 import { Working } from "../Working";
-import { count, errorText, inOrder, load, stepLanded, usable, useKeptScroll, wakeScreens, type Notify } from "../util";
+import { allOrNone, change, type Change } from "../change";
+import { count, errorText, load, stepLanded, usable, useKeptScroll, wakeScreens, type Notify } from "../util";
 
 // The reading page's Auto follows the iPhone's Light or Dark mode (D311).
 followAppearance();
@@ -656,6 +657,8 @@ export function PhoneApp() {
   };
   // Whether the library has answered for the source the saved place opens on (below, F120).
   const [startKnown, setStartKnown] = useState(!start.openId);
+  /** A change to the lists he can take back (change.ts); the lists are read again once its newest write settles. */
+  const listChange = (c: Change) => change(notify, { settled: () => void refresh(), ...c });
   const refresh = useCallback(async () => {
     try {
       const [all, sk, w] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills"), ore<Waiting[]>("inbox")]);
@@ -919,118 +922,76 @@ export function PhoneApp() {
     open(t.id);
   };
   /** Archive from the source's menu: back to the list at once, with Undo, as on the Mac. */
-  const archive = async (item: Item) => {
+  const archive = (item: Item) => {
     setOpenId(null);
-    setItems((all) => all?.filter((i) => i.id !== item.id) ?? all);
-    // Undo and Redo return the write, so a failed one goes back on the history and says why.
-    const apply = (on: boolean) => {
-      if (on) setItems((all) => all?.filter((i) => i.id !== item.id) ?? all);
-      return ore("archive", item.id, ...(on ? [] : ["--undo"])).finally(refresh);
-    };
-    notify(`Archived “${item.title}”`, "info", () => apply(false), () => apply(true));
-    try {
-      await ore("archive", item.id);
-    } catch (e) {
-      notify(errorText(e), "error");
-    }
-    void refresh();
+    void listChange({
+      message: `Archived “${item.title}”`,
+      key: item.id,
+      show: (on) => setItems((all) => (on ? all?.filter((i) => i.id !== item.id) : all && (all.some((i) => i.id === item.id) ? all : [item, ...all])) ?? all),
+      write: (on) => ore("archive", item.id, ...(on ? [] : ["--undo"])),
+    });
   };
-  const moveTo = async (item: Item, to: Item["status"], undoable = true) => {
-    // At once, so a swiped row doesn't come back to its old section while the write runs.
-    setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, status: to } : i)) ?? all);
-    try {
+  const moveTo = (item: Item, to: Item["status"]) =>
+    void listChange({
+      message: to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`,
+      key: item.id,
+      // At once, so a swiped row doesn't come back to its old section while the write runs.
+      show: (on) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, status: on ? to : item.status } : i)) ?? all),
       // Back to Done (an Undo): it keeps the finish date it had.
-      await whileOut(ore("status", item.id, to, ...(to === "done" && item.status === "done" && item.finished_at ? [opt("at", item.finished_at)] : [])));
-      if (undoable) notify(to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, "info", () => moveTo(item, item.status, false), () => moveTo(item, to, false));
-    } catch (e) {
-      // From the history (Undo or Redo): it puts the step back and says why.
-      if (!undoable) throw e;
-      notify(errorText(e), "error");
-    } finally {
-      void refresh();
-    }
-  };
-  const refile = async (item: Item, next: string[], before: string[], changed?: Skill, cards?: CardSkills) => {
-    try {
-      const r = await whileOut(ore<{ cards_before?: CardSkills }>("edit", item.id, "--skills", next.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : [])));
-      // Undo gives each exercise back its own skills (Codex sweep 3).
-      if (changed)
-        notify(next.includes(changed.id) ? `Filed “${item.title}” under ${changed.name}` : `Removed “${item.title}” from ${changed.name}`, "info", () => refile(item, before, next, undefined, r?.cards_before), () => refile(item, next, before));
-    } catch (e) {
-      // From the history (Undo or Redo, with no `changed`): it puts the step back and says why.
-      if (!changed) throw e;
-      notify(errorText(e), "error");
-    } finally {
-      void refresh();
-    }
+      write: (on) => ore("status", item.id, ...(on ? [to] : [item.status, ...(item.status === "done" && item.finished_at ? [opt("at", item.finished_at)] : [])])),
+    });
+  const refile = (item: Item, next: string[], before: string[], changed: Skill) => {
+    // Undo gives each exercise back its own skills (Codex sweep 3): the write says which.
+    let cards: CardSkills | undefined;
+    void listChange({
+      message: next.includes(changed.id) ? `Filed “${item.title}” under ${changed.name}` : `Removed “${item.title}” from ${changed.name}`,
+      key: item.id,
+      write: (on) =>
+        on
+          ? ore<{ cards_before?: CardSkills }>("edit", item.id, "--skills", next.join(",")).then((r) => void (cards = r?.cards_before))
+          : ore("edit", item.id, "--skills", before.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : [])),
+    });
   };
   const fileUnder = (item: Item, k: Skill) => refile(item, item.skills.includes(k.id) ? item.skills.filter((s) => s !== k.id) : [...item.skills, k.id], item.skills, k);
   /** How much a source matters, over its skills' ("" hands it back to them): at once, with Undo (the Mac's setSourceImportance). */
-  const setImportance = async (item: Item, p: Priority | "", undoable = true) => {
+  const setImportance = (item: Item, p: Priority | "") => {
     const before = item.priority ?? "";
-    setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, priority: p || undefined } : i)) ?? all);
-    const write = inOrder(item.id, () => ore("edit", item.id, opt("priority", p)));
     const said = p ? LEVELS.find((l) => l.p === p)!.label : item.skills.length ? "same as its skills" : "Normal";
-    const forget = undoable
-      ? notify(`${item.title}: ${said}`, "quiet", () => write.catch(() => {}).then(() => setImportance({ ...item, priority: p || undefined }, before, false)), () => setImportance({ ...item, priority: before || undefined }, p, false))
-      : undefined;
-    try {
-      await write;
-    } catch (e) {
-      forget?.();
-      if (!undoable) throw e;
-      notify(errorText(e), "error");
-    } finally {
-      void refresh();
-    }
+    void listChange({
+      message: `${item.title}: ${said}`,
+      kind: "quiet",
+      key: item.id,
+      show: (on) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, priority: (on ? p : before) || undefined } : i)) ?? all),
+      write: (on) => ore("edit", item.id, opt("priority", on ? p : before)),
+    });
   };
   /** From the Archive list, at once and with Undo, as archiving is. */
-  const restore = (item: Item) => {
-    setArchived((all) => all?.filter((i) => i.id !== item.id) ?? all);
-    // Undo and Redo return the write, so a failed one goes back on the history and says why.
-    const apply = (on: boolean) => ore("archive", item.id, ...(on ? [] : ["--undo"])).finally(refresh);
-    notify(`Restored “${item.title}”`, "info", () => apply(true), () => apply(false));
-    apply(false).catch((e) => notify(errorText(e), "error"));
-  };
+  const restore = (item: Item) =>
+    void listChange({
+      message: `Restored “${item.title}”`,
+      show: (on) => setArchived((all) => (on ? all?.filter((i) => i.id !== item.id) : all && (all.some((i) => i.id === item.id) ? all : [item, ...all])) ?? all),
+      write: (on) => ore("archive", item.id, ...(on ? ["--undo"] : [])),
+    });
   /** A title edited in place: at once, put back if the write fails, with Undo (the Mac's retitle). */
-  const retitle = async (item: Item, before: string, t: string, undoable = true): Promise<boolean> => {
+  const retitle = (item: Item, before: string, t: string): Promise<boolean> => {
     t = t.trim();
-    if (!t || t === before) return true;
-    setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, title: t } : i)) ?? all);
-    // On the history at once, so a quick ⌘Z takes this back, never the step before it (F146, F156); off it again if the write fails.
-    const forget = undoable ? notify(`Renamed to “${t}”`, "quiet", () => retitle(item, t, before, false), () => retitle(item, before, t, false)) : () => {};
-    try {
-      await inOrder(item.id, () => ore("edit", item.id, "--title", t));
-      return true;
-    } catch (e) {
-      forget();
-      setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, title: before } : i)) ?? all);
-      if (!undoable) throw e;
-      notify(errorText(e), "error");
-      return false;
-    } finally {
-      void refresh();
-    }
+    if (!t || t === before) return Promise.resolve(true);
+    const show = (title: string) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, title } : i)) ?? all);
+    return listChange({ message: `Renamed to “${t}”`, kind: "quiet", key: item.id, show: (on) => show(on ? t : before), write: (on) => ore("edit", item.id, "--title", on ? t : before) });
   };
   /** The pinned sources of an item's list, in their order (toReadOrder: oldest pin first). */
   const pinnedWith = (_: Item) => (items ?? []).filter((i) => i.pinned_at && !i.archived_at && i.status !== "done").sort((a, b) => a.pinned_at!.localeCompare(b.pinned_at!));
   /** Moves a pinned source up or down among the pinned, with Undo (the Mac's pinMoves, parity). */
-  const movePinned = async (item: Item, to: number) => {
+  const movePinned = (item: Item, to: number) => {
     const rest = pinnedWith(item).filter((i) => i.id !== item.id);
     const at = pinBetween(rest[to - 1]?.pinned_at, rest[to]?.pinned_at);
-    const repin = async (t: string, fromHistory = false) => {
-      setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: t } : i)) ?? all);
-      try {
-        await ore("pin", item.id, "--at", t);
-      } catch (e) {
-        if (fromHistory) throw e;
-        notify(errorText(e), "error");
-      } finally {
-        void refresh();
-      }
-    };
-    await whileOut(repin(at));
-    notify(`Moved “${item.title}”`, "quiet", () => repin(item.pinned_at!, true), () => repin(at, true));
+    void listChange({
+      message: `Moved “${item.title}”`,
+      kind: "quiet",
+      key: item.id,
+      show: (on) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: on ? at : item.pinned_at } : i)) ?? all),
+      write: (on) => ore("pin", item.id, "--at", on ? at : item.pinned_at!),
+    });
   };
   const pinMoves = (item: Item): MenuAction[] => {
     // Only where the list is ordered by pin and holds every pinned source: Sources' To read (a skill's list shows
@@ -1044,21 +1005,17 @@ export function PhoneApp() {
     ];
   };
   /** Pins a source to the top of the Sources list, or unpins it, with Undo (the Mac's pinSource). */
-  const pin = async (item: Item, undoable = true) => {
-    const on = !item.pinned_at;
-    const set = (pinned_at: string | undefined) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at } : i)) ?? all);
-    set(on ? new Date().toISOString() : undefined);
-    try {
-      await whileOut(ore("pin", item.id, ...(on ? [] : ["--undo"])));
-      const flip = (now: boolean) => () => pin({ ...item, pinned_at: now ? "x" : undefined }, false);
-      if (undoable) notify(on ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`, "quiet", flip(on), flip(!on));
-    } catch (e) {
-      set(item.pinned_at);
-      if (!undoable) throw e;
-      notify(errorText(e), "error");
-    } finally {
-      void refresh();
-    }
+  const pin = (item: Item) => {
+    const was = item.pinned_at;
+    const now = was ? undefined : new Date().toISOString();
+    void listChange({
+      message: now ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`,
+      kind: "quiet",
+      key: item.id,
+      show: (on) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: on ? now : was } : i)) ?? all),
+      // Undoing an unpin puts it back where it was among the pinned.
+      write: (on) => ore("pin", item.id, ...(on ? (now ? [] : ["--undo"]) : was ? ["--at", was] : ["--undo"])),
+    });
   };
   const [renamingCollection, setRenamingCollection] = useState<{ collection: string; draft?: string } | null>(null);
   const menuOf = skillMenu({
@@ -1073,39 +1030,29 @@ export function PhoneApp() {
    *  back the lessons this Archive put away, not one archived before it (F573). */
   const archiveCourse = (c: Extract<Line, { kind: "course" }>) => {
     let changed: string[] = [];
-    const apply = (on: boolean) =>
-      (on
-        ? ore<{ lessons: string[] }>("course", "archive", c.id).then((r) => void (changed = r.lessons))
-        : ore("course", "archive", c.id, "--undo", "--lessons", changed.join(","))
-      ).finally(refresh);
-    setItems((all) => all?.filter((i) => i.course?.id !== c.id) ?? all);
     setCourse((now) => (now === c.id ? null : now));
-    // Undo waits for the Archive's answer: it brings back the lessons that answer names.
-    const write = apply(true);
-    notify(`Archived “${c.title}”`, "info", () => apply(false), () => apply(true)).hold(write);
-    write.catch((e) => notify(errorText(e), "error"));
+    const lessons = (items ?? []).filter((i) => i.course?.id === c.id);
+    void listChange({
+      message: `Archived “${c.title}”`,
+      show: (on) => setItems((all) => (on ? all?.filter((i) => i.course?.id !== c.id) : all && [...lessons.filter((l) => (!changed.length || changed.includes(l.id)) && !all.some((i) => i.id === l.id)), ...all]) ?? all),
+      // Undo brings back the lessons the Archive's answer names: its write waits for that answer.
+      write: (on) => (on ? ore<{ lessons: string[] }>("course", "archive", c.id).then((r) => void (changed = r.lessons)) : ore("course", "archive", c.id, "--undo", "--lessons", changed.join(","))),
+    });
   };
   /** Writes each picked source in turn, as one step with one Undo and Redo (the Mac's `batch`). `patch` shows
    *  the result at once: the source as it will be, or null when it leaves the list. */
   const batch = (sel: Item[], message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null) => {
     const ids = new Set(sel.map((i) => i.id));
-    const run = async (forward: boolean, fromHistory = false) => {
-      if (forward) {
+    setPicking(null);
+    void listChange({
+      message,
+      show: (forward) => {
+        if (!forward) return;
         if (patch) setItems((all) => all?.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) ?? all);
         else setArchived((all) => all?.filter((i) => !ids.has(i.id)) ?? all);
-      }
-      try {
-        for (const i of sel) await write(i, forward);
-      } catch (e) {
-        if (fromHistory) throw e;
-        notify(errorText(e), "error");
-      } finally {
-        void refresh();
-      }
-    };
-    setPicking(null);
-    void whileOut(run(true));
-    notify(message, "info", () => run(false, true), () => run(true, true));
+      },
+      write: (forward) => allOrNone(sel.map((i) => (on: boolean) => write(i, on)), forward),
+    });
   };
   /** What the picked sources can do together: the Mac's pick bar (Mark done or To read, Skills, Archive; Restore in Archive). */
   const manyActions = (sel: Item[]): MenuAction[] => {
