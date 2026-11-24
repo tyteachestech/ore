@@ -1923,17 +1923,20 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         // A gem of a skill that had no turn of its own goes from where it was cut straight to its medal.
         const src = kind === "cut" ? host.querySelector<HTMLElement>(`.review-cut > span[data-fly][data-skill="${CSS.escape(r.skill)}"]:not([data-gone])`) : null;
         if (kind === "cut") {
-          const m = host.querySelector(`[data-pip="${row}-${d}"]`)?.getBoundingClientRect();
+          const pip = host.querySelector(`[data-pip="${row}-${d}"]`), m = pip?.getBoundingClientRect();
           if (!src || !m) return bump("cut", row);
           const from = src.getBoundingClientRect();
           src.setAttribute("data-gone", "");
           src.style.visibility = "hidden";
-          return fly(r.first + d, row, from, { x: m.left + m.width / 2, y: m.top + m.height / 2 }, { big: from.width / 28, seen: true, ms: 480, end: 20 / 28 }, () => (layer("right", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.5 }), bump("cut", row)));
+          return fly(r.first + d, row, from, { x: m.left + m.width / 2, y: m.top + m.height / 2 }, { big: from.width / 28, seen: true, ms: 480, end: 20 / 28 }, () => (pip?.removeAttribute("data-wait"), layer("right", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.5 }), bump("cut", row)));
         }
         const medal = host.querySelector(`[data-pip="${row}-${d}"]`), ring = host.querySelector(".end-ring");
         if (!medal || !ring) return bump("stone", row);
         const z = medal.getBoundingClientRect(), c = ring.getBoundingClientRect();
         fly(r.first + d, row, new DOMRect(c.left + c.width / 2 - 10 + (d % 3 - 1) * 14, c.top + c.height / 2 - 10, 20, 20), { x: z.left + z.width / 2, y: z.top + z.height / 2 }, { big: 1.6, seen: false, ms: 420, end: 17 / 24 }, () => {
+          // Its place is lit here and now, not when the screen next draws: a busy screen left a gap between the
+          // flying stone going and its place showing.
+          medal.removeAttribute("data-wait");
           bump("stone", row);
           layer("tap", { up: END_NOTES[Math.min(row, END_NOTES.length - 1)] ?? 0, level: 0.3 });
         });
