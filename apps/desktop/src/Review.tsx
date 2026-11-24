@@ -1873,6 +1873,8 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         opts.end ? { transform: `translate(0, 0) scale(${opts.end})`, opacity: 1 } : { transform: "translate(0, 0) scale(0.3)", opacity: 0 },
       ], { duration: opts.ms, easing: "cubic-bezier(0.5, 0, 0.25, 1)" }).onfinish = () => (ghost.remove(), land());
     };
+    // A gem of this skill still in the ring.
+    const gemOf = (skill: string) => [...host.querySelectorAll<HTMLElement>(".review-cut > span[data-fly]:not([data-gone])")].find((x) => x.dataset.skill === skill) ?? null;
     const take = (src: HTMLElement) => (src.setAttribute("data-gone", ""), setGoneGems((g) => [...g, Number(src.dataset.i)]));
     const was = b?.skills ?? [];
     let t = 150;
@@ -1883,10 +1885,10 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
       const cuts = r.slots.filter((k) => k === "cut").length, levelUp = ups.some((k) => k.skill === r.skill);
       if (!cuts || !r.solo) return;
       at(t, () => (setLeaving(null), setOnStage(row)));
-      t += 220;
+      t += 200;
       for (let d = 0; d < cuts; d++) {
         at(t + d * 90, () => {
-          const src = host.querySelector<HTMLElement>(`.review-cut > span[data-fly][data-skill="${CSS.escape(r.skill)}"]:not([data-gone])`), ring = host.querySelector(".end-stage-ring");
+          const src = gemOf(r.skill), ring = host.querySelector(".end-stage-ring");
           if (!src || !ring) return bump("cut", row);
           // It lands where the ring will be lit next: the end of the skill's share with this gem in.
           const z = ring.getBoundingClientRect(), a = Math.min(1, levelAt(r, d + 1, false, was, t0.skills).share) * 2 * Math.PI - Math.PI / 2;
@@ -1903,7 +1905,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
             pop.animate([{ transform: "scale(0.6)", opacity: 1 }, { transform: "scale(3.2)", opacity: 0 }], { duration: 420, easing: "cubic-bezier(0.2, 0.7, 0.2, 1)" }).onfinish = () => pop.remove();
             layer("right", { up: END_NOTES[Math.min(d, END_NOTES.length - 1)] ?? 0, level: 0.6 });
             bump("cut", row);
-            if (d === cuts - 1 && levelUp) sfx("goal", { after: 0.05 });
+            if (d === cuts - 1 && levelUp) layer("goal", { after: 0.05, level: 0.6 });
           });
         });
       }
@@ -1915,7 +1917,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
         // Its line is there to meet it: the name and today's gems come in as it leaves, the medal as it lands.
         setProg((p) => ({ ...p, shown: p.shown.map((x, i) => x || i === row), landing: row }));
       });
-      t += 280;
+      t += 300;
       at(t, () => (setProg((p) => ({ ...p, landing: undefined })), setOnStage(-3)));
     });
     // Then every medal is out, and the rough stones go to them in one volley from the ring's middle.
@@ -1930,7 +1932,7 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
     volley.forEach(({ r, row, kind, d }) => {
       at(t + stones++ * gap, () => {
         // A gem of a skill that had no turn of its own goes from where it was cut straight to its medal.
-        const src = kind === "cut" ? host.querySelector<HTMLElement>(`.review-cut > span[data-fly][data-skill="${CSS.escape(r.skill)}"]:not([data-gone])`) : null;
+        const src = kind === "cut" ? gemOf(r.skill) : null;
         if (kind === "cut") {
           const pip = host.querySelector(`[data-pip="${row}-${d}"]`), m = pip?.getBoundingClientRect();
           if (!m) return bump("cut", row);

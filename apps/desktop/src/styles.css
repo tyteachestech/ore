@@ -2524,7 +2524,7 @@ button.home-plan:hover { color: var(--text); }
 /* More than three: a window three medals wide that the row rolls through, its edges fading out. */
 /* The next line shows its top through the fade at the foot: there is more, and it is coming. */
 .end-skills[data-rolls] { height: calc(var(--seen, 3) * 60px + 14px); overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 8px, #000 calc(100% - 26px), transparent); mask-image: linear-gradient(transparent, #000 8px, #000 calc(100% - 26px), transparent); }
-.end-skills[data-rolls] .end-skills-track { transition: transform 400ms cubic-bezier(0.5, 0, 0.2, 1); }
+.end-skills[data-rolls] .end-skills-track { transition: transform var(--t-moment) var(--ease-in-out); }
 .end-skills[data-rolls] .end-skills-track[data-jump] { transition: none; }
 
 
@@ -2536,7 +2536,7 @@ button.home-plan:hover { color: var(--text); }
 /* The one that went up a level stands a size larger, for as long as the screen is up. */
 
 
-.end-medal[data-wait], .end-skills-more[data-wait] { visibility: hidden; animation: none; }
+.end-medal[data-wait] { visibility: hidden; animation: none; }
 @keyframes end-medal-in { from { opacity: 0.4; } }
 /* A skill's turn in the big ring: the ring is the skill's, its icon and level in the middle. */
 .end-ring > .ring, .end-ring > .review-cut > b { transition: opacity var(--t-3) var(--ease-out); }
@@ -2544,12 +2544,12 @@ button.home-plan:hover { color: var(--text); }
 .review-cut > span[data-off] { opacity: 0; }
 .review-cut > span[data-gone] { visibility: hidden; }
 .review-cut > span { transition: opacity var(--t-2) var(--ease-out); }
-.end-stage { position: relative; display: grid; place-items: center; color: var(--skill, var(--text)); pointer-events: none; animation: end-stage-in 220ms var(--ease-spring) both; }
+.end-stage { position: relative; display: grid; place-items: center; color: var(--skill, var(--text)); pointer-events: none; animation: end-stage-in var(--t-3) var(--ease-spring) both; }
 .end-stage > * { grid-area: 1 / 1; }
-.end-stage[data-leaving] { animation: end-stage-out 280ms cubic-bezier(0.5, 0, 0.3, 1) both; }
+.end-stage[data-leaving] { animation: end-stage-out var(--t-4) var(--ease-in-out) both; }
 @keyframes end-stage-in { from { transform: scale(0.9); opacity: 0.6; } }
 @keyframes end-stage-out { 85% { opacity: 1; } to { transform: translate(var(--dx, 0), var(--dy, 150px)) scale(0.19); opacity: 0.6; } }
-.end-stage-ring[data-beat] { animation: end-ring-beat 320ms var(--ease-spring); }
+.end-stage-ring[data-beat] { animation: end-ring-beat var(--t-4) var(--ease-spring); }
 .end-stage-mid { display: flex; flex-direction: column; align-items: center; gap: 10px; opacity: 0.35; transition: opacity var(--t-3) var(--ease-out); }
 .end-stage-ring[data-beat] ~ .end-stage-mid { opacity: 1; }
 .end-stage-mid > .skill-icon.glyph { width: 88px; height: 88px; -webkit-mask-size: 88px; mask-size: 88px; }
@@ -2569,7 +2569,7 @@ button.home-plan:hover { color: var(--text); }
 .end-emblem ~ .end-skills ~ .review-foot { margin-top: 24px; }
 .end-medal-core > .skill-icon.glyph { width: 22px; height: 22px; -webkit-mask-size: 22px; mask-size: 22px; }
 .end-medal-core > .skill-icon.dot { width: 10px; height: 10px; }
-.end-medal-core[data-beat] { animation: end-ring-beat 320ms var(--ease-spring); }
+.end-medal-core[data-beat] { animation: end-ring-beat var(--t-4) var(--ease-spring); }
 @keyframes end-ring-beat { 35% { transform: scale(1.16); } }
 .end-medal-ring .gem-ring-lv { color: var(--text); font-size: 11px; bottom: -6px; }
 .end-medal-ring .gem-ring-lv[data-flip] { color: var(--bg); background: var(--skill, var(--text)); border-color: transparent; }
@@ -2577,20 +2577,17 @@ button.home-plan:hover { color: var(--text); }
 .end-medal-fliers > span { position: absolute; display: grid; place-items: center; visibility: hidden; }
 /* Under a medal: what today added. Before today's part of its ring is dim, today's bright. */
 .end-medal-pips { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
-.end-medal-pips > span { display: grid; place-items: center; animation: end-stone-in 320ms var(--ease-spring); }
+.end-medal-pips > span { display: grid; place-items: center; animation: end-stone-in var(--t-4) var(--ease-spring); }
 @keyframes end-stone-in { from { transform: scale(1.3); } }
 .end-medal-pips > [data-wait] { visibility: hidden; animation: none; }
 .end-medal-pips .gem[data-kind="rough"], .end-medal-pips .gem[data-kind="ready"] { opacity: 1; filter: brightness(1.5); }
 .end-medal-name[data-long] { -webkit-line-clamp: 3; font-size: 14px; line-height: 1.2; }
-.end-medal-pips > small { margin-left: 2px; font: 400 11px/1 var(--mono); color: var(--muted); }
 
 .end-medal .dot-ring .on:not(.fresh) { opacity: 0.4; }
 .end-medal .dot-ring .fresh, .end-stage .dot-ring .fresh { fill: color-mix(in oklab, var(--ring), white 35%); }
 .end-stage .dot-ring .on:not(.fresh) { opacity: 0.55; }
 
 .end-medal-name { flex: 1; font-family: var(--font); min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; text-align: left; text-wrap: balance; font-size: 16px; font-weight: 500; line-height: 1.25; color: var(--text); }
-.end-skills-more { align-self: center; margin: 0 0 28px 4px; font: 400 14px/1.3 var(--mono); color: var(--text); border-radius: 4px; }
-.end-skills-more:focus-visible { outline: 2px solid var(--focus); outline-offset: 4px; }
 @media (prefers-reduced-motion: reduce) { .end-medal, .end-medal *, .end-stage, .end-stage * { animation: none !important; transition: none; } .end-stage-burst { display: none; } }
 /* The row of results (D252): three at most, no frames; a number in the ring's dots over what it counts.
    Each lands in hard steps, one after another, then is still. */
@@ -3336,7 +3333,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .says.end-says .says-line { font-size: 15px; text-wrap: balance; }
 .phone .says.end-says .says-block { display: none; }
 @keyframes end-says-phone { from { opacity: 0; transform: translate(-50%, 6px) scale(0.96); } }
-.phone .end-skills { max-width: none; }
+.phone .end-skills { width: 100%; }
 /* The results stand in equal columns as wide as the rows over them and Done under them, so the pair is even about
    the screen's middle whatever each one's words (two tiles of unlike width, centred as a group, leaned left). */
 .phone .end-tally { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; width: 100%; margin-top: 24px; }

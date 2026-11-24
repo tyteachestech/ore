@@ -76,42 +76,31 @@ export function LapCentre({ min }: { min: number }) {
   );
 }
 
-/** Under the end screen's ring: the skills this session kept memories in, a row each (Tyler, 2026-11-20, of
- *  the one small line that took turns: "very underwhelming. It almost looks like a subtitle rather than the
- *  reward"). A row is the skill, its level as a figure of dots at the right, and under the name the way to the
- *  next level beside the memories it kept: ten dots, the ones this session lit in the skill's colour. Every row
- *  has its level, so a level never looks like something only one skill has; a skill that went up has its new
- *  level and the whole bar it filled in its colour (an independent critic, 2026-11-20: the level-up was "the
- *  quietest thing in its own row" and "+9" had no unit).
- *  One that went up leads, then the ones fed most, three at most. A memory filed under no skill is named as the
- *  review picker names it, and has no level. `was` and `now` are each skill's strength before and after. */
 /** What the end screen's rows show and what flies to them, worked out once so the screen and the flight agree.
  *  A row is a skill the session fed; its line is the session's own stones for it, one per memory kept: the ones
  *  that became gems first, then the ones one good answer from a gem, then the rest. A flier is one of those,
  *  leaving the ring for its place in the line. Skills that went up lead, then by gems, then by memories kept. */
-export type EndRow = { skill: string; cut: number; kept: number; slots: ("cut" | "ready" | "rough")[]; extra: number; first: number; /** It has the big ring to itself for a turn. */ solo: boolean };
-export function endPlan(cut: string[], kept: { skill: string; n: number }[], was: Today["skills"], now: Today["skills"]): { rows: EndRow[]; fliers: { skill: string; kind: "cut" | "ready" | "rough"; row: number }[]; more: number } {
+export type EndRow = { skill: string; cut: number; kept: number; slots: ("cut" | "ready" | "rough")[]; first: number; /** It has the big ring to itself for a turn. */ solo: boolean };
+export function endPlan(cut: string[], kept: { skill: string; n: number }[], was: Today["skills"], now: Today["skills"]): { rows: EndRow[]; fliers: { skill: string; kind: "cut" | "ready" | "rough"; row: number }[] } {
   const of = (list: Today["skills"], id: string) => list.find((k) => k.skill === id);
   const up = (id: string) => (of(now, id)?.level ?? 0) > (of(was, id)?.level ?? of(now, id)?.level ?? 0);
   const ids = [...new Set([...cut, ...kept.map((k) => k.skill)])].filter((id) => of(now, id));
-  const all = ids.map((id) => {
+  const rows = ids.map((id) => {
     const c = cut.filter((x) => x === id).length, n = Math.max(c, kept.find((k) => k.skill === id)?.n ?? 0);
     const near = Math.min(of(now, id)!.ready, n - c);
     const line = [...Array<"cut">(c).fill("cut"), ...Array<"ready">(near).fill("ready"), ...Array<"rough">(n - c - near).fill("rough")];
-    return { skill: id, cut: c, kept: n, slots: line.slice(0, LINE), extra: Math.max(0, n - LINE), first: 0, solo: false };
+    return { skill: id, cut: c, kept: n, slots: line.slice(0, LINE), first: 0, solo: false };
   }).sort((x, y) => Number(up(y.skill)) - Number(up(x.skill)) || y.cut - x.cut || y.kept - x.kept);
-  // Every skill fed has its medal (Tyler, 2026-11-23, of a "+3" that stood for the rest: "I don't get what the +3
-  // does"); only a session wider than the row can hold leaves any out. The big ring is given to two at most,
-  // the ones that went up first, so the wait does not grow with the skills.
-  const rows = all.slice(0, REEL_ROWS);
+  // Every skill fed has its line (Tyler, 2026-11-23, of a "+3" that stood for the rest: "I don't get what the +3
+  // does"). The big ring is given to two at most, so the wait does not grow with the skills.
   // The big ring is a level's: a skill that went up has it for a turn. A day with no new level gives it to the
   // one skill that won most, so every day has one turn and none is handed out unevenly.
   const risen = rows.filter((r) => r.cut > 0 && up(r.skill)).slice(0, SOLOS);
   (risen.length ? risen : rows.filter((r) => r.cut > 0).slice(0, 1)).forEach((r) => (r.solo = true));
   const fliers = rows.flatMap((r, row) => ((r.first = rows.slice(0, row).reduce((n, x) => n + x.slots.length, 0)), r.slots.map((kind) => ({ skill: r.skill, kind, row }))));
-  return { rows, fliers, more: all.length - rows.length };
+  return { rows, fliers };
 }
-/** The most stones a row's line holds; past it the line ends on "+N". */
+/** The most stones a row's line holds. */
 const LINE = 5;
 
 /** How far a session's fliers have got, row by row of its plan: the gems that have landed on the skill's ring,
@@ -175,7 +164,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
   // Past the last one the row is back where it began: it jumps there unseen, the first ones standing in twice.
   useEffect(() => {
     if (step < n) return;
-    const id = setTimeout(() => setStep(0), 400);
+    const id = setTimeout(() => setStep(0), 650);
     return () => clearTimeout(id);
   }, [step, n]);
   if (!n) return null;
@@ -218,12 +207,11 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
         );
       })}
       </div>
-      {/* A session wider than the row can hold says how many are left out. */}
-      {plan.more > 0 && <span className="end-skills-more" data-wait={!prog.shown.every(Boolean) || undefined}>+{plan.more}</span>}
     </div>
   );
 }
-const REEL_ROWS = 12, SOLOS = 2;
+/** The skills that get the big ring to themselves. */
+const SOLOS = 2;
 /** The medals the row shows at once when it rolls, a medal's place in px, and how long it rests between steps. */
 const SEEN = 3, MEDAL_SLOT = 60, ROLL_MS = 1700;
 /** A medal's ring, in px. */

@@ -6,7 +6,7 @@ import { act } from "react";
 // centre, the minutes stand alone in the ring's middle, and under the ring a row each names the skills
 // the session kept memories in.
 const w = new Window();
-for (const k of ["window", "document", "HTMLElement", "Node", "MutationObserver", "getComputedStyle", "navigator"] as const) {
+for (const k of ["window", "document", "HTMLElement", "Node", "MutationObserver", "getComputedStyle", "navigator", "DOMRect"] as const) {
   const v = (w as unknown as Record<string, unknown>)[k];
   (globalThis as Record<string, unknown>)[k] = typeof v === "function" && /^[a-z]/.test(k) ? (v as (...a: unknown[]) => unknown).bind(w) : v;
 }
@@ -16,11 +16,11 @@ let reduce = true;
 g.matchMedia = () => ({ matches: reduce, addEventListener() {}, removeEventListener() {} });
 g.requestAnimationFrame = (fn: (t: number) => void) => setTimeout(() => fn(performance.now()), 16);
 g.cancelAnimationFrame = (id: number) => clearTimeout(id);
-(w.Element.prototype as unknown as Record<string, unknown>).animate = () => ({ cancel() {} });
+(w.Element.prototype as unknown as Record<string, unknown>).animate = () => ({ cancel() {}, set onfinish(f: () => void) { setTimeout(f, 0); } }); // a flight lands at once
 const { createRoot } = await import("react-dom/client");
 const { EndScreen } = await import("../src/Review");
 const { DotRing } = await import("../src/Ring");
-const { lapPlan, overDots, lapSteps, lapTickUp, SkillRows } = await import("../src/Lap");
+const { lapPlan, overDots, lapSteps, lapTickUp, SkillRows, endPlan, levelAt } = await import("../src/Lap");
 const { TooltipProvider } = await import("@radix-ui/react-tooltip");
 
 const today = (active_min: number, o: Record<string, unknown> = {}) => ({ goal_minutes: 10, goal_ms: 600_000, active_ms: active_min * 60_000, met: active_min >= 10, counts: true, caught_up: false, new_waiting: 0, skills: [], ...o });
@@ -111,49 +111,73 @@ test("the quick quiz keeps its small ring: no minutes in it", async () => {
 });
 
 // Tyler, 2026-11-20: the one small line was "very underwhelming. It almost looks like a subtitle rather than the reward".
-const str = (skill: string, solid: number, level: number) => ({ skill, solid, peak: solid, level, next_level_at: 5 * (level + 1) ** 2 });
-test("under the ring: each skill the session fed has a row, with what it kept, its level and the way to the next", async () => {
+const str = (skill: string, solid: number, level: number, ready = 0) => ({ skill, solid, peak: solid, ready, level, next_level_at: 5 * (level + 1) ** 2 });
+// Tyler, 2026-11-23: "I don't want to read it. I want to feel it"; and of names cut short in a row of small medals: "a
+// fundementally bad layout".
+test("under the ring: each skill the session fed has a line: its medal and level, its whole name, and today's gems and stones at the right", async () => {
   // AI went from 18 solid (level 1) to 20 (level 2); Learning from 50 to 57, on level 3 (45 to 80).
-  const body = await screen(today(4, { skills: [str("ai", 18, 1), str("learning", 50, 3)] }), today(16, { skills: [str("ai", 20, 2), str("learning", 57, 3)] }));
+  const body = await screen(today(4, { skills: [str("ai", 18, 1), str("learning", 50, 3)] }), today(16, { skills: [str("ai", 20, 2), str("learning", 57, 3, 2)] }));
   // Under the ring, never in it, and above the row of results.
   expect(body.querySelectorAll(".end-ring .end-skills").length).toBe(0);
   expect(body.querySelectorAll(".end-emblem + .end-skills + .end-tally").length).toBe(1);
-  const rows = [...body.querySelectorAll(".end-skill")];
-  const dots = (r: Element) => [r.querySelectorAll(".end-skill-bar i[data-on]").length, r.querySelectorAll(".end-skill-bar i[data-new]").length, r.querySelectorAll(".end-skill-bar i").length];
-  // The skill that went up a level leads: its new level is the row's figure, and the bar it filled is all in its colour.
-  expect([rows[0]!.getAttribute("data-color"), rows[0]!.hasAttribute("data-up"), rows[0]!.textContent]).toEqual(["purple", true, "AILevel 3 kept"]);
-  expect(rows[0]!.querySelectorAll("b > .dot-number").length).toBe(1);
-  expect(dots(rows[0]!)).toEqual([0, 10, 10]);
-  // One that stayed on its level says the level all the same, and how far along it is.
-  expect([rows[1]!.hasAttribute("data-up"), rows[1]!.textContent]).toEqual([false, "LearningLevel 5 kept"]);
-  expect(dots(rows[1]!)).toEqual([1, 2, 10]);
-  // A reader gets every row at once.
-  expect(body.querySelector(".end-skills .sr-only")!.textContent).toBe("AI, 3 kept, level 2 · Learning, 5 kept");
-  // The row under it never counts the memories again.
-  expect(body.querySelector(".end-tally")?.textContent ?? "").not.toContain("kept");
-  // A session of misses has no rows.
+  const rows = [...body.querySelectorAll(".end-medal")];
+  const pips = (r: Element) => [...r.querySelectorAll(".end-medal-pips > span:not([data-wait]) .gem")].map((x) => x.getAttribute("data-kind"));
+  // The skill that went up a level leads, in its colour, its new level on the medal's rim.
+  expect([rows[0]!.getAttribute("data-color"), rows[0]!.hasAttribute("data-up"), rows[0]!.querySelector(".end-medal-name")!.textContent, rows[0]!.querySelector(".gem-ring-lv")!.textContent]).toEqual(["purple", true, "AI", "2"]);
+  // What today added stands at the right: the gem it cut, then a stone for each other memory kept.
+  expect(pips(rows[0]!)).toEqual(["cut", "rough", "rough"]);
+  // One that stayed on its level shows the level all the same; the stones one good answer from a gem come first.
+  expect([rows[1]!.hasAttribute("data-up"), rows[1]!.querySelector(".end-medal-name")!.textContent, rows[1]!.querySelector(".gem-ring-lv")!.textContent]).toEqual([false, "Learning", "3"]);
+  expect(pips(rows[1]!)).toEqual(["ready", "ready", "rough", "rough", "rough"]);
+  // No sentence in a line: the name is its only words.
+  expect(rows.map((r) => r.textContent)).toEqual(["2AI", "3Learning"]);
+  // A reader gets every line at once.
+  expect(body.querySelector(".end-skills .sr-only")!.textContent).toBe("AI · 3 kept · 1 became a gem · level 2. Learning · 5 kept · level 3");
+  // A session of misses has no lines.
   expect((await screen(today(0), today(6), { kept: 0, kept_skills: [], cut: [] })).querySelectorAll(".end-skills").length).toBe(0);
 });
 
-test("three rows at most, most fed first; no skill has no level; its room is held until the minutes have counted", async () => {
-  const kept = [{ skill: "learning", n: 5 }, { skill: "ai", n: 3 }, { skill: "x", n: 2 }, { skill: "y", n: 1 }];
-  const now = [str("learning", 50, 3), str("ai", 6, 1)] as never;
-  const body = await mount(<SkillRows kept={kept} was={now} now={now} skills={skills} run />);
-  // A memory filed under no known skill is named as the picker names it, with its colour's dot and no bar.
-  expect([...body.querySelectorAll(".end-skill")].map((r) => r.textContent)).toEqual(["LearningLevel 5 kept", "AILevel 3 kept", "No skill2 kept"]);
-  expect(body.querySelectorAll(".end-skill:nth-of-type(3) .end-skill-bar, .end-skill:nth-of-type(3) > .skill-icon.glyph, .end-skill:nth-of-type(3) > b").length).toBe(0);
-  // Nothing gained on the way to the next level lights no new dot.
-  expect(body.querySelectorAll(".end-skill-bar i[data-new]").length).toBe(0);
-  // The fourth is counted, and a reader hears them all.
-  expect(body.querySelector(".end-skills-more")!.textContent).toBe("and 1 more skill");
-  expect(body.querySelector(".end-skills .sr-only")!.textContent).toBe("Learning, 5 kept · AI, 3 kept · No skill, 2 kept · No skill, 1 kept");
-  // A skill with an icon shows it, in its colour.
-  const drawn = await mount(<SkillRows kept={[{ skill: "b", n: 1 }]} was={[]} now={[]} skills={[{ id: "b", name: "Biology", color: "green", icon: "mc:leaf" }] as never} run />);
-  expect(drawn.querySelector('.end-skill > .skill-icon.glyph[data-color="green"]')).not.toBeNull();
-  expect(drawn.querySelectorAll(".end-skills-more").length).toBe(0);
-  // Before the minutes have counted its room is held and nothing is seen.
-  const waiting = await mount(<SkillRows kept={kept} was={now} now={now} skills={skills} run={false} />);
-  expect([waiting.querySelectorAll(".end-skills[data-wait]").length, waiting.querySelectorAll(".end-skill").length]).toEqual([1, 3]);
+test("the plan: level-ups lead, then gems, then memories kept; a line holds five; the big ring goes to a new level, or to the one skill that won most", () => {
+  const now = [str("a", 20, 2), str("b", 9, 1), str("c", 7, 1), str("d", 3, 0, 1)] as never, was = [str("a", 18, 1), str("b", 7, 1), str("c", 6, 1), str("d", 3, 0, 1)] as never;
+  const kept = [{ skill: "d", n: 9 }, { skill: "c", n: 2 }, { skill: "b", n: 2 }, { skill: "a", n: 2 }, { skill: "gone", n: 1 }];
+  const plan = endPlan(["b", "b", "a", "c"], kept, was, now);
+  // A memory filed under a skill that no longer exists has no line.
+  expect(plan.rows.map((r) => `${r.skill} ${r.cut}/${r.kept}${r.solo ? " solo" : ""}`)).toEqual(["a 1/2 solo", "b 2/2", "c 1/2", "d 0/9"]);
+  // Nine memories kept draw five stones, so the name beside them keeps its room.
+  expect(plan.rows[3]!.slots).toEqual(["ready", "rough", "rough", "rough", "rough"]);
+  // One flier for each stone drawn, in the lines' order.
+  expect(plan.fliers.map((f) => f.skill).join("")).toBe("aabbccddddd");
+  expect(plan.rows.map((r) => r.first)).toEqual([0, 2, 4, 6]);
+  // No new level: the big ring goes to the skill with most gems, and only to it.
+  expect(endPlan(["b", "b", "c"], kept, now, now).rows.filter((r) => r.solo).map((r) => r.skill)).toEqual(["b"]);
+  // No gem at all: no turn in the big ring.
+  expect(endPlan([], kept, now, now).rows.some((r) => r.solo)).toBe(false);
+  // A level as the gems land: 18 solid is level 1; the second gem makes 20, level 2, and the ring it filled stays full.
+  const a = plan.rows[0]!, two = { ...a, cut: 2 };
+  expect([levelAt(two, 1, false, was, now).lv, levelAt(two, 1, false, was, now).up, levelAt(two, 2, false, was, now).lv, levelAt(two, 2, false, was, now).up, levelAt(two, 2, false, was, now).share]).toEqual([1, false, 2, true, 1]);
+});
+
+test("more lines than the window has room for roll like credits; Reduce Motion shows them all; the room is held until the lines come in", async () => {
+  const ids = ["a", "b", "c", "d"], now = ids.map((id) => str(id, 6, 1)) as never, named = ids.map((id) => ({ id, name: `Skill ${id}`, color: "green" })) as never;
+  const plan = endPlan(["a"], ids.map((skill) => ({ skill, n: 2 })), now, now);
+  const over = { cut: plan.rows.map((r) => r.cut), stone: plan.rows.map(() => 0), shown: plan.rows.map(() => true), done: true };
+  // Reduce Motion: nothing rolls, every line stands.
+  const flat = await mount(<SkillRows plan={plan} prog={over} was={now} now={now} skills={named} run />);
+  expect([flat.querySelectorAll(".end-skills[data-rolls]").length, flat.querySelectorAll(".end-medal").length]).toEqual([0, 4]);
+  reduce = false;
+  // Four lines in a window with room for two: they roll, and the first two stand in again after the last so the roll comes round.
+  const rolling = await mount(<SkillRows plan={plan} prog={over} was={now} now={now} skills={named} run />);
+  expect(rolling.querySelector(".end-skills")!.getAttribute("style")).toContain("--seen: 2");
+  expect([rolling.querySelectorAll(".end-skills[data-rolls]").length, rolling.querySelectorAll(".end-medal").length]).toEqual([1, 6]);
+  // Until the session's stones have landed it stays on its first lines, and none is drawn twice.
+  const early = await mount(<SkillRows plan={plan} prog={{ ...over, shown: plan.rows.map(() => false), done: false }} was={now} now={now} skills={named} run />);
+  expect([early.querySelectorAll(".end-medal").length, early.querySelectorAll(".end-medal[data-wait]").length]).toEqual([4, 4]);
+  // Before the lines come in their room is held and nothing is seen.
+  const waiting = await mount(<SkillRows plan={plan} prog={over} was={now} now={now} skills={named} run={false} />);
+  expect(waiting.querySelectorAll(".end-skills[data-wait]").length).toBe(1);
+  // A long name gets a third line of smaller type; no name is cut to one line.
+  const long = await mount(<SkillRows plan={endPlan([], [{ skill: "a", n: 1 }], now, now)} prog={{ cut: [0], stone: [0], shown: [true], done: true }} was={now} now={now} skills={[{ id: "a", name: "Machine learning systems design and evaluation", color: "green" }] as never} run />);
+  expect(long.querySelectorAll(".end-medal-name[data-long]").length).toBe(1);
 });
 
 // Tyler, 2026-11-20: "the alignment is off in some parts of the reward screen".
@@ -163,34 +187,33 @@ test("the ring's minutes and a result's mark are boxed to their dots, so what is
   expect(body.querySelector(".end-lap-n svg")?.getAttribute("viewBox")).toBe("1 0 10 7");
   // The calendar's sprite has three empty columns at its left and two at its right.
   expect(body.querySelector(".end-tally .end-mark")?.getAttribute("viewBox")).toBe("3 1 11 13");
-  expect(body.querySelector(".end-tally .dot-number")?.getAttribute("viewBox")).toBe("0 0 16 7");
   // "+41" ends in a 1, with an empty column at its right.
-  // A skill's level keeps its full cell, so "Level" stands in one column down the rows whatever the figure.
-  expect(body.querySelector(".end-skill .dot-number")?.getAttribute("viewBox") ?? "0 0 5 7").toBe("0 0 5 7");
+  expect(body.querySelector('.end-tally [data-key="depth"] .dot-number')?.getAttribute("viewBox")).toBe("0 0 16 7");
   const css = (await import("node:fs")).readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
   // On the iPhone the rows and the results are as wide as Done, and the results stand in equal columns.
-  expect(css).toContain(".phone .end-skills { max-width: none; }");
+  expect(css).toContain(".phone .end-skills { width: 100%; }");
   expect(css).toMatch(/\.phone \.end-tally \{ display: grid; grid-auto-flow: column; grid-auto-columns: minmax\(0, 1fr\);[^}]*width: 100%;/);
 });
 
 // D336
-test("the end screen's sounds are layered: the minutes tick as they count, each row lands a step higher, each result after them", async () => {
+test("the end screen's sounds are layered: a gem chimes on the ring, each stone taps on its line a step higher, the minutes tick as they count, each result after them", async () => {
   const { setPlayer, setSounds } = await import("../src/sfx");
   const heard: string[] = [];
   setSounds(true);
   setPlayer((id, o) => heard.push(`${id}${o.over ? "+" : ""}${Math.round(Math.log2(o.rate) * 12)}`));
   reduce = false;
-  const now = today(16, { skills: [{ skill: "ai", level: 3, solid: 45, next_level_at: 80 }, { skill: "learning", level: 1, solid: 9, next_level_at: 20 }] });
-  const was = today(4, { skills: [{ skill: "ai", level: 2, solid: 40, next_level_at: 45 }, { skill: "learning", level: 1, solid: 6, next_level_at: 20 }] });
+  const now = today(16, { skills: [str("ai", 45, 3), str("learning", 9, 1)] });
+  const was = today(4, { skills: [str("ai", 44, 2), str("learning", 6, 1)] });
   const body = await screen(was, now, { depth_days: 41 });
   for (let i = 0; i < 80 && !body.querySelector(".end-tally li:last-child:not([data-wait])"); i++) await act(async () => void (await new Promise((r) => setTimeout(r, 100))));
   setPlayer(null);
   const layers = heard.filter((h) => h.includes("+"));
-  // The minutes: a tick each, climbing.
-  expect(layers.filter((h) => h.startsWith("tap+")).slice(0, 3)).toEqual(["tap+1", "tap+2", "tap+3"]);
-  // Two rows a step apart, the level-up's chime under them, then the results' shines above both.
-  const rest = layers.filter((h) => !/^tap\+([1-9]|1[0-2])$/.test(h) || h === "tap+7");
-  expect(rest.slice(rest.indexOf("right+0"))).toEqual(["right+0", "right+2", "goal+0", "tap+7", "right+7", "tap+7", "right+9"]);
+  // The skill that went up has the big ring: its gem lands with a chime, and the new level's chime over it.
+  expect(layers.slice(0, 2)).toEqual(["right+0", "goal+0"]);
+  // Then the stones, a soft tap each as it lands on its line, each line a step higher: AI's two, Learning's five.
+  expect(layers.slice(2, 9)).toEqual(["tap+0", "tap+0", "tap+2", "tap+2", "tap+2", "tap+2", "tap+2"]);
+  // The minutes: a tick each, climbing; then the results' shines above them all.
+  expect(layers.slice(9)).toEqual(["tap+1", "tap+2", "tap+3", "tap+4", "tap+5", "tap+6", "tap+7", "right+7", "tap+7", "right+9"]);
   // The jingle still plays on its own, and takes its turn as before.
   expect(heard).toContain("done0");
 }, 15000);
