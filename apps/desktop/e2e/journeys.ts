@@ -2285,6 +2285,15 @@ journey("menus: every item of a source's right-click and ⋯ menu has an icon, i
   await page.keyboard.press("Escape");
 });
 
+journey("Collected: a new question is typed in place, with no line over it and no box (F-new-collected-ask-line)", async (page) => {
+  await openSource(page, TESTING);
+  await page.getByRole("tab", { name: "Collected" }).click();
+  await page.locator(".cp-head.question").hover();
+  await page.getByRole("button", { name: "Ask a question" }).click();
+  await askFieldIsPlain(page, page.locator(".cp"));
+  await page.keyboard.press("Escape");
+});
+
 journey("Collected: a key point he is typing survives closing its group and switching to the note and back", async (page) => {
   await openSource(page, TESTING);
   await page.getByRole("tab", { name: "Collected" }).click();
@@ -17803,6 +17812,30 @@ journey("phone: a source's Collected page has its title, as Sources and Settings
   const collected = page.locator('aside.mynotes[aria-label="Collected"]');
   await collected.waitFor();
   await collected.getByRole("heading", { level: 1, name: "Collected" }).waitFor();
+}, "phone");
+/** A new question typed in Collected sits where its row will: no line above it, no box around it, and the Questions
+ *  label as tall as its neighbours (F-new-collected-ask-line: Review's `.ask` and the skill page's `.question` styled them). */
+async function askFieldIsPlain(page: Page, panel: Locator) {
+  const field = panel.getByRole("textbox", { name: "New question" });
+  await field.waitFor();
+  const drawn = await field.evaluate((el) => {
+    const box = (e: Element) => { const s = getComputedStyle(e); return { line: s.borderTopWidth, edge: s.boxShadow, gap: s.marginTop }; };
+    const row = document.querySelector(".cp-row .cp-text")!.getBoundingClientRect();
+    return { wrap: box(el.parentElement!), field: box(el), left: el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft) - row.left, heads: [...document.querySelectorAll(".cp-head")].map((h) => h.getBoundingClientRect().height) };
+  });
+  if (drawn.wrap.line !== "0px" || drawn.wrap.gap !== "0px") throw new Error(`a line or a gap sits over the new question: ${JSON.stringify(drawn.wrap)}`);
+  if (drawn.field.line !== "0px" || drawn.field.edge !== "none") throw new Error(`the new question is typed in a box: ${JSON.stringify(drawn.field)}`);
+  if (Math.abs(drawn.left) > 0.5) throw new Error(`the new question's words start ${drawn.left}px off the rows' words`);
+  if (new Set(drawn.heads).size > 1) throw new Error(`Collected's labels are not one height: ${drawn.heads}`);
+}
+journey("phone: a new question in Collected is typed in place, with no line over it and no box (F-new-collected-ask-line)", async (page) => {
+  await phoneSource(page, TESTING);
+  await tap(page, page.locator(".phone-tools > :first-child"));
+  const collected = page.locator('aside.mynotes[aria-label="Collected"]');
+  await collected.waitFor();
+  await tap(page, collected.getByRole("button", { name: "Ask a question" }));
+  await askFieldIsPlain(page, collected);
+  await page.keyboard.press("Escape");
 }, "phone");
 journey("phone: a link typed into Add a link and left with a tap outside is there when it opens again (Codex UX sweep, D342)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Add a source", exact: true }));
