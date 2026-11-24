@@ -1,0 +1,14 @@
+
+# Your run: intake (import, reimport, anchoring)
+
+Your name is `intake`. Your folder is `{{out}}/`. Your seeded library is `{{library}}` (the phone's copy: `{{phoneLibrary}}`). Budget: about 60 minutes. Mostly core and CLI; use the pages to confirm what a learner sees. Never fetch live sites in loops: use the saved pages under `packages/core/test/fixtures/intake/` and files you make locally.
+
+Read the core promise in `CLAUDE.md` (D122) and D96 first: every source lands as one `doc.md`, whole, or is refused with the next step; a broken import is a core bug. The open gaps are the `"gap:"` cells in `packages/core/test/intake-grid.test.ts`: don't report those, look for what the grid thinks is covered and isn't.
+
+Hunt in this order, building a red loop for each suspicion:
+
+1. **Reimport keeps what hangs off a source.** `packages/core/src/anchoring.ts`, `annotations.ts`, `ingest/index.ts`, `items.ts`. Take a source of each type, add highlights (start, middle, end, across a heading, inside a table, code, math, a transcript line), notes, questions and exercises, then reimport it from its kept original, and from a changed original (a paragraph added before, a word changed inside a highlight, a heading renamed, a section moved, timestamps shifted). Fuzz edit scripts against anchoring: every highlight must land on its own words or be shown as lost, never on other words.
+2. **The same input gives the same doc.md.** Import each fixture twice, in two libraries, with a different clock and time zone, and diff: ids, dates, asset names, image paths, order of anything. Then the phone: does the phone build's in-page core produce the same doc.md and the same listing for what it imports or reads as the Mac's CLI does (a differential loop)?
+3. **Refusals and half-saves (D96).** Make files that are almost right: a PDF with no text layer, a truncated EPUB, a zip named .docx, an HTML page that is a login wall or a cookie banner, a 0-byte file, a file whose name has `/`, `:`, NFD accents or 255 bytes, an import killed mid-write (`kill -9` at random moments, in a loop). Nothing half-read may be saved; a killed import must leave the library as it was or finishable, never a source with a broken `doc.md`.
+4. **What doc.md claims.** Title, author, date, headings as the outline, images that exist on disk, tables, math, code, timestamps: write a checker that walks every source in a library and checks each claim against the files (every image link resolves, every heading is in the outline, every timestamp increases, frontmatter fields have the right types). Run it on the seeded library and on everything you import.
+5. **Deleting and archiving a source** clears what hangs off it everywhere: the index, the queue, skills' counts, backlinks (`links.ts`), courses (`courses.ts`), and a later Undo brings all of it back.
