@@ -205,7 +205,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
               <span className="end-medal-pips" aria-hidden="true">
                 {r.slots.map((kind, d) => {
                   const cuts = r.slots.filter((x) => x === "cut").length, here = prog.done || (kind === "cut" ? d < prog.cut[i]! : d - cuts < prog.stone[i]!);
-                  return <span key={d} data-pip={j < n ? `${i}-${d}` : undefined} data-wait={!here || undefined}><Gem kind={kind} size={kind === "cut" ? 20 : 14} /></span>;
+                  return <span key={d} data-pip={j < n ? `${i}-${d}` : undefined} data-wait={!here || undefined}><Gem kind={kind} size={kind === "cut" ? 20 : 17} /></span>;
                 })}
                 {r.extra > 0 && <small data-wait={!prog.done || undefined}>+{r.extra}</small>}
               </span>
@@ -221,7 +221,7 @@ export function SkillRows({ plan, prog, was, now, skills, run }: { plan: ReturnT
 }
 const REEL_ROWS = 12, SOLOS = 2;
 /** The medals the row shows at once when it rolls, a medal's place in px, and how long it rests between steps. */
-const SEEN = 3, MEDAL_SLOT = 56, ROLL_MS = 1700;
+const SEEN = 3, MEDAL_SLOT = 60, ROLL_MS = 1700;
 /** A medal's ring, in px. */
 const MEDAL = 44;
 

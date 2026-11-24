@@ -2519,21 +2519,21 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-lap-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .end-lap { animation: none; } }
 /* Under the ring: the skills the session fed, a row each (`SkillRows`). */
-.end-skills { display: flex; flex-direction: column; width: min(100%, 350px); min-height: calc(var(--seen, 3) * 56px); margin: 20px auto 0; }
+.end-skills { display: flex; flex-direction: column; width: min(100%, 350px); min-height: calc(var(--seen, 3) * 60px); margin: 20px auto 0; }
 .end-skills-track { display: flex; flex-direction: column; min-width: 0; }
 /* More than three: a window three medals wide that the row rolls through, its edges fading out. */
-.end-skills[data-rolls] { height: calc(var(--seen, 3) * 56px); overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 5px, #000 calc(100% - 5px), transparent); mask-image: linear-gradient(transparent, #000 5px, #000 calc(100% - 5px), transparent); }
+.end-skills[data-rolls] { height: calc(var(--seen, 3) * 60px); overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 5px, #000 calc(100% - 5px), transparent); mask-image: linear-gradient(transparent, #000 5px, #000 calc(100% - 5px), transparent); }
 .end-skills[data-rolls] .end-skills-track { transition: transform 400ms cubic-bezier(0.5, 0, 0.2, 1); }
 .end-skills[data-rolls] .end-skills-track[data-jump] { transition: none; }
 
 
 .end-skills[data-wait] { visibility: hidden; }
 /* A medal: the skill's icon in the ring of its level. Its place is held until it comes out. */
-.end-medal { display: flex; align-items: center; gap: 14px; flex: none; height: 48px; margin-bottom: 8px; min-width: 0; color: var(--skill, var(--text)); animation: end-medal-in var(--t-3) var(--ease-out) both; }
+.end-medal { display: flex; align-items: center; gap: 14px; flex: none; height: 52px; margin-bottom: 8px; padding-bottom: 6px; box-sizing: border-box; min-width: 0; color: var(--skill, var(--text)); animation: end-medal-in var(--t-3) var(--ease-out) both; }
 
 
 /* The one that went up a level stands a size larger, for as long as the screen is up. */
-.end-medal[data-up] .end-medal-ring { transform: scale(1.12); }
+
 
 .end-medal[data-wait], .end-skills-more[data-wait] { visibility: hidden; animation: none; }
 @keyframes end-medal-in { from { opacity: 0.4; } }
@@ -2569,7 +2569,7 @@ button.home-plan:hover { color: var(--text); }
 .end-medal-core > .skill-icon.dot { width: 10px; height: 10px; }
 .end-medal-core[data-beat] { animation: end-ring-beat 320ms var(--ease-spring); }
 @keyframes end-ring-beat { 35% { transform: scale(1.16); } }
-.end-medal-ring .gem-ring-lv { color: var(--text); font-size: 11px; }
+.end-medal-ring .gem-ring-lv { color: var(--text); font-size: 11px; bottom: -6px; }
 .end-medal-ring .gem-ring-lv[data-flip] { color: var(--bg); background: var(--skill, var(--text)); border-color: transparent; }
 .end-medal-fliers { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
 .end-medal-fliers > span { position: absolute; display: grid; place-items: center; visibility: hidden; }
@@ -2579,7 +2579,7 @@ button.home-plan:hover { color: var(--text); }
 @keyframes end-stone-in { from { transform: scale(0.4); } 55% { transform: scale(1.35); } }
 .end-medal-pips > [data-wait] { visibility: hidden; animation: none; }
 .end-medal-pips > small { margin-left: 2px; font: 400 11px/1 var(--mono); color: var(--muted); }
-.end-medal-pips .gem[data-kind="rough"], .end-medal-pips .gem[data-kind="ready"] { opacity: 0.7; }
+
 .end-medal .dot-ring .on:not(.fresh) { opacity: 0.4; }
 .end-medal .dot-ring .fresh, .end-stage .dot-ring .fresh { fill: color-mix(in oklab, var(--ring), white 35%); }
 .end-stage .dot-ring .on:not(.fresh) { opacity: 0.55; }
