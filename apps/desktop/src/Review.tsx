@@ -1917,7 +1917,6 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
       });
       t += 280;
       at(t, () => (setProg((p) => ({ ...p, landing: undefined })), setOnStage(-3)));
-      t += 30;
     });
     // Then every medal is out, and the rough stones go to them in one volley from the ring's middle.
     at(t, () => (setOnStage(-2), setProg((p) => ({ ...p, shown: p.shown.map(() => true) }))));
