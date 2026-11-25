@@ -1,0 +1,7 @@
+import {writeFileSync,appendFileSync} from 'node:fs';import {join} from 'node:path';
+import {allItems} from '../../packages/core/src/items.ts';import {listCards} from '../../packages/core/src/cards.ts';
+const root=import.meta.dir,out=join(root,'cli-timing.jsonl');writeFileSync(out,'');
+for(const size of ['large','twice-large']){const lib={root:join(root,'libs',size)},items=allItems(lib),card=listCards(lib)[0]!;
+const cmds=[['skills'],['ls'],['ls','--archived'],['today'],['stats','--skill','ai'],['due','--all','--start'],['show',card.meta.item,'--annotations'],['cards','--item',card.meta.item],['card','show',card.meta.id,'--review'],['notes',card.meta.item],['backlinks',card.meta.item],['questions','--skill','ai'],['tries','--skill','ai'],['tries','--now'],['dig','ai'],['dig','--ready'],['search','learning','--sources'],['settings'],['goal'],['inbox'],['chat'],['feed']];
+for(let run=0;run<3;run++)for(const args of cmds){const t=performance.now();const p=Bun.spawn(['bun','packages/cli/src/ore.ts',...args,'--json'],{env:{...process.env,ORE_NO_ENRICH:'1',ORE_LIBRARY:lib.root},stdout:'pipe',stderr:'pipe'});const stdout=await new Response(p.stdout).text(),stderr=await new Response(p.stderr).text();const code=await p.exited;const row={size,sources:items.length,run,args,ms:performance.now()-t,bytes:stdout.length,code,error:code?stderr:undefined};appendFileSync(out,JSON.stringify(row)+'\n');}
+console.log('[DEEP] timed',size,cmds.length,'commands x3');}
