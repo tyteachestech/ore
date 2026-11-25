@@ -374,6 +374,7 @@ function videoCards(doc: Document) {
 }
 
 async function readHtml(html: string, url: string, min: number): Promise<WebDoc> {
+  if (!html.trim()) throw new Error("This HTML file is empty. Open the page in your browser and save a fresh copy, or paste its text here.");
   // A chat shared from Claude, as the browser drew it.
   const chat = chatMarkdown(html);
   if (chat) return { title: chat.title || url, author: "Claude", published: chat.published, markdown: chat.markdown, chat: "claude" };
@@ -409,7 +410,10 @@ async function readHtml(html: string, url: string, min: number): Promise<WebDoc>
   } catch {
     // fall through to Readability
   }
-  const r = new Readability(parseHTML(html).document as unknown as Document).parse();
+  const r = (() => {
+    try { return new Readability(parseHTML(html).document as unknown as Document).parse(); }
+    catch { return null; } // malformed input follows the same actionable no-text refusal
+  })();
   if (!r?.textContent?.trim()) throw new Error(`Couldn’t find article text on ${new URL(url).host}: it may be built in the browser or need a sign-in. Open it in your browser and ${FROM_TAB}, or paste its text here instead.`);
   const paragraphs = r.textContent
     .split(/\n\s*\n/)

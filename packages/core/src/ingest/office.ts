@@ -46,7 +46,9 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
   // Code paragraphs (Word's and Pandoc's "Source Code" style) keep their lines and indent, fenced (F177);
   // comments come along at the end instead of vanishing (F187).
   const styleMap = ["p[style-name='Source Code'] => pre:separator('\\n')", "p[style-name='HTML Preformatted'] => pre:separator('\\n')", "comment-reference => sup"];
-  const { value } = await mammoth.convertToHtml(input, { convertImage, styleMap });
+  const { value } = await mammoth.convertToHtml(input, { convertImage, styleMap }).catch((cause: unknown) => {
+    throw new Error("That Word file is damaged or only partly downloaded. Download it again, or open it in Word or Pages and save a fresh copy.", { cause });
+  });
   const { document } = parseHTML(`<html><body>${value}</body></html>`);
   // A code block reads as one fenced block: its line breaks as lines, inside <code> as turndown fences it.
   for (const pre of document.querySelectorAll("pre")) pre.innerHTML = `<code>${pre.innerHTML.replace(/<br\s*\/?>/g, "\n")}</code>`;
