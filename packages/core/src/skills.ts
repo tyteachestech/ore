@@ -263,7 +263,7 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
     }
     for (const key of ["icon", "color", "collection", "hook", "goal"] as const) {
       const raw = look[key];
-      const v = raw === undefined ? undefined : key === "collection" ? collectionName(raw) : key === "hook" || key === "goal" ? raw.trim().replace(/\s+/g, " ") : raw.trim();
+      const v = raw === undefined ? undefined : key === "collection" ? collectionName(raw, loadSkills(lib).skills.filter((s) => s.id !== id).map((s) => s.collection)) : key === "hook" || key === "goal" ? raw.trim().replace(/\s+/g, " ") : raw.trim();
       if (v === undefined) continue;
       if (key === "color" && v && !SkillColor.options.includes(v as SkillColor))
         throw new Error(`color must be one of ${SkillColor.options.join("|")}`);
@@ -311,9 +311,14 @@ export function unarchiveFiled(lib: Library, ids: string[]): string[] {
 }
 
 // A collection's name as saved; a collection named Other would show as a second Other (collection-name.ts).
-function collectionName(name: string): string {
+// `others`: the collections the other skills are in. A name that differs from one of them only in its
+// capitals is refused (Tyler, 2026-11-25): saved as a second collection, "work" beside "Work" made the
+// sidebar's layout one arrangeSkills would not take again. Collections saved that way before still read.
+function collectionName(name: string, others: (string | undefined)[] = []): string {
   const c = tidyCollection(name);
   if (isOther(c)) throw new Error(`"${c}" is the name of the skills in no collection`);
+  const near = others.find((o) => o && o !== c && o.toLowerCase() === c.toLowerCase());
+  if (near && !others.includes(c)) throw new Error(`There is already a collection named "${near}". Use that name, or one that differs by more than its capitals.`);
   return c;
 }
 
@@ -367,7 +372,7 @@ export async function addSkill(lib: Library, name: string, collection = ""): Pro
     const existing = skills.find((s) => sameName(s.name, n));
     if (existing) throw new Error(`skill "${existing.name}" already exists`);
     const id = newSkillId(lib, skills, n);
-    const c = collectionName(collection);
+    const c = collectionName(collection, skills.map((s) => s.collection));
     const skill: Skill = { id, name: n, priority: NEW_SKILL_PRIORITY, ...(c ? { collection: c } : {}) };
     (doc.get("skills") as YAMLLib.YAMLSeq).add(doc.createNode(skill));
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));

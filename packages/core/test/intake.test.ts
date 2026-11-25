@@ -2638,3 +2638,14 @@ test("a Markdown file's picture that isn't beside it stays as written, never a l
   expect(item.body).toContain("![chart](img/chart.png)");
   expect(item.body).not.toContain("file:");
 });
+
+test("PowerPoint: a large figure that comes again on three slides is kept on each; only a small repeated logo is left out (office-05)", async () => {
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const deck = unzipSync(new Uint8Array(readFileSync(file("deck-pictures.pptx"))));
+  // The sample's logo, drawn as large as its figure on all three slides: a diagram each slide builds on.
+  for (const n of [1, 2, 3]) deck[`ppt/slides/slide${n}.xml`] = strToU8(strFromU8(deck[`ppt/slides/slide${n}.xml`]!).replaceAll('cx="1016000" cy="508000"', 'cx="5080000" cy="3048000"'));
+  const dir = mkdtempSync(join(tmpdir(), "ore-pptx-"));
+  writeFileSync(join(dir, "steps.pptx"), zipSync(deck));
+  const item = await addSource(await tempLibrary(), join(dir, "steps.pptx"));
+  expect(item.body.split(/<!-- slide \d+ -->/).slice(1).map((s) => images(s).length)).toEqual([2, 2, 1]);
+});

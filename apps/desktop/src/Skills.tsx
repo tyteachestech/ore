@@ -4,7 +4,7 @@ import { CaretDown, Check as CheckIcon, Plus } from "./icons";
 import { useEffect, useRef, useState, type ElementType, type MutableRefObject, type ReactNode, type RefObject, type SyntheticEvent } from "react";
 import { Hint } from "./Hint";
 import { keepKeysIn } from "./keys";
-import { isOther } from "../../../packages/core/src/collection-name";
+import { isOther, tidyCollection } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
 import { onBackdrop, Trap } from "./Trap";
 import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
@@ -440,7 +440,8 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
 function CollectionPicker({ value, collections, onPick }: { value: string; collections: string[]; onPick: (c: string) => void }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const typed = query.trim();
+  // As the library saves it (spaces run together), so "work   desk" is Work Desk, not a new collection.
+  const typed = tidyCollection(query);
   const choose = (c: string) => {
     onPick(c);
     setOpen(false);

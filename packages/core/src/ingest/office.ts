@@ -104,8 +104,12 @@ export function pptxToDoc(data: Uint8Array): OfficeDoc {
   const paths = order.map((target) => posix.join("ppt", target.replace(/^\/?ppt\//, "")));
   if (paths.some((path) => !files[path]))
     throw new Error("This PowerPoint file is missing a listed slide. Download it again or save a fresh copy in PowerPoint.");
-  // Each slide's pictures, in the order they sit on it. One on three or more slides is a logo or a
-  // footer graphic, not what the slide teaches, so it is left out.
+  // Each slide's pictures, in the order they sit on it. A small one on three or more slides is a logo or
+  // a footer graphic, not what the slide teaches, so it is left out. A large one that comes again is kept
+  // (Tyler, 2026-11-25): a figure shown step by step, or a diagram each slide adds to. Small: under a
+  // twentieth of the slide, where logos sit (the sample's is under a hundredth); one of no known size stays.
+  const [, slideW, slideH] = read("ppt/presentation.xml").match(/<p:sldSz\b[^>]*\bcx="(\d+)"[^>]*\bcy="(\d+)"/) ?? [];
+  const small = (area: number | undefined) => area !== undefined && !!slideW && area < (Number(slideW) * Number(slideH)) / 20;
   const pictures = paths.map((path) => slidePictures(read(path), read(posix.join(posix.dirname(path), "_rels", posix.basename(path) + ".rels")), posix.dirname(path)));
   const uses = new Map<string, number>();
   for (const media of pictures.map((ps) => new Set(ps.map((p) => p.media)))) for (const m of media) uses.set(m, (uses.get(m) ?? 0) + 1);
@@ -144,7 +148,7 @@ export function pptxToDoc(data: Uint8Array): OfficeDoc {
     for (const pic of pictures[i]!) {
       const ext = IMAGE_EXT[posix.extname(pic.media).slice(1).toLowerCase()];
       const data = files[pic.media];
-      if (!ext || !data || (paths.length >= 3 && uses.get(pic.media)! >= 3)) continue;
+      if (!ext || !data || (paths.length >= 3 && uses.get(pic.media)! >= 3 && small(pic.area))) continue;
       const name = assetName(data, ext);
       assets.set(name, { name, data });
       parts.push(`![${pic.alt}](assets/${name})`);
@@ -162,13 +166,14 @@ const IMAGE_EXT: Record<string, string> = { png: "png", jpg: "jpg", jpeg: "jpg",
 
 /** A slide's pictures (`<p:pic>`) in order: the media file each embeds, and its alt text unless that
  *  is only a file name ("image.png", which PowerPoint writes by default). */
-function slidePictures(xml: string, rels: string, dir: string): { media: string; alt: string }[] {
+function slidePictures(xml: string, rels: string, dir: string): { media: string; alt: string; area?: number }[] {
   const targets = new Map([...rels.matchAll(/<Relationship\b[^>]*>/g)].map((r) => [r[0].match(/Id="([^"]+)"/)?.[1], r[0].match(/Target="([^"]+)"/)?.[1]]));
   return [...xml.matchAll(/<p:pic>([\s\S]*?)<\/p:pic>/g)].flatMap((m) => {
     const target = targets.get(m[1]!.match(/<a:blip\b[^>]*r:embed="([^"]+)"/)?.[1]);
     if (!target || /^https?:/.test(target)) return [];
     const descr = xmlText(m[1]!.match(/<p:cNvPr\b[^>]*descr="([^"]*)"/)?.[1] ?? "").replace(/[\[\]\n]/g, " ").trim();
-    return [{ media: packageTarget(dir, target), alt: /^[\w -]+\.(png|jpe?g|gif|svg|emf|wmf|tiff?)$/i.test(descr) ? "" : descr }];
+    const [, w, h] = m[1]!.match(/<a:ext\b[^>]*\bcx="(\d+)"[^>]*\bcy="(\d+)"/) ?? [];
+    return [{ media: packageTarget(dir, target), alt: /^[\w -]+\.(png|jpe?g|gif|svg|emf|wmf|tiff?)$/i.test(descr) ? "" : descr, ...(w ? { area: Number(w) * Number(h) } : {}) }];
   });
 }
 
