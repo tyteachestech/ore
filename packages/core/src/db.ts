@@ -1,3 +1,5 @@
+import { tryWithLock } from "./lock.ts";
+import { skillDir } from "./skill-path.ts";
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { basename, dirname, join, relative } from "node:path";
@@ -73,7 +75,7 @@ function scan(lib: Library, dirs: Map<string, string>): FileStat[] {
   }
   // A removed skill's notes stay on disk for recovery, but out of search: they can't be opened.
   const skills = new Set(loadSkills(lib).skills.map((s) => s.id));
-  for (const s of subdirs(paths.skillNotes(lib)).filter((s) => skills.has(s))) add(join(paths.skillNotes(lib), s, "notes.md"), "skill-notes");
+  for (const s of subdirs(paths.skillNotes(lib)).filter((s) => skills.has(s))) add(join(skillDir(lib, s), "notes.md"), "skill-notes");
   for (const f of ls(paths.cards(lib))) if (/^[0-9A-HJKMNP-TV-Z]{26}\.md$/.test(f)) add(join(paths.cards(lib), f), "card");
   for (const f of ls(paths.topics(lib))) if (f.endsWith(".md")) add(join(paths.topics(lib), f), "topic");
   for (const f of ls(paths.reviews(lib))) if (f.endsWith(".jsonl")) add(join(paths.reviews(lib), f), "review");
@@ -238,45 +240,47 @@ function openDb(lib: Library): Database {
   const path = paths.index(lib);
   mkdirSync(dirname(path), { recursive: true });
   const db = new Database(path, { create: true });
-  // The app runs several `ore` processes at once (Home, a review, a background enrich): wait for a lock instead of failing.
-  db.exec("pragma busy_timeout = 5000");
-  // Switching a new file to WAL doesn't wait on busy_timeout (2 of 8 processes opening a fresh index at
-  // once failed here on Tyler's Mac), so it waits as long by hand.
-  for (const until = Date.now() + 5000; ; ) {
-    try {
-      db.exec("pragma journal_mode = wal");
-      break;
-    } catch (e) {
-      if ((e as { code?: string }).code !== "SQLITE_BUSY" || Date.now() > until) throw e;
-      Bun.sleepSync(20);
-    }
-  }
-  const version = () => {
-    try {
-      return db.query<{ value: string }, []>("select value from meta where key = 'schema'").get()?.value;
-    } catch {
-      return undefined;
-    }
-  };
-  if (version() !== SCHEMA_VERSION) {
-    // A new or outdated index is rebuilt in place under a write lock, checked again once held: deleting
-    // the file instead pulled it from under another process opening it at the same moment (first launch,
-    // or the first after an update), which failed with "disk I/O error" or "database is locked".
-    db.exec("begin immediate");
-    try {
-      if (version() !== SCHEMA_VERSION) {
-        const tables = db.query<{ name: string }, []>("select name from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like 'fts_%'").all();
-        for (const { name } of tables) db.exec(`drop table if exists "${name}"`);
-        db.exec(SCHEMA);
-        db.run("insert into meta values ('schema', ?)", [SCHEMA_VERSION]);
+  try {
+    // The app runs several `ore` processes at once (Home, a review, a background enrich): wait for a lock instead of failing.
+    db.exec("pragma busy_timeout = 5000");
+    // Switching a new file to WAL doesn't wait on busy_timeout (2 of 8 processes opening a fresh index at
+    // once failed here on Tyler's Mac), so it waits as long by hand.
+    for (const until = Date.now() + 5000; ; ) {
+      try {
+        db.exec("pragma journal_mode = wal");
+        break;
+      } catch (e) {
+        if ((e as { code?: string }).code !== "SQLITE_BUSY" || Date.now() > until) throw e;
+        Bun.sleepSync(20);
       }
-      db.exec("commit");
-    } catch (e) {
-      db.exec("rollback");
-      throw e;
     }
-  }
-  return db;
+    const version = () => {
+      try {
+        return db.query<{ value: string }, []>("select value from meta where key = 'schema'").get()?.value;
+      } catch {
+        return undefined;
+      }
+    };
+    if (version() !== SCHEMA_VERSION) {
+      // A new or outdated index is rebuilt in place under a write lock, checked again once held: deleting
+      // the file instead pulled it from under another process opening it at the same moment (first launch,
+      // or the first after an update), which failed with "disk I/O error" or "database is locked".
+      db.exec("begin immediate");
+      try {
+        if (version() !== SCHEMA_VERSION) {
+          const tables = db.query<{ name: string }, []>("select name from sqlite_master where type = 'table' and name not like 'sqlite_%' and name not like 'fts_%'").all();
+          for (const { name } of tables) db.exec(`drop table if exists "${name}"`);
+          db.exec(SCHEMA);
+          db.run("insert into meta values ('schema', ?)", [SCHEMA_VERSION]);
+        }
+        db.exec("commit");
+      } catch (e) {
+        db.exec("rollback");
+        throw e;
+      }
+    }
+    return db;
+  } catch (e) { db.close(); throw e; }
 }
 
 /** How many of a search by source get a snippet, best first: as many lines as the list's search had before it found every source. */
@@ -391,59 +395,88 @@ export interface SyncReport {
   errors: { path: string; error: string }[];
 }
 
-export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncReport } {
+function syncIndexOnce(lib: Library): { index: LibraryIndex; report: SyncReport } {
   const db = openDb(lib);
-  const known = new Map(
-    db.query<{ path: string; kind: FileKind; mtime: number; size: number }, []>("select * from files").all().map((r) => [r.path, r]),
-  );
-  const dirs = sourceDirs(lib);
-  // A folder gone or renamed away is known by the id it was indexed under.
-  const was = new Map(db.query<{ id: string; path: string }, []>("select id, path from items").all().map((r) => [dirname(join(lib.root, r.path)), r.id]));
-  const idOf = (dir: string) => dirs.get(dir) ?? was.get(dir) ?? dir.slice(-26);
-  const current = scan(lib, dirs);
-  const own = current.filter((f) => {
-    const k = known.get(f.path);
-    return !k || k.mtime !== f.mtime || k.size !== f.size;
-  });
-  // Search rows that carry their owner's name go again when it changes: a source's highlights and notes
-  // with its doc.md (its title), the skills' notes with skills.yaml (their names), so the index is a rebuild's.
-  const docs = new Set(own.filter((f) => f.kind === "doc").map((f) => dirname(f.path)));
-  const skillsChanged = own.some((f) => f.path === paths.skills(lib));
-  const mine = new Set(own);
-  const changed = current.filter((f) => mine.has(f) || ((f.kind === "ann" || f.kind === "notes") && docs.has(dirname(f.path))) || (f.kind === "skill-notes" && skillsChanged));
-  const currentPaths = new Set(current.map((f) => f.path));
-  const removed = [...known.values()].filter((k) => !currentPaths.has(k.path));
-  const report: SyncReport = { changed: changed.length, removed: removed.length, errors: [] };
-  if (changed.length || removed.length) {
-    db.transaction(() => {
-      // A write comes first so this process holds the lock before it looks: a read that another process
-      // then wrote past would fail the transaction instead of waiting its turn.
-      db.run("delete from files where path = ''");
-      // The sources he set an importance on: a change there moves their cards' retention, as a skill's does.
-      const set = () => db.query<{ p: string }, []>("select coalesce(group_concat(id || priority), '') as p from (select id, priority from items where priority is not null order by id)").get()!.p;
-      const before = set();
-      for (const k of removed) {
-        dropFile(db, lib, k.path, k.kind, idOf);
-        db.run("delete from files where path = ?", [k.path]);
-      }
-      // An empty index has no rows to drop, and each drop scans the whole search table: on a first build they cost
-      // most of its time (F84).
-      const fresh = !db.query("select 1 where exists (select 1 from fts) or exists (select 1 from items) or exists (select 1 from cards)").get();
-      for (const f of changed) {
-        // Otherwise always, not only for files this process saw before: several `ore` processes sync at once (the
-        // app's launch), and one that read the files table before another committed would index a file twice.
-        if (!fresh) dropFile(db, lib, f.path, f.kind, idOf);
-        try {
-          indexFile(db, lib, f);
-        } catch (e) {
-          report.errors.push({ path: relative(lib.root, f.path), error: errorLine(e) });
+  try {
+    const known = new Map(
+      db.query<{ path: string; kind: FileKind; mtime: number; size: number }, []>("select * from files").all().map((r) => [r.path, r]),
+    );
+    const dirs = sourceDirs(lib);
+    // A folder gone or renamed away is known by the id it was indexed under.
+    const was = new Map(db.query<{ id: string; path: string }, []>("select id, path from items").all().map((r) => [dirname(join(lib.root, r.path)), r.id]));
+    const idOf = (dir: string) => dirs.get(dir) ?? was.get(dir) ?? dir.slice(-26);
+    const current = scan(lib, dirs);
+    const own = current.filter((f) => {
+      const k = known.get(f.path);
+      return !k || k.mtime !== f.mtime || k.size !== f.size;
+    });
+    // Search rows that carry their owner's name go again when it changes: a source's highlights and notes
+    // with its doc.md (its title), the skills' notes with skills.yaml (their names), so the index is a rebuild's.
+    const docs = new Set(own.filter((f) => f.kind === "doc").map((f) => dirname(f.path)));
+    const skillsChanged = own.some((f) => f.path === paths.skills(lib));
+    const mine = new Set(own);
+    const changed = current.filter((f) => mine.has(f) || ((f.kind === "ann" || f.kind === "notes") && docs.has(dirname(f.path))) || (f.kind === "skill-notes" && skillsChanged));
+    const currentPaths = new Set(current.map((f) => f.path));
+    const removed = [...known.values()].filter((k) => !currentPaths.has(k.path));
+    const report: SyncReport = { changed: changed.length, removed: removed.length, errors: [] };
+    if (changed.length || removed.length) {
+      db.transaction(() => {
+        // A write comes first so this process holds the lock before it looks: a read that another process
+        // then wrote past would fail the transaction instead of waiting its turn.
+        db.run("delete from files where path = ''");
+        // The sources he set an importance on: a change there moves their cards' retention, as a skill's does.
+        const set = () => db.query<{ p: string }, []>("select coalesce(group_concat(id || priority), '') as p from (select id, priority from items where priority is not null order by id)").get()!.p;
+        const before = set();
+        for (const k of removed) {
+          dropFile(db, lib, k.path, k.kind, idOf);
+          db.run("delete from files where path = ?", [k.path]);
         }
-        db.run("insert or replace into files values (?,?,?,?)", [f.path, f.kind, f.mtime, f.size]);
+        // An empty index has no rows to drop, and each drop scans the whole search table: on a first build they cost
+        // most of its time (F84).
+        const fresh = !db.query("select 1 where exists (select 1 from fts) or exists (select 1 from items) or exists (select 1 from cards)").get();
+        for (const f of changed) {
+          // Otherwise always, not only for files this process saw before: several `ore` processes sync at once (the
+          // app's launch), and one that read the files table before another committed would index a file twice.
+          if (!fresh) dropFile(db, lib, f.path, f.kind, idOf);
+          try {
+            indexFile(db, lib, f);
+          } catch (e) {
+            if (corruptIndex(e)) throw e;
+            report.errors.push({ path: relative(lib.root, f.path), error: errorLine(e) });
+          }
+          db.run("insert or replace into files values (?,?,?,?)", [f.path, f.kind, f.mtime, f.size]);
+        }
+        if ([...changed, ...removed].some((f) => f.kind === "card" || f.kind === "review" || f.kind === "config") || set() !== before) recomputeStates(db, lib);
+      })();
+    }
+    return { index: new LibraryIndex(db, lib), report };
+  } catch (e) { db.close(); throw e; }
+}
+
+const corruptIndex = (e: unknown) => /^SQLITE_(CORRUPT|NOTADB)(_|$)/.test(String((e as { code?: unknown })?.code));
+
+function discardDamagedIndex(lib: Library): void {
+  const path = paths.index(lib);
+  for (const f of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(f)) unlinkSync(f);
+}
+
+export function syncIndex(lib: Library): { index: LibraryIndex; report: SyncReport } {
+  try { return syncIndexOnce(lib); }
+  catch (e) {
+    if (!corruptIndex(e)) throw e;
+    // Recheck under an exclusive repair lock: another opener may have repaired it
+    // since our failed read. Never delete a healthy replacement, or a busy index.
+    const repaired = tryWithLock(paths.index(lib) + ".repair", () => {
+      try { return syncIndexOnce(lib); }
+      catch (again) {
+        if (!corruptIndex(again)) throw again;
+        discardDamagedIndex(lib);
+        return syncIndexOnce(lib);
       }
-      if ([...changed, ...removed].some((f) => f.kind === "card" || f.kind === "review" || f.kind === "config") || set() !== before) recomputeStates(db, lib);
-    })();
+    });
+    if (!repaired) throw new Error("The search index is being repaired. Retry in a moment, or run ore reindex.");
+    return repaired;
   }
-  return { index: new LibraryIndex(db, lib), report };
 }
 
 export function openIndex(lib: Library): LibraryIndex {
@@ -475,11 +508,10 @@ export function rebuildIndex(lib: Library): SyncReport {
       db.close();
     }
   } catch (e) {
-    // An index too damaged to open ("database disk image is malformed") is deleted and built from scratch.
+    // An explicit reindex is the broad repair: an index too damaged to open is deleted and built from scratch.
     // Another `ore` holding the lock past busy_timeout leaves the file alone: deleting it fails that one.
     if (/^SQLITE_(BUSY|LOCKED)/.test(String((e as { code?: unknown }).code))) throw e;
-    const path = paths.index(lib);
-    for (const f of [path, `${path}-wal`, `${path}-shm`]) if (existsSync(f)) unlinkSync(f);
+    discardDamagedIndex(lib);
   }
   const { index, report } = syncIndex(lib);
   index.close();

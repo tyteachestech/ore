@@ -4,4 +4,6 @@ export const homedir = () => "/";
 export const tmpdir = () => "/tmp";
 export const hostname = () => "iphone";
 export const release = () => "0.0.0";
-export default { homedir, tmpdir, hostname, release };
+/** No boot to date a lock by (lock.ts): the phone's `.ore` is rebuilt each launch. */
+export const uptime = () => NaN;
+export default { homedir, tmpdir, hostname, release, uptime };

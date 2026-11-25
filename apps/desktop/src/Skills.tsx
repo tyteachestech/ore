@@ -8,7 +8,7 @@ import { isOther } from "../../../packages/core/src/collection-name";
 import { useLite } from "./Lite";
 import { onBackdrop, Trap } from "./Trap";
 import { focusFilter, IconPicker, SkillIcon, Swatches } from "./IconPicker";
-import { change } from "./change";
+import { change, valueChange } from "./change";
 import { ore, opt, type Skill, type SkillColor } from "./ore";
 import { count, load, save, settleFocus, usable, useFocusWhileMounted, type Notify } from "./util";
 
@@ -258,12 +258,13 @@ export function SkillName({ skill, as: Tag = "h1", editing = false, inputRef, co
     if (v === skill.name) return close();
     setSaving((busy.current = true));
     // One slot: a failed write's error takes the place of this toast.
-    const ok = await change(notify, {
+    const ok = await change(notify, valueChange({
+      field: `skill ${skill.id} name`, before: skill.name, after: v,
       message: `Renamed “${skill.name}” to “${v}”`,
       key: `skill ${skill.id}`,
       slot: `rename-${skill.id}`,
-      write: (on) => ore("skills", "set", skill.id, opt("name", on ? v : skill.name)).then(onRenamed),
-    });
+      write: (name) => ore("skills", "set", skill.id, opt("name", name)).then(onRenamed),
+    }));
     setSaving((busy.current = false));
     return ok && close();
   };
@@ -352,13 +353,14 @@ export function SkillEditor({ skill, rename, collections, onSaved, onClose, onDe
     const before = look[key];
     if (before === value) return;
     const what = { icon: "icon", color: "colour", collection: "collection" }[key];
-    return change(notify, {
+    return change(notify, valueChange({
+      field: `skill ${skill.id} ${key}`, before, after: value,
       message: `Changed the ${what} of ${skill.name}`,
       kind: "quiet",
       key: `skill ${skill.id}`,
-      show: (on) => setLook((l) => ({ ...l, [key]: on ? value : before })),
-      write: (on) => ore("skills", "set", skill.id, opt(key, on ? value : before)).then(onSaved),
-    });
+      show: (v) => setLook((l) => ({ ...l, [key]: v })),
+      write: (v) => ore("skills", "set", skill.id, opt(key, v)).then(onSaved),
+    }));
   };
 
   // Esc closes the editor from inside the panel, and from the body: Radix hands focus back to the

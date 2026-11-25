@@ -1,3 +1,4 @@
+import { readGuard } from "./reads";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { citedRange } from "./cite-pills";
 import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
@@ -1152,19 +1153,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const shownBodyOf = useRef<string | null>(null);
   /** Goes up on "Try again" after a failed open: the read runs once more (F299). */
   const [tries, setTries] = useState(0);
-  /** Goes up when a filing under skills starts and when it ends: a read that was out across either has skills
-   *  older than what he picked, so it keeps the ones on screen (F474). */
-  const filings = useRef(0);
+  /** Preserve skills across reads begun before or during any queued filing (F474, F631). */
+  const filings = useRef(readGuard()).current;
   useEffect(() => {
     let live = true;
-    const filedAt = filings.current;
+    const filedAt = filings.begin();
     const since = hl.reading();
     ore<Doc>("show", p.id, "--annotations").then(
       (d) => {
         if (!live) return;
         if (opened.current === p.id && shownBodyOf.current !== null && shownBodyOf.current !== d.body) return p.reload();
         shownBodyOf.current = d.body;
-        setDoc((cur) => (cur?.id === d.id && filings.current !== filedAt ? { ...d, skills: cur.skills } : d));
+        setDoc((cur) => (cur?.id === d.id && !filedAt.unchanged() ? { ...d, skills: cur.skills } : d));
         // Enrich runs once, right after `ore add`: long after that with nothing to show, it failed.
         if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || d.enrich_skipped || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);
         // Read again (a wake), what he made or changed here that is still saving stays as he has it.
@@ -1196,12 +1196,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     let n = 0;
     const t = setInterval(() => {
       if (++n > 45) return setGaveUp(true);
-      const filedAt = filings.current;
+      const filedAt = filings.begin();
       ore<Item[]>("ls").then(
         (all) => {
           const d = all.find((i) => i.id === p.id);
           if (d && (d.enriched_at || d.prequestions?.length))
-            setDoc((cur) => cur && { ...cur, prequestions: d.prequestions ?? [], skills: filings.current === filedAt ? d.skills : cur.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at });
+            setDoc((cur) => cur && { ...cur, prequestions: d.prequestions ?? [], skills: filedAt.unchanged() ? d.skills : cur.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at });
           else if (d?.enrich_error) {
             // The background run died: say why now, not after the wait runs out.
             setDoc((cur) => cur && { ...cur, enrich_error: d.enrich_error });
@@ -3197,9 +3197,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     return change(p.notify, {
       message: skills.includes(changed.id) ? `Filed under ${changed.name}` : `Removed from ${changed.name}`,
       key: id,
+      out: filings.writing,
       show: (on) => {
-        // A read of the source begun before this (its write may wait its turn) keeps the skills shown here.
-        filings.current++;
         // Undo and Redo show the list their write saves. A write that failed takes only its own skill back:
         // another filing he made meanwhile stays.
         const [to, from] = on ? [skills, before] : [before, skills];
@@ -3209,8 +3208,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       },
       write: async (on) => {
         const r = await ore<{ cards_before?: CardSkills }>("edit", id, "--skills", (on ? skills : before).join(","), ...(!on && cards ? [opt("cards", JSON.stringify(cards))] : []))
-          .catch((e) => ((refused = true), Promise.reject(e)))
-          .finally(() => filings.current++);
+          .catch((e) => ((refused = true), Promise.reject(e)));
         if (on) cards ??= r?.cards_before;
         else await p.rearchive?.(revived);
         setFiled((on ? skills : before).join());

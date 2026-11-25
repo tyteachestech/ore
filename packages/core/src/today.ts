@@ -77,7 +77,7 @@ export const mergedReviews = (cards: CardRow[], reviews: Review[], w?: number[])
 };
 
 /** `reviews` as `mergedReviews` gives them: a review's saved state is where its own device stood. */
-export function strength(cards: CardRow[], reviews: Review[], skill: string, w?: number[], now = new Date()): Strength {
+export function strength(cards: CardRow[], reviews: Review[], skill: string, w?: number[], now = new Date(), earnedPeak = 0): Strength {
   const mine = cards.filter((c) => c.state !== "retired" && c.skills.includes(skill));
   // The peak counts retired exercises too: a level, once earned, never drops (D63).
   const ids = new Set(cards.filter((c) => c.skills.includes(skill)).map((c) => c.id));
@@ -103,7 +103,7 @@ export function strength(cards: CardRow[], reviews: Review[], skill: string, w?:
   const live = mine.filter((c) => c.state === "live");
   const isSolid = (c: CardRow) => (c.fsrs?.stability ?? 0) >= SOLID_DAYS;
   const solid = live.filter(isSolid);
-  const top = Math.max(peak, solid.length);
+  const top = Math.max(earnedPeak, peak, solid.length);
   const ready = live.filter((c) => c.fsrs && !isSolid(c) && nextState(c.fsrs, new Date(Math.max(Date.parse(c.fsrs.due), now.getTime())), 3, c.retention, w).stability >= SOLID_DAYS);
   const tonight = new Date(now);
   tonight.setHours(24, 0, 0, 0);
@@ -205,7 +205,7 @@ export function today(lib: Library, now = new Date()): Today {
     const skillList = loadSkills(lib).skills;
     const history = mergedReviews(cards, reviews, w);
     const skills = skillList.map((k) => {
-      const { explain: _, ...st } = strength(cards, history, k.id, w, now);
+      const { explain: _, ...st } = strength(cards, history, k.id, w, now, k.earned_peak);
       return { skill: k.id, due: k.archived ? 0 : queue.filter((e) => e.skills.includes(k.id)).length, ...st };
     });
     return {
@@ -249,7 +249,7 @@ export function skillStrength(lib: Library, skill: string, now = new Date(), ope
   return withIndex(lib, open, (index) => {
     const cards = index.cards();
     const w = loadParams(lib);
-    return strength(cards, mergedReviews(cards, readReviews(lib), w), skill, w, now);
+    return strength(cards, mergedReviews(cards, readReviews(lib), w), skill, w, now, loadSkills(lib).skills.find((s) => s.id === skill)?.earned_peak);
   });
 }
 

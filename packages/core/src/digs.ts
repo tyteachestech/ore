@@ -1,3 +1,4 @@
+import { skillDir } from "./skill-path.ts";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
@@ -44,7 +45,7 @@ export const DIG_GAPS = [7, 14, 30, 60, 90];
 /** Days after any dig before a session offers another, whatever the skill: about one a week at most. */
 export const DIG_REST_DAYS = 7;
 
-const digsPath = (lib: Library, skill: string) => join(paths.skillNotes(lib), skill, "digs.json");
+const digsPath = (lib: Library, skill: string) => join(skillDir(lib, skill), "digs.json");
 
 export function readDigs(lib: Library, skill: string): Dig[] {
   const path = digsPath(lib, skill);

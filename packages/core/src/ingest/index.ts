@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
-import { deviceName, latestRevs, sha256, writeAtomic } from "../fsutil.ts";
+import { deviceName, latestRevs, sha256, subdirs, writeAtomic } from "../fsutil.ts";
 import { isUlid, nowIso, ulid } from "../ids.ts";
 import { THEIRS_FIRST_MS } from "../inbox.ts";
 import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
@@ -821,16 +821,46 @@ function swapFiles(item: Item, from: string) {
   writeAtomic(join(tmp, "highlights.json"), JSON.stringify(latestRevs(annotationRevs(item.dir))));
   const old = parseFrontmatter(readFileSync(join(from, "doc.md"), "utf8"));
   const was = ItemMetaSchema.parse(old.data);
-  for (const f of readdirSync(item.dir).filter(REPLACED)) unlinkSync(join(item.dir, f));
-  for (const f of readdirSync(from).filter((f) => REPLACED(f) && f !== "doc.md")) keepFile(join(from, f), join(item.dir, f));
+  // Written over in place, never removed first, so a stop at any point leaves every file the source needs
+  // (deep scan 4, EDGES-01); only a file the other version doesn't have goes, after.
+  const theirs = readdirSync(from).filter((f) => REPLACED(f) && f !== "doc.md");
+  for (const f of theirs) keepFile(join(from, f), join(item.dir, f));
   // Each chapter's recall goes back with its chapter; one whose chapter the newer version lost comes back as it was.
   const back = followChapters(item.meta.chapter_recalls, item.body, old.body, was.type) ?? [];
   const lost = (was.chapter_recalls ?? []).filter((r) => !back.some((b) => b.n === r.n || (b.at === r.at && b.text === r.text)));
   const recalls = [...back, ...lost].sort((a, b) => a.n - b.n);
   const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, page_added: was.page_added, author: was.author, published: was.published, structure: was.structure, text_sha256: was.text_sha256, chapter_recalls: recalls.length ? recalls : undefined };
   writeAtomic(item.docPath, stringifyFrontmatter(meta, old.body));
+  for (const f of readdirSync(item.dir).filter((f) => REPLACED(f) && f !== "doc.md" && !theirs.includes(f))) unlinkSync(join(item.dir, f));
   rmSync(from, { recursive: true, force: true });
   return tmp;
+}
+
+/** What an older Ore's interrupted Undo of a reimport left (it removed doc.md and the other files before
+ *  writing their replacements): the `<step>.swap` copy it took first of the version on screen, complete,
+ *  newest first. Never a plain step: that is the other version, with older frontmatter. */
+export function reimportRecovery(lib: Library, dir: string): string | undefined {
+  const id = basename(dir).slice(-26);
+  if (!isUlid(id)) return;
+  const root = stashes(lib, id);
+  if (!existsSync(root)) return;
+  const swaps = readdirSync(root).filter((s) => s.endsWith(".swap") && isUlid(s.slice(0, -5)));
+  for (const name of swaps.sort((a, b) => statSync(join(root, b)).mtimeMs - statSync(join(root, a)).mtimeMs)) {
+    try {
+      if (ItemMetaSchema.parse(parseFrontmatter(readFileSync(join(root, name, "doc.md"), "utf8")).data).id === id) return join(root, name);
+    } catch { /* an incomplete copy is not a recovery */ }
+  }
+}
+
+/** Caller holds the library lock. Puts back every file of the copy that is missing, doc.md last, so the
+ *  source shows again only once it is whole. */
+export function recoverReimport(lib: Library, dir: string): boolean {
+  if (existsSync(join(dir, "doc.md"))) return false;
+  const saved = reimportRecovery(lib, dir);
+  if (!saved) return false;
+  for (const f of readdirSync(saved).filter((f) => REPLACED(f) && f !== "doc.md")) if (!existsSync(join(dir, f))) keepFile(join(saved, f), join(dir, f));
+  writeAtomic(join(dir, "doc.md"), readFileSync(join(saved, "doc.md")));
+  return true;
 }
 
 /** A source's chapters as their text, without their markers: an EPUB's marked ones, a video's `###` ones (D115). */
@@ -1132,6 +1162,13 @@ const alive = (pid: number) => {
 /** Puts back the version the reimport `step` replaced, highlights included; run again with that step, it redoes
  *  it. Without a step it undoes the newest reimport not undone yet, so each call goes one further back. */
 export async function undoReimport(lib: Library, ref: string, step?: string): Promise<Item> {
+  // Old versions unlinked doc.md before replacing it. Recover before findItem, which
+  // deliberately omits folders without a document.
+  if (isUlid(ref)) await withLock(paths.lock(lib), () => {
+    for (const year of subdirs(paths.items(lib)))
+      for (const folder of subdirs(join(paths.items(lib), year)))
+        if (folder.endsWith("-" + ref)) recoverReimport(lib, join(paths.items(lib), year, folder));
+  });
   const item = findItem(lib, ref);
   const name = step ?? steps(lib, item.meta.id).filter((s) => !existsSync(join(stashes(lib, item.meta.id), s, UNDONE))).at(-1);
   const dir = join(stashes(lib, item.meta.id), name && isUlid(name) ? name : "-");
@@ -1139,7 +1176,7 @@ export async function undoReimport(lib: Library, ref: string, step?: string): Pr
   const saved = JSON.parse(readFileSync(join(dir, "highlights.json"), "utf8")) as Annotation[];
   const undone = existsSync(join(dir, UNDONE));
   await withLock(paths.lock(lib), () => {
-    const tmp = swapFiles(item, dir);
+    const tmp = swapFiles(readItemDir(item.dir), dir);
     // The swap's other side becomes the stash, so the next call with its step redoes.
     mkdirSync(dir, { recursive: true });
     for (const f of readdirSync(tmp)) keepFile(join(tmp, f), join(dir, f));

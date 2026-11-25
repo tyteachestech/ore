@@ -466,6 +466,22 @@ describe("AI adapter", () => {
     expect(text.slice(c!.meta.evidence![1]!.start, c!.meta.evidence![1]!.end)).toBe("The second reason is modularity.");
   });
 
+  for (const deleted of ["primary", "grouped"]) test(`enrich skips a draft whose ${deleted} highlight was deleted while AI replied`, async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, "# Agents\n\nAgents direct their own tool use. Workflows follow predefined paths.");
+    const primary = addHighlight(item, { exact: "Agents direct their own tool use.", intent: "card" });
+    const grouped = addHighlight(item, { exact: "Workflows follow predefined paths.", intent: "card" });
+    fakeClaude([enrichOut(["Q1?", "Q2?"], [{ ...draft(primary.id), also: [grouped.id] }])]);
+    writeFileSync(join(binDir, "while.js"), `
+      const { findItem } = require(${JSON.stringify(join(import.meta.dir, "../src/items.ts"))});
+      const { reviseAnnotation } = require(${JSON.stringify(join(import.meta.dir, "../src/annotations.ts"))});
+      reviseAnnotation(findItem(${JSON.stringify(lib)}, ${JSON.stringify(item.meta.id)}), ${JSON.stringify(deleted === "primary" ? primary : grouped)}, { status: "deleted" });
+    `);
+    await enrichItem(lib, item.meta.id);
+    expect(readAnnotations(findItem(lib, item.meta.id))).toHaveLength(1);
+    expect(listCards(lib)).toHaveLength(0);
+  });
+
   test("enrich keeps prequestion attempts and recall; never regenerates attempted prequestions", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Workflows follow predefined code paths. Agents direct their own tool use." });

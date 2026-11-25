@@ -60,6 +60,20 @@ export function highlights(io: {
   const landedAt = new Map<string, number>();
 
   const idOf = (id: string) => saved.get(id) ?? id;
+  let editNumber = 0;
+  const edits = new Map<string, Partial<Record<"intent" | "note", number>>>();
+  const editing = (id: string, field: "intent" | "note") => {
+    const n = ++editNumber;
+    const key = idOf(id);
+    edits.set(key, { ...edits.get(key), [field]: n });
+    return () => edits.get(idOf(id))?.[field] === n;
+  };
+  const savedAs = (tmp: string, id: string) => {
+    const a = edits.get(tmp), b = edits.get(id);
+    if (a || b) edits.set(id, { intent: Math.max(a?.intent ?? 0, b?.intent ?? 0), note: Math.max(a?.note ?? 0, b?.note ?? 0) });
+    if (tmp !== id) edits.delete(tmp);
+    saved.set(tmp, id);
+  };
   const same = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && idOf(a) === idOf(b);
   const find = (id: string | null | undefined) => (id ? list.find((a) => same(a.id, id)) : undefined);
   const set = (next: Annotation[] | ((list: Annotation[]) => Annotation[])) => {
@@ -137,6 +151,7 @@ export function highlights(io: {
   function setIntent(id: string, intent: Intent, undoable = true, taken?: (back: () => void) => void): Promise<void> {
     return track((async () => {
       const wake = wakeOnLanding();
+      const current = editing(id, "intent");
       const was = find(id)?.intent;
       set((l) => l.map((a) => (same(a.id, id) ? { ...a, intent } : a)));
       const rid = realId(id);
@@ -151,7 +166,7 @@ export function highlights(io: {
         await annotateWaking(wake, await rid, "--intent", intent);
       } catch (e) {
         forget?.();
-        set((l) => l.map((a) => (same(a.id, id) && was ? { ...a, intent: was } : a)));
+        if (current()) set((l) => l.map((a) => (same(a.id, id) && was ? { ...a, intent: was } : a)));
         // From the history (undo or redo): it puts the step back and says why.
         if (!undoable) throw e;
         io.notify(errorText(e), "error");
@@ -162,24 +177,27 @@ export function highlights(io: {
   function setNote(id: string, note: string, undoable = true): Promise<void> {
     return track((async () => {
       const wake = wakeOnLanding();
+      const current = editing(id, "note");
       const was = find(id)?.note ?? "";
       set((l) => l.map((a) => (same(a.id, id) ? { ...a, note } : a)));
       let rid = id;
+      const write = whileOut((async () => {
+        rid = await realId(id);
+        await annotateWaking(wake, rid, opt("note", note));
+      })());
+      // Register when he types, before a later Remove or edit can overtake this step.
+      const forget = undoable ? io.notify(note ? "Highlight note saved" : "Removed the highlight note", "quiet", () => setNote(rid, was, false), () => setNote(rid, note, false)) : undefined;
+      forget?.hold(write);
       try {
-        // Its step goes on the history once it has landed, so ⌘Z waits for it (`whileOut`): counted from the
-        // highlight's own save (realId waits for it) to the note's.
-        await whileOut((async () => {
-          rid = await realId(id);
-          await annotateWaking(wake, rid, opt("note", note));
-        })());
-        io.unsaved.delete(rid);
-        if (undoable) io.notify(note ? "Highlight note saved" : "Removed the highlight note", "quiet", () => setNote(rid, was, false), () => setNote(rid, note, false));
+        await write;
+        if (current()) io.unsaved.delete(rid);
       } catch (e) {
-        set((l) => l.map((a) => (same(a.id, id) ? { ...a, note: was } : a)));
+        forget?.();
+        if (current()) set((l) => l.map((a) => (same(a.id, id) ? { ...a, note: was } : a)));
         // From the history (undo or redo): it puts the step back and says why.
         if (!undoable) throw e;
-        io.unsaved.set(rid, { note, was });
-        io.notify(`${errorText(e)} Your note is kept: open the highlight to save it again.`, "error");
+        if (current()) io.unsaved.set(rid, { note, was });
+        io.notify(`${errorText(e)}${current() ? " Your note is kept: open the highlight to save it again." : ""}`, "error");
       }
     })());
   }
@@ -224,7 +242,7 @@ export function highlights(io: {
       const forget = io.notify("Highlighted", "quiet", act("remove"), act("bring"));
       save.then(
         (ann) => {
-          saved.set(tmp, ann.id);
+          savedAs(tmp, ann.id);
           landedAt.set(ann.id, ++landings);
           const was = list.find((a) => a.id === ann.id);
           existed = !!was;
@@ -256,7 +274,7 @@ export function highlights(io: {
         // Swapped as the save lands, before anything waiting on it (a removal) goes on.
         const shown = save.then((ann) => {
           landedAt.set(ann.id, ++landings);
-          saved.set(draft.id, ann.id); // so a read again landing before the swap doesn't list it twice
+          savedAs(draft.id, ann.id); // so a read again landing before the swap doesn't list it twice
           // A type or note he changed meanwhile stays; otherwise it is as the library saved it.
           set((l) => l.map((a) => (a.id === draft.id ? { ...ann, ...(a.intent !== draft.intent && { intent: a.intent }), ...(a.note !== draft.note && { note: a.note }) } : a)));
           return ann;

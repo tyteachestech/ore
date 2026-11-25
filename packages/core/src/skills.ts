@@ -1,5 +1,4 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import type * as YAMLLib from "yaml";
 import { z } from "zod";
 import { listCards, writeCardMeta } from "./cards.ts";
@@ -12,6 +11,9 @@ import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 import { listTopics, readTopic, writeTopic } from "./topics.ts";
 
+import { skillStrength } from "./today.ts";
+import { SkillId, skillDir } from "./skill-path.ts";
+
 export const Priority = z.enum(["P1", "P2", "P3"]);
 export type Priority = z.infer<typeof Priority>;
 
@@ -20,9 +22,10 @@ export const SkillColor = z.enum(["gray", "red", "orange", "yellow", "green", "t
 export type SkillColor = z.infer<typeof SkillColor>;
 
 export const SkillSchema = z.object({
-  id: z.string(),
+  id: SkillId,
   name: z.string(),
   priority: Priority,
+  earned_peak: z.number().int().nonnegative().optional(), // D63: retained before exercises leave this skill
   hook: z.string().optional(),
   goal: z.string().optional(), // D101: what he could show he can do, tried from memory on the skill page
   icon: z.string().optional(), // "mc:<name>", a pixel skill icon (D36, D157); emoji and "ph:" from before D157 draw nothing
@@ -198,7 +201,7 @@ const newSkillId = (lib: Library, skills: Skill[], name: string): string => {
   let id = base;
   // A deleted skill's note stays on disk (removeSkill), so its folder's id is taken too: a new skill of
   // the same name starts with its own empty note (Codex sweep 3).
-  const taken = (id: string) => skills.some((s) => s.id === id) || existsSync(join(paths.skillNotes(lib), id));
+  const taken = (id: string) => skills.some((s) => s.id === id) || existsSync(skillDir(lib, id));
   for (let n = 2; taken(id); n++) id = `${base}-${n}`;
   return id;
 };
@@ -464,6 +467,25 @@ export function itemCardSkills(lib: Library, itemId: string): Record<string, str
   return Object.fromEntries(listCards(lib).filter((c) => c.meta.item === itemId).map((c) => [c.meta.id, c.meta.skills]));
 }
 
+/** Caller holds the library lock. Save the peak before a change discards the
+ * membership needed to replay it. YAML is canonical and syncs; the index is not. */
+function keepSkillPeaks(lib: Library, ids: string[]): void {
+  if (!ids.length) return;
+  const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+  const list = doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>;
+  let changed = false;
+  for (const id of new Set(ids)) {
+    const node = list.items.find((m) => m.get("id") === id);
+    if (!node) continue;
+    const peak = skillStrength(lib, id).peak;
+    if (peak > Number(node.get("earned_peak") ?? 0)) {
+      node.set("earned_peak", peak);
+      changed = true;
+    }
+  }
+  if (changed) writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+}
+
 /** Files a source under exactly `ids`; its cards and topics follow (a card gains each added skill and
  *  loses each removed one). `cards` (an Undo, from `itemCardSkills` taken before) puts each card listed
  *  back to exactly its skills instead, so a card that never had an added skill doesn't gain it. */
@@ -474,8 +496,10 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[], ca
     const next = [...new Set(ids)];
     const added = next.filter((id) => !item.meta.skills.includes(id));
     const removed = item.meta.skills.filter((id) => !next.includes(id));
+    const exercises = listCards(lib).filter((c) => c.meta.item === item.meta.id);
+    // Not on an Undo (`cards`): a filing taken back gave its skill nothing to keep (code review of #538).
+    if (!cards) keepSkillPeaks(lib, exercises.flatMap((c) => c.meta.skills.filter((s) => removed.includes(s))));
     const meta = parseItemMeta({ ...item.meta, skills: next });
-    writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
     unarchiveFiled(lib, added);
     for (const c of listCards(lib).filter((c) => c.meta.item === meta.id)) {
       const skills = cards?.[c.meta.id] ?? [...new Set([...c.meta.skills.filter((s) => !removed.includes(s)), ...added])];
@@ -483,6 +507,9 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[], ca
     }
     for (const t of meta.topics.map((slug) => readTopic(lib, slug)))
       if (t && added.some((id) => !t.meta.skills.includes(id))) writeTopic({ ...t, meta: { ...t.meta, skills: [...new Set([...t.meta.skills, ...added])] } });
+    // Commit the source last. Until then its old skills retain the delta needed
+    // by a retry; exercise/topic updates above are idempotent, including Undo.
+    writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
     return meta;
   });
 }
@@ -510,6 +537,7 @@ const putBack = (skills: string[], id: string, at?: number) => [...skills.slice(
 
 export async function removeSkill(lib: Library, id: string, opts: { archive?: boolean } = {}): Promise<{ skill: Skill; untagged: number; archived: number; removed: RemovedSkill }> {
   return withLock(paths.lock(lib), () => {
+    keepSkillPeaks(lib, [id]);
     const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
     const list = doc.get("skills") as YAMLLib.YAMLSeq<YAMLLib.YAMLMap>;
     const i = list.items.findIndex((m) => m.get("id") === id);

@@ -55,3 +55,21 @@ describe("source note saves never drop outside changes", () => {
     expect(plain).toMatchObject({ merged: false, text: "Fresh." });
   });
 });
+
+test("history skips a half-written change without delaying the next complete snapshot", async () => {
+  const { withLock } = await import("../src/lock.ts");
+  const { paths } = await import("../src/library.ts");
+  const lib = await tempLibrary();
+  snapshot(lib, { force: true });
+  const marker = join(lib.root, ".ore", "last-snapshot");
+  const before = readFileSync(marker, "utf8");
+  await withLock(paths.lock(lib), () => {
+    writeFileSync(join(lib.root, "first.txt"), "half");
+    expect(snapshot(lib, { force: true }).committed).toBe(false);
+    expect(log(lib.root)).toHaveLength(1);
+    expect(readFileSync(marker, "utf8")).toBe(before);
+    writeFileSync(join(lib.root, "second.txt"), "complete");
+  });
+  expect(snapshot(lib, { force: true }).committed).toBe(true);
+  expect(log(lib.root)).toHaveLength(2);
+});

@@ -271,6 +271,7 @@ async function enrichOnce(lib: Library, ref: string, now: Date): Promise<EnrichR
 
   return withLock(paths.lock(lib), () => {
     const fresh = findItem(lib, item.meta.id);
+    const liveHighlights = new Set(readAnnotations(fresh).map((a) => a.id));
     const firstRun = !fresh.meta.enriched_at;
     const created: string[] = [];
     const slugs = data.topics.map((t) => {
@@ -298,7 +299,7 @@ async function enrichOnce(lib: Library, ref: string, now: Date): Promise<EnrichR
       if (found.length) meta = { ...meta, question_matches: [...(meta.question_matches ?? []), ...found] };
     }
     if (notes !== null) meta = { ...meta, notes_drafted: sha256(notes) };
-    if (plain.length) meta = { ...meta, planned: [...new Set([...(meta.planned ?? []), ...plain.map((a) => a.id)])] };
+    if (plain.length) meta = { ...meta, planned: [...new Set([...(meta.planned ?? []), ...plain.filter((a) => liveHighlights.has(a.id)).map((a) => a.id)])] };
     if (meta !== fresh.meta) {
       meta = parseItemMeta(meta);
       writeAtomic(fresh.docPath, stringifyFrontmatter(meta, fresh.body));
@@ -313,6 +314,9 @@ async function enrichOnce(lib: Library, ref: string, now: Date): Promise<EnrichR
     const source = (d: EnrichOutput["drafts"][number]) =>
       d.from_notes ? { from: "notes" as const } : d.prequestion !== null ? { from: "prequestion" as const, prequestion: d.prequestion } : { annotation: d.annotation! };
     const cards = data.drafts
+      // The reply can arrive after a highlight was deleted. A grouped answer may
+      // rely on any of its origins, so omit the whole draft if one is gone.
+      .filter((d) => [d.annotation, ...d.also].filter((id): id is string => id !== null).every((id) => liveHighlights.has(id)))
       .filter((d) => (d.from_notes ? !notesDone : d.prequestion !== null ? preqOpen.has(d.prequestion) : !already.has(d.annotation!)))
       .map((d) => {
         const ts = d.topics.map(slugify).filter((s) => slugs.includes(s) || meta.topics.includes(s));

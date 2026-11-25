@@ -6,23 +6,29 @@
  *  an earlier write was still saving may have read the library before that write reached it (an Undo
  *  pressed while its archive still saved: the read shows the row gone, and the selection moves off it).
  *  Each write reads the list again once it settles, so the newer read brings the truth; a write that
- *  hangs never settles, so a read begun after it still lands and never freezes the list. */
+ *  hangs never settles, so a read begun after it still lands (`lands`) and never freezes the list.
+ *  `unchanged` is stricter, for one field shown as he set it (the Reader's skills, F474, F631): a read
+ *  begun while a write to it was out may have read the library before that write reached it. */
 export const readGuard = () => {
   let reads = 0;
   let writes = 0;
-  const bump = () => void writes++;
+  let pending = 0;
+  const settled = () => { writes++; pending--; };
   return {
     /** Counts a write, when it starts and when it settles; returns the same promise. */
     writing<T>(p: Promise<T>): Promise<T> {
       writes++;
-      p.then(bump, bump);
+      pending++;
+      p.then(settled, settled);
       return p;
     },
-    /** Starts a read: `newest()` says no later read began; `lands()` also says no write started or settled since. */
+    /** Starts a read: `newest()` says no later read began; `lands()` also says no write started or settled
+     *  since; `unchanged()` also says none was out when it began. */
     begin() {
       const n = ++reads;
       const w = writes;
-      return { newest: () => n === reads, lands: () => n === reads && w === writes };
+      const out = pending;
+      return { newest: () => n === reads, unchanged: () => out === 0 && w === writes, lands: () => n === reads && w === writes };
     },
   };
 };
