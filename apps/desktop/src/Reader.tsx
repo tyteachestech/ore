@@ -13,7 +13,7 @@ import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
-import { frontEnd, unfold, unfoldFor } from "./front";
+import { backStart, frontEnd, unfold, unfoldFor } from "./front";
 import { SearchButton, SearchField } from "./HeadSearch";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
 import { paragraphRange, sentenceRange, snapRange } from "./snap";
@@ -553,22 +553,15 @@ type VideoCard = { head: ReactNode; foot?: ReactNode; box: RefObject<HTMLDivElem
 /** The document body, rendered in slices so a 100k-word book stays responsive while it mounts. With a
  *  video card, the transcript before VIDEO_END goes in the card and the page's text follows it. */
 const Body = memo(function Body({ markdown, video, dir, cells, pages, book, onReady, card }: { markdown: string; video: boolean; dir: string; cells?: boolean; pages?: boolean; book?: boolean; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
-  // A book's front matter (its title page, copyright, contents) folds under one row, shut, so it opens on its text.
+  // A book's front matter (its title page, copyright, contents) folds under one row, shut, so it opens on its text;
+  // the publisher's last pages (also by, about the author) fold the same way under the text.
   const front = card ? -1 : frontEnd(markdown, !!book);
+  const back = card ? -1 : backStart(markdown, !!book);
   const split = card ? markdown.indexOf(VIDEO_END) : front;
-  const [frontOpen, setFrontOpen] = useState(false);
-  const frontBox = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const box = frontBox.current;
-    if (!box) return;
-    // A jump into it (`unfold`): shown at once, so what jumps can measure where to go, and kept open.
-    const open = () => ((box.hidden = false), setFrontOpen(true));
-    box.addEventListener("unfold", open);
-    return () => box.removeEventListener("unfold", open);
-  }, [front > 0]);
   const top = useMemo(() => (split > 0 ? chunks(markdown.slice(0, split)) : []), [markdown, split]);
-  const rest = useMemo(() => (pages ? pageChunks : chunks)(split > 0 ? markdown.slice(split) : markdown), [markdown, split, pages]);
-  const total = top.length + rest.length;
+  const rest = useMemo(() => (pages ? pageChunks : chunks)(markdown.slice(Math.max(split, 0), back > 0 ? back : undefined)), [markdown, split, back, pages]);
+  const tail = useMemo(() => (back > 0 ? chunks(markdown.slice(back)) : []), [markdown, back]);
+  const total = top.length + rest.length + tail.length;
   const [shown, setShown] = useState(() => Math.min(total, 2));
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -594,17 +587,11 @@ const Body = memo(function Body({ markdown, video, dir, cells, pages, book, onRe
         </section>
       )}
       {front > 0 && (
-        <section className="front-matter">
-          <button className="front-head" data-noindex onClick={() => setFrontOpen(!frontOpen)} aria-expanded={frontOpen}>
-            <CaretRight className={`caret${frontOpen ? " open" : ""}`} size={12} aria-hidden="true" />
-            Front matter
-          </button>
-          <div className="front-body" ref={frontBox} hidden={!frontOpen}>
-            {top.slice(0, shown).map((md, i) => (
-              <Chunk key={i} md={md} video={video} dir={dir} cells={cells} />
-            ))}
-          </div>
-        </section>
+        <Folded name="Front matter">
+          {top.slice(0, shown).map((md, i) => (
+            <Chunk key={i} md={md} video={video} dir={dir} cells={cells} />
+          ))}
+        </Folded>
       )}
       {rest.slice(0, Math.max(0, shown - top.length)).map((md, i) => {
         // Where a PDF's page starts (D202), for the Original tab to follow. Page 1 needs no mark: it is what shows above the first.
@@ -616,9 +603,41 @@ const Body = memo(function Body({ markdown, video, dir, cells, pages, book, onRe
           </Fragment>
         );
       })}
+      {back > 0 && shown > top.length + rest.length && (
+        <Folded name="Back matter">
+          {tail.slice(0, shown - top.length - rest.length).map((md, i) => (
+            <Chunk key={i} md={md} video={video} dir={dir} cells={cells} />
+          ))}
+        </Folded>
+      )}
     </article>
   );
 });
+
+/** A book's front or back matter: one row, shut, that opens its pages in place. */
+function Folded({ name, children }: { name: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    // A jump into it (`unfold`): shown at once, so what jumps can measure where to go, and kept open.
+    const show = () => ((el.hidden = false), setOpen(true));
+    el.addEventListener("unfold", show);
+    return () => el.removeEventListener("unfold", show);
+  }, []);
+  return (
+    <section className="front-matter">
+      <button className="front-head" data-noindex onClick={() => setOpen(!open)} aria-expanded={open}>
+        <CaretRight className={`caret${open ? " open" : ""}`} size={12} aria-hidden="true" />
+        {name}
+      </button>
+      <div className="front-body" ref={box} hidden={!open}>
+        {children}
+      </div>
+    </section>
+  );
+}
 
 /** `wide`: the note ran past four lines, so the popup widened for it, and stays so while it is open. */
 type Popup = { id: string; top: number; left: number; below: boolean; note: string; wide?: boolean };

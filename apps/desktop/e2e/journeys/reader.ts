@@ -2354,7 +2354,9 @@ journey("reader: a book opens on its text, its publisher's pages under one shut 
   try {
     await page.reload();
     await openSource(page, "The Slow Lamp");
-    const row = page.locator(".front-head");
+    const row = page.locator(".front-head").first();
+    const front = page.locator(".front-body").first();
+    const back = page.locator(".front-body").last();
     await row.waitFor();
     // What he can read, top down: nothing of the publisher's before the prologue.
     const visible = () => page.locator(".doc").evaluate((doc) => [...doc.querySelectorAll<HTMLElement>("p, h1, h2")].filter((e) => e.checkVisibility()).map((e) => e.textContent ?? ""));
@@ -2362,7 +2364,7 @@ journey("reader: a book opens on its text, its publisher's pages under one shut 
     if (shut.some((t) => /Thank you for buying|personal use only|night shift/.test(t))) throw new Error(`the publisher's pages show before he opens them: ${shut.slice(0, 4).join(" | ")}`);
     if (!/^Prologue/.test(shut[0] ?? "")) throw new Error(`the book's first line is "${shut[0]}", not its prologue`);
     if ((await row.getAttribute("aria-expanded")) !== "false") throw new Error("the row says it is open while shut");
-    if (await page.locator(".front-body a img").first().isVisible()) throw new Error("the newsletter button shows in the reading flow");
+    if (await front.locator("a img").first().isVisible()) throw new Error("the newsletter button shows in the reading flow");
     // The outline is the book's own chapters, not the folded pages' headings.
     const outline = await page.locator(".outline-panel button").allTextContents();
     if (!outline.some((t) => /Prologue/.test(t))) throw new Error(`the outline lacks the prologue: ${outline.join(" | ")}`);
@@ -2371,23 +2373,34 @@ journey("reader: a book opens on its text, its publisher's pages under one shut 
     await page.locator(".find-bar input").waitFor();
     await page.keyboard.type("night shift");
     await page.waitForTimeout(300);
-    if (await page.locator(".front-body").isVisible()) throw new Error("Find opened the folded pages");
+    if ((await front.isVisible()) || (await back.isVisible())) throw new Error("Find opened the folded pages");
     await page.keyboard.press("Escape");
     await page.locator(".reader-scroll").evaluate((e) => (e.scrollTop = 0)); // Find went to "night" in the text as he typed
     // Open: the pages are all there, and the row he clicked has not moved under the pointer.
     const y = async () => Math.round((await row.boundingBox())!.y);
     const was = await y();
     await row.click();
-    await page.locator(".front-body", { hasText: "Thank you for buying this Lantern House ebook." }).waitFor();
-    await page.locator(".front-body", { hasText: "To the night shift" }).waitFor();
+    await front.filter({ hasText: "Thank you for buying this Lantern House ebook." }).waitFor();
+    await front.filter({ hasText: "To the night shift" }).waitFor();
+    if (await back.isVisible()) throw new Error("opening the front matter opened the back matter too");
     await page.waitForTimeout(300);
     if (Math.abs((await y()) - was) > 1) throw new Error(`the row moved ${(await y()) - was}px when it opened`);
     if ((await row.getAttribute("aria-expanded")) !== "true") throw new Error("the row says it is shut while open");
     // Keys: Enter on the row shuts it again.
     await row.focus();
     await page.keyboard.press("Enter");
-    await until("Enter on the row shuts it", async () => !(await page.locator(".front-body").isVisible()));
+    await until("Enter on the row shuts it", async () => !(await front.isVisible()));
     if (Math.abs((await y()) - was) > 1) throw new Error(`the row moved ${(await y()) - was}px when it shut`);
+    // The book's end: its acknowledgments and notes show; the publisher's last pages sit under a second shut row.
+    const end = page.locator(".front-head").last();
+    if (((await end.textContent()) ?? "").trim() !== "Back matter") throw new Error(`the last row says "${await end.textContent()}"`);
+    if (!shut.some((t) => t === "Acknowledgments") || !shut.some((t) => /harbour ledger of 1911/.test(t))) throw new Error("the acknowledgments or the notes are folded away");
+    if (shut.some((t) => /ALSO BY|NOTE ABOUT THE AUTHOR/.test(t))) throw new Error("the publisher's last pages show before he opens them");
+    await end.click();
+    await back.filter({ hasText: "A NOTE ABOUT THE AUTHOR" }).waitFor();
+    await end.click();
+    await until("a second click shuts the back matter", async () => !(await back.isVisible()));
+    await page.locator(".reader-scroll").evaluate((e) => (e.scrollTop = 0));
     // The cover: a click opens it at its own size, Esc closes it.
     const cover = page.locator("img.doc-thumb");
     await until("the cover has loaded", () => cover.evaluate((i: HTMLImageElement) => i.naturalWidth > 0));
@@ -2406,7 +2419,7 @@ journey("reader: a book opens on its text, its publisher's pages under one shut 
     await page.keyboard.press("Meta+k");
     await page.keyboard.type("night shift");
     await page.locator("[cmdk-item]").filter({ hasText: "The Slow Lamp" }).first().click();
-    await page.locator(".front-body", { hasText: "To the night shift" }).waitFor();
+    await front.filter({ hasText: "To the night shift" }).waitFor();
     await until("Find counts the match", async () => /^\d+\/\d+$/.test((await page.locator(".find-count").textContent().catch(() => "")) ?? ""));
     await page.keyboard.press("Escape");
   } finally {

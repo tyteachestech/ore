@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { frontPages, pageKind, type PageFacts } from "../src/ingest/front-matter.ts";
+import { backPages, frontPages, pageKind, type PageFacts } from "../src/ingest/front-matter.ts";
 
 // Which of a book's first pages fold away as front matter (F-new-front-matter). Each case is the shape of a page
 // in a real book from one of 59 checked (trade, academic and self-published EPUBs, Standard Ebooks, Project
@@ -72,4 +72,61 @@ describe("where the front matter ends", () => {
   test("a short unmarked page after the last of them stays with the text", () => expect(frontPages([title, rights, page({ text: words(47) }), chapter])).toBe(2));
   test("a long unmarked page ends it, and what follows stays", () => expect(frontPages([title, page({ text: words(238) }), rights, chapter])).toBe(1));
   test("a book that is all front matter is not folded", () => expect(frontPages([title, rights, contents])).toBe(0));
+});
+
+// The same at a book's end (Tyler 2026-11-25: fold the publisher's last pages too): only what is plainly theirs,
+// read from the last page back. Shapes from the same 59 books.
+describe("a book's last pages", () => {
+  const stays: [string, Partial<PageFacts>][] = [
+    ["an afterword", { heading: "Afterword", text: words(170) }],
+    ["an epilogue the book marks backmatter", { types: ["backmatter"], heading: "Epilogue", text: words(260) }],
+    ["acknowledgments", { heading: "ACKNOWLEDGMENTS", text: words(60) }],
+    ["notes", { types: ["backmatter"], heading: "Notes", text: words(9000) }],
+    ["a short notes page", { heading: "NOTES AND SOURCES", text: "NOTES AND SOURCES" }],
+    ["an index that is all links", { heading: "Index", text: words(3000), links: 2900, linkWords: 2900 }],
+    ["an unnamed index page of links", { text: words(90), links: 80, linkWords: 88 }],
+    ["a bibliography", { labels: ["Selected Bibliography"], text: words(84) }],
+    ["a glossary", { types: ["glossary"], text: words(150) }],
+    ["an appendix", { heading: "Appendix: Ten Tools", text: words(180) }],
+    ["illustration credits, with their copyright signs", { heading: "Illustration Credits", text: `© 2019 Ada Learner. © 2018 Ben Reviewer. All rights reserved. ${words(100)}` }],
+    ["further reading", { heading: "Further Reading", text: words(120) }],
+    ["discussion questions", { heading: "Discussion Questions", text: words(140) }],
+    ["a last page that names the author, as a poem's close does", { text: "Ada Learner, at the harbour, in winter" }],
+    ["a last page that starts To…", { text: "To be continued in the second volume" }],
+    ["a long excerpt from another title", { heading: "An Excerpt from The Quiet Kettle", text: words(2600) }],
+  ];
+  for (const [name, p] of stays) test(`stays: ${name}`, () => expect(pageKind(page(p), TITLE, true)).not.toBe("fold"));
+
+  const folds: [string, Partial<PageFacts>][] = [
+    ["about the author", { heading: "About the Author", text: words(160) }],
+    ["an Also by page with no heading", { text: "ALSO BY ADA LEARNER The Quiet Kettle" }],
+    ["a newsletter page", { text: "Thank you for buying this Lantern House ebook. To receive special offers, sign up for our newsletters." }],
+    ["a what's-next advert", { types: ["backmatter"], text: "What's next on your reading list? Discover your next great read! Sign up now." }],
+    ["a second contents page", { heading: "Contents", text: words(170), links: 40, linkWords: 160 }],
+    ["a copyright page", { text: `Lantern House 120 Broadway Copyright © 2019 by Ada Learner All rights reserved ISBN 978-0-00-000000-2 ${words(40)}` }],
+    ["about the publisher", { heading: "About the Publisher", text: words(77) }],
+    ["a colophon", { types: ["colophon", "backmatter"], heading: "Colophon", text: words(170) }],
+  ];
+  for (const [name, p] of folds) test(`folds: ${name}`, () => expect(pageKind(page(p), TITLE, true)).toBe("fold"));
+
+  const chapter = page({ heading: "9", text: words(3000) });
+  const thanks = page({ heading: "Acknowledgments", text: words(300) });
+  const notes = page({ heading: "Notes", text: words(5000) });
+  const also = page({ heading: "Also by Ada Learner", text: "Also by Ada Learner The Quiet Kettle" });
+  const bio = page({ heading: "About the Author", text: words(90) });
+  const second = page({ text: words(50) }); // the second author's lines, with no name on the page
+  const advert = page({ text: "Sign up for our newsletter and receive special offers." });
+  const rights = page({ types: ["copyright-page"], text: words(180) });
+  const figure = page({ heading: "Extended image description for Figure 4.1", text: words(84) });
+
+  test("start at the first of the publisher's pages after the text", () => expect(backPages([chapter, thanks, notes, also, bio, advert, rights])).toBe(3));
+  test("a book that ends on its text, its notes or its index has none", () => {
+    expect(backPages([chapter, chapter])).toBe(2);
+    expect(backPages([chapter, thanks, notes])).toBe(3);
+  });
+  test("a publisher's page before the notes stays where it is", () => expect(backPages([chapter, also, notes, advert])).toBe(3));
+  test("a short unmarked page between two of them goes with them", () => expect(backPages([chapter, bio, second, advert])).toBe(1));
+  test("short pages after the last of them keep the whole end unfolded: they may be figure descriptions", () => expect(backPages([chapter, advert, figure, figure])).toBe(4));
+  test("the page after the front matter is never folded, so a book is never all fold", () => expect(backPages([rights, bio, advert], [], 1)).toBe(2));
+  test("a one-page book has none", () => expect(backPages([bio])).toBe(1));
 });

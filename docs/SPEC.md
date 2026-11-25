@@ -87,7 +87,7 @@ chapter_recalls:            # optional: EPUB closed-book recall per chapter (D18
 notes_drafted: ...          # sha256 of notes.md text the last enrich drafted from; a different non-empty notes.md is pending
 enriched_at: ...            # absent until AI enrichment ran
 ```
-Body: Markdown. For YouTube, paragraphs carry `[mm:ss]` markers at the start. For PDFs, `<!-- page N -->` comments between pages. For EPUBs, `<!-- chapter N -->` comments between spine documents, and one `<!-- end of front matter -->` after the publisher's pages when the book starts with some (the Reader folds what is above it).
+Body: Markdown. For YouTube, paragraphs carry `[mm:ss]` markers at the start. For PDFs, `<!-- page N -->` comments between pages. For EPUBs, `<!-- chapter N -->` comments between spine documents, and one `<!-- end of front matter -->` after the publisher's pages when the book starts with some (the Reader folds what is above it), and one `<!-- back matter -->` before the publisher's last pages when it ends on some (the Reader folds what is below it).
 
 ### annotations.jsonl (W3C-style)
 ```json

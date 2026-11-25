@@ -6,7 +6,9 @@
 //   its chapters swapped, and with its first chapter's heading reworded.
 // - files/front-matter.epub: a trade publisher's book (F-new-front-matter): a title page, an unmarked page of links
 //   with "Thank you for buying" and two newsletter buttons, an unmarked copyright notice, a dedication, then a
-//   prologue the publisher marks "frontmatter", a part page and a chapter. Its cover is a real picture (400×600).
+//   prologue the publisher marks "frontmatter", a part page and a chapter; then acknowledgments and notes, and the
+//   publisher's last pages (also by, a note about the author, the newsletter page again), all marked "backmatter".
+//   Its cover is a real picture (400×600).
 // - files/front-matter-plain.epub: an older book with no marks at all, only a contents file (NCX): a title page, a
 //   copyright page, a contents page, a short note to the reader, a chapter, and a copyright page again at the back.
 // The text is written for Ore and is AGPL like the rest of the repo. Run: bun make-study-epubs.ts
@@ -131,6 +133,11 @@ book(
     { id: "prologue", title: "Prologue", body: `<section epub:type="frontmatter prologue"><h1>Prologue: The First Evening</h1>\n<p>The lamp took an hour to warm, and nobody hurried it.</p></section>` },
     { id: "part1", title: "Part I", body: `<section epub:type="bodymatter part"><h1>Part I</h1><h1>Light</h1></section>` },
     { id: "chapter1", title: "1", body: `<section epub:type="bodymatter chapter"><h1>1</h1><h1>What a Lamp Keeps</h1>\n<p>A wick trimmed each night burns evenly for years.</p></section>` },
+    { id: "thanks", title: "Acknowledgments", body: `<section epub:type="backmatter acknowledgments"><h1>Acknowledgments</h1>\n<p>The harbour keepers lent their ledgers.</p></section>` },
+    { id: "notes", title: "Notes", body: `<section epub:type="backmatter"><h1>Notes</h1>\n<p>1. The wick figures come from the harbour ledger of 1911.</p></section>` },
+    { id: "alsoby", title: "Also by", body: `<section epub:type="backmatter"><p>ALSO BY <a href="https://example.com/ada">ADA LEARNER</a></p>\n<p><i>The Quiet Kettle</i></p></section>` },
+    { id: "author", title: "Author", body: `<section epub:type="backmatter"><p>A NOTE ABOUT THE AUTHOR</p>\n<p>Ada Learner keeps lamps in a harbour town.</p></section>` },
+    { id: "newsletter", title: "Newsletter", body: `<section epub:type="backmatter"><p><b>Thank you for buying this Lantern House ebook.</b></p>\n<p>To receive special offers, sign up for our newsletters.</p>\n<p><a href="https://example.com/signup"><img src="img/signup.png" alt="Sign Up"/></a></p></section>` },
   ],
   [
     { id: "title-image", href: "img/title.png" },

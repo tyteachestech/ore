@@ -1194,15 +1194,25 @@ journey("phone: a book's publisher pages sit under one shut row a finger can hit
     return join(PHONE_LIB, r.path, "..");
   }, async () => {
     await phoneSource(page, "The Slow Lamp");
-    await page.locator(".phone-reader .front-head").waitFor();
+    const row = page.locator(".phone-reader .front-head").first();
+    const body = page.locator(".phone-reader .front-body").first();
+    await row.waitFor();
     await fits44(page, ".phone-reader .front-head", "Front matter");
-    if (await page.locator(".phone-reader .front-body").isVisible()) throw new Error("the publisher's pages show before he opens them");
-    await tap(page, page.locator(".phone-reader .front-head"));
-    await page.locator(".phone-reader .front-body", { hasText: "Thank you for buying" }).waitFor();
+    if (await body.isVisible()) throw new Error("the publisher's pages show before he opens them");
+    await tap(page, row);
+    await body.filter({ hasText: "Thank you for buying" }).waitFor();
     const wide = await page.locator(".phone-reader .reader-scroll").evaluate((e) => e.scrollWidth - e.clientWidth);
     if (wide > 1) throw new Error(`the open pages run ${wide}px past the screen's edge`);
-    await tap(page, page.locator(".phone-reader .front-head"));
-    await until("a second tap shuts it", async () => !(await page.locator(".phone-reader .front-body").isVisible()));
+    await tap(page, row);
+    await until("a second tap shuts it", async () => !(await body.isVisible()));
+    // The publisher's last pages, under the text: the same row.
+    const end = page.locator(".phone-reader .front-head").last();
+    await end.scrollIntoViewIfNeeded();
+    const h = (await end.boundingBox())!.height;
+    if (h < 44) throw new Error(`the Back matter row is ${h}pt tall`);
+    await tap(page, end);
+    await page.locator(".phone-reader .front-body").last().filter({ hasText: "A NOTE ABOUT THE AUTHOR" }).waitFor();
+    await page.locator(".phone-reader .reader-scroll").evaluate((e) => (e.scrollTop = 0));
     const cover = page.locator(".phone-reader img.doc-thumb");
     await until("the cover has loaded", () => cover.evaluate((i: HTMLImageElement) => i.naturalWidth > 0));
     await tap(page, cover);

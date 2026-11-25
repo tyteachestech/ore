@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { frontEnd } from "./front";
+import { backStart, frontEnd } from "./front";
 import { Hint } from "./Hint";
 import { Signpost } from "./icons";
 import { renderedNodeAt, type Skeleton, type TextIndex } from "./text";
@@ -34,11 +34,13 @@ export function findChapterEnds(body: string, src: Skeleton, idx: TextIndex, art
   const marks = chapterMarks(body, type);
   // A book's front matter (its copyright page, its praise) is no chapter to recall.
   const front = frontEnd(body, type === "epub");
+  // Nor are the publisher's last pages; the chapter before them is the book's last, which Finish covers.
+  const back = backStart(body, type === "epub");
   const out: ChapterEnd[] = [];
   for (let i = 0; i + 1 < marks.length; i++) {
     const cur = marks[i]!;
     const next = marks[i + 1]!;
-    if (cur.at < front) continue;
+    if (cur.at < front || (back > 0 && next.at > back)) continue;
     const text = body.slice(cur.text, next.at);
     if (words(text) < MIN_WORDS) continue;
     let el = renderedNodeAt(src, idx, next.text)?.parentElement ?? null;

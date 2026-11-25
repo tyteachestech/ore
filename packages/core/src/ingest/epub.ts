@@ -4,7 +4,7 @@ import { posix } from "node:path";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
 import { cleanDate, cleanTitle } from "./check.ts";
-import { FRONT_END, frontPages, type PageFacts } from "./front-matter.ts";
+import { BACK_START, FRONT_END, backPages, frontPages, type PageFacts } from "./front-matter.ts";
 import { td } from "./markdown.ts";
 
 export interface EpubDoc {
@@ -197,7 +197,10 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
   const creators = text("dc:creator");
   // The publisher's pages before the text stay, in their place; the mark after them lets the reader fold them.
   const title = text("dc:title")[0];
-  const front = frontPages(facts, [title, title?.split(/[:\u2014(]/)[0], ...creators].filter((s): s is string => !!s));
+  const names = [title, title?.split(/[:\u2014(]/)[0], ...creators].filter((s): s is string => !!s);
+  const front = frontPages(facts, names);
+  const back = backPages(facts, names, front);
+  if (back < chapters.length) chapters[back] = `${BACK_START}\n\n${chapters[back]}`;
   if (front) chapters[front] = `${FRONT_END}\n\n${chapters[front]}`;
   return { title: cleanTitle(text("dc:title")[0], { numbers: true }), author: creators.length ? creators.join(", ") : undefined, published: cleanDate(text("dc:date")[0]), body: chapters.join("\n\n") + "\n", assets: [...assets.values()] };
 }
