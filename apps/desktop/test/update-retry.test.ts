@@ -30,3 +30,7 @@ test("documentation-only changes advance the Mac marker without rebuilding", () 
 test("a checkout with no successful-install marker installs once even without a pull", () => {
   expect(run("missing-stamp")).toMatchObject({ attempts: 1, installed: "new", stamp: "new", pulls: 0 });
 });
+
+test("a commit that can't build is tried three times, not on every pass", () => {
+  expect(run("broken")).toMatchObject({ attempts: 3, installed: "old", stamp: null, pulls: 1 });
+});

@@ -18,6 +18,8 @@ const LABEL = "com.tylerpoelking.ore.auto-update";
 const repo = resolve(import.meta.dir, "../../..");
 const cache = join(homedir(), "Library/Caches/ore");
 const appStamp = join(cache, "app-built");
+/** A commit per failed install, so a commit that can't build is tried three times, not every pass. */
+const appFailed = join(cache, "app-failed");
 const phoneStamp = join(cache, "phone-built");
 const plist = join(homedir(), "Library/LaunchAgents", `${LABEL}.plist`);
 
@@ -60,7 +62,9 @@ function pass() {
   // Git may already be current after a failed build. Retry through the same serialized hook;
   // the hook records a HEAD only after installation succeeds, and a live build keeps its lock.
   const installed = existsSync(appStamp) ? readFileSync(appStamp, "utf8").trim() : "";
-  if (!pulled && installed !== head) {
+  const failed = existsSync(appFailed) ? readFileSync(appFailed, "utf8").split("\n").filter((l) => l === head).length : 0;
+  if (!pulled && installed !== head && failed >= 3) log(`not retrying ${head.slice(0, 7)}: its install failed ${failed} times (app-install.log)`);
+  else if (!pulled && installed !== head) {
     const changed = installed ? git("diff", "--name-only", `${installed}..${head}`) : { ok: false, out: "" };
     if (changed.ok && !changed.out.split("\n").some((f) => /^(apps\/desktop|packages)\/|^(package\.json|bun\.lock|tsconfig\.json)$/.test(f))) {
       const tmp = `${appStamp}.${process.pid}.tmp`;
