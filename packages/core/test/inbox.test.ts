@@ -100,3 +100,39 @@ test("a file waits beside its item, is handed to the import by its path, and lea
   writeFileSync(join(paths.inbox(lib), `${dotted.id}.file.json`), JSON.stringify({ ...dotted, file: "../skills.yaml" }));
   expect(queuedLinks(lib)).toEqual([]);
 });
+
+test("removing a waiting file with Undo keeps its bytes and descriptor through repeated restore (PHONE-02)", async () => {
+  const { restoreQueuedLink } = await import("../src/inbox.ts");
+  const lib = await tempLibrary();
+  const input = join(lib.root, "paper.pdf");
+  const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46, 0xff, 0x00]);
+  writeFileSync(input, bytes);
+  const q = queueFile(lib, input, ["ai"]);
+  unlinkSync(input);
+  const descriptor = join(paths.inbox(lib), `${q.id}.file.json`);
+  const original = readFileSync(descriptor, "utf8");
+  for (let i = 0; i < 2; i++) {
+    removeQueuedLink(lib, q.id, true);
+    expect(queuedLinks(lib)).toEqual([]);
+    expect(readFileSync(join(paths.inbox(lib), q.file!))).toEqual(bytes);
+    restoreQueuedLink(lib, q.id);
+    expect(queuedLinks(lib)).toEqual([q]);
+    expect(readFileSync(descriptor, "utf8")).toBe(original);
+  }
+  removeQueuedLink(lib, q.id);
+  expect(existsSync(join(paths.inbox(lib), q.file!))).toBe(false);
+});
+
+test("Undo of a waiting link keeps its original metadata and refuses to replace a live entry (PHONE-02)", async () => {
+  const { restoreQueuedLink } = await import("../src/inbox.ts");
+  const lib = await tempLibrary();
+  const q = queueLink(lib, "https://example.com/a", ["ai"]);
+  removeQueuedLink(lib, q.id, true);
+  const descriptor = join(paths.inbox(lib), `${q.id}.link.json`);
+  writeFileSync(descriptor, JSON.stringify({ ...q, url: "https://example.com/new" }));
+  expect(() => restoreQueuedLink(lib, q.id)).toThrow(/already waiting/);
+  expect(queuedLinks(lib)[0]!.url).toBe("https://example.com/new");
+  unlinkSync(descriptor);
+  restoreQueuedLink(lib, q.id);
+  expect(queuedLinks(lib)).toEqual([q]);
+});

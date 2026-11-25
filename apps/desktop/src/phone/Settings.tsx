@@ -5,7 +5,7 @@ import * as Switch from "@radix-ui/react-switch";
 import { useEffect, useRef, useState } from "react";
 import { goalOptions, Group, newOptions, PlanField, REMINDER_TEXT, Row, Seg, VOICE_TEXT } from "../Settings";
 import { setSounds, setVoice, useSounds, useVoice } from "../sfx";
-import { change } from "../change";
+import { change, valueChange } from "../change";
 import { ore, opt, pullFromMac } from "../ore";
 import { errorText, type Notify } from "../util";
 import { syncState } from "./fs";
@@ -80,13 +80,17 @@ export function PhoneSettings({ reload, onPulled, notify }: { reload: number; on
     const r = now.current;
     if (!r) return Promise.resolve(false);
     const was = r[key];
-    return change(notify, {
+    return change(notify, valueChange({
       message: `Changed “${NAME[key]}”`,
       kind: "quiet",
       key: "goal",
-      show: (on) => setReview((x) => x && { ...x, [key]: on ? value : was }),
-      write: (on) => ore("goal", opt(FLAG[key], key === "reminder" ? String(on ? value : was) || "off" : String(on ? value : was))).then(() => void planReminders()),
-    });
+      field: `goal ${key}`, before: was, after: value,
+      show: (v) => {
+        const x = now.current;
+        if (x) setReview((now.current = { ...x, [key]: v }));
+      },
+      write: (v) => ore("goal", opt(FLAG[key], key === "reminder" ? String(v) || "off" : String(v))).then(() => void planReminders()),
+    }));
   };
   /** On asks iOS first, from his tap; refused, the switch stays off and says where to allow it. */
   const remind = async (on: boolean) => {

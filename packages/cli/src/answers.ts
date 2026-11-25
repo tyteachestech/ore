@@ -10,6 +10,8 @@ import type { DueRow, ShownCard, SkillStatsRow } from "./cmd-study.ts";
 
 export type { Backlink, CardGem, Evidence, Intent, Prequestion, Priority, SearchHit, Skill, SkillColor, Strength, Today, TryLine } from "@ore/core";
 export type { SessionEnd } from "./cmd-study.ts";
+/** An entry returned by `ore inbox`, whether a link or a shared file. */
+export type { QueuedLink as Waiting } from "@ore/core";
 
 /** One shape for an answer built in more than one way: what every way holds, and what only some do as it may be there. */
 type Any<U> = Pick<U, keyof U> & { [K in U extends unknown ? keyof U : never]?: U extends unknown ? (K extends keyof U ? U[K] : never) : never };

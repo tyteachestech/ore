@@ -94,3 +94,26 @@ describe("phone fs stand-in", () => {
     expect(() => fs.utimesSync(`${ROOT}/none`, 0, 0)).toThrow(/ENOENT/);
   });
 });
+
+test("same-length writes get distinct modification times even within one millisecond (PHONE-07)", () => {
+  const now = Date.now;
+  Date.now = () => 1_795_521_600_000;
+  try {
+    const p = `${ROOT}/skills/learning/notes.md`;
+    fs.writeFileSync(p, "alpha");
+    const first = fs.statSync(p);
+    fs.writeFileSync(p, "bravo");
+    expect(fs.statSync(p).size).toBe(first.size);
+    expect(fs.statSync(p).mtimeMs).toBeGreaterThan(first.mtimeMs);
+    const second = fs.statSync(p).mtimeMs;
+    fs.writeFileSync(`${ROOT}/.note.tmp`, "delta");
+    fs.renameSync(`${ROOT}/.note.tmp`, p);
+    expect(fs.statSync(p).mtimeMs).toBeGreaterThan(second);
+    const third = fs.statSync(p).mtimeMs;
+    fs.unlinkSync(p);
+    fs.writeFileSync(p, new TextEncoder().encode("gamma"));
+    expect(fs.statSync(p).mtimeMs).toBeGreaterThan(third);
+  } finally {
+    Date.now = now;
+  }
+});

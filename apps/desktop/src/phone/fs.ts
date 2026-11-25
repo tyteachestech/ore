@@ -131,9 +131,15 @@ const binary = (bytes: Uint8Array, mtime: number, unread?: true): Entry => ({
     return new TextDecoder().decode(bytes);
   },
 });
-/** `text` is the file's, or ignored when `bytes` are given. */
-function put(p: string, text: string, mtime = Date.now(), bytes?: Uint8Array) {
+// The index uses mtime and size. A millisecond clock alone misses equal-length edits in one tick,
+// including an atomic replacement or a delete and recreate. Keep local writes strictly ordered.
+let writtenAt = 0;
+const writeTime = (p: string) => (writtenAt = Math.max(Date.now(), writtenAt + 1, (files.get(p)?.mtime ?? 0) + 1));
+/** `text` is the file's, or ignored when `bytes` are given. Explicit times (utimes) stay exact. */
+function put(p: string, text: string, mtime = writeTime(p), bytes?: Uint8Array) {
   if (disk && downloading.has(rel(p))) throw Object.assign(new Error("This file is still downloading from iCloud: try again in a moment"), { code: "EBUSY" });
+  // A listed file whose read failed is not empty, even when no earlier copy is in memory.
+  if (disk && failed.has(rel(p))) throw Object.assign(new Error("This file could not be read from iCloud: try again in a moment"), { code: "EBUSY" });
   const e: Entry = bytes ? binary(bytes, mtime) : { text, mtime };
   files.set(p, e);
   addDirs(p);
@@ -180,10 +186,12 @@ let flushes = 0;
  *  wrongly thinks is there (an empty log, say), so that waits until it arrives. */
 const downloading = new Set<string>();
 let sending: Promise<void> = Promise.resolve();
+/** Operations handed to the flush chain, including batches waiting behind the current native call. */
+let inFlight = 0;
 /** For Settings: when the folder last took a write or a scan, and the last write it refused. */
 let lastSync = 0;
 let lastError: string | null = null;
-export const syncState = () => ({ icloud: !!disk, at: lastSync, unsent: unsent.size, downloading: downloading.size, error: lastError });
+export const syncState = () => ({ icloud: !!disk, at: lastSync, unsent: unsent.size + inFlight, downloading: downloading.size, error: lastError });
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 const rel = (p: string) => p.slice(disk!.prefix.length + 1);
@@ -205,6 +213,7 @@ export function flush(): Promise<void> {
   const ops = [...unsent].filter(([r, op]) => op !== null || known.has(r) || sent.has(r));
   unsent.clear();
   if (!ops.length || !disk) return sending;
+  inFlight += ops.length;
   const n = ++flushes;
   for (const [r] of ops) sent.add(r), sentBy.set(r, n);
   const { root, invoke } = disk;
@@ -232,7 +241,8 @@ export function flush(): Promise<void> {
       for (const [r, ms, stamp] of stamps) {
         if (LISTED.test("/" + r)) known.set(r, stamp);
         const e = files.get(`${disk!.prefix}/${r}`);
-        if (e) e.mtime = ms;
+        // A folder acknowledgment must not wind a newer local write's clock back.
+        if (e) e.mtime = Math.max(e.mtime, ms);
       }
       [lastSync, lastError] = [Date.now(), null];
       for (const [r, op] of ops) if (op === null) for (const k of [...known.keys()]) if (k === r || k.startsWith(r + "/")) known.delete(k);
@@ -241,6 +251,8 @@ export function flush(): Promise<void> {
       for (const [r, op] of ops) if (!unsent.has(r) && sentBy.get(r) === n) unsent.set(r, op);
       lastError = String(e);
       dispatchEvent(new CustomEvent("ore:save-failed", { detail: String(e) }));
+    } finally {
+      inFlight -= ops.length;
     }
   });
   return sending;
@@ -322,7 +334,7 @@ async function read(list: Stamped[]): Promise<number> {
       known.set(r, stamp);
       landed++;
       const p = `${disk!.prefix}/${r}`;
-      files.set(p, { text, mtime });
+      files.set(p, { text, mtime: Math.max(mtime, (files.get(p)?.mtime ?? -1) + 1) });
       addDirs(p);
     });
   });
@@ -379,7 +391,7 @@ export function readFileSync(p: string, enc?: unknown): string {
   if (enc === undefined && e.bytes) return new Bytes(e.bytes) as unknown as string;
   return e.text;
 }
-export const writeFileSync = (p: string, s: string | Uint8Array) => (typeof s === "string" ? put(p, s) : put(p, "", Date.now(), s));
+export const writeFileSync = (p: string, s: string | Uint8Array) => (typeof s === "string" ? put(p, s) : put(p, "", undefined, s));
 export const appendFileSync = (p: string, s: string) => put(p, (files.get(p)?.text ?? "") + s);
 export function mkdirSync(p: string, _o?: unknown) {
   // The folder and every parent not made yet: adding p first stopped addDirs at once (it stops at a known
@@ -406,7 +418,7 @@ export function renameSync(a: string, b: string) {
 export const copyFileSync = (a: string, b: string) => {
   readFileSync(a); // throws for a missing file, and for one the phone lists but hasn't loaded
   const e = files.get(a)!;
-  put(b, e.bytes ? "" : e.text, Date.now(), e.bytes);
+  put(b, e.bytes ? "" : e.text, undefined, e.bytes);
 };
 // copyFileSync's flags (core asks for a clone, COPYFILE_FICLONE): the phone's copy is in memory either way.
 export const constants = { COPYFILE_FICLONE: 2 };

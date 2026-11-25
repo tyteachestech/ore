@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, unlinkSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, unlinkSync } from "node:fs";
 import { basename, join } from "node:path";
 import { deviceName, writeAtomic } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
@@ -72,9 +72,17 @@ export function queuedLinks(lib: Library): QueuedLink[] {
   return out;
 }
 
-export function removeQueuedLink(lib: Library, id: string): void {
+export function removeQueuedLink(lib: Library, id: string, keepForUndo = false): void {
   const f = find(lib, id);
   if (!f) throw new Error(`no link ${id} waiting`);
+  if (keepForUndo) {
+    // Only the descriptor leaves the queue. Keep the attachment in place, even when this device
+    // hasn't downloaded it: Undo must not need the share extension's temporary original.
+    const removed = join(paths.inbox(lib), "removed");
+    mkdirSync(removed, { recursive: true });
+    renameSync(f, join(removed, basename(f)));
+    return;
+  }
   // A file's folder goes with it: named by the id it was saved under, which a synced copy's name isn't.
   let dir: string | undefined;
   try {
@@ -83,6 +91,16 @@ export function removeQueuedLink(lib: Library, id: string): void {
   } catch {}
   unlinkSync(f);
   if (dir) rmSync(dir, { recursive: true, force: true });
+}
+
+/** Restore the exact descriptor, including its id, file, skills and capture device. */
+export function restoreQueuedLink(lib: Library, id: string): void {
+  if (strays(id) || /[\\/]/.test(id)) throw new Error("Not an inbox id");
+  if (find(lib, id)) throw new Error(`${id} is already waiting`);
+  const removed = join(paths.inbox(lib), "removed");
+  const f = [LINK, FILE].map((suffix) => join(removed, `${id}${suffix}`)).find((p) => existsSync(p));
+  if (!f) throw new Error(`no removed link ${id}`);
+  renameSync(f, join(paths.inbox(lib), basename(f)));
 }
 
 /** How long another device's link is left for that device to import itself. */
