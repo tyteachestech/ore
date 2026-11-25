@@ -1,0 +1,24 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [271.03ms]
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [232.41ms]
+(pass) recall feedback checks its prequestion input at save (after) [164.26ms]
+(pass) recall feedback checks its prequestion input at save (before) [166.08ms]
+(pass) recall feedback checks its prequestion input at save (question) [171.06ms]
+(pass) recall feedback checks its prequestion input at save (skipped) [165.38ms]
+(pass) recall feedback checks its prequestion input at save (removed) [178.14ms]
+(pass) recall feedback checks its prequestion input at save (reordered) [162.17ms]
+(pass) recall feedback checks its prequestion input at save (unchanged) [159.48ms]
+(pass) recall feedback checks its prequestion input at save (marks) [195.11ms]
+(pass) a late prequestion check matches the current question and ordered points (more) [171.74ms]
+(pass) a late prequestion check matches the current question and ordered points (text) [192.93ms]
+(pass) a late prequestion check matches the current question and ordered points (order) [175.48ms]
+(pass) a late prequestion check matches the current question and ordered points (question) [176.18ms]
+(pass) a late prequestion check matches the current question and ordered points (unchanged) [170.22ms]
+(pass) a late prequestion check matches the current question and ordered points (evidence) [171.80ms]
+
+ 16 pass
+ 0 fail
+ 32 expect() calls
+Ran 16 tests across 1 file. [2.96s]

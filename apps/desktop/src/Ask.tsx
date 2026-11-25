@@ -7,16 +7,15 @@ import { aiMath, reply as math, wholeFormulas } from "./math-md";
 import { Grow } from "./Grow";
 import { Hint } from "./Hint";
 import { listen } from "@tauri-apps/api/event";
-import { cancelOre, oreJob, opt, type CardFull } from "./ore";
+import { cancelOre, oreJob, opt, type CardFull, type AskReply } from "./ore";
 import { is } from "./keys";
 import { errorText } from "./util";
 import { wordDiff } from "./worddiff";
 
-type Proposal = { question: string; answer: string };
+type Proposal = NonNullable<AskReply["proposal"]> & { ai: AskReply["ai"] };
 /** `was`: the card as it stood when the proposal came, so the change it shows survives Use this card (D161). */
 /** `stopped`: he stopped this reply part way; what was written by then is the reply. */
-type Turn = { role: "me" | "ai"; text: string; proposal?: Proposal | null; was?: Proposal; stopped?: boolean };
-type Reply = { reply: string; proposal: Proposal | null; session: string };
+type Turn = { role: "me" | "ai"; text: string; proposal?: Proposal | null; was?: AskReply["proposal"]; stopped?: boolean };
 
 const STARTERS = ["Why is this the answer?", "Give me an example", "Make this exercise clearer"];
 
@@ -67,11 +66,13 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
       if (p.stream === job && p.reply !== undefined) setChat((c) => (mine(c) ? { ...c, partial: p.reply } : c));
     }).catch(() => () => {});
     try {
+      // Stop can run while listener registration is pending, before there is a native job to cancel.
+      if (sending.current !== job) return;
       // His answer goes with every turn: a session from the AI he used before he switched starts a new one with it.
-      const r = await oreJob<Reply>(job, null, "ask", card.id, opt("message", message), opt("stream", job), ...(chat.session ? [opt("session", chat.session)] : []), opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : []));
+      const r = await oreJob<AskReply>(job, null, "ask", card.id, opt("message", message), opt("stream", job), ...(chat.session ? [opt("session", chat.session)] : []), opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : []));
       // Checked here, outside the updater: a throw inside one escapes this catch and takes Review down with it.
       if (typeof r?.reply !== "string" || !r.reply.trim()) throw new TypeError("ask gave no reply");
-      setChat((c) => (mine(c) ? { ...c, session: r.session, busy: false, failed: undefined, partial: undefined, job: undefined, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal, was: { question: card.question, answer: card.answer } }] } : c));
+      setChat((c) => (mine(c) ? { ...c, session: r.session, busy: false, failed: undefined, partial: undefined, job: undefined, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal && { ...r.proposal, ai: r.ai }, was: { question: card.question, answer: card.answer } }] } : c));
     } catch (e) {
       setChat((c) => (mine(c) ? { ...c, busy: false, partial: undefined, job: undefined, error: errorText(e, "answer that"), failed: message } : c));
     } finally {

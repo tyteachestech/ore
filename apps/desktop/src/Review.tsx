@@ -510,8 +510,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   /** A card's new wording, and an Explain card's key points when given, on the history: undo puts the old
    *  ones back (and on screen, if it still is). */
   /** Only what changed from `from` is written, so a field edited outside meanwhile keeps its edit (F174). */
-  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true, from: { question: string; answer: string; rubric?: string[] } = c) => {
-    const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric };
+  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true, from: { question: string; answer: string; rubric?: string[] } = c, ai?: CardFull["ai"] | null) => {
+    const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric, ai: c.ai ?? null };
     const changed = [
       ...(question !== from.question ? [opt("question", question)] : []),
       ...(answer !== from.answer ? [opt("answer", answer)] : []),
@@ -519,7 +519,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     ];
     if (!changed.length) return;
     dropAhead();
-    const saved = await ore<CardFull>("card", "set", c.id, ...changed, ...variantOpt(c));
+    const saved = await ore<CardFull>("card", "set", c.id, ...changed, ...(ai !== undefined ? [opt("ai", JSON.stringify(ai))] : []), ...variantOpt(c));
     const s = now.current;
     setCard((cur) => (cur?.id === c.id ? saved : cur));
     // New key points: the AI's grade was for the old ones, so it goes (and one still on its way). A point
@@ -541,8 +541,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       setDraft(loaded.current);
     }
     if (undoable) {
-      const put = (w: typeof was, f: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false, f);
-      notify("Exercise edit", "quiet", put(was, { question, answer, rubric }), put({ question, answer, rubric }, was));
+      const put = (w: typeof was, f: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false, f, ai === undefined ? undefined : w.ai);
+      notify("Exercise edit", "quiet", put(was, { question, answer, rubric, ai: saved.ai ?? null }), put({ question, answer, rubric, ai: saved.ai ?? null }, was));
     }
   };
 
@@ -1051,7 +1051,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                     setChat={(f) => setAsks((a) => ({ ...a, [card.id]: f(a[card.id] ?? NO_ASK) }))}
                     onApply={async (p) => {
                       try {
-                        await setText(card, p.question, p.answer);
+                        await setText(card, p.question, p.answer, undefined, true, card, p.ai);
                       } catch (e) {
                         notify(errorText(e), "error");
                         throw e;

@@ -32,6 +32,8 @@ export const Dig = z.object({
   asks: z.array(z.object({ idea: z.string(), q: z.string(), answer: z.string().optional() })).optional(),
   /** Set once nothing more is asked of him: the ideas' states stand. */
   done_at: z.string().optional(),
+  /** First-stage questions and own marks; absent in older records. ai remains the latest stage. */
+  ask_ai: AiStamp.optional(),
   ai: AiStamp.optional(),
 });
 export type Dig = z.infer<typeof Dig>;

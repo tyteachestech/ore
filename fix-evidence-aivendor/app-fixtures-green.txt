@@ -1,0 +1,11 @@
+bun test v1.4.4 (38afee6c8)
+
+apps/desktop/test/ask.test.ts:
+(pass) applying an Ask rewrite passes its author to the shared card command [243.53ms]
+(pass) Ask owns the request after listener registration (stop) [147.31ms]
+(pass) Ask owns the request after listener registration (normal) [143.99ms]
+
+ 3 pass
+ 0 fail
+ 3 expect() calls
+Ran 3 tests across 1 file. [546.00ms]

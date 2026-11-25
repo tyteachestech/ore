@@ -1,0 +1,9 @@
+bun test v1.4.4 (38afee6c8)
+
+apps/desktop/test/ore-answer.test.ts:
+(pass) F330: an AI reply, grade or check that comes back empty is a failure the screen can say, never a null to read [0.14ms]
+
+ 1 pass
+ 0 fail
+ 12 expect() calls
+Ran 1 test across 1 file. [12.00ms]

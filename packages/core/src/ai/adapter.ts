@@ -239,6 +239,7 @@ function claudeResult(r: Exec, events?: StreamEvent[]) {
     const msg = out.result ?? (r.stderr.trim().split("\n").pop()?.trim() || "unknown error");
     throw new Error(`claude: ${msg}${signInHint("claude", msg)}`);
   }
+  if (r.code !== 0) throw vendorFailure("claude", r);
   return out;
 }
 

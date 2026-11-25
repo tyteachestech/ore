@@ -1,0 +1,9 @@
+$ bun codex-out/aivendor/stop-before-start.tsx
+Warning: KaTeX doesn't work in quirks mode. Make sure your website has a suitable doctype.
+[DEEP] PASS run is pending while progress listener registers
+[DEEP] PASS Stop marks the request stopped before the vendor starts
+[DEEP] {"events":["STOP vendor job","START vendor job"],"error":"Stopped.","turns":[{"role":"me","text":"Why is this the answer?"}]}
+[DEEP] PASS the start and Stop use the same job ID, or the no-Stop control starts once
+[DEEP] FAIL a stopped request must not start after its progress listener resolves
+
+Exit: 1

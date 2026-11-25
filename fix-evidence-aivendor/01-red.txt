@@ -1,0 +1,166 @@
+bun test v1.4.4 (38afee6c8)
+
+apps/desktop/test/ask.test.ts:
+3 | 
+4 | // Run the real component in Happy DOM in a child: its native-boundary mocks cannot leak into other tests.
+5 | test("applying an Ask rewrite passes its author to the shared card command", async () => {
+6 |   const p = Bun.spawn([process.execPath, join(import.meta.dir, "fixtures/ask-provenance.tsx")], { stdout: "pipe", stderr: "pipe" });
+7 |   const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+8 |   expect({ code, output: code ? out + err : "" }).toEqual({ code: 0, output: "" });
+                                                      ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "code": 0,
+-   "output": "",
++   "code": 1,
++   "output": 
++ "[DEEP] {"replyAI":{"vendor":"codex","model":"rewrite-author","prompt_version":"chat@2"},"turn":{"role":"ai","text":"Try this wording.","proposal":{"question":"What strengthens memory?","answer":"Retrieval practice."},"was":{"question":"What helps?","answer":"Recall."}},"proposal":{"question":"What strengthens memory?","answer":"Retrieval practice."},"savedQuestion":"What strengthens memory?","savedAI":{"vendor":"claude","model":"first-author","prompt_version":"enrich@25"}}
++ Warning: KaTeX doesn't work in quirks mode. Make sure your website has a suitable doctype.
++ 33 |  await act(async()=>{button.click();await new Promise(r=>setTimeout(r,10));});
++ 34 |  const use=[...document.querySelectorAll('button')].find(b=>b.textContent==='Use this exercise')!;
++ 35 |  await act(async()=>{use.click();await apply;});
++ 36 |  const saved=findCard(lib,card.meta.id);
++ 37 |  console.log('[DEEP]',JSON.stringify({replyAI:result.ai,turn:state.turns.at(-1),proposal,savedQuestion:saved.question,savedAI:saved.meta.ai}));
++ 38 |  assert.deepEqual(saved.meta.ai,result.ai,'applying an AI rewrite must retain who wrote the new text');
++              ^
++ AssertionError: applying an AI rewrite must retain who wrote the new text
++ + actual - expected
++ 
++   {
++ +   model: 'first-author',
++ +   prompt_version: 'enrich@25',
++ +   vendor: 'claude'
++ -   model: 'rewrite-author',
++ -   prompt_version: 'chat@2',
++ -   vendor: 'codex'
++   }
++ 
++  generatedMessage: false,
++      actual: {
++   vendor: "claude",
++   model: "first-author",
++   prompt_version: "enrich@25",
++ },
++    expected: {
++   vendor: "codex",
++   model: "rewrite-author",
++   prompt_version: "chat@2",
++ },
++    operator: "deepStrictEqual",
++        diff: "simple",
++        code: "ERR_ASSERTION"
++ 
++       at /Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/apps/desktop/test/fixtures/ask-provenance.tsx:38:9
++ 
++ Bun v1.4.4 (macOS arm64)
++ "
++ ,
+  }
+
+- Expected  - 2
++ Received  + 43
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/apps/desktop/test/ask.test.ts:8:51)
+(fail) applying an Ask rewrite passes its author to the shared card command [256.38ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [265.00ms]
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-rewrite.test.ts:
+18 |   try {
+19 |     const item = await addText(lib, "Memory grows through retrieval.");
+20 |     for (const ai of [undefined, original]) {
+21 |       const c = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "What helps?", answer: "Recall.", rubric: [], ai });
+22 |       await studyCommands.card!.run(["set", c.meta.id], { question: "What strengthens memory?", ai: JSON.stringify(rewrite) });
+23 |       expect(findCard(lib, c.meta.id).meta.ai).toEqual(rewrite);
+                                                    ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "model": "second",
+-   "prompt_version": "chat@2",
+-   "vendor": "codex",
+- }
++ undefined
+
+- Expected  - 5
++ Received  + 1
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-rewrite.test.ts:23:48)
+(fail) card set saves AI wording and attribution together, and restores an unstamped original [34.69ms]
+270 | 
+271 | export function findVariant(lib: Library, cardRef: string, variantRef: string): Variant {
+272 |   const id = findCard(lib, cardRef).meta.id;
+273 |   const key = variantRef.toUpperCase();
+274 |   const v = readVariants(lib, id).find((x) => x.id === key || x.id.endsWith(key));
+275 |   if (!v) throw new Error(`card ${id} has no variant "${variantRef}"`);
+                          ^
+error: card 01M88JKGX833TDQAY01EQJAJ6W has no variant "v1"
+      at findVariant (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/src/remix.ts:275:21)
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/src/remix.ts:302:15)
+      at withLock (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/src/lock.ts:107:22)
+      at setVariant (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/src/remix.ts:301:10)
+      at run (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/cli/src/cmd-study.ts:122:27)
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-rewrite.test.ts:43:46)
+(fail) rewriting a variant saves and returns its own author without changing the original [15.61ms]
+
+ 0 pass
+ 2 fail
+ 1 expect() calls
+Ran 2 tests across 1 file. [86.00ms]
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-rewrite.test.ts:
+18 |   try {
+19 |     const item = await addText(lib, "Memory grows through retrieval.");
+20 |     for (const ai of [undefined, original]) {
+21 |       const c = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "What helps?", answer: "Recall.", rubric: [], ai });
+22 |       await studyCommands.card!.run(["set", c.meta.id], { question: "What strengthens memory?", ai: JSON.stringify(rewrite) });
+23 |       expect(findCard(lib, c.meta.id).meta.ai).toEqual(rewrite);
+                                                    ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "model": "second",
+-   "prompt_version": "chat@2",
+-   "vendor": "codex",
+- }
++ undefined
+
+- Expected  - 5
++ Received  + 1
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-rewrite.test.ts:23:48)
+(fail) card set saves AI wording and attribution together, and restores an unstamped original [29.46ms]
+39 |   try {
+40 |     const item = await addText(lib, "Memory grows through retrieval.");
+41 |     const c = writeNewCard(lib, { kind: "prompt", item: item.meta.id, skills: [], topics: [], content_type: "concept", question: "Why recall?", answer: "Effort.", rubric: ["Effort"], ai: original });
+42 |     appendJsonl(paths.variants(lib, c.meta.id), { id: "V1", card: c.meta.id, rev: 1, type: "new-case", setting: "School", question: "Why quiz?", answer: "Effort.", rubric: ["Effort"], maps: [0], ai: original, status: "ready", created: new Date().toISOString() });
+43 |     const result = await studyCommands.card!.run(["set", c.meta.id], { variant: "V1", question: "Why test yourself?", ai: JSON.stringify(rewrite) });
+44 |     expect(findVariant(lib, c.meta.id, "V1").ai).toEqual(rewrite);
+                                                      ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "model": "second",
+-   "prompt_version": "chat@2",
+-   "vendor": "codex",
++   "model": "first",
++   "prompt_version": "enrich@25",
++   "vendor": "claude",
+  }
+
+- Expected  - 3
++ Received  + 3
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-rewrite.test.ts:44:50)
+(fail) rewriting a variant saves and returns its own author without changing the original [16.05ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [80.00ms]

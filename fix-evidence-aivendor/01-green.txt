@@ -1,0 +1,13 @@
+bun test v1.4.4 (38afee6c8)
+
+apps/desktop/test/ask.test.ts:
+(pass) applying an Ask rewrite passes its author to the shared card command [227.06ms]
+
+packages/core/test/ai-rewrite.test.ts:
+(pass) card set saves AI wording and attribution together, and restores an unstamped original [35.99ms]
+(pass) rewriting a variant saves and returns its own author without changing the original [15.75ms]
+
+ 3 pass
+ 0 fail
+ 10 expect() calls
+Ran 3 tests across 2 files. [311.00ms]

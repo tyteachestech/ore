@@ -1,0 +1,18 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/vendor-schema.test.ts:
+(pass) AI output schemas > AskLibraryOutput is strict: every key required, no others [0.72ms]
+(pass) AI output schemas > ChatOutput is strict: every key required, no others [0.15ms]
+(pass) AI output schemas > CheckOutput is strict: every key required, no others [0.03ms]
+(pass) AI output schemas > EnrichOutput is strict: every key required, no others [0.47ms]
+(pass) AI output schemas > ExplainOutput is strict: every key required, no others [0.04ms]
+(pass) AI output schemas > GradeOutput is strict: every key required, no others [0.09ms]
+(pass) AI output schemas > KeyPointsOutput is strict: every key required, no others [0.06ms]
+(pass) AI output schemas > RecallFeedbackOutput is strict: every key required, no others [0.06ms]
+(pass) AI output schemas > ResearchOutput is strict: every key required, no others [0.11ms]
+(pass) AI output schemas > TutorOutput is strict: every key required, no others [0.15ms]
+
+ 10 pass
+ 0 fail
+ 10 expect() calls
+Ran 10 tests across 1 file. [39.00ms]

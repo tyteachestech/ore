@@ -1,0 +1,13 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/card-edit.test.ts:
+(pass) editing an Explain card's key points > saves the corrected points with the answer, and grading marks against them [231.77ms]
+(pass) editing an Explain card's key points > refuses points that wouldn't read back: none, an empty one, or two lines in one [11.18ms]
+(pass) editing an Explain card's key points > a Fact card has no key points to give [11.04ms]
+(pass) fill in the blank (D182) > a blank never shows what it hides: written, read and edited, it is ____ [10.41ms]
+(pass) fill in the blank (D182) > a drafted blank hides one exact thing in a statement of a Fact exercise [0.23ms]
+
+ 5 pass
+ 0 fail
+ 23 expect() calls
+Ran 5 tests across 1 file. [297.00ms]

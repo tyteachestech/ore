@@ -1,0 +1,193 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [363.18ms]
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [325.64ms]
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (after) [166.10ms]
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (before) [205.63ms]
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (question) [283.64ms]
+ZodError: [
+  {
+    "code": "invalid_value",
+    "values": [
+      "past",
+      "left_out"
+    ],
+    "path": [
+      "prequestions",
+      0,
+      "skipped"
+    ],
+    "message": "Invalid option: expected one of \"past\"|\"left_out\""
+  }
+]
+(fail) recall feedback checks its prequestion input at save (skipped) [170.88ms]
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (removed) [223.15ms]
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (reordered) [166.21ms]
+(pass) recall feedback checks its prequestion input at save (unchanged) [170.18ms]
+(pass) recall feedback checks its prequestion input at save (marks) [188.88ms]
+
+ 4 pass
+ 6 fail
+ 13 expect() calls
+Ran 10 tests across 1 file. [2.30s]
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (after) [252.59ms]
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (before) [159.86ms]
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (question) [172.87ms]
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (skipped) [165.79ms]
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (removed) [182.43ms]
+125 |   const feedback = findItem(lib, item.meta.id).meta.recall?.feedback;
+126 |   if (change === "unchanged" || change === "marks") {
+127 |     expect(result.error).toBeUndefined();
+128 |     expect(feedback?.feedback).toBe("Try recalling.");
+129 |   } else {
+130 |     expect(String(result.error)).toMatch(/changed.*feedback/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*feedback/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:130:34)
+(fail) recall feedback checks its prequestion input at save (reordered) [233.66ms]
+(pass) recall feedback checks its prequestion input at save (unchanged) [182.69ms]
+(pass) recall feedback checks its prequestion input at save (marks) [165.92ms]
+
+ 2 pass
+ 2 filtered out
+ 6 fail
+ 10 expect() calls
+Ran 8 tests across 1 file. [1.55s]
