@@ -133,22 +133,25 @@ function topBlock(scroll: HTMLElement, doc: HTMLElement): { el: HTMLElement; ind
     else hi = mid - 1;
   }
   const el = blocks[found];
-  if (!el) return null;
+  // Above every block that shows (a book's folded front matter measures as the page's top): no place to keep.
+  if (!el || el.closest("[hidden]")) return null;
   const r = el.getBoundingClientRect();
   return { el, index: found, at: r.height ? (top - r.top) / r.height : 0 };
 }
 
 /** Scrolls so the view's top is `at` of the way into `el`. */
-function toBlock(scroll: HTMLElement, el: HTMLElement, at: number) {
+function toBlock(scroll: HTMLElement, el: HTMLElement, at: number): boolean {
+  if (el.closest("[hidden]")) return false; // folded away since: nowhere to go back to
   const n = el.getBoundingClientRect();
   scroll.scrollTop += n.top + at * n.height - scroll.getBoundingClientRect().top;
+  return true;
 }
 
 /** Finds the block at the top of `scroll`'s view inside `doc` and returns a function that scrolls it
  *  back to the same spot, as Books keeps your paragraph when the text size changes. */
 export function placeOf(scroll: HTMLElement, doc: HTMLElement): () => void {
   const b = topBlock(scroll, doc);
-  return b ? () => toBlock(scroll, b.el, b.at) : () => {};
+  return b ? () => void toBlock(scroll, b.el, b.at) : () => {};
 }
 
 /** His place in a source, to save: the block at the top of the view and how far into it, as "index:at". A
@@ -162,9 +165,7 @@ export function placeAt(scroll: HTMLElement, doc: HTMLElement): string | null {
 export function toPlace(scroll: HTMLElement, doc: HTMLElement, place: string): boolean {
   const m = place.match(/^(\d+):([\d.]+)$/);
   const el = m && doc.querySelectorAll<HTMLElement>(BLOCKS)[+m[1]!];
-  if (!m || !el) return false;
-  toBlock(scroll, el, +m[2]!);
-  return true;
+  return !!m && !!el && toBlock(scroll, el, +m[2]!);
 }
 
 /** The reading looks now, outside React. */

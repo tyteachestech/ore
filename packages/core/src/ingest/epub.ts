@@ -4,6 +4,7 @@ import { posix } from "node:path";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
 import { cleanDate, cleanTitle } from "./check.ts";
+import { BACK_START, FRONT_END, backPages, frontPages, type PageFacts } from "./front-matter.ts";
 import { td } from "./markdown.ts";
 
 export interface EpubDoc {
@@ -117,6 +118,38 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
       .filter((e) => /\bcover-image\b/.test(e.getAttribute("properties") ?? "") || (coverId && e.getAttribute("id") === coverId) || (/^image\//.test(e.getAttribute("media-type") ?? "") && coverWord(`${e.getAttribute("id")} ${posix.basename(e.getAttribute("href") ?? "")}`)))
       .map((e) => posix.normalize(posix.join(dir, decodeURIComponent(e.getAttribute("href") ?? "")))),
   );
+  // What the book says each page is: its guide and landmarks (kinds), and its table of contents (names).
+  const kinds = new Map<string, string[]>();
+  const labels = new Map<string, string[]>();
+  const say = (map: Map<string, string[]>, from: string, href: string | null, what: string | null | undefined) => {
+    const word = what?.replace(/\s+/g, " ").trim();
+    if (!href || !word || /^[a-z]+:/i.test(href)) return;
+    let file: string;
+    try {
+      file = posix.normalize(posix.join(posix.dirname(from), decodeURIComponent(href.split("#")[0]!)));
+    } catch {
+      return;
+    }
+    map.set(file, [...(map.get(file) ?? []), word]);
+  };
+  for (const r of Array.from(opf.getElementsByTagName("reference"))) say(kinds, opfPath, r.getAttribute("href"), r.getAttribute("type"));
+  for (const e of Array.from(opf.getElementsByTagName("item"))) {
+    const file = posix.join(dir, decodeURIComponent(e.getAttribute("href") ?? ""));
+    if (!files[file]) continue;
+    if (/\bnav\b/.test(e.getAttribute("properties") ?? "")) {
+      for (const nav of Array.from(parse(read(file)).querySelectorAll("nav"))) {
+        const type = nav.getAttribute("epub:type") ?? "";
+        for (const a of Array.from(nav.querySelectorAll("a[href]"))) {
+          if (/\blandmarks\b/.test(type)) for (const t of (a.getAttribute("epub:type") ?? "").split(/\s+/)) say(kinds, file, a.getAttribute("href"), t);
+          else if (/\btoc\b/.test(type)) say(labels, file, a.getAttribute("href"), a.textContent);
+        }
+      }
+    } else if (e.getAttribute("media-type") === "application/x-dtbncx+xml") {
+      const ncx = new DOMParser().parseFromString(read(file), "text/xml");
+      for (const point of Array.from(ncx.getElementsByTagName("navPoint"))) say(labels, file, point.getElementsByTagName("content")[0]?.getAttribute("src") ?? null, point.getElementsByTagName("text")[0]?.textContent);
+    }
+  }
+  const facts: PageFacts[] = [];
   let notes = 0;
   for (const path of spine) {
     const image = (src: string) => {
@@ -140,6 +173,10 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
       return target && NOTE.test(kind(target)) ? target : undefined;
     };
     const page = docs.get(path)!;
+    // The page's own kind, from its body and the blocks that hold it: a heading marked "title" names the heading, not the page.
+    const own = Array.from(page.querySelectorAll(":is(body, section, article, div, nav, aside)[epub\\:type], :is(body, section, article, div, nav, aside)[role]")).flatMap((e) => kind(e).replace(/\bdoc-/g, "").split(/\s+/).filter(Boolean));
+    const anchors = Array.from(page.querySelectorAll("a[href]"));
+    const fact: PageFacts = { types: [...own, ...(kinds.get(path) ?? [])], labels: labels.get(path) ?? [], text: page.body?.textContent ?? "", links: anchors.length, linkWords: anchors.reduce((n, a) => n + (a.textContent?.match(/\S+/g) ?? []).length, 0) };
     const { md, pictures } = chapterMarkdown(page, image, note, () => ++notes);
     if (pictures) {
       // A page with only an image before the text begins (the cover, a title plate), or one the book marks
@@ -153,9 +190,17 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
       continue;
     }
     for (const [k, v] of used) assets.set(k, v);
+    facts.push({ ...fact, heading: md.match(/^#{1,6}[ \t]+(.+)$/m)?.[1]?.replace(/[*_`\\]/g, "") });
     chapters.push(`<!-- chapter ${chapters.length + 1} -->\n\n${md}`);
   }
   if (!chapters.length) throw new Error("EPUB has no readable text (DRM-protected?)");
   const creators = text("dc:creator");
+  // The publisher's pages before the text stay, in their place; the mark after them lets the reader fold them.
+  const title = text("dc:title")[0];
+  const names = [title, title?.split(/[:\u2014(]/)[0], ...creators].filter((s): s is string => !!s);
+  const front = frontPages(facts, names);
+  const back = backPages(facts, names, front);
+  if (back < chapters.length) chapters[back] = `${BACK_START}\n\n${chapters[back]}`;
+  if (front) chapters[front] = `${FRONT_END}\n\n${chapters[front]}`;
   return { title: cleanTitle(text("dc:title")[0], { numbers: true }), author: creators.length ? creators.join(", ") : undefined, published: cleanDate(text("dc:date")[0]), body: chapters.join("\n\n") + "\n", assets: [...assets.values()] };
 }

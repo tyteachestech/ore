@@ -1131,6 +1131,73 @@ describe("import coverage: EPUB", () => {
     expect(r.item.meta.chapter_recalls?.map((c) => c.n)).toEqual([1]);
   });
 
+  // make-study-epubs.ts: front-matter.epub is a trade publisher's book as Tyler's opened (F649): links,
+  // "Thank you for buying", newsletter buttons and a rights notice before the prologue, which the publisher marks
+  // "frontmatter" too. Every page stays, in the book's order (D122); the mark is where the reader's fold ends.
+  const FRONT_END = "<!-- end of front matter -->";
+  const BACK_START = "<!-- back matter -->";
+  test("EPUB: a publisher's pages before the text are kept and marked as front matter; the prologue is the text", async () => {
+    const item = await addSource(await tempLibrary(), file("front-matter.epub"));
+    const [front, text] = item.body.split(FRONT_END);
+    expect(item.body.match(new RegExp(FRONT_END, "g"))).toHaveLength(1);
+    for (const kept of ["Begin Reading", "Thank you for buying this Lantern House ebook.", "sign up for our newsletters", "[![Sign Up](assets/", "for your personal use only", "To the night shift, who kept the lamp lit"]) expect(front).toContain(kept);
+    expect(front).not.toContain("Prologue");
+    expect(text).toMatch(/^\n\n<!-- chapter 4 -->\n\n# Prologue: The First Evening\n/);
+    for (const kept of ["nobody hurried it.", "# Part I", "# What a Lamp Keeps", "burns evenly for years."]) expect(text).toContain(kept);
+    // Chapters keep their numbers, front matter included, so a recall saved before this stays with its chapter.
+    expect([...(item.body.match(/<!-- chapter \d+ -->/g) ?? [])]).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => `<!-- chapter ${n} -->`));
+  });
+
+  test("EPUB: the publisher's last pages (also by, about the author, the newsletter page) are kept and marked as back matter; the acknowledgments and notes are the text", async () => {
+    const item = await addSource(await tempLibrary(), file("front-matter.epub"));
+    expect(item.body.match(new RegExp(BACK_START, "g"))).toHaveLength(1);
+    const [text, back] = item.body.split(FRONT_END)[1]!.split(BACK_START);
+    for (const kept of ["# Acknowledgments", "lent their ledgers.", "# Notes", "the harbour ledger of 1911."]) expect(text).toContain(kept);
+    expect(back).toMatch(/^\n\n<!-- chapter 9 -->\n\nALSO BY \[ADA LEARNER\]/);
+    for (const kept of ["*The Quiet Kettle*", "A NOTE ABOUT THE AUTHOR", "keeps lamps in a harbour town.", "Thank you for buying this Lantern House ebook.", "[![Sign Up](assets/"]) expect(back).toContain(kept);
+  });
+
+  test("EPUB: a book with no marks folds its title, copyright and contents pages by what they say, and nothing after the text starts", async () => {
+    const item = await addSource(await tempLibrary(), file("front-matter-plain.epub"));
+    const [front, text] = item.body.split(FRONT_END);
+    for (const kept of ["TIDE TABLES FOR BEGINNERS", "All rights reserved.", "ISBN 978-0-00-000000-2", "CONTENTS"]) expect(front).toContain(kept);
+    // The text starts early, on a two-line note: it is the author's, so it shows.
+    expect(text).toMatch(/^\n\n<!-- chapter 4 -->\n\nA NOTE TO THE READER\n\nRead chapter 1 with a real tide table open beside you\./);
+    expect(text).toContain("READING THE TABLE");
+    // The copyright page at the back of the book is not front matter: it stays where it is, as the back matter.
+    expect(text).toMatch(/<!-- back matter -->\n\n<!-- chapter 6 -->\n\nCopyright © 2019 by Ada Learner\. All rights reserved\.\n$/);
+  });
+
+  test("EPUB: an introduction between the title page and the copyright page shows, read by its heading over a paragraph, though its heading is marked \"title\" and the book's start-reading mark points at the title page", async () => {
+    const lib = await tempLibrary();
+    const xhtml = (body: string) => `<?xml version="1.0" encoding="utf-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>t</title></head><body>${body}</body></html>`;
+    const intro = Array.from({ length: 12 }, (_, i) => `Tides are the slow breath of the sea, line ${i + 1}.`).join(" ");
+    const epub = zipSync({
+      mimetype: strToU8("application/epub+zip"),
+      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
+      "OEBPS/content.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Harbour Notes</dc:title><dc:creator>Ada Learner</dc:creator></metadata>
+<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="t" href="title.xhtml" media-type="application/xhtml+xml"/><item id="i" href="intro.xhtml" media-type="application/xhtml+xml"/><item id="c" href="copy.xhtml" media-type="application/xhtml+xml"/><item id="one" href="one.xhtml" media-type="application/xhtml+xml"/></manifest>
+<spine><itemref idref="t"/><itemref idref="i"/><itemref idref="c"/><itemref idref="one"/></spine></package>`),
+      "OEBPS/nav.xhtml": strToU8(xhtml(`<nav epub:type="landmarks"><ol><li><a epub:type="bodymatter" href="title.xhtml">Start</a></li></ol></nav>`)),
+      "OEBPS/title.xhtml": strToU8(xhtml(`<section epub:type="titlepage"><p>HARBOUR NOTES</p><p>Ada Learner</p></section>`)),
+      "OEBPS/intro.xhtml": strToU8(xhtml(`<section><h1 epub:type="title">Introduction</h1><p>${intro}</p></section>`)),
+      "OEBPS/copy.xhtml": strToU8(xhtml(`<section epub:type="copyright-page"><p>Copyright © 2021 Ada Learner. All rights reserved.</p></section>`)),
+      "OEBPS/one.xhtml": strToU8(xhtml(`<section epub:type="chapter"><h1>One</h1><p>${intro}</p></section>`)),
+    });
+    const path = join(lib.root, "harbour.epub");
+    writeFileSync(path, epub);
+    const body = (await addSource(lib, path)).body;
+    const [front, text] = body.split(FRONT_END);
+    expect(front).toContain("HARBOUR NOTES");
+    expect(front).not.toContain("Introduction");
+    expect(text).toMatch(/^\n\n<!-- chapter 2 -->\n\n# Introduction\n/);
+    expect(text).toContain("All rights reserved.");
+  });
+
+  test("EPUB: a book that opens and ends on its text has no front or back matter mark", async () => {
+    for (const name of ["chapters.epub", "book.epub", "plates.epub"]) expect((await addSource(await tempLibrary(), file(name))).body).not.toMatch(/matter -->/);
+  });
+
   test("EPUB: the book's date, and its footnotes and endnotes as Markdown footnotes under the chapter that cites them", async () => {
     const item = await addSource(await tempLibrary(), file("book.epub"));
     expect(item.meta).toMatchObject({ type: "epub", title: "A Small Book of Remembering", author: "Ada Learner, Ben Reviewer", published: "2024-03-01" });

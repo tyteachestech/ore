@@ -738,6 +738,16 @@ body:has(aside.tutor:not(.float)) .toasts { max-width: min(70vw, calc(100vw - va
 .preq-head .caret.open { transform: rotate(90deg); }
 .preq-head .quiet { font-weight: 400; color: var(--faint); margin-left: auto; white-space: nowrap; }
 .preq-head.failed:hover { color: var(--muted); }
+/* A book's front matter (title page, copyright, contents), folded under one row drawn as the prequestions' row is. */
+.front-matter { margin: 0 0 8px; }
+.doc > .front-matter + * { margin-top: 0.6em; }
+.front-head { display: flex; align-items: center; gap: 6px; min-height: 28px; margin-left: -4px; padding: 0 4px; font: 500 13px/1.45 var(--font); color: var(--muted); text-align: left; cursor: pointer; }
+.front-head:hover { color: var(--text); }
+.front-head .caret { color: var(--faint); flex: none; transition: transform var(--t-1) ease-out; }
+.front-head .caret.open { transform: rotate(90deg); }
+.front-body { padding-top: 8px; }
+/* The cover opens larger on a click. */
+img.doc-thumb { cursor: zoom-in; }
 .preq-retry { flex: none; color: var(--accent); font-weight: 600; padding: 2px 6px; border-radius: 6px; }
 .preq-retry:hover { background: var(--bg-hover); }
 .preq-retry:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
@@ -768,11 +778,11 @@ body:has(aside.tutor:not(.float)) .toasts { max-width: min(70vw, calc(100vw - va
 .preq .preq-input:focus-visible { box-shadow: inset 0 -1px 0 var(--accent); }
 /* The question marks hang in the margin, in the column the highlight marks use, so the questions' text lines up
    with the article's (Matter's hanging marks); the answer field is a hairline frame on the same edge. */
-.preq-head { margin-left: -22px; }
+.preq-head, .front-head { margin-left: -22px; }
 .preq-q { margin-left: -34px; width: calc(100% + 40px); }
 .preq .preq-input { width: 100%; margin-left: 0; padding: 4px 8px; border: 1px solid var(--border); }
 .preq .preq-input:focus-visible { border-color: var(--focus); box-shadow: none; }
-.phone .preq-head { margin-left: -4px; }
+.phone .preq-head, .phone .front-head { margin-left: -4px; }
 .phone .preq-q { margin-left: -6px; width: calc(100% + 12px); }
 .phone .preq .preq-input { width: calc(100% - 28px); margin-left: 28px; }
 .field { background: transparent; }
@@ -3363,7 +3373,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .menu-sub { box-sizing: border-box; width: calc(100vw - 16px); max-width: none; max-height: 50vh; overflow-y: auto; margin: 0 8px max(8px, calc(env(safe-area-inset-bottom, 0px) + 8px)); }
 .phone .popup .intent { height: 44px; }
 .phone .popup .intent:is(.icon, .remove) { min-width: 44px; }
-.phone .preq-head { min-height: 44px; }
+.phone .preq-head, .phone .front-head { min-height: 44px; }
 /* A key point ticks from anywhere on its row, as a Reminders row does, not only from its 28pt circle. */
 .phone .quiz-points li { position: relative; min-height: 44px; align-items: center; }
 .phone .quiz-points .quiz-mark::before { content: ""; position: absolute; inset: 0; }
