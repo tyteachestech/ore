@@ -1729,3 +1729,47 @@ journey("source note: a new table fits the side panel, its three columns whole (
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.press("Backspace");
 });
+
+journey("note table: its controls let go when the table is deleted under them, and the / menu scrolling after throws nothing (F650)", async (page) => {
+  const thrown: string[] = [];
+  const onError = (e: Error) => void thrown.push(e.message);
+  page.on("pageerror", onError);
+  try {
+  const pm = page.locator(".note-editor .ProseMirror").first();
+  await openSource(page, AGENTS);
+  await pm.click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await until("the note is empty", async () => ((await pm.textContent()) ?? "").trim() === "");
+  // Two lines, then a table, so the table sits well into the note.
+  await page.keyboard.type("A first line of the note.");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/table");
+  await page.locator(".note-menu-row.on", { hasText: "Table" }).waitFor();
+  await page.keyboard.press("Enter");
+  const cell = page.locator(".note-editor .note-table td, .note-editor .note-table th").first();
+  await cell.waitFor();
+  // The pointer rests on a cell: the table's + and ⋮⋮ show, holding where the table is.
+  await cell.hover();
+  await page.locator(".table-ctl").first().waitFor();
+  // The table goes from under them (the pointer has not moved), and the / menu's list scrolls inside the note.
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("ControlOrMeta+a");
+  await page.keyboard.press("Backspace");
+  await until("the note is empty", async () => ((await pm.textContent()) ?? "").trim() === "");
+  // A press on a control still drawn over the empty note lets go of them instead of asking for the table.
+  const bar = page.locator(".table-ctl button").first();
+  if (await bar.count()) await bar.click({ force: true }).catch(() => {});
+  await page.keyboard.type("/", { delay: 20 });
+  await page.locator(".note-menu").waitFor();
+  for (let i = 0; i < 15; i++) await page.keyboard.press("ArrowDown");
+  await page.waitForTimeout(200);
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Backspace");
+  } finally {
+    page.off("pageerror", onError);
+  }
+  if (thrown.length) throw new Error(`the page threw: ${thrown[0]}`);
+  if (await page.locator(".table-ctl").count()) throw new Error("the table's controls still show with no table");
+});

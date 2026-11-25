@@ -78,6 +78,7 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "office-word-outline-after-plain", add: join(FIX, "office/word-outline-after-plain.docx") },
   { name: "office-notebook-cell-attachments", add: join(FIX, "office/notebook-cell-attachments.ipynb") },
   { name: "office-text-reference", add: join(FIX, "office/text-reference.md") },
+  { name: "epub-front-matter", add: join(FIX, "files/front-matter.epub") }, // make-study-epubs.ts: a publisher's pages before the text, marked
   { name: "word", add: join(FIX, "files/notes.docx") },
   { name: "powerpoint", add: join(FIX, "files/deck.pptx") },
   { name: "rtf-textedit", add: join(FIX, "files/textedit.rtf") },

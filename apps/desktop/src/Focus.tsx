@@ -5,9 +5,10 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 const BLOCKS = "p, li, h1, h2, h3, h4, h5, h6, pre, blockquote, td, th";
 
-/** The text blocks of `doc` in reading order: innermost only (a list item's paragraph, not the item). */
+/** The text blocks of `doc` in reading order: innermost only (a list item's paragraph, not the item), and only
+ *  those on the page (not a book's folded front matter). */
 export function blocksOf(doc: HTMLElement): HTMLElement[] {
-  return [...doc.querySelectorAll<HTMLElement>(BLOCKS)].filter((el) => !el.querySelector(BLOCKS) && !!el.textContent?.trim());
+  return [...doc.querySelectorAll<HTMLElement>(BLOCKS)].filter((el) => !el.querySelector(BLOCKS) && !!el.textContent?.trim() && !el.closest("[hidden]"));
 }
 
 /** The block where the focus starts: the first one reaching past a third of the way down the view. */

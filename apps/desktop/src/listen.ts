@@ -9,7 +9,8 @@ export function sentences(root: HTMLElement): Range[] {
   const out: Range[] = [];
   const seg = new Intl.Segmenter(undefined, { granularity: "sentence" });
   for (const block of root.querySelectorAll<HTMLElement>(BLOCKS)) {
-    if (block.querySelector(BLOCKS) || block.closest("pre")) continue;
+    // Folded front matter (a book's copyright page) is not read aloud; opened, it is.
+    if (block.querySelector(BLOCKS) || block.closest("pre, [hidden]")) continue;
     const nodes: Text[] = [];
     const walk = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
       acceptNode: (n) => (n.parentElement?.closest(".ts, pre, code, .katex, [data-noindex]") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
