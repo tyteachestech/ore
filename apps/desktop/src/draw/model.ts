@@ -591,14 +591,19 @@ export function clone(src: Els, dx: number, dy: number): El[] {
   const groups = new Map<string, string>();
   const g = (id: string) => groups.get(id) ?? (groups.set(id, uid()), groups.get(id)!);
   const bind = (b: Binding | null | undefined) => (b && ids.has(b.elementId) ? { ...b, elementId: ids.get(b.elementId)! } : null);
-  return src.map((e) => ({
-    ...translate(e, dx, dy),
-    id: ids.get(e.id)!,
-    groupIds: e.groupIds.map(g),
-    containerId: e.containerId ? (ids.get(e.containerId) ?? null) : e.containerId,
-    ...(isLinear(e) ? { startBinding: bind(e.startBinding), endBinding: bind(e.endBinding) } : {}),
-    boundElements: null,
-  }));
+  return src.map((e) => {
+    const cell = cellOf(e);
+    return {
+      ...translate(e, dx, dy),
+      id: ids.get(e.id)!,
+      groupIds: e.groupIds.map(g),
+      // Copy/paste and Duplicate both need a new matrix identity, shared only by the copied cells.
+      ...(cell ? { customData: { ...e.customData, oreCell: { ...cell, matrix: g(cell.matrix) } } } : {}),
+      containerId: e.containerId ? (ids.get(e.containerId) ?? null) : e.containerId,
+      ...(isLinear(e) ? { startBinding: bind(e.startBinding), endBinding: bind(e.endBinding) } : {}),
+      boundElements: null,
+    };
+  });
 }
 
 /** Duplicates the selection beside itself; returns the scene and the copies' ids. */
@@ -1346,7 +1351,8 @@ export function growMatrix(els: Els, mid: string, what: "row" | "col"): El[] {
   if (!cells.length) return [...els];
   const nr = Math.max(...cells.map((e) => cellOf(e)!.row)) + 1;
   const nc = Math.max(...cells.map((e) => cellOf(e)!.col)) + 1;
-  const template = cells.find((e) => cellOf(e)!.row === nr - 1 && cellOf(e)!.col === nc - 1)!;
+  // Individual cells can be deleted. Grow from a surviving cell even when the last corner is gone.
+  const template = cells.find((e) => cellOf(e)!.row === nr - 1 && cellOf(e)!.col === nc - 1) ?? cells[cells.length - 1]!;
   const head = cells.find((e) => cellOf(e)!.row === 0 && cellOf(e)!.col === 1) ?? template;
   const add: El[] = [];
   const count = what === "row" ? nc : nr;

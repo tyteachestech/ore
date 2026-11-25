@@ -231,3 +231,40 @@ describe("toggle headings", () => {
   });
 });
 
+
+for (const kind of ["toggle", "th1", "th2", "th3", "code"] as const) {
+  test(`turn into ${kind} retains inline equations through save, reopen and undo`, async () => {
+    const input = "Equation $$x+1$$ and $$y^2$$\n";
+    const out = await act(input, "Equation", (v, b) => ops.turnInto(v.state, b, kind));
+    expect(out).toContain("x+1");
+    expect(out).toContain("y^2");
+    const reopened = await act(out, "Equation", () => null);
+    expect(reopened).toBe(out);
+    const history = await import("@milkdown/kit/prose/history");
+    expect(await act(input, "Equation", (v, b) => {
+      v.dispatch(ops.turnInto(v.state, b, kind)!);
+      history.undo(v.state, v.dispatch);
+      return null;
+    })).toBe(input);
+  });
+}
+
+for (const kind of ["toggle", "code"] as const) {
+  test(`turn into ${kind} retains image and diagram references`, async () => {
+    const out = await act('See ![Photo](images/photo.png "Caption") and ![Diagram](diagrams/map.excalidraw)\n', "See", (v, b) => ops.turnInto(v.state, b, kind));
+    expect(out).toContain("images/photo.png");
+    expect(out).toContain("diagrams/map.excalidraw");
+    expect(out).toContain("Photo");
+    expect(out).toContain("Caption");
+    expect(await act(out, "See", () => null)).toBe(out);
+  });
+}
+
+test("turning an empty inline equation into code makes an empty code block", async () => {
+  const out = await act("Equation\n", "Equation", (v) => {
+    const equation = v.state.schema.nodes.math_inline!.create({ value: "" });
+    v.dispatch(v.state.tr.replaceWith(1, v.state.doc.firstChild!.nodeSize - 1, equation));
+    return ops.turnInto(v.state, ops.blockAt(v.state.doc, 1)!, "code");
+  });
+  expect(out.trim()).toBe("```\n```");
+});
