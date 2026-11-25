@@ -94,7 +94,15 @@ async function fetchOnce(url: string): Promise<{ text: string; url: string; type
   const charset = /charset\s*=\s*["']?([^\s;"']+)/i.exec(type)?.[1];
   const head = new TextDecoder("latin1").decode(bytes.subarray(0, 512));
   const declared = /^\s*<\?xml\s[^>]*encoding\s*=\s*["']([^"']+)["']/i.exec(head)?.[1];
-  const text = new TextDecoder(bom ?? charset ?? declared ?? "utf-8").decode(bytes);
+  // A label the decoder doesn't know ("unicode", a typo) reads as UTF-8, as before, never a failed feed.
+  const decoder = [bom, charset, declared].flatMap((label) => {
+    try {
+      return label ? [new TextDecoder(label)] : [];
+    } catch {
+      return [];
+    }
+  })[0] ?? new TextDecoder();
+  const text = decoder.decode(bytes);
   return { text, url: res.url || url, type };
 }
 

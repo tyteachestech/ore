@@ -94,23 +94,25 @@ export function removeQueuedLink(lib: Library, id: string, keepForUndo = false):
     if (f.endsWith(FILE) && at && at !== ".." && at !== ".") dir = join(paths.inbox(lib), at);
   } catch {}
   unlinkSync(f);
-  if (dir) {
-    // Live and undoable descriptors can share a capture directory after sync. Inspect
-    // descriptors directly: queuedLinks omits attachments that have not arrived yet.
-    for (const folder of [paths.inbox(lib), join(paths.inbox(lib), "removed")]) {
-      if (!existsSync(folder)) continue;
-      for (const name of readdirSync(folder).filter((n) => n.endsWith(FILE))) {
-        try {
-          const file = (JSON.parse(readFileSync(join(folder, name), "utf8")) as QueuedLink).file;
-          if (file && join(paths.inbox(lib), file.split("/")[0]!) === dir) return;
-        } catch {
-          // A half-synced descriptor may own the bytes; leave them until it is readable.
-          return;
-        }
+  if (dir && !fileDirInUse(lib, dir)) rmSync(dir, { recursive: true, force: true });
+}
+
+/** Whether a waiting or removed-for-Undo entry still names a file in this folder: synced copies of one entry share
+ *  it. Read from the entries themselves, since queuedLinks leaves out a file that hasn't arrived; one that doesn't
+ *  parse (half-synced) may own the bytes, so they stay until it reads. */
+function fileDirInUse(lib: Library, dir: string): boolean {
+  for (const folder of [paths.inbox(lib), removedDir(lib)]) {
+    if (!existsSync(folder)) continue;
+    for (const name of readdirSync(folder).filter((n) => n.endsWith(FILE))) {
+      try {
+        const file = (JSON.parse(readFileSync(join(folder, name), "utf8")) as QueuedLink).file;
+        if (file && join(paths.inbox(lib), file.split("/")[0]!) === dir) return true;
+      } catch {
+        return true;
       }
     }
-    rmSync(dir, { recursive: true, force: true });
   }
+  return false;
 }
 
 /** Where a removed entry waits for an Undo, kept a day: the Undo history doesn't outlive the app. */
@@ -124,9 +126,13 @@ function pruneRemoved(lib: Library, now = Date.now()) {
     const f = join(removedDir(lib), name);
     try {
       if (now - statSync(f).mtimeMs < KEEP_REMOVED_MS) continue;
-      const id = name.replace(SUFFIX, "");
-      if (SUFFIX.test(name) && !strays(id) && !find(lib, id)) rmSync(join(paths.inbox(lib), id), { recursive: true, force: true });
+      let file: string | undefined;
+      try {
+        file = (JSON.parse(readFileSync(f, "utf8")) as QueuedLink).file;
+      } catch {}
       rmSync(f, { force: true });
+      const dir = file && !strays(file) ? join(paths.inbox(lib), file.split("/")[0]!) : undefined;
+      if (dir && !fileDirInUse(lib, dir)) rmSync(dir, { recursive: true, force: true });
     } catch {}
   }
 }
