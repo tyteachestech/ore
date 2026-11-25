@@ -385,7 +385,7 @@ test("an exercise ⌘Z brings back is a new showing, even when the screen never 
   expect(t.s.turn).toBe(shownAs + 2);
 });
 
-// F-new-review-undo-while-saving
+// F617
 test("a rating's undo that arrives while another rating saves is refused, not counted as done", async () => {
   const t = await open({ slow: ["review"] });
   void t.rate("a");
