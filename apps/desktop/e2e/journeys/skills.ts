@@ -777,7 +777,11 @@ journey("skill picker: two skills added in a source, then ⌘Z twice takes both 
     await page.keyboard.press("Backspace");
     await page.keyboard.type(k.name);
     await page.keyboard.press("Enter");
-    await until(`filed under ${k.name} by keys`, async () => (await item()).skills.includes(k.id));
+    // F631: when the tick never lands, say what the picker did with the keys instead (seen three times on CI).
+    await until(`filed under ${k.name} by keys`, async () => (await item()).skills.includes(k.id)).catch(async (e: Error) => {
+      const seen = await page.evaluate(() => ({ toasts: [...document.querySelectorAll(".toast")].map((t) => t.textContent), typed: (document.querySelector(".skill-picker .menu-input") as HTMLInputElement | null)?.value, focus: document.activeElement?.className, on: document.querySelector(".skill-picker [aria-selected=true]")?.textContent }));
+      throw new Error(`${e.message}: ${JSON.stringify(seen)}`);
+    });
     await page.getByText(`Filed under ${k.name}`, { exact: true }).last().waitFor();
   }
   // Typing after the tick is the field's to undo first; once it is undone, ⌘Z goes back to the app.
