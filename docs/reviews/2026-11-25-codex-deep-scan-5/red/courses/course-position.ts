@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {mkdirSync,rmSync,readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+import React from 'react';
+import {createItem,setItemArchived} from '../../packages/core/src/items.ts';
+import {courseLessons} from '../../packages/core/src/courses.ts';
+const root=resolve('codex-out/courses/libs/position');rmSync(root,{recursive:true,force:true});mkdirSync(root,{recursive:true});const lib={root};
+const items=[];for(let part=1;part<=3;part++)items.push(await createItem(lib,{type:'article',title:`Lesson ${part}`,body:'Fixture lesson.',course:{id:'c',title:'Course',part}}));
+if(process.argv[2]!=='control') await setItemArchived(lib,items[0]!.meta.id,true);
+const lessons=courseLessons(lib,'c').map(i=>({...i.meta,dir:i.dir}));
+const reader=readFileSync('apps/desktop/src/Reader.tsx','utf8');const start=reader.indexOf('function CourseLine(');const end=reader.indexOf('\n}',start)+2;const fn=reader.slice(start,end);
+const code=new Bun.Transpiler({loader:'tsx',tsconfig:{compilerOptions:{jsx:'react'}}}).transformSync(fn+'\nreturn CourseLine;');
+const pass=(props:any)=>props.children;const menu=new Proxy({},{get:()=>pass});
+const view=new Function('React','DropdownMenu','Hint','CaretDown','Check','CaretLeft','CaretRight',code)(React,menu,pass,pass,pass,pass,pass);
+const last=lessons.at(-1)!;const tree=view({id:last.id,course:last.course,lessons,onOpen(){}});
+function find(node:any):any {if(!node||typeof node!=='object')return null;if(node.props?.className==='course-at')return node;for(const child of React.Children.toArray(node.props?.children)){const f=find(child);if(f)return f;}return null;}
+const label=React.Children.toArray(find(tree).props.children).join('').replace(/\s+/g,' ').trim();
+console.log('[DEEP]',JSON.stringify({activeParts:lessons.map(i=>i.course!.part),readerLabel:label}));
+const [,part,total]=label.match(/Lesson (\d+) of (\d+)/)!;assert.ok(Number(part)<=Number(total),'Reader must not say Lesson 3 of 2 after archiving one lesson');
+console.log('[DEEP] PASS');

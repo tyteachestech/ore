@@ -1,0 +1,46 @@
+import { library,fake,ready,release,check,calls,base } from './harness.ts';
+import { readFileSync,writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { addText } from '../../packages/core/src/ingest/index.ts';
+import { findItem,updateItemMeta,setPrequestionAttempt } from '../../packages/core/src/items.ts';
+import { setRecall } from '../../packages/core/src/notes.ts';
+import { recallFeedback } from '../../packages/core/src/ai/recall.ts';
+import { checkPrequestion } from '../../packages/core/src/ai/check.ts';
+import { tryLine } from '../../packages/core/src/ai/tries.ts';
+import { addHighlight,findAnnotation } from '../../packages/core/src/annotations.ts';
+import { markTried } from '../../packages/core/src/tries.ts';
+import { runAgent } from '../../packages/core/src/ai/adapter.ts';
+import { ExplainOutput } from '../../packages/core/src/ai/explain.ts';
+const mode=process.argv[2]??'controls';const lib=await library('probes-'+mode);
+const it=await addText(lib,'# Learning\n\nRecall strengthens memory.');
+if(mode==='controls'){
+ const fb={feedback:'Read your answer.',questions:[{n:1,feedback:'You mentioned recall.'}],missed:[],section_lines:null};
+ await updateItemMeta(lib,it.meta.id,m=>({...m,recall:{text:'Original recall.'},prequestions:[{q:'What helps?',after:'Recall.'}]}));
+ fake([{data:fb,hold:true}]);const run=recallFeedback(lib,it.meta.id).then(()=>'',e=>String(e));await ready();
+ const input=JSON.parse(calls()[0].args[1].split('Task input (JSON):\n')[1].split('\n\nFiles to read:')[0]);
+ check(input.prequestions[0].after==='Recall.','fake received the exact original prequestion answer');
+ await setRecall(lib,it.meta.id,'Changed recall.');release();const error=await run;
+ check(error.includes('recall text changed'),'recall feedback correctly guards free-recall text changes');
+ check(!findItem(lib,it.meta.id).meta.recall?.feedback,'rejected recall feedback writes nothing');
+ await updateItemMeta(lib,it.meta.id,m=>({...m,prequestions:[{q:'What helps?',after:'Recall.',points:[{text:'Retrieval',evidence:[]},{text:'Spacing',evidence:[]}]}]}));
+ fake([{data:{covered:[true,false]},hold:true}]);const pending=checkPrequestion(lib,it.meta.id,1).then(()=>'',e=>String(e));await ready();
+ await setPrequestionAttempt(lib,it.meta.id,1,{after:'Spacing too.'});release();
+ check((await pending).includes('answer changed'),'check correctly rejects changed answer text');
+ check(!findItem(lib,it.meta.id).meta.prequestions![0]!.check,'changed-answer check writes nothing');
+ const a=addHighlight(findItem(lib,it.meta.id),{exact:'Recall strengthens memory.',intent:'apply',note:'I will recall.'});await markTried(lib,a.id,{reflection:'Worked.'});
+ fake([{data:{line:'Keep recalling.'},exit:1,stderr:'transport failed after structured output'}]);
+ let why='';try{await tryLine(lib,a.id);}catch(e){why=String(e);}
+ const saved=findAnnotation(lib,a.id).annotation;
+ console.log('[DEEP]',JSON.stringify({error:why,savedLine:saved.line}));
+ check(!saved.line,'Claude exit failure must not persist feedback');
+}else if(mode==='default-model'){
+ writeFileSync(join(process.env.CODEX_HOME!,'config.toml'),'model = "model-at-start"\n');
+ fake([{data:{here:'Here.',general:'General.'},hold:true}],'codex');
+ const pending=runAgent(lib,{prompt:'explain',input:{term:'Recall'},schema:ExplainOutput,cwd:lib.root});await ready();
+ check(!calls()[0].args.includes('-m'),'default Codex run passes no explicit model');
+ console.log('[DEEP] config at fake start:',readFileSync(join(process.env.CODEX_HOME!,'config.toml'),'utf8').trim());
+ writeFileSync(join(process.env.CODEX_HOME!,'config.toml'),'model = "model-picked-later"\n');release();
+ const result=await pending;
+ console.log('[DEEP]',JSON.stringify(result.ai));
+ check(result.ai.model==='model-at-start','model stamp must describe the model chosen before the run');
+}else throw Error('unknown probe');

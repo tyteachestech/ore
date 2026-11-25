@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import * as fs from '../../apps/desktop/src/phone/fs';
+fs.mkdirSync('/scratch/deep/folder',{recursive:true});
+assert.ok(fs.statSync('/scratch/deep/folder').isDirectory());
+assert.throws(()=>fs.readdirSync('/scratch/missing'),{code:'ENOENT'});
+assert.throws(()=>fs.readFileSync('/scratch/missing'),{code:'ENOENT'});
+fs.writeFileSync('/scratch/a','new text');fs.writeFileSync('/scratch/b','old text');
+fs.renameSync('/scratch/a','/scratch/b');
+assert.equal(fs.readFileSync('/scratch/b','utf8'),'new text');assert.equal(fs.existsSync('/scratch/a'),false);
+const bytes=new Uint8Array([0,255,10,128,195,169]);
+fs.writeFileSync('/scratch/data.bin',bytes);
+fs.renameSync('/scratch/data.bin','/scratch/Data.bin');
+assert.deepEqual([...fs.readFileSync('/scratch/Data.bin') as any],[...bytes]);
+assert.equal(fs.statSync('/scratch/Data.bin').size,bytes.length);
+assert.equal(fs.existsSync('/scratch/data.bin'),false);
+console.log('[DEEP] memory shim: recursive mkdir; missing readdir/read ENOENT; rename over existing text; binary round-trip; case-only rename passed');

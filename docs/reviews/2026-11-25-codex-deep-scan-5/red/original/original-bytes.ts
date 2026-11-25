@@ -1,0 +1,14 @@
+import { fresh, log, OUT } from './harness';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import assert from 'node:assert/strict';
+const { addSource, reimportSource } = await import('../../packages/core/src/ingest/index');
+const { sourceFile } = await import('../../packages/core/src/items');
+const lib = fresh('original-bytes');
+const input = join(lib.root, 'utf16.csv');
+const bytes = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from('Term,Meaning\r\nCafé,Coffee\r\n', 'utf16le')]);
+writeFileSync(input, bytes);
+const item = await addSource(lib, input);
+const kept = readFileSync(sourceFile(item)!);
+log('original-bytes', { inputBytes: bytes.length, keptBytes: kept.length, originalEqualsInput: bytes.equals(kept), body: item.body, keptPrefix: [...kept.subarray(0, 12)] });
+assert(bytes.equals(kept), 'The kept original must preserve the imported file byte for byte (D122/SPEC)');
