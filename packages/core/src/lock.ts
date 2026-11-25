@@ -1,4 +1,5 @@
-import { closeSync, mkdirSync, openSync, readFileSync, statSync, unlinkSync, writeSync } from "node:fs";
+import fs, { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { hostname } from "node:os";
 import { dirname } from "node:path";
 
 const STALE_MS = 60_000;
@@ -7,66 +8,95 @@ function isAlive(pid: number): boolean {
   try {
     process.kill(pid, 0);
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code !== "ESRCH";
   }
 }
 
-/** A lock left by a dead process, or older than a minute. An empty or unreadable pid (a crash
- *  between create and write) goes stale by age only, since a live taker writes it a moment later. */
+/** .ore is device-local in sync (the phone serializes commands). New locks also name
+ * their host so a copied/shared library never treats a remote PID as local. Legacy
+ * numeric locks are local. Only a dead local owner can lose its lock by takeover. */
 export function lockStale(path: string): boolean {
   try {
-    const pid = Number(readFileSync(path, "utf8").trim());
-    if (Number.isInteger(pid) && pid > 0 && !isAlive(pid)) return true;
+    const raw = readFileSync(path, "utf8").trim();
+    const owner = raw.startsWith("{") ? JSON.parse(raw) as { pid: number; host: string } : { pid: Number(raw), host: hostname() };
+    if (owner.host !== hostname()) return false;
+    if (Number.isInteger(owner.pid) && owner.pid > 0) return !isAlive(owner.pid);
     return Date.now() - statSync(path).mtimeMs > STALE_MS;
   } catch {
     return false;
   }
 }
 
-// Removes a stale lock. Two waiters can both see it stale; without a guard the second would
-// delete the lock the first had just taken, and both would run. The takeover file lets one
-// waiter check and remove at a time; a takeover file left by a crash is cleared after 5 s.
-function takeOver(path: string): boolean {
-  const guard = path + ".takeover";
+/** Publish a fully populated owner record in one exclusive operation. A process
+ * killed before publication leaves only an unused temp file, never an empty lock. */
+function acquire(path: string): string | undefined {
+  const owner = JSON.stringify({ pid: process.pid, host: hostname(), token: crypto.randomUUID() });
+  const tmp = `${path}.${crypto.randomUUID()}.tmp`;
+  writeFileSync(tmp, owner, { flag: "wx" });
   try {
-    closeSync(openSync(guard, "wx"));
+    if (typeof fs.linkSync === "function") fs.linkSync(tmp, path);
+    else {
+      // The phone's ephemeral filesystem has no hard links and runs one command
+      // at a time. This synchronous check/rename cannot interleave there.
+      if (existsSync(path)) return undefined;
+      renameSync(tmp, path);
+    }
+    return owner;
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-    try { if (Date.now() - statSync(guard).mtimeMs > 5_000) unlinkSync(guard); } catch { /* gone */ }
+    return undefined;
+  } finally {
+    try { unlinkSync(tmp); } catch { /* renamed on the phone, or already gone */ }
+  }
+}
+
+function release(path: string, owner: string): void {
+  try {
+    if (readFileSync(path, "utf8") === owner) unlinkSync(path);
+  } catch { /* already gone */ }
+}
+
+// Serialize stale-owner removal, including a guard whose own owner crashed.
+// Guards use the same populated record and liveness rules as the main lock.
+function takeOver(path: string): boolean {
+  const guard = path + ".takeover";
+  const owner = acquire(guard);
+  if (!owner) {
+    if (lockStale(guard)) takeOver(guard);
     return false;
   }
   try {
     if (lockStale(path)) unlinkSync(path);
     return true;
-  } catch {
-    return true; // gone already: retry the create
-  } finally {
-    try { unlinkSync(guard); } catch { /* gone */ }
-  }
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    return true;
+  } finally { release(guard, owner); }
 }
 
-// Advisory lock: exclusive-create a lockfile holding our pid. Stale locks
-// (dead pid or older than a minute) are taken over.
+/** Synchronous best-effort work: skip a busy library without touching its files. */
+export function tryWithLock<T>(path: string, fn: () => T): T | undefined {
+  mkdirSync(dirname(path), { recursive: true });
+  let owner = acquire(path);
+  if (!owner && lockStale(path) && takeOver(path)) owner = acquire(path);
+  if (!owner) return undefined;
+  try { return fn(); }
+  finally { release(path, owner); }
+}
+
+// Advisory lock. Live local owners never expire; dead owners can be reclaimed.
 export async function withLock<T>(path: string, fn: () => T | Promise<T>, timeoutMs = 15_000): Promise<T> {
   mkdirSync(dirname(path), { recursive: true });
   const deadline = Date.now() + timeoutMs;
+  let owner: string | undefined;
   for (;;) {
-    try {
-      const fd = openSync(path, "wx");
-      writeSync(fd, String(process.pid));
-      closeSync(fd);
-      break;
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-      if (lockStale(path) && takeOver(path)) continue;
-      if (Date.now() > deadline) throw new Error(`library is locked (${path}); retry, or delete it if no ore process is running`);
-      await Bun.sleep(50);
-    }
+    owner = acquire(path);
+    if (owner) break;
+    if (lockStale(path) && takeOver(path)) continue;
+    if (Date.now() > deadline) throw new Error(`library is locked (${path}); retry, or delete it if no ore process is running`);
+    await Bun.sleep(50);
   }
-  try {
-    return await fn();
-  } finally {
-    try { unlinkSync(path); } catch { /* already gone */ }
-  }
+  try { return await fn(); }
+  finally { release(path, owner); }
 }
