@@ -38,6 +38,8 @@ const TEXT = /^(?:introduction|preface|foreword|prologue|preamble|prelude|overtu
 const TEXT_TYPES = new Set("chapter part volume division foreword preface introduction prologue preamble abstract acknowledgments acknowledgements epilogue afterword conclusion appendix backmatter glossary bibliography index".split(" "));
 // At a book's end these are the book too: what the author wrote after the last chapter, and what a learner looks things up in.
 const BACK_TEXT = /^(?:afterword|epilogue|conclusions?|coda|postscript|postface|appendi(?:x|ces)|notes?|endnotes|footnotes|index|bibliography|references|glossary|(?:further|recommended|suggested) (?:reading|resources)|sources|works cited|resources|credits|(?:image|photo|illustration|picture|text) credits|permissions|discussion (?:questions|guide)|reading group\b.*|questions for\b.*|timeline|chronology|abbreviations|a note on\b.*|about this book|key terms|exercises|answers|solutions)\b/;
+// Marks on a book's last pages that say the same.
+const BACK_TYPES = new Set("endnotes rearnotes rearnote footnotes notes credits credit contributors errata answers qna".split(" "));
 const START = new Set(["text", "start", "bodymatter", "other start"]);
 // Kinds a mark may name on a block inside a chapter (its epigraph), so they count only on a short page.
 const SHORT_TYPES = /^(?:dedication|epigraph|titlepage|halftitlepage|title page|cover)$/;
@@ -45,9 +47,9 @@ const SHORT_TYPES = /^(?:dedication|epigraph|titlepage|halftitlepage|title page|
 const NEWSLETTER = /\bnewsletters?\b|\bsign up\b|\bspecial offers\b|\bthank you for (?:buying|purchasing|downloading)\b/;
 const RIGHTS = [/©|\bcopyright (?:©|\(c\)|\d{4})/i, /\ball rights reserved\b/i, /\bISBN\b/, /\blibrary of congress\b/i, /\bno part of this (?:book|publication|work)\b/i, /\bfirst (?:published|edition|printing)\b/i, /\bcopyright infringement\b/i, /\bfor your personal use only\b/i, /\bcopyright act\b/i, /\bpermission of the publisher\b/i, /\bcataloging.in.publication\b/i];
 /** A rights notice: two of its phrases, or one on a short page. */
-function rights(text: string, words: number): boolean {
+function rights(text: string, words: number, least = 1): boolean {
   const n = RIGHTS.filter((re) => re.test(text)).length;
-  return n >= 2 || (n === 1 && words <= 150);
+  return n >= 2 || (n >= least && words <= 150);
 }
 
 /** A page's words read as a publisher's page with no mark on it. */
@@ -57,7 +59,8 @@ function reads(text: string, words: number, p: PageFacts, title: string[], back:
   if (/^(?:also by|(?:other |more )?(?:books|titles|works) by|by the same author|(?:advance |more )?praise (?:for|from)|what (?:people|readers|others) (?:are saying|have said|say))\b/.test(head)) return true;
   // At a book's end only what is plainly the publisher's: a last page that names the author, starts "To…" or is
   // all links can be a poem's close, a letter or the index.
-  if (back) return (words <= 150 && NEWSLETTER.test(t)) || (words <= 400 && rights(text, words));
+  // A rights notice there needs two of its phrases: a picture credit or a cited edition has one.
+  if (back) return (words <= 150 && NEWSLETTER.test(t)) || (words <= 400 && rights(text, words, 2));
   if (words <= 40 && title.some((name) => name.length > 2 && ` ${t} `.includes(` ${name} `))) return true;
   if (words <= 150 && /^begin reading\b/.test(head)) return true;
   if (words <= 25 && !p.heading && /^(?:to|for)\b/.test(head)) return true;
@@ -80,7 +83,7 @@ export function pageKind(p: PageFacts, title: string[] = [], back = false): "fol
   const named = p.labels.length ? p.labels.map(norm).every((n) => FOLD.test(n)) : !!p.heading && FOLD.test(norm(p.heading));
   if (sized && named) return "fold";
   // "backmatter" is on the publisher's last pages as often as on the notes, so at the end it says nothing.
-  if (types.some((t) => TEXT_TYPES.has(t) && !(back && t === "backmatter"))) return "text";
+  if (types.some((t) => (TEXT_TYPES.has(t) && !(back && t === "backmatter")) || (back && BACK_TYPES.has(t)))) return "text";
   if (sized && types.some((t) => FOLD.test(t) && (words <= 300 || !SHORT_TYPES.test(t)))) return "fold";
   if (sized && reads(p.text, words, p, title.map(norm).filter(Boolean), back)) return "fold";
   // "Start reading here" often points at the title page, so it only speaks for a page nothing else has placed.
@@ -104,14 +107,20 @@ export function frontPages(pages: PageFacts[], title: string[] = []): number {
 /** Where a book's back matter starts: the first of the publisher's pages it ends on, or `pages.length` when it
  *  ends on its text. Read from the last page back, the same way as the front: the book's last page must be the
  *  publisher's (short pages after the last of theirs are figure descriptions or notes, and all below the mark
- *  folds), and a short unmarked page between two of theirs goes with them. `front` pages are already folded, and
- *  the page after them stays, so a book is never all fold. */
+ *  folds), and one short unmarked page between two of theirs goes with them. Two in a row end it: in a book of
+ *  short pages (poems, aphorisms) they are the text, and a page far up that reads as the publisher's is not the
+ *  start of its end. `front` pages are already folded; a page of the book's text must come before the fold, so a
+ *  sample that is all publisher's pages is left whole, as the front leaves it. */
 export function backPages(pages: PageFacts[], title: string[] = [], front = 0): number {
   let start = pages.length;
-  for (let i = pages.length - 1; i > front; i--) {
+  let small = 0;
+  let i = pages.length - 1;
+  for (; i > front; i--) {
     const kind = pageKind(pages[i]!, title, true);
-    if (kind === "fold") start = i;
-    else if (kind !== "small" || start === pages.length) break;
+    if (kind === "fold") (start = i), (small = 0);
+    else if (kind !== "small" || start === pages.length || ++small > 1) break;
   }
-  return start;
+  // `i` is the page that ended it. Stopped only by running out of pages, or by short pages alone: no text was seen.
+  const text = pages.slice(front, start).some((p) => ["text", "long"].includes(pageKind(p, title, true)));
+  return text ? start : pages.length;
 }

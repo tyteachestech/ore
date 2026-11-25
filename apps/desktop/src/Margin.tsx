@@ -34,13 +34,13 @@ export function findChapterEnds(body: string, src: Skeleton, idx: TextIndex, art
   const marks = chapterMarks(body, type);
   // A book's front matter (its copyright page, its praise) is no chapter to recall.
   const front = frontEnd(body, type === "epub");
-  // Nor are the publisher's last pages; the chapter before them is the book's last, which Finish covers.
+  // Nor are the publisher's last pages. The chapter before them keeps its recall, as it had before they folded.
   const back = backStart(body, type === "epub");
   const out: ChapterEnd[] = [];
   for (let i = 0; i + 1 < marks.length; i++) {
     const cur = marks[i]!;
     const next = marks[i + 1]!;
-    if (cur.at < front || (back > 0 && next.at > back)) continue;
+    if (cur.at < front || (back > 0 && cur.at > back)) continue;
     const text = body.slice(cur.text, next.at);
     if (words(text) < MIN_WORDS) continue;
     let el = renderedNodeAt(src, idx, next.text)?.parentElement ?? null;

@@ -1734,6 +1734,7 @@ journey("note table: its controls let go when the table is deleted under them, a
   const thrown: string[] = [];
   const onError = (e: Error) => void thrown.push(e.message);
   page.on("pageerror", onError);
+  try {
   const pm = page.locator(".note-editor .ProseMirror").first();
   await openSource(page, AGENTS);
   await pm.click();
@@ -1757,13 +1758,18 @@ journey("note table: its controls let go when the table is deleted under them, a
   await page.keyboard.press("ControlOrMeta+a");
   await page.keyboard.press("Backspace");
   await until("the note is empty", async () => ((await pm.textContent()) ?? "").trim() === "");
+  // A press on a control still drawn over the empty note lets go of them instead of asking for the table.
+  const bar = page.locator(".table-ctl button").first();
+  if (await bar.count()) await bar.click({ force: true }).catch(() => {});
   await page.keyboard.type("/", { delay: 20 });
   await page.locator(".note-menu").waitFor();
   for (let i = 0; i < 15; i++) await page.keyboard.press("ArrowDown");
   await page.waitForTimeout(200);
   await page.keyboard.press("Escape");
   await page.keyboard.press("Backspace");
-  page.off("pageerror", onError);
+  } finally {
+    page.off("pageerror", onError);
+  }
   if (thrown.length) throw new Error(`the page threw: ${thrown[0]}`);
   if (await page.locator(".table-ctl").count()) throw new Error("the table's controls still show with no table");
 });

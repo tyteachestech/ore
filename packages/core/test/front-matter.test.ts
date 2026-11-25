@@ -93,6 +93,8 @@ describe("a book's last pages", () => {
     ["discussion questions", { heading: "Discussion Questions", text: words(140) }],
     ["a last page that names the author, as a poem's close does", { text: "Ada Learner, at the harbour, in winter" }],
     ["a last page that starts To…", { text: "To be continued in the second volume" }],
+    ["endnotes with no heading that cite an edition's copyright", { types: ["backmatter", "endnotes"], text: `First published in 1962. Copyright © 1999 by the estate. ${words(280)}` }],
+    ["picture credits with no heading", { text: `© Ada Learner, page 3. © Ben Reviewer, page 9. ${words(60)}` }],
     ["a long excerpt from another title", { heading: "An Excerpt from The Quiet Kettle", text: words(2600) }],
   ];
   for (const [name, p] of stays) test(`stays: ${name}`, () => expect(pageKind(page(p), TITLE, true)).not.toBe("fold"));
@@ -127,6 +129,21 @@ describe("a book's last pages", () => {
   test("a publisher's page before the notes stays where it is", () => expect(backPages([chapter, also, notes, advert])).toBe(3));
   test("a short unmarked page between two of them goes with them", () => expect(backPages([chapter, bio, second, advert])).toBe(1));
   test("short pages after the last of them keep the whole end unfolded: they may be figure descriptions", () => expect(backPages([chapter, advert, figure, figure])).toBe(4));
-  test("the page after the front matter is never folded, so a book is never all fold", () => expect(backPages([rights, bio, advert], [], 1)).toBe(2));
+  test("the page after the front matter is never folded, and with no page of text before them nothing is", () => {
+    expect(backPages([rights, chapter, bio, advert], [], 1)).toBe(2);
+    expect(backPages([rights, bio, advert], [], 1)).toBe(3);
+  });
   test("a one-page book has none", () => expect(backPages([bio])).toBe(1));
+  test("a book of short pages keeps them all: two in a row end the fold, however a page far up reads", () => {
+    const poem = page({ text: words(90) });
+    const half = page({ labels: ["Contents"], text: words(30) }); // a poem called "Contents", mid-book
+    expect(backPages([chapter, poem, half, poem, poem, poem, bio])).toBe(6);
+  });
+  test("a sample that is all publisher's pages is left whole, as the front leaves it", () => {
+    const title = page({ types: ["titlepage"], text: "The Slow Lamp" });
+    const contents = page({ heading: "Contents", text: words(100) });
+    expect(frontPages([title, rights, contents])).toBe(0);
+    expect(backPages([title, rights, contents], [], 0)).toBe(3);
+    expect(backPages([title, page({ text: words(120) }), rights, also], [], 0)).toBe(4);
+  });
 });

@@ -18,14 +18,16 @@ export function backStart(md: string, book: boolean): number {
   return book ? (md.match(/^<!-- back matter -->$/m)?.index ?? -1) : -1;
 }
 
-/** Opens the folded front or back matter under `root` that holds every word of `query`: Find looks only at what
- *  shows, so a search result whose words are there would open the book on nothing. */
+/** Opens the folded front or back matter under `root` that holds every word of `query`, when the text that shows
+ *  does not: Find looks only at what shows, so a search result whose words are only there would open the book on
+ *  nothing. A hit in the chapters leaves them shut, though the publisher's pages name the author too. */
 export function unfoldFor(root: Element | null | undefined, query: string): void {
   const words = query.toLowerCase().split(/\s+/).filter(Boolean);
-  for (const box of root?.querySelectorAll(".front-body[hidden]") ?? []) {
-    const text = box.textContent?.toLowerCase() ?? "";
-    if (words.length && words.every((w) => text.includes(w))) unfold(box);
-  }
+  const boxes = [...(root?.querySelectorAll(".front-body[hidden]") ?? [])];
+  if (!root || !words.length || !boxes.length) return;
+  const holds = (text: string) => words.every((w) => text.includes(w));
+  if (holds([...root.children].filter((c) => !c.matches(".front-matter")).map((c) => c.textContent ?? "").join(" ").toLowerCase())) return;
+  for (const box of boxes) if (holds(box.textContent?.toLowerCase() ?? "")) unfold(box);
 }
 
 /** Opens the folded front matter when `n` is in it, so a jump or a link lands on text he can see. */

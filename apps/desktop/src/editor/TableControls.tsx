@@ -69,6 +69,8 @@ export function TableControls({ view, host }: { view: () => EditorView | undefin
   const run = (edit: TableEdit, row = at.row, col = at.col) => () => {
     const v = view();
     const el = host.current;
+    // The controls can outlive their table until the pointer moves: a press on one then lets go of them.
+    if (v && !tableAt(v, at.table)) return setAt(null);
     const tr = v && editTable(v.state, at.table, row, col, edit);
     if (!v || !el || !tr) return;
     v.dispatch(tr);
@@ -183,11 +185,13 @@ function spot(v: EditorView, host: HTMLElement, cell: HTMLTableCellElement): At 
   return table === null || !row ? null : measure(v, host, table, row.rowIndex, cell.cellIndex);
 }
 
+/** Whether a table still starts at `pos`. It may be gone (deleted with the pointer still on it): past the note's
+ *  end, `nodeAt` throws (F-new-table-controls). */
+const tableAt = (v: EditorView, pos: number) => pos < v.state.doc.content.size && v.state.doc.nodeAt(pos)?.type.spec.tableRole === "table";
+
 /** The same table after an edit or a scroll, on the same cell or the nearest one left. */
 function again(v: EditorView, host: HTMLElement, a: At): At | null {
-  // The table may be gone (deleted with the pointer still on it): past the note's end, `nodeAt` throws (F-new-table-controls).
-  const node = a.table < v.state.doc.content.size ? v.state.doc.nodeAt(a.table) : null;
-  if (node?.type.spec.tableRole !== "table") return null;
+  if (!tableAt(v, a.table)) return null;
   const { rows, cols } = sizeOf(v.state, a.table);
   return measure(v, host, a.table, Math.min(a.row, rows - 1), Math.min(a.col, cols - 1));
 }
