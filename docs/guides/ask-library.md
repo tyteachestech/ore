@@ -16,7 +16,7 @@ bun run eval:ask --vendor claude --library big   # with ~240 generated sources a
 2. **Answer**. The AI sees only the numbered passages and returns JSON: the reply with `[n]` markers, and per marker a passage id and an exact quote.
 3. **Check**. Every quote must be found in its passage (`locate`, the same fuzzy anchoring highlights use), every marker must have a citation, and an unknown passage is refused. A web citation's URL must be one the search returned and its quote words the search returned: a web task runs `claude -p` with `--output-format stream-json`, whose events carry each WebSearch's links and text (`webSeen` in `adapter.ts`). A quote from his sources that fails is mended in place (D291): moved to the sentence of its passage that says it, or dropped with its marker when no sentence does, the reply then marked as not all from his sources. A web link the search never returned, and broken structure, go back to the AI once with the reason.
 4. **Stream** (D138). While the AI writes, the reply so far goes to the app as it comes, so the first words show in about 2 seconds; its markers wait for the citations, which come with the checked answer.
-5. **Place**. Each quote is mapped to its character offsets in the source's `doc.md`. The citation opens the reader at `q:start:end`, which marks that range (`apps/desktop/e2e/journeys.ts`, "tutor citation").
+5. **Place**. Each quote is mapped to its character offsets in the source's `doc.md`. The citation opens the reader at `q:start:end`, which marks that range (`apps/desktop/e2e/journeys/tutor.ts`, "tutor citation").
 
 ## The eval
 
