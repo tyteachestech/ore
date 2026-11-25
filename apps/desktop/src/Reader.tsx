@@ -52,7 +52,7 @@ import { firstFrom, sentences, Speaker, speechAvailable, speechTrouble } from ".
 import { clock, MAX_RATE, MIN_RATE, Speed, useAudio, useYouTube, VideoPlayer, type Player } from "./Video";
 import { ownsMediaKey } from "./media-keys";
 import { FillingLine, useFilling } from "./Filling";
-import { errorText, focusQuietly, kept, load, readingFor, save, useFocusBack, useLibraryChanges, wakeOnLanding, type Notify } from "./util";
+import { errorText, focusQuietly, kept, load, readingFor, save, useFocusBack, useLibraryChanges, type Notify } from "./util";
 import { TitleField } from "./TitleField";
 import { popupPlace, type Aim } from "./popup-place";
 import { TablesLine } from "./Tables";
@@ -697,7 +697,28 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const [annWrites, setAnnWrites] = useState(0);
   /** This source's highlights (highlights.ts): the list on screen, the stand-in id of one still being made, the
    *  writes still out. Here stays only what is the page's: where each sits (`ranges`), its popup, `fresh`. */
-  const [hl] = useState(() => highlights({ annotate: (id, ...args) => ore("annotate", id, ...args), show: showAnns, landed: () => setAnnWrites((k) => k + 1) }));
+  const [hl] = useState(() =>
+    highlights({
+      run: ore,
+      show: showAnns,
+      landed: () => setAnnWrites((k) => k + 1),
+      notify: (...a) => notifyNow.current(...a),
+      label: (i) => LABEL[i],
+      // What a step of the history takes away and brings back: the passage's place is kept with the step.
+      page: (id) => {
+        let range: Range | undefined;
+        return {
+          off: () => {
+            range = ranges.current.get(id) ?? range;
+            ranges.current.delete(id);
+            setPopup((cur) => (cur?.id === id ? null : cur));
+          },
+          on: () => void (range && ranges.current.set(id, range)),
+        };
+      },
+      unsaved: unsavedNotes,
+    }),
+  );
   const setAnns = hl.set;
   const [ready, setReady] = useState(false);
   const [popup, setPopup] = useState<Popup | null>(null);
@@ -1642,8 +1663,6 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     else if (!questionsShown) scrollRef.current?.focus({ preventScroll: true });
   }, [notesShown, questionsShown, closedBook]);
 
-  /** Each new highlight's `forget`, for a fresh one he drops before it counts. */
-  const made = useRef(new Map<string, () => void>());
 
   /** Writes what he typed in the popup's note, however it closes: a click away, Esc, another
    *  highlight, leaving the source. Only Remove (and a selection dropped untouched) throws it away. */
@@ -1958,20 +1977,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       setAdding(line);
       return p.notify("Couldn’t tell where you are in the text. Scroll to the part it’s about, then press Enter again.", "error");
     }
-    const tmp = `pending-${Date.now()}`;
-    setAnns((l) => [...l, { id: tmp, item: doc.id, ts: "", rev: 0, intent: "card", exact: "", prefix: "", suffix: "", start: at, end: at, note: line, status: "open", point: true }]);
-    const wake = wakeOnLanding();
     try {
-      const made = ore<Annotation>("highlight", p.id, "--at", String(at), opt("note", line));
-      wake(made);
-      const ann = await whileOut(made); // ⌘Z meanwhile waits for its step (F481)
-      keptFromFeed(ann);
-      hl.made(tmp, ann.id); // so a read again landing before the swap doesn't list it twice
-      setAnns((l) => l.map((a) => (a.id === tmp ? ann : a)));
-      const s = annStep(ann.id);
-      p.notify("Key point added", "quiet", s.remove, s.bring);
+      keptFromFeed(await hl.point(["highlight", p.id, "--at", String(at), opt("note", line)], { id: hl.standIn(), item: doc.id, ts: "", rev: 0, intent: "card", exact: "", prefix: "", suffix: "", start: at, end: at, note: line, status: "open", point: true }));
     } catch (e) {
-      setAnns((l) => l.filter((a) => a.id !== tmp));
       focusAdd.current = true;
       setAdding(line);
       p.notify(errorText(e), "error");
@@ -1991,36 +1999,20 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     if (lookedUp) args.push("--looked-up");
     // Never without a place: the core saves the match nearest it, not the first one in the source.
     args.push("--start", String(q ? q.start : sourceHint(src, index, range)));
-    const tmp = `pending-${Date.now()}`;
-    const promise = hl.track(ore<Annotation>(...args));
-    wakeOnLanding()(promise); // a skill page opened while it is made (4 on the focus is a try) reads it once it lands
-    hl.make(tmp, promise);
+    const tmp = hl.standIn();
     ranges.current.set(tmp, range);
     vein(range, intent);
     tick.saved();
-    setAnns((l) => [...l, { id: tmp, item: doc.id, ts: "", rev: 0, intent, exact: text, prefix: "", suffix: "", start: 0, end: 0, status: "open", ...(lookedUp && { looked_up: true }) }]);
-    if (intent === "card") gather(tmp);
-    if (popupToo) {
-      openPopup(tmp, range, "", aim);
-      fresh.current = tmp;
-    }
-    // On the history at once, so a ⌘Z right after the drag takes this highlight back, not the step
-    // before it; the step acts on the saved highlight once the write is back.
-    let step: ReturnType<typeof annStep> | undefined;
-    const act = (f: "remove" | "bring") => () => promise.then((ann) => (step ??= annStep(ann.id, ann))[f](), () => {});
-    const forget = p.notify("Highlighted", "quiet", act("remove"), act("bring"));
-    promise.then(
-      (ann) => {
-        hl.made(tmp, ann.id);
+    hl.create(args, { id: tmp, item: doc.id, ts: "", rev: 0, intent, exact: text, prefix: "", suffix: "", start: 0, end: 0, status: "open", ...(lookedUp && { looked_up: true }) }, {
+      // The save is back: the passage's place moves to the saved id, before the list does.
+      saved: (ann, was) => {
         keptFromFeed(ann);
         if (fresh.current === tmp) fresh.current = ann.id;
         const r = ranges.current.get(tmp);
         const old = ranges.current.get(ann.id);
         ranges.current.delete(tmp);
         if (r) ranges.current.set(ann.id, r);
-        // The passage was already highlighted: the core gave that highlight back, so the popup edits it.
-        const was = annsRef.current.find((a) => a.id === ann.id);
-        const existing = !!was;
+        // The passage was already highlighted (`was`): the core gave that highlight back, so the popup edits it.
         // Selected past its edge, the highlight grew to cover both (core): its range becomes both ranges.
         if (was && r && old && (was.start !== ann.start || was.end !== ann.end)) {
           const both = union(old, r);
@@ -2028,20 +2020,22 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           const s = spanStep(ann.id, { exact: was.exact, start: was.start, range: old }, { exact: ann.exact, start: ann.start, range: both });
           p.notify("Highlighted", "quiet", s.back, s.again);
         } else if (was && old) ranges.current.set(ann.id, old);
-        if (existing) forget(); // no new highlight: nothing of this one to take back
-        setAnns((l) => (existing ? l.filter((a) => a.id !== tmp).map((a) => (a.id === ann.id ? { ...a, exact: ann.exact, prefix: ann.prefix, suffix: ann.suffix, start: ann.start, end: ann.end, rev: ann.rev } : a)) : l.map((a) => (a.id === tmp ? { ...ann, intent: a.intent, note: a.note } : a))));
+      },
+      shown: (ann, existing) => {
         setPopup((cur) => (cur?.id === tmp ? { ...cur, id: ann.id, ...(existing && { note: ann.note ?? "" }) } : cur));
         if (existing && intent !== "keep" && intent !== ann.intent) void setIntentOf(ann.id, intent);
-        else if (!existing) made.current.set(ann.id, forget);
       },
-      (e) => {
-        forget();
+      failed: (e) => {
         ranges.current.delete(tmp);
-        setAnns((l) => l.filter((a) => a.id !== tmp));
         setPopup((cur) => (cur?.id === tmp ? null : cur));
         p.notify(placeError(e), "error");
       },
-    );
+    });
+    if (intent === "card") gather(tmp);
+    if (popupToo) {
+      openPopup(tmp, range, "", aim);
+      fresh.current = tmp;
+    }
     return tmp;
   }
 
@@ -2105,10 +2099,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     setFocus({ anchor: focus.head, head: focus.head });
   }
 
-  // A screen opened while a highlight saves (he closes the popup and goes to the skill page at once) has read the
-  // library without it: once it lands, those screens read again (`wake`, taken at his action, before any wait).
-  const annotateWaking = hl.annotate;
-  const annotate = <T = unknown,>(id: string, ...args: string[]) => annotateWaking<T>(wakeOnLanding(), id, ...args);
+  const annotate = hl.annotate;
 
   /** A digit that just set the type from an empty note (D133), and how to take that change back. */
   const typeKey = useRef<{ key: string; at: number; undo?: () => void } | null>(null);
@@ -2135,73 +2126,17 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     await setIntentOf(popup.id, intent);
   }
 
-  function setIntentOf(id: string, intent: Intent, undoable = true) {
-    return hl.track(setIntentNow(id, intent, undoable));
-  }
-  async function setIntentNow(id: string, intent: Intent, undoable: boolean) {
-    const wake = wakeOnLanding();
+  function setIntentOf(id: string, intent: Intent) {
     const was = annOf(id)?.intent;
-    setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, intent } : a)));
-    if (intent === "card" && was !== "card" && undoable) gather(id);
-    const saved = realId(id);
-    // On the history at once, so a ⌘Z right after the click takes this change back, not the step before it.
-    const to = (i: Intent) => () => saved.then((rid) => setIntentOf(rid, i, false));
-    const forget = undoable && was && was !== intent ? p.notify(`Changed to ${LABEL[intent]}`, "quiet", to(was), to(intent)) : undefined;
-    const key = typeKey.current;
-    if (undoable && key && !key.undo) key.undo = () => {
-      forget?.();
-      if (was && was !== intent) void to(was)();
-    };
-    try {
-      await annotateWaking(wake, await saved, "--intent", intent);
-    } catch (e) {
-      forget?.();
-      setAnns((l) => l.map((a) => (isAnn(a, id) && was ? { ...a, intent: was } : a)));
-      // From the history (undo or redo): it puts the step back and says why.
-      if (!undoable) throw e;
-      p.notify(errorText(e), "error");
-    }
+    const done = hl.setIntent(id, intent, true, (back) => {
+      const key = typeKey.current;
+      if (key && !key.undo) key.undo = back;
+    });
+    if (intent === "card" && was !== "card") gather(id);
+    return done;
   }
 
-  /** Takes a highlight away and brings it back, as one step of the history (⌘Z, ⇧⌘Z); what comes
-   *  back is the highlight as it was when it went, its type and note included. */
-  function annStep(rid: string, seed?: Annotation) {
-    let ann: Annotation | undefined = seed;
-    let range: Range | undefined;
-    const drop = () => {
-      ann = annsRef.current.find((a) => a.id === rid) ?? ann;
-      range = ranges.current.get(rid) ?? range;
-      ranges.current.delete(rid);
-      setAnns((l) => l.filter((a) => a.id !== rid));
-      setPopup((cur) => (cur?.id === rid ? null : cur));
-    };
-    const restore = () => {
-      if (range) ranges.current.set(rid, range);
-      if (ann) setAnns((l) => (l.some((a) => a.id === rid) ? l : [...l, ann!]));
-    };
-    // Brought back whole, type and note too: a note changed while it was gone (an older step of the history
-    // run meanwhile) comes back as it was when it went.
-    const whole = () => (ann ? ["--status", ann.status, "--intent", ann.intent, opt("note", ann.note ?? "")] : ["--status", "open"]);
-    return {
-      drop,
-      restore,
-      // Both return the write: one that fails rolls back here, and the history says why (history.ts).
-      remove: () => {
-        drop();
-        return annotate(rid, "--status", "deleted").catch((e) => {
-          restore();
-          throw e;
-        });
-      },
-      bring: () => {
-        restore();
-        return annotate(rid, ...whole()).catch((e) => {
-          drop();
-          throw e;
-        });
-      },
-    };
-  }
+  const annStep = hl.step;
 
   /** Moves a highlight's passage to `to` and back to `from`, as one step of the history (⌘Z, ⇧⌘Z). */
   function spanStep(rid: string, from: Span, to: Span) {
@@ -2262,30 +2197,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     }
   }
 
-  function setNoteOf(id: string, note: string, undoable = true) {
-    return hl.track(setNoteNow(id, note, undoable));
-  }
-  async function setNoteNow(id: string, note: string, undoable: boolean) {
-    const wake = wakeOnLanding();
-    const was = annOf(id)?.note ?? "";
-    setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note } : a)));
-    let rid = id;
-    try {
-      // Counted from the highlight's own write (realId waits for it) to the note's.
-      await whileOut((async () => {
-        rid = await realId(id);
-        await annotateWaking(wake, rid, opt("note", note));
-      })());
-      unsavedNotes.delete(rid);
-      if (undoable) p.notify(note ? "Highlight note saved" : "Removed the highlight note", "quiet", () => setNoteOf(rid, was, false), () => setNoteOf(rid, note, false));
-    } catch (e) {
-      setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, note: was } : a)));
-      // From the history (undo or redo): it puts the step back and says why.
-      if (!undoable) throw e;
-      unsavedNotes.set(rid, { note, was });
-      p.notify(`${errorText(e)} Your note is kept: open the highlight to save it again.`, "error");
-    }
-  }
+  const setNoteOf = hl.setNote;
 
   /** `undoable` false: a selection made only to point (Start from here) goes quietly. */
   async function remove(undoable = true) {
@@ -2299,31 +2211,13 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     } catch {
       return; // creating it failed; already cleaned up
     }
-    // A selection he dropped (Esc, or one made only to point) leaves no step behind.
-    if (!undoable) made.current.get(rid)?.();
-    await removeStep(rid, undoable);
-  }
-
-  /** Takes a saved highlight away as one step of the history, put on it at once, as the highlight goes: a ⌘Z
-   *  while the write is out takes back this step, not the one before it (a note, which it then cleared). The
-   *  history holds its Undo and Redo until the removal has landed (history.ts `hold`), so they never land first. */
-  async function removeStep(rid: string, undoable = true) {
-    const s = annStep(rid);
-    s.drop();
-    const write = annotate(rid, "--status", "deleted");
-    if (undoable) p.notify("Highlight removed", "info", s.bring, s.remove).hold(write);
-    try {
-      await write;
-    } catch (e) {
-      p.notify(errorText(e), "error");
-      s.restore();
-    }
+    await hl.remove(rid, undoable);
   }
 
   /** Removes a saved highlight from outside its popup (the Collected tab's menu); Undo brings it back. */
   async function removeSaved(id: string) {
     if (popup?.id === id) closePopup(false);
-    await removeStep(id);
+    await hl.remove(id);
   }
 
   /** A highlight's menu in the Collected tab: its type, copy, remove, as in its popup. */
@@ -2356,7 +2250,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       const a = annsRef.current.find((x) => x.id === rid) ?? ann;
       if (!a) return;
       if (untouched) {
-        made.current.get(rid)?.();
+        hl.forget(rid);
         await annotate(rid, "--status", "deleted");
       }
       // Not a `change` (change.ts): what its toast says (the words and highlights that went) comes from the write.
@@ -2385,15 +2279,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     else closePopup();
   }
 
-  /** Marks a highlight looked up; quiet, since the Explain popover is what he is looking at. */
-  async function markLookedUp(id: string) {
-    setAnns((l) => l.map((a) => (isAnn(a, id) ? { ...a, looked_up: true } : a)));
-    try {
-      await annotate(id, "--looked-up");
-    } catch {
-      // Not saved: the highlight is still his, only the plan won't know he looked it up.
-    }
-  }
+  const markLookedUp = hl.lookedUp;
 
   /** Explain (D97) on a word: a term he had to look up is one he didn't know, so it stays highlighted,
    *  marked looked up, and the plan weighs it at the finish (D318). With no highlight there
