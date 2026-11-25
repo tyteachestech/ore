@@ -3,6 +3,8 @@ import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grow } from "./Grow";
 import { PixelGem } from "./PixelIcon";
+import { drafting } from "./drafting";
+import { ExerciseText } from "./ExerciseText";
 import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, PHONE, whileOut, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
@@ -114,7 +116,11 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const field = useRef<HTMLTextAreaElement>(null);
   const panel = useRef<HTMLElement>(null);
   // The questions in this finish: the ones a partway finish left out are skipped (D100).
-  const shown = qs.map((_, i) => i).filter((i) => !qs[i]!.skipped);
+  /** iPhone: a question whose key points the Mac hasn't found can't be checked there (AI runs on the Mac, D78.3):
+   *  asked anyway, it showed no answer, key point or passage to learn from (F738). It waits for the Mac's Finish,
+   *  so the phone's saves the recall and leaves the source in To read. */
+  const held = PHONE ? qs.filter((p) => !p.skipped && !p.points).length : 0;
+  const shown = qs.map((_, i) => i).filter((i) => !qs[i]!.skipped && !(PHONE && !qs[i]!.points));
   const n = shown.length;
   const qi = step >= 1 && step <= n ? shown[step - 1]! : -1;
   const q = qi >= 0 ? qs[qi]! : null;
@@ -130,10 +136,13 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
 
   // D56: key points for every prequestion, written while he does the free recall.
   const pointsRun = useRef<Promise<unknown> | null>(null);
+  /** The key points are being found: what Continue waits for when a part is to be left out. */
+  const [finding, setFinding] = useState(false);
   const loadPoints = () => {
-    if (!qs.length || qs.every((p) => p.points)) return;
+    if (PHONE || !qs.length || qs.every((p) => p.points)) return; // the phone can't find them: those questions wait (`held`)
     setPointsError(null);
-    pointsRun.current = ore<{ prequestions: Prequestion[] }>("key-points", doc.id).then(
+    setFinding(true);
+    pointsRun.current = ore<{ prequestions: Prequestion[] }>("key-points", doc.id).finally(() => setFinding(false)).then(
       (r) => {
         // An empty reply would leave "Finding the key points…" up forever; say it failed instead.
         if (!r?.prequestions?.some((p) => p.points?.length)) return setPointsError("No key points came back.");
@@ -201,7 +210,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     // Run in the app, not detached, so a failure says why at once, wherever he has gone, with a retry.
     // Its Try again is the only way back to the cards, so the failure stays until he acts on it.
     const run = (): Promise<boolean> =>
-      ore<{ cards?: unknown[]; skipped?: string } | null>("enrich", doc.id).then(
+      drafting(doc.id, ore<{ cards?: unknown[]; skipped?: string } | null>("enrich", doc.id)).then(
         (r) => {
           // A run with something to draft from that drafted nothing: say so, and what gives it something.
           if (r && !r.skipped && !r.cards?.length) void back.then(() => notify(`No exercises came from “${doc.title}”: mark a Key point to draft some.`, "info"));
@@ -214,7 +223,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
         },
       );
     if (PHONE) return; // Cards are drafted on the Mac (D78.3); said once in the panel, not as a failure.
-    if (feedbackRun.current) void feedbackRun.current.finally(run);
+    // Being drafted from here on, the wait for the recall's feedback included: Review this source says so (F734).
+    if (feedbackRun.current) void drafting(doc.id, feedbackRun.current.then(run, run));
     else void run();
   }
 
@@ -229,10 +239,12 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     dropDraft(doc.id);
   }
 
+  /** Some questions are to be left out before the quiz (D100). */
+  const scoped = !!qs.length && (partway || !!leave.trim() || !!doc.leave_out || qs.some((p) => p.skipped));
   /** D100: before the questions, leave out the ones past where he stopped or that his note rules out
    *  (that needs the key points, being found meanwhile). Returns how many questions are left. */
   async function applyScope(): Promise<number | null> {
-    if (!qs.length || (!partway && !leave.trim() && !doc.leave_out && !qs.some((p) => p.skipped))) return n;
+    if (!scoped) return n;
     await pointsRun.current?.catch(() => {});
     let r: { prequestions: Prequestion[] };
     try {
@@ -413,6 +425,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     if (step === 0) void submitRecall();
     else if (qi >= 0 && !isChecked) void check();
     else if (qi >= 0) next();
+    else if (held && !marked) void keepReading();
     else void finish();
   };
 
@@ -482,7 +495,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             )}
             <Hint text={recall.trim() ? "Save to your source note and continue" : "Skip the recall"} keys="finish" side="top">
               <button className="pill-btn quiz-go" onClick={primary} disabled={busy}>
-                {busy ? <Working label={leave.trim() ? "Leaving that out…" : "Saving…"} /> : recall.trim() ? "Continue" : n ? "Skip to questions" : "Skip"}
+                {busy ? <Working label={leave.trim() ? "Leaving that out…" : scoped && finding ? "Finding the key points…" : "Saving…"} /> : recall.trim() ? "Continue" : n ? "Skip to questions" : "Skip"}
               </button>
             </Hint>
           </div>
@@ -494,7 +507,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <div className="quiz-kicker">
             Question {step} of {n}
           </div>
-          <h2 className="quiz-q">{q.q}</h2>
+          <h2 className="quiz-q"><ExerciseText text={q.q} inline /></h2>
           {q.before && (
             <p className="quiz-sub">
               Before reading you wrote: <span className="quiz-before">{q.before}</span>
@@ -575,7 +588,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             </div>
           </div>
           {verdict && verdict !== "yes" && conf[qi] === 3 && <p className="quiz-sure-miss">You were sure about this one. Worth a careful look.</p>}
-          <div className="quiz-mini">{q.q}</div>
+          <div className="quiz-mini"><ExerciseText text={q.q} inline /></div>
           <p className="quiz-yours">{q.after}</p>
           {q.points && (
             <>
@@ -598,7 +611,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
                         <span className="quiz-mark wait" aria-hidden="true" />
                       )}
                       <button className="quiz-point" disabled={first < 0} onClick={() => go(first)}>
-                        {p.text}
+                        <ExerciseText text={p.text} inline />
                         {first < 0 && <span className="quiz-none">No passage found</span>}
                       </button>
                     </li>
@@ -639,7 +652,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
                 <PixelBurst />
               </span>
             )}
-            <h2>{marked ? "Source finished" : "Done with this source?"}</h2>
+            <h2>{marked ? "Source finished" : held ? `${held === 1 ? "One quiz question waits" : `${held} quiz questions wait`} on your Mac` : "Done with this source?"}</h2>
           </div>
           {marked && (
             <div className="quiz-verdict yes quiz-made">
@@ -665,7 +678,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           {feedback && typeof feedback !== "string" && (
             <div className="feedback quiz-feedback">
               <div className="quiz-kicker">On your recall</div>
-              <p>{feedback.feedback}</p>
+              <p><ExerciseText text={feedback.feedback} inline /></p>
               {feedback.section_lines && <p className="sections">{feedback.section_lines}</p>}
               <Missed items={feedback.missed} />
             </div>
@@ -676,14 +689,14 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <Grow ref={field} id="quiz-use" className="field quiz-answer short" value={use} onChange={(e) => setUse(e.target.value)} readOnly={busy} />
           <div className="quiz-grow" />
           <div className="quiz-foot">
-            {!marked && (
+            {!marked && !held && (
               <Hint text="Keep it in To read · its questions become exercises when you finish" side="top">
                 <button className="quiz-ghost" onClick={() => void keepReading()} disabled={busy}>
                   Keep reading
                 </button>
               </Hint>
             )}
-            {nextLesson && (
+            {nextLesson && !(held && !marked) && (
               <Hint text={`Draft this lesson’s exercises and open “${nextLesson.title}”`} side="top">
                 <button className="quiz-ghost" onClick={() => void finish(nextLesson.open)} disabled={busy}>
                   Next lesson
@@ -764,7 +777,7 @@ function Missed({ items }: { items?: string[] }) {
       <div className="quiz-kicker">Worth another look</div>
       <ul>
         {items.map((m, i) => (
-          <li key={i}>{m}</li>
+          <li key={i}><ExerciseText text={m} inline /></li>
         ))}
       </ul>
     </>

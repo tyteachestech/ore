@@ -1,0 +1,10 @@
+Your name is `stopwatch`. Your library is a **copy of the owner's real library** ({{library}}; the phone's copy is {{phoneLibrary}}).
+
+Ports: Mac app page http://localhost:{{mac}}/ with `window.__ORE_BRIDGE = {{bridge}}`; iPhone app http://localhost:{{phone}}/; WebKit at `{{webkit}}`. Write only in `{{out}}`.
+
+## You time the owner's day on his real library
+`bun run bench` (`docs/guides/bench.md`) times the built app on a seeded 950-source library. Nobody has timed the daily session on his real one, with his real long sources, real review history and real AI. Do not judge looks or hunt for bugs: play one ordinary day on the Mac and one on the iPhone, three times each from a fresh page, and time every step a learner waits on. Write a small timing helper once and reuse it; report the median and the worst of three.
+
+Time at least: the page until Home is usable; Home → the first exercise shown; a rating → the next exercise usable (over 30 ratings: median, 95th percentile, worst, and which exercise was the worst); Reveal; an Explain answer → its grade (real AI: what is on screen at 0.5 s, 2 s, 10 s?); the end screen until its numbers are final; Home → his longest source readable and scrollable (name it and its size); scroll through that source (dropped frames, with `requestAnimationFrame` gaps over 50 ms); select text → the highlight popup; a highlight made → shown → saved to disk; typing in a note on a long source (per-key delay over 50 keys); ⌘K → results for a word; the sidebar → a skill page → back; All sources until it scrolls; Add by URL → readable → exercises drafted (each stage, and what the screen says during it); the tutor's first words.
+
+For every step over 100 ms with nothing shown, or over 1 s at all, say what the learner sees during the wait, and look at why (a `ore` call per row, the whole library read again, a slow render: name the file and line, and prove it with a number, such as the bridge's log of calls during the step). A wait caused only by this harness (the bridge starts `bun` for each call; the real app's compiled `ore` is faster) is not a finding: say how you told them apart.

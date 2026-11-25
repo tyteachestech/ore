@@ -676,17 +676,39 @@ async function outlineOf(doc: Doc): Promise<{ title: string; page: number }[]> {
 
 /** Each outline entry becomes a chapter: a `<!-- chapter N -->` marker and a `## title` where its
  *  page has the title's line (or at the page's top), so chapter recall and the outline rail see the
- *  chapters the author made. An outline of one entry, or out of page order, is not a table of chapters. */
+ *  chapters the author made. An outline of one entry, or out of page order, is not a table of chapters.
+ *  A paper prints "1 Introduction" where its outline says "Introduction": the line is found with or without
+ *  its section number, and the heading keeps the page's number. A line of the title's own length is looked for
+ *  first, so a paragraph that only opens with the same word never takes the heading from the line below it.
+ *  Each entry goes below the one before it on its page: one with no line of its own went in at the page's top,
+ *  last first, above the page's own headings (F733). */
 function markChapters(paras: { text: string; note: boolean }[][], outline: { title: string; page: number }[]) {
   if (outline.length < 2 || outline.some((e, i) => e.page >= paras.length || (i > 0 && e.page < outline[i - 1]!.page))) return;
-  const fold = (t: string) => plain(t).replace(/^#+\s*/, "").replace(/[*_]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const words = (t: string) => plain(t).replace(/^#+\s*/, "").replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
+  const fold = (t: string) => words(t).toLowerCase();
+  const NUMBER = /^\d+(\.\d+)*\.?\s+(?=\S)/;
+  const unnumbered = (t: string) => t.replace(NUMBER, "");
+  /** Where the last chapter head went on each page: the next one on that page goes below it. */
+  const last = new Map<number, number>();
   outline.forEach((e, n) => {
     const page = paras[e.page]!;
-    const want = fold(e.title).slice(0, 40);
-    const at = page.findIndex((p) => !p.note && !isBlock(p.text) && (fold(p.text).startsWith(want) || (fold(p.text).length >= 3 && want.startsWith(fold(p.text)))));
-    const head = { text: `<!-- chapter ${n + 1} -->\n\n## ${e.title}`, note: false };
-    if (at >= 0 && fold(page[at]!.text).length <= want.length + 3) page[at] = head;
-    else page.splice(Math.max(0, at), 0, head);
+    const from = (last.get(e.page) ?? -1) + 1;
+    const full = fold(e.title);
+    const text = (p: { text: string; note: boolean }) => (!p.note && !isBlock(p.text) ? fold(p.text) : null);
+    const find = (fits: (got: string) => boolean) => page.findIndex((p, i) => i >= from && text(p) !== null && fits(text(p)!));
+    const starts = (want: string) => (got: string) => got.startsWith(want) || (got.length >= 3 && want.startsWith(got));
+    // The title's own line: as the outline has it, or the same words behind (or without) a section number.
+    const short = (got: string) => unnumbered(got).length <= unnumbered(full).length + 3;
+    let at = find((got) => short(got) && (starts(full.slice(0, 40))(got) || starts(unnumbered(full).slice(0, 40))(unnumbered(got))));
+    const line = at >= 0 ? page[at]!.text : null;
+    // No such line: a paragraph that opens with the title, which the heading goes above.
+    if (at < 0) at = find(starts(full.slice(0, 40)));
+    // The page's section number, when the outline left it off.
+    const number = line !== null && !NUMBER.test(full) ? (NUMBER.exec(words(line))?.[0].trim() ?? "") : "";
+    const head = { text: `<!-- chapter ${n + 1} -->\n\n## ${number ? `${number} ` : ""}${e.title}`, note: false };
+    if (line !== null) page[at] = head;
+    else page.splice((at = at >= 0 ? at : from), 0, head);
+    last.set(e.page, at);
   });
 }
 

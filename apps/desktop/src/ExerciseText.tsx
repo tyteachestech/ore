@@ -27,10 +27,11 @@ const altOnly: Components["img"] = ({ src, alt }) =>
 /** An exercise's question or answer, drawn as a tutor reply is (its formulas, code and Markdown, F320) with
  *  the images of its source, as the reader draws them (`dir`: the source's folder). Plain text reads as it was
  *  typed: a paragraph keeps its line breaks, and what looks like a tag shows as typed. `inline`: in a one-line
- *  spot, one line: no paragraph wraps it, its blocks run on with a space and an image is its alt text. */
+ *  spot, one line: no paragraph wraps it, its blocks run on with a space, an image is its alt text and a link its words. */
 export function ExerciseText({ text, dir, inline }: { text: string; dir?: string; inline?: boolean }) {
   const parts = useMemo<Components>(() => {
-    if (inline) return { p: ({ children }) => <Fragment>{children}</Fragment>, img: ({ alt }) => <Fragment>{alt}</Fragment> };
+    // One line sits in rows and buttons (a quiz's key point, a prequestion): a link there is its words, never a link inside a button.
+    if (inline) return { p: ({ children }) => <Fragment>{children}</Fragment>, img: ({ alt }) => <Fragment>{alt}</Fragment>, a: ({ children }) => <Fragment>{children}</Fragment> };
     return dir ? withImages({}, dir) : { img: altOnly };
   }, [dir, inline]);
   return (

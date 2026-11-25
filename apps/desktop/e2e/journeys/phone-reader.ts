@@ -625,7 +625,8 @@ journey("phone: the small controls of a source answer a 44pt touch", async (page
   await tap(page, page.getByRole("button", { name: "Source actions" }));
   await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
   await tap(page, page.getByRole("button", { name: "Just mark done" }));
-  await page.locator(".quiz-foot button").first().waitFor();
+  // The closing card's foot, not the first step's (its "Just mark done" is a .quiz-foot button too, gone a moment later).
+  await page.locator(".quiz-done").waitFor();
   await fits(".quiz-foot button", "the closing card's Done");
 }, "phone");
 
@@ -1218,4 +1219,41 @@ journey("phone: a book's publisher pages sit under one shut row a finger can hit
     await tap(page, cover);
     await page.locator(".figure-view.open").waitFor();
   });
+}, "phone");
+
+journey("phone: while he types in the note beside a source, its highlights' tints are off the page; they are back when he leaves the field (F736)", async (page) => {
+  // WebKit slows every key in the note while a highlight is painted in a long source a page away: 51 keys took 6.8 s
+  // in his 638 KB book, 2 s with none painted. The lag itself only shows in WebKit on a long source; this holds its cause.
+  await phoneSource(page, TESTING);
+  const tints = () => page.evaluate(() => ["keep", "card", "question", "apply"].reduce((n, k) => n + (CSS.highlights.get(`hl-${k}`)?.size ?? 0), 0));
+  await until("the source's highlights are tinted", async () => (await tints()) > 0);
+  await tap(page, page.locator(".phone-tools > :nth-child(2)"));
+  await page.locator(".reader.noting").waitFor();
+  await until("focus is on the note", () => page.evaluate(() => !!document.activeElement?.closest(".mynotes")));
+  await until("no tint is painted while the note has the keyboard", async () => (await tints()) === 0);
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+  await until("the tints are back once he leaves the field", async () => (await tints()) > 0);
+}, "phone");
+
+journey("phone: Finish holds the questions it has no key points for: the recall is saved, they wait for the Mac, and the source stays in To read (F738)", async (page) => {
+  // The phone asked them anyway: after an answer or "No idea" it said "Not checked here", with no key point or passage
+  // to learn from (AI runs on the Mac, D78.3).
+  await phoneSource(page, TESTING);
+  const finish = async () => {
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: /^Finish/ }));
+  };
+  await finish();
+  await page.getByLabel("Free recall").fill("Testing yourself beats rereading, more so after a week.");
+  await tap(page, page.locator(".quiz-go"));
+  await page.locator(".quiz-done h2").filter({ hasText: /wait on your Mac/ }).waitFor({ timeout: 5000 });
+  if (await page.getByText("Not checked here").count()) throw new Error("a question the phone can't check was asked");
+  await tap(page, page.locator(".quiz-go"));
+  await page.locator(".quiz-done").waitFor({ state: "detached" });
+  // Still in To read: Finish is offered again (the Mac's asks the questions), and his recall is in the source note.
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await page.locator(".action-sheet button").filter({ hasText: /^Finish/ }).waitFor();
+  await page.keyboard.press("Escape");
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  await page.locator(".mynotes").filter({ hasText: "Testing yourself beats rereading" }).waitFor({ timeout: 5000 });
 }, "phone");

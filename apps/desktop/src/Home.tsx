@@ -646,8 +646,9 @@ export function waiting(t: Today): string {
   const n = t.new_waiting;
   const cards = count(n, "new exercise");
   if (!t.new_per_day) return `${cards} wait. New exercises are off in Settings.`;
-  // New cards only take the goal time due cards leave (D65), so past a day's worth say that, not "up to 10 a day".
-  return n <= t.new_per_day ? `${cards} start${n === 1 ? "s" : ""} tomorrow.` : `${cards} wait. A few start each day, as your goal leaves room.`;
+  // Past a day's worth, the day's limit is what holds them: new ones take every fifth place whatever is due (D144),
+  // so it never says they wait on room in the goal (D65.2's rule, which D144 replaced).
+  return n <= t.new_per_day ? `${cards} start${n === 1 ? "s" : ""} tomorrow.` : `${cards} wait. ${t.new_per_day === 1 ? "One starts" : `Up to ${t.new_per_day} start`} each day.`;
 }
 
 /** A source whose doc.md can't be read drops out of every list (files-10), so Home names it in one quiet
