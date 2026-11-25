@@ -185,7 +185,8 @@ function spot(v: EditorView, host: HTMLElement, cell: HTMLTableCellElement): At 
 
 /** The same table after an edit or a scroll, on the same cell or the nearest one left. */
 function again(v: EditorView, host: HTMLElement, a: At): At | null {
-  const node = v.state.doc.nodeAt(a.table);
+  // The table may be gone (deleted with the pointer still on it): past the note's end, `nodeAt` throws (F-new-table-controls).
+  const node = a.table < v.state.doc.content.size ? v.state.doc.nodeAt(a.table) : null;
   if (node?.type.spec.tableRole !== "table") return null;
   const { rows, cols } = sizeOf(v.state, a.table);
   return measure(v, host, a.table, Math.min(a.row, rows - 1), Math.min(a.col, cols - 1));
