@@ -1,0 +1,54 @@
+# Owner five-day friction log
+
+67 sources, 38 exercises; initial daily goal 10 min. Frontend days advanced with page.clock; bridge time remains real.
+- Day 1 · Review · Check a correct Explain answer: rating controls appeared in 137 ms; this was not completed grading.
+- Day 1 · Review · Actual grading completion 11.5 s (rating controls appeared immediately; previous 0.1 s line measures controls only).
+- Day 1 · Review · Half-right API explanation: I waited 9.4 s, then rated Hard while Checking was still visible. The AI reply arrived afterward; no completed-feedback claim.
+- Day 1 · Review · Wrong ANI/AGI explanation received 0/3 and a useful correction; see events.jsonl for grading duration.
+- Day 1 · Review · Missed Fact returned as Again (without New), after three intervening exercises; successful recall saved.
+- Day 1 · Read · Book opens on publisher newsletter and copyright pages; no Front matter fold (F649). Four highlights and a Key point note saved.
+- Day 1 · Add · Async/await imported with code and headings intact; prequestions finished in about 21 s per saved timestamps. The second of four prequestions shows literal backticks around `await` (inspect on Day 2).
+- Day 2 · Open · Frontend advanced to Nov 26; Home remains 11 of 10 because CLI today uses Nov 25. Harness limitation, not a finding.
+- Day 2 · Review/Close · Six exercises encountered; five ratings saved; Esc preserved the half-typed sixth answer. Home counts cumulative backend-day time, not the simulated day.
+- Day 3 · Read · Tutor answered the await passage correctly and marked its CPU-loop explanation as outside the saved sources. Asked library about retrieval and spacing; waiting state visible.
+- Day 3 · Review cleanup · Edited rational-agent question and reopened it successfully. Deleted redundant scoring-rule exercise 01M78B5FPC50C89GP1EGNQ1JE2; Undo restored its file, Redo retired it again. Undo leaves the next exercise on screen.
+- Day 4 · Missed · No learner actions or ratings.
+- Day 5 · Open/Review · Normal queue still held by Nov 25 CLI clock and daily cap; cannot verify missed-day due dates or 1-in-5 mixing. Using Review this source to inspect the five Finish drafts without changing settings.
+- Day 5 · Close · Final receipt: 5 memories kept, +12 days, 25 minutes today. File audit gives 621409 ms for this session and 1504708 ms across all four played sessions. Web Development remains level 0 / 0 cut gems; all five first reviews have stability 2.3065 days.
+
+- Day 1 · Read · Investigated the publisher pages: D354 explicitly says old imports get the fold on Reimport. Not a returned F649 bug; the existing book has no boundary marker. The screen did not explain this upgrade path.
+- Day 2 · Read · Reopened Async/await at the Await section, matching the prior screenshot; one saved highlight remained. Expanded prequestions: literal backticks again (day2-prequestions.png).
+- Day 3 · Review/Close · After the remaining Again exercise, the normal queue ended at 1 min 25 s; the backend had already used its ten-new-exercise cap. The requested fresh ten-minute day is not testable with frontend-only time travel.
+- Day 3 · Read/Finish · Continue displayed Saving while the AI key-point request completed (32.25 s total request, overlapping recall entry). Four quiz checks took 6.13–6.84 s apiece and showed Checking. Done returned to Home in 1.33 s; five draft exercises finished saving 45.92 s after drafting began.
+- Day 3 · Read/Quiz · Literal backticks recur in quiz question 2 and in the final recall feedback, including try/catch and Promise.all. Same rendering cause as the prequestions.
+- Day 3 · Close/Open · End screen and Home say new exercises start “as your goal leaves room.” I read Home.tsx and study.ts to resolve this: the limit is new exercises per day, with every fifth place reserved while due exercises last. The screen should explain that rule.
+- Day 3 · Review cleanup · Finding an exercise outside the exhausted normal queue required reading the code to discover that Source actions → Review this source includes unseen drafts despite the daily cap. The main review result remains separate from this maintenance session.
+- Day 5 · Open/Close · The same spare-goal-time explanation appeared with 19 waiting on Home and 14 waiting at the end; repeated on a fresh page at real time. This wording problem is independent of the simulated dates.
+- Day 5 · Review · Five newly drafted article exercises all showed New; no broken questions, raw Markdown in their review prompts, or missing information needed to attempt them. This source-only session cannot establish the one-in-five normal queue mix.
+- Day 5 · Audit · No page exceptions recorded; no lost answers, highlights, notes or ratings observed. Reading/editing wall time was not separately metered, and automation selector failures are excluded from learner friction.
+- Day 1 · Review · Measured `D1 grade completion`: 11.55 s. Action/observer duration; boundary details are in events.jsonl.
+- Day 1 · Review · Measured `D1 half-right grading`: 9.38 s. Action/observer duration; boundary details are in events.jsonl.
+- Day 1 · Review · Measured `D1 wrong grading complete`: 9.39 s. Action/observer duration; boundary details are in events.jsonl.
+- Day 1 · Read/Add · Measured `D1 URL import`: 1.46 s. Action/observer duration; boundary details are in events.jsonl.
+- Day 2 · Review · Measured `D2 Check Your AI editor is told to maximize audie`: 8.38 s. Action/observer duration; boundary details are in events.jsonl.
+- Day 2 · Review · Measured `CLI grade 01M73GSRZSGD0EZDKD8D0DAN3Q`: 10.62 s. Background/request duration; may overlap reading or a later exercise.
+- Day 2 · Review · Measured `CLI grade 01M73GSRZTKA0CTCCAYKHF480J`: 7.35 s. Background/request duration; may overlap reading or a later exercise.
+- Day 3 · Review · Measured `CLI grade 01M73GRQKZYRGP028GZX14EHBW`: 8.18 s. Background/request duration; may overlap reading or a later exercise.
+- Day 3 · Review · Measured `D3 Check Your AI editor is told to maximize audie`: 8.38 s. Action/observer duration; boundary details are in events.jsonl.
+- Day 3 · Read/Add · Measured `CLI key-points 01M89HVDXCRGZXNX25XQV20EH6`: 32.25 s. Background/request duration; may overlap reading or a later exercise.
+- Day 3 · Read/Add · Measured `CLI recall 01M89HVDXCRGZXNX25XQV20EH6`: 15.54 s. Background/request duration; may overlap reading or a later exercise.
+- Day 3 · Read/Add · Measured `CLI check 01M89HVDXCRGZXNX25XQV20EH6`: 6.54 s. Background/request duration; may overlap reading or a later exercise.
+- Day 3 · Read/Add · Measured `CLI check 01M89HVDXCRGZXNX25XQV20EH6`: 6.35 s. Background/request duration; may overlap reading or a later exercise.
+- Day 3 · Read/Add · Measured `CLI check 01M89HVDXCRGZXNX25XQV20EH6`: 6.13 s. Background/request duration; may overlap reading or a later exercise.
+- Day 3 · Read/Add · Measured `CLI check 01M89HVDXCRGZXNX25XQV20EH6`: 6.84 s. Background/request duration; may overlap reading or a later exercise.
+- Day 3 · Read/Add · Measured `D3 Done finish`: 1.33 s. Action/observer duration; boundary details are in events.jsonl.
+- Day 3 · Read/Add · Measured `CLI enrich 01M89HVDXCRGZXNX25XQV20EH6`: 45.92 s. Background/request duration; may overlap reading or a later exercise.
+- Day 3 · Read/Add · Measured `CLI tutor The passage says await suspends the function without costing CPU resources. Why can the page still respond to clicks, and would await make a slow CPU-heavy loop stop blocking the page too?`: 19.85 s. Background/request duration; may overlap reading or a later exercise.
+- Day 3 · Read/Add · Measured `CLI tutor Across my saved learning sources, why is trying to recall an idea before rereading useful, and why should spaced practice revisit the same underlying knowledge?`: 18.12 s. Background/request duration; may overlap reading or a later exercise.
+- Day 5 · Review · Measured `CLI grade 01M89J6V38TA6KQXG769VQA793`: 10.59 s. Background/request duration; may overlap reading or a later exercise.
+- Day 5 · Review · Measured `D5 Check Your creator dashboard loads analytics a`: 10.91 s. Action/observer duration; boundary details are in events.jsonl.
+- Day 5 · Review · Measured `CLI grade 01M89J6V37P96RARM7W23D4S6B`: 13.37 s. Background/request duration; may overlap reading or a later exercise.
+- Day 5 · Review · Measured `D5 Check How can JavaScript code get a plain valu`: 13.42 s. Action/observer duration; boundary details are in events.jsonl.
+- Day 5 · Review · Measured `CLI grade 01M89J6V37P96RARM7W23D4S6C`: 6.79 s. Background/request duration; may overlap reading or a later exercise.
+- Day 5 · Review · Measured `CLI grade 01M89J6V38TA6KQXG769VQA791`: 7.12 s. Background/request duration; may overlap reading or a later exercise.
+- Day 5 · Review · Measured `CLI grade 01M89J6V38TA6KQXG769VQA792`: 8.53 s. Background/request duration; may overlap reading or a later exercise.

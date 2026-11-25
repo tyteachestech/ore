@@ -1,0 +1,57 @@
+- Day 1 | Open / add dialog | 42 ms
+- Day 1 | 6 Read / article import usable upper bound 7071 ms; Adding shown
+- Day 1 | 6 Read / YouTube ready 3390 ms; Adding indicator shown
+- Day 1 | 6 Read / PDF ready 2841 ms; Adding indicator shown
+- Day 1 | 6 Read / Wikipedia ready 3385 ms; Adding indicator shown
+- Day 1 | 6 Read / reopen article | 56 ms
+- Day 1 | 6 Read / completed article pass; diagrams render; two highlight notes and source note saved
+- Day 1 | 6 Read / Finish opens quiz | 60 ms
+- Day 1 | 6 Read / recall saved to next step 6653 ms (upper bound)
+- Day 1 | 6 Read / player unavailable twice; read test shim after inspecting screen: player_port returns null without a separately supplied player server. Harness limit, not product finding.
+- Day 1 | 6 Read / Q1 feedback observed after 44864 ms upper bound; correct coverage, waiting message visible
+- Day 1 | 6 Read / quiz Q1 AI feedback 45471 ms
+- Day 1 | 6 Read / Q2 feedback 6882 ms
+- Day 1 | 6 Read / Q3 submitted 114 ms; feedback continues in background
+- Day 1 | 6 Read / Q4 feedback 6373 ms
+- Day 1 | 6 Read / Done closes 1342 ms
+- Day 2 | 2 Open / simulated date 2026-11-26T14:49:23.178Z; bridge retains real date
+- Day 2 | 3 Review / no first exercises available after Finish; inspecting source menu and Collected for recovery
+- Day 2 | 3 Review / after Finish, Home says All caught up and source Review closes with no exercise. No drafting status visible for 82 s. Read Finish code to learn enrich is still running; screen should say drafting.
+- Day 2 | 6 Read / video playback blocked by harness; read 12:27–14:21 and saved transcript Key point with note
+- Day 2 | 3 Review / tutor corrected missed idea; response completed in 16374 ms (bridge), saved across close/reopen
+- Day 2 | 3 Review / first Explain grade 40 ms
+- Day 2 | 3 Review / first Explain AI feedback ready 7728 ms
+- Day 2 | 3 Review / Good to next usable screen | 104 ms
+- Day 2 | 5 Close / first session saved 1 Good, 26693 ms; end screen 0 minutes (rounded), 1 memory, +2 days; CLI dates stay Nov 25
+- Day 3 | 2 Open / simulated date 2026-11-27T14:49:23.125Z; bridge retains real date
+- Day 3 | 3 Review / Home still says 7 new exercises tomorrow on simulated day 3 because CLI is on real day 1; scheduling cannot be tested with page clock alone. Drafting finally completed after 168410 ms.
+- Day 3 | 3 Review / Fact answer in mind: a key describes what information this token offers for other tokens queries to match
+- Day 3 | 3 Review / rate Fact Good | 93 ms
+- Day 3 | 3 Review / incorrect Explain feedback 9401 ms
+- Day 3 | 6 Read / PDF opens page 2 with Model Architecture, Background, Introduction in reverse order above 1 Introduction; confusing route through paper
+- Day 3 | 6 Read / PDF reversed duplicate headings persist on reopen, 2/2; raw single-dollar LaTex and missing parentheses in Table 1 observed, checking known PDF limits
+- Day 3 | 6 Read / search animal tired results 303 ms
+- Day 3 | 6 Read / search result opening with 500ms settle 647 ms
+- Day 3 | 6 Read / Just mark done stayed Saving for at least 50.4 s, waiting for AI key-points, not a file write. Closed and reopened quiz safely; no rating saved.
+- Day 3 | 6 Read / Wikipedia code indentation and rendered formulas checked; article through Applications and citations saved
+- Day 3 | 6 Read / second Finish (PDF) returns Home without drafting status; promise says tomorrow; waiting request verified
+- Day 3 | 1 Cue / goal set to 5 minutes and plan to morning coffee, verified after reopening and in skills.yaml
+- Day 3 | 6 Read / PDF drafting completed; no wait status throughout; second occurrence confirmed
+- Day 4 | 2 Open / phone starts empty, as supplied. Expected Mac sources/progress in actual use; no sync available in this test. Mac context saved/closed to keep one context; will restore for day 5.
+- Day 4 | 6 Read / phone article add sheet closed 51 ms
+- Day 4 | 6 Read / phone import outcome 8106 ms
+- Day 4 | 6 Read / phone URL imports refused for both Jay Alammar and Wikipedia, with explicit Mac retry; no half-read source saved
+- Day 4 | 6 Read / phone pasted notes + read + note reopen + recall 46 s (includes tool overhead); Done 1329 ms
+- Day 4 | 3 Review / Review this source has no exercises in empty no-AI phone copy; cannot do short review. Text note and recall persisted in IndexedDB, no reviews.
+- Day 5 | 2 Open / day 5 Mac restored after phone; same scratch library, browser time Nov29, CLI remains Nov25
+- Day 5 | 3 Review / added 120000 ms simulated thinking via page.clock, not wall waiting
+- Day 5 | 3 Review / weights Explain feedback 10425 ms
+- Day 5 | 3 Review / added another 120000 ms simulated thinking, not wall waiting
+- Day 5 | 3 Review / cut-context Explain feedback 15488 ms
+- Day 5 | 3 Review / Good to next exercise 100 ms
+- Day 5 | 5 Close / end shows 7 minutes today, 2 memories kept and +5 days; library active total 425703 ms, including 360000 ms capped day-5 review
+- Day 5 | 5 Close / Transformers retains the coworker-explanation goal and suggests Try it; reviewed article belongs to AI, so no Transformers mastery claim. End ring matches seven rounded minutes; Home tomorrow remains limited by real CLI date.
+
+Measurement reconciliation: Q1 45471 ms is a duplicate waiter that resolved after Next, not a second AI wait; retain only the 44864 ms upper-bound observation. Day 2 first Explain 40 ms measured answer reveal, not grading; use 7728 ms UI / 7673 ms bridge for feedback. The Good 104 ms line does not prove final end-screen readiness. Day 3 search 647 ms includes an intentional 500 ms settle. Day 4 46 seconds includes tool overhead. Day 5's 240000 ms total clock advances are synthetic. Full per-day saved-rating reconciliation and all timing bounds are in report.md.
+
+Final library check: four Mac sources, twelve exercises, five review records; 425703 ms counted active time all on CLI date November 25. Browser dates moved Nov25→26→27→28→29; phone had its own empty seed. No actual cross-day due-queue pass was possible. All own browser pages/context closed at end; no shared service stopped.
