@@ -371,7 +371,7 @@ export function App() {
     );
   }, [notify]);
 
-  /** Loads the sources and the skills, at launch and on a Try again after `ore` failed. */
+  /** Loads the sources and the skills, at launch, on return and on a Try again after `ore` failed. */
   const reload = useCallback(() => {
     void refresh();
     reloadSkills();
@@ -406,14 +406,14 @@ export function App() {
     const back = () => {
       if (!left || Date.now() - left < 10_000) return;
       left = 0;
-      void refresh();
+      reload();
       void fromPhone();
       wakeScreens();
     };
     addEventListener("blur", away);
     addEventListener("focus", back);
     return () => (clearTimeout(first), removeEventListener("blur", away), removeEventListener("focus", back));
-  }, [notify, refresh, reload]);
+  }, [notify, reload]);
 
   useEffect(() => save("ore.view", JSON.stringify({ status, skill })), [status, skill]);
 
