@@ -324,7 +324,7 @@ test("a read again keeps a highlight still being made, and lists it once when it
   expect(t.ids()).toEqual(["a", "b"]);
 });
 
-// F-new-reread-drops-landed: the read was asked for before the save landed, so its answer doesn't have the highlight.
+// F620: the read was asked for before the save landed, so its answer doesn't have the highlight.
 test("a highlight saved while the library was being read stays when that older read arrives", async () => {
   const t = open([ann("a")]);
   const since = t.hl.reading();
@@ -354,7 +354,7 @@ test("a highlight grown over a passage keeps its new span when an older read arr
   expect(t.hl.list()[0]).toMatchObject({ start: 5, exact: "longer" });
 });
 
-// F-new-reread-flips-removed: a read that lands while the removal (or the ⌘Z that brings it back) is still saving.
+// F621: a read that lands while the removal (or the ⌘Z that brings it back) is still saving.
 test("a highlight he removed stays gone, and one ⌘Z brought back stays, when the library is read again before the write lands", async () => {
   const t = open([ann("a", { intent: "card" }), ann("b")]);
   const gone = t.hl.remove("a");
