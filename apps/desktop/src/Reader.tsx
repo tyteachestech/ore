@@ -13,7 +13,7 @@ import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
-import { FRONT_END, unfold } from "./front";
+import { frontEnd, unfold, unfoldFor } from "./front";
 import { SearchButton, SearchField } from "./HeadSearch";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
 import { paragraphRange, sentenceRange, snapRange } from "./snap";
@@ -202,7 +202,8 @@ function coverOf(t: EventTarget | null): Zoomed | null {
   if (!img) return null;
   const from = img.getBoundingClientRect();
   const max = img.naturalHeight / from.height;
-  return PHONE || max > 1.1 ? { img, from, max } : null;
+  // Opened even when it was saved no bigger than shown, as Quick Look opens a small picture: a click on it always does something.
+  return { img, from, max: Math.max(1, max) };
 }
 
 type Box = [number, number, number, number];
@@ -551,9 +552,9 @@ type VideoCard = { head: ReactNode; foot?: ReactNode; box: RefObject<HTMLDivElem
 
 /** The document body, rendered in slices so a 100k-word book stays responsive while it mounts. With a
  *  video card, the transcript before VIDEO_END goes in the card and the page's text follows it. */
-const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, card }: { markdown: string; video: boolean; dir: string; cells?: boolean; pages?: boolean; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
+const Body = memo(function Body({ markdown, video, dir, cells, pages, book, onReady, card }: { markdown: string; video: boolean; dir: string; cells?: boolean; pages?: boolean; book?: boolean; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
   // A book's front matter (its title page, copyright, contents) folds under one row, shut, so it opens on its text.
-  const front = card ? -1 : markdown.indexOf(FRONT_END);
+  const front = card ? -1 : frontEnd(markdown, !!book);
   const split = card ? markdown.indexOf(VIDEO_END) : front;
   const [frontOpen, setFrontOpen] = useState(false);
   const frontBox = useRef<HTMLDivElement>(null);
@@ -1316,6 +1317,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       // transcript folded away opens, since Find looks only at what shows (Codex UX sweep 10).
       const [query = "", near] = p.jumpTo.slice(5).split("\n");
       showTranscriptFor(null, query);
+      unfoldFor(docEl.current, query);
       setFind((f) => ({ open: true, focus: f.focus + 1, query, near }));
     }
     else if (p.jumpTo?.startsWith("note:")) {
@@ -3770,7 +3772,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
             </div>
           )}
           <TableCtx.Provider value={tables}>
-            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} pages={!!pdf || !!deck} onReady={onReady} card={cardMode ? videoCard : undefined} />
+            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} pages={!!pdf || !!deck} book={doc.type === "epub"} onReady={onReady} card={cardMode ? videoCard : undefined} />
           </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">

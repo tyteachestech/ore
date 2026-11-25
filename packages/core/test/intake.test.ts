@@ -1158,6 +1158,32 @@ describe("import coverage: EPUB", () => {
     expect(text).toMatch(/Copyright © 2019 by Ada Learner\. All rights reserved\.\n$/);
   });
 
+  test("EPUB: an introduction between the title page and the copyright page shows, read by its heading over a paragraph, though its heading is marked \"title\" and the book's start-reading mark points at the title page", async () => {
+    const lib = await tempLibrary();
+    const xhtml = (body: string) => `<?xml version="1.0" encoding="utf-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>t</title></head><body>${body}</body></html>`;
+    const intro = Array.from({ length: 12 }, (_, i) => `Tides are the slow breath of the sea, line ${i + 1}.`).join(" ");
+    const epub = zipSync({
+      mimetype: strToU8("application/epub+zip"),
+      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
+      "OEBPS/content.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Harbour Notes</dc:title><dc:creator>Ada Learner</dc:creator></metadata>
+<manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="t" href="title.xhtml" media-type="application/xhtml+xml"/><item id="i" href="intro.xhtml" media-type="application/xhtml+xml"/><item id="c" href="copy.xhtml" media-type="application/xhtml+xml"/><item id="one" href="one.xhtml" media-type="application/xhtml+xml"/></manifest>
+<spine><itemref idref="t"/><itemref idref="i"/><itemref idref="c"/><itemref idref="one"/></spine></package>`),
+      "OEBPS/nav.xhtml": strToU8(xhtml(`<nav epub:type="landmarks"><ol><li><a epub:type="bodymatter" href="title.xhtml">Start</a></li></ol></nav>`)),
+      "OEBPS/title.xhtml": strToU8(xhtml(`<section epub:type="titlepage"><p>HARBOUR NOTES</p><p>Ada Learner</p></section>`)),
+      "OEBPS/intro.xhtml": strToU8(xhtml(`<section><h1 epub:type="title">Introduction</h1><p>${intro}</p></section>`)),
+      "OEBPS/copy.xhtml": strToU8(xhtml(`<section epub:type="copyright-page"><p>Copyright © 2021 Ada Learner. All rights reserved.</p></section>`)),
+      "OEBPS/one.xhtml": strToU8(xhtml(`<section epub:type="chapter"><h1>One</h1><p>${intro}</p></section>`)),
+    });
+    const path = join(lib.root, "harbour.epub");
+    writeFileSync(path, epub);
+    const body = (await addSource(lib, path)).body;
+    const [front, text] = body.split(FRONT_END);
+    expect(front).toContain("HARBOUR NOTES");
+    expect(front).not.toContain("Introduction");
+    expect(text).toMatch(/^\n\n<!-- chapter 2 -->\n\n# Introduction\n/);
+    expect(text).toContain("All rights reserved.");
+  });
+
   test("EPUB: a book that opens on its text has no front matter mark", async () => {
     for (const name of ["chapters.epub", "book.epub", "plates.epub"]) expect((await addSource(await tempLibrary(), file(name))).body).not.toContain(FRONT_END);
   });

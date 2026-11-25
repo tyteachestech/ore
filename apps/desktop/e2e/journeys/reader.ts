@@ -2401,6 +2401,14 @@ journey("reader: a book opens on its text, its publisher's pages under one shut 
     if (big.height > 602) throw new Error(`the cover is blown up past its own 600px: ${Math.round(big.height)}px`);
     await page.keyboard.press("Escape");
     await until("Esc closes the cover", async () => (await page.locator(".figure-zoom").count()) === 0);
+    // A library search whose words are only in the folded pages opens them, so Find has the words to light.
+    await page.locator(".sidebar .side-item", { hasText: "Home" }).first().click();
+    await page.keyboard.press("Meta+k");
+    await page.keyboard.type("night shift");
+    await page.locator("[cmdk-item]").filter({ hasText: "The Slow Lamp" }).first().click();
+    await page.locator(".front-body", { hasText: "To the night shift" }).waitFor();
+    await until("Find counts the match", async () => /^\d+\/\d+$/.test((await page.locator(".find-count").textContent().catch(() => "")) ?? ""));
+    await page.keyboard.press("Escape");
   } finally {
     await ore("archive", made.id).catch(() => {});
   }

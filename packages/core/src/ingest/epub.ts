@@ -173,7 +173,8 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
       return target && NOTE.test(kind(target)) ? target : undefined;
     };
     const page = docs.get(path)!;
-    const own = Array.from(page.querySelectorAll("[epub\\:type], [role]")).flatMap((e) => kind(e).replace(/\bdoc-/g, "").split(/\s+/).filter(Boolean));
+    // The page's own kind, from its body and the blocks that hold it: a heading marked "title" names the heading, not the page.
+    const own = Array.from(page.querySelectorAll(":is(body, section, article, div, nav, aside)[epub\\:type], :is(body, section, article, div, nav, aside)[role]")).flatMap((e) => kind(e).replace(/\bdoc-/g, "").split(/\s+/).filter(Boolean));
     const anchors = Array.from(page.querySelectorAll("a[href]"));
     const fact: PageFacts = { types: [...own, ...(kinds.get(path) ?? [])], labels: labels.get(path) ?? [], text: page.body?.textContent ?? "", links: anchors.length, linkWords: anchors.reduce((n, a) => n + (a.textContent?.match(/\S+/g) ?? []).length, 0) };
     const { md, pictures } = chapterMarkdown(page, image, note, () => ++notes);
@@ -189,7 +190,7 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
       continue;
     }
     for (const [k, v] of used) assets.set(k, v);
-    facts.push({ ...fact, heading: md.match(/^#{1,6}[ \t]+(.+)$/)?.[1]?.replace(/[*_`\\]/g, "") });
+    facts.push({ ...fact, heading: md.match(/^#{1,6}[ \t]+(.+)$/m)?.[1]?.replace(/[*_`\\]/g, "") });
     chapters.push(`<!-- chapter ${chapters.length + 1} -->\n\n${md}`);
   }
   if (!chapters.length) throw new Error("EPUB has no readable text (DRM-protected?)");

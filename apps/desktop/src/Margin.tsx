@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { FRONT_END } from "./front";
+import { frontEnd } from "./front";
 import { Hint } from "./Hint";
 import { Signpost } from "./icons";
 import { renderedNodeAt, type Skeleton, type TextIndex } from "./text";
@@ -33,7 +33,7 @@ export function chapterMarks(body: string, type?: string): { n: number; at: numb
 export function findChapterEnds(body: string, src: Skeleton, idx: TextIndex, article: HTMLElement, type?: string): ChapterEnd[] {
   const marks = chapterMarks(body, type);
   // A book's front matter (its copyright page, its praise) is no chapter to recall.
-  const front = body.indexOf(FRONT_END);
+  const front = frontEnd(body, type === "epub");
   const out: ChapterEnd[] = [];
   for (let i = 0; i + 1 < marks.length; i++) {
     const cur = marks[i]!;
