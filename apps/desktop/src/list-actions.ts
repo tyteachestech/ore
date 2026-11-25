@@ -1,4 +1,4 @@
-import { allOrNone, type Change } from "./change";
+import { allOrNone, valueChange, type Change } from "./change";
 import { LEVELS } from "./importance";
 import { opt, pinBetween, type CardSkills, type Item, type Priority, type Skill } from "./ore";
 import { layoutOf, skillGroups, type SkillLayout } from "./Skills";
@@ -121,20 +121,20 @@ export function sourceActions(env: Lists) {
   const retitle = (id: string, before: string, typed: string) => {
     const t = typed.trim();
     if (!t || t === before) return Promise.resolve(true);
-    return env.change({ message: `Renamed to “${t}”`, kind: "quiet", key: id, show: (on) => patch(id, (i) => ({ ...i, title: on ? t : before })), write: (on) => ore("edit", id, "--title", on ? t : before) });
+    return env.change(valueChange({ message: `Renamed to “${t}”`, kind: "quiet", key: id, field: `source ${id} title`, before, after: t, show: (title) => patch(id, (i) => ({ ...i, title })), write: (title) => ore("edit", id, "--title", title) }));
   };
 
   /** How much a source matters, over its skills' importance ("" hands it back to them). */
   const setImportance = (item: Item, p: Priority | "") => {
     const before = item.priority ?? "";
     const said = p ? LEVELS.find((l) => l.p === p)!.label : item.skills.length ? "same as its skills" : "Normal";
-    return env.change({
+    return env.change(valueChange<Priority | "">({
       message: `${item.title}: ${said}`,
-      kind: "quiet",
-      key: item.id,
-      show: (on) => patch(item.id, (i) => ({ ...i, priority: (on ? p : before) || undefined })),
-      write: (on) => ore("edit", item.id, opt("priority", on ? p : before)),
-    });
+      kind: "quiet", key: item.id,
+      field: `source ${item.id} priority`, before, after: p,
+      show: (priority) => patch(item.id, (i) => ({ ...i, priority: priority || undefined })),
+      write: (priority) => ore("edit", item.id, opt("priority", priority)),
+    }));
   };
 
   /** Files a source under exactly `next` skills (its exercises follow), with Undo back to `before`. */
@@ -167,6 +167,7 @@ export function sourceActions(env: Lists) {
     const was = env.cursor?.now;
     return env.change({
       message,
+      key: sel.map((i) => i.id),
       show: (forward) => {
         show(forward);
         if (!forward && was !== undefined) env.cursor!.set(was);
@@ -183,15 +184,34 @@ export function sourceActions(env: Lists) {
     const next = (i: Item) => (on ? [...new Set([...i.skills, k.id])] : i.skills.filter((s) => s !== k.id));
     // What each source's exercises were filed under before, so Undo puts each one back as it was.
     const was = new Map<string, CardSkills | undefined>();
+    // Every completed filing owns its part of the revival. The last inverse rearchives it,
+    // whether that inverse is normal Undo or compensation for a later failed source.
+    const filed = new Set<string>();
     return batch(
       on ? `Filed ${what} under ${k.name}` : `Removed ${what} from ${k.name}`,
       sel,
       each(sel, "skills", next),
-      (i, f) =>
-        f
-          ? ore<{ cards_before?: CardSkills } | undefined>("edit", i.id, "--skills", next(i).join(",")).then((r) => void was.set(i.id, r?.cards_before))
-          : ore("edit", i.id, "--skills", i.skills.join(","), ...(was.get(i.id) ? [opt("cards", JSON.stringify(was.get(i.id)))] : [])),
-      on && k.archived ? (forward) => (forward ? env.reloadSkills() : rearchive([k.id])) : undefined,
+      async (i, f) => {
+        const edit = async (forward: boolean) => {
+          const cards = was.get(i.id);
+          const restoreCards = cards ? [opt("cards", JSON.stringify(cards))] : [];
+          if (forward) {
+            const r = await ore<{ cards_before?: CardSkills } | undefined>("edit", i.id, "--skills", next(i).join(","));
+            was.set(i.id, r?.cards_before);
+            filed.add(i.id);
+          } else {
+            await ore("edit", i.id, "--skills", i.skills.join(","), ...restoreCards);
+            filed.delete(i.id);
+          }
+        };
+        await allOrNone([
+          edit,
+          async (forward) => {
+            if (!forward && on && k.archived && !filed.size) await rearchive([k.id]);
+          },
+        ], f);
+      },
+      on && k.archived ? () => env.reloadSkills() : undefined,
     );
   };
   const fileMany = (sel: Item[], k: Skill, on: boolean) => fileItems(sel, count(sel.length, "source"), k, on);
@@ -203,7 +223,7 @@ export function sourceActions(env: Lists) {
     const was = env.cursor?.now;
     return env.change({
       message: `Archived “${c.title}”`,
-      key: `course ${c.id}`,
+      key: [`course ${c.id}`, ...lessons.map((i) => i.id)],
       show: (on) => {
         away(on || !changed.length ? lessons : lessons.filter((l) => changed.includes(l.id)), on);
         if (!on && was !== undefined) env.cursor!.set(was);
@@ -231,7 +251,7 @@ export function skillActions(env: Lists) {
         const ids = new Set(placed.map((s) => s.id));
         return [...placed, ...all.filter((s) => !ids.has(s.id))];
       });
-    return env.skillChange({ message, kind, key: "sidebar layout", show: (on) => show(on ? layout : before), write: (on) => ore("skills", "arrange", JSON.stringify(on ? layout : before)) });
+    return env.skillChange(valueChange({ message, kind, key: "sidebar layout", field: "sidebar layout", before, after: layout, show, write: (value) => ore("skills", "arrange", JSON.stringify(value)) }));
   };
   /** Files a skill under another collection (or none), at the end of it. */
   const move = (s: Skill, collection: string) => {
@@ -258,21 +278,24 @@ export function skillActions(env: Lists) {
 
   /** Writes a skill's importance or archived flag (D173) at once, then saves through `ore`. */
   type Patch = Partial<Pick<Skill, "priority" | "archived">>;
-  const set = (message: string, kind: "info" | "quiet", id: string, before: Patch, after: Patch) =>
-    env.skillChange({
-      message,
-      kind,
-      key: `skill ${id}`,
-      show: (on) => env.setSkills((all) => all.map((k) => (k.id === id ? { ...k, ...(on ? after : before) } : k))),
-      write: (on) =>
-        allOrNone(
-          [
-            async (to) => void ((to ? after : before).priority && (await ore("skills", "set", id, opt("priority", (to ? after : before).priority!)))),
-            async (to) => void ((to ? after : before).archived !== undefined && (await ore("skills", "archive", id, ...((to ? after : before).archived ? [] : ["--undo"])))),
-          ],
-          on,
-        ),
-    });
+  const set = (message: string, kind: "info" | "quiet", id: string, before: Patch, after: Patch) => {
+    const skill = env.skills.find((s) => s.id === id);
+    const current: { priority: Priority; archived: boolean } = { priority: skill?.priority ?? "P2", archived: !!skill?.archived };
+    return env.skillChange(valueChange({
+      message, kind, key: `skill ${id}`, field: `skill ${id} settings`,
+      before: { ...current, ...before }, after: { ...current, ...after },
+      rebase: (saved) => ({ ...saved, ...after }),
+      show: (value) => env.setSkills((all) => all.map((k) => k.id === id ? { ...k, ...value } : k)),
+      write: (to, from) => allOrNone([
+        async (forward) => {
+          if (to.priority !== from.priority) await ore("skills", "set", id, opt("priority", (forward ? to : from).priority));
+        },
+        async (forward) => {
+          if (to.archived !== from.archived) await ore("skills", "archive", id, ...((forward ? to : from).archived ? [] : ["--undo"]));
+        },
+      ], true),
+    }));
+  };
   /** Picks a level; picking one on an archived skill brings it back too. */
   const setImportance = (s: Skill, p: Priority) => {
     // Archived only when it changes: a live skill's level is one write.

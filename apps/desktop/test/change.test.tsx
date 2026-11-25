@@ -17,7 +17,7 @@ g.cancelAnimationFrame = (id: number) => clearTimeout(id);
 const { createRoot } = await import("react-dom/client");
 const { TooltipProvider } = await import("@radix-ui/react-tooltip");
 const { useToast } = await import("../src/Toast");
-const { change } = await import("../src/change");
+const { change, valueChange } = await import("../src/change");
 
 type Toasts = ReturnType<typeof useToast>;
 const open = new Set<() => Promise<void>>();
@@ -212,4 +212,66 @@ test("a change of several writes that fails part-way writes back the ones that l
   };
   await expect(allOrNone([step("a"), step("b"), step("c", true), step("d")], true)).rejects.toThrow("locked");
   expect(wrote).toEqual(["a archive", "b archive", "b restore", "a restore"]);
+});
+
+
+test("field edits skip failed predecessors across controls and keep later fields on screen", async () => {
+  const t = await mount();
+  const lib = library();
+  const screen = { icon: "old", goal: "learn" };
+  const edit = (field: "icon" | "goal", value: string) => change(t.notify, valueChange({
+    message: field, key: "shared-skill", field: `shared-skill ${field}`, before: screen[field], after: value,
+    show: (v) => { screen[field] = v; }, write: (v) => lib.write(`${field} ${v}`),
+  }));
+  await act(async () => { void edit("icon", "failed"); });
+  await act(async () => { void edit("goal", "new goal"); void edit("icon", "final"); });
+  lib.calls[0]!.fail("offline"); await tick();
+  expect(screen).toEqual({ icon: "final", goal: "new goal" });
+  lib.calls[1]!.land(); await tick();
+  lib.calls[2]!.land(); await tick();
+  await act(async () => t.undo());
+  expect(lib.calls[3]!.what).toBe("icon old");
+  lib.calls[3]!.land(); await tick();
+  expect(screen).toEqual({ icon: "old", goal: "new goal" });
+});
+
+test("Undo held before a dependent field save uses its corrected inverse even if both saves fail", async () => {
+  const t = await mount();
+  const lib = library();
+  let shown = "original";
+  const edit = (after: string) => change(t.notify, valueChange({
+    message: after, key: "failed-chain", field: "failed-chain title", before: shown, after,
+    show: (v) => { shown = v; }, write: (v) => lib.write(v),
+  }));
+  await act(async () => { void edit("first"); });
+  await act(async () => { void edit("second"); });
+  await act(async () => t.undo());
+  lib.calls[0]!.fail("first refused"); await tick();
+  lib.calls[1]!.fail("second refused"); await tick();
+  expect(shown).toBe("original");
+  expect(lib.calls).toHaveLength(2);
+  expect(t.history.canUndo).toBe(false);
+  expect(t.history.canRedo).toBe(false);
+});
+
+test("field Undo follows a successful predecessor and an idle field accepts freshly loaded values", async () => {
+  const t = await mount();
+  const lib = library();
+  let shown = "original";
+  const edit = (after: string) => change(t.notify, valueChange({
+    message: after, key: "saved-chain", field: "saved-chain title", before: shown, after,
+    show: (v) => { shown = v; }, write: (v) => lib.write(v),
+  }));
+  await act(async () => { void edit("first"); });
+  await act(async () => { void edit("second"); });
+  lib.calls[0]!.land(); await tick(); lib.calls[1]!.land(); await tick();
+  await act(async () => t.undo());
+  expect(lib.calls[2]!.what).toBe("first");
+  lib.calls[2]!.land(); await tick();
+  shown = "from another device";
+  await act(async () => { void edit("third"); });
+  lib.calls[3]!.land(); await tick();
+  await act(async () => t.undo());
+  expect(lib.calls[4]!.what).toBe("from another device");
+  lib.calls[4]!.land(); await tick();
 });

@@ -17,7 +17,7 @@ import { escTaken, Hint } from "./Hint";
 import { Working } from "./Working";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { Gem, GEM_WORD, gemHint, GemRing, NearGoal, type GemKind } from "./Gem";
-import { change } from "./change";
+import { change, valueChange } from "./change";
 import { depthText, levelProgress, ore, opt, PHONE, type Question, type Research, type Skill, type SkillStats } from "./ore";
 import { AnswerBox, AskQuestion, announce, questionText, typedQuestion, useQuestionEdits } from "./Questions";
 import { SkillChip, SkillName } from "./Skills";
@@ -293,14 +293,15 @@ function BadgePicker({ skill, onChanged, notify }: { skill: Skill; onChanged: ()
   const set = (key: "icon" | "color", value: string) => {
     const before = shown.current[key];
     if (before === value) return;
-    return change(notify, {
+    return change(notify, valueChange({
+      field: `skill ${skill.id} ${key}`, before, after: value,
       message: `Changed the ${key === "icon" ? "icon" : "colour"} of ${skill.name}`,
       kind: "quiet",
       key: `skill ${skill.id}`,
-      show: (on) => void (shown.current[key] = on ? value : before),
-      write: (on) => ore("skills", "set", skill.id, opt(key, on ? value : before)),
+      show: (v) => void (shown.current[key] = v),
+      write: (v) => ore("skills", "set", skill.id, opt(key, v)),
       settled: onChanged,
-    });
+    }));
   };
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -423,15 +424,16 @@ function Goal({ skill, lastTry, onTry, onChanged, notify, tools }: { skill: Skil
     const before = shownGoal.current;
     if (v === before) return;
     // Emptying the field throws the goal away: say so, with Undo.
-    const ok = await change(notify, {
+    const ok = await change(notify, valueChange({
+      field: `skill ${skill.id} goal`, before, after: v,
       message: v ? `Goal for ${skill.name}` : `Cleared the goal for ${skill.name}`,
       kind: v ? "quiet" : "info",
       key: `skill ${skill.id}`,
       // One that fails leaves the goal as it was, so typing this goal again still saves it.
-      show: (on) => void (shownGoal.current = on ? v : before),
-      write: (on) => ore("skills", "set", skill.id, opt("goal", on ? v : before)),
+      show: (value) => void (shownGoal.current = value),
+      write: (value) => ore("skills", "set", skill.id, opt("goal", value)),
       settled: onChanged,
-    });
+    }));
     // The field opens again with what he typed, so a failed save loses nothing.
     if (!ok) setDraft(v);
   };

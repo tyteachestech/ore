@@ -272,3 +272,99 @@ function envOf(d: Awaited<ReturnType<typeof device>>) {
     reloadSkills: () => {},
   };
 }
+
+test("a later move of one source waits for an older batch touching that source", async () => {
+  const d = await device({ items: [item("batch-a"), item("batch-b")] });
+  d.lib.hold = true;
+  await act(async () => { void d.sources().moveMany(d.state.items, "done"); });
+  await act(async () => { void d.sources().moveTo(d.state.items[1]!, "reading"); });
+  const beforeRelease = [...d.calls];
+  d.lib.hold = false;
+  for (const land of d.held) land();
+  await tick(); await tick();
+  expect(beforeRelease).toEqual(["status batch-a done"]);
+  expect(d.calls).toEqual(["status batch-a done", "status batch-b done", "status batch-b reading"]);
+  expect(d.state.items[1]!.status).toBe("reading");
+});
+
+test("Undo of importance after an earlier failed save restores the last saved importance", async () => {
+  const t = await mount();
+  let items = [item("importance-failure")];
+  let saved: string | undefined;
+  let fail!: (e: Error) => void;
+  let first = true;
+  const calls: string[] = [];
+  const run = async <T,>(...args: string[]): Promise<T> => {
+    calls.push(args.join(" "));
+    if (first) {
+      first = false;
+      await new Promise<void>((_, reject) => { fail = reject; });
+    }
+    saved = args[2]!.split("=")[1] || undefined;
+    return undefined as T;
+  };
+  const actions = () => sourceActions({
+    ore: run, skills: [], items: (f) => { items = f(items); }, archived() {}, setSkills() {}, reloadSkills() {},
+    change: (c) => change(t.notify, c), skillChange: (c) => change(t.notify, c),
+  });
+  let a!: Promise<boolean>, b!: Promise<boolean>;
+  await act(async () => { a = actions().setImportance(items[0]!, "P1"); });
+  await act(async () => { b = actions().setImportance(items[0]!, "P3"); });
+  await act(async () => { fail(new Error("first edit refused")); await Promise.all([a, b]); });
+  expect(saved).toBe("P3");
+  const shownAfterSave = items[0]!.priority;
+  await act(async () => t.undo()); await tick();
+  expect(saved).toBeUndefined();
+  expect(items[0]!.priority).toBeUndefined();
+  expect(t.history.canUndo).toBe(false);
+  expect(calls.at(-1)).toBe("edit importance-failure --priority=");
+  expect(shownAfterSave).toBe("P3");
+});
+
+test("a failed batch filing puts its revived skill back in Archive with no Undo left", async () => {
+  const old: Skill = { id: "rollback-skill", name: "Old", archived: true };
+  let archived = true;
+  const filed = new Map<string, string[]>();
+  const d = await device({ items: [item("rollback-a"), item("rollback-b")], skills: [old], answers: (a) => {
+    if (a[0] === "edit") {
+      if (a[1] === "rollback-b" && a[3] === old.id) throw new Error("second source refused");
+      filed.set(a[1]!, a[3] ? a[3].split(",") : []);
+      if (a[3] === old.id) archived = false;
+    }
+    if (a[0] === "skills" && a[1] === "archive") archived = true;
+  } });
+  let ok = true;
+  await act(async () => { ok = await d.sources().fileMany(d.state.items, old, true); });
+  expect(ok).toBe(false);
+  expect(filed.get("rollback-a")).toEqual([]);
+  expect(archived).toBe(true);
+  expect(d.state.items.map((i) => i.skills)).toEqual([[], []]);
+  expect(d.t.history.canUndo).toBe(false);
+});
+
+test("archiving a skill after its failed importance edit does not save that failed importance", async () => {
+  let fail!: (e: Error) => void;
+  let first = true;
+  const t = await mount();
+  let skills: Skill[] = [{ id: "skill-patch", name: "Skill", priority: "P3" }];
+  let saved: Skill = { ...skills[0]! };
+  const env = () => ({
+    ore: async <T,>(...a: string[]): Promise<T> => {
+      if (first) { first = false; await new Promise<void>((_, no) => { fail = no; }); }
+      if (a[1] === "set") saved.priority = a[3]!.split("=")[1] as Skill["priority"];
+      else saved.archived = !a.includes("--undo");
+      return undefined as T;
+    },
+    skills, items() {}, archived() {}, setSkills: (f: (all: Skill[]) => Skill[]) => { skills = f(skills); }, reloadSkills() {},
+    change: (c: Parameters<typeof change>[1]) => change(t.notify, c), skillChange: (c: Parameters<typeof change>[1]) => change(t.notify, c),
+  });
+  await act(async () => { skillActions(env()).setImportance(skills[0]!, "P1"); });
+  await act(async () => { skillActions(env()).archive(skills[0]!, true); });
+  fail(new Error("importance refused")); await tick();
+  expect(saved.priority).toBe("P3");
+  expect(saved.archived).toBe(true);
+  expect(skills[0]!.priority).toBe("P3");
+  await act(async () => t.undo()); await tick();
+  expect(saved.priority).toBe("P3");
+  expect(saved.archived).toBe(false);
+});
