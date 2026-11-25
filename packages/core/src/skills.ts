@@ -490,6 +490,11 @@ function keepSkillPeaks(lib: Library, ids: string[]): void {
  *  loses each removed one). `cards` (an Undo, from `itemCardSkills` taken before) puts each card listed
  *  back to exactly its skills instead, so a card that never had an added skill doesn't gain it. */
 export async function setItemSkills(lib: Library, ref: string, ids: string[], cards?: Record<string, string[]>): Promise<ItemMeta> {
+  return (await fileItemSkills(lib, ref, ids, cards)).meta;
+}
+
+/** The filing and its Undo snapshot share one exercise collection under the same lock. */
+export async function fileItemSkills(lib: Library, ref: string, ids: string[], cards?: Record<string, string[]>): Promise<{ meta: ItemMeta; cards_before: Record<string, string[]> }> {
   return withLock(paths.lock(lib), () => {
     checkSkills(lib, [...ids, ...Object.values(cards ?? {}).flat()]);
     const item = findItem(lib, ref);
@@ -497,11 +502,12 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[], ca
     const added = next.filter((id) => !item.meta.skills.includes(id));
     const removed = item.meta.skills.filter((id) => !next.includes(id));
     const exercises = listCards(lib).filter((c) => c.meta.item === item.meta.id);
+    const before = Object.fromEntries(exercises.map((c) => [c.meta.id, c.meta.skills]));
     // Not on an Undo (`cards`): a filing taken back gave its skill nothing to keep (code review of #538).
     if (!cards) keepSkillPeaks(lib, exercises.flatMap((c) => c.meta.skills.filter((s) => removed.includes(s))));
     const meta = parseItemMeta({ ...item.meta, skills: next });
     unarchiveFiled(lib, added);
-    for (const c of listCards(lib).filter((c) => c.meta.item === meta.id)) {
+    for (const c of exercises) {
       const skills = cards?.[c.meta.id] ?? [...new Set([...c.meta.skills.filter((s) => !removed.includes(s)), ...added])];
       if (skills.join() !== c.meta.skills.join()) writeCardMeta(c, { ...c.meta, skills });
     }
@@ -510,7 +516,7 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[], ca
     // Commit the source last. Until then its old skills retain the delta needed
     // by a retry; exercise/topic updates above are idempotent, including Undo.
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
-    return meta;
+    return { meta, cards_before: before };
   });
 }
 

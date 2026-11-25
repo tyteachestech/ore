@@ -240,21 +240,27 @@ export function sourceFile(item: Item): string | undefined {
   return name && join(item.dir, name);
 }
 
-export function itemDirs(lib: Library): string[] {
+/** Candidate folders only: a lookup filters their names before probing doc.md. */
+function itemFolders(lib: Library): string[] {
   const root = paths.items(lib);
   if (!existsSync(root)) return [];
   return subdirs(root)
-    .flatMap((y) => subdirs(join(root, y)).filter((d) => existsSync(join(root, y, d, "doc.md"))).map((d) => join(root, y, d)))
+    .flatMap((y) => subdirs(join(root, y)).map((d) => join(root, y, d)))
     .sort();
+}
+
+export function itemDirs(lib: Library): string[] {
+  return itemFolders(lib).filter((d) => existsSync(join(d, "doc.md")));
 }
 
 // Accepts a full id or a unique prefix/suffix of one.
 export function findItem(lib: Library, ref: string): Item {
   const key = ref.toUpperCase();
-  const hits = itemDirs(lib).filter((d) => {
+  const folders = itemFolders(lib);
+  const hits = folders.filter((d) => {
     const id = d.slice(-26);
     return id === key || id.startsWith(key) || id.endsWith(key);
-  });
+  }).filter((d) => existsSync(join(d, "doc.md")));
   // Folders all ending in one id are a copy (Finder, iCloud): open the one the lists show (F176).
   if (hits.length > 1 && new Set(hits.map((d) => d.slice(-26))).size === 1) {
     const one = oncePerId(readable(hits, readItemDir))[0];
@@ -263,7 +269,7 @@ export function findItem(lib: Library, ref: string): Item {
   if (hits.length > 1) throw new Error(`"${ref}" matches ${hits.length} items; use more of the id`);
   if (hits.length === 1) return readItemDir(hits[0]!);
   // A folder renamed in Finder no longer ends in its id, but its doc.md still names it.
-  const renamed = readable(itemDirs(lib).filter((d) => !ID_END.test(d)), readItemDir).filter((i) => i.meta.id === key || i.meta.id.startsWith(key) || i.meta.id.endsWith(key));
+  const renamed = readable(folders.filter((d) => !ID_END.test(d) && existsSync(join(d, "doc.md"))), readItemDir).filter((i) => i.meta.id === key || i.meta.id.startsWith(key) || i.meta.id.endsWith(key));
   if (renamed.length === 1) return renamed[0]!;
   if (renamed.length > 1) throw new Error(`"${ref}" matches ${renamed.length} items; use more of the id`);
   throw new Error(`no item matches "${ref}"`);
@@ -272,7 +278,7 @@ export function findItem(lib: Library, ref: string): Item {
 /** An item's folder, found by its full id without reading its doc.md (a book's runs to megabytes); a copy or a
  *  folder renamed in Finder is looked up as `findItem` does. */
 export function findItemDir(lib: Library, id: string): string {
-  const hits = itemDirs(lib).filter((d) => d.endsWith(`-${id.toUpperCase()}`));
+  const hits = itemFolders(lib).filter((d) => d.endsWith(`-${id.toUpperCase()}`) && existsSync(join(d, "doc.md")));
   return hits.length === 1 ? hits[0]! : findItem(lib, id).dir;
 }
 

@@ -5,10 +5,10 @@ import { z } from "zod";
 import { readAnnotations } from "./annotations.ts";
 import { writeAtomic } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
-import { AiStamp, listItems } from "./items.ts";
+import { AiStamp, listItems, type Item } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
-import { loadSkills } from "./skills.ts";
+import { loadSkills, type Skill } from "./skills.ts";
 
 /** One idea of the skill, fixed before he answers: a key point of one of its sources. */
 export const DigIdea = z.object({
@@ -60,7 +60,11 @@ const writeDigs = (lib: Library, skill: string, digs: Dig[]) => writeAtomic(digs
 
 /** The skill's ideas as they stand now: the key points of its sources, newest first. */
 export function digIdeas(lib: Library, skill: string): DigIdea[] {
-  return listItems(lib)
+  return ideasFromItems(listItems(lib), skill);
+}
+
+function ideasFromItems(items: Item[], skill: string): DigIdea[] {
+  return items
     .filter((i) => i.meta.skills.includes(skill))
     .flatMap((i) =>
       readAnnotations(i)
@@ -85,19 +89,27 @@ export interface DigState {
 export function digState(lib: Library, skill: string, now = new Date()): DigState {
   const s = loadSkills(lib).skills.find((x) => x.id === skill);
   if (!s) throw new Error(`unknown skill "${skill}"`);
-  const digs = readDigs(lib, skill);
+  return { ...readiness(lib, s, now), ideas: digIdeas(lib, skill).length };
+}
+
+/** Readiness depends on the goal and history, not on source text. */
+function readiness(lib: Library, s: Skill, now: Date): Omit<DigState, "ideas"> {
+  const digs = readDigs(lib, s.id);
   const last = digs.at(-1) ?? null;
   const gap = DIG_GAPS[Math.min(digs.length, DIG_GAPS.length) - 1] ?? 0;
   const ready = !!s.goal && (!last || now.getTime() - new Date(last.at).getTime() >= gap * 86_400_000);
-  return { skill, goal: s.goal ?? null, ideas: digIdeas(lib, skill).length, ready, last };
+  return { skill: s.id, goal: s.goal ?? null, ready, last };
 }
 
 /** The one skill a session may offer a dig for: ready, with ideas to check against, the one dug longest
  *  ago (never dug first); none in the week after a dig of any skill. */
 export function digReady(lib: Library, skills?: string[], now = new Date()): DigState | null {
-  const live = loadSkills(lib).skills.filter((s) => !s.archived).map((s) => digState(lib, s.id, now));
+  const live = loadSkills(lib).skills.filter((s) => !s.archived).map((s) => readiness(lib, s, now));
   if (live.some((d) => d.last && now.getTime() - new Date(d.last.at).getTime() < DIG_REST_DAYS * 86_400_000)) return null;
-  const all = live.filter((d) => (!skills?.length || skills.includes(d.skill)) && d.ready && d.ideas >= DIG_IDEAS_MIN);
+  const eligible = live.filter((d) => (!skills?.length || skills.includes(d.skill)) && d.ready);
+  if (!eligible.length) return null;
+  const items = listItems(lib);
+  const all = eligible.map((d) => ({ ...d, ideas: ideasFromItems(items, d.skill).length })).filter((d) => d.ideas >= DIG_IDEAS_MIN);
   return all.sort((a, b) => (a.last?.at ?? "").localeCompare(b.last?.at ?? ""))[0] ?? null;
 }
 
