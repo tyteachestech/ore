@@ -324,6 +324,55 @@ test("a read again keeps a highlight still being made, and lists it once when it
   expect(t.ids()).toEqual(["a", "b"]);
 });
 
+// F-new-reread-drops-landed: the read was asked for before the save landed, so its answer doesn't have the highlight.
+test("a highlight saved while the library was being read stays when that older read arrives", async () => {
+  const t = open([ann("a")]);
+  const since = t.hl.reading();
+  const { save } = making(t);
+  save.ok(ann("b", { exact: "words" }));
+  await tick();
+  t.hl.read([ann("a")], true, since);
+  expect(t.ids()).toEqual(["a", "b"]);
+  // So does a key point typed with nothing selected.
+  const point = t.hl.point(["highlight", "src", "--at", "4", "--note=x"], ann("pending-2", { point: true }));
+  (await t.last("highlight src --at 4 --note=x")).ok(ann("p", { point: true }));
+  await point;
+  t.hl.read([ann("a")], true, since);
+  expect(t.ids()).toEqual(["a", "b", "p"]);
+  // A read begun after they landed is the library's word: one it no longer has (removed on the phone) goes.
+  t.hl.read([ann("a"), ann("p", { point: true })], true, t.hl.reading());
+  expect(t.ids()).toEqual(["a", "p"]);
+});
+
+test("a highlight grown over a passage keeps its new span when an older read arrives", async () => {
+  const t = open([ann("a", { start: 10, end: 20 })]);
+  const since = t.hl.reading();
+  const { save } = making(t);
+  save.ok(ann("a", { start: 5, end: 20, exact: "longer", rev: 2 }));
+  await tick();
+  t.hl.read([ann("a", { start: 10, end: 20 })], true, since);
+  expect(t.hl.list()[0]).toMatchObject({ start: 5, exact: "longer" });
+});
+
+// F-new-reread-flips-removed: a read that lands while the removal (or the ⌘Z that brings it back) is still saving.
+test("a highlight he removed stays gone, and one ⌘Z brought back stays, when the library is read again before the write lands", async () => {
+  const t = open([ann("a", { intent: "card" }), ann("b")]);
+  const gone = t.hl.remove("a");
+  t.hl.read([ann("a", { intent: "card" }), ann("b")], true, t.hl.reading());
+  expect(t.ids()).toEqual(["b"]);
+  (await t.last("annotate a --status deleted")).ok();
+  await gone;
+
+  void t.steps[0]!.undo!();
+  expect(t.ids()).toEqual(["b", "a"]);
+  t.hl.read([ann("b")], true, t.hl.reading()); // the library still has it deleted
+  expect(t.ids()).toEqual(["b", "a"]);
+  (await t.last("annotate a --status open --intent card --note=")).ok();
+  await tick();
+  t.hl.read([ann("b"), ann("a", { intent: "card", rev: 3 })], true, t.hl.reading());
+  expect(t.hl.find("a")!.rev).toBe(3);
+});
+
 test("another source opened takes the library's list whole", () => {
   const t = open([ann("a")]);
   making(t);

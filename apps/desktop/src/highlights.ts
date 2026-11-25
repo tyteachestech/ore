@@ -2,16 +2,19 @@ import { opt, whileOut, type Annotation, type Intent } from "./ore";
 import { errorText, inOrder, wakeOnLanding, type Notify } from "./util";
 
 /** A source's highlights read again from the library (a wake after a write elsewhere), merged with what is on
- *  screen. It keeps two things: a highlight still being made (a `pending-` stand-in the library doesn't have
- *  yet; `saved` maps a stand-in whose save has landed to its id, so it isn't listed twice), and a highlight still on
- *  screen with a write of his in flight (`busy`), whose copy wins over the library's older one. It does not
- *  cover two cases: a highlight whose save landed after this read began can still be dropped by the older read, and
- *  one he just removed or brought back with ⌘Z can flip back until its write lands. */
-export function mergeAnns(server: Annotation[], local: Annotation[], busy: ReadonlySet<string>, saved: ReadonlyMap<string, string> = new Map()): Annotation[] {
+ *  screen: the library's list, but for what he did here that it doesn't know yet.
+ *  - A highlight still being made (a `pending-` stand-in) stays; `saved` maps a stand-in whose save has landed to
+ *    its id, so it isn't listed twice.
+ *  - A highlight with a write of his in flight (`busy`) is as he has it: his copy wins over the library's older
+ *    one, one he removed stays gone, one he brought back with ⌘Z stays.
+ *  - A highlight whose save landed after this read was asked for (`recent`) is as he has it: the read is older
+ *    than the highlight, so it doesn't have it, or has the passage it held before it grew. */
+export function mergeAnns(server: Annotation[], local: Annotation[], busy: ReadonlySet<string>, saved: ReadonlyMap<string, string> = new Map(), recent: ReadonlySet<string> = new Set()): Annotation[] {
   const mine = new Map(local.map((a) => [a.id, a]));
-  const out = server.map((a) => (busy.has(a.id) && mine.get(a.id)) || a);
+  const his = (id: string) => busy.has(id) || recent.has(id);
+  const out = server.flatMap((a) => (!his(a.id) ? [a] : mine.has(a.id) ? [mine.get(a.id)!] : busy.has(a.id) ? [] : [a]));
   const have = new Set(server.map((a) => a.id));
-  for (const a of local) if (a.id.startsWith("pending-") && !have.has(saved.get(a.id) ?? "")) out.push(a);
+  for (const a of local) if (a.id.startsWith("pending-") ? !have.has(saved.get(a.id) ?? "") : !have.has(a.id) && his(a.id)) out.push(a);
   return out;
 }
 
@@ -50,6 +53,10 @@ export function highlights(io: {
   const writing = new Set<Promise<unknown>>();
   /** Each new highlight's step on the history, to take off when he drops a fresh one before it counts. */
   const steps = new Map<string, () => void>();
+  /** Saves of new highlights that have landed, counted, and each one's number: a read of the library asked for
+   *  before a save landed is older than that highlight. */
+  let landings = 0;
+  const landedAt = new Map<string, number>();
 
   const idOf = (id: string) => saved.get(id) ?? id;
   const same = (a: string | null | undefined, b: string | null | undefined) => !!a && !!b && idOf(a) === idOf(b);
@@ -213,6 +220,7 @@ export function highlights(io: {
       save.then(
         (ann) => {
           saved.set(tmp, ann.id);
+          landedAt.set(ann.id, ++landings);
           const was = list.find((a) => a.id === ann.id);
           on.saved(ann, was);
           if (was) forget(); // no new highlight: nothing of this one to take back
@@ -236,6 +244,7 @@ export function highlights(io: {
         const save = io.run<Annotation>(...args);
         wake(save);
         const ann = await whileOut(save); // ⌘Z meanwhile waits for its step (F481)
+        landedAt.set(ann.id, ++landings);
         saved.set(draft.id, ann.id); // so a read again landing before the swap doesn't list it twice
         set((l) => l.map((a) => (a.id === draft.id ? ann : a)));
         const s = step(ann.id);
@@ -278,10 +287,13 @@ export function highlights(io: {
         // Not saved: the highlight is still his, only the plan won't know he looked it up.
       }
     },
+    /** Taken as a read of the library is asked for, and handed to `read` with its answer. */
+    reading: () => landings,
     /** The library's highlights, read as the source opens (`again` false) or again while it is open: then what he
-     *  made or changed here that is still saving stays as he has it (`mergeAnns`). */
-    read(server: Annotation[], again: boolean) {
-      set(again ? (l) => mergeAnns(server, l, new Set(busy.keys()), saved) : server);
+     *  made or changed here that the read doesn't know yet stays as he has it (`mergeAnns`). */
+    read(server: Annotation[], again: boolean, since = landings) {
+      const recent = new Set([...landedAt].filter(([, n]) => n > since).map(([id]) => id));
+      set(again ? (l) => mergeAnns(server, l, new Set(busy.keys()), saved, recent) : server);
     },
   };
 }
