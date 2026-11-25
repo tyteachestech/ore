@@ -324,6 +324,162 @@ test("a read again keeps a highlight still being made, and lists it once when it
   expect(t.ids()).toEqual(["a", "b"]);
 });
 
+// F624: the read was asked for before the save landed, so its answer doesn't have the highlight.
+test("a highlight saved while the library was being read stays when that older read arrives", async () => {
+  const t = open([ann("a")]);
+  const since = t.hl.reading();
+  const { save } = making(t);
+  save.ok(ann("b", { exact: "words" }));
+  await tick();
+  t.hl.read([ann("a")], true, since);
+  expect(t.ids()).toEqual(["a", "b"]);
+  // So does a key point typed with nothing selected.
+  const point = t.hl.point(["highlight", "src", "--at", "4", "--note=x"], ann("pending-2", { point: true }));
+  (await t.last("highlight src --at 4 --note=x")).ok(ann("p", { point: true }));
+  await point;
+  t.hl.read([ann("a")], true, since);
+  expect(t.ids()).toEqual(["a", "b", "p"]);
+  // A read begun after they landed is the library's word: one it no longer has (removed on the phone) goes.
+  t.hl.read([ann("a"), ann("p", { point: true })], true, t.hl.reading());
+  expect(t.ids()).toEqual(["a", "p"]);
+});
+
+test("a highlight grown over a passage keeps its new span when an older read arrives", async () => {
+  const t = open([ann("a", { start: 10, end: 20 })]);
+  const since = t.hl.reading();
+  const { save } = making(t);
+  save.ok(ann("a", { start: 5, end: 20, exact: "longer", rev: 2 }));
+  await tick();
+  t.hl.read([ann("a", { start: 10, end: 20 })], true, since);
+  expect(t.hl.list()[0]).toMatchObject({ start: 5, exact: "longer" });
+});
+
+// F625: a read that lands while the removal (or the ⌘Z that brings it back) is still saving.
+test("a highlight he removed stays gone, and one ⌘Z brought back stays, when the library is read again before the write lands", async () => {
+  const t = open([ann("a", { intent: "card" }), ann("b")]);
+  const gone = t.hl.remove("a");
+  t.hl.read([ann("a", { intent: "card" }), ann("b")], true, t.hl.reading());
+  expect(t.ids()).toEqual(["b"]);
+  (await t.last("annotate a --status deleted")).ok();
+  await gone;
+
+  void t.steps[0]!.undo!();
+  expect(t.ids()).toEqual(["b", "a"]);
+  t.hl.read([ann("b")], true, t.hl.reading()); // the library still has it deleted
+  expect(t.ids()).toEqual(["b", "a"]);
+  (await t.last("annotate a --status open --intent card --note=")).ok();
+  await tick();
+  t.hl.read([ann("b"), ann("a", { intent: "card", rev: 3 })], true, t.hl.reading());
+  expect(t.hl.find("a")!.rev).toBe(3);
+});
+
+test("⌘Z right after a drag over a passage already highlighted leaves that older highlight alone", async () => {
+  const t = open([ann("a", { note: "mine" })]);
+  const { save } = making(t);
+  const undo = t.steps[0]!.undo!(); // before the save is back
+  save.ok(ann("a", { rev: 2 })); // the core gives back the one already there
+  await undo;
+  await tick();
+  expect(t.ids()).toEqual(["a"]);
+  expect(t.sent.map((s) => s.args)).toEqual(["highlight src --exact=words"]);
+});
+
+test("a highlight removed from the list while it is still saving is removed under its saved id", async () => {
+  const t = open();
+  const { save } = making(t);
+  const gone = t.hl.remove("pending-1");
+  await tick();
+  expect(t.sent.map((s) => s.args)).toEqual(["highlight src --exact=words"]); // waits for its id
+  save.ok(ann("b"));
+  (await t.last("annotate b --status deleted")).ok();
+  await gone;
+  expect(t.ids()).toEqual([]);
+  expect(t.steps.filter((s) => s.kind === "error")).toEqual([]);
+});
+
+test("a typed key point still saving takes a change under its saved id", async () => {
+  const t = open();
+  const made = t.hl.point(["highlight", "src", "--at", "3", "--note=a line"], ann("pending-1", { point: true, intent: "card", note: "a line" }));
+  const save = t.sent.at(-1)!;
+  void t.hl.setIntent("pending-1", "question");
+  await tick();
+  expect(t.sent.length).toBe(1); // waits for its id
+  let closed = false;
+  void t.hl.allSaved().then(() => (closed = true));
+  await tick();
+  expect(closed).toBe(false); // the closing count waits for the key point's save
+  save.ok(ann("b", { point: true, intent: "card", note: "a line" }));
+  await made;
+  (await t.last("annotate b --intent question")).ok();
+  await tick();
+  expect(t.hl.list()[0]).toMatchObject({ id: "b", intent: "question" });
+  expect(t.steps.filter((s) => s.kind === "error")).toEqual([]);
+});
+
+test("a typed key point removed while it is still saving goes, and stays gone", async () => {
+  const t = open();
+  const made = t.hl.point(["highlight", "src", "--at", "3", "--note=a line"], ann("pending-1", { point: true, intent: "card", note: "a line" }));
+  const save = t.sent.at(-1)!;
+  const gone = t.hl.remove("pending-1");
+  save.ok(ann("b", { point: true, intent: "card", note: "a line" }));
+  await made;
+  (await t.last("annotate b --status deleted")).ok();
+  await gone;
+  await tick();
+  expect(t.ids()).toEqual([]);
+  expect(t.said()).toEqual(["Highlight removed"]);
+  // ⌘Z brings it back whole.
+  void t.steps[0]!.undo!();
+  expect(t.hl.list()[0]).toMatchObject({ id: "b", note: "a line" });
+});
+
+test("a highlight removed twice while it is still saving, or taken back with ⌘Z first, is removed once", async () => {
+  const t = open();
+  const { save } = making(t);
+  const once = t.hl.remove("pending-1");
+  const twice = t.hl.remove("pending-1");
+  save.ok(ann("b"));
+  (await t.last("annotate b --status deleted")).ok();
+  await Promise.all([once, twice]);
+  await tick();
+  expect(t.sent.map((s) => s.args)).toEqual(["highlight src --exact=words", "annotate b --status deleted"]);
+  expect(t.said()).toEqual(["Highlighted", "Highlight removed"]);
+});
+
+test("a typed key point takes what the library saved when he changed nothing meanwhile", async () => {
+  const t = open();
+  const made = t.hl.point(["highlight", "src", "--at", "3", "--note=a line "], ann("pending-1", { point: true, intent: "card", note: "a line " }));
+  t.sent.at(-1)!.ok(ann("b", { point: true, intent: "card", note: "a line" }));
+  await made;
+  expect(t.hl.list()[0]!.note).toBe("a line");
+});
+
+test("a type set on a new highlight while it saves stays when the save gives back the highlight already there", async () => {
+  const t = open([ann("a")]);
+  const { save } = making(t);
+  void t.hl.setIntent("pending-1", "question");
+  save.ok(ann("a", { rev: 2 }));
+  await tick();
+  expect(t.hl.list()).toMatchObject([{ id: "a", intent: "question" }]);
+  (await t.last("annotate a --intent question")).ok();
+});
+
+test("a change or a removal that landed while an older read was out stays when that read arrives", async () => {
+  const t = open([ann("a"), ann("b")]);
+  const since = t.hl.reading();
+  void t.hl.setIntent("a", "question");
+  (await t.last("annotate a --intent question")).ok();
+  const gone = t.hl.remove("b");
+  (await t.last("annotate b --status deleted")).ok();
+  await gone;
+  await tick();
+  t.hl.read([ann("a"), ann("b")], true, since);
+  expect(t.hl.list()).toMatchObject([{ id: "a", intent: "question" }]);
+  // A read asked for after they landed is the library's word again.
+  t.hl.read([ann("a", { intent: "apply" })], true, t.hl.reading());
+  expect(t.hl.list()).toMatchObject([{ id: "a", intent: "apply" }]);
+});
+
 test("another source opened takes the library's list whole", () => {
   const t = open([ann("a")]);
   making(t);

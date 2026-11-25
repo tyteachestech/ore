@@ -1158,6 +1158,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   useEffect(() => {
     let live = true;
     const filedAt = filings.current;
+    const since = hl.reading();
     ore<Doc>("show", p.id, "--annotations").then(
       (d) => {
         if (!live) return;
@@ -1168,7 +1169,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         if (!d.enriched_at && !d.prequestions?.length && (d.enrich_error || d.enrich_skipped || Date.now() - Date.parse(d.captured_at) > ENRICH_GIVE_UP_MS)) setGaveUp(true);
         // Read again (a wake), what he made or changed here that is still saving stays as he has it.
         const server = (d.annotations ?? []).filter(visible);
-        hl.read(server, opened.current === p.id);
+        hl.read(server, opened.current === p.id, since);
         // Opening starts it and moves it up To read (D110); a preview isn't listed, so it's left alone.
         if (!d.preview && opened.current !== p.id) ore("opened", p.id).then(p.onChanged, (e) => p.notify(errorText(e), "error"));
         opened.current = p.id;
