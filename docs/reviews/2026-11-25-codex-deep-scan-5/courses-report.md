@@ -105,7 +105,7 @@ exit=1
 **Red command:**
 
 ```sh
-bun test codex-out/courses/course-questions.test.tsx
+bun test codex-out/courses/course-questions.red.tsx
 ```
 
 Output, [full run](logs/questions-1.log):
@@ -126,8 +126,8 @@ exit=1
 **Ranked hypotheses and probes:**
 
 1. Course Archive does not notify dependent screens. Prediction: an explicit wake, or individual-source Archive, repairs the stale state. Both controls pass:
-   - `COURSES_PROBE=source bun test codex-out/courses/course-questions.test.tsx`: shown 0, saved 0; a second `questions` call occurs.
-   - `COURSES_PROBE=wake bun test codex-out/courses/course-questions.test.tsx`: same result after `wakeOpenScreens()`.
+   - `COURSES_PROBE=source bun test codex-out/courses/course-questions.red.tsx`: shown 0, saved 0; a second `questions` call occurs.
+   - `COURSES_PROBE=wake bun test codex-out/courses/course-questions.red.tsx`: same result after `wakeOpenScreens()`.
 2. Core still returns questions from archived lessons. Rejected: `listQuestions()` returns zero after the same archive, without any repair.
 3. A delayed read overwrites the fresh result. Rejected: the first read is awaited before Archive; nothing is held or failed; there is no second question read at all in the red trace.
 
