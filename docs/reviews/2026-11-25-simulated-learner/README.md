@@ -19,3 +19,11 @@ ORE_MOCK_REAL_AI=1 ORE_MOCK_ENRICH=1 ORE_AI=codex bun run sweep docs/reviews/202
 ```
 
 Reports land beside this file as `<name>-report.md` and `<name>-log.md`; verified findings go to `../findings.md`.
+
+## What came back
+
+All four ran in about an hour (2026-11-25), with no crash and no lost data. Ten rows in `../findings.md`: six fixed in #542, test first; two open (note typing on the iPhone lags after a highlight in his longest book, in WebKit only; the first scroll through that book catches while it mounts); one for Tyler (the phone's finish quiz has no answer to show before the Mac has found the key points); one in the tooling.
+
+What the run could not do: **days never moved for `ore`.** `page.clock` moves the page; the bridge's `ore` kept 2026-11-25, so due dates, the day's count and the new-exercise limit stayed on day 1. The second day's queue, a missed day and the one-in-five mix of new exercises are unchecked. The next run of this kind needs a bridge that takes a date.
+
+What it measured on his real library (67 sources), medians: Home usable in 256 ms on the Mac; a rating to the next exercise 127 ms on the Mac and 69 ms on the iPhone; his longest book readable in 204 ms; search 322 ms; a URL readable in 1.8 s; an Explain grade 9.7 s and exercises drafted 32 s after Finish (both the AI, on Codex here), each with its wait shown or in the background.

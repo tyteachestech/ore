@@ -3,7 +3,7 @@ import { waiting } from "../src/Home";
 import type { Today } from "../src/ore";
 
 // What Home and the end of Review say about new exercises the daily limit held back. It gave the rule D144 replaced
-// ("as your goal leaves room"), so a learner with a backlog read that more review would crowd new ones out (F-new-waiting-reason).
+// ("as your goal leaves room"), so a learner with a backlog read that more review would crowd new ones out (F731).
 const t = (new_waiting: number, new_per_day = 10) => ({ new_waiting, new_per_day }) as Today;
 
 test("more new exercises waiting than a day takes: it gives the day's limit, the rule that holds them", () => {

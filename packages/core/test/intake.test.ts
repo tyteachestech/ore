@@ -538,7 +538,7 @@ describe("import coverage: files", () => {
     expect(text).not.toContain("## Spacing the practice");
   });
 
-  test("PDF: an outline that leaves off the section numbers the page prints: each section once, in the paper's order (F-new-outline-numbers)", async () => {
+  test("PDF: an outline that leaves off the section numbers the page prints: each section once, in the paper's order (F733)", async () => {
     // numbered-outline.pdf (make-numbered-outline-pdf.py): a paper as LaTeX sets one. The page says "1 Introduction",
     // the outline "Introduction", and sections 1 to 3 start on page 2. No outline title matched its line, so each
     // went in at the top of its page, last first, above the page's own headings: Method, Background, Introduction,

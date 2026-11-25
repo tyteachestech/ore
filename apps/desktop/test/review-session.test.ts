@@ -476,7 +476,7 @@ test("a session that can't be opened again after an end-screen Undo still takes 
   t.stop(); t.s.gone();
 });
 
-test("time with Ore out of sight is not review time: an hour in the background adds nothing to the exercise's clock (F-new-away-time)", async () => {
+test("time with Ore out of sight is not review time: an hour in the background adds nothing to the exercise's clock (F730)", async () => {
   const t = await open();
   const real = Date.now;
   let now = real();
@@ -510,7 +510,7 @@ test("time with Ore out of sight is not review time: an hour in the background a
   }
 });
 
-test("Review this source while its exercises are still being drafted says so, not that nothing is due (F-new-drafting-silent)", async () => {
+test("Review this source while its exercises are still being drafted says so, not that nothing is due (F734)", async () => {
   const { nothingDue } = await import("../src/review-session");
   const { drafting } = await import("../src/drafting");
   expect(nothingDue(null, null, "I")).toBe("Nothing from this source is due right now.");

@@ -5,7 +5,6 @@ import { Grow } from "./Grow";
 import { PixelGem } from "./PixelIcon";
 import { drafting } from "./drafting";
 import { ExerciseText } from "./ExerciseText";
-import { finishBusy } from "./finish-busy";
 import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, PHONE, whileOut, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
@@ -487,7 +486,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             )}
             <Hint text={recall.trim() ? "Save to your source note and continue" : "Skip the recall"} keys="finish" side="top">
               <button className="pill-btn quiz-go" onClick={primary} disabled={busy}>
-                {busy ? <Working label={finishBusy(leave, scoped && !qs.every((p) => p.points))} /> : recall.trim() ? "Continue" : n ? "Skip to questions" : "Skip"}
+                {busy ? <Working label={leave.trim() ? "Leaving that out…" : scoped && !qs.every((p) => p.points) ? "Finding the key points…" : "Saving…"} /> : recall.trim() ? "Continue" : n ? "Skip to questions" : "Skip"}
               </button>
             </Hint>
           </div>

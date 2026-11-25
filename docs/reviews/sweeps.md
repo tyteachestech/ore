@@ -122,6 +122,10 @@ When a sweep's triage is done, add a row per tester here.
 | 11-25 | [deep scan 5](2026-11-25-codex-deep-scan-5/) soak | Codex, diagnosing-bugs loop, in the app; Codex also drafted the fixes | The Mac left open: stale screens, late answers, coming back from other apps | Mac | 2 | #541 |
 | 11-25 | [deep scan 5](2026-11-25-codex-deep-scan-5/) perf | Codex, diagnosing-bugs loop, in the app; Codex also drafted the fixes | What one action reads and writes at 950 sources; profiles of F293 and F294 | both | 3 (+ F293's cause; F294 open) | #541 |
 | 11-25 | [deep scan 5](2026-11-25-codex-deep-scan-5/) untrusted | Codex | Hostile content in sources and feeds: refused by OpenAI's cyber filter before it ran, not reworded | both | not run | — |
+| 11-25 | [simulated learner](2026-11-25-simulated-learner/) owner | Codex | Five days as Tyler on a copy of ~/Ore, real AI (on Codex), a friction log with measured waits | Mac | 2 | #542 |
+| 11-25 | [simulated learner](2026-11-25-simulated-learner/) commuter | Codex | Five days of short bursts on the phone, backgrounded mid-exercise, a missed day | iPhone | 1 (+1 for Tyler) | #542 |
+| 11-25 | [simulated learner](2026-11-25-simulated-learner/) newcomer | Codex | A first week from an empty library: a real article, video, arXiv PDF and Wikipedia page, real AI | Mac | 3 | #542 |
+| 11-25 | [simulated learner](2026-11-25-simulated-learner/) stopwatch | Codex | Every wait in his day timed on his real library, three runs each, Mac and iPhone | both | 2 (open) | — |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
@@ -152,4 +156,5 @@ Ranked by likely yield.
 - **Real tasks beat checklists:** diagram tasks (d2) found 5 where the 80-item checklist (d1) found 2. The six UX-parity checklists averaged under 2, with reader 0 and lists 0.
 - **Walk-throughs find little:** persona 1, daily 2, looks 1, rehearsal 3 + 1. The rehearsal on his real library still found bugs a seed never shows (F194, F195).
 - **A red script per finding, below the screens:** the 11-24 deep scan asked Codex for a reproducing script before a finding counted, and drove core and the CLI instead of pages. 16 of 16 were real, after eighteen UX rounds had ended clean.
+- **Days in a row need one clock:** the 11-25 simulated learners moved days with `page.clock`, which moves the page and not the bridge's `ore`, so no second day's queue was ever checked. Until the bridge takes a date, a multi-day tester can only check what one day shows. Timing every wait on his real library (stopwatch) found what no bug hunt had: the two slow spots are both in his longest book.
 - **Mock limits hide real bugs:** sweep 2 dropped empty AI replies as mock-only, and sweep 6 showed both were real (F329, F330). Prefer real AI or real-shaped faults over the mock's nulls.
