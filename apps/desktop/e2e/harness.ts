@@ -72,7 +72,8 @@ async function library(): Promise<() => Promise<void>> {
   return async () => {
     bridge.kill();
     await bridge.exited;
-    rmSync(lib, { recursive: true, force: true });
+    // As far as it goes: a background `ore enrich` an add started may still be writing its log there.
+    try { rmSync(lib, { recursive: true, force: true }); } catch {}
   };
 }
 
@@ -89,16 +90,25 @@ async function safariBrowser(): Promise<Browser> {
  *  vite's port + 2; E2E_PHONE_URL uses one already running). It runs the core inside the page, so it takes no bridge.
  *  Its library is a seed of its own (PHONE_LIB), never the one the desktop journeys change: the phone only reads the
  *  files (its writes stay in each page's IndexedDB, and every journey's page is a fresh one), so each phone journey
- *  starts from the same fresh seed. A journey that changes a file there (a sync from the Mac) puts it back. */
+ *  starts from the same seed, made afresh for each file of phone journeys. A journey that changes a file there (a sync
+ *  from the Mac) puts it back. */
 let phoneVite: { url: string; stop: () => void } | undefined;
 
 export let PHONE_LIB = process.env.ORE_PHONE_LIBRARY ?? "";
 
+/** The phone's library seeded afresh, in the folder its vite already reads: once for each file of phone journeys. */
+let phoneOwn = "";
+async function phoneLibrary() {
+  if (process.env.E2E_PHONE_URL) return;
+  if (!phoneOwn) phoneOwn = PHONE_LIB = mkdtempSync(join(tmpdir(), "ore-e2e-phone-"));
+  else for (const f of readdirSync(phoneOwn)) rmSync(join(phoneOwn, f), { recursive: true, force: true });
+  await $`bun ${join(MOCK, "seed.ts")} ${phoneOwn}`.quiet();
+}
+
 async function phoneApp(): Promise<string> {
   if (process.env.E2E_PHONE_URL) return process.env.E2E_PHONE_URL;
   if (phoneVite) return phoneVite.url;
-  PHONE_LIB = mkdtempSync(join(tmpdir(), "ore-e2e-phone-"));
-  await $`bun ${join(MOCK, "seed.ts")} ${PHONE_LIB}`.quiet();
+  if (!phoneOwn) await phoneLibrary();
   const port = Number(process.env.ORE_E2E_PHONE_PORT ?? PORT + 2);
   const vite = Bun.spawn(["bunx", "vite", "--port", String(port), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_PHONE: "1", ORE_PHONE_LIBRARY: PHONE_LIB }, stdout: "ignore", stderr: "inherit" });
   const url = `http://localhost:${port}/`;
@@ -784,8 +794,10 @@ export async function run() {
     load[least]! += count(f);
     if (least === shard - 1) mine.add(f);
   }
+  if (!picked.length) throw new Error(`no journey picked${only ? ` by “${only}”` : ""}${onlyFile ? ` in ORE_E2E_FILE=${onlyFile} (the files: ${[...new Set(journeys.map((j) => j[3]))].join(", ")})` : ""}`);
   for (const f of files.filter((f) => mine.has(f))) {
-    const done = await library();
+    // A file of phone journeys takes no bridge: its fresh library is the phone's own.
+    const done = picked.some((j) => j[3] === f && j[2] !== "phone") ? await library() : (await phoneLibrary(), async () => {});
     console.log(`\n${f}`);
     for (const [name, journey, engine] of picked.filter((j) => j[3] === f).flatMap((j) => Array(Number(process.env.ORE_E2E_REPEAT ?? 1)).fill(j) as typeof journeys)) {
       let page: Page | undefined;

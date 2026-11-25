@@ -3,7 +3,7 @@
 // that the parts still work together on screen (note saves across switches, undo, review).
 //   bun run e2e                      seeds, starts the bridge and vite, runs every journey
 //   bun run e2e -- highlight         only journeys whose name contains "highlight"
-//   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead
+//   E2E_URL=http://localhost:1420/   use a mock already running (scripts/mock/README.md) instead: one library for every file, so pick a file or a name
 //   ORE_E2E_PORT=1490 ORE_E2E_MOCK_PORT=1491   vite's and the bridge's ports (1450, 1451), so runs side by side don't answer each other
 //   ORE_E2E_FILE=reader              only the journeys in e2e/journeys/reader.ts
 //   ORE_E2E_SHARD=2/4                the second of four parts (CI runs five side by side); a part takes whole files

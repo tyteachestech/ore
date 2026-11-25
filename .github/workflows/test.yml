@@ -28,7 +28,7 @@ jobs:
       # The iPhone bundle has its own Vite setup (D78): a core import only Bun understands breaks it and nothing else.
       - run: mkdir -p /tmp/empty-library && cd apps/desktop && ORE_PHONE=1 ORE_PHONE_LIBRARY=/tmp/empty-library bunx vite build
       - run: bun apps/desktop/scripts/mock/impeccable-gate.ts
-  # The journeys in five runners side by side, each a fifth of them in order on its own fresh library: one runner
+  # The journeys in five runners side by side, each taking whole files of them (apps/desktop/e2e/journeys/), every file on its own fresh library: one runner
   # took 14 min, and a quarter outgrew the 15 min limit (2026-11-20). A shard that fails leaves the others running, so one run shows every failing journey.
   e2e:
     name: e2e (${{ matrix.shard }}/5)
