@@ -65,7 +65,7 @@ test("the phone reads the folder, writes back to it, and reads in the Mac's edit
   folder.set("skills.yaml", { text: "skills: []\n", mtime: 1 });
   folder.set("items/a-01/doc.md", { text: "# A", mtime: 1 });
   await mountDisk(P, "/root", invoke);
-  expect(fs.readFileSync(`${P}/items/a-01/doc.md`)).toBe("# A");
+  expect(fs.readFileSync(`${P}/items/a-01/doc.md`, "utf8")).toBe("# A");
   expect(fs.statSync(`${P}/items/a-01/doc.md`).mtimeMs).toBe(1);
 
   // An atomic write sends the file once, never its temp file.
@@ -85,7 +85,7 @@ test("the phone reads the folder, writes back to it, and reads in the Mac's edit
   mac("items/a-01/doc.md", "# A, edited");
   mac("items/b-02/doc.md", "# B");
   expect(await rescan()).toBe(true);
-  expect(fs.readFileSync(`${P}/items/a-01/doc.md`)).toBe("# A, edited");
+  expect(fs.readFileSync(`${P}/items/a-01/doc.md`, "utf8")).toBe("# A, edited");
   mac("items/b-02/doc.md", null);
   expect(await rescan()).toBe(true);
   expect(fs.existsSync(`${P}/items/b-02`)).toBe(false);
@@ -95,7 +95,7 @@ test("the phone reads the folder, writes back to it, and reads in the Mac's edit
   folder.delete("items/a-01/doc.md");
   waiting = ["items/a-01/doc.md"];
   expect(await rescan()).toBe(false);
-  expect(fs.readFileSync(`${P}/items/a-01/doc.md`)).toBe("# A, edited");
+  expect(fs.readFileSync(`${P}/items/a-01/doc.md`, "utf8")).toBe("# A, edited");
   waiting = [];
 
   // Deleting a file the folder never had sends nothing.
@@ -229,8 +229,8 @@ test("a big folder is read in parts asked for together, not one after another", 
   reading.most = 0;
   expect(await rescan()).toBe(true);
   expect(reading.most).toBe(3);
-  expect(fs.readFileSync(`${P}/items/big-0/doc.md`)).toBe("# Big 0");
-  expect(fs.readFileSync(`${P}/items/big-899/doc.md`)).toBe("# Big 899");
+  expect(fs.readFileSync(`${P}/items/big-0/doc.md`, "utf8")).toBe("# Big 0");
+  expect(fs.readFileSync(`${P}/items/big-899/doc.md`, "utf8")).toBe("# Big 899");
 });
 
 test("a failed save's retry never writes over a newer save of the same file that went through (F559)", async () => {

@@ -50,6 +50,8 @@ mkdir -p "$cache"
       relaunch
     else
       echo "$(date): FAILED"
+      # The updater retries a failed commit three times, then waits for the next one.
+      echo "$building" >> "$cache/app-failed"
       break
     fi
   done

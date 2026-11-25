@@ -40,6 +40,29 @@ export function valueChange<T>(c: Omit<Change, "show" | "write" | "value"> & {
   return { ...rest, value, show: (on) => show?.(on ? value.after : value.before), write: (on) => write(on ? value.after : value.before, on ? value.before : value.after) };
 }
 
+/** The write of a change whose Undo and Redo must leave alone a value set outside since (F175: `ore edit`, the
+ *  phone): the first write goes through; each later one reads the value first and, if it isn't what the step
+ *  before left, keeps it and says so. `newer()` is that value until the next write, for the screen to show. */
+export function keepNewer<T>(read: () => Promise<T>, write: (to: T) => Promise<unknown>, said: (now: T) => string) {
+  let first = true;
+  let newer: { v: T } | undefined;
+  return {
+    newer: () => newer?.v,
+    write: async (to: T, from: T) => {
+      newer = undefined;
+      if (!first) {
+        const now = await read();
+        if (now !== from) {
+          newer = { v: now };
+          throw new Error(said(now));
+        }
+      }
+      first = false;
+      await write(to);
+    },
+  };
+}
+
 type Field = { saved: unknown; pending: number; owner: symbol };
 // Only outstanding writes, scoped to the window's history. No cache survives an idle field:
 // the next action starts from its fresh screen value, including changes from another device.

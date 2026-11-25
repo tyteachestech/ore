@@ -40,7 +40,7 @@ import { clickBelow, SidePanel, SidePanelFrame, SourceNoteBody, useSourceNote, t
 import { QuestionsPanel } from "./Questions";
 import { Position, ReadingPill } from "./Outline";
 import { openOriginal, playerLink, originalLabel, pathOf, pubDate, revealInFinder } from "./original";
-import { change } from "./change";
+import { change, keepNewer } from "./change";
 import { highlights } from "./highlights";
 import { INTENTS, ore, opt, PHONE, visible, whileOut, type Annotation, type CardFull, type CardSkills, type ChapterFeedback, type Doc, type Intent, type Item, type Priority, type Skill } from "./ore";
 import { SkillChip, skillMade, SkillPicker, unfile } from "./Skills";
@@ -3111,23 +3111,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   async function retitle(id: string, before: string, t: string) {
     if (!t || t === before) return true;
     const put = (title: string) => setDoc((cur) => (cur && cur.id === id ? { ...cur, title } : cur));
-    let first = true;
-    let since: string | undefined;
+    const title = keepNewer(async () => (await ore<{ title: string }>("show", id)).title, (to: string) => ore("edit", id, "--title", to), (now) => `Left as “${now}”: it was renamed since`);
     return change(p.notify, {
       message: `Renamed to “${t}”`,
       kind: "quiet",
       key: id,
       show: (on) => put(on ? t : before),
-      write: async (on) => {
-        const [to, from] = on ? [t, before] : [before, t];
-        since = undefined;
-        // Undo or redo: a title set outside since (`ore edit`, the phone) is newer, and stays (F175).
-        if (!first && (since = (await ore<{ title: string }>("show", id)).title) !== from) throw new Error(`Left as “${since}”: it was renamed since`);
-        first = false;
-        since = undefined;
-        await ore("edit", id, "--title", to);
+      // Undo or redo: a title set outside since (`ore edit`, the phone) is newer, and stays (F175).
+      write: (on) => (on ? title.write(t, before) : title.write(before, t)),
+      settled: () => {
+        const newer = title.newer();
+        return newer === undefined ? p.onChanged() : put(newer);
       },
-      settled: () => (since === undefined ? p.onChanged() : put(since)),
     });
   }
 
