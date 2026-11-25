@@ -51,3 +51,9 @@ test("interleaved PDF columns never mark the neighboring column", () => {
 test("a passage repeated twice cannot select three copies on the page", () => {
   expect(passage(Array(3).fill("Test yourself often."), "Test yourself often. Test yourself often.")).toBeNull();
 });
+
+test("a footnote mark the page has between the probes and the text lacks still lights the passage", () => {
+  const a = "Practice spread over several days beats the same practice crammed into one night";
+  const b = "and this spacing effect is among the oldest findings in psychology, yet among the least used by students who study for exams the evening before they sit them.";
+  expect(passage(["Before.", `${a}`, "12", ` ${b}`, "After."], `${a} ${b}`)).toEqual([1, 3]);
+});
