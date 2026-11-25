@@ -46,9 +46,8 @@ export function addBig(root: string) {
 }
 
 /** Goldens of pages whose words rewrite-page.ts swapped for learning words at random: noise that
- *  crowds out the real evidence, so they stay out of the eval's library. So does epub-front-matter, a second book
- *  that is about a lamp and holds nothing to ask about: the cases that say "the book" mean the one on memory. */
-export const REWRITTEN = new Set(["web-academy-lesson", "web-discourse", "web-hn-thread", "web-speakerdeck", "epub-front-matter"]);
+ *  crowds out the real evidence, so they stay out of the eval's library. */
+export const REWRITTEN = new Set(["web-academy-lesson", "web-discourse", "web-hn-thread", "web-speakerdeck"]);
 
 /** Each golden doc.md as a source in the library; returns item id → golden name. */
 export async function addGolden(lib: Library, dir = GOLDEN): Promise<Map<string, string>> {

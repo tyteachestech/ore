@@ -1142,7 +1142,7 @@ describe("import coverage: EPUB", () => {
     for (const kept of ["Begin Reading", "Thank you for buying this Lantern House ebook.", "sign up for our newsletters", "[![Sign Up](assets/", "for your personal use only", "To the night shift, who kept the lamp lit"]) expect(front).toContain(kept);
     expect(front).not.toContain("Prologue");
     expect(text).toMatch(/^\n\n<!-- chapter 4 -->\n\n# Prologue: The First Evening\n/);
-    for (const kept of ["nobody hurried it.", "# Part I", "# What a Lamp Remembers", "burns evenly for years."]) expect(text).toContain(kept);
+    for (const kept of ["nobody hurried it.", "# Part I", "# What a Lamp Keeps", "burns evenly for years."]) expect(text).toContain(kept);
     // Chapters keep their numbers, front matter included, so a recall saved before this stays with its chapter.
     expect([...(item.body.match(/<!-- chapter \d+ -->/g) ?? [])]).toEqual([1, 2, 3, 4, 5, 6].map((n) => `<!-- chapter ${n} -->`));
   });

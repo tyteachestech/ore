@@ -124,13 +124,13 @@ book(
     {
       id: "mini_toc",
       title: "The Slow Lamp",
-      body: `<p><a href="prologue.xhtml">Begin Reading</a></p>\n<p><a href="contents.xhtml">Table of Contents</a></p>\n<p><a href="author.xhtml">A Note About the Author</a></p>\n<p><a href="copyright.xhtml">Copyright Page</a></p>\n<p><b>Thank you for buying this Lantern House ebook.</b></p>\n<p>To receive special offers and news of new books, sign up for our newsletters.</p>\n<p><a href="https://example.com/signup"><img src="img/signup.png" alt="Sign Up"/></a></p>\n<p>Or visit us online at <a href="https://example.com/newsletter">example.com/newsletter</a></p>`,
+      body: `<p><a href="prologue.xhtml">Begin Reading</a></p>\n<p><a href="contents.xhtml">Table of Contents</a></p>\n<p><a href="author.xhtml">A Note About the Author</a></p>\n<p><a href="copyright.xhtml">Copyright Page</a></p>\n<p><b>Thank you for buying this Lantern House ebook.</b></p>\n<p>To receive special offers and news of new titles, sign up for our newsletters.</p>\n<p><a href="https://example.com/signup"><img src="img/signup.png" alt="Sign Up"/></a></p>\n<p>Or visit us online at <a href="https://example.com/newsletter">example.com/newsletter</a></p>`,
     },
     { id: "notice", title: "Copyright notice", body: `<section epub:type="frontmatter"><p>The author and publisher have provided this e-book to you for your personal use only. You may not make it publicly available in any way. Copyright infringement is against the law.</p></section>` },
     { id: "dedication", title: "Dedication", body: `<section epub:type="frontmatter dedication"><p>To the night shift, who kept the lamp lit</p></section>` },
     { id: "prologue", title: "Prologue", body: `<section epub:type="frontmatter prologue"><h1>Prologue: The First Evening</h1>\n<p>The lamp took an hour to warm, and nobody hurried it.</p></section>` },
     { id: "part1", title: "Part I", body: `<section epub:type="bodymatter part"><h1>Part I</h1><h1>Light</h1></section>` },
-    { id: "chapter1", title: "1", body: `<section epub:type="bodymatter chapter"><h1>1</h1><h1>What a Lamp Remembers</h1>\n<p>A wick trimmed each night burns evenly for years.</p></section>` },
+    { id: "chapter1", title: "1", body: `<section epub:type="bodymatter chapter"><h1>1</h1><h1>What a Lamp Keeps</h1>\n<p>A wick trimmed each night burns evenly for years.</p></section>` },
   ],
   [
     { id: "title-image", href: "img/title.png" },

@@ -4,7 +4,7 @@ type: epub
 title: The Slow Lamp
 author: Ada Learner
 captured_at: <time>
-text_sha256: 07c177f58bef87bcbff8947ef58e7d4964090215c098ef1640015e4fd34ad843
+text_sha256: c819caaf7ba3cb7e330272b7902cf34afb7720935d2fbafc7cdb3970955729ed
 status: inbox
 skills: []
 topics: []
@@ -21,7 +21,7 @@ Copyright Page
 
 **Thank you for buying this Lantern House ebook.**
 
-To receive special offers and news of new books, sign up for our newsletters.
+To receive special offers and news of new titles, sign up for our newsletters.
 
 [![Sign Up](assets/c414cd0e204de974.png)](https://example.com/signup)
 
@@ -53,6 +53,6 @@ The lamp took an hour to warm, and nobody hurried it.
 
 # 1
 
-# What a Lamp Remembers
+# What a Lamp Keeps
 
 A wick trimmed each night burns evenly for years.
