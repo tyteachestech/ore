@@ -27,12 +27,16 @@ export type Feed = z.infer<typeof FeedSchema>;
 const FeedsFile = z.object({ feeds: z.array(FeedSchema).default([]) });
 
 export type Post = { feed: string; url: string; title: string; author?: string; published?: string; image?: string };
-type Cache = { feeds: Record<string, { checked_at: string; error?: string; posts: Post[] }> };
+type Cache = { generation?: number; feeds: Record<string, { generation?: number; checked_at: string; error?: string; posts: Post[] }> };
 
 /** Posts older than this leave the Feed, read or not: it never becomes a pile. */
 export const FEED_DAYS = 14;
 /** At most this many posts kept per feed. */
 const PER_FEED = 30;
+// D107: a dated post belongs to the preceding fourteen days, never a future day.
+// Undated posts stay eligible while the publisher lists them.
+const inFeedWindow = (post: Pick<Post, "published">, now: number) => !post.published
+  || (Date.parse(post.published) >= now - FEED_DAYS * 86400_000 && Date.parse(post.published) <= now);
 /** A preview left behind (the app quit while it was open) is cleared after a day. */
 const PREVIEW_MS = 24 * 3600_000;
 
@@ -59,7 +63,7 @@ function readCache(lib: Library): Cache {
 // ---- Reading feeds
 
 const UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15";
-const isFeedText = (text: string) => /^\s*(?:<\?xml[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*|<\?xml-stylesheet[^>]*>\s*)*<(?:rss|feed|rdf:RDF)\b/.test(text.slice(0, 3000));
+const isFeedText = (text: string) => /^\s*(?:<\?xml[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*|<\?xml-stylesheet[^>]*>\s*)*<(?:[\w.-]+:)?(?:rss|feed|RDF)\b/.test(text.slice(0, 3000));
 const host = (url: string) => new URL(url).host.replace(/^www\./, "");
 
 /** YouTube's feed server answers 404 or 500 about half the time (2026-11): its feeds get a second try,
@@ -82,7 +86,16 @@ async function fetchOnce(url: string): Promise<{ text: string; url: string; type
     throw new Error(`Couldn’t reach ${host(url)}. Check your connection and try again.`);
   });
   if (!res.ok) throw new Error(`${host(url)} answered HTTP ${res.status}.`);
-  return { text: await res.text(), url: res.url || url, type: res.headers.get("content-type") ?? "" };
+  const type = res.headers.get("content-type") ?? "";
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const bom = bytes[0] === 0xff && bytes[1] === 0xfe ? "utf-16le"
+    : bytes[0] === 0xfe && bytes[1] === 0xff ? "utf-16be"
+    : bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf ? "utf-8" : undefined;
+  const charset = /charset\s*=\s*["']?([^\s;"']+)/i.exec(type)?.[1];
+  const head = new TextDecoder("latin1").decode(bytes.subarray(0, 512));
+  const declared = /^\s*<\?xml\s[^>]*encoding\s*=\s*["']([^"']+)["']/i.exec(head)?.[1];
+  const text = new TextDecoder(bom ?? charset ?? declared ?? "utf-8").decode(bytes);
+  return { text, url: res.url || url, type };
 }
 
 const decode = (s: string) => s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim();
@@ -93,14 +106,27 @@ export async function parseFeed(xml: string, base: string): Promise<{ title: str
   // The forgiving parser reads a download cut off partway as a feed with fewer posts, or none: one whose root
   // never closes is refused, so a refresh keeps the last posts and says why (F366). What comes
   // after a closed root (a site's script, a PHP notice, NULs) is not the feed's and is left out.
-  const top = /<(rss|feed|rdf:RDF)\b/.exec(xml)?.[1];
-  const close = top ? [...xml.matchAll(new RegExp(`</${top}\\s*>`, "g"))].at(-1) : undefined;
+  const top = /<((?:[\w.-]+:)?(?:rss|feed|RDF))\b/.exec(xml)?.[1];
+  const close = top ? [...xml.matchAll(new RegExp(`</${top.replaceAll(".", "\\.")}\\s*>`, "g"))].at(-1) : undefined;
   if (!close) throw new Error(`${host(base)} sent a feed that stops partway.`);
   xml = xml.slice(0, close.index + close[0].length);
   const { DOMParser } = await import("linkedom");
   const doc = new DOMParser().parseFromString(xml, "text/xml") as unknown as Document;
   type El = Element;
-  const kids = (el: El, name: string) => [...el.children].filter((c) => c.tagName.toLowerCase() === name);
+  // linkedom retains qualified names but does not expose XML namespace lookup.
+  const namespace = (el: El) => {
+    const prefix = el.tagName.includes(":") ? el.tagName.split(":")[0] : undefined;
+    const attr = prefix ? `xmlns:${prefix}` : "xmlns";
+    for (let node: El | null = el; node; node = node.parentElement) {
+      if (node.hasAttribute(attr)) return node.getAttribute(attr);
+    }
+    return undefined;
+  };
+  const kids = (el: El, name: string) => [...el.children].filter((c) => {
+    const qualified = c.tagName.toLowerCase();
+    if (qualified === name) return true;
+    return !name.includes(":") && qualified.split(":").at(-1) === name && namespace(c) === "http://www.w3.org/2005/Atom";
+  });
   const text = (el: El, ...names: string[]) => {
     for (const n of names) {
       const t = kids(el, n)[0]?.textContent;
@@ -108,10 +134,17 @@ export async function parseFeed(xml: string, base: string): Promise<{ title: str
     }
     return undefined;
   };
-  const abs = (u: string | undefined | null) => {
+  const abs = (u: string | undefined | null, el: El) => {
     if (!u) return undefined;
     try {
-      return new URL(u.trim(), base).href;
+      const ancestors: El[] = [];
+      for (let node: El | null = el; node; node = node.parentElement) ancestors.unshift(node);
+      let inherited = base;
+      for (const node of ancestors) {
+        const declared = node.getAttribute("xml:base");
+        if (declared) inherited = new URL(declared, inherited).href;
+      }
+      return new URL(u.trim(), inherited).href;
     } catch {
       return undefined;
     }
@@ -121,39 +154,56 @@ export async function parseFeed(xml: string, base: string): Promise<{ title: str
     return Number.isNaN(t) ? undefined : new Date(t).toISOString();
   };
   const root = doc.documentElement as El;
-  const atom = root.tagName.toLowerCase() === "feed";
+  const atom = root.tagName.toLowerCase().split(":").at(-1) === "feed";
   const channel = atom ? root : (kids(root, "channel")[0] ?? root);
   const entries = atom ? kids(root, "entry") : [...doc.getElementsByTagName("item")];
   const link = (el: El) => {
-    if (!atom) return abs(text(el, "link") ?? kids(el, "guid").find((g) => g.getAttribute("ispermalink") !== "false")?.textContent);
+    if (!atom) {
+      const target = kids(el, "link").find((l) => l.textContent?.trim()) ?? kids(el, "guid").find((g) => (g.getAttribute("isPermaLink") ?? g.getAttribute("ispermalink")) !== "false");
+      return abs(target?.textContent, target ?? el);
+    }
     const links = kids(el, "link");
-    return abs((links.find((l) => (l.getAttribute("rel") ?? "alternate") === "alternate") ?? links[0])?.getAttribute("href"));
+    const target = links.find((l) => (l.getAttribute("rel") ?? "alternate") === "alternate") ?? links[0];
+    return abs(target?.getAttribute("href"), target ?? el);
   };
   const image = (el: El) => {
     const media = [...el.getElementsByTagName("media:thumbnail"), ...el.getElementsByTagName("media:content")].find((m) => m.getAttribute("url") && (m.tagName.toLowerCase() === "media:thumbnail" || /image/.test(m.getAttribute("medium") ?? m.getAttribute("type") ?? "")));
-    if (media) return abs(media.getAttribute("url"));
+    if (media) return abs(media.getAttribute("url"), media);
     const enc = kids(el, "enclosure").find((e) => /^image\//.test(e.getAttribute("type") ?? ""));
-    if (enc) return abs(enc.getAttribute("url"));
-    const html = text(el, "content:encoded", "content", "description", "summary") ?? "";
-    return abs(/<img[^>]+src=["']([^"']+)["']/i.exec(html)?.[1]);
+    if (enc) return abs(enc.getAttribute("url"), enc);
+    const content = ["content:encoded", "content", "description", "summary"].flatMap((name) => kids(el, name)).find((c) => c.textContent?.trim());
+    const html = content?.textContent ?? "";
+    return abs(/<img[^>]+src=["']([^"']+)["']/i.exec(html)?.[1], content ?? el);
   };
   const author = (el: El) => {
     const a = kids(el, "author")[0];
     const name = a && (kids(a, "name")[0]?.textContent ?? a.textContent);
     return oneLine(decode(name ?? text(el, "dc:creator") ?? "")) || undefined;
   };
+  const title = (el: El) => {
+    const element = kids(el, "title")[0];
+    const value = text(el, "title") ?? "";
+    if (!atom) return oneLine(value);
+    // Atom's default text construct is literal text. Only type=html contains
+    // escaped markup; XHTML already has XML elements and textContent removes them.
+    const plain = element?.getAttribute("type") === "html"
+      ? new DOMParser().parseFromString(`<html><body>${value}</body></html>`, "text/html").body.textContent ?? ""
+      : value;
+    return plain.replace(/\s+/g, " ").trim();
+  };
   const seen = new Set<string>();
   const posts = entries
     .flatMap((e): Omit<Post, "feed">[] => {
       const url = link(e);
       if (!url || !/^https?:/.test(url)) return [];
-      return [{ url, title: oneLine(text(e, "title") ?? "") || host(url), author: author(e), published: date(text(e, "published", "pubdate", "dc:date", "updated")), image: image(e) }];
+      return [{ url, title: title(e) || host(url), author: author(e), published: date(text(e, "published", "pubdate", "dc:date", "updated")), image: image(e) }];
     })
     .sort((a, b) => (b.published ?? "").localeCompare(a.published ?? ""))
     // A post listed twice is one post, so copies never use up the posts a feed keeps (F367).
     .filter((p) => !seen.has(p.url) && !!seen.add(p.url));
-  const siteLink = atom ? abs(kids(channel, "link").find((l) => (l.getAttribute("rel") ?? "alternate") === "alternate")?.getAttribute("href")) : abs(text(channel, "link"));
-  return { title: oneLine(text(channel, "title") ?? "") || host(base), site: siteLink, posts };
+  const siteElement = atom ? kids(channel, "link").find((l) => (l.getAttribute("rel") ?? "alternate") === "alternate") : kids(channel, "link")[0];
+  const siteLink = abs(atom ? siteElement?.getAttribute("href") : siteElement?.textContent, siteElement ?? channel);
+  return { title: title(channel) || host(base), site: siteLink, posts };
 }
 
 type Read = { url: string; title: string; site?: string; posts: Omit<Post, "feed">[] };
@@ -283,6 +333,7 @@ export async function arrangeFeeds(lib: Library, order: string[]): Promise<Feed[
     const feeds = listFeeds(lib);
     if (order.length !== feeds.length || new Set(order).size !== order.length) throw new Error("give every followed feed once");
     const next = order.map((u) => feedOf(feeds, u));
+    if (new Set(next).size !== feeds.length) throw new Error("give every followed feed once");
     writeFeeds(lib, next);
     return next;
   });
@@ -305,26 +356,41 @@ export async function setFeed(lib: Library, ref: string, patch: { title?: string
 /** Fetches every feed (or the named ones) and caches their posts; a feed that fails keeps its last
  *  posts and says why. Also clears previews left behind. */
 export async function refreshFeeds(lib: Library, only?: string[]): Promise<{ checked: number; failed: { feed: string; error: string }[] }> {
-  const all = listFeeds(lib);
-  const feeds = all.filter((f) => !only?.length || only.includes(f.url));
+  // Reserve an order on disk, shared by separate CLI processes. Never hold the
+  // library lock over the network; later refreshes and Follow can still finish.
+  const { feeds, generation } = await withLock(paths.lock(lib), () => {
+    const feeds = listFeeds(lib).filter((f) => !only?.length || only.includes(f.url));
+    const cache = readCache(lib);
+    const generation = (cache.generation ?? 0) + 1;
+    cache.generation = generation;
+    writeAtomic(cachePath(lib), JSON.stringify(cache));
+    return { feeds, generation };
+  });
   const results = await Promise.all(
     feeds.map(async (f) => {
       try {
         const parsed = await readFeed(f.url);
-        return { f, posts: parsed.posts.slice(0, PER_FEED).map((p) => ({ ...p, feed: f.url })) };
+        return { f, posts: parsed.posts.filter((p) => inFeedWindow(p, Date.now())).slice(0, PER_FEED).map((p) => ({ ...p, feed: f.url })) };
       } catch (e) {
         return { f, error: (e as Error).message };
       }
     }),
   );
-  const cache = readCache(lib);
-  const now = nowIso();
-  for (const r of results) {
-    const prev = cache.feeds[r.f.url];
-    cache.feeds[r.f.url] = "error" in r ? { checked_at: now, error: r.error, posts: prev?.posts ?? [] } : { checked_at: now, posts: r.posts };
-  }
-  for (const url of Object.keys(cache.feeds)) if (!all.some((f) => f.url === url)) delete cache.feeds[url];
-  writeAtomic(cachePath(lib), JSON.stringify(cache));
+  await withLock(paths.lock(lib), () => {
+    const all = listFeeds(lib);
+    const cache = readCache(lib);
+    const now = nowIso();
+    for (const r of results) {
+      if (!all.some((f) => f.url === r.f.url && f.followed_at === r.f.followed_at)) continue;
+      const prev = cache.feeds[r.f.url];
+      if ((prev?.generation ?? 0) > generation) continue;
+      cache.feeds[r.f.url] = "error" in r
+        ? { generation, checked_at: now, error: r.error, posts: prev?.posts ?? [] }
+        : { generation, checked_at: now, posts: r.posts };
+    }
+    for (const url of Object.keys(cache.feeds)) if (!all.some((f) => f.url === url)) delete cache.feeds[url];
+    writeAtomic(cachePath(lib), JSON.stringify(cache));
+  });
   await clearPreviews(lib);
   return { checked: feeds.length, failed: results.flatMap((r) => ("error" in r ? [{ feed: r.f.url, error: r.error! }] : [])) };
 }
@@ -358,12 +424,11 @@ export function feedView(lib: Library, now = new Date()): FeedView {
   // The same link written another way (http, www, tags) is the same post, as when adding it.
   const kept = new Set(allItems(lib).flatMap((i) => (i.meta.url ? [linkKey(i.meta.url)] : [])));
   const previews = new Map(listItems(lib, { preview: true }).flatMap((i) => (i.meta.url ? [[linkKey(i.meta.url), i.meta.id] as const] : [])));
-  const since = now.getTime() - FEED_DAYS * 86400_000;
   const seen = new Set<string>();
   const posts = feeds
     .flatMap((f) => (cache.feeds[f.url]?.posts ?? []).map((p) => ({ ...p, feed_title: f.title })))
     // A post with no date counts as new until the feed stops listing it.
-    .filter((p) => !kept.has(linkKey(p.url)) && (!p.published || Date.parse(p.published) >= since) && !seen.has(linkKey(p.url)) && seen.add(linkKey(p.url)))
+    .filter((p) => !kept.has(linkKey(p.url)) && inFeedWindow(p, now.getTime()) && !seen.has(linkKey(p.url)) && seen.add(linkKey(p.url)))
     .map((p) => ({ ...p, read: read.has(linkKey(p.url)), ...(previews.has(linkKey(p.url)) ? { preview: previews.get(linkKey(p.url)) } : {}) }))
     .sort((a, b) => (b.published ?? "").localeCompare(a.published ?? ""));
   return { feeds: feeds.map((f) => ({ ...f, checked_at: cache.feeds[f.url]?.checked_at, error: cache.feeds[f.url]?.error })), posts };

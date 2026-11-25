@@ -94,7 +94,23 @@ export function removeQueuedLink(lib: Library, id: string, keepForUndo = false):
     if (f.endsWith(FILE) && at && at !== ".." && at !== ".") dir = join(paths.inbox(lib), at);
   } catch {}
   unlinkSync(f);
-  if (dir) rmSync(dir, { recursive: true, force: true });
+  if (dir) {
+    // Live and undoable descriptors can share a capture directory after sync. Inspect
+    // descriptors directly: queuedLinks omits attachments that have not arrived yet.
+    for (const folder of [paths.inbox(lib), join(paths.inbox(lib), "removed")]) {
+      if (!existsSync(folder)) continue;
+      for (const name of readdirSync(folder).filter((n) => n.endsWith(FILE))) {
+        try {
+          const file = (JSON.parse(readFileSync(join(folder, name), "utf8")) as QueuedLink).file;
+          if (file && join(paths.inbox(lib), file.split("/")[0]!) === dir) return;
+        } catch {
+          // A half-synced descriptor may own the bytes; leave them until it is readable.
+          return;
+        }
+      }
+    }
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 /** Where a removed entry waits for an Undo, kept a day: the Undo history doesn't outlive the app. */

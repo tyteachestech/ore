@@ -2424,3 +2424,73 @@ test("PowerPoint: package-root picture targets keep the same figures", async () 
   for (const image of images(rooted.body))
     expect(readFileSync(join(rooted.dir, image.path))).toEqual(readFileSync(join(relative.dir, image.path)));
 });
+
+test("feed intake resolves inherited and element xml:base for posts, site and pictures (feeds-05)", async () => {
+  const { parseFeed } = await import("../src/feeds.ts");
+  const xml = readFileSync(join(FIX, "feeds/xml-base.xml"), "utf8");
+  const parsed = await parseFeed(xml, "https://feeds.example.test/rss/feed.xml");
+  expect(parsed.title).toBe("Ore feed fixture");
+  expect(parsed.site).toBe("https://site.example.test/learn/index");
+  expect(parsed.posts).toEqual([
+    { title: "Lesson one", author: "Ada", published: "2026-11-20T12:00:00.000Z", url: "https://site.example.test/learn/articles/one", image: "https://site.example.test/learn/images/diagram.png" },
+    { title: "Lesson two", author: undefined, published: undefined, url: "https://site.example.test/learn/two", image: "https://site.example.test/learn/pictures/two.png" },
+  ]);
+});
+
+test("feed intake decodes declared XML and HTTP encodings before reading titles and URLs (feeds-06)", async () => {
+  const { findFeed, followFeed, refreshFeeds, feedView } = await import("../src/feeds.ts");
+  const published = new Date(Date.now() - 86400_000).toUTCString();
+  const xml = readFileSync(join(FIX, "feeds/latin1.xml")).toString("latin1").replace("20 Nov 2026 12:00:00 GMT", published);
+  const bytes = Buffer.from(xml, "latin1");
+  const url = "https://feeds.example.test/rss/feed.xml";
+  const cases: [Uint8Array, string][] = [
+    [bytes, "application/rss+xml; charset=ISO-8859-1"],
+    [bytes, "application/rss+xml"],
+    [Buffer.from(xml.replace(' encoding="ISO-8859-1"', ""), "latin1"), 'application/rss+xml; charset="ISO-8859-1"'],
+    [Buffer.from(xml.replace("ISO-8859-1", "UTF-8"), "utf8"), "application/rss+xml"],
+    [Buffer.from("\uFEFF" + xml.replace("ISO-8859-1", "UTF-16"), "utf16le"), "application/rss+xml"],
+  ];
+  for (const [body, type] of cases) {
+    serve({ [url]: { body: body as BodyInit, type } });
+    expect((await findFeed(url)).title).toBe("Café");
+    const lib = await tempLibrary();
+    await followFeed(lib, url);
+    expect((await refreshFeeds(lib)).failed).toEqual([]);
+    expect(feedView(lib).posts[0]).toMatchObject({ title: "Café lesson", url: "https://example.test/caf%C3%A9", author: "Ada", published: new Date(published).toISOString() });
+  }
+});
+
+test("feed intake uses permalink GUIDs and real links but never opaque GUIDs (feeds-07)", async () => {
+  const { parseFeed } = await import("../src/feeds.ts");
+  const parsed = await parseFeed(readFileSync(join(FIX, "feeds/guids.xml"), "utf8"), "https://feeds.example.test/rss/feed.xml");
+  expect(parsed.posts.map((p) => [p.title, p.url])).toEqual([
+    ["Default permalink", "https://example.test/default"],
+    ["Explicit permalink", "https://example.test/explicit"],
+    ["Linked opaque", "https://example.test/linked"],
+  ]);
+});
+
+test("feed intake preserves plain Atom titles and reads HTML and XHTML titles as text (feeds-08)", async () => {
+  const { parseFeed } = await import("../src/feeds.ts");
+  const parsed = await parseFeed(readFileSync(join(FIX, "feeds/text-titles.xml"), "utf8"), "https://feeds.example.test/rss/feed.xml");
+  expect(parsed.title).toBe("Learn <T> & practice");
+  expect(parsed.posts.map((p) => p.title)).toEqual(["Use <T> in TypeScript", "Use <U> by default", "Use <V> & practice", "Use <W> & practice"]);
+});
+
+test("feed intake discovers and refreshes prefixed Atom while rejecting a truncated root (feeds-09)", async () => {
+  const { parseFeed, findFeed, followFeed, refreshFeeds, feedView } = await import("../src/feeds.ts");
+  const xml = readFileSync(join(FIX, "feeds/prefixed-atom.xml"), "utf8");
+  const url = "https://feeds.example.test/feed.xml";
+  const parsed = await parseFeed(xml, url);
+  expect(parsed.title).toBe("Prefixed lessons");
+  expect(parsed.site).toBe("https://example.test/lessons/");
+  expect(parsed.posts[0]).toEqual({ title: "Use <T>", url: "https://example.test/post", author: "Ada", published: "2026-11-20T12:00:00.000Z", image: "https://example.test/diagram.png" });
+  serve({ [url]: { body: xml.replace("2026-11-20T12:00:00Z", new Date(Date.now() - 86400_000).toISOString()), type: "application/atom+xml" } });
+  expect((await findFeed(url)).posts).toBe(1);
+  const lib = await tempLibrary();
+  await followFeed(lib, url);
+  expect((await refreshFeeds(lib)).failed).toEqual([]);
+  expect(feedView(lib).posts).toHaveLength(1);
+  await expect(parseFeed(xml.replace("</a:feed>", ""), url)).rejects.toThrow("stops partway");
+  expect(await parseFeed(xml.replaceAll("a:", "alt:").replace("xmlns:a=", "xmlns:alt="), url)).toEqual(parsed);
+});
