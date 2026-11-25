@@ -49,7 +49,8 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
     if (!files[path]) continue;
     const xml = strFromU8(files[path]!);
     const headings = xml.replace(/<w:pPr\b[^>]*(?<!\/)>[\s\S]*?<\/w:pPr>/g, (props) => {
-      const level = props.match(/<w:outlineLvl\b[^>]*w:val="([0-8])"/)?.[1];
+      // What a tracked change records after <w:pPrChange> is the paragraph as it was, not as it is.
+      const level = props.replace(/<w:pPrChange\b[\s\S]*$/, "").match(/<w:outlineLvl\b[^>]*w:val="([0-8])"/)?.[1];
       if (level === undefined) return props;
       const style = `<w:pStyle w:val="Heading${Math.min(6, Number(level) + 1)}"/>`;
       return props.replace(/<w:pStyle\b[^>]*(?:\/>|>[\s\S]*?<\/w:pStyle>)/g, "").replace(/(<w:pPr\b[^>]*>)/, `$1${style}`);

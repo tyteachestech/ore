@@ -35,8 +35,10 @@ export const FEED_DAYS = 14;
 const PER_FEED = 30;
 // D107: a dated post belongs to the preceding fourteen days, never a future day.
 // Undated posts stay eligible while the publisher lists them.
-const inFeedWindow = (post: Pick<Post, "published">, now: number) => !post.published
-  || (Date.parse(post.published) >= now - FEED_DAYS * 86400_000 && Date.parse(post.published) <= now);
+// `ahead`: a refresh keeps a post due within the day (a clock a minute fast, a post scheduled for 09:00
+// listed at 08:58), so the Feed shows it when its time comes instead of after the next refresh.
+const inFeedWindow = (post: Pick<Post, "published">, now: number, ahead = 0) => !post.published
+  || (Date.parse(post.published) >= now - FEED_DAYS * 86400_000 && Date.parse(post.published) <= now + ahead);
 /** A preview left behind (the app quit while it was open) is cleared after a day. */
 const PREVIEW_MS = 24 * 3600_000;
 
@@ -209,7 +211,7 @@ export async function parseFeed(xml: string, base: string): Promise<{ title: str
     .sort((a, b) => (b.published ?? "").localeCompare(a.published ?? ""))
     // A post listed twice is one post, so copies never use up the posts a feed keeps (F367).
     .filter((p) => !seen.has(p.url) && !!seen.add(p.url));
-  const siteElement = atom ? kids(channel, "link").find((l) => (l.getAttribute("rel") ?? "alternate") === "alternate") : kids(channel, "link")[0];
+  const siteElement = atom ? kids(channel, "link").find((l) => (l.getAttribute("rel") ?? "alternate") === "alternate") : kids(channel, "link").find((l) => l.textContent?.trim()); // not WordPress's <atom:link rel="self"/> above it
   const siteLink = abs(atom ? siteElement?.getAttribute("href") : siteElement?.textContent, siteElement ?? channel);
   return { title: title(channel) || host(base), site: siteLink, posts };
 }
@@ -378,7 +380,7 @@ export async function refreshFeeds(lib: Library, only?: string[]): Promise<{ che
     feeds.map(async (f) => {
       try {
         const parsed = await readFeed(f.url);
-        return { f, posts: parsed.posts.filter((p) => inFeedWindow(p, Date.now())).slice(0, PER_FEED).map((p) => ({ ...p, feed: f.url })) };
+        return { f, posts: parsed.posts.filter((p) => inFeedWindow(p, Date.now(), 86400_000)).slice(0, PER_FEED).map((p) => ({ ...p, feed: f.url })) };
       } catch (e) {
         return { f, error: (e as Error).message };
       }

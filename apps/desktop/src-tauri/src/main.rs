@@ -644,8 +644,16 @@ fn set_tray(app: AppHandle, on: bool, tip: String) -> Result<(), String> {
 /// with their shortcut, run in the page as that shortcut) and standard macOS items by name.
 #[tauri::command]
 fn set_app_menu(app: AppHandle, window: tauri::WebviewWindow, menus: Vec<Value>) -> Result<(), String> {
-    if !window.is_focused().unwrap_or(false) {
-        return Ok(()); // a background page must not replace the key window's menu
+    // A background page must not replace the key window's menu. With no Ore window focused (Ore opened
+    // behind another app), the main window's menu stands: skipping it left the menu bar empty until a
+    // focus change that could arrive before the page listened for it.
+    let focused = app.webview_windows().into_values().find(|w| w.is_focused().unwrap_or(false));
+    let mine = match &focused {
+        Some(w) => w.label() == window.label(),
+        None => window.label() == "main",
+    };
+    if !mine {
+        return Ok(());
     }
     let e = |e: tauri::Error| e.to_string();
     let bar = Menu::new(&app).map_err(e)?;

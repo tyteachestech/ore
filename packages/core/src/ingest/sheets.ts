@@ -154,7 +154,8 @@ export function xlsxToDoc(data: Uint8Array): SheetDoc {
           text = as === "date" ? iso.slice(0, 10) : iso.slice(0, 16).replace("T", " ");
         } else if (num) text = String(Number(Number(v).toPrecision(15))); // as Excel shows it: 15 digits, so 0.1+0.2 is 0.3
         // Exporters may leave a formula pending recalculation. Keep its expression instead of a blank.
-        if (!v && /<f\b/.test(inner)) {
+        // A saved text result that is empty (`t="str"` with `<v></v>`: =IF(A2="","",…)) is a blank cell, not a pending one.
+        if (!v && /<f\b/.test(inner) && !(t === "str" && /<v\b/.test(inner))) {
           const formula = xmlText(inner.match(/<f\b[^>]*>([\s\S]*?)<\/f>/)?.[1] ?? "");
           if (!formula) throw new Error("This workbook has an uncached shared formula. Open it in Excel or LibreOffice, recalculate and save it, then add that copy.");
           text = `=${formula}`;

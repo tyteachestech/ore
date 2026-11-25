@@ -383,3 +383,20 @@ test("future dates cannot consume the last-two-weeks cache or hide today's post 
   expect(feedView(lib, now).posts.map((p) => p.title)).toEqual(["today", "undated"]);
   expect(readFileSync(path, "utf8")).toBe(before);
 });
+
+test("an RSS feed's site is its own <link>, not the <atom:link rel=\"self\"> WordPress puts above it", async () => {
+  const f = await parseFeed(`<rss xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Blog</title><atom:link href="https://blog.example/feed/" rel="self" type="application/rss+xml"/><link>https://blog.example</link><item><title>One</title><link>https://blog.example/one</link></item></channel></rss>`, "https://blog.example/feed/");
+  expect(f.site).toBe("https://blog.example/");
+});
+
+test("a post dated two minutes ahead waits in the cache and shows when its time comes, without another refresh", async () => {
+  const now = new Date();
+  const soon = new Date(now.getTime() + 120_000).toISOString();
+  const url = "https://example.test/soon";
+  serve(new Set(), { [url]: [`<rss><channel><title>Soon</title><item><title>scheduled</title><link>https://example.test/scheduled</link><pubDate>${soon}</pubDate></item></channel></rss>`, "application/rss+xml"] });
+  const lib = await tempLibrary();
+  await followFeed(lib, url);
+  await refreshFeeds(lib);
+  expect(feedView(lib, now).posts.map((p) => p.title)).toEqual([]);
+  expect(feedView(lib, new Date(now.getTime() + 180_000)).posts.map((p) => p.title)).toEqual(["scheduled"]);
+});

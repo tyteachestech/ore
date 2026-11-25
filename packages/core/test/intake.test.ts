@@ -2604,3 +2604,37 @@ test("feed intake discovers and refreshes prefixed Atom while rejecting a trunca
   await expect(parseFeed(xml.replace("</a:feed>", ""), url)).rejects.toThrow("stops partway");
   expect(await parseFeed(xml.replaceAll("a:", "alt:").replace("xmlns:a=", "xmlns:alt="), url)).toEqual(parsed);
 });
+
+test("Excel: a formula whose saved result is empty text is a blank cell, not a pending formula or a refusal", async () => {
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const book = unzipSync(new Uint8Array(readFileSync(officeFile("sheets-formula.xlsx"))));
+  const sheet = strFromU8(book["xl/worksheets/sheet1.xml"]!);
+  book["xl/worksheets/sheet1.xml"] = strToU8(sheet.replace("</sheetData>", `<row r="3"><c r="A3" t="str"><f t="shared" ref="A3:A4" si="0">IF(B3="","",B3*2)</f><v></v></c><c r="B3"><v>7</v></c></row><row r="4"><c r="A4" t="str"><f t="shared" si="0"/><v></v></c><c r="B4"><v>8</v></c></row></sheetData>`));
+  const dir = mkdtempSync(join(tmpdir(), "ore-xlsx-"));
+  writeFileSync(join(dir, "blank-results.xlsx"), zipSync(book));
+  const item = await addSource(await tempLibrary(), join(dir, "blank-results.xlsx"));
+  expect(item.body).toContain("| =1+1 |");
+  expect(item.body).toContain("7");
+  expect(item.body).toContain("8");
+  expect(item.body).not.toContain("=IF");
+});
+
+test("Word: an outline level a tracked change took away does not make a heading", async () => {
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const doc = unzipSync(new Uint8Array(readFileSync(officeFile("word-outline-after-plain.docx"))));
+  const xml = strFromU8(doc["word/document.xml"]!);
+  doc["word/document.xml"] = strToU8(xml.replace("<w:p><w:pPr/><w:r><w:t>Opening paragraph", `<w:p><w:pPr><w:jc w:val="left"/><w:pPrChange w:id="1" w:author="A"><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:pPrChange></w:pPr><w:r><w:t>Opening paragraph`));
+  const dir = mkdtempSync(join(tmpdir(), "ore-docx-"));
+  writeFileSync(join(dir, "tracked.docx"), zipSync(doc));
+  const item = await addSource(await tempLibrary(), join(dir, "tracked.docx"));
+  expect(item.body).toContain("Opening paragraph\n\n# Chapter one");
+  expect(item.body).not.toContain("# Opening paragraph");
+});
+
+test("a Markdown file's picture that isn't beside it stays as written, never a link into this Mac's folders", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-md-"));
+  writeFileSync(join(dir, "notes.md"), "# Notes\n\nA chart of the forgetting curve, described in words long enough to be a source.\n\n![chart](img/chart.png)\n");
+  const item = await addSource(await tempLibrary(), join(dir, "notes.md"));
+  expect(item.body).toContain("![chart](img/chart.png)");
+  expect(item.body).not.toContain("file:");
+});

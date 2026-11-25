@@ -13,7 +13,7 @@ import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
 import { loadSkills, setItemSkills, unarchiveFiled } from "../skills.ts";
-import { saveImages, withImages } from "./assets.ts";
+import { localImageSaves, saveImages, withImages } from "./assets.ts";
 import { recordEnd } from "../cut.ts";
 import { chapterLines } from "../ai/recall.ts";
 import { BOT, cleanAuthor, cleanDate, FROM_TAB, refusal, wordCount } from "./check.ts";
@@ -541,7 +541,10 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
     const base = new URL("file://" + resolve(path).split("/").map(encodeURIComponent).join("/"));
     draft.body = rewriteImageUrls(draft.body, (url) => {
       if (/^(?:[a-z][\w+.-]*:|#|\/\/)/i.test(url)) return;
-      return new URL(url, base).href;
+      // Only a picture that is there to save: a link to one that is missing stays as written, never
+      // this Mac's folder in a doc.md the phone reads too.
+      const href = new URL(url, base).href;
+      return localImageSaves(href) ? href : undefined;
     });
   }
   return draft;
