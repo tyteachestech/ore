@@ -625,7 +625,8 @@ journey("phone: the small controls of a source answer a 44pt touch", async (page
   await tap(page, page.getByRole("button", { name: "Source actions" }));
   await tap(page, page.locator(".action-sheet button").filter({ hasText: "Finish" }));
   await tap(page, page.getByRole("button", { name: "Just mark done" }));
-  await page.locator(".quiz-foot button").first().waitFor();
+  // The closing card's foot, not the first step's (its "Just mark done" is a .quiz-foot button too, gone a moment later).
+  await page.locator(".quiz-done").waitFor();
   await fits(".quiz-foot button", "the closing card's Done");
 }, "phone");
 
