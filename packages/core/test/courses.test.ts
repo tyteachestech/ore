@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { courseLessons, renameCourse, setCourseArchived, setCourseSkills } from "../src/courses.ts";
 import { academyLessons, addCourse, isCourseUrl, type CoursePlan } from "../src/ingest/course.ts";
 import { addSource, courseCoverFile } from "../src/ingest/index.ts";
-import { findItem, listItems, setItemArchived, setItemStatus } from "../src/items.ts";
+import { createItem, findItem, listItems, setItemArchived, setItemStatus } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const COURSE = `<html><head><title>AI Fluency: Framework and foundations · Claude Academy</title></head><body>
@@ -205,4 +205,13 @@ test("changed course plans match URLs, retain removed lessons and preserve saved
   for (const item of first.added) expect(findItem(lib, item.meta.id).body).toBe(item.body);
   expect(findItem(lib, original[0]!).meta.status).toBe("done");
   expect((await addCourse(lib, changed)).added).toEqual([]);
+});
+
+test("a saved video lesson is the plan's by its video, however its link is written: it is not added twice", async () => {
+  const lib = await tempLibrary();
+  const url = "https://www.youtube.com/playlist?list=PLabc";
+  const saved = await createItem(lib, { type: "youtube", title: "One", url: "https://youtu.be/abcdefghijk", body: "[00:00] words", skills: [], course: { id: "c1", title: "List", part: 1, url } });
+  const again = await addCourse(lib, { title: "List", url, lessons: [{ title: "One", url: "https://www.youtube.com/watch?v=abcdefghijk" }] });
+  expect([again.added, again.failed, again.kept]).toEqual([[], [], 1]);
+  expect(listItems(lib).map((i) => i.meta.id)).toEqual([saved.meta.id]);
 });

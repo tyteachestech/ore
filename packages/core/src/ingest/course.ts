@@ -11,7 +11,7 @@ import { setItemSkills, unarchiveFiled } from "../skills.ts";
 import { withImages } from "./assets.ts";
 import { dropTitle, hasText, pageDraft, withTranscript } from "./page.ts";
 import { courseCoverFile, makeCourseCover, makeThumbnail } from "./thumbnail.ts";
-import { ytDlp } from "./youtube.ts";
+import { youtubeId, ytDlp } from "./youtube.ts";
 
 // A course is a list of lessons, each added as its own source (option B, docs/design/courses-and-live-links.md).
 // Two kinds are read: a Claude Academy course (its page lists the lessons in order; a lesson's video ID
@@ -128,6 +128,11 @@ export async function lessonDraft(l: Omit<CourseLesson, "title"> & { title?: str
   return d.type === "article" ? { ...d, author: undefined } : d;
 }
 
+/** Whether a saved lesson's link is a plan's: the same link, or the same video however its link is
+ *  written (yt-dlp names the page it landed on, which need not be the link the playlist listed). */
+const sameLink = (saved: string | undefined, planned: string | undefined) =>
+  !!saved && !!planned && (saved === planned || (!!youtubeId(saved) && youtubeId(saved) === youtubeId(planned)));
+
 /** Whether a lesson added before D92 lacks its page's text: a video lesson with a page of its own. */
 const lacksPage = (i: Item, l: CourseLesson | undefined) => !!l?.video && l.url !== l.video && i.meta.type === "youtube";
 
@@ -177,8 +182,8 @@ export async function addCourse(lib: Library, plan: CoursePlan, opts: { skills?:
   // pre-D92 lessons kept only their video URL, so accept that identity too.
   const unmatched = new Set(existing);
   const planned = plan.lessons.map((l, index) => {
-    const had = [...unmatched].find((i) => i.meta.url === l.url)
-      ?? [...unmatched].find((i) => i.meta.type === "youtube" && !!l.video && i.meta.url === l.video);
+    const had = [...unmatched].find((i) => sameLink(i.meta.url, l.url))
+      ?? [...unmatched].find((i) => i.meta.type === "youtube" && sameLink(i.meta.url, l.video));
     if (had) unmatched.delete(had);
     return { l, part: index + 1, had };
   });
