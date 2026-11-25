@@ -116,7 +116,11 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const field = useRef<HTMLTextAreaElement>(null);
   const panel = useRef<HTMLElement>(null);
   // The questions in this finish: the ones a partway finish left out are skipped (D100).
-  const shown = qs.map((_, i) => i).filter((i) => !qs[i]!.skipped);
+  /** iPhone: a question whose key points the Mac hasn't found can't be checked there (AI runs on the Mac, D78.3):
+   *  asked anyway, it showed no answer, key point or passage to learn from (F738). It waits for the Mac's Finish,
+   *  so the phone's saves the recall and leaves the source in To read. */
+  const held = PHONE ? qs.filter((p) => !p.skipped && !p.points).length : 0;
+  const shown = qs.map((_, i) => i).filter((i) => !qs[i]!.skipped && !(PHONE && !qs[i]!.points));
   const n = shown.length;
   const qi = step >= 1 && step <= n ? shown[step - 1]! : -1;
   const q = qi >= 0 ? qs[qi]! : null;
@@ -135,7 +139,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   /** The key points are being found: what Continue waits for when a part is to be left out. */
   const [finding, setFinding] = useState(false);
   const loadPoints = () => {
-    if (!qs.length || qs.every((p) => p.points)) return;
+    if (PHONE || !qs.length || qs.every((p) => p.points)) return; // the phone can't find them: those questions wait (`held`)
     setPointsError(null);
     setFinding(true);
     pointsRun.current = ore<{ prequestions: Prequestion[] }>("key-points", doc.id).finally(() => setFinding(false)).then(
@@ -421,6 +425,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     if (step === 0) void submitRecall();
     else if (qi >= 0 && !isChecked) void check();
     else if (qi >= 0) next();
+    else if (held && !marked) void keepReading();
     else void finish();
   };
 
@@ -647,7 +652,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
                 <PixelBurst />
               </span>
             )}
-            <h2>{marked ? "Source finished" : "Done with this source?"}</h2>
+            <h2>{marked ? "Source finished" : held ? `${held === 1 ? "One quiz question waits" : `${held} quiz questions wait`} on your Mac` : "Done with this source?"}</h2>
           </div>
           {marked && (
             <div className="quiz-verdict yes quiz-made">
@@ -684,7 +689,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <Grow ref={field} id="quiz-use" className="field quiz-answer short" value={use} onChange={(e) => setUse(e.target.value)} readOnly={busy} />
           <div className="quiz-grow" />
           <div className="quiz-foot">
-            {!marked && (
+            {!marked && !held && (
               <Hint text="Keep it in To read · its questions become exercises when you finish" side="top">
                 <button className="quiz-ghost" onClick={() => void keepReading()} disabled={busy}>
                   Keep reading

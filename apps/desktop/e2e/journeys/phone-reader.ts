@@ -1233,3 +1233,26 @@ journey("phone: while he types in the note beside a source, its highlights' tint
   await page.evaluate(() => (document.activeElement as HTMLElement).blur());
   await until("the tints are back once he leaves the field", async () => (await tints()) > 0);
 }, "phone");
+
+journey("phone: Finish holds the questions it has no key points for: the recall is saved, they wait for the Mac, and the source stays in To read (F738)", async (page) => {
+  // The phone asked them anyway: after an answer or "No idea" it said "Not checked here", with no key point or passage
+  // to learn from (AI runs on the Mac, D78.3).
+  await phoneSource(page, TESTING);
+  const finish = async () => {
+    await tap(page, page.getByRole("button", { name: "Source actions" }));
+    await tap(page, page.locator(".action-sheet button").filter({ hasText: /^Finish/ }));
+  };
+  await finish();
+  await page.getByLabel("Free recall").fill("Testing yourself beats rereading, more so after a week.");
+  await tap(page, page.locator(".quiz-go"));
+  await page.locator(".quiz-done h2").filter({ hasText: /wait on your Mac/ }).waitFor({ timeout: 5000 });
+  if (await page.getByText("Not checked here").count()) throw new Error("a question the phone can't check was asked");
+  await tap(page, page.locator(".quiz-go"));
+  await page.locator(".quiz-done").waitFor({ state: "detached" });
+  // Still in To read: Finish is offered again (the Mac's asks the questions), and his recall is in the source note.
+  await tap(page, page.getByRole("button", { name: "Source actions" }));
+  await page.locator(".action-sheet button").filter({ hasText: /^Finish/ }).waitFor();
+  await page.keyboard.press("Escape");
+  await tap(page, page.locator(".phone-tools button").filter({ hasText: "Note" }));
+  await page.locator(".mynotes").filter({ hasText: "Testing yourself beats rereading" }).waitFor({ timeout: 5000 });
+}, "phone");
