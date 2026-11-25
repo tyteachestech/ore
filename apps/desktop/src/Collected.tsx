@@ -84,7 +84,7 @@ export function Collected({ anns, ready, rectOf, onOpen, fit = "all" }: Props) {
   }, [anns, ready]);
   useEffect(() => {
     if (!pop) return;
-    const t = setTimeout(() => setPop(null), 1400);
+    const t = setTimeout(() => setPop(null), 1760); // past the "+1" (820ms in, 900ms long: styles.css)
     return () => clearTimeout(t);
   }, [pop]);
 
