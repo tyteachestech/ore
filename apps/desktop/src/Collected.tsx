@@ -84,7 +84,7 @@ export function Collected({ anns, ready, rectOf, onOpen, fit = "all" }: Props) {
   }, [anns, ready]);
   useEffect(() => {
     if (!pop) return;
-    const t = setTimeout(() => setPop(null), 1400);
+    const t = setTimeout(() => setPop(null), 1760); // past the "+1" (820ms in, 900ms long: styles.css)
     return () => clearTimeout(t);
   }, [pop]);
 
@@ -108,7 +108,7 @@ export function Collected({ anns, ready, rectOf, onOpen, fit = "all" }: Props) {
           { transform: `translate(${x0 + (x1 - x0) * 0.4}px, ${Math.min(y0, y1) - 40 - i * 4}px) scale(1)`, opacity: 1, offset: 0.4 },
           { transform: `translate(${x1}px, ${y1}px) scale(0.6)`, opacity: 0.9 },
         ],
-        { duration: 520, delay: i * 40, easing: "cubic-bezier(.5,0,.3,1)", fill: "backwards" },
+        { duration: 800, delay: i * 60, easing: "cubic-bezier(.5,0,.3,1)", fill: "backwards" },
       ).finished.finally(() => dot.remove());
     }
   }, [flown]);

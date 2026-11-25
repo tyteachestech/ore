@@ -1704,19 +1704,34 @@ journey("highlight: its colour arrives as dots that join (the vein), its ore fli
   const moving = () => page.evaluate(() => document.querySelectorAll(".vein, .vein-ore, .collect-fly").length);
   const tinted = (name: string) => page.evaluate((name) => (CSS.highlights.get(name)?.size ?? 0), name);
   const before = await tinted("hl-keep");
+  // Read in the page the moment the vein is drawn: a read from here a stalled runner made late found the vein
+  // gone and its tint painted, and called that "painted under the vein" (F480).
+  await page.evaluate((before) => {
+    const w = window as unknown as { __vein?: { lines: number; tinted: boolean; ms: number } };
+    delete w.__vein;
+    const seen = new MutationObserver(() => {
+      const lines = document.querySelectorAll(".vein.keep i");
+      if (!lines.length) return;
+      seen.disconnect();
+      w.__vein = { lines: lines.length, tinted: (CSS.highlights.get("hl-keep")?.size ?? 0) !== before, ms: Number(lines[0]!.getAnimations()[0]?.effect?.getComputedTiming().duration ?? 0) };
+    });
+    seen.observe(document.body, { childList: true, subtree: true });
+  }, before);
   await select(page, "Free recall, short-answer questions");
   // The dots are the tint while they sweep: the real one waits for them.
-  const at = await page.evaluate(() => ({ lines: document.querySelectorAll(".vein.keep i").length, ore: document.querySelectorAll(".collect-fly.keep").length }));
-  if (!at.lines) throw new Error("no vein over the new highlight");
-  if ((await tinted("hl-keep")) !== before) throw new Error("the tint was painted under the vein");
+  await until("a vein over the new highlight", () => page.evaluate(() => "__vein" in window), 1000);
+  const at = await page.evaluate(() => ({ ...(window as unknown as { __vein: { lines: number; tinted: boolean; ms: number } }).__vein, ore: document.querySelectorAll(".collect-fly.keep").length }));
+  if (at.tinted) throw new Error("the tint was painted under the vein");
+  // Unhurried (Tyler, 2026-11-25): the dots take a moment's time, not a panel's.
+  if (at.ms < 500) throw new Error(`the vein swept in ${at.ms}ms: snappy again`);
   await popup.waitFor();
   await until("the ore lifts off toward Collected", async () => at.ore > 0 || (await page.locator(".collect-fly.keep").count()) > 0 || (await page.locator(".collected-chip.keep").count()) > 0, 400);
-  await until("the vein has joined into the tint", async () => (await page.locator(".vein").count()) === 0 && (await tinted("hl-keep")) === before + 1, 1000);
+  await until("the vein has joined into the tint", async () => (await page.locator(".vein").count()) === 0 && (await tinted("hl-keep")) === before + 1, 2000);
   // A Key point: its ore gathers where the margin mark lands.
   await popup.locator(".intent.card").click();
   await until("the ore gathers in the margin", async () => (await page.locator(".vein-ore i").count()) > 0, 400);
   await page.locator(".mark-icon.card").first().waitFor();
-  await until("nothing is left on the page", async () => (await moving()) === 0 && (await page.locator(".mark-icon.gather").count()) === 0, 2500);
+  await until("nothing is left on the page", async () => (await moving()) === 0 && (await page.locator(".mark-icon.gather").count()) === 0, 4000);
   // Reduced motion: the highlight is simply there.
   const card = page.locator(".mark-icon.card").first();
   if (!(await popup.isVisible())) await card.click();

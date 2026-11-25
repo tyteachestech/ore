@@ -1787,7 +1787,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       const mark = page.querySelector<HTMLElement>(`.mark-icon[data-key="${CSS.escape(id)}"]`);
       if (!mark) return;
       mark.classList.add("settle");
-      setTimeout(() => mark.classList.remove("settle"), 240);
+      setTimeout(() => mark.classList.remove("settle"), 360);
     });
     const range = rangeOf(id);
     if (range) {
@@ -1801,7 +1801,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         glow.appendChild(bit);
       }
       page.appendChild(glow);
-      setTimeout(() => glow.remove(), 460);
+      setTimeout(() => glow.remove(), 740);
     }
   }
 
@@ -1832,7 +1832,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       el.remove();
       veining.current.delete(range);
       setRepaint((n) => n + 1);
-    }, motionMs("--t-4", 300) + Math.min(lines - 1, 6) * 3 * motionMs("--stagger", 16));
+    }, motionMs("--t-moment", 600) + Math.min(lines - 1, 6) * 6 * motionMs("--stagger", 16));
   }
 
   /** A highlight made a Key point (D240): loose dots lift off its words and gather in the margin, where its
@@ -1842,7 +1842,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     if (!page || !range || PHONE || still()) return;
     const rects = [...range.getClientRects()].filter((r) => r.width);
     if (!rects.length) return;
-    const fly = motionMs("--t-moment", 600) * 0.7, gap = motionMs("--stagger", 16), N = 18;
+    const fly = motionMs("--t-moment", 600), gap = motionMs("--stagger", 16), N = 18;
     // After the change renders: the margin draws the mark as the type changes.
     const easing = getComputedStyle(document.documentElement).getPropertyValue("--ease-in-out").trim() || "ease-in-out";
     let tries = 0;
@@ -1852,7 +1852,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       if (!mark) return void (++tries < 6 && requestAnimationFrame(land));
       const box = page.getBoundingClientRect(), to = mark.getBoundingClientRect();
       const tx = to.left + to.width / 2 - box.left, ty = to.top + to.height / 2 - box.top;
-      mark.style.setProperty("--land", `${fly + (N - 1) * gap * 0.5}ms`);
+      mark.style.setProperty("--land", `${fly + (N - 1) * gap}ms`);
       mark.classList.add("gather");
       const el = document.createElement("div");
       el.className = "vein-ore";
@@ -1867,14 +1867,14 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
             { transform: `translate(${x + (tx - x) * 0.35}px, ${y + (ty - y) * 0.35 - 14}px) scale(1)`, opacity: 1, offset: 0.35 },
             { transform: `translate(${tx}px, ${ty}px) scale(0.7)`, opacity: 1 },
           ],
-          { duration: fly, delay: i * gap * 0.5, easing, fill: "both" },
+          { duration: fly, delay: i * gap, easing, fill: "both" },
         );
       }
       page.appendChild(el);
       setTimeout(() => {
         el.remove();
         mark.classList.remove("gather");
-      }, fly + N * gap * 0.5 + motionMs("--t-4", 300) + 40);
+      }, fly + N * gap + motionMs("--t-4", 300) + 40);
     });
   }
 
