@@ -1,7 +1,9 @@
+import { useEffect, useRef } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ownsUndo } from "./history";
-import { BINDINGS, comboOf, IN_REVIEW, type Combo, type CommandEvent, type KeyId } from "./keys";
+import { BINDINGS, comboOf, IN_REVIEW, useKeymap, type Combo, type CommandEvent, type KeyId } from "./keys";
 
 // The Mac menu bar (Apple's apps, Things): every command with its shortcut, built from the keymap
 // so a rebinding updates the menu too, and found by name from Help ▸ Search. A menu click replays
@@ -141,9 +143,30 @@ export function runMenu(id: KeyId, keymap: Record<KeyId, Combo>, now = performan
   ((here && document.activeElement) || document.body).dispatchEvent(e);
 }
 
-export function listenMenu(keymap: () => Record<KeyId, Combo>) {
+export function listenMenu(keymap: () => Record<KeyId, Combo>, quick = false) {
   return listen<string>("menu", (e) => {
     const id = e.payload.replace(/^ore:/, "") as KeyId;
-    if (BINDINGS.some((b) => b.id === id)) runMenu(id, keymap());
+    if (!BINDINGS.some((b) => b.id === id)) return;
+    // App navigation still opens main; Review commands and history belong to this quiz.
+    if (quick && !IN_REVIEW.has(id) && id !== "undo" && id !== "redo") {
+      void invoke("menu_main", { id: e.payload }).catch(() => {});
+    } else runMenu(id, keymap());
   });
+}
+
+/** Each webview owns its commands and republishes its menu when it becomes the key window.
+ * The native setter checks focus too, so a background refresh cannot replace the active menu. */
+export function useMenu(where: Where, quick = false) {
+  const keys = useKeymap();
+  const current = useRef({ keys, where });
+  current.current = { keys, where };
+  useEffect(() => setMenu(keys, where), [keys, where.reader, where.review, where.sound]);
+  useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    const menu = listenMenu(() => current.current.keys, quick);
+    const focus = getCurrentWindow().onFocusChanged(({ payload }) => {
+      if (payload) setMenu(current.current.keys, current.current.where);
+    });
+    return () => { for (const p of [menu, focus]) void p.then((un) => un()); };
+  }, [quick]);
 }

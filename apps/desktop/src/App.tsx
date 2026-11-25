@@ -47,7 +47,7 @@ import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
 import { readGuard } from "./reads";
 import { change, type Change } from "./change";
 import { skillActions, sourceActions, statusArgs, type Lists } from "./list-actions";
-import { listenMenu, setMenu } from "./menubar";
+import { useMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
 import { askDig } from "./Dig";
@@ -718,14 +718,8 @@ export function App() {
 
   // The Mac menu bar: rebuilt when a shortcut or the screen changes, so Source and Review items
   // are greyed out where they do nothing.
-  const keysRef = useRef(keys);
-  keysRef.current = keys;
   const [sound, setSound] = useState(false);
-  useEffect(() => setMenu(keys, { reader: !!openId, review: !!reviewing, sound: !!openId && sound }), [keys, openId, reviewing, sound]);
-  useEffect(() => {
-    const un = listenMenu(() => keysRef.current);
-    return () => void un.then((f) => f());
-  }, []);
+  useMenu({ reader: !!openId, review: !!reviewing, sound: !!openId && sound });
 
   /** A skill's page (D46): its stats, skill note, questions and sources. */
   const openSkill = useCallback((id: string | null) => {
