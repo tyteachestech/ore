@@ -98,9 +98,14 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
   const assets = new Map<string, Asset>();
   // The book's own table of contents (EPUB 3 nav document) is not a chapter to read.
   const spine = Array.from(opf.getElementsByTagName("itemref"))
-    .map((ref) => manifest.get(ref.getAttribute("idref")))
-    .filter((item) => item && /html/.test(item.type) && !item.nav)
-    .map((item) => posix.join(dir, decodeURIComponent(item!.href.split("#")[0]!)));
+    .map((ref) => {
+      const id = ref.getAttribute("idref");
+      const item = manifest.get(id);
+      if (!id || !item?.href) throw new Error(`This EPUB has an unresolved chapter (${id || "unnamed"}). Download the book again or export a fresh EPUB, then add it again.`);
+      return item;
+    })
+    .filter((item) => /html/.test(item.type) && !item.nav)
+    .map((item) => posix.join(dir, decodeURIComponent(item.href.split("#")[0]!)));
   const docs = new Map(spine.map((path) => [path, parse(read(path))]));
   // The cover picture as the book names it: EPUB 3's cover-image, EPUB 2's <meta name="cover">, or a picture
   // the book calls cover (cover.jpg, id="cover", coverImage), as many older books do: cover as a word of its

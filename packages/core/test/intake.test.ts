@@ -2174,3 +2174,21 @@ describe("import coverage: other languages", () => {
     });
   });
 });
+
+test("EPUB: an unresolved spine chapter refuses the whole import with a next step", async () => {
+  const lib = await tempLibrary();
+  await expect(addSource(lib, file("unresolved-spine.epub"))).rejects.toThrow(/chapter.*download.*again/i);
+  expect(listItems(lib)).toHaveLength(0);
+});
+
+test("an empty HTML file explains how to save readable content", async () => {
+  const lib = await tempLibrary();
+  await expect(addSource(lib, file("empty.html"))).rejects.toThrow(/(empty|no (readable )?text).*(save|export|paste)/i);
+  expect(listItems(lib)).toHaveLength(0);
+});
+
+test("a ZIP named Word explains how to export a valid document", async () => {
+  const lib = await tempLibrary();
+  await expect(addSource(lib, file("not-word.docx"))).rejects.toThrow(/(Word|damaged).*(save|export|download)/i);
+  expect(listItems(lib)).toHaveLength(0);
+});
