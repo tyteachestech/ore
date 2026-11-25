@@ -536,6 +536,22 @@ describe("import coverage: files", () => {
     expect(text).not.toContain("## Spacing the practice");
   });
 
+  test("PDF: an outline that leaves off the section numbers the page prints: each section once, in the paper's order (F-new-outline-numbers)", async () => {
+    // numbered-outline.pdf (make-numbered-outline-pdf.py): a paper as LaTeX sets one. The page says "1 Introduction",
+    // the outline "Introduction", and sections 1 to 3 start on page 2. No outline title matched its line, so each
+    // went in at the top of its page, last first, above the page's own headings: Method, Background, Introduction,
+    // then "1 Introduction" (Attention Is All You Need from arXiv, the simulated learner run of 2026-11-25).
+    const it = await addSource(await tempLibrary(), file("numbered-outline.pdf"));
+    const b = it.body;
+    expect(it.meta.title).toBe("Spacing is all you need");
+    expect(b.match(/^#+ .+$/gm)).toEqual(["## Spacing is all you need", "## 1 Introduction", "## 2 Background", "## 3 Method", "## 4 Results", "## 5 Conclusion"]);
+    expect(b.match(/^<!-- chapter \d+ -->$/gm)).toEqual([1, 2, 3, 4, 5].map((n) => `<!-- chapter ${n} -->`));
+    for (const name of ["Introduction", "Background", "Method", "Results", "Conclusion"]) expect(b.match(new RegExp(`^.*\\b${name}$`, "gm"))).toHaveLength(1);
+    // Each heading sits over its own section's words, on the page that has them.
+    expect(b).toMatch(/<!-- page 2 -->\n\n<!-- chapter 1 -->\n\n## 1 Introduction\n\nEach [^#]+<!-- chapter 2 -->\n\n## 2 Background\n\nEach [^#]+<!-- chapter 3 -->\n\n## 3 Method\n\nEach /);
+    expect(b).toMatch(/<!-- page 3 -->\n\n<!-- chapter 4 -->\n\n## 4 Results\n\nEach /);
+  });
+
   test("PDF: a programming book's code keeps its lines and indents, typewriter words in a sentence are code (F65)", async () => {
     // code.pdf (make-code-pdf.py): set as LaTeX books are, prose in a serif face and code in a typewriter one.
     // It came in as prose: lines run together, indents gone, "# inside class Card:" a heading over the whole book.

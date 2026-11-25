@@ -3,6 +3,7 @@ import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grow } from "./Grow";
 import { PixelGem } from "./PixelIcon";
+import { ExerciseText } from "./ExerciseText";
 import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, PHONE, whileOut, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
@@ -494,7 +495,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           <div className="quiz-kicker">
             Question {step} of {n}
           </div>
-          <h2 className="quiz-q">{q.q}</h2>
+          <h2 className="quiz-q"><ExerciseText text={q.q} inline /></h2>
           {q.before && (
             <p className="quiz-sub">
               Before reading you wrote: <span className="quiz-before">{q.before}</span>
@@ -575,7 +576,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             </div>
           </div>
           {verdict && verdict !== "yes" && conf[qi] === 3 && <p className="quiz-sure-miss">You were sure about this one. Worth a careful look.</p>}
-          <div className="quiz-mini">{q.q}</div>
+          <div className="quiz-mini"><ExerciseText text={q.q} inline /></div>
           <p className="quiz-yours">{q.after}</p>
           {q.points && (
             <>
@@ -598,7 +599,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
                         <span className="quiz-mark wait" aria-hidden="true" />
                       )}
                       <button className="quiz-point" disabled={first < 0} onClick={() => go(first)}>
-                        {p.text}
+                        <ExerciseText text={p.text} inline />
                         {first < 0 && <span className="quiz-none">No passage found</span>}
                       </button>
                     </li>
@@ -665,7 +666,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
           {feedback && typeof feedback !== "string" && (
             <div className="feedback quiz-feedback">
               <div className="quiz-kicker">On your recall</div>
-              <p>{feedback.feedback}</p>
+              <p><ExerciseText text={feedback.feedback} inline /></p>
               {feedback.section_lines && <p className="sections">{feedback.section_lines}</p>}
               <Missed items={feedback.missed} />
             </div>
@@ -764,7 +765,7 @@ function Missed({ items }: { items?: string[] }) {
       <div className="quiz-kicker">Worth another look</div>
       <ul>
         {items.map((m, i) => (
-          <li key={i}>{m}</li>
+          <li key={i}><ExerciseText text={m} inline /></li>
         ))}
       </ul>
     </>

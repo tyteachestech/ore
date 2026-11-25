@@ -134,6 +134,8 @@ export class ReviewSession<S> {
   private ahead: { id: string; card: Promise<CardFull>; armed: boolean } | null = null;
   /** When the exercise on screen showed. */
   private shownAt = Date.now();
+  /** When Ore went out of sight, while it is. */
+  private awaySince: number | null = null;
   /** ⌘Z presses while a rating saved or the session wrapped up: they go to the history once that is
    *  done, so they take back the newest steps (that rating first), never an older card's meanwhile. */
   private waiting: { n: number; key: KeyboardEventInit } = { n: 0, key: {} };
@@ -227,9 +229,14 @@ export class ReviewSession<S> {
       }
     })();
     this.mounted = true;
+    const doc = typeof document === "undefined" ? null : document;
+    const seen = () => this.away(!!doc?.hidden);
+    doc?.addEventListener("visibilitychange", seen);
+    seen();
     return () => {
       live = false;
       this.mounted = false;
+      doc?.removeEventListener("visibilitychange", seen);
     };
   }
 
@@ -346,9 +353,20 @@ export class ReviewSession<S> {
   /** Starts the clock of the exercise on screen, `elapsed` ms in. */
   clock(elapsed = 0) {
     this.shownAt = Date.now() - elapsed;
+    if (this.awaySince !== null) this.awaySince = Date.now();
+  }
+  /** Ore went out of sight (the phone locked, another app in front of it on the phone, the window minimized) or
+   *  came back: the time between is not review time. The three-minute cap (D60) was all that held it, so a
+   *  glance at a message mid-exercise put three minutes on the day's goal. */
+  away(hidden: boolean) {
+    if (hidden) this.awaySince ??= Date.now();
+    else if (this.awaySince !== null) {
+      this.shownAt += Math.max(0, Date.now() - this.awaySince);
+      this.awaySince = null;
+    }
   }
   /** A wall clock set back since it showed (a time zone fix, a sync) never makes it negative (F183). */
-  private elapsed = () => Math.max(0, Date.now() - this.shownAt);
+  private elapsed = () => Math.max(0, (this.awaySince ?? Date.now()) - this.shownAt);
 
   /** One write on the exercise on screen (an edit, a version dropped): nothing else starts until it is done.
    *  False if one is already out. */

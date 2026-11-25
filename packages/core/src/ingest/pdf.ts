@@ -676,17 +676,32 @@ async function outlineOf(doc: Doc): Promise<{ title: string; page: number }[]> {
 
 /** Each outline entry becomes a chapter: a `<!-- chapter N -->` marker and a `## title` where its
  *  page has the title's line (or at the page's top), so chapter recall and the outline rail see the
- *  chapters the author made. An outline of one entry, or out of page order, is not a table of chapters. */
+ *  chapters the author made. An outline of one entry, or out of page order, is not a table of chapters.
+ *  A paper prints "1 Introduction" where its outline says "Introduction": the line is found with or without
+ *  its section number and the heading keeps the page's words, number and all. Entries with no line of their own
+ *  go at the page's top in the outline's order (they went in last first, above the page's own headings). */
 function markChapters(paras: { text: string; note: boolean }[][], outline: { title: string; page: number }[]) {
   if (outline.length < 2 || outline.some((e, i) => e.page >= paras.length || (i > 0 && e.page < outline[i - 1]!.page))) return;
-  const fold = (t: string) => plain(t).replace(/^#+\s*/, "").replace(/[*_]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const words = (t: string) => plain(t).replace(/^#+\s*/, "").replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
+  const fold = (t: string) => words(t).toLowerCase();
+  const bare = (t: string) => t.replace(/^\d+(\.\d+)*\.?\s+(?=\S)/, "");
+  const atTop = new Map<number, number>();
   outline.forEach((e, n) => {
     const page = paras[e.page]!;
-    const want = fold(e.title).slice(0, 40);
-    const at = page.findIndex((p) => !p.note && !isBlock(p.text) && (fold(p.text).startsWith(want) || (fold(p.text).length >= 3 && want.startsWith(fold(p.text)))));
-    const head = { text: `<!-- chapter ${n + 1} -->\n\n## ${e.title}`, note: false };
-    if (at >= 0 && fold(page[at]!.text).length <= want.length + 3) page[at] = head;
-    else page.splice(Math.max(0, at), 0, head);
+    const want = bare(fold(e.title)).slice(0, 40);
+    const fits = (t: string) => [fold(t), bare(fold(t))].some((got) => got.startsWith(want) || (got.length >= 3 && want.startsWith(got)));
+    const at = page.findIndex((p) => !p.note && !isBlock(p.text) && !p.text.startsWith("<!-- chapter ") && fits(p.text));
+    const line = at >= 0 && bare(fold(page[at]!.text)).length <= want.length + 3 ? page[at]!.text : null;
+    // The page's own line, when all it adds is the section number.
+    const title = line !== null && fold(line) !== fold(e.title) && bare(fold(line)) === bare(fold(e.title)) ? words(line) : e.title;
+    const head = { text: `<!-- chapter ${n + 1} -->\n\n## ${title}`, note: false };
+    if (line !== null) page[at] = head;
+    else if (at >= 0) page.splice(at, 0, head);
+    else {
+      const top = atTop.get(e.page) ?? 0;
+      page.splice(top, 0, head);
+      atTop.set(e.page, top + 1);
+    }
   });
 }
 

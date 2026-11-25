@@ -24,6 +24,7 @@ import { Finish, type Reveal } from "./Finish";
 import { Grow } from "./Grow";
 import { breakList, bulletOnSpace, fromBullets, showBullets } from "./list-keys";
 import { HideDots } from "./HideDots";
+import { ExerciseText } from "./ExerciseText";
 import { Hint } from "./Hint";
 import { Thumb, thumbSrc } from "./Thumb";
 import { useNowPlaying } from "./now-playing";
@@ -4068,11 +4069,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                     )}
                     {chapterFb.feedback && (
                       <>
-                        <p>{chapterFb.feedback.feedback}</p>
+                        <p><ExerciseText text={chapterFb.feedback.feedback} inline /></p>
                         {chapterFb.feedback.missed.length > 0 && (
                           <ul>
                             {chapterFb.feedback.missed.map((m, i) => (
-                              <li key={i}>{m}</li>
+                              <li key={i}><ExerciseText text={m} inline /></li>
                             ))}
                           </ul>
                         )}
@@ -4183,7 +4184,7 @@ function ReadingFor({ qs, onOpen }: { qs: NonNullable<Doc["prequestions"]>; onOp
           <ol>
             {qs.map((q, i) => (
               <li key={i}>
-                {q.q}
+                <ExerciseText text={q.q} inline />
                 {q.before && <span>{q.before}</span>}
               </li>
             ))}
@@ -4216,7 +4217,7 @@ function PhoneReadingFor({ qs, onOpen }: { qs: NonNullable<Doc["prequestions"]>;
                 {qs.map((q, i) => (
                   <button key={i} className="pick-row" onClick={() => { close(); onOpen(); }}>
                     <span className="name">
-                      {q.q}
+                      <ExerciseText text={q.q} inline />
                       {q.before && <span>{q.before}</span>}
                     </span>
                   </button>
@@ -4354,7 +4355,7 @@ function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
                   }}
                 >
                   {done ? <Check className="preq-icon" size={16} weight="bold" aria-label="Answered" /> : <PixelQuestion className="preq-icon" size={12} aria-hidden="true" />}
-                  <span className="preq-text">{q.q}</span>
+                  <span className="preq-text"><ExerciseText text={q.q} inline /></span>
                   {done && at !== i && <span className="preq-said">{saved[i]}</span>}
                 </button>
                 {at === i && (

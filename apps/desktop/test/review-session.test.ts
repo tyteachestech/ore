@@ -475,3 +475,37 @@ test("a session that can't be opened again after an end-screen Undo still takes 
   expect(t.s.done).toBe(1);
   t.stop(); t.s.gone();
 });
+
+test("time with Ore out of sight is not review time: an hour in the background adds nothing to the exercise's clock (F-new-away-time)", async () => {
+  const t = await open();
+  const real = Date.now;
+  let now = real();
+  Date.now = () => now;
+  try {
+    t.s.clock();
+    now += 20_000;
+    t.s.away(true);
+    now += 3_600_000;
+    t.s.away(false);
+    now += 10_000;
+    await t.rate("a");
+    expect(t.wrote("review")[0]).toContain("--elapsed-ms=30000");
+    expect(t.s.activeMs).toBe(30_000);
+    // Rated while still out of sight (a key from a script, the quick quiz closing): the time away so far is left out too.
+    t.s.clock();
+    now += 5_000;
+    t.s.away(true);
+    now += 600_000;
+    await t.rate("b");
+    expect(t.wrote("review")[1]).toContain("--elapsed-ms=5000");
+    // The next exercise showed while he was away: its clock starts when he is back.
+    t.s.clock();
+    now += 600_000;
+    t.s.away(false);
+    now += 2_000;
+    await t.rate("c");
+    expect(t.wrote("review")[2]).toContain("--elapsed-ms=2000");
+  } finally {
+    Date.now = real;
+  }
+});
