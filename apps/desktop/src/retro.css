@@ -261,9 +261,9 @@
    STANDARDS); `translate` and `scale` compose with the inline positioning transforms. */
 .popup.leaving { pointer-events: none; transition: opacity var(--t-2) var(--ease-out), translate var(--t-2) var(--ease-out), scale var(--t-2) var(--ease-out); }
 .popup.leaving.gone { opacity: 0; translate: 0 -6px; scale: 0.97; }
-.mark-icon.settle { animation: settle-pop 180ms steps(3, jump-end); }
+.mark-icon.settle { animation: settle-pop 300ms steps(3, jump-end); }
 @keyframes settle-pop { 0% { scale: 0.6; } 50% { scale: 1.25; } 100% { scale: 1; } }
-.settle-glow { position: absolute; inset: 0; pointer-events: none; opacity: 0; animation: settle-glow 420ms var(--ease-out); --glow: var(--keep); }
+.settle-glow { position: absolute; inset: 0; pointer-events: none; opacity: 0; animation: settle-glow 700ms var(--ease-out); --glow: var(--keep); }
 .settle-glow.card { --glow: var(--card); } .settle-glow.question { --glow: var(--question); } .settle-glow.apply { --glow: var(--apply); }
 .settle-glow i { position: absolute; background: var(--glow); border-radius: 2px; }
 @keyframes settle-glow { 0% { opacity: 0; } 35% { opacity: 1; } 100% { opacity: 0; } }
@@ -276,11 +276,11 @@
 .home-day.off i { background: var(--bg); box-shadow: inset 0 0 0 2px var(--border); }
 
 /* The vein (D240): a new highlight's colour arrives as dots that sweep along each line, swell and join into the
-   tint. `--vein-r` is a dot's radius; past 4.4px the dots of a 6px grid have joined and the line is its tint. */
+   tint, unhurried (Tyler, 2026-11-25: slower). `--vein-r` is a dot's radius; past 4.4px the dots of a 6px grid have joined and the line is its tint. */
 @property --vein-r { syntax: "<length>"; inherits: false; initial-value: 4.4px; }
 .vein { position: absolute; inset: 0; pointer-events: none; --tint: var(--keep); }
 .vein.card { --tint: var(--card); } .vein.question { --tint: var(--question); } .vein.apply { --tint: var(--apply); }
-.vein i { position: absolute; background: radial-gradient(circle, var(--tint) var(--vein-r), transparent calc(var(--vein-r) + 0.6px)) 0 50% / 6px 6px; animation: vein-sweep var(--t-4) var(--ease-out) both, vein-swell var(--t-4) var(--ease-in-out) both; animation-delay: calc(var(--i, 0) * 3 * var(--stagger)); }
+.vein i { position: absolute; background: radial-gradient(circle, var(--tint) var(--vein-r), transparent calc(var(--vein-r) + 0.6px)) 0 50% / 6px 6px; animation: vein-sweep var(--t-moment) var(--ease-out) both, vein-swell var(--t-moment) var(--ease-in-out) both; animation-delay: calc(var(--i, 0) * 6 * var(--stagger)); }
 @keyframes vein-sweep { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
 @keyframes vein-swell { from { --vein-r: 1.2px; } 40% { --vein-r: 2.1px; } to { --vein-r: 4.4px; } }
 /* A Key point's ore (D240): loose dots that lift off the words and gather where its margin mark lands. */
