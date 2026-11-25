@@ -18024,7 +18024,7 @@ journey("phone: a pinned source moves up among the pinned from its long press, w
   await page.keyboard.press("Meta+z");
   await until("Undo put it back", async () => (await order()) === "AT");
 }, "phone");
-journey("phone: Undo of a filing under an archived skill archives the skill again, as on the Mac (F-new-phone-refile-revived)", async (page) => {
+journey("phone: Undo of a filing under an archived skill archives the skill again, as on the Mac (F617)", async (page) => {
   // Architecture review 2026-11-24 (2): the phone's own copy of the Mac's refile left the skill it had brought back.
   type Core = { run: <T>(args: string[], input: string | null) => Promise<T> };
   const run = <T,>(...args: string[]) => page.evaluate(async (args) => ((await import("/src/phone/core.ts" as string)) as Core).run<unknown>([...args, "--json"], null), args) as Promise<T>;
