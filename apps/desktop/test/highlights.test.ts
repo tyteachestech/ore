@@ -198,9 +198,11 @@ test("a note that fails to save is kept for the next time its highlight opens", 
   expect(t.steps.at(-1)).toMatchObject({ kind: "error" });
   expect(t.steps.at(-1)!.message).toContain("Your note is kept");
 
-  // Saved the next time: the kept draft goes, and the step is on the history only once it has landed.
+  // The failed step was forgotten. Retrying registers a held step immediately.
   const again = t.hl.setNote("a", "new words");
-  expect(t.steps.length).toBe(1);
+  expect(t.steps[0]!.forgotten).toBe(true);
+  expect(t.steps.filter((s) => s.undo && !s.forgotten)).toHaveLength(1);
+  expect(t.steps.at(-1)!.held).toBeInstanceOf(Promise);
   (await t.last("annotate a --note=new words")).ok();
   await again;
   expect(t.unsaved.has("a")).toBe(false);
@@ -501,4 +503,58 @@ test("the closing count waits for every change still saving, the ones begun mean
   await tick();
   await tick();
   expect(done).toBe(true);
+});
+
+test("Undo after removing a highlight restores it with the note that was still saving", async () => {
+  const t = open([ann("a")]);
+  const note = t.hl.setNote("a", "valuable note");
+  await tick();
+  const removed = t.hl.remove("a");
+  t.sent[0]!.ok();
+  (await t.last("annotate a --status deleted")).ok();
+  await Promise.all([note, removed]);
+  const newest = t.steps.filter((s) => s.undo && !s.forgotten).at(-1)!;
+  expect(newest.message).toBe("Highlight removed");
+  const undo = newest.undo!();
+  (await t.last("annotate a --status open --intent keep --note=valuable note")).ok();
+  await undo;
+  expect(t.hl.find("a")?.note).toBe("valuable note");
+});
+
+for (const field of ["intent", "note"] as const) {
+  test(`a failed earlier highlight ${field} edit leaves the newer successful edit visible`, async () => {
+    const t = open([ann("failure-" + field)]);
+    const id = "failure-" + field;
+    const first = field === "intent" ? t.hl.setIntent(id, "card") : t.hl.setNote(id, "first note");
+    await tick();
+    const second = field === "intent" ? t.hl.setIntent(id, "question") : t.hl.setNote(id, "final note");
+    t.sent[0]!.fail("first annotation refused");
+    await first; await tick();
+    t.sent[1]!.ok(); await second;
+    expect(t.hl.find(id)?.[field]).toBe(field === "intent" ? "question" : "final note");
+    expect(t.unsaved.size).toBe(0);
+  });
+}
+
+test("a failed highlight type edit cannot roll back a later choice of the same type", async () => {
+  const t = open([ann("same-type")]);
+  const first = t.hl.setIntent("same-type", "card"); await tick();
+  const second = t.hl.setIntent("same-type", "question");
+  const third = t.hl.setIntent("same-type", "card");
+  t.sent[0]!.fail("first refused"); await first; await tick();
+  t.sent[1]!.ok(); await second; await tick();
+  t.sent[2]!.ok(); await third;
+  expect(t.hl.find("same-type")?.intent).toBe("card");
+});
+
+test("an older note failure on a stand-in cannot hide an edit under its saved id", async () => {
+  const t = open();
+  const { save } = making(t, "pending-edit");
+  const first = t.hl.setNote("pending-edit", "first note");
+  save.ok(ann("saved-edit")); await tick();
+  const second = t.hl.setNote("saved-edit", "latest note");
+  t.sent[1]!.fail("first refused"); await first; await tick();
+  t.sent[2]!.ok(); await second;
+  expect(t.hl.find("saved-edit")?.note).toBe("latest note");
+  expect(t.unsaved.size).toBe(0);
 });
