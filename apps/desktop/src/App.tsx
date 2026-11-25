@@ -1557,7 +1557,7 @@ export function App() {
   /** A source row's title edited in place. False when the write failed (and a toast said why), so the field keeps what he typed. */
   const retitle = sourceList.retitle;
 
-  const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id };
+  const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id, priority: "P2" };
 
   /** Archives a source (hidden from lists and search, files and cards kept), with Undo: out of the reader too. */
   const archiveSource = (item: Item) => {

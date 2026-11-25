@@ -257,7 +257,7 @@ export function skillActions(env: Lists) {
   };
 
   /** Writes a skill's importance or archived flag (D173) at once, then saves through `ore`. */
-  type Patch = Pick<Skill, "priority" | "archived">;
+  type Patch = Partial<Pick<Skill, "priority" | "archived">>;
   const set = (message: string, kind: "info" | "quiet", id: string, before: Patch, after: Patch) =>
     env.skillChange({
       message,

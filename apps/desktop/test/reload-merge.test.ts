@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mergeAnns } from "../src/anns";
+import { mergeAnns } from "../src/highlights";
 import type { Annotation } from "../src/ore";
 import { singleFlight } from "../src/util";
 

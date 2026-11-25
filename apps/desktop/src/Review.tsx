@@ -687,7 +687,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   }, []);
 
   const left = queue?.length ?? 0;
-  const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id };
+  const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id, priority: "P2" };
   // D246: the gem he sees before he rates never shows what a Good would win. A Fact exercise, rated by him
   // alone, shows none; a nearly cut one reads as growing. People just short of a goal overstate (Schweitzer 2004),
   // and a generous Good here costs the memory the gem stands for.

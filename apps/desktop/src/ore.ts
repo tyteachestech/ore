@@ -4,6 +4,10 @@ import { foundIn } from "./search-landing";
 import { answersWithAi } from "./ai-commands";
 import { siteOf } from "./details";
 import { wakeOpenScreens } from "./util";
+// What each `ore` command answers is described once, where it is built (packages/cli/src/answers.ts): a field
+// renamed there is a type error here, never a value that silently reads as empty.
+import type { Annotation, CardFull, DueEntry, Intent, Item, SearchHit, Skill, SkillColor, Status, Strength } from "../../../packages/cli/src/answers";
+export type * from "../../../packages/cli/src/answers";
 
 /** The iPhone build (`ORE_PHONE=1 vite build`, apps/phone). */
 export const PHONE = import.meta.env.VITE_PHONE === "1";
@@ -51,7 +55,6 @@ export function wakesScreens(args: string[]): boolean {
   if (args[0] === "edit") return has("--title") || has("--skills");
   return args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"));
 }
-
 
 /** Whether a command's answer is one the app reads (an AI reply, a grade, a check), which the CLI always prints as
  *  an object. Empty output, from a run that ended without printing (or the mock's AI-off null), comes back as
@@ -162,89 +165,11 @@ export const cancelOre = (job: string): Promise<void> => invoke<void>("ore_cance
  *  (a Markdown list), so free text always goes in this form. */
 export const opt = (name: string, value: string) => `--${name}=${value}`;
 
-export type Status = "inbox" | "reading" | "done";
 /** The two source tabs (D28): To read holds inbox (not opened yet) and reading (started) sources. */
 export type Tab = "toread" | "done" | "archived";
 /** Archived sources come from `ore ls --archived`, never from the main list, so no status is in that tab. */
 export const inTab = (s: Status, tab: Tab) => tab !== "archived" && (tab === "done") === (s === "done");
-export type Intent = "keep" | "card" | "question" | "apply";
 export const INTENTS: Intent[] = ["keep", "card", "question", "apply"];
-
-/** A passage of the body that supports a key point, anchored like a highlight (D56). */
-export type Evidence = { exact: string; prefix: string; suffix: string; start: number; end: number };
-type KeyPoint = { text: string; evidence: Evidence[] };
-/** `confidence` 1 guess, 2 think so, 3 sure; `check.covered` has one mark per key point (D53 to D56). */
-/** `skipped`: not part of this finish (D100), its answer past where he stopped or left out by his note. */
-export type Prequestion = { q: string; before?: string; after?: string; confidence?: number; points?: KeyPoint[]; check?: { covered: boolean[]; edited?: boolean }; skipped?: "past" | "left_out" };
-
-export type Item = {
-  id: string;
-  type: string;
-  title: string;
-  author?: string;
-  /** The date it was published, as its page, file or feed gave it ("2024-12-19", "2024"). */
-  published?: string;
-  url?: string;
-  /** A page that plays a video (D92): the video's link; the page's link is `url`. */
-  video?: string;
-  /** Absolute paths: the item's folder and the original kept at capture (source.pdf, …), if any. */
-  dir: string;
-  source_file?: string;
-  /** `ore show`: Reimport has an original to read again, a link or a file's kept copy (D93). */
-  reimport?: boolean;
-  /** Absolute path of thumbnail.* beside doc.md (D77), if the source has one. */
-  thumbnail?: string;
-  captured_at: string;
-  status: Status;
-  /** A Feed post being read, not saved: a highlight or a note line keeps it. */
-  preview?: string;
-  /** A chat he had with an AI, brought in from its shared page: whose it is. */
-  chat?: "claude";
-  /** Archived: hidden from lists and search (only in the Archived tab). */
-  archived_at?: string;
-  /** How much it matters, set by him over its skills' importance; unset, its exercises follow its skills. */
-  priority?: Priority;
-  /** Pinned: listed first, under Pinned. */
-  pinned_at?: string;
-  /** Last opened in the reader (D110). */
-  opened_at?: string;
-  /** When it was finished: kept on its way to Done. */
-  finished_at?: string;
-  /** A PDF's tables or formulas that read as plain text until the optional reader reads them (D125). */
-  structure?: ("tables" | "formulas")[];
-  /** What the device that added it couldn't bring in (a video's transcript on the iPhone, D235). */
-  owed?: "transcript"[];
-  owed_error?: string;
-  /** `ore show`, for one with a part owed: whether this device fills it, or the Mac must. */
-  fills_here?: boolean;
-  /** `ore show`: being read now, or read; why the last reading failed; whether the reader is installed. */
-  tables?: "reading" | "read";
-  /** The step a PDF's tables read took, for its Undo (`ore reimport --undo --step`). */
-  tables_step?: string;
-  tables_error?: string;
-  tables_reader?: boolean;
-  /** An episode whose own page is kept and whose text isn't in it yet (D219): one click adds it. */
-  page_text?: boolean;
-  skills: string[];
-  suggested_skill?: { name: string; hook?: string };
-  prequestions?: Prequestion[];
-  enriched_at?: string;
-  /** Why background enrich failed, while the source has never been enriched. */
-  enrich_error?: string;
-  /** Added with no enrich on its way (`ore add --no-enrich`): nothing is writing its prequestions. */
-  enrich_skipped?: boolean;
-  recall?: { text: string; at: string; feedback?: string };
-  chapter_recalls?: ChapterRecall[];
-  /** From `ore ls`: how many words its text holds, for the time left to read it (D341). */
-  words?: number;
-  /** From `ore ls`: the source note (notes.md) has text. */
-  has_notes?: boolean;
-  /** A lesson of a course (D79): the course's id, title and link, and the lesson's place in it (from 1). */
-  course?: Course;
-  /** From `ore ls`, on the lesson that holds it: the course's own picture (its page's og:image). */
-  course_cover?: string;
-};
-type Course = { id: string; title: string; part: number; url?: string };
 
 /** A course's lessons among `items`, in course order. */
 export const lessonsOf = (items: Item[], course: string): Item[] =>
@@ -278,82 +203,8 @@ export function searchFieldsOf(items: Item[], skills: Pick<Skill, "id" | "name">
 const siteName = (site?: string) => site?.replace(/\.[^.]+$/, "");
 /** The lesson to open next: the first one not done (null when all are). */
 export const nextLesson = (lessons: Item[]): Item | null => lessons.find((l) => l.status !== "done") ?? null;
-/** EPUB chapter recall (D18); `n` is the number in the body's `<!-- chapter N -->` marker. */
-type ChapterRecall = { n: number; text: string; at: string; feedback?: ChapterFeedback };
-/** `section_lines`: one line on his section lines (D32), null when he wrote none in that range. */
-export type ChapterFeedback = { feedback: string; missed: string[]; section_lines?: string | null };
 
-export type Annotation = {
-  id: string;
-  /** Set on the highlight that kept a Feed post as a source. */
-  kept_from_feed?: boolean;
-  rev: number;
-  intent: Intent;
-  exact: string;
-  prefix: string;
-  suffix: string;
-  start: number;
-  end: number;
-  note?: string;
-  status: string;
-  anchor?: { start: number; end: number; method: string } | null;
-  /** Card here: a line he typed with nothing selected; `exact` is only the sentence where he was. */
-  point?: boolean;
-  /** He opened Explain on it: a term he didn't know, weighed by the plan (D318). */
-  looked_up?: boolean;
-  /** Apply (D127): how it went, written when he checked the try off. */
-  reflection?: string;
-  /** Apply (D148): the rounds before this one, oldest first, each with his plan and how it went. */
-  uses?: { ts: string; plan?: string; reflection?: string }[];
-};
-
-/** `ore tries`: an Apply highlight (D127), a technique he plans to try on his own work; `note` is what
- *  he'll do and `when` its cue; status "done" means it is his. With `--skill`, one open try is `active`. */
-/** The mole's one line on how a use went (AI). */
-export type TryLine = { text: string };
-export type Try = Annotation & { item: string; ts: string; item_title: string; when?: string; obstacle?: string; section?: string; active?: boolean; done_at?: string; picked?: string; line?: TryLine; uses?: { ts: string; plan?: string; reflection?: string; when?: string; line?: TryLine }[] };
-
-/** `ore questions`: a Question-intent highlight (D47); status "done" means answered. `answers` is his
- *  answer so far, piece by piece, each naming the source he wrote it from; `matches` the sources that
- *  may answer it (D75). With `--item`, `here` says why it is listed for that source. */
-export type Question = Annotation & {
-  item: string;
-  ts: string;
-  item_title: string;
-  answers: { ts: string; text: string; item?: string; item_title?: string; quote?: string }[];
-  matches: { item: string; title: string; quote?: string; start?: number }[];
-  here?: "match" | "from" | "skill";
-};
-
-/** `ore stats --skill`: one row; retention is null below 10 reviews (D23). */
-export type SkillStats = {
-  skill: string;
-  items_read: number;
-  cards_live: number;
-  reviews: number;
-  retention: number | null;
-  strength: Strength;
-  /** Solid memories at each of the last 12 week ends, oldest first. */
-  growth: { week_end: string; solid: number }[];
-};
-
-/** `ore research`: 3–5 sources for a highlight (D17); nothing is added until he picks one. */
-export type Research = { sources: { title: string; url: string; site: string; type: string; why: string; minutes?: number | null }[] };
-
-/** `ore show` on a YouTube source: the video and each transcript word's start time, `[seconds, word]`, in body order (D49). */
-export type Transcript = { video: string; words: [number, string][] };
-
-/** `reached` and `leave_out`: what his last partway finish covered (D100). */
-export type Doc = Item & { body: string; annotations?: Annotation[]; transcript?: Transcript | null; audio?: { file: string; words: [number, string][] }; reached?: number; leave_out?: { text: string } };
-
-export const SKILL_COLORS = ["gray", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink"] as const;
-export type SkillColor = (typeof SKILL_COLORS)[number];
-/** `collection` groups skills in the sidebar. */
-/** `hook` is his one line on why he is learning it (D63); `goal` what he could show he can do (D101). */
-export type Priority = "P1" | "P2" | "P3";
-export type Skill = { id: string; name: string; priority?: Priority; archived?: boolean; hook?: string; goal?: string; icon?: string; color?: SkillColor; collection?: string };
-
-export type SearchHit = { kind: string; ref: string; item?: string; title: string; snippet?: string; annotation?: string };
+export const SKILL_COLORS = ["gray", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink"] as const satisfies readonly SkillColor[];
 
 /** Where a search match lands in its source (Reader's `jumpTo`), for ⌘K and a list's search alike: the words in
  *  its text (those its snippet shows, then the passage they sit in on a line of its own: `foundIn`), a
@@ -365,71 +216,9 @@ const inText = (h: SearchHit, query: string) => {
 export const landing = (h: SearchHit, query: string): string | undefined =>
   h.kind === "item" ? inText(h, query) : h.kind === "notes" ? `note:${query}` : h.kind === "annotation" ? `ann:${h.ref}` : h.annotation && `ann:${h.annotation}`;
 
-/** `ore notes`: a source note or a skill note (notes.md) as it now is; `dir` is its folder, absolute. */
-export type Notes = { kept_from_feed?: boolean; item?: string; skill?: string; text: string; path: string; dir: string };
-
-/** `ore backlinks`: a line in another note that links here (D39). */
-export type Backlink = { from: { kind: "item" | "skill"; id: string; title: string }; heading: string | null; line: string };
-
-/** `ore diagram`: a scene in Excalidraw's file format beside a note (D40, D103); `scene` is null until first saved. */
-export type Diagram = { item?: string; skill?: string; name: string; path: string; scene: { type: "excalidraw"; elements: unknown[]; files?: Record<string, unknown>; [k: string]: unknown } | null };
-
-export type Feedback = { item: string; feedback: string; questions?: { n: number; feedback: string }[]; missed?: string[]; section_lines?: string | null };
-
 export const loadSkills = () => ore<Skill[]>("skills");
 
 export const visible = (a: Annotation) => a.status !== "deleted";
-
-/** `ore today` (D58, D60): the daily goal, what is due, this week, and each skill's due cards and strength. */
-export type Today = {
-  goal_minutes: number;
-  weekdays_only: boolean;
-  new_per_day: number;
-  counts: boolean;
-  active_ms: number;
-  goal_ms: number;
-  met: boolean;
-  caught_up: boolean;
-  due: number;
-  new_today: number;
-  new_waiting: number;
-  /** Exercises he has, live or draft: none means a first day, not "caught up". */
-  exercises: number;
-  /** Of `due`, the exercises filed under no skill: What to review's "No skill" row (D204). */
-  no_skill_due: number;
-  estimate_ms: number;
-  /** Today's slice: the most urgent cards that fit what is left of the goal (D65). */
-  slice_ms: number;
-  /** "After <plan>, I review." ("" for none) and the reminder time, "HH:MM" or "" (D67). */
-  plan: string;
-  reminder: string;
-  week: { date: string; status: "met" | "open" | "off"; active_ms: number }[];
-  days_met: number;
-  skills: ({ skill: string; due: number } & Omit<Strength, "explain">)[];
-  /** Sources whose doc.md can't be read, and why (files-10): they drop out of every list. */
-  unreadable: { dir: string; error: string }[];
-};
-
-/** A skill's strength (D62, D63): solid = live cards with stability of 21 days or more. `level`
- *  comes from the most solid memories it ever had, so it never drops; `win_back` were solid once. */
-export type Strength = {
-  solid: number;
-  growing: number;
-  /** Growing cards that become solid if he recalls them at their next review (D90). */
-  ready: number;
-  ready_today: number;
-  new: number;
-  win_back: number;
-  /** Gem grades (D197), each solid gem once: polished on a new case, or missed once and won back. */
-  mended: number;
-  polished: number;
-  /** How long his live memories now last, in days, added up. */
-  depth: number;
-  peak: number;
-  level: number;
-  next_level_at: number;
-  explain: { id: string; question: string }[];
-};
 
 /** Where the next level stands, framed from the last level until halfway and from the goal after
  *  (D63: motivation sags in the middle when it is counted from one end only). */
@@ -440,41 +229,6 @@ export function levelProgress(k: Pick<Strength, "solid" | "level" | "next_level_
   const share = Math.max(0, Math.min(1, since / Math.max(1, k.next_level_at - from)));
   return { share, line: k.level > 0 && since > 0 && since < left ? `${since} since level ${k.level}` : `${left} to level ${k.level + 1}` };
 }
-
-/** `ore due`: one card in queue order. `card` is a Fact, `prompt` an Explain (D43). */
-export type DueEntry = { id: string; kind: "card" | "prompt"; state: "draft" | "live"; item: string; skills: string[]; question: string; relearn: boolean; /** null: never reviewed. */ due?: string | null; /** His chance of recalling it now, 0 to 1. */ retrievability?: number };
-
-/** `ore card show`. */
-export type CardFull = {
-  id: string; kind: "card" | "prompt"; state: "draft" | "live" | "retired"; item: string; annotation?: string;
-  /** D118: the other highlights it was planned from. */
-  also?: string[];
-  question: string; answer: string; rubric: string[];
-  /** A remixed version shown in review (D66), with the card it stands in for. */
-  variant?: string; original?: { question: string; answer: string; rubric: string[] };
-  /** Review may offer "In my head" (D68): an Explain card he has passed twice. */
-  in_head_ok?: boolean;
-  /** A card from a line he typed (Card here, D99): the passages that answer it, found in the source. */
-  evidence?: { exact: string; start: number; end: number }[];
-  /** A card from part of a figure (D166): the image as the source names it and the box hidden in review, as
-   *  fractions of its size; `figure_file` is where the image is (show only). */
-  figure?: { src: string; box: [number, number, number, number] };
-  figure_file?: string;
-  /** The folder of its source, where the images its text names are (show and set; absent when the source is gone). */
-  source_dir?: string;
-  /** Its reviews and where each rating puts the next one (D149): every `card show` and `card set`. */
-  history?: CardHistory;
-};
-/** A card's gem (D236); `seam`: missed and won back, `polished`: passed on a new case. */
-export type CardGem = { kind: "empty" | "rough" | "ready" | "cut" | "dull"; seam?: boolean; polished?: boolean };
-/** `gem`: as it is now and as each rating would leave it, with the days of memory that rating adds. */
-export type CardHistory = { reviews: { ts: string; rating: 1 | 2 | 3 | 4 }[]; next: Record<1 | 2 | 3 | 4, string>; gem?: CardGem & { after: Record<1 | 2 | 3 | 4, CardGem & { days: number }> } };
-
-/** `ore grade`: a proposed rating (never logged by itself, D21) and one mark per rubric point, with the words
- *  of his answer that earned each covered one ("" for none; absent from a grade made before D141). */
-/** Each of a source's exercises and its skills, as `ore edit --skills` gave them before (cards_before): passed back as --cards for Undo. */
-export type CardSkills = Record<string, string[]>;
-export type Grade = { rating: 1 | 2 | 3 | 4; gaps: string[]; feedback: string; covered: boolean[]; evidence?: string[]; ai?: { vendor: string; model: string; prompt_version: string } };
 
 /** `ore session end` (D62). */
 /** The end screen says how many were rescued only when they are a minority of the session: over a backlog
@@ -541,28 +295,6 @@ export function depthParts(days: number): { n: string; unit: string } {
   if (n < 730) return { n: String(Math.round(n / 30.44)), unit: "months" };
   return { n: (n / 365.25).toFixed(1).replace(/\.0$/, ""), unit: "years" };
 }
-
-export type SessionEnd = {
-  id: string; reviews: number; kept: number; rescued: number; caught_up?: boolean;
-  /** The longest gap, in days, he recalled a card across this session (D177). */
-  longest_days?: number;
-  /** Cards that became solid this session, as each one's first skill (D90): one cut gem each. */
-  cut?: string[];
-  /** Per cut gem, its grade (D197): mended (won back after a miss) or polished (passed as a remix); absent when all are plain. */
-  grades?: ("cut" | "mended" | "polished")[];
-  /** Gems cut before this session and polished in it, as each one's first skill (D197). */
-  polished?: string[];
-  /** How much longer the exercises he passed now last, in days added up (D197). */
-  depth_days?: number;
-  /** Memories kept this session by skill, most first; absent when none was kept. */
-  kept_skills?: { skill: string; n: number }[];
-  /** The part of `depth_days` earned after the day's goal closed (D246). */
-  depth_extra_days?: number;
-  /** Then and now (D248), at most once in four weeks: an exercise he missed or guessed weeks ago and passed now, with both answers. */
-  then_now?: { card: string; question: string; then_ts: string; then: string; now: string };
-  /** On the week's first end screen (D69): of Explain answers marked Sure, the share the key-point check passed. */
-  calibration?: { sure_n: number; sure_right: number; levels: { confidence: 1 | 2 | 3; n: number; right: number | null }[] } | null;
-};
 
 /** When he last added or opened a source: To read lists the last touched first (D110). */
 export const touched = (i: Pick<Item, "captured_at" | "opened_at">) => (i.opened_at && i.opened_at > i.captured_at ? i.opened_at : i.captured_at);
