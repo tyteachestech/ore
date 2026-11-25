@@ -1,3 +1,4 @@
+import { skillDir } from "./skill-path.ts";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, join, relative } from "node:path";
 import { diff3Merge } from "node-diff3";
@@ -79,7 +80,7 @@ export function sectionLines(notes: string): { heading: string; text: string }[]
 }
 
 // Skill notes (D41): skills/<skill-id>/notes.md, one per skill, his writing only.
-export const skillNotesPath = (lib: Library, skill: string) => join(paths.skillNotes(lib), skill, "notes.md");
+export const skillNotesPath = (lib: Library, skill: string) => join(skillDir(lib, skill), "notes.md");
 
 // Which note: a source note (an item ref) or a skill's note.
 export type NoteRef = string | { skill: string };
