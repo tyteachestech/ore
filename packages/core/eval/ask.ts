@@ -51,7 +51,7 @@ export const REWRITTEN = new Set(["web-academy-lesson", "web-discourse", "web-hn
 
 /** Goldens that pin one import fix each (a merged table, a code page; `office-*`, deep scan 5): a few
  *  lines apiece, not sources the questions are over. Fourteen of them moved the search's word weights
- *  enough to drop a two-source question's video from the eight sources a search keeps (F-new-ds5-ask-eighth-source). */
+ *  enough to drop a two-source question's video from the eight sources a search keeps (F728). */
 const IMPORT_SAMPLE = /^office-/;
 
 /** Each golden doc.md as a source in the library; returns item id → golden name. */
