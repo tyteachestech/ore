@@ -1219,3 +1219,17 @@ journey("phone: a book's publisher pages sit under one shut row a finger can hit
     await page.locator(".figure-view.open").waitFor();
   });
 }, "phone");
+
+journey("phone: while he types in the note beside a source, its highlights' tints are off the page; they are back when he leaves the field (F736)", async (page) => {
+  // WebKit slows every key in the note while a highlight is painted in a long source a page away: 51 keys took 6.8 s
+  // in his 638 KB book, 2 s with none painted. The lag itself only shows in WebKit on a long source; this holds its cause.
+  await phoneSource(page, TESTING);
+  const tints = () => page.evaluate(() => ["keep", "card", "question", "apply"].reduce((n, k) => n + (CSS.highlights.get(`hl-${k}`)?.size ?? 0), 0));
+  await until("the source's highlights are tinted", async () => (await tints()) > 0);
+  await tap(page, page.locator(".phone-tools > :nth-child(2)"));
+  await page.locator(".reader.noting").waitFor();
+  await until("focus is on the note", () => page.evaluate(() => !!document.activeElement?.closest(".mynotes")));
+  await until("no tint is painted while the note has the keyboard", async () => (await tints()) === 0);
+  await page.evaluate(() => (document.activeElement as HTMLElement).blur());
+  await until("the tints are back once he leaves the field", async () => (await tints()) > 0);
+}, "phone");

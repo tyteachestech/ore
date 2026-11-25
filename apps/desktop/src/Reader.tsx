@@ -791,6 +791,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const [dragging, setDragging] = useState(false);
   /** Bumped when a highlight's range changes in place (an edge dragged), so the paint below reruns. */
   const [repaint, setRepaint] = useState(0);
+  /** iPhone: a field beside the source (its note, a question) has the keyboard. WebKit then slows every key while a
+   *  highlight is painted in a long source (F736: 51 keys took 6.8 s in a 638 KB book, 2 s with none painted), so the
+   *  source, a page away, goes untinted until he leaves the field; a swipe back to it blurs first. */
+  const [writing, setWriting] = useState(false);
   /** Ranges whose highlight is drawing itself in (D240): painted by `vein`, not yet by the Highlight API. */
   const veining = useRef(new Set<Range>());
   /** "Card here" open in the Collected tab: a line he is typing, anchored where he is. */
@@ -1382,6 +1386,17 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     return () => gone.disconnect();
   }, [ready, scrollKey]);
 
+  useEffect(() => {
+    if (!PHONE) return;
+    const beside = (t: EventTarget | null) => t instanceof Element && !!readerRef.current?.contains(t) && !!t.closest(".mynotes");
+    const focus = (e: FocusEvent) => setWriting(beside(e.type === "focusin" ? e.target : e.relatedTarget));
+    document.addEventListener("focusin", focus);
+    document.addEventListener("focusout", focus);
+    return () => {
+      document.removeEventListener("focusin", focus);
+      document.removeEventListener("focusout", focus);
+    };
+  }, []);
   // Paint highlights with the CSS Custom Highlight API; the Markdown DOM is never mutated.
   useEffect(() => {
     const index = idx.current;
@@ -1409,7 +1424,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // Hidden behind the quiz, highlight colors would show where the answers are (D52).
     for (const i of INTENTS) {
       // Above hl-spoken, so a highlight in a playing transcript keeps its own text colour.
-      paint(`hl-${i}`, hidden ? [] : by[i], MARKS);
+      paint(`hl-${i}`, hidden || writing ? [] : by[i], MARKS);
     }
     const active = popup && map.get(popup.id);
     paint("hl-active", active ? [active] : [], MARKS);
@@ -1425,7 +1440,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       toThird(jump);
       paint("hl-active", [jump], MARKS);
     }
-  }, [ready, anns, body, popup?.id, hidden, repaint, p.jumpTo]);
+  }, [ready, anns, body, popup?.id, hidden, writing, repaint, p.jumpTo]);
   useEffect(() => () => unpaintAll(), []);
   // A ⌘K match in a highlight or its note: land on it with its popup open, once its range is painted.
   const landed = useRef<string | undefined>(undefined);
