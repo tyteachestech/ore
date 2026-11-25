@@ -1,4 +1,4 @@
-import { allOrNone, valueChange, type Change } from "./change";
+import { allOrNone, keepNewer, valueChange, type Change } from "./change";
 import { LEVELS } from "./importance";
 import { opt, pinBetween, type CardSkills, type Doc, type Item, type Priority, type Skill } from "./ore";
 import { layoutOf, skillGroups, type SkillLayout } from "./Skills";
@@ -121,19 +121,11 @@ export function sourceActions(env: Lists) {
   const retitle = (id: string, before: string, typed: string) => {
     const t = typed.trim();
     if (!t || t === before) return Promise.resolve(true);
-    let first = true;
-    let since: string | undefined;
+    const title = keepNewer(async () => (await ore<Doc>("show", id)).title, (to: string) => ore("edit", id, "--title", to), (now) => `Left as “${now}”: it was renamed since`);
     return env.change(valueChange({
       message: `Renamed to “${t}”`, kind: "quiet", key: id, field: `source ${id} title`, before, after: t,
-      show: (title) => patch(id, (i) => ({ ...i, title: since ?? title })),
-      write: async (title, from) => {
-        since = undefined;
-        // Undo and Redo must not replace a title written outside this history (F175), on either device.
-        if (!first && (since = (await ore<Doc>("show", id)).title) !== from) throw new Error(`Left as “${since}”: it was renamed since`);
-        first = false;
-        since = undefined;
-        await ore("edit", id, "--title", title);
-      },
+      show: (shown) => patch(id, (i) => ({ ...i, title: title.newer() ?? shown })),
+      write: title.write,
     }));
   };
 

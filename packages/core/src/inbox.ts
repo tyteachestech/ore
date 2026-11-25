@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, unlinkSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, utimesSync } from "node:fs";
 import { basename, join } from "node:path";
 import { deviceName, writeAtomic } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
@@ -75,12 +75,16 @@ export function queuedLinks(lib: Library): QueuedLink[] {
 export function removeQueuedLink(lib: Library, id: string, keepForUndo = false): void {
   const f = find(lib, id);
   if (!f) throw new Error(`no link ${id} waiting`);
+  pruneRemoved(lib);
   if (keepForUndo) {
-    // Only the descriptor leaves the queue. Keep the attachment in place, even when this device
-    // hasn't downloaded it: Undo must not need the share extension's temporary original.
-    const removed = join(paths.inbox(lib), "removed");
-    mkdirSync(removed, { recursive: true });
-    renameSync(f, join(removed, basename(f)));
+    // Only the descriptor leaves the queue, for an Undo to put back as it was. Its attachment stays in place, even
+    // when this device hasn't downloaded it: Undo must not need the share extension's temporary original.
+    mkdirSync(removedDir(lib), { recursive: true });
+    const kept = join(removedDir(lib), basename(f));
+    renameSync(f, kept);
+    // Its day starts now, not when it was queued.
+    const now = new Date();
+    utimesSync(kept, now, now);
     return;
   }
   // A file's folder goes with it: named by the id it was saved under, which a synced copy's name isn't.
@@ -93,12 +97,29 @@ export function removeQueuedLink(lib: Library, id: string, keepForUndo = false):
   if (dir) rmSync(dir, { recursive: true, force: true });
 }
 
+/** Where a removed entry waits for an Undo, kept a day: the Undo history doesn't outlive the app. */
+const removedDir = (lib: Library) => join(paths.inbox(lib), "removed");
+export const KEEP_REMOVED_MS = 24 * 3600_000;
+
+/** Drops removed entries older than a day, with a file's attachment folder. */
+function pruneRemoved(lib: Library, now = Date.now()) {
+  if (!existsSync(removedDir(lib))) return;
+  for (const name of readdirSync(removedDir(lib))) {
+    const f = join(removedDir(lib), name);
+    try {
+      if (now - statSync(f).mtimeMs < KEEP_REMOVED_MS) continue;
+      const id = name.replace(SUFFIX, "");
+      if (SUFFIX.test(name) && !strays(id) && !find(lib, id)) rmSync(join(paths.inbox(lib), id), { recursive: true, force: true });
+      rmSync(f, { force: true });
+    } catch {}
+  }
+}
+
 /** Restore the exact descriptor, including its id, file, skills and capture device. */
 export function restoreQueuedLink(lib: Library, id: string): void {
   if (strays(id) || /[\\/]/.test(id)) throw new Error("Not an inbox id");
   if (find(lib, id)) throw new Error(`${id} is already waiting`);
-  const removed = join(paths.inbox(lib), "removed");
-  const f = [LINK, FILE].map((suffix) => join(removed, `${id}${suffix}`)).find((p) => existsSync(p));
+  const f = [LINK, FILE].map((suffix) => join(removedDir(lib), `${id}${suffix}`)).find((p) => existsSync(p));
   if (!f) throw new Error(`no removed link ${id}`);
   renameSync(f, join(paths.inbox(lib), basename(f)));
 }

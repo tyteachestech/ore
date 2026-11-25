@@ -381,14 +381,14 @@ class Bytes extends Uint8Array {
     return new TextDecoder().decode(this);
   }
 }
-/** With an encoding, the text. With none, a file saved as bytes (a picked PDF, a picture) comes back as its
- *  bytes, as Node gives a Buffer; a text file still comes back as text, which every caller here expects. */
+/** With an encoding, the text. With none, its bytes, as Node gives a Buffer: core reads a picked file that way
+ *  whatever it holds, and a shared .md read back as a string came in empty (PHONE-04). */
 export function readFileSync(p: string, enc?: unknown): string {
   const e = files.get(p);
   if (!e) throw err("ENOENT", p);
   if (e.unread && !e.bytes) throw Object.assign(new Error(`not loaded on iPhone: ${p}`), { code: "EISDIR" });
   // One block copy: Bytes.from walked an hour's audio byte by byte and held over a gigabyte while it did.
-  if (enc === undefined && e.bytes) return new Bytes(e.bytes) as unknown as string;
+  if (enc === undefined) return (e.bytes ? new Bytes(e.bytes) : new Bytes(new TextEncoder().encode(e.text))) as unknown as string;
   return e.text;
 }
 export const writeFileSync = (p: string, s: string | Uint8Array) => (typeof s === "string" ? put(p, s) : put(p, "", undefined, s));

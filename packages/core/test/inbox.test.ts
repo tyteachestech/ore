@@ -1,6 +1,6 @@
 // Links added on the iPhone wait in inbox/ for the Mac to import them (D223).
 import { expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink } from "../src/inbox.ts";
 import { paths } from "../src/library.ts";
@@ -135,4 +135,25 @@ test("Undo of a waiting link keeps its original metadata and refuses to replace 
   unlinkSync(descriptor);
   restoreQueuedLink(lib, q.id);
   expect(queuedLinks(lib)).toEqual([q]);
+});
+
+test("a removed entry kept for Undo is dropped, with its file, a day after it was removed (PHONE-02)", async () => {
+  const { restoreQueuedLink, KEEP_REMOVED_MS } = await import("../src/inbox.ts");
+  const lib = await tempLibrary();
+  const input = join(lib.root, "old.pdf");
+  writeFileSync(input, "x");
+  const old = queueFile(lib, input);
+  const fresh = queueLink(lib, "https://example.com/b");
+  removeQueuedLink(lib, old.id, true);
+  const kept = join(paths.inbox(lib), "removed", `${old.id}.file.json`);
+  // Queued long ago, removed just now: still there for an Undo.
+  removeQueuedLink(lib, fresh.id, true);
+  expect(existsSync(kept)).toBe(true);
+  const then = new Date(Date.now() - KEEP_REMOVED_MS - 1000);
+  utimesSync(kept, then, then);
+  restoreQueuedLink(lib, fresh.id);
+  removeQueuedLink(lib, fresh.id, true);
+  expect(existsSync(kept)).toBe(false);
+  expect(existsSync(join(paths.inbox(lib), old.id))).toBe(false);
+  expect(() => restoreQueuedLink(lib, old.id)).toThrow(/no removed link/);
 });
