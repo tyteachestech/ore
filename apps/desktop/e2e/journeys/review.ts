@@ -2742,7 +2742,8 @@ journey("ambience: in a narrow window with the sidebar folded the radio sits in 
   const size = page.viewportSize()!;
   await openSource(page, TESTING);
   await page.setViewportSize({ width: 760, height: 600 });
-  const folded = (await page.locator(".app.collapsed").count()) > 0;
+  // A window this narrow folds the sidebar by itself, a moment after the resize: he folds it only when it has not.
+  const folded = await page.locator(".app.collapsed").waitFor({ timeout: 1000 }).then(() => true, () => false);
   if (!folded) await page.getByRole("button", { name: "Hide sidebar" }).click();
   try {
     await page.locator(".app.collapsed").waitFor();

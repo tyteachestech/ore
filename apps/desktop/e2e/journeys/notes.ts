@@ -941,95 +941,105 @@ journey("diagram: ⌘Z on a rename takes the file back with the link, ⇧⌘Z re
 });
 
 journey("diagram: S styles at the pointer, keys stay on the canvas, Space never sticks, and Esc closes only the drawing", async (page) => {
-  await openSource(page, TESTING); // no other journey draws here, so the diagram starts empty
-  const note = page.locator(".note-editor [contenteditable=true]").first();
-  await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
-  await page.keyboard.press("Meta+ArrowDown");
-  await page.keyboard.press("Enter");
-  await page.keyboard.type("/diagram");
-  await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
-  await page.keyboard.press("Enter");
-  const draw = page.locator(".diagram .draw");
-  await draw.focus();
-  await page.keyboard.press("Shift+Meta+Enter");
-  await page.locator(".diagram-scrim.full").waitFor();
-  await draw.focus();
-  const c = (await page.locator(".diagram .draw-canvas").boundingBox())!;
-  await page.keyboard.press("r");
-  await page.mouse.click(c.x + 500, c.y + 300);
-  await page.locator(".draw-text").waitFor();
-  // An empty label shows only the caret, no prompt text (Tyler 2026-11-07).
-  if (await page.locator(".draw-text").getAttribute("placeholder")) throw new Error("a new label shows placeholder text");
-  await page.keyboard.type("Memory");
-  await page.keyboard.press("Enter");
-  const boxes = () => page.locator(".diagram .draw-canvas > g rect").count();
-  await until("the box is drawn", async () => (await boxes()) === 1);
-  // A drawn box goes back to Select, as in Excalidraw (Tyler 2026-11-11); each tool shows its key against its icon.
-  const boxTool = page.locator(".draw-tools").getByRole("button", { name: "Box" });
-  const selectTool = page.locator(".draw-tools").getByRole("button", { name: "Select" });
-  await until("drawing a box goes back to Select", async () => (await selectTool.getAttribute("aria-pressed")) === "true");
-  if ((await boxTool.locator(".draw-key").textContent()) !== "R") throw new Error("the Box tool doesn't show its key");
-  // S opens the style picker by the pointer; its keys restyle the selection and Esc closes only it.
-  const rect = page.locator(".diagram .draw-canvas > g rect").first();
-  await page.mouse.move(c.x + 640, c.y + 420);
-  await page.keyboard.press("s");
-  const quick = page.locator(".draw-quick");
-  await quick.waitFor();
-  const qb = (await quick.boundingBox())!;
-  if (Math.hypot(qb.x - (c.x + 640), qb.y + qb.height - (c.y + 420)) > 60) throw new Error(`the picker opened at ${qb.x},${qb.y}, not by the pointer`);
-  await page.keyboard.press("2");
-  await page.keyboard.press("Shift+4");
-  await page.keyboard.press("e");
-  await until("1–5, ⇧1–5 and Q W E restyle the box", async () => (await rect.getAttribute("stroke")) !== "#f2f1ec" && (await rect.getAttribute("fill")) !== "none" && (await rect.getAttribute("stroke-width")) === "4");
-  await page.keyboard.press("Escape");
-  await until("Esc closes the picker, the box stays picked", async () => (await quick.count()) === 0 && (await page.locator(".sr-only[aria-live]").textContent()) === "Selected: Memory");
-  await page.keyboard.press("Meta+z");
-  await until("⌘Z takes back the last change", async () => (await rect.getAttribute("stroke-width")) === "2");
-  // Picking a colour by click must not take the keys away from the drawing (Excalidraw).
-  await page.keyboard.press("s");
-  await quick.locator(".draw-swatch").nth(1).click();
-  await page.keyboard.press("Escape");
-  await page.keyboard.press("Backspace");
-  await until("Backspace after a swatch click still deletes the box", async () => (await boxes()) === 0);
-  await page.keyboard.press("Meta+z");
-  await until("⌘Z brings it back", async () => (await boxes()) === 1);
-  // Z X C set the line in the picker (dashed for a weak link); a custom colour is one undo step and hands the keys back.
-  await page.keyboard.press("s");
-  await page.keyboard.press("x");
-  await until("X makes the line dashed", async () => !!(await rect.getAttribute("stroke-dasharray")));
-  const before = await rect.getAttribute("stroke");
-  await quick.locator(".draw-custom").first().click();
-  const hex = page.locator(".draw-colour input");
-  await until("the custom colour picker takes the caret", async () => hex.evaluate((e) => e === document.activeElement));
-  await hex.fill("7048e8");
-  await until("a typed hex restyles the box as the canvas shows it", async () => (await rect.getAttribute("stroke")) === "#af8dff");
-  await page.keyboard.press("Escape");
-  await until("Esc closes only the colour picker", async () => (await page.locator(".draw-colour").count()) === 0 && (await page.locator(".diagram").count()) === 1);
-  await until("the custom swatch shows the colour in use", async () => (await quick.locator(".draw-custom").first().getAttribute("aria-pressed")) === "true");
-  await page.keyboard.press("Escape");
-  await page.keyboard.press("Meta+z");
-  await until("⌘Z takes the whole custom colour back in one step", async () => (await rect.getAttribute("stroke")) === before);
-  // With several selected, a click on one of them picks just that one (Figma, Excalidraw).
-  await page.mouse.click(c.x + 500, c.y + 300);
-  await page.keyboard.press("Meta+d");
-  await page.keyboard.press("Meta+a");
-  const selected = () => page.locator(".sr-only[aria-live]").textContent();
-  await until("⌘A picks both", async () => (await selected())?.includes("Memory, Memory") ?? false);
-  await page.mouse.click(c.x + 500, c.y + 300);
-  await until("a click on one of them picks it alone", async () => (await selected()) === "Selected: Memory");
-  // Space held while focus leaves (the name field, another app) must not leave the canvas panning.
-  await page.keyboard.down(" ");
-  await page.locator(".diagram-name").focus();
-  await page.keyboard.up(" ");
-  await page.keyboard.press("Escape");
-  await draw.focus();
-  await until("the canvas is not stuck panning", async () => !(await draw.evaluate((e) => e.classList.contains("panning"))));
-  await page.locator(".note-editor .note-diagram").waitFor({ timeout: 6000 }); // autosaved, so Esc has nothing to write
-  await page.keyboard.press("Escape"); // clears the selection
-  await page.keyboard.press("Escape"); // Done
-  await until("Esc closes the drawing", async () => (await page.locator(".diagram").count()) === 0);
-  await Bun.sleep(300);
-  if (!(await page.locator(".doc").count())) throw new Error("Esc closed the source as well as the drawing");
+  // The note is put back as it was: the drawing it leaves fills the note's middle, where the journeys after it click
+  // to type (F158, F295 opened the drawing instead once this file ran on its own library).
+  const item = ((await ore("ls")) as { id: string; title: string }[]).find((i) => i.title === TESTING)!.id;
+  const { text: was } = (await ore("notes", item)) as { text: string };
+  try {
+    await openSource(page, TESTING); // no other journey draws here, so the diagram starts empty
+    const note = page.locator(".note-editor [contenteditable=true]").first();
+    await until("the note takes the caret", async () => (await note.click(), await note.evaluate((e) => e.contains(document.activeElement))));
+    await page.keyboard.press("Meta+ArrowDown");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("/diagram");
+    await page.locator(".note-menu-row.on").filter({ hasText: "Diagram" }).waitFor();
+    await page.keyboard.press("Enter");
+    const draw = page.locator(".diagram .draw");
+    await draw.focus();
+    await page.keyboard.press("Shift+Meta+Enter");
+    await page.locator(".diagram-scrim.full").waitFor();
+    await draw.focus();
+    const c = (await page.locator(".diagram .draw-canvas").boundingBox())!;
+    await page.keyboard.press("r");
+    await page.mouse.click(c.x + 500, c.y + 300);
+    await page.locator(".draw-text").waitFor();
+    // An empty label shows only the caret, no prompt text (Tyler 2026-11-07).
+    if (await page.locator(".draw-text").getAttribute("placeholder")) throw new Error("a new label shows placeholder text");
+    await page.keyboard.type("Memory");
+    await page.keyboard.press("Enter");
+    const boxes = () => page.locator(".diagram .draw-canvas > g rect").count();
+    await until("the box is drawn", async () => (await boxes()) === 1);
+    // A drawn box goes back to Select, as in Excalidraw (Tyler 2026-11-11); each tool shows its key against its icon.
+    const boxTool = page.locator(".draw-tools").getByRole("button", { name: "Box" });
+    const selectTool = page.locator(".draw-tools").getByRole("button", { name: "Select" });
+    await until("drawing a box goes back to Select", async () => (await selectTool.getAttribute("aria-pressed")) === "true");
+    if ((await boxTool.locator(".draw-key").textContent()) !== "R") throw new Error("the Box tool doesn't show its key");
+    // S opens the style picker by the pointer; its keys restyle the selection and Esc closes only it.
+    const rect = page.locator(".diagram .draw-canvas > g rect").first();
+    await page.mouse.move(c.x + 640, c.y + 420);
+    await page.keyboard.press("s");
+    const quick = page.locator(".draw-quick");
+    await quick.waitFor();
+    const qb = (await quick.boundingBox())!;
+    if (Math.hypot(qb.x - (c.x + 640), qb.y + qb.height - (c.y + 420)) > 60) throw new Error(`the picker opened at ${qb.x},${qb.y}, not by the pointer`);
+    await page.keyboard.press("2");
+    await page.keyboard.press("Shift+4");
+    await page.keyboard.press("e");
+    await until("1–5, ⇧1–5 and Q W E restyle the box", async () => (await rect.getAttribute("stroke")) !== "#f2f1ec" && (await rect.getAttribute("fill")) !== "none" && (await rect.getAttribute("stroke-width")) === "4");
+    await page.keyboard.press("Escape");
+    await until("Esc closes the picker, the box stays picked", async () => (await quick.count()) === 0 && (await page.locator(".sr-only[aria-live]").textContent()) === "Selected: Memory");
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes back the last change", async () => (await rect.getAttribute("stroke-width")) === "2");
+    // Picking a colour by click must not take the keys away from the drawing (Excalidraw).
+    await page.keyboard.press("s");
+    await quick.locator(".draw-swatch").nth(1).click();
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Backspace");
+    await until("Backspace after a swatch click still deletes the box", async () => (await boxes()) === 0);
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z brings it back", async () => (await boxes()) === 1);
+    // Z X C set the line in the picker (dashed for a weak link); a custom colour is one undo step and hands the keys back.
+    await page.keyboard.press("s");
+    await page.keyboard.press("x");
+    await until("X makes the line dashed", async () => !!(await rect.getAttribute("stroke-dasharray")));
+    const before = await rect.getAttribute("stroke");
+    await quick.locator(".draw-custom").first().click();
+    const hex = page.locator(".draw-colour input");
+    await until("the custom colour picker takes the caret", async () => hex.evaluate((e) => e === document.activeElement));
+    await hex.fill("7048e8");
+    await until("a typed hex restyles the box as the canvas shows it", async () => (await rect.getAttribute("stroke")) === "#af8dff");
+    await page.keyboard.press("Escape");
+    await until("Esc closes only the colour picker", async () => (await page.locator(".draw-colour").count()) === 0 && (await page.locator(".diagram").count()) === 1);
+    await until("the custom swatch shows the colour in use", async () => (await quick.locator(".draw-custom").first().getAttribute("aria-pressed")) === "true");
+    await page.keyboard.press("Escape");
+    await page.keyboard.press("Meta+z");
+    await until("⌘Z takes the whole custom colour back in one step", async () => (await rect.getAttribute("stroke")) === before);
+    // With several selected, a click on one of them picks just that one (Figma, Excalidraw).
+    await page.mouse.click(c.x + 500, c.y + 300);
+    await page.keyboard.press("Meta+d");
+    await page.keyboard.press("Meta+a");
+    const selected = () => page.locator(".sr-only[aria-live]").textContent();
+    await until("⌘A picks both", async () => (await selected())?.includes("Memory, Memory") ?? false);
+    await page.mouse.click(c.x + 500, c.y + 300);
+    await until("a click on one of them picks it alone", async () => (await selected()) === "Selected: Memory");
+    // Space held while focus leaves (the name field, another app) must not leave the canvas panning.
+    await page.keyboard.down(" ");
+    await page.locator(".diagram-name").focus();
+    await page.keyboard.up(" ");
+    await page.keyboard.press("Escape");
+    await draw.focus();
+    await until("the canvas is not stuck panning", async () => !(await draw.evaluate((e) => e.classList.contains("panning"))));
+    await page.locator(".note-editor .note-diagram").waitFor({ timeout: 6000 }); // autosaved, so Esc has nothing to write
+    await page.keyboard.press("Escape"); // clears the selection
+    await page.keyboard.press("Escape"); // Done
+    await until("Esc closes the drawing", async () => (await page.locator(".diagram").count()) === 0);
+    await Bun.sleep(300);
+    if (!(await page.locator(".doc").count())) throw new Error("Esc closed the source as well as the drawing");
+  } finally {
+    // Off the note first, so no save of its own lands after this one; a journey that failed with the drawing open stays there.
+    await page.getByRole("button", { name: /^All sources/ }).click({ timeout: 2000 }).then(() => loaded(page), () => {});
+    await ore("notes", item, `--set=${was}`);
+  }
 });
 
 journey("diagram: editing picks the whole label, a run of nudges is one undo step, undo re-selects, and a one-click arrow dropped with Esc leaves the Select tool", async (page) => {

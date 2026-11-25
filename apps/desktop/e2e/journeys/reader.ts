@@ -975,6 +975,9 @@ journey("highlight: a drag that starts right after a double click keeps both, th
   await page.getByRole("dialog", { name: "Highlight" }).waitFor();
   await until("the drag's passage is highlighted, its popup open", async () => (await active()).startsWith("Free recall, short-answer questions"));
   await until("the double click's sentence is kept too", async () => (await kept()).some((t) => t.startsWith("Decades of laboratory") && t.endsWith("no feedback is given.")));
+  // The drag's highlight goes again: the vein journey below highlights these words as new.
+  await page.getByRole("dialog", { name: "Highlight" }).getByRole("button", { name: "Remove highlight" }).click();
+  await until("the drag's highlight is gone", async () => !(await kept()).some((t) => t.startsWith("Free recall, short-answer questions")));
 });
 
 journey("highlight: a triple click whose selection runs past the text keeps the double click's sentence", async (page) => {
@@ -1297,6 +1300,9 @@ journey("highlight note: a note whose save fails is kept, and saves when the hig
   await openSource(page, AGENTS);
   await open();
   await until("the retried save landed", async () => (await note.inputValue()) === "first thought and two");
+  // Its highlight goes again: the explain journeys below select words inside this passage as new.
+  await page.getByRole("dialog", { name: "Highlight" }).getByRole("button", { name: "Remove highlight" }).click();
+  await note.waitFor({ state: "detached" });
 });
 
 // F350: Remove highlight put its step on the history only once its write was back, so a ⌘Z
@@ -1617,6 +1623,12 @@ journey("highlight note: a click on the highlight in the instant its save lands 
 journey("click away saves what he typed: the author, a source's title, a skill's goal; Esc throws it away", async (page) => {
   await openSource(page, TESTING);
   const away = () => page.locator(".doc p").first().click(); // a click in the text, as he does
+  // From no author, whatever a journey before it left there (the byline journey ends with one set).
+  if (await page.locator(".doc-head .by").count()) {
+    await page.locator(".doc-head .by").click();
+    await page.getByLabel("Author").fill("");
+    await page.keyboard.press("Enter");
+  }
   await page.locator(".doc-head .by-add").click();
   await page.getByLabel("Author").fill("Jeffrey Karpicke");
   await away();
