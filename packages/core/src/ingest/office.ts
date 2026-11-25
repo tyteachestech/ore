@@ -1,4 +1,4 @@
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { parseHTML } from "linkedom";
 import { posix } from "node:path";
 import type { Asset } from "../items.ts";
@@ -41,20 +41,39 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
     assets.set(name, { name, data: bytes });
     return { src: `assets/${name}` };
   });
+  // Mammoth does not expose w:outlineLvl. Map explicit outline levels to its heading styles
+  // in a conversion copy only; the original document kept by intake stays byte-for-byte intact.
+  const files = unzipSync(data);
+  let mapped = false;
+  for (const path of ["word/document.xml", "word/footnotes.xml", "word/endnotes.xml"]) {
+    if (!files[path]) continue;
+    const xml = strFromU8(files[path]!);
+    const headings = xml.replace(/<w:pPr\b[^>]*(?<!\/)>[\s\S]*?<\/w:pPr>/g, (props) => {
+      const level = props.match(/<w:outlineLvl\b[^>]*w:val="([0-8])"/)?.[1];
+      if (level === undefined) return props;
+      const style = `<w:pStyle w:val="Heading${Math.min(6, Number(level) + 1)}"/>`;
+      return props.replace(/<w:pStyle\b[^>]*(?:\/>|>[\s\S]*?<\/w:pStyle>)/g, "").replace(/(<w:pPr\b[^>]*>)/, `$1${style}`);
+    });
+    if (headings !== xml) { files[path] = strToU8(headings); mapped = true; }
+  }
+  const converted = mapped ? zipSync(files) : data;
   // Node's build of mammoth takes a Buffer; its browser build (the iPhone app) takes the bytes themselves.
-  const input = (typeof Buffer !== "undefined" ? { buffer: Buffer.from(data) } : { arrayBuffer: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) }) as { buffer: Buffer };
+  const input = (typeof Buffer !== "undefined" ? { buffer: Buffer.from(converted) } : { arrayBuffer: converted.buffer.slice(converted.byteOffset, converted.byteOffset + converted.byteLength) }) as { buffer: Buffer };
   // Code paragraphs (Word's and Pandoc's "Source Code" style) keep their lines and indent, fenced (F177);
   // comments come along at the end instead of vanishing (F187).
   const styleMap = ["p[style-name='Source Code'] => pre:separator('\\n')", "p[style-name='HTML Preformatted'] => pre:separator('\\n')", "comment-reference => sup"];
-  const { value } = await mammoth.convertToHtml(input, { convertImage, styleMap }).catch((cause: unknown) => {
+  const { value, messages } = await mammoth.convertToHtml(input, { convertImage, styleMap }).catch((cause: unknown) => {
     throw new Error("That Word file is damaged or only partly downloaded. Download it again, or open it in Word or Pages and save a fresh copy.", { cause });
   });
+  // Mammoth reports OMML as ignored. Never save the remaining prose as a complete source.
+  if (messages.some((m) => m.message.includes("/officeDocument/2006/math}") && /oMath/.test(m.message)))
+    throw new Error("This Word file contains an equation Ore cannot read yet. Open it in Word or Pages and export it as a PDF, then add that copy.");
   const { document } = parseHTML(`<html><body>${value}</body></html>`);
   // A code block reads as one fenced block: its line breaks as lines, inside <code> as turndown fences it.
   for (const pre of document.querySelectorAll("pre")) pre.innerHTML = `<code>${pre.innerHTML.replace(/<br\s*\/?>/g, "\n")}</code>`;
   const body = td.turndown(document.body as unknown as HTMLElement).trim();
   if (!body) throw new Error("This Word file has no text to read.");
-  const meta = coreProps(unzipSync(data));
+  const meta = coreProps(files);
   return { ...meta, title: meta.title ?? body.match(/^#+\s+(.+)$/m)?.[1]?.trim(), body: body + "\n", assets: [...assets.values()] };
 }
 
@@ -74,10 +93,16 @@ export function pptxToDoc(data: Uint8Array): OfficeDoc {
   const read = (p: string) => (files[p] ? strFromU8(files[p]) : "");
   // Slide order is the presentation's list of slide ids, through its relationships.
   const rels = new Map([...read("ppt/_rels/presentation.xml.rels").matchAll(/<Relationship\b[^>]*>/g)].map((r) => [r[0].match(/Id="([^"]+)"/)?.[1], r[0].match(/Target="([^"]+)"/)?.[1]]));
-  const order = [...read("ppt/presentation.xml").matchAll(/<p:sldId\b[^>]*r:id="([^"]+)"/g)].map((m) => rels.get(m[1]!)).filter(Boolean) as string[];
+  const order = [...read("ppt/presentation.xml").matchAll(/<p:sldId\b[^>]*r:id="([^"]+)"/g)].map((m) => {
+    const target = rels.get(m[1]!);
+    if (!target) throw new Error("This PowerPoint file is missing a listed slide relationship. Download it again or save a fresh copy in PowerPoint.");
+    return target;
+  });
   const slides: string[] = [];
   let first: string | undefined;
   const paths = order.map((target) => posix.join("ppt", target.replace(/^\/?ppt\//, "")));
+  if (paths.some((path) => !files[path]))
+    throw new Error("This PowerPoint file is missing a listed slide. Download it again or save a fresh copy in PowerPoint.");
   // Each slide's pictures, in the order they sit on it. One on three or more slides is a logo or a
   // footer graphic, not what the slide teaches, so it is left out.
   const pictures = paths.map((path) => slidePictures(read(path), read(posix.join(posix.dirname(path), "_rels", posix.basename(path) + ".rels")), posix.dirname(path)));
@@ -89,7 +114,23 @@ export function pptxToDoc(data: Uint8Array): OfficeDoc {
     const shapes = [...xml.matchAll(/<p:sp>([\s\S]*?)<\/p:sp>/g)].map((s) => s[1]!);
     const isTitle = (s: string) => /<p:ph\b[^>]*type="(?:title|ctrTitle)"/.test(s);
     const title = shapes.filter(isTitle).flatMap(paragraphs).map((p) => p.text).join(" ");
-    const text = shapes.filter((s) => !isTitle(s)).flatMap(paragraphs);
+    // Text shapes and native tables share the slide's document order.
+    const content = [...xml.matchAll(/<p:(sp|graphicFrame)\b[^>]*>([\s\S]*?)<\/p:\1>/g)].flatMap((m) => {
+      if (m[1] === "sp") return isTitle(m[2]!) ? [] : paragraphs(m[2]!).map((p) => `${"  ".repeat(p.level)}- ${p.text}`);
+      return [...m[2]!.matchAll(/<a:tbl\b[^>]*>([\s\S]*?)<\/a:tbl>/g)].map((t) => {
+        const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const rows = [...t[1]!.matchAll(/<a:tr\b[^>]*>([\s\S]*?)<\/a:tr>/g)].map((r) => {
+          const cells = [...r[1]!.matchAll(/<a:tc\b([^>]*)>([\s\S]*?)<\/a:tc>/g)].map((c) => {
+            if (/\b(?:hMerge|vMerge)="(?:1|true)"/.test(c[1]!)) return "";
+            const width = c[1]!.match(/\bgridSpan="(\d+)"/)?.[1] ?? "1";
+            const height = c[1]!.match(/\browSpan="(\d+)"/)?.[1] ?? "1";
+            return `<td colspan="${width}" rowspan="${height}">${escape(paragraphs(c[2]!).map((p) => p.text).join(" "))}</td>`;
+          });
+          return `<tr>${cells.join("")}</tr>`;
+        });
+        return td.turndown(`<table>${rows.join("")}</table>`);
+      });
+    });
     const notesRel = read(posix.join(posix.dirname(path), "_rels", posix.basename(path) + ".rels")).match(/Target="([^"]*notesSlide[^"]*)"/)?.[1];
     // A notes page also repeats the slide number; only its body placeholder is the speaker's notes.
     const notes = notesRel
@@ -98,7 +139,7 @@ export function pptxToDoc(data: Uint8Array): OfficeDoc {
     const n = slides.length + 1;
     first ??= title || undefined;
     const parts = [`<!-- slide ${n} -->`, `## ${title || `Slide ${n}`}`];
-    if (text.length) parts.push(text.map((p) => `${"  ".repeat(p.level)}- ${p.text}`).join("\n"));
+    if (content.length) parts.push(content.join("\n\n").replace(/^( *- .*)\n\n(?= *- )/gm, "$1\n"));
     for (const pic of pictures[i]!) {
       const ext = IMAGE_EXT[posix.extname(pic.media).slice(1).toLowerCase()];
       const data = files[pic.media];
