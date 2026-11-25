@@ -664,14 +664,17 @@ export function PhoneApp() {
   const guard = useRef(readGuard()).current;
   /** A change to the lists he can take back (change.ts): its writes count against the lists' reads, and the lists
    *  are read again once its newest write settles. */
-  const listChange = (c: Change) => change(notify, { out: guard.writing, settled: () => void refresh(), ...c });
+  const listChange = (c: Change) => change(notify, { out: guard.writing, settled: () => void refresh(), ...c }).then((ok) => (ok || reread(), ok));
+  /** A read let go for a write that then failed: that change reads nothing again (change.ts), so this does. */
+  const missed = useRef(false);
+  const reread = () => void (missed.current && refresh());
   const refresh = useCallback(async () => {
     const read = guard.begin();
     try {
       const [all, sk, w] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills"), ore<Waiting[]>("inbox")]);
       // The links waiting are no list a change shows ahead of its write: the newest read of them lands.
       if (read.newest()) setWaiting(w.filter((l) => !removing.current.has(l.id)));
-      if (!read.lands()) return;
+      if ((missed.current = !read.lands())) return;
       setItems(all);
       setSkills(sk);
       void shareSkills(sk.filter((k) => !k.archived));

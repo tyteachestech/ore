@@ -46,7 +46,7 @@ import { lineAfter, lineKey, type Line } from "./lines";
 import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
 import { readGuard } from "./reads";
 import { change, type Change } from "./change";
-import { skillActions, sourceActions, type Lists } from "./list-actions";
+import { skillActions, sourceActions, statusArgs, type Lists } from "./list-actions";
 import { listenMenu, setMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
@@ -101,8 +101,6 @@ type CourseAdd = {
 /** A source that was in the library already: what adding it again did. */
 type Kept = { kept: true; filed: string[]; restored: boolean };
 
-/** `ore status` args to `to`: back to Done (an Undo), a source keeps the finish date it had. */
-const back = (i: Item, to: Item["status"]) => (to === "done" && i.status === "done" && i.finished_at ? [to, opt("at", i.finished_at)] : [to]);
 const lessonFirst = (l: Extract<Line, { kind: "course" }>) => l.next ?? l.lessons[0]!;
 
 const added = (iso: string) => {
@@ -338,12 +336,15 @@ export function App() {
   const writing = guard.writing;
   /** A change to the lists he can take back (change.ts): its writes count against the list's reads, and the list
    *  is read again once the newest of them settles. */
-  const listChange = (c: Change) => change(notify, { out: writing, settled: () => void refresh(), ...c });
+  const listChange = (c: Change) => change(notify, { out: writing, settled: () => void refresh(), ...c }).then((ok) => (ok || reread(), ok));
+  /** A read let go for a write that then failed: that change reads nothing again (change.ts), so this does. */
+  const missed = useRef(false);
+  const reread = () => void (missed.current && refresh());
   const refresh = useCallback(async () => {
     const read = guard.begin();
     try {
       const [all, gone] = await Promise.all([ore<Item[]>("ls"), ore<Item[]>("ls", "--archived")]);
-      if (!read.lands()) return;
+      if ((missed.current = !read.lands())) return;
       setItems(all);
       setArchived(gone);
       setListError(null);
@@ -1668,7 +1669,7 @@ export function App() {
 
 
   const moveSource = sourceList.moveTo;
-  const writeStatus = (item: Item, to: Item["status"]) => ore("status", item.id, ...back(item, to));
+  const writeStatus = (item: Item, to: Item["status"]) => ore("status", item.id, ...statusArgs(item, to));
   const pinSource = sourceList.pin;
   const setSourceImportance = sourceList.setImportance;
   /** A pinned source moved among the pinned of this list (drag, or Move up/down), to `to` among them. */

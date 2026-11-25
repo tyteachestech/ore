@@ -223,6 +223,11 @@ test("a skill moved to a collection shows at once and is written as a whole layo
   await tick();
   expect(d.state.skills.find((s) => s.id === "a")!.collection).toBeUndefined();
   expect(d.state.skillReads).toBe(2);
+  // A skill made or renamed since the step keeps its place and its name when the step is done again.
+  d.state.skills = [...d.state.skills.map((s) => (s.id === "b" ? { ...s, name: "B2" } : s)), { id: "new", name: "New" }];
+  await act(async () => d.t.redo());
+  expect(d.state.skills.map((s) => s.name).sort()).toEqual(["A", "B2", "Gone", "New"]);
+  await tick();
 });
 
 test("a collection renamed or deleted takes its archived skills with it (F-new-phone-collection-archived)", async () => {

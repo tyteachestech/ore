@@ -32,8 +32,8 @@ export type Lists = {
   cursor?: { now: string | null; set: (id: string | null) => void };
 };
 
-/** `ore status` arguments: a source going back to Done keeps the day it was finished. */
-const statusArgs = (i: Item, to: Item["status"]) => (to === "done" && i.status === "done" && i.finished_at ? [to, opt("at", i.finished_at)] : [to]);
+/** `ore status` arguments: a source going back to Done (an Undo) keeps the day it was finished. */
+export const statusArgs = (i: Item, to: Item["status"]) => (to === "done" && i.status === "done" && i.finished_at ? [to, opt("at", i.finished_at)] : [to]);
 
 export function sourceActions(env: Lists) {
   const { ore } = env;
@@ -223,16 +223,14 @@ export function skillActions(env: Lists) {
    *  refused (said in a toast), so a rename field can open again with his words. */
   const arrange = (message: string, layout: SkillLayout, kind: "info" | "quiet" = "info") => {
     const before = whole();
-    const byId = new Map(env.skills.map((s) => [s.id, s]));
+    // From the skills as they are now: one made or renamed since the step keeps its place and its name.
     const show = (l: SkillLayout) =>
-      env.setSkills(() =>
-        l.flatMap((g) =>
-          g.skills.flatMap((id) => {
-            const s = byId.get(id);
-            return s ? [{ ...s, collection: g.collection || undefined }] : [];
-          }),
-        ),
-      );
+      env.setSkills((all) => {
+        const byId = new Map(all.map((s) => [s.id, s]));
+        const placed = l.flatMap((g) => g.skills.flatMap((id) => (byId.has(id) ? [{ ...byId.get(id)!, collection: g.collection || undefined }] : [])));
+        const ids = new Set(placed.map((s) => s.id));
+        return [...placed, ...all.filter((s) => !ids.has(s.id))];
+      });
     return env.skillChange({ message, kind, key: "sidebar layout", show: (on) => show(on ? layout : before), write: (on) => ore("skills", "arrange", JSON.stringify(on ? layout : before)) });
   };
   /** Files a skill under another collection (or none), at the end of it. */
