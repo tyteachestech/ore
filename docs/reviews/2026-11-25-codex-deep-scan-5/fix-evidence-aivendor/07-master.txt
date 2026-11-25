@@ -1,0 +1,7 @@
+$ bun codex-out/aivendor/adapter-faults.ts
+[DEEP] {"vendor":"claude","error":"","accepted":{"line":"A partial candidate"},"calls":1}
+[DEEP] FAIL claude rejects exit 1 even with a parseable candidate
+[DEEP] {"vendor":"codex","error":"codex failed (exit 1): fatal: transport failed after output","calls":1}
+[DEEP] PASS codex rejects exit 1 even with a parseable candidate
+
+Exit: 1

@@ -1,0 +1,28 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [269.78ms]
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [268.58ms]
+(pass) recall feedback checks its prequestion input at save (after) [197.58ms]
+(pass) recall feedback checks its prequestion input at save (before) [185.02ms]
+(pass) recall feedback checks its prequestion input at save (question) [199.51ms]
+(pass) recall feedback checks its prequestion input at save (skipped) [160.50ms]
+(pass) recall feedback checks its prequestion input at save (removed) [158.91ms]
+(pass) recall feedback checks its prequestion input at save (reordered) [157.06ms]
+(pass) recall feedback checks its prequestion input at save (unchanged) [150.26ms]
+(pass) recall feedback checks its prequestion input at save (marks) [173.93ms]
+(pass) a late prequestion check matches the current question and ordered points (more) [160.12ms]
+(pass) a late prequestion check matches the current question and ordered points (text) [159.73ms]
+(pass) a late prequestion check matches the current question and ordered points (order) [163.96ms]
+(pass) a late prequestion check matches the current question and ordered points (question) [160.07ms]
+(pass) a late prequestion check matches the current question and ordered points (unchanged) [155.36ms]
+(pass) a late prequestion check matches the current question and ordered points (evidence) [158.25ms]
+(pass) ending a Dig prevents the late first-stage reply from changing its saved record [165.27ms]
+(pass) a failed Claude process cannot save its otherwise valid Try feedback [151.96ms]
+(pass) Claude chat rejects a failed process with a valid result (stream: %s) [158.27ms]
+(pass) Claude chat rejects a failed process with a valid result (stream: %s) [184.44ms]
+
+ 20 pass
+ 0 fail
+ 39 expect() calls
+Ran 20 tests across 1 file. [3.57s]

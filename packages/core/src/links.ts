@@ -21,7 +21,9 @@ export function parseLinks(text: string): { text: string; target: LinkTarget; in
 }
 
 type MdNode = { type: string; url?: string; identifier?: string; value?: string; children?: MdNode[]; position?: { start: { line: number } } };
-const ORE_URL = /^ore:(item|skill)\/(\S+)$/;
+// Markdown has already parsed the destination (including <...> around spaces). Keep the ID
+// verbatim: hand-written skill IDs may contain spaces, and trimming would change the target.
+const ORE_URL = /^ore:(item|skill)\/(.+)$/;
 const textOf = (n: MdNode): string => n.value ?? (n.children ?? []).map(textOf).join("");
 
 /** The Ore links a note shows as links, as Markdown renders it: none in code or after an escaped bracket,

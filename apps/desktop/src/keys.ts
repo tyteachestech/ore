@@ -320,6 +320,16 @@ export const IN_REVIEW: ReadonlySet<string> = new Set<KeyId>(["no-idea", "in-hea
 /** App keys that work in Review too (⌘↵, the passage arrows, Undo and Redo, by its button and the toast), and the quick quiz, which works from any app. */
 const IN_REVIEW_TOO: ReadonlySet<string> = new Set<KeyId>(["finish", "passage-next", "passage-prev", "undo", "redo", "quick-quiz"]);
 
+/** Review's fixed digits, with a keypad in numeric mode treated like the top row.
+ *  Keypad bindings were already allowed: an assigned command keeps its key. */
+export function reviewDigit(e: KeyboardEvent): number | null {
+  if (e.metaKey || e.ctrlKey || e.altKey) return null;
+  if (/^Digit[1-4]$/.test(e.code)) return Number(e.code.slice(-1));
+  if (!/^Numpad[1-4]$/.test(e.code) || e.key !== e.code.slice(-1)) return null;
+  if (DEFAULTS.some((b) => (IN_REVIEW.has(b.id) || IN_REVIEW_TOO.has(b.id)) && is(e, b.id))) return null;
+  return Number(e.key);
+}
+
 const scope = (x: Binding) => (x.scope === "diagram" ? "diagram" : IN_REVIEW.has(x.id) ? "review" : "app");
 /** A source has sound of its own or it hasn't, so their keys are never live together. */
 function apart(x: Binding, y: Binding) {
@@ -342,8 +352,8 @@ const put = (next: Record<string, Combo>, id: KeyId, combo: Combo) => {
   else next[id] = combo;
 };
 
-/** Assigns `combo` to `id`, or returns why it cannot. With `replace`, the binding that had it is left
- *  not assigned. */
+/** Assigns `combo` to `id`, or returns why it cannot. With `replace`, every binding that meets it
+ *  is left not assigned (a reader command can meet both sound and silent defaults). */
 export function rebind(id: KeyId, combo: Combo, replace = false): string | null {
   const why = invalid(id, combo);
   if (why) return why;
@@ -351,7 +361,11 @@ export function rebind(id: KeyId, combo: Combo, replace = false): string | null 
   if (taken && !replace) return `${label(combo)} is used by ${taken.label}`;
   const next = { ...overrides };
   put(next, id, combo);
-  if (taken) put(next, taken.id, "");
+  if (taken) {
+    for (const other of DEFAULTS) {
+      if (other.id !== id && meet(other, byId(id)) && keymap[other.id] === combo) put(next, other.id, "");
+    }
+  }
   commit(next);
   return null;
 }
@@ -380,3 +394,20 @@ function kept(saved: Record<string, Combo>): Record<string, Combo> {
 }
 overrides = kept(read());
 keymap = build();
+
+// Every webview has its own module cache. Read another window's settings without writing
+// them back (or emitting another storage event), using the same rules as a fresh window.
+function refreshKeys() {
+  const next = kept(read());
+  if (JSON.stringify(next) === JSON.stringify(overrides)) return;
+  overrides = next;
+  keymap = build();
+  for (const f of listeners) f();
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if ((event.key === STORE || event.key === null) && (!event.storageArea || event.storageArea === window.localStorage)) refreshKeys();
+  });
+  // A hidden webview can miss a storage notification; it catches up before he uses its keys.
+  window.addEventListener("focus", refreshKeys);
+}

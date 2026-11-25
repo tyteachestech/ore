@@ -368,3 +368,24 @@ test("archiving a skill after its failed importance edit does not save that fail
   expect(saved.priority).toBe("P3");
   expect(saved.archived).toBe(false);
 });
+
+test("list title Undo and Redo preserve a newer external title (PHONE-03)", async () => {
+  let disk = "Original";
+  const d = await device({ items: [item("a", { title: disk })], answers: (args) => {
+    if (args[0] === "show") return { title: disk };
+    if (args[0] === "edit") disk = args[3]!;
+  } });
+  await act(async () => void await d.sources().retitle("a", "Original", "Phone"));
+  await act(async () => d.t.undo());
+  await tick();
+  expect(disk).toBe("Original");
+  await act(async () => d.t.redo());
+  await tick();
+  expect(disk).toBe("Phone");
+  disk = "Mac";
+  await act(async () => d.t.undo());
+  await tick();
+  expect(disk).toBe("Mac");
+  expect(d.state.items[0]!.title).toBe("Mac");
+  expect(document.body.textContent).toContain("it was renamed since");
+});

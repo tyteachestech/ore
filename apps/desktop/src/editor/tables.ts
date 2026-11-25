@@ -86,11 +86,59 @@ export function moveLine(state: EditorState, table: number, kind: "row" | "col",
   return tr.setSelection(TextSelection.near(tr.doc.resolve(cell + 1))).scrollIntoView();
 }
 
+/** GFM cells hold one paragraph and cannot store spans. Normalize clipboard tables before the
+ *  schema parses them, keeping each value in its column. Existing notes are not rewritten here. */
+function pasteTableHTML(html: string): string {
+  if (!/<(?:td|th)\b/i.test(html)) return html;
+  const root = document.createElement("div");
+  root.innerHTML = html;
+  for (const table of Array.from(root.querySelectorAll("table")).reverse()) {
+    if (!table.querySelector("[rowspan], [colspan]")) continue;
+    const rows = Array.from(table.rows);
+    const grid: HTMLTableCellElement[][] = rows.map(() => []);
+    rows.forEach((row, r) => {
+      let col = 0;
+      for (const cell of Array.from(row.cells)) {
+        while (grid[r]![col]) col++;
+        // A zero rowspan runs to the end of its row group (thead/tbody/tfoot).
+        const groupEnd = rows.findIndex((next, i) => i > r && next.parentElement !== row.parentElement);
+        const remaining = (groupEnd < 0 ? rows.length : groupEnd) - r;
+        const height = Math.min(parseInt(cell.getAttribute("rowspan") ?? "", 10) === 0 ? remaining : Math.max(1, cell.rowSpan), remaining);
+        const width = Math.max(1, cell.colSpan);
+        for (let dr = 0; dr < height; dr++) {
+          for (let dc = 0; dc < width; dc++) {
+            const copy = cell.cloneNode(true) as HTMLTableCellElement;
+            copy.removeAttribute("rowspan");
+            copy.removeAttribute("colspan");
+            grid[r + dr]![col + dc] = copy;
+          }
+        }
+        col += width;
+      }
+    });
+    rows.forEach((row, r) => row.replaceChildren(...grid[r]!));
+  }
+  // Unwrap block boundaries into spaces, retaining inline marks, links and images. Otherwise
+  // the one-paragraph schema closes the cell at the second paragraph and creates another cell.
+  for (const cell of Array.from(root.querySelectorAll("td, th")).reverse()) {
+    const blocks = cell.querySelectorAll("p, div, h1, h2, h3, h4, h5, h6, blockquote, pre, ul, ol, li, dl, dt, dd, table, thead, tbody, tfoot, tr, td, th, hr, br");
+    if (!blocks.length) continue;
+    for (const block of Array.from(blocks).reverse()) {
+      block.replaceWith(document.createTextNode(" "), ...Array.from(block.childNodes), document.createTextNode(" "));
+    }
+    const paragraph = document.createElement("p");
+    paragraph.append(...Array.from(cell.childNodes));
+    cell.replaceChildren(paragraph);
+  }
+  return root.innerHTML;
+}
+
 /** Tab in the last cell adds a row and goes to it (Notion, Google Docs). Before the GFM keymap. */
 export const tablePlugin = $prose(
   () =>
     new Plugin({
       props: {
+        transformPastedHTML: pasteTableHTML,
         handleKeyDown: (view, e) => {
           if (e.key !== "Tab" || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey || !isInTable(view.state)) return false;
           if (goToNextCell(1)(view.state)) return false;

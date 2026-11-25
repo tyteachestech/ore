@@ -64,6 +64,20 @@ const CASES: { name: string; add: string; serve?: Record<string, [string, string
   { name: "pdf-scripts", add: join(FIX, "files/scripts.pdf") }, // Russian, Greek, Japanese, Chinese, Arabic
   { name: "pdf-code", add: join(FIX, "files/code.pdf") }, // code blocks and typewriter words (make-code-pdf.py)
   { name: "epub", add: join(FIX, "files/book.epub") }, // make-book-epub.ts
+  { name: "office-word-merged", add: join(FIX, "office/word-merged.docx") },
+  { name: "office-rtf-cp1251", add: join(FIX, "office/rtf-cp1251.rtf") },
+  { name: "office-slides-table", add: join(FIX, "office/slides-table.pptx") },
+  { name: "office-sheets-formula", add: join(FIX, "office/sheets-formula.xlsx") },
+  { name: "office-sheets-time", add: join(FIX, "office/sheets-time.xlsx") },
+  { name: "office-notebook-attachment", add: join(FIX, "office/notebook-attachment.ipynb") },
+  { name: "office-notebook-error", add: join(FIX, "office/notebook-error.ipynb") },
+  { name: "office-notebook-html", add: join(FIX, "office/notebook-html.ipynb") },
+  { name: "office-notebook-order", add: join(FIX, "office/notebook-order.ipynb") },
+  { name: "office-text-relative", add: join(FIX, "office/text-relative.md") },
+  { name: "office-word-outline", add: join(FIX, "office/word-outline.docx") },
+  { name: "office-word-outline-after-plain", add: join(FIX, "office/word-outline-after-plain.docx") },
+  { name: "office-notebook-cell-attachments", add: join(FIX, "office/notebook-cell-attachments.ipynb") },
+  { name: "office-text-reference", add: join(FIX, "office/text-reference.md") },
   { name: "epub-front-matter", add: join(FIX, "files/front-matter.epub") }, // make-study-epubs.ts: a publisher's pages before the text, marked
   { name: "word", add: join(FIX, "files/notes.docx") },
   { name: "powerpoint", add: join(FIX, "files/deck.pptx") },

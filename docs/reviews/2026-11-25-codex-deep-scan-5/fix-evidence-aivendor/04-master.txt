@@ -1,0 +1,5 @@
+$ bun codex-out/aivendor/small-paths.ts recall-race
+[DEEP] {"error":"","answer":"Recall strengthens memory.","feedback":{"feedback":"Rereading alone is not sufficient.","questions":[{"n":1,"feedback":"Your answer missed retrieval."}],"missed":["Retrieval"],"section_lines":null,"ai":{"vendor":"claude","model":"claude-fake","prompt_version":"recall-feedback@4"}}}
+[DEEP] FAIL feedback for the old answer must not be saved on the corrected answer
+
+Exit: 1

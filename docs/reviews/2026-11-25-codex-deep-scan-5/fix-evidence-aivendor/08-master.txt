@@ -1,0 +1,5 @@
+$ bun codex-out/aivendor/reply-edges.ts blank
+[DEEP] {"error":"","saved":{"text":"","ai":{"vendor":"claude","model":"claude-fake","prompt_version":"try-line@1"}},"calls":1}
+[DEEP] FAIL a whitespace-only feedback reply must be rejected or retried, not saved empty
+
+Exit: 1

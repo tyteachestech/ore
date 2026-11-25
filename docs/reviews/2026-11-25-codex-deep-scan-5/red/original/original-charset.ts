@@ -1,0 +1,21 @@
+import { fresh, log } from './harness';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import assert from 'node:assert/strict';
+const { addSource, reimportSource } = await import('../../packages/core/src/ingest/index');
+const { sourceFile } = await import('../../packages/core/src/items');
+const lib = fresh('original-charset');
+// The public-domain Japanese sentence and Shift_JIS bytes from the F38 intake test.
+const title = [0x93,0xfa,0x96,0x7b,0x82,0xcc,0x95,0xb6,0x8a,0x77];
+const line = [0x8c,0xe1,0x94,0x79,0x82,0xcd,0x94,0x4c,0x82,0xc5,0x82,0xa0,0x82,0xe9,0x81,0x42];
+const para = Array.from({length: 10}, () => line).flat();
+const bytes = Buffer.from([...Buffer.from('<html><head><meta charset="Shift_JIS"><title>'), ...title, ...Buffer.from('</title></head><body><article><h1>'), ...title, ...Buffer.from('</h1><p>'), ...para, ...Buffer.from('</p><p>'), ...para, ...Buffer.from('</p></article></body></html>')]);
+const input = join(lib.root, 'japanese.html'); writeFileSync(input, bytes);
+const item = await addSource(lib, input);
+assert(item.meta.title === '日本の文学' && item.body.includes('吾輩は猫である。'), 'F38 import is correct');
+const kept = readFileSync(sourceFile(item)!);
+const encoding = /charset="([^"]+)"/.exec(kept.toString('latin1'))![1]!;
+const shownTitle = new TextDecoder(encoding).decode(kept).match(/<title>(.*?)<\/title>/)![1];
+const originalTitle = new TextDecoder(encoding).decode(bytes).match(/<title>(.*?)<\/title>/)![1];
+log('original-charset', { originalTitle, importedTitle: item.meta.title, keptDeclaration: encoding, keptTitleWhenDecodedAsDeclared: shownTitle, identicalBytes: bytes.equals(kept), reimportChanged: (await reimportSource(lib, item.meta.id)).changed });
+assert.equal(shownTitle, originalTitle, 'The kept HTML original must remain readable in its own declared encoding');

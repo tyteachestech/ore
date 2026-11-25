@@ -1,0 +1,11 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/digs.test.ts:
+(pass) the Dig: a skill explained from memory against its key points (D325) > a dig keeps what he wrote with the ideas as they stood: the skill's key points, fixed before anything reads it [33.87ms]
+(pass) the Dig: a skill explained from memory against its key points (D325) > the gap widens with each dig and a skill is only ever ready, never owed; no goal, nothing to dig [19.65ms]
+(pass) the Dig: a skill explained from memory against its key points (D325) > a session offers one skill: ready, with ideas to check against, the one dug longest ago, and none in the week after a dig [33.74ms]
+
+ 3 pass
+ 0 fail
+ 26 expect() calls
+Ran 3 tests across 1 file. [119.00ms]

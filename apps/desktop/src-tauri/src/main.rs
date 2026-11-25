@@ -559,6 +559,14 @@ fn show_main(app: &AppHandle) {
     }
 }
 
+/// Commands outside Review still open the main app when chosen from the quiz's menu.
+#[tauri::command]
+fn menu_main(app: AppHandle, id: String) {
+    if !id.starts_with("ore:") { return; }
+    show_main(&app);
+    let _ = app.emit_to("main", "menu", id);
+}
+
 /// "Open in source" from the quiz: the main window opens that source, at that highlight.
 #[tauri::command]
 fn quiz_open_source(app: AppHandle, item: String, at: Option<String>) {
@@ -635,7 +643,18 @@ fn set_tray(app: AppHandle, on: bool, tip: String) -> Result<(), String> {
 /// The Mac menu bar, as `menu.ts` describes it: menus of command items (`ore:<binding>`, shown
 /// with their shortcut, run in the page as that shortcut) and standard macOS items by name.
 #[tauri::command]
-fn set_app_menu(app: AppHandle, menus: Vec<Value>) -> Result<(), String> {
+fn set_app_menu(app: AppHandle, window: tauri::WebviewWindow, menus: Vec<Value>) -> Result<(), String> {
+    // A background page must not replace the key window's menu. With no Ore window focused (Ore opened
+    // behind another app), the main window's menu stands: skipping it left the menu bar empty until a
+    // focus change that could arrive before the page listened for it.
+    let focused = app.webview_windows().into_values().find(|w| w.is_focused().unwrap_or(false));
+    let mine = match &focused {
+        Some(w) => w.label() == window.label(),
+        None => window.label() == "main",
+    };
+    if !mine {
+        return Ok(());
+    }
     let e = |e: tauri::Error| e.to_string();
     let bar = Menu::new(&app).map_err(e)?;
     for m in &menus {
@@ -714,16 +733,19 @@ fn main() {
                 .with_state_flags(StateFlags::all() & !StateFlags::VISIBLE)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![ore, ore_cancel, player_port, define, clipboard_count, clipboard_text, clipboard_files, set_reminder, login_item, quiz_hide, quiz_open_source, set_quiz_shortcut, set_tray, set_app_menu])
+        .invoke_handler(tauri::generate_handler![ore, ore_cancel, player_port, define, clipboard_count, clipboard_text, clipboard_files, set_reminder, login_item, quiz_hide, quiz_open_source, set_quiz_shortcut, set_tray, set_app_menu, menu_main])
         .on_menu_event(|app, e| {
             let id = e.id().as_ref();
             if !id.starts_with("ore:") {
                 return; // the menu bar item's own menu
             }
-            if id != "ore:quick-quiz" {
-                show_main(app);
+            if id == "ore:quick-quiz" {
+                toggle_quiz(app);
+            } else if let Some(w) = app.webview_windows().values().find(|w| w.is_focused().unwrap_or(false)) {
+                let _ = app.emit_to(w.label(), "menu", id);
+            } else {
+                menu_main(app.clone(), id.to_string());
             }
-            let _ = app.emit_to("main", "menu", id);
         })
         // Images in notes (D38) load from the library through the asset protocol; nothing else on disk does.
         .setup(|app| Ok(app.asset_protocol_scope().allow_directory(library(), true)?))

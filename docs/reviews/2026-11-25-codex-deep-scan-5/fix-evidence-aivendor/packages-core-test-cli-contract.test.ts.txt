@@ -1,0 +1,32 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/cli-contract.test.ts:
+(pass) the CLI as an agent drives it > an edit with an unknown skill changes nothing, not even the title before it [57.01ms]
+(pass) the CLI as an agent drives it > add --for a question that isn't there adds nothing [44.16ms]
+(pass) the CLI as an agent drives it > add and inbox --add refuse a skill that doesn't exist, as edit does [165.81ms]
+49 |     expect((await ore(lib.root, ["add", "--stdin", "--skill", "learning", "--no-enrich", "--json"], { stdin: "# Retrieval\n\nTesting yourself helps." })).code).toBe(0);
+50 |   });
+51 | 
+52 |   test("an inbox import where every link fails exits non-zero and keeps them", async () => {
+53 |     const lib = await tempLibrary();
+54 |     const server = Bun.serve({ port: 0, fetch: () => new Response("gone", { status: 404 }) });
+                            ^
+error: Failed to start server. Is port 0 in use?
+ syscall: "listen",
+   errno: 0,
+    code: "EADDRINUSE"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/cli-contract.test.ts:54:24)
+(fail) the CLI as an agent drives it > an inbox import where every link fails exits non-zero and keeps them [9.56ms]
+(pass) the CLI as an agent drives it > card edit with an editor that fails exits non-zero, and --json stays JSON [85.28ms]
+(pass) the CLI as an agent drives it > an AI rating without its stamp is refused before anything is logged (D21) [44.74ms]
+(pass) the CLI as an agent drives it > a feed that isn't there points at a command that works [107.55ms]
+(pass) the CLI as an agent drives it > an exercise edited in review keeps its history: card set and card show answer as card show --review does [205.81ms]
+(pass) the CLI as an agent drives it > card show names the source's folder without reading its doc.md [55.71ms]
+(pass) doctor > a session or variant line that parses but isn't a record is reported [28.67ms]
+(pass) doctor > retiring a card whose source is gone, as doctor suggests, clears the error [96.34ms]
+
+ 10 pass
+ 1 fail
+ 34 expect() calls
+Ran 11 tests across 1 file. [931.00ms]

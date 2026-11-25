@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { z } from "zod";
-import { findItem, updateItemMeta } from "../items.ts";
+import { findItem, updateItemMeta, type ItemMeta } from "../items.ts";
 import { chapterMarker, readNotes, sectionLines } from "../notes.ts";
 import type { Library } from "../library.ts";
 import { runAgent } from "./adapter.ts";
@@ -21,14 +21,19 @@ function sectionCheck(d: Output, given: unknown[]): string | null {
   return null;
 }
 
+// Compare exactly the question/answer input sent to the vendor, not unrelated check marks.
+function recallQuestions(meta: ItemMeta) {
+  return (meta.prequestions ?? [])
+    .map((p, i) => ({ n: i + 1, q: p.q, before: p.before ?? null, after: p.after ?? null, skipped: !!p.skipped }))
+    .filter((p) => !p.skipped)
+    .map(({ skipped: _, ...p }) => p);
+}
+
 // D18 finish step: feedback on Tyler's after-answers and free recall, stored
 // as recall.feedback. Never a score.
 export async function recallFeedback(lib: Library, ref: string) {
   const item = findItem(lib, ref);
-  const prequestions = (item.meta.prequestions ?? [])
-    .map((p, i) => ({ n: i + 1, q: p.q, before: p.before ?? null, after: p.after ?? null, skipped: !!p.skipped }))
-    .filter((p) => !p.skipped)
-    .map(({ skipped: _, ...p }) => p);
+  const prequestions = recallQuestions(item.meta);
   const recall = item.meta.recall?.text;
   const sections = sectionLines(readNotes(item));
   const answered = new Set(prequestions.filter((p) => p.after !== null || p.before !== null).map((p) => p.n));
@@ -48,6 +53,7 @@ export async function recallFeedback(lib: Library, ref: string) {
   });
   await updateItemMeta(lib, item.meta.id, (m) => {
     if (m.recall?.text !== recall) throw new Error("recall text changed while feedback was running; run ore recall --feedback again");
+    if (JSON.stringify(recallQuestions(m)) !== JSON.stringify(prequestions)) throw new Error("prequestions changed while feedback was running; run ore recall --feedback again");
     return { ...m, recall: { ...m.recall, feedback: { ...data, ai } } };
   });
   return { item: item.meta.id, ...data, ai };

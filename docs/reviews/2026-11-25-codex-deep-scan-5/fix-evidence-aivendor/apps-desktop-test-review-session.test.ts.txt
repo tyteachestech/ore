@@ -1,0 +1,33 @@
+bun test v1.4.4 (38afee6c8)
+
+apps/desktop/test/review-session.test.ts:
+(pass) it starts a session, reads today and what is due, and names the session in every rating [3.13ms]
+(pass) a rating given before the session has started waits for it, so it never goes in unnamed [2.61ms]
+(pass) a second press while a rating saves does nothing: one review is written, one step moves on [3.83ms]
+(pass) a rating that fails to save says why and leaves the exercise, the count and the time as they were [5.11ms]
+(pass) a miss comes back a few exercises on, and its second answer is one more step [1.44ms]
+(pass) ⌘Z takes the newest rating back and shows that exercise again; ⇧⌘Z gives the same rating again [1.48ms]
+(pass) a ⌘Z pressed while a rating saves waits, and goes to the history once it has [3.80ms]
+(pass) the last rating ends the session on the end screen, and ⌘Z there opens it again on that exercise [2.60ms]
+(pass) Esc while a rating saves does nothing; after it, the session ends once and closes [3.81ms]
+(pass) closed mid-save (a click away from the quick quiz): the session ends by its id, the rating still lands, and its ⌘Z then only changes the log [7.68ms]
+(pass) closed before the session began: it ends at once, by its id, when it has [2.55ms]
+(pass) left before rating anything: it closes with no end screen, and with nothing due it says why [6.38ms]
+(pass) Later puts the exercise at the end and records nothing; ⌘Z brings it back as he had it, its clock going on [1.48ms]
+(pass) Later on every exercise left ends the session with them still due; ⌘Z opens it again on the last [2.69ms]
+(pass) a Later whose exercise has left the session leaves the history, and the press goes on to the step before [2.70ms]
+(pass) an exercise retired since stays out when an older rating is taken back [1.43ms]
+(pass) the day's goal closing is said once and the session goes on; taking that rating back opens it again [1.42ms]
+(pass) a goal that closes on a miss gets one likely recall first (D177); the quick quiz ends at its goal [3.96ms]
+(pass) one write at a time on the exercise on screen: an edit holds a rating off until it has saved [1.42ms]
+(pass) the next exercise loads ahead and is used only when a rating or a Later moved on to it [1.40ms]
+(pass) an exercise ⌘Z brings back is a new showing, even when the screen never drew the one between [6.39ms]
+(pass) a rating's undo that arrives while another rating saves is refused, not counted as done [6.38ms]
+(pass) two Undos held during review saving can both be redone in the same session [15.35ms]
+(pass) end-screen Undo stays removed when reopening fails and can be redone after recovery [6.58ms]
+(pass) a session that can't be opened again after an end-screen Undo still takes his next rating, in no session (F618) [5.31ms]
+
+ 25 pass
+ 0 fail
+ 114 expect() calls
+Ran 25 tests across 1 file. [213.00ms]

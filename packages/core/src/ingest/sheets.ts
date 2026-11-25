@@ -72,16 +72,18 @@ const DATE_TIMES = new Set([22]);
 const TIMES = new Set([18, 19, 20, 21, 45, 46, 47]);
 /** Its built-in percent formats, by their decimals: 0% and 0.00%. */
 const PERCENTS = new Map([[9, 0], [10, 2]]);
-type Shown = "date" | "datetime" | "time" | { percent: number } | undefined;
+type Shown = "date" | "datetime" | "time" | "duration" | { percent: number } | undefined;
 
 /** How a cell format shows a number: a format of the book's own by its letters, outside quoted text. */
 function shown(id: number, code: string | undefined): Shown {
   if (DATES.has(id)) return "date";
   if (DATE_TIMES.has(id)) return "datetime";
+  if (id === 46) return "duration";
   if (TIMES.has(id)) return "time";
   if (PERCENTS.has(id)) return { percent: PERCENTS.get(id)! };
   const c = code?.replace(/\[(?![hms]+\])[^\]]*\]|"[^"]*"|\\./gi, "").toLowerCase() ?? "";
   if (c.includes("%")) return { percent: c.match(/\.(0+)/)?.[1]!.length ?? 0 };
+  if (/\[[hms]+\]/.test(c)) return "duration";
   const day = /[dy]/.test(c);
   const time = /h|s|\[m+\]/.test(c);
   return day && time ? "datetime" : day ? "date" : time ? "time" : undefined;
@@ -94,8 +96,9 @@ const round = (n: number, d: number) => {
 };
 const pad = (n: number) => String(n).padStart(2, "0");
 /** A time of day or a duration from its fraction of a day: 0.5208 → 12:30, 1.5 → 36:00. */
-function clock(days: number): string {
-  const secs = Math.round(days * 86400);
+function clock(days: number, elapsed: boolean): string {
+  const total = Math.round(days * 86400);
+  const secs = elapsed ? total : ((total % 86400) + 86400) % 86400;
   const s = secs % 60;
   return `${Math.floor(secs / 3600)}:${pad(Math.floor(secs / 60) % 60)}${s ? `:${pad(s)}` : ""}`;
 }
@@ -129,7 +132,9 @@ export function xlsxToDoc(data: Uint8Array): SheetDoc {
   const sections: string[] = [];
   for (const s of book.matchAll(/<sheet\b[^>]*>/g)) {
     if (/hidden/i.test(attr(s[0], "state") ?? "")) continue;
-    const xml = read(parts.find((r) => r.id === attr(s[0], "r:id"))?.path ?? "");
+    const sheet = parts.find((r) => r.id === attr(s[0], "r:id"));
+    if (!sheet || !files[sheet.path]) throw new Error("This Excel file is missing a listed worksheet. Download it again or save a fresh copy in Excel.");
+    const xml = read(sheet.path);
     const rows: string[][] = [];
     for (const r of xml.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
       if (!r[2]) continue;
@@ -142,12 +147,19 @@ export function xlsxToDoc(data: Uint8Array): SheetDoc {
         let text = t === "s" ? (strings[Number(v)] ?? "") : t === "inlineStr" ? cellText(inner.match(/<is>([\s\S]*?)<\/is>/)?.[1] ?? "") : t === "b" ? (v === "1" ? "TRUE" : "FALSE") : v;
         const num = (!t || t === "n") && v && !Number.isNaN(Number(v));
         const as = num ? xfs[Number(attr(a, "s") ?? 0)] : undefined;
-        if (as === "time") text = clock(Number(v));
+        if (as === "time" || as === "duration") text = clock(Number(v), as === "duration");
         else if (typeof as === "object") text = `${round(Number(v) * 100, as.percent)}%`;
         else if (as) {
           const iso = new Date(Math.round((Number(v) - epoch) * 86400) * 1000).toISOString();
           text = as === "date" ? iso.slice(0, 10) : iso.slice(0, 16).replace("T", " ");
         } else if (num) text = String(Number(Number(v).toPrecision(15))); // as Excel shows it: 15 digits, so 0.1+0.2 is 0.3
+        // Exporters may leave a formula pending recalculation. Keep its expression instead of a blank.
+        // A saved text result that is empty (`t="str"` with `<v></v>`: =IF(A2="","",…)) is a blank cell, not a pending one.
+        if (!v && /<f\b/.test(inner) && !(t === "str" && /<v\b/.test(inner))) {
+          const formula = xmlText(inner.match(/<f\b[^>]*>([\s\S]*?)<\/f>/)?.[1] ?? "");
+          if (!formula) throw new Error("This workbook has an uncached shared formula. Open it in Excel or LibreOffice, recalculate and save it, then add that copy.");
+          text = `=${formula}`;
+        }
         // Only cells with something in them count: a styled empty cell far to the right is nothing.
         if (text) row[attr(a, "r") ? column(attr(a, "r")!) : row.length] = text;
       }

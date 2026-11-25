@@ -16,7 +16,7 @@ import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, oreWith, searchFieldsOf, oreJob, opt, PHONE, type Item, type Question as QuestionView, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, ore, oreWith, searchFieldsOf, oreJob, opt, PHONE, type Item, type Question as QuestionView, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
@@ -42,12 +42,12 @@ import { Feed, feedProof, type FeedPost, type FoundFeed } from "./Feed";
 import { dueSkills, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { Review } from "./Review";
 import { useToast } from "./Toast";
-import { lineAfter, lineKey, type Line } from "./lines";
+import { courseGroups, lineAfter, lineKey, type Line } from "./lines";
 import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
 import { readGuard } from "./reads";
 import { change, type Change } from "./change";
 import { skillActions, sourceActions, statusArgs, type Lists } from "./list-actions";
-import { listenMenu, setMenu } from "./menubar";
+import { useMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
 import { askDig } from "./Dig";
@@ -371,7 +371,7 @@ export function App() {
     );
   }, [notify]);
 
-  /** Loads the sources and the skills, at launch and on a Try again after `ore` failed. */
+  /** Loads the sources and the skills, at launch, on return and on a Try again after `ore` failed. */
   const reload = useCallback(() => {
     void refresh();
     reloadSkills();
@@ -406,14 +406,14 @@ export function App() {
     const back = () => {
       if (!left || Date.now() - left < 10_000) return;
       left = 0;
-      void refresh();
+      reload();
       void fromPhone();
       wakeScreens();
     };
     addEventListener("blur", away);
     addEventListener("focus", back);
     return () => (clearTimeout(first), removeEventListener("blur", away), removeEventListener("focus", back));
-  }, [notify, refresh, reload]);
+  }, [notify, reload]);
 
   useEffect(() => save("ore.view", JSON.stringify({ status, skill })), [status, skill]);
 
@@ -506,11 +506,13 @@ export function App() {
             // Lessons added before D92 as bare videos get their page's text when the link is added again.
             const filled = r.filled?.length ? `added the page text to ${r.filled.length} lesson${r.filled.length > 1 ? "s" : ""}` : "";
             const id = r.course.id;
+            // Record every effect of re-adding, even when the receipt also has new or filled lessons.
+            const already = again(r.course.title, r.first?.status === "done", r.filed, r.restored.length > 0, (ids) => ore("course", "set", id, opt("skills", ids.join(","))), (on) => ore("course", "archive", id, ...(on ? [] : ["--undo"]), opt("lessons", r.restored.join(","))), r.skills);
             added = r.lessons.length
               ? `Added ${count(r.lessons.length, "lesson")} of “${r.course.title}”${filled ? `; ${filled}` : ""}`
               : filled
                 ? `“${r.course.title}”: ${filled}`
-                : again(r.course.title, r.first?.status === "done", r.filed, r.restored.length > 0, (ids) => ore("course", "set", id, opt("skills", ids.join(","))), (on) => ore("course", "archive", id, ...(on ? [] : ["--undo"]), opt("lessons", r.restored.join(","))), r.skills);
+                : already;
             if (!r.lessons.length && !filled) here++;
             if (!r.lessons.length && r.first) last = { ...r.first } as Item;
             if (r.failed.length) {
@@ -718,14 +720,8 @@ export function App() {
 
   // The Mac menu bar: rebuilt when a shortcut or the screen changes, so Source and Review items
   // are greyed out where they do nothing.
-  const keysRef = useRef(keys);
-  keysRef.current = keys;
   const [sound, setSound] = useState(false);
-  useEffect(() => setMenu(keys, { reader: !!openId, review: !!reviewing, sound: !!openId && sound }), [keys, openId, reviewing, sound]);
-  useEffect(() => {
-    const un = listenMenu(() => keysRef.current);
-    return () => void un.then((f) => f());
-  }, []);
+  useMenu({ reader: !!openId, review: !!reviewing, sound: !!openId && sound });
 
   /** A skill's page (D46): its stats, skill note, questions and sources. */
   const openSkill = useCallback((id: string | null) => {
@@ -1257,25 +1253,13 @@ export function App() {
   /** The list with each course as one row (D79), placed where its first lesson sorts: in To read while
    *  any lesson is left, in Done once all are done; its lessons follow it when open. A filter lists lessons. */
   const groups = useMemo((): Line[][] => {
-    if (status === "archived") return tabRows.map((item) => [{ kind: "item", item }]);
-    const out: Line[][] = [];
-    const seen = new Set<string>();
-    for (const item of tabRows) {
-      const c = item.course;
-      if (!c) {
-        out.push([{ kind: "item", item }]);
-        continue;
-      }
-      if (seen.has(c.id)) continue;
-      seen.add(c.id);
-      const lessons = lessonsOf(inSkill, c.id);
-      const next = nextLesson(lessons);
-      if ((status === "done") !== !next) continue;
-      const open = openCourses.includes(c.id);
-      const head: Line = { kind: "course", id: c.id, title: c.title, url: c.url, lessons, next, open };
-      out.push(open ? [head, ...lessons.filter((l) => passes(l, filters)).map((l): Line => ({ kind: "item", item: l, lesson: true }))] : [head]);
-    }
-    return out;
+    return courseGroups(inSkill, tabRows, status, filters, openCourses).map((group) => {
+      const head = group[0]!;
+      if (head.kind !== "course" || !head.open) return group;
+      // The Mac expands a course inline; the phone opens its lessons on their own screen.
+      const lessons = head.lessons;
+      return [head, ...lessons.filter((l) => passes(l, filters)).map((item): Line => ({ kind: "item", item, lesson: true }))];
+    });
   }, [tabRows, inSkill, status, openCourses, filters]);
   const lines = useMemo(
     (): Line[] => (q ? rows.map((item) => ({ kind: "item", item })) : (onSkillPage && !showAll ? groups.slice(0, SKILL_CAP) : groups).flat()),

@@ -1,0 +1,34 @@
+import { fresh, log } from './harness';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join, posix } from 'node:path';
+import assert from 'node:assert/strict';
+import { unzipSync, zipSync, strFromU8, strToU8 } from '../../packages/core/node_modules/fflate';
+const { addSource, reimportSource, undoReimport } = await import('../../packages/core/src/ingest/index');
+const { addHighlight, readAnnotations } = await import('../../packages/core/src/annotations');
+const { sourceFile, findItem } = await import('../../packages/core/src/items');
+const lib = fresh('slides-reimport');
+const input = join(lib.root, 'lesson.pptx');
+writeFileSync(input, readFileSync('packages/core/test/fixtures/intake/files/deck.pptx'));
+const item = await addSource(lib, input);
+const exact = 'Start with the cocktail party example.';
+const hl = addHighlight(item, {exact, intent: 'keep', note: 'My reminder about selective attention.'});
+const original = sourceFile(item)!;
+const files = unzipSync(readFileSync(original));
+const rel = 'ppt/slides/_rels/slide1.xml.rels';
+const xml = strFromU8(files[rel]!);
+const target = /Target="(\.\.\/notesSlides\/[^\"]+)"/.exec(xml)![1]!;
+const key = posix.normalize(posix.join('ppt/slides', target));
+assert(files[key], 'Notes exist at their resolved target');
+files[rel] = strToU8(xml.replace(target, '/' + key));
+if (process.argv.includes('--relative')) files[rel] = strToU8(xml);
+writeFileSync(original, zipSync(files));
+const changed = await reimportSource(lib, item.meta.id);
+const now = findItem(lib, item.meta.id);
+const live = readAnnotations(now);
+const preserved = live.some(a => a.id === hl.id && a.note === hl.note);
+log('slides-reimport', { targetBefore: target, targetAfter: process.argv.includes('--relative') ? target : '/' + key, targetEntryPresent: !!files[key], notesPartBytes: files[key]!.length, changed: changed.changed, removed: changed.removed.map(a => ({exact:a.exact,note:a.note})), notesRemain: now.body.includes(exact), highlightRemains: preserved });
+if (changed.step) {
+ await undoReimport(lib, item.meta.id, changed.step);
+ log('undo', { highlightRestored: readAnnotations(findItem(lib,item.meta.id)).some(a=>a.id===hl.id), notesRestored: findItem(lib,item.meta.id).body.includes(exact) });
+}
+assert(preserved, 'Reimport of equivalent PowerPoint relationships must preserve a highlight and its note on speaker notes');

@@ -1,0 +1,5 @@
+$ bun codex-out/aivendor/small-paths.ts check-race
+[DEEP] {"error":"","inputPoints":["Retrieval","Spacing"],"points":[{"text":"New point A","evidence":[]},{"text":"New point B","evidence":[]},{"text":"New point C","evidence":[]}],"check":{"covered":[true,false],"ai":{"vendor":"claude","model":"claude-fake","prompt_version":"check@1"}}}
+[DEEP] FAIL late check must not put two marks on three changed key points
+
+Exit: 1

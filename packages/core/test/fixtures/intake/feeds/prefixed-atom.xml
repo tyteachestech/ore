@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<a:feed xmlns:a="http://www.w3.org/2005/Atom" xmlns:other="https://example.test/extension" xml:base="https://example.test/">
+  <a:title>Prefixed lessons</a:title><a:link href="lessons/"/>
+  <a:entry>
+    <other:title>Extension title is not the title</other:title>
+    <a:title>Use &lt;T&gt;</a:title><a:link href="post"/>
+    <a:author><a:name>Ada</a:name></a:author><a:published>2026-11-20T12:00:00Z</a:published>
+    <a:content type="html">&lt;img src="diagram.png"&gt;</a:content>
+  </a:entry>
+</a:feed>

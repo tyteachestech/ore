@@ -82,7 +82,10 @@ function markdown(runs: Run[]): string {
 }
 
 export function rtfToDoc(data: Uint8Array): RtfDoc {
-  const src = new TextDecoder("latin1").decode(data).replace(/^\xEF\xBB\xBF/, "");
+  // Keep each input byte intact until the active document/font code page is known.
+  let src = "";
+  for (let i = 0; i < data.length; i += 8192) src += String.fromCharCode(...data.subarray(i, i + 8192));
+  src = src.replace(/^\xEF\xBB\xBF/, "");
   if (!src.startsWith("{\\rtf")) throw new Error("That RTF file is damaged: it doesn’t start as one. Open it in TextEdit or Word and save it again.");
   let codepage = "windows-1252";
   const charsets = new Map<number, number>();
@@ -190,7 +193,7 @@ export function rtfToDoc(data: Uint8Array): RtfDoc {
     if (ch !== "\\") {
       // Plain text runs to the next control or brace.
       const end = src.slice(i).search(/[\\{}\r\n]/);
-      put(src.slice(i, end < 0 ? undefined : i + end));
+      for (const byte of src.slice(i, end < 0 ? undefined : i + end)) bytes.push(byte.charCodeAt(0));
       i = end < 0 ? src.length : i + end;
       continue;
     }

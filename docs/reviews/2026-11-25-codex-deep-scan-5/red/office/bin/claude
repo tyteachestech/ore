@@ -1,0 +1,3 @@
+#!/bin/sh
+echo 'AI disabled for office scout' >&2
+exit 91

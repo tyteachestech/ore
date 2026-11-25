@@ -307,3 +307,96 @@ describe("the Feed and what he saved meanwhile", () => {
     expect(posts.find((p) => p.url.endsWith("/newest"))!.preview).toBe(item.meta.id);
   });
 });
+
+test("a reorder rejects duplicate resolved subscriptions without changing feeds.yaml (feeds-02)", async () => {
+  serve();
+  const lib = await tempLibrary();
+  const a = (await followFeed(lib, "https://simonwillison.net/")).feed;
+  const b = (await followFeed(lib, "https://howiai.example.com/")).feed;
+  const before = readFileSync(join(lib.root, "feeds.yaml"), "utf8");
+  await expect(arrangeFeeds(lib, [a.url, a.title])).rejects.toThrow("give every followed feed once");
+  expect(readFileSync(join(lib.root, "feeds.yaml"), "utf8")).toBe(before);
+  await expect(arrangeFeeds(lib, [a.title, a.title.toUpperCase()])).rejects.toThrow("give every followed feed once");
+  expect(readFileSync(join(lib.root, "feeds.yaml"), "utf8")).toBe(before);
+  expect((await arrangeFeeds(lib, [b.title, a.url])).map((f) => f.url)).toEqual([b.url, a.url]);
+});
+
+function heldResponse() {
+  let resolve!: (r: Response) => void;
+  const promise = new Promise<Response>((r) => { resolve = r; });
+  let started!: () => void;
+  const entered = new Promise<void>((r) => { started = r; });
+  return { resolve, promise, started, entered };
+}
+
+for (const scenario of ["follow", "newer refresh", "unfollow"] as const) {
+  test(`an older refresh preserves current subscriptions and results after ${scenario} (feeds-03)`, async () => {
+    serve();
+    const lib = await tempLibrary();
+    const a = (await followFeed(lib, "https://howiai.example.com/")).feed;
+    await refreshFeeds(lib);
+    const hold = heldResponse();
+    const previousFetch = globalThis.fetch;
+    let first = true;
+    globalThis.fetch = (async (...args: Parameters<typeof fetch>) => {
+      if (first) { first = false; hold.started(); return hold.promise; }
+      return previousFetch(...args);
+    }) as typeof fetch;
+    const older = refreshFeeds(lib);
+    await hold.entered;
+    if (scenario === "follow") {
+      const b = (await followFeed(lib, "https://simonwillison.net/")).feed;
+      await refreshFeeds(lib, [b.url]);
+    } else if (scenario === "newer refresh") {
+      await refreshFeeds(lib);
+    } else {
+      await unfollowFeed(lib, a.url);
+    }
+    hold.resolve(new Response(RSS.replace(/<item>[\s\S]*?<\/item>/g, "")));
+    await older;
+    const view = feedView(lib);
+    if (scenario === "follow") expect(view.posts.some((p) => p.title === "Prompt injection & you")).toBe(true);
+    if (scenario === "newer refresh") expect(view.posts.map((p) => p.title)).toEqual(["Newest", "Claire on agents"]);
+    if (scenario === "unfollow") expect(JSON.parse(readFileSync(join(lib.root, ".index/feeds.json"), "utf8")).feeds[a.url]).toBeUndefined();
+  });
+}
+
+test("future dates cannot consume the last-two-weeks cache or hide today's post (feeds-10)", async () => {
+  const { writeFileSync } = await import("node:fs");
+  const now = new Date();
+  const future = new Date(now.getTime() + 365 * day).toISOString();
+  const item = (name: string, date?: string) => `<item><title>${name}</title><link>https://example.test/${name}</link>${date ? `<pubDate>${date}</pubDate>` : ""}</item>`;
+  const xml = `<rss><channel><title>Dates</title>${Array.from({ length: 30 }, (_, i) => item(`future-${i}`, future)).join("")}${item("today", now.toISOString())}${item("undated")}${item("old", new Date(now.getTime() - 15 * day).toISOString())}</channel></rss>`;
+  const url = "https://example.test/feed";
+  serve(new Set(), { [url]: [xml, "application/rss+xml"] });
+  const lib = await tempLibrary();
+  await followFeed(lib, url);
+  await refreshFeeds(lib);
+  expect(feedView(lib, now).posts.map((p) => p.title)).toEqual(["today", "undated"]);
+  const path = join(lib.root, ".index/feeds.json");
+  const cache = JSON.parse(readFileSync(path, "utf8"));
+  expect(cache.feeds[url].posts.map((p: { title: string }) => p.title)).toEqual(["today", "undated"]);
+  // Old caches are read without rewriting them, but use the same date window.
+  cache.feeds[url].posts.unshift({ feed: url, title: "future", url: "https://example.test/future", published: future });
+  writeFileSync(path, JSON.stringify(cache));
+  const before = readFileSync(path, "utf8");
+  expect(feedView(lib, now).posts.map((p) => p.title)).toEqual(["today", "undated"]);
+  expect(readFileSync(path, "utf8")).toBe(before);
+});
+
+test("an RSS feed's site is its own <link>, not the <atom:link rel=\"self\"> WordPress puts above it", async () => {
+  const f = await parseFeed(`<rss xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Blog</title><atom:link href="https://blog.example/feed/" rel="self" type="application/rss+xml"/><link>https://blog.example</link><item><title>One</title><link>https://blog.example/one</link></item></channel></rss>`, "https://blog.example/feed/");
+  expect(f.site).toBe("https://blog.example/");
+});
+
+test("a post dated two minutes ahead waits in the cache and shows when its time comes, without another refresh", async () => {
+  const now = new Date();
+  const soon = new Date(now.getTime() + 120_000).toISOString();
+  const url = "https://example.test/soon";
+  serve(new Set(), { [url]: [`<rss><channel><title>Soon</title><item><title>scheduled</title><link>https://example.test/scheduled</link><pubDate>${soon}</pubDate></item></channel></rss>`, "application/rss+xml"] });
+  const lib = await tempLibrary();
+  await followFeed(lib, url);
+  await refreshFeeds(lib);
+  expect(feedView(lib, now).posts.map((p) => p.title)).toEqual([]);
+  expect(feedView(lib, new Date(now.getTime() + 180_000)).posts.map((p) => p.title)).toEqual(["scheduled"]);
+});

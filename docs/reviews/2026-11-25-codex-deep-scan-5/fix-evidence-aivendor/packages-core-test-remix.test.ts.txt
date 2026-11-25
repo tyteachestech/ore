@@ -1,0 +1,19 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/remix.test.ts:
+(pass) card remixing (D66) > facts and fill in the blanks stay as written; concepts, procedures and definitions remix [26.98ms]
+(pass) card remixing (D66) > starts after two passes on the original, rotates variant, variant, original, and uses each variant twice at most [22.27ms]
+(pass) card remixing (D66) > a miss goes back to the original until two passes again [14.34ms]
+(pass) card remixing (D66) > B drops a variant, E edits it, and the Remix cards switch turns variants off [20.98ms]
+(pass) card remixing (D66) > the code check: real point indices, 2 to 4 points, a new setting, and no 5-word run from the original [13.40ms]
+(pass) card remixing (D66) > remixCard writes two ahead: a failed code check is retried, a checker no is kept with its reason [420.93ms]
+(pass) card remixing (D66) > after he removes a key point or rewrites the exercise, versions made from the old one are no longer shown, and new ones are written (F600) [288.33ms]
+(pass) card remixing (D66) > a version written while he edits the exercise is not saved (F600) [355.13ms]
+(pass) card remixing (D66) > two remix runs that overlap never save the same version twice (F601) [689.66ms]
+(pass) card remixing (D66) > grading a variant uses its key points; stats compare variant and original pass rates [167.72ms]
+(pass) answering in his head (D68) > offered on an Explain card passed twice since its last miss, never on facts; logged as in_head [15.38ms]
+
+ 11 pass
+ 0 fail
+ 63 expect() calls
+Ran 11 tests across 1 file. [2.07s]

@@ -1,0 +1,79 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+73 |   process.env.ORE_AI = "codex";
+74 |   process.env.ORE_AI_MODEL = "second-author";
+75 |   fake([{ data: { came: [2], asks: [] } }]);
+76 |   await digAnswer(lib, "learning", ["Space practice."]);
+77 |   const saved = readDigs(lib, "learning")[0]!;
+78 |   expect(saved.ask_ai).toEqual(first.ai);
+                            ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "model": "first-author",
+-   "prompt_version": "dig@1",
+-   "vendor": "claude",
+- }
++ undefined
+
+- Expected  - 5
++ Received  + 1
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:78:24)
+(fail) a Dig retains both stages' authors after a vendor switch [302.24ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [331.00ms]
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+79 |   process.env.ORE_AI = "codex";
+80 |   process.env.ORE_AI_MODEL = "second-author";
+81 |   fake([{ data: { came: [2], asks: [] } }]);
+82 |   await digAnswer(lib, "learning", ["Space practice."]);
+83 |   const saved = readDigs(lib, "learning")[0]!;
+84 |   expect(saved.ask_ai).toEqual(first.ai);
+                            ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "model": "first-author",
+-   "prompt_version": "dig@1",
+-   "vendor": "claude",
+- }
++ undefined
+
+- Expected  - 5
++ Received  + 1
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:84:24)
+(fail) a Dig retains both stages' authors after a vendor switch (legacy: %s) [257.49ms]
+79 |   process.env.ORE_AI = "codex";
+80 |   process.env.ORE_AI_MODEL = "second-author";
+81 |   fake([{ data: { came: [2], asks: [] } }]);
+82 |   await digAnswer(lib, "learning", ["Space practice."]);
+83 |   const saved = readDigs(lib, "learning")[0]!;
+84 |   expect(saved.ask_ai).toEqual(first.ai);
+                            ^
+error: expect(received).toEqual(expected)
+
+- {
+-   "model": "first-author",
+-   "prompt_version": "dig@1",
+-   "vendor": "claude",
+- }
++ undefined
+
+- Expected  - 5
++ Received  + 1
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:84:24)
+(fail) a Dig retains both stages' authors after a vendor switch (legacy: %s) [228.15ms]
+
+ 0 pass
+ 2 fail
+ 2 expect() calls
+Ran 2 tests across 1 file. [516.00ms]

@@ -1,0 +1,20 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/tries.test.ts:
+(pass) tries: Apply highlights checked off with how it went (D127) > listed under the source's skills, to try first; checking off records how it went [26.38ms]
+(pass) tries: Apply highlights checked off with how it went (D127) > only a try checked off with a reflection waits for a card; Undo puts it back and drops the reflection [13.96ms]
+(pass) tries: Apply highlights checked off with how it went (D127) > a highlight of another type is not a try [10.82ms]
+(pass) tries: Apply highlights checked off with how it went (D127) > Next time I'll… closes the round and opens the try again with the new plan; one highlight per idea (D148) [15.15ms]
+(pass) tries: rounds without a write-up, and one card per idea (D148) > Next time I'll… with nothing on how it went keeps the round with its plan only, and no card waits; one step back makes it tried as it was [12.68ms]
+(pass) tries: rounds without a write-up, and one card per idea (D148) > an idea gets one card however many rounds it goes: a second write-up after the card is drafted asks for no other [12.50ms]
+(pass) the Forge: one try at a time, a plan with its cue, tries with no passage (D322) > one open try of a skill is active: the first he marked, then the one he picked last; a try that is his can't be picked [12.60ms]
+(pass) the Forge: one try at a time, a plan with its cue, tries with no passage (D322) > a plan is When, I'll and If; an empty field clears it; the passage's section comes with the try [12.00ms]
+(pass) the Forge: one try at a time, a plan with its cue, tries with no passage (D322) > uses count the rounds he closed and the last one once it is his [14.38ms]
+(pass) the Forge: one try at a time, a plan with its cue, tries with no passage (D322) > a try typed in the Forge has no passage, is listed in its skill and stays out of the source lists [12.99ms]
+(pass) the rest of the apply loop: each use keeps its moment, and what he is trying now across skills (D324) > a round closed with Again keeps the moment it was used in, so a new cue for the next use leaves the record as it was [12.94ms]
+(pass) the rest of the apply loop: each use keeps its moment, and what he is trying now across skills (D324) > trying now lists each skill's one active try, once, and none for a skill whose tries are all his [15.43ms]
+
+ 12 pass
+ 0 fail
+ 69 expect() calls
+Ran 12 tests across 1 file. [204.00ms]

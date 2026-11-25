@@ -9,7 +9,7 @@
 // Skips a pass while the Mac is loaded (mac-load.ts) so a pull never lands on a running tester.
 // Log: ~/Library/Caches/ore/auto-update.log
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { freePercent, refusal, testers } from "./mac-load";
@@ -17,6 +17,9 @@ import { freePercent, refusal, testers } from "./mac-load";
 const LABEL = "com.tylerpoelking.ore.auto-update";
 const repo = resolve(import.meta.dir, "../../..");
 const cache = join(homedir(), "Library/Caches/ore");
+const appStamp = join(cache, "app-built");
+/** A commit per failed install, so a commit that can't build is tried three times, not every pass. */
+const appFailed = join(cache, "app-failed");
 const phoneStamp = join(cache, "phone-built");
 const plist = join(homedir(), "Library/LaunchAgents", `${LABEL}.plist`);
 
@@ -47,13 +50,34 @@ function pass() {
   const why = loaded();
   if (why) return log(`skipped: ${why}`);
   if (!git("fetch", "-q", "origin", "master").ok) return log("fetch failed (offline?)");
+  let pulled = false;
   if (git("rev-parse", "HEAD").out !== git("rev-parse", "origin/master").out) {
     const pull = git("pull", "--ff-only", "-q", "origin", "master");
     log(pull.ok ? `pulled to ${git("rev-parse", "--short", "HEAD").out}` : `pull refused: ${pull.err}`);
     if (!pull.ok) return;
+    pulled = true;
   }
 
   const head = git("rev-parse", "HEAD").out;
+  // Git may already be current after a failed build. Retry through the same serialized hook;
+  // the hook records a HEAD only after installation succeeds, and a live build keeps its lock.
+  const installed = existsSync(appStamp) ? readFileSync(appStamp, "utf8").trim() : "";
+  const failed = existsSync(appFailed) ? readFileSync(appFailed, "utf8").split("\n").filter((l) => l === head).length : 0;
+  if (!pulled && installed !== head && failed >= 3) log(`not retrying ${head.slice(0, 7)}: its install failed ${failed} times (app-install.log)`);
+  else if (!pulled && installed !== head) {
+    const changed = installed ? git("diff", "--name-only", `${installed}..${head}`) : { ok: false, out: "" };
+    if (changed.ok && !changed.out.split("\n").some((f) => /^(apps\/desktop|packages)\/|^(package\.json|bun\.lock|tsconfig\.json)$/.test(f))) {
+      const tmp = `${appStamp}.${process.pid}.tmp`;
+      writeFileSync(tmp, head);
+      renameSync(tmp, appStamp);
+    } else {
+      const retry = spawnSync("/bin/sh", [join(repo, ".githooks/post-commit")], {
+        cwd: repo, encoding: "utf8", env: { ...process.env, ORE_INSTALL_RETRY: "1" },
+      });
+      if (retry.status !== 0) log(`Mac install hook failed: ${retry.stderr}`);
+    }
+  }
+
   const last = existsSync(phoneStamp) ? readFileSync(phoneStamp, "utf8").trim() : "";
   if (last === head) return;
   const diff = last ? git("diff", "--name-only", `${last}..${head}`) : { ok: false, out: "" };

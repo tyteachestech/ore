@@ -10,7 +10,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { escTaken, Hint } from "./Hint";
 import { onBackdrop, Trap } from "./Trap";
 import { comboOf, label, rebind, useKeymap } from "./keys";
-import { change } from "./change";
+import { change, valueChange } from "./change";
 import { ore, opt, PHONE } from "./ore";
 import { setSounds, setVoice, useSounds, useVoice } from "./sfx";
 import { TablesSetting } from "./Tables";
@@ -166,7 +166,15 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     const d = dataRef.current;
     if (!d) return false;
     const was = d.review[key];
-    return setting(`Changed “${NAMES[flag] ?? flag}”`, (now, on) => ({ ...now, review: { ...now.review, [key]: on ? value : was } }), (on) => ore("goal", opt(flag, String(on ? value : was))));
+    return change(notify, valueChange({
+      message: `Changed “${NAMES[flag] ?? flag}”`, kind: "quiet", key: SETTINGS,
+      field: `goal ${key}`, before: was, after: value,
+      show: (v) => {
+        const now = dataRef.current;
+        if (now) setData((dataRef.current = { ...now, review: { ...now.review, [key]: v } }));
+      },
+      write: (v) => ore("goal", opt(flag, String(v))),
+    }));
   };
 
   /** The reminder lives in skills.yaml and in a LaunchAgent that fires with the app closed (D67). */

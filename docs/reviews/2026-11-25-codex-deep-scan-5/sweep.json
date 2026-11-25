@@ -1,0 +1,4 @@
+{ "testers": [
+  { "name": "soak", "seed": "seed" },
+  { "name": "perf", "seed": "big" }
+] }

@@ -34,6 +34,9 @@ function localImage(url: string): Uint8Array | null {
   }
 }
 
+/** Whether a `file://` image would be saved: a link to one that would not must stay as it was written. */
+export const localImageSaves = (url: string) => (localImage(url)?.length ?? 0) >= MIN_IMAGE;
+
 /** Downloads the body's remote images and points the body at the saved copies. */
 export async function saveImages(body: string, opts: { referer?: string; local?: boolean } = {}): Promise<{ body: string; assets: Asset[] }> {
   // `file://` images are read only for a file he added himself (a saved page), never for a web page.

@@ -1,0 +1,9 @@
+# Your run: phone (the iPhone app's own logic)
+
+Your name is `phone`. Hunt in this order; files are starting points, not limits.
+
+1. **The phone's storage layer** (`apps/desktop/src/phone/fs.ts`, `sqlite.ts`, `node.ts`, `core.ts`, `tauri-core.ts`, `streams.ts`, `env.ts`): core runs inside the page over these shims. Compare each shim against the Node/Bun API core expects (`packages/core/src/fsutil.ts`, `lock.ts`, `db.ts`, `history.ts`): rename over an existing file, mkdir recursive, readdir of a missing folder, partial writes, NFD vs NFC names, case-only renames, binary files, `stat` fields core reads (mtime precision), errors with the `code` core checks (`ENOENT`, `EEXIST`). A shim that returns a different shape or error than Node turns into silent data loss in core.
+2. **Undo on the phone** (`phone/native-undo.ts`, shake to undo, and `apps/desktop/src/change.ts` as the phone uses it): the order of steps, Undo after the app was backgrounded and restored, Undo of a step whose file another device changed.
+3. **Reminders and the share sheet** (`phone/reminder.ts`, `phone/share-skills.ts`, `apps/phone/share/ShareViewController.swift`, `apps/phone/src-tauri/src/lib.rs`): what the share extension hands the app (URL, text, a file, several items, an item with no URL), how it is queued and picked up, an item shared twice, or while the app is closed; reminder times across a timezone or DST change and with nothing due.
+4. **PhoneApp.tsx's state against the library**: what happens when the iCloud folder changes under an open screen (a source removed, a skill renamed), when a list action from `list-actions.ts` fails half-way on the phone, and phone-only branches (`PHONE`) in shared screens that skip a check the Mac does.
+5. **Appearance, dynamic type and reading looks** (`appearance.ts`, `dynamic-type.ts`, `ReadingLooks.tsx`, `phone/Settings.tsx`): settings that are saved but never read back, read from the wrong place, or lost on a second device.

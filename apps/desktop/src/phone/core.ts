@@ -279,8 +279,10 @@ async function command<T>({ commands, errorLine }: typeof import("ore-commands")
 
 function picture(path: string): string | undefined {
   try {
-    const got = readFileSync(path) as string | Uint8Array;
-    if (typeof got === "string") return got.startsWith("data:image/") ? got : undefined;
+    const got = readFileSync(path) as unknown as Uint8Array;
+    // A picture read from the folder is held as its data URL's text.
+    const head = new TextDecoder().decode(got.subarray(0, 11));
+    if (head === "data:image/") return new TextDecoder().decode(got);
     // One this phone just saved (an import's thumbnail) is still its bytes: the same data URL the folder's read gives.
     const kind = ({ jpg: "jpeg", jpeg: "jpeg", png: "png", webp: "webp", gif: "gif" } as Record<string, string>)[path.split(".").pop()!.toLowerCase()];
     let bin = "";

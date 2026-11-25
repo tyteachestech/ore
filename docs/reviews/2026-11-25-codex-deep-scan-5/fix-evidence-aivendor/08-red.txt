@@ -1,0 +1,56 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [271.84ms]
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [237.25ms]
+(pass) recall feedback checks its prequestion input at save (after) [169.63ms]
+(pass) recall feedback checks its prequestion input at save (before) [171.93ms]
+(pass) recall feedback checks its prequestion input at save (question) [173.02ms]
+(pass) recall feedback checks its prequestion input at save (skipped) [172.24ms]
+(pass) recall feedback checks its prequestion input at save (removed) [169.39ms]
+(pass) recall feedback checks its prequestion input at save (reordered) [174.39ms]
+(pass) recall feedback checks its prequestion input at save (unchanged) [173.06ms]
+(pass) recall feedback checks its prequestion input at save (marks) [173.63ms]
+(pass) a late prequestion check matches the current question and ordered points (more) [181.72ms]
+(pass) a late prequestion check matches the current question and ordered points (text) [175.44ms]
+(pass) a late prequestion check matches the current question and ordered points (order) [176.56ms]
+(pass) a late prequestion check matches the current question and ordered points (question) [181.13ms]
+(pass) a late prequestion check matches the current question and ordered points (unchanged) [172.93ms]
+(pass) a late prequestion check matches the current question and ordered points (evidence) [173.07ms]
+(pass) ending a Dig prevents the late first-stage reply from changing its saved record [162.52ms]
+(pass) a failed Claude process cannot save its otherwise valid Try feedback [187.16ms]
+(pass) Claude chat rejects a failed process with a valid result (stream: %s) [145.87ms]
+(pass) Claude chat rejects a failed process with a valid result (stream: %s) [151.89ms]
+197 | });
+198 | 
+199 | test("blank Try feedback is rejected after retry and never saved", async () => {
+200 |   const a = await tried();
+201 |   fake([{ data: { line: " \n\t " } }]);
+202 |   await expect(tryLine(lib, a.id)).rejects.toThrow();
+                                                 ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:202:44)
+(fail) blank Try feedback is rejected after retry and never saved [171.76ms]
+206 | 
+207 | test("Try feedback retries a blank reply and trims the readable replacement", async () => {
+208 |   const a = await tried();
+209 |   fake([{ data: { line: " \n\t " } }, { data: { line: " Keep recalling. " } }]);
+210 |   await tryLine(lib, a.id);
+211 |   expect(findAnnotation(lib, a.id).annotation.line?.text).toBe("Keep recalling.");
+                                                                ^
+error: expect(received).toBe(expected)
+
+Expected: "Keep recalling."
+Received: ""
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:211:59)
+(fail) Try feedback retries a blank reply and trims the readable replacement [192.75ms]
+
+ 20 pass
+ 2 fail
+ 41 expect() calls
+Ran 22 tests across 1 file. [3.99s]

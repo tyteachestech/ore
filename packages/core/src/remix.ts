@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { findAnnotation } from "./annotations.ts";
-import { findCard, hasBlank, rubricProblem, type Card } from "./cards.ts";
+import { findCard, hasBlank, rubricProblem, type Card, type CardEdit } from "./cards.ts";
 import { appendJsonl, latestRevs, readJsonl, sha256 } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
 import { AiStamp } from "./items.ts";
@@ -297,7 +297,7 @@ export async function restoreVariant(lib: Library, cardRef: string, variantRef: 
 }
 
 /** E in review on a variant edits the variant, not the original (D66). */
-export async function setVariant(lib: Library, cardRef: string, variantRef: string, edit: { question?: string; answer?: string; rubric?: string[] }): Promise<Variant> {
+export async function setVariant(lib: Library, cardRef: string, variantRef: string, edit: CardEdit): Promise<Variant> {
   return withLock(paths.lock(lib), () => {
     const v = findVariant(lib, cardRef, variantRef);
     if (edit.rubric) {
@@ -306,7 +306,8 @@ export async function setVariant(lib: Library, cardRef: string, variantRef: stri
       // Each point stands for one of the original's (maps): reword them, don't add or drop one.
       if (edit.rubric.length !== v.rubric.length) throw new Error(`This version keeps its ${v.rubric.length} key points: reword them, or drop the version for the original.`);
     }
-    const next = { ...v, rev: v.rev + 1, question: edit.question?.trim() || v.question, answer: edit.answer?.trim() || v.answer, rubric: edit.rubric?.map((p) => p.trim()) ?? v.rubric };
+    // A version is always the AI's: an Undo back to "no stamp" (null) keeps the one it has.
+    const next = { ...v, ...(edit.ai ? { ai: AiStamp.parse(edit.ai) } : {}), rev: v.rev + 1, question: edit.question?.trim() || v.question, answer: edit.answer?.trim() || v.answer, rubric: edit.rubric?.map((p) => p.trim()) ?? v.rubric };
     appendJsonl(paths.variants(lib, v.card), VariantSchema.parse(next));
     return next;
   });

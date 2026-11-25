@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import {open,select,pm,paste} from './harness';
+const mode=process.argv[2]??'table';
+const code=mode.startsWith('code');
+const md=code?'```\nKEEP\n```\n':'| Header 1 | Header 2 |\n|---|---|\n| KEEP | NEIGHBOR |\n';
+const plain='First\nSecond';const html=mode==='code-plain'?undefined:code?'<p>First</p><p>Second</p>':undefined;
+const h=await open(md);const v=h.view;select(v,'KEEP');const before=h.md();
+const event=new window.Event('paste',{bubbles:true,cancelable:true});
+Object.defineProperty(event,'clipboardData',{value:{getData:(t:string)=>t==='text/plain'?plain:t==='text/html'?html??'':'',files:[],items:[],types:html?['text/plain','text/html']:['text/plain']}});
+v.dom.dispatchEvent(event);
+const out=h.md();console.log('[DEEP]',JSON.stringify({mode,before,selectionEmpty:true,after:out,eventTaken:event.defaultPrevented,blocks:v.state.doc.content.content.map((n:any)=>n.type.name)}));
+await h.close();
+if(code)assert.equal(out,'```\nFirst\nSecondKEEP\n```\n','Rich paste into code must keep all pasted and existing text inside the code block');
+else assert.ok(out.includes('KEEP')&&out.includes('NEIGHBOR'),'Paste at a cell caret must not delete that cell or its unselected neighbor');

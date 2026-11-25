@@ -37,3 +37,23 @@ test("the runs' boxes join into one bar a line", () => {
     { left: 10, top: 24, width: 15, height: 10 },
   ]);
 });
+
+test("interleaved PDF columns never mark the neighboring column", () => {
+  const left = ["Spread your retrieval practice across several different days.", "Retrieve the important idea before reading the explanation.", "Wait a little longer after giving a completely correct answer."];
+  const right = ["Unrelated weather station records.", "Storms arrived on Tuesday evening.", "Wind speeds decreased on Thursday."];
+  const runs = left.flatMap((line, i) => [line, " ", right[i]!]);
+  const found = passage(runs, left.join(" "));
+  const marked = found ? runs.slice(found[0], found[1] + 1).join(" ") : "";
+  expect(right.some(line => marked.includes(line))).toBe(false);
+  expect(passage([...left, ...right], left.join(" "))).toEqual([0, 2]);
+});
+
+test("a passage repeated twice cannot select three copies on the page", () => {
+  expect(passage(Array(3).fill("Test yourself often."), "Test yourself often. Test yourself often.")).toBeNull();
+});
+
+test("a footnote mark the page has between the probes and the text lacks still lights the passage", () => {
+  const a = "Practice spread over several days beats the same practice crammed into one night";
+  const b = "and this spacing effect is among the oldest findings in psychology, yet among the least used by students who study for exams the evening before they sit them.";
+  expect(passage(["Before.", `${a}`, "12", ` ${b}`, "After."], `${a} ${b}`)).toEqual([1, 3]);
+});

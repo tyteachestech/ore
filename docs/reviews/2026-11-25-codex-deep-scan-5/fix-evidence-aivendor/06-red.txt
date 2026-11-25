@@ -1,0 +1,38 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [325.94ms]
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [381.88ms]
+(pass) recall feedback checks its prequestion input at save (after) [189.29ms]
+(pass) recall feedback checks its prequestion input at save (before) [243.16ms]
+(pass) recall feedback checks its prequestion input at save (question) [196.13ms]
+(pass) recall feedback checks its prequestion input at save (skipped) [196.89ms]
+(pass) recall feedback checks its prequestion input at save (removed) [183.24ms]
+(pass) recall feedback checks its prequestion input at save (reordered) [206.78ms]
+(pass) recall feedback checks its prequestion input at save (unchanged) [201.63ms]
+(pass) recall feedback checks its prequestion input at save (marks) [172.47ms]
+(pass) a late prequestion check matches the current question and ordered points (more) [161.08ms]
+(pass) a late prequestion check matches the current question and ordered points (text) [165.50ms]
+(pass) a late prequestion check matches the current question and ordered points (order) [189.38ms]
+(pass) a late prequestion check matches the current question and ordered points (question) [211.47ms]
+(pass) a late prequestion check matches the current question and ordered points (unchanged) [204.26ms]
+(pass) a late prequestion check matches the current question and ordered points (evidence) [171.40ms]
+167 |   let closed = "";
+168 |   const result = await during(digAsk(lib, "learning"), async () => {
+169 |     await endDig(lib, "learning", d.id);
+170 |     closed = readFileSync(path, "utf8");
+171 |   });
+172 |   expect(String(result.error)).toMatch(/dig changed/);
+                                     ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /dig changed/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:172:32)
+(fail) ending a Dig prevents the late first-stage reply from changing its saved record [202.65ms]
+
+ 16 pass
+ 1 fail
+ 33 expect() calls
+Ran 17 tests across 1 file. [3.64s]

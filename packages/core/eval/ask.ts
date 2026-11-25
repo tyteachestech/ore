@@ -49,10 +49,15 @@ export function addBig(root: string) {
  *  crowds out the real evidence, so they stay out of the eval's library. */
 export const REWRITTEN = new Set(["web-academy-lesson", "web-discourse", "web-hn-thread", "web-speakerdeck"]);
 
+/** Goldens that pin one import fix each (a merged table, a code page; `office-*`, deep scan 5): a few
+ *  lines apiece, not sources the questions are over. Fourteen of them moved the search's word weights
+ *  enough to drop a two-source question's video from the eight sources a search keeps (F729). */
+const IMPORT_SAMPLE = /^office-/;
+
 /** Each golden doc.md as a source in the library; returns item id → golden name. */
 export async function addGolden(lib: Library, dir = GOLDEN): Promise<Map<string, string>> {
   const names = new Map<string, string>();
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".md") && !REWRITTEN.has(basename(f, ".md"))).sort()) {
+  for (const f of readdirSync(dir).filter((f) => f.endsWith(".md") && !REWRITTEN.has(basename(f, ".md")) && !IMPORT_SAMPLE.test(f)).sort()) {
     const { data, body } = parseFrontmatter<{ type?: string; title?: string; author?: string }>(readFileSync(join(dir, f), "utf8"));
     const type = ItemType.safeParse(data.type).data ?? "article";
     const item = await createItem(lib, { type, title: data.title ?? basename(f, ".md"), author: data.author, body });

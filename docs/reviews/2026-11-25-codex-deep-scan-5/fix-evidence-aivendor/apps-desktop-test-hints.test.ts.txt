@@ -1,0 +1,18 @@
+bun test v1.4.4 (38afee6c8)
+
+apps/desktop/test/hints.test.ts:
+(pass) shortcut hints > every binding is shown on its control, or listed as having none [0.06ms]
+(pass) shortcut hints > the no-control list holds only real, unhinted bindings [0.05ms]
+(pass) icon-only buttons > every one shows a hint on hover, or is listed with the reason it can't [0.01ms]
+(pass) icon-only buttons > the list holds only icon-only buttons with no hint
+(pass) icon-only buttons > every file's hints balance, so the count can be trusted
+(pass) icon-only buttons > a <Hint in a comment doesn't hint the buttons after it [0.01ms]
+(pass) dismiss buttons > a Cancel, Close, Done or Back that Esc runs shows Esc, or is listed, as many as there are, with the reason it doesn't [0.02ms]
+(pass) dismiss buttons > Esc in the label or in the hint around it counts; Esc anywhere else doesn't [0.02ms]
+(pass) dismiss buttons > a button it can't read fails the scan instead of passing [0.04ms]
+(pass) no control explains itself with a native title= [4.55ms]
+
+ 10 pass
+ 0 fail
+ 12 expect() calls
+Ran 10 tests across 1 file. [58.00ms]

@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {mkdirSync,rmSync,writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {addSkill,arrangeSkills,archiveSkill,loadSkills} from '../../packages/core/src/skills.ts';
+import {skillActions} from '../../apps/desktop/src/list-actions.ts';
+import {change} from '../../apps/desktop/src/change.ts';
+import {skillGroups,sidebarGroups} from '../../apps/desktop/src/Skills.tsx';
+const root=resolve('codex-out/courses/libs/collections');rmSync(root,{recursive:true,force:true});mkdirSync(root,{recursive:true});writeFileSync(`${root}/skills.yaml`,'skills: []\n');const lib={root};
+const a=await addSkill(lib,'Active','Work');const b=await addSkill(lib,'Archived','Work');await archiveSkill(lib,b.id,true);const c=await addSkill(lib,'Other activity');
+let skills=loadSkills(lib).skills;let undo:any,redo:any;const notify=(_m:any,_k:any,u:any,r:any)=>{undo=u;redo=r;return ()=>{}};
+const actions=()=>skillActions({ore:async<T>(...args:string[])=>{assert.equal(args.slice(0,2).join(' '),'skills arrange');return await arrangeSkills(lib,JSON.parse(args[2]!)) as T;},skills,items(){},archived(){},setSkills:f=>{skills=f(skills)},reloadSkills(){},change:c=>change(notify as any,c),skillChange:c=>change(notify as any,c)});
+await actions().renameCollection('Work','Job');assert.deepEqual(loadSkills(lib).skills.filter(s=>s.collection==='Job').map(s=>s.id),[a.id,b.id]);await undo();assert.equal(loadSkills(lib).skills.find(s=>s.id===b.id)!.collection,'Work');await redo();
+await actions().deleteCollection('Job');assert.ok(loadSkills(lib).skills.every(s=>!s.collection));await undo();assert.equal(loadSkills(lib).skills.find(s=>s.id===b.id)!.collection,'Job');
+assert.equal(sidebarGroups(skills).some(g=>g.skills.some(s=>s.id===b.id)),false);
+await actions().move(skills.find(s=>s.id===a.id)!,'');await actions().move(skills.find(s=>s.id===b.id)!,'');assert.equal(skillGroups(loadSkills(lib).skills).some(g=>g.collection==='Job'),false);
+console.log('[DEEP] PASS rename/delete and Undo/Redo include archived skills; archived skill hidden in drawer groups; last skill leaving removes empty collection (D36)');

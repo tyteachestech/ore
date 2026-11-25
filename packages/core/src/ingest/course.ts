@@ -4,14 +4,14 @@ import { reanchorItem } from "../annotations.ts";
 import { stringifyFrontmatter } from "../frontmatter.ts";
 import { writeAtomic } from "../fsutil.ts";
 import { ulid } from "../ids.ts";
-import { createItem, findItem, listItems, readItemDir, setItemArchived, sourceFile, type CourseRef, type Item, type NewItem } from "../items.ts";
+import { createItem, findItem, listItems, readItemDir, setItemArchived, sourceFile, updateItemMeta, type CourseRef, type Item, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { withLock } from "../lock.ts";
 import { setItemSkills, unarchiveFiled } from "../skills.ts";
 import { withImages } from "./assets.ts";
 import { dropTitle, hasText, pageDraft, withTranscript } from "./page.ts";
 import { courseCoverFile, makeCourseCover, makeThumbnail } from "./thumbnail.ts";
-import { ytDlp } from "./youtube.ts";
+import { youtubeId, ytDlp } from "./youtube.ts";
 
 // A course is a list of lessons, each added as its own source (option B, docs/design/courses-and-live-links.md).
 // Two kinds are read: a Claude Academy course (its page lists the lessons in order; a lesson's video ID
@@ -128,6 +128,11 @@ export async function lessonDraft(l: Omit<CourseLesson, "title"> & { title?: str
   return d.type === "article" ? { ...d, author: undefined } : d;
 }
 
+/** Whether a saved lesson's link is a plan's: the same link, or the same video however its link is
+ *  written (yt-dlp names the page it landed on, which need not be the link the playlist listed). */
+const sameLink = (saved: string | undefined, planned: string | undefined) =>
+  !!saved && !!planned && (saved === planned || (!!youtubeId(saved) && youtubeId(saved) === youtubeId(planned)));
+
 /** Whether a lesson added before D92 lacks its page's text: a video lesson with a page of its own. */
 const lacksPage = (i: Item, l: CourseLesson | undefined) => !!l?.video && l.url !== l.video && i.meta.type === "youtube";
 
@@ -173,7 +178,23 @@ export async function addCourse(lib: Library, plan: CoursePlan, opts: { skills?:
   const first = existing[0]?.meta.course;
   const id = first?.id ?? ulid();
   const title = first?.title ?? plan.title;
-  const have = new Set(existing.map((i) => i.meta.course!.part));
+  // Positions change when a playlist gains or loses a video. Match the saved source instead;
+  // pre-D92 lessons kept only their video URL, so accept that identity too.
+  const unmatched = new Set(existing);
+  const planned = plan.lessons.map((l, index) => {
+    const had = [...unmatched].find((i) => sameLink(i.meta.url, l.url))
+      ?? [...unmatched].find((i) => i.meta.type === "youtube" && sameLink(i.meta.url, l.video));
+    if (had) unmatched.delete(had);
+    return { l, part: index + 1, had };
+  });
+  // Keep sources no longer in the remote plan, after its lessons, in their saved order.
+  const positions = [
+    ...planned.filter((x) => x.had).map((x) => ({ item: x.had!, part: x.part })),
+    ...[...unmatched].sort((a, b) => a.meta.course!.part - b.meta.course!.part).map((item, i) => ({ item, part: plan.lessons.length + i + 1 })),
+  ];
+  for (const { item, part } of positions) if (item.meta.course!.part !== part) {
+    await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, course: { ...m.course!, part } }));
+  }
   // Skills belong to the course as a whole: new lessons join the ones it has, and skills picked when the
   // link is added again file every lesson already here too.
   const had = [...new Set(existing.flatMap((i) => i.meta.skills))];
@@ -187,13 +208,12 @@ export async function addCourse(lib: Library, plan: CoursePlan, opts: { skills?:
   const filled: Item[] = [];
   const failed: CourseAdded["failed"] = [];
   // Lessons it lacks, and lessons added before D92 that lack their page's text.
-  const fill = existing.filter((i) => lacksPage(i, plan.lessons[i.meta.course!.part - 1]));
-  const todo = plan.lessons.map((l, i) => ({ l, part: i + 1, had: fill.find((f) => f.meta.course!.part === i + 1) })).filter((x) => !have.has(x.part) || x.had);
+  const todo = planned.filter(({ l, had }) => !had || lacksPage(had, l));
   for (const [done, { l, part, had }] of todo.entries()) {
     opts.onLesson?.(done, todo.length, l.title);
     try {
       if (had) {
-        if (await fillPage(lib, had, l)) filled.push(findItem(lib, had.meta.id));
+        if (await fillPage(lib, findItem(lib, had.meta.id), l)) filled.push(findItem(lib, had.meta.id));
         continue;
       }
       const draft = await withImages(await lessonDraft(l));
@@ -209,5 +229,5 @@ export async function addCourse(lib: Library, plan: CoursePlan, opts: { skills?:
   const lessons = [...existing, ...added];
   if (lessons.length && !lessons.some(courseCoverFile)) await makeCourseCover(lessons[0]!, plan.url);
   if (skills.length && added.length) await withLock(paths.lock(lib), () => unarchiveFiled(lib, skills)); // D173
-  return { course: { id, title, url: plan.url }, added, kept: have.size, filled, failed, filed, restored: archived.map((i) => i.meta.id) };
+  return { course: { id, title, url: plan.url }, added, kept: existing.length, filled, failed, filed, restored: archived.map((i) => i.meta.id) };
 }
