@@ -8,7 +8,7 @@ import { itemCardSkills, setItemSkills } from "../src/skills.ts";
 import { skillStrength, today } from "../src/today.ts";
 import { tempLibrary } from "./helpers.ts";
 
-test("moving solid exercises keeps the earned level after rebuilding and Undo", async () => {
+test("moving solid exercises keeps the earned level after rebuilding, and its Undo gives the other skill none", async () => {
   const lib = await tempLibrary();
   const item = await addText(lib, "# Level\n\nMemory matters.", { skills: ["learning"] });
   for (let i = 0; i < 5; i++) {
@@ -24,6 +24,7 @@ test("moving solid exercises keeps the earned level after rebuilding and Undo", 
   expect(today(lib).skills.find(s => s.skill === "learning")).toMatchObject({ solid: 0, peak: 5, level: 1 });
   await setItemSkills(lib, item.meta.id, ["learning"], cards);
   expect(skillStrength(lib, "learning")).toMatchObject({ solid: 5, peak: 5, level: 1 });
-  expect(skillStrength(lib, "habits")).toMatchObject({ solid: 0, peak: 5, level: 1 });
+  // The filing was taken back: habits never kept those exercises, so it earned nothing.
+  expect(skillStrength(lib, "habits")).toMatchObject({ solid: 0, peak: 0, level: 0 });
   expect(readReviews(lib)).toEqual(reviews);
 });

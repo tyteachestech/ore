@@ -19,7 +19,7 @@ async function setup() {
   } finally { globalThis.fetch = real; }
 }
 
-test("Undo keeps an existing source readable at every document replacement boundary", async () => {
+test("Undo keeps an existing source readable, with all its files, at every document replacement boundary", async () => {
   const { lib, item, step } = await setup();
   // Isolate fs instrumentation so no other test sees it.
   const code = `
@@ -27,7 +27,8 @@ test("Undo keeps an existing source readable at every document replacement bound
     import * as fs from "node:fs";
     const unlink = fs.unlinkSync, rename = fs.renameSync;
     mock.module("node:fs", () => ({ ...fs,
-      unlinkSync(p) { unlink(p); if (String(p) === ${JSON.stringify(item.docPath)}) process.exit(42); },
+      // Stopped as any of the source's own files goes: both versions have them all, so none may go.
+      unlinkSync(p) { unlink(p); if (String(p).startsWith(${JSON.stringify(item.dir + "/")})) process.exit(42); },
       renameSync(a,b) { if (String(b) === ${JSON.stringify(item.docPath)} && !fs.existsSync(b)) process.exit(43); rename(a,b); }
     }));
     const { undoReimport } = await import(${JSON.stringify(join(import.meta.dir, "../src/ingest/index.ts"))});

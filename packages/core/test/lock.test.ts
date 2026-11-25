@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { readFileSync, utimesSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import { hostname, tmpdir, uptime } from "node:os";
 import { join } from "node:path";
 import { lockStale, withLock } from "../src/lock.ts";
 import { tempLibrary } from "./helpers.ts";
@@ -48,4 +48,14 @@ test("a crash while publishing a lock lets the next save proceed immediately", a
   let saved = false;
   await withLock(path, () => { saved = true; }, 100);
   expect(saved).toBe(true);
+});
+
+test("a lock left before this machine last started is stale, though a new process has its pid", () => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-lock-"));
+  const path = join(dir, "lock");
+  const boot = Math.round(Date.now() / 1000 - uptime());
+  writeFileSync(path, JSON.stringify({ pid: process.pid, host: hostname(), boot: boot - 3600 }));
+  expect(lockStale(path)).toBe(true);
+  writeFileSync(path, JSON.stringify({ pid: process.pid, host: hostname(), boot }));
+  expect(lockStale(path)).toBe(false);
 });

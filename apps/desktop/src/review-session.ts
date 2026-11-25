@@ -475,10 +475,16 @@ export class ReviewSession<S> {
   private async submit(args: string[], rating: number, elapsed: number, again?: Again) {
     const { run } = this;
     const was = { queue: this.queue ?? [], done: this.done, activeMs: this.activeMs, off: new Set(this.off), won: this.wonLast, told: this.goalTold };
-    // A committed Undo can outlive a failed reopen. Resume before recording another rating.
+    // An Undo on the end screen whose reopen failed (F618): open the session again before the next rating. If
+    // that fails too, the rating still goes in, as one in no session, and he can carry on (code review of #538).
     if (this.session && !this.session.open) {
-      await run("session", "reopen", this.session.id);
-      this.session.open = true;
+      try {
+        await run("session", "reopen", this.session.id);
+        this.session.open = true;
+      } catch (e) {
+        this.screen.notify(errorText(e), "error");
+        args = args.filter((a) => !a.startsWith("--session="));
+      }
     }
     const r = await run<{ ts: string }>("review", ...args);
     this.reviewed++;

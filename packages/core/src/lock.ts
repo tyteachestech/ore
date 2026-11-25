@@ -1,5 +1,5 @@
 import fs, { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { hostname, uptime } from "node:os";
 import { dirname } from "node:path";
 
 const STALE_MS = 60_000;
@@ -13,15 +13,22 @@ function isAlive(pid: number): boolean {
   }
 }
 
-/** A lock is stale when its owner is gone: a dead local pid. A live local owner keeps its lock however long it writes (deep scan 4, EDGES-02). A lock
+/** When this machine started, in seconds, to tell a lock from before a restart: its pid may belong to a new
+ *  process now. NaN on the iPhone, whose `.ore` is rebuilt each launch anyway. */
+const bootedAt = () => Math.round(Date.now() / 1000 - uptime());
+
+/** A lock is stale when its owner is gone: a dead local pid, or one from before this machine last started
+ *  (code review of #538: a reused pid would hold it for good). A live local owner keeps its lock however long it writes (deep scan 4, EDGES-02). A lock
  *  from another host (a copied or synced `.ore`) can't be asked, so it goes stale by age, as an empty one did.
  *  Locks are written whole (`acquire`), so an empty one is a lock from an older Ore. */
 export function lockStale(path: string): boolean {
   try {
     const raw = readFileSync(path, "utf8").trim();
-    const owner = raw.startsWith("{") ? JSON.parse(raw) as { pid: number; host: string } : { pid: Number(raw), host: hostname() };
+    const owner = raw.startsWith("{") ? JSON.parse(raw) as { pid: number; host: string; boot?: number } : { pid: Number(raw), host: hostname() };
     const age = Date.now() - statSync(path).mtimeMs;
     if (owner.host !== hostname() || !(Number.isInteger(owner.pid) && owner.pid > 0)) return age > STALE_MS;
+    const boot = bootedAt();
+    if (Number.isFinite(boot) && typeof owner.boot === "number" && Math.abs(owner.boot - boot) > 120) return true;
     return !isAlive(owner.pid);
   } catch {
     return false;
@@ -31,7 +38,7 @@ export function lockStale(path: string): boolean {
 /** Publish a fully populated owner record in one exclusive operation. A process
  * killed before publication leaves only an unused temp file, never an empty lock. */
 function acquire(path: string): string | undefined {
-  const owner = JSON.stringify({ pid: process.pid, host: hostname(), token: crypto.randomUUID() });
+  const owner = JSON.stringify({ pid: process.pid, host: hostname(), boot: bootedAt(), token: crypto.randomUUID() });
   const tmp = `${path}.${crypto.randomUUID()}.tmp`;
   writeFileSync(tmp, owner, { flag: "wx" });
   try {

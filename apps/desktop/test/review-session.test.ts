@@ -461,3 +461,17 @@ test("end-screen Undo stays removed when reopening fails and can be redone after
   expect(t.wrote("session end")).toHaveLength(2);
   t.stop(); t.s.gone();
 });
+
+test("a session that can't be opened again after an end-screen Undo still takes his next rating, in no session (F618)", async () => {
+  const options = { queue: [due("a")], failReopen: true };
+  const t = await open(options);
+  withHistory(t);
+  await t.rate("a"); await tick();
+  t.s.undoLast(); await tick();
+  await t.rate("a"); await tick();
+  const ratings = t.wrote("review a --rating");
+  expect(ratings).toHaveLength(2);
+  expect(ratings[1]).not.toContain("--session=");
+  expect(t.s.done).toBe(1);
+  t.stop(); t.s.gone();
+});

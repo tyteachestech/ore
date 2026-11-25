@@ -431,7 +431,6 @@ export async function undoSuggestedSkill(lib: Library, ref: string, input: Sugge
   return withLock(paths.lock(lib), () => {
     const item = findItem(lib, ref);
     const id = r.skill;
-    if (id) keepSkillPeaks(lib, [id]);
     const off = (skills: string[]) => skills.filter((x) => x !== id);
     const meta = parseItemMeta({ ...item.meta, skills: id && r.filed ? off(item.meta.skills) : item.meta.skills, suggested_skill: r.suggestion });
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
@@ -498,7 +497,8 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[], ca
     const added = next.filter((id) => !item.meta.skills.includes(id));
     const removed = item.meta.skills.filter((id) => !next.includes(id));
     const exercises = listCards(lib).filter((c) => c.meta.item === item.meta.id);
-    keepSkillPeaks(lib, exercises.flatMap((c) => c.meta.skills.filter((s) => cards?.[c.meta.id] ? !cards[c.meta.id]!.includes(s) : removed.includes(s))));
+    // Not on an Undo (`cards`): a filing taken back gave its skill nothing to keep (code review of #538).
+    if (!cards) keepSkillPeaks(lib, exercises.flatMap((c) => c.meta.skills.filter((s) => removed.includes(s))));
     const meta = parseItemMeta({ ...item.meta, skills: next });
     unarchiveFiled(lib, added);
     for (const c of listCards(lib).filter((c) => c.meta.item === meta.id)) {
