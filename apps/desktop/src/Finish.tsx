@@ -696,7 +696,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
                 </button>
               </Hint>
             )}
-            {nextLesson && (
+            {nextLesson && !(held && !marked) && (
               <Hint text={`Draft this lesson’s exercises and open “${nextLesson.title}”`} side="top">
                 <button className="quiz-ghost" onClick={() => void finish(nextLesson.open)} disabled={busy}>
                   Next lesson

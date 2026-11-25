@@ -1386,9 +1386,13 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     return () => gone.disconnect();
   }, [ready, scrollKey]);
 
+  const beside = (t: EventTarget | null) => t instanceof Element && !!readerRef.current?.contains(t) && !!t.closest(".mynotes");
+  // A field taken off the page with the keyboard still in it (its page closed) sends no focusout in WebKit.
+  useEffect(() => {
+    if (writing && !beside(document.activeElement)) setWriting(false);
+  });
   useEffect(() => {
     if (!PHONE) return;
-    const beside = (t: EventTarget | null) => t instanceof Element && !!readerRef.current?.contains(t) && !!t.closest(".mynotes");
     const focus = (e: FocusEvent) => setWriting(beside(e.type === "focusin" ? e.target : e.relatedTarget));
     document.addEventListener("focusin", focus);
     document.addEventListener("focusout", focus);
