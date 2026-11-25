@@ -2192,3 +2192,141 @@ test("a ZIP named Word explains how to export a valid document", async () => {
   await expect(addSource(lib, file("not-word.docx"))).rejects.toThrow(/(Word|damaged).*(save|export|download)/i);
   expect(listItems(lib)).toHaveLength(0);
 });
+
+// Deep scan 5: Ore-authored office examples; keep the saved source, not just converter output, under test.
+const officeFile = (name: string) => join(FIX, "office", name);
+test("office-01: Word merged cells keep outcomes in their columns", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("word-merged.docx"));
+  expect(item.meta.title).toBe("Retrieval practice notes");
+  expect(item.meta.author).toBe("Ada Learner");
+  expect(item.body).toContain("| Treatment | Outcome |");
+  expect(item.body).toContain("| Training | Improved |");
+  expect(item.body).toContain("|  | Retained |");
+});
+
+test("office-02: RTF literal bytes use the declared code page", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("rtf-cp1251.rtf"));
+  expect(item.body).toBe("Привет\n");
+  // The same decoder must handle escaped bytes, mixed runs and font-specific charsets.
+  expect(rtfToDoc(new Uint8Array([...new TextEncoder().encode("{\\rtf1\\ansi\\ansicpg1251 "), 0xcf, 0xf0, ...new TextEncoder().encode("\\'e8\\'e2"), 0xe5, 0xf2, 125])).body).toBe("Привет\n");
+  expect(rtfToDoc(new Uint8Array([...new TextEncoder().encode("{\\rtf1\\ansi\\ansicpg1252 "), 0x80, 125])).body).toBe("€\n");
+});
+
+test("office-03: Word equations refuse partial import with an export step", async () => {
+  const lib = await tempLibrary();
+  await expect(addSource(lib, officeFile("word-equation.docx"))).rejects.toThrow(/equation.*export.*PDF/i);
+  expect(listItems(lib)).toHaveLength(0);
+});
+
+test("office-04: PowerPoint native tables keep their rows and columns", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("slides-table.pptx"));
+  expect(item.meta.title).toBe("How memory works");
+  expect(item.body).toContain("<!-- slide 1 -->");
+  expect(item.body).toContain("| Method | Score |\n| --- | --- |\n| Practice | 92 |");
+});
+
+test("office-06: Excel uncached formulas remain visible", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("sheets-formula.xlsx"));
+  expect(item.meta.title).toBe("Spanish vocabulary");
+  expect(item.meta.author).toBe("Ada Learner");
+  expect(item.body).toContain("## Lesson");
+  expect(item.body).toContain("| Result |");
+  expect(item.body).toContain("| =1+1 |");
+});
+
+test("office-07: Excel clock time wraps at midnight while duration keeps days", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("sheets-time.xlsx"));
+  expect(item.body).toContain("| Clock | Duration |");
+  expect(item.body).toContain("| 12:00 | 36:00 |");
+});
+
+test("office-08: notebook Markdown attachments are saved as usable images", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("notebook-attachment.ipynb"));
+  const name = item.body.match(/!\[Diagram\]\(<?assets\/([^)>]+)/)?.[1];
+  expect(name).toBeDefined();
+  expect(readFileSync(join(item.dir, "assets", name!), "utf8")).toContain("Left ventricle");
+  expect(item.body).not.toContain("attachment:");
+});
+
+test("office-09: notebook errors and HTML-only results survive import", async () => {
+  const error = await addSource(await tempLibrary(), officeFile("notebook-error.ipynb"));
+  expect(error.body).toContain("```python\n1 / 0\n```");
+  expect(error.body).toContain("ZeroDivisionError: division by zero");
+  const html = await addSource(await tempLibrary(), officeFile("notebook-html.ipynb"));
+  expect(html.body).toContain("show_results()");
+  expect(html.body).toContain("| Improved |");
+  expect(html.body).not.toContain("<table>");
+});
+
+test("office-10: notebook output figures and explanations keep execution order", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("notebook-order.ipynb"));
+  expect(item.body).toContain("plot_then_explain()");
+  expect(item.body).toContain("![](assets/");
+  expect(item.body.indexOf("![](assets/")).toBeLessThan(item.body.indexOf("AFTER FIGURE"));
+});
+
+test("office-11: a Markdown file saves its adjacent image inside the library", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("text-relative.md"));
+  const name = item.body.match(/!\[Diagram\]\(assets\/([^)]+)\)/)?.[1];
+  expect(name).toBeDefined();
+  expect(readFileSync(join(item.dir, "assets", name!), "utf8")).toBe(readFileSync(officeFile("diagram.svg"), "utf8"));
+  expect(readFileSync(join(item.dir, "source.md"), "utf8")).toBe(readFileSync(officeFile("text-relative.md"), "utf8"));
+});
+
+test("office-12: Word outline levels become reader headings", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("word-outline.docx"));
+  expect(item.meta.title).toBe("Retrieval practice notes");
+  expect(item.meta.author).toBe("Ada Learner");
+  expect(item.body).toBe("# Chapter one\n");
+});
+
+test("office-13: PowerPoint refuses a missing listed slide without saving a source", async () => {
+  const lib = await tempLibrary();
+  await expect(addSource(lib, officeFile("slides-missing.pptx"))).rejects.toThrow(/damaged.*Download it again/);
+  expect(listItems(lib)).toHaveLength(0);
+});
+
+test("office-14: Excel refuses a missing listed worksheet without saving a partial workbook", async () => {
+  const lib = await tempLibrary();
+  await expect(addSource(lib, officeFile("sheets-missing.xlsx"))).rejects.toThrow(/damaged.*Download it again/);
+  expect(listItems(lib)).toHaveLength(0);
+});
+
+test("office-15: OCR helper failure gives a recovery step and saves no source", async () => {
+  const previous = process.env.ORE_OCR;
+  const dir = mkdtempSync(join(tmpdir(), "ore-office-ocr-"));
+  const helper = join(dir, "ocr-failure");
+  writeFileSync(helper, readFileSync(officeFile("ocr-failure.sh")));
+  chmodSync(helper, 0o755);
+  process.env.ORE_OCR = helper;
+  const lib = await tempLibrary();
+  try {
+    await expect(addSource(lib, officeFile("ocr-failure.png"))).rejects.toThrow(/can't open the image.*paste/i);
+    expect(listItems(lib)).toHaveLength(0);
+  } finally {
+    if (previous === undefined) delete process.env.ORE_OCR;
+    else process.env.ORE_OCR = previous;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("office-12: an empty paragraph-properties element does not borrow the next heading", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("word-outline-after-plain.docx"));
+  expect(item.body).toBe("Opening paragraph\n\n# Chapter one\n");
+});
+
+test("office-08: notebook attachment references are cell-local and code examples stay literal", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("notebook-cell-attachments.ipynb"));
+  const images = [...item.body.matchAll(/!\[(?:Diagram|Second)\]\(assets\/([^)]+)\)/g)];
+  expect(images).toHaveLength(2);
+  expect(readFileSync(join(item.dir, "assets", images[0]![1]!), "utf8")).toContain("Left ventricle");
+  expect(readFileSync(join(item.dir, "assets", images[1]![1]!), "utf8")).toContain("Right ventricle");
+  expect(item.body).toContain("`![Example](attachment:heart.svg)`");
+});
+
+test("office-11: Markdown reference images keep titles and leave code examples alone", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("text-reference.md"));
+  expect(item.body).toMatch(/!\[Diagram\]\(assets\/[^)]+ "The heart"\)/);
+  expect(item.body).toContain("`![Example](diagram.svg)`");
+  expect(item.body).toContain("```md\n![Example](diagram.svg)\n```");
+});

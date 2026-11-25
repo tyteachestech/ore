@@ -380,3 +380,20 @@ function kept(saved: Record<string, Combo>): Record<string, Combo> {
 }
 overrides = kept(read());
 keymap = build();
+
+// Every webview has its own module cache. Read another window's settings without writing
+// them back (or emitting another storage event), using the same rules as a fresh window.
+function refreshKeys() {
+  const next = kept(read());
+  if (JSON.stringify(next) === JSON.stringify(overrides)) return;
+  overrides = next;
+  keymap = build();
+  for (const f of listeners) f();
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if ((event.key === STORE || event.key === null) && (!event.storageArea || event.storageArea === window.localStorage)) refreshKeys();
+  });
+  // A hidden webview can miss a storage notification; it catches up before he uses its keys.
+  window.addEventListener("focus", refreshKeys);
+}

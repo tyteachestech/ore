@@ -535,7 +535,16 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
   const text = !extname(path) && !/[\0-\x08\x0e-\x1a]/.test(decodeText(bytes.subarray(0, 4096)));
   const kind = opts.type ? ({ article: "html", youtube: "html", snippet: "markdown" } as Record<string, string>)[opts.type] ?? opts.type : (kindOf(path) ?? (text ? "markdown" : null));
   if (!kind) throw new Error(`${extname(path) ? `Ore can’t read “${extname(path)}” files yet.` : "Ore can’t read that file: it has no extension and isn’t text."} It reads ${FILE_TYPES.filter((t) => !["markdown", "text", "htm"].includes(t)).join(", ")}; for anything else, copy its text and paste it here.`);
-  return fromBytes(bytes, kind, path, undefined, undefined, opts);
+  const draft = await fromBytes(bytes, kind, path, undefined, undefined, opts);
+  if (kind === "markdown") {
+    const { rewriteImageUrls } = await import("./markdown.ts");
+    const base = new URL("file://" + resolve(path).split("/").map(encodeURIComponent).join("/"));
+    draft.body = rewriteImageUrls(draft.body, (url) => {
+      if (/^(?:[a-z][\w+.-]*:|#|\/\/)/i.test(url)) return;
+      return new URL(url, base).href;
+    });
+  }
+  return draft;
 }
 
 // Tags a share or an ad adds to a link (utm_source=chatgpt.com, fbclid…): not part of the page, so a link is

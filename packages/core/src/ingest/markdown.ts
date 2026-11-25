@@ -31,9 +31,25 @@ td.addRule("table", {
   filter: "table",
   replacement: (_c, node) => {
     const table = node as HTMLTableElement;
-    const rows = [...children(table, /^tr$/i), ...children(table, /^(thead|tbody|tfoot)$/i).flatMap((g) => children(g, /^tr$/i))].map((tr) =>
-      children(tr, /^(th|td)$/i).map((c) => cellText(c).replace(/\s+/g, " ").trim().replace(/\|/g, "\\|")),
-    );
+    const trs = [...children(table, /^tr$/i), ...children(table, /^(thead|tbody|tfoot)$/i).flatMap((g) => children(g, /^tr$/i))];
+    const occupied: number[] = [];
+    const rows = trs.map((tr, rowIndex) => {
+      const row: string[] = [];
+      let col = 0;
+      for (const cell of children(tr, /^(th|td)$/i)) {
+        while ((occupied[col] ?? 0) > rowIndex) row[col++] = "";
+        const width = Math.min(1000, Math.max(1, Number(cell.getAttribute("colspan")) || 1));
+        const rawHeight = cell.getAttribute("rowspan");
+        const height = rawHeight === "0" ? trs.length - rowIndex : Math.max(1, Number(rawHeight) || 1);
+        row[col] = cellText(cell).replace(/\s+/g, " ").trim().replace(/\|/g, "\\|");
+        for (let offset = 0; offset < width; offset++) {
+          if (offset) row[col + offset] = "";
+          occupied[col + offset] = rowIndex + height;
+        }
+        col += width;
+      }
+      return row;
+    });
     // Spanned cells leave rows with nothing in them.
     rows.splice(0, rows.length, ...rows.filter((r) => r.some(Boolean)));
     if (!rows.length) return "";
@@ -71,4 +87,25 @@ export function htmlBlocksToMarkdown(md: string): string {
   }
   flush();
   return out.join("\n");
+}
+
+/** Rewrite rendered Markdown images, including references, without touching examples inside code. */
+export function rewriteImageUrls(md: string, resolve: (url: string) => string | undefined): string {
+  const { fromMarkdown } = require("mdast-util-from-markdown") as typeof import("mdast-util-from-markdown");
+  type Node = { type: string; url?: string; identifier?: string; alt?: string | null; title?: string | null; children?: Node[]; position?: { start: { offset?: number }; end: { offset?: number } } };
+  const nodes: Node[] = [];
+  const walk = (node: Node) => { nodes.push(node); node.children?.forEach(walk); };
+  walk(fromMarkdown(md));
+  const defs = new Map<string, Node>();
+  for (const node of nodes) if (node.type === "definition" && !defs.has(node.identifier!)) defs.set(node.identifier!, node);
+  for (const node of nodes.reverse()) {
+    const target = node.type === "image" ? node : node.type === "imageReference" ? defs.get(node.identifier!) : undefined;
+    const url = target?.url && resolve(target.url);
+    if (!url || url === target?.url) continue;
+    const alt = (node.alt ?? "").replace(/[\\[\]]/g, "\\$&");
+    const title = target?.title ? ` "${target.title.replace(/[\\"]/g, "\\$&")}"` : "";
+    const destination = url.replace(/ /g, "%20").replace(/\(/g, "%28").replace(/\)/g, "%29");
+    md = md.slice(0, node.position!.start.offset!) + `![${alt}](${destination}${title})` + md.slice(node.position!.end.offset!);
+  }
+  return md;
 }
