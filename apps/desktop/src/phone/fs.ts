@@ -10,10 +10,40 @@ const files = new Map<string, Entry>();
 /** The snapshot's paths: only these need a tombstone when deleted. */
 const shipped = new Set<string>();
 const dirs = new Set<string>(["/"]);
+/** Immediate children, maintained with file/folder membership: readdir never walks the library. */
+const children = new Map<string, Map<string, boolean>>();
 
 const parent = (p: string) => p.slice(0, p.lastIndexOf("/")) || "/";
+function remember(p: string, directory: boolean) {
+  const d = parent(p);
+  let entries = children.get(d);
+  if (!entries) children.set(d, entries = new Map());
+  entries.set(p.slice(d === "/" ? 1 : d.length + 1), directory);
+}
+function forget(p: string) {
+  const d = parent(p);
+  children.get(d)?.delete(p.slice(d === "/" ? 1 : d.length + 1));
+}
+function setFile(p: string, e: Entry) {
+  files.set(p, e);
+  remember(p, dirs.has(p));
+}
+function deleteFile(p: string): boolean {
+  const gone = files.delete(p);
+  if (gone && !dirs.has(p)) forget(p);
+  return gone;
+}
+function deleteDir(p: string) {
+  dirs.delete(p);
+  children.delete(p);
+  if (files.has(p)) remember(p, false);
+  else forget(p);
+}
 function addDirs(p: string) {
-  for (let d = parent(p); !dirs.has(d); d = parent(d)) dirs.add(d);
+  for (let d = parent(p); !dirs.has(d); d = parent(d)) {
+    dirs.add(d);
+    remember(d, true);
+  }
 }
 const err = (code: string, p: string) => Object.assign(new Error(`${code}: ${p}`), { code });
 
@@ -50,11 +80,11 @@ export async function mount(listed: Record<string, string | null>, id: string) {
     addDirs(p);
     // A file the phone doesn't load (audio, a PDF): listed only, as the folder's listing names it.
     if (text === null) {
-      files.set(p, { text: "", mtime: 0, unread: true });
+      setFile(p, { text: "", mtime: 0, unread: true });
       continue;
     }
     snapshot[p] = text;
-    files.set(p, { text, mtime: 1 });
+    setFile(p, { text, mtime: 1 });
     shipped.add(p);
   }
   // Ask iOS not to clear the phone's library when storage runs low.
@@ -96,9 +126,9 @@ export async function mount(listed: Record<string, string | null>, id: string) {
       if (!c) return done();
       const p = String(c.key);
       if (p === SNAPSHOT || p === HASHES) return c.continue();
-      if (c.value === null) files.delete(p);
+      if (c.value === null) deleteFile(p);
       else {
-        files.set(p, c.value as Entry);
+        setFile(p, c.value as Entry);
         addDirs(p);
       }
       c.continue();
@@ -141,7 +171,7 @@ function put(p: string, text: string, mtime = writeTime(p), bytes?: Uint8Array) 
   // A listed file whose read failed is not empty, even when no earlier copy is in memory.
   if (disk && failed.has(rel(p))) throw Object.assign(new Error("This file could not be read from iCloud: try again in a moment"), { code: "EBUSY" });
   const e: Entry = bytes ? binary(bytes, mtime) : { text, mtime };
-  files.set(p, e);
+  setFile(p, e);
   addDirs(p);
   if (SCRATCH.test(p)) return;
   if (bytes && disk) return p.startsWith(disk.prefix + "/") ? queue(p, { bytes }) : undefined;
@@ -150,7 +180,7 @@ function put(p: string, text: string, mtime = writeTime(p), bytes?: Uint8Array) 
 /** The lock and the search index are rebuilt each launch, never kept. */
 const SCRATCH = /\/\.(ore|index)\//;
 function drop(p: string) {
-  files.delete(p);
+  deleteFile(p);
   if (SCRATCH.test(p)) return;
   // A file from the snapshot gets a tombstone, so it stays deleted after a relaunch. One made on the
   // phone (every atomic write's temp file among them) is simply removed, or IndexedDB would keep a
@@ -236,7 +266,7 @@ export function flush(): Promise<void> {
       // hour's episode is 60 MB or more. Listed like any file the phone doesn't load.
       for (const [r, op] of ops) {
         const p = `${disk!.prefix}/${r}`;
-        if (op && "bytes" in op && HEAVY.test(r) && files.get(p)?.bytes === op.bytes) files.set(p, { text: "", mtime: Date.now(), unread: true });
+        if (op && "bytes" in op && HEAVY.test(r) && files.get(p)?.bytes === op.bytes) setFile(p, { text: "", mtime: Date.now(), unread: true });
       }
       for (const [r, ms, stamp] of stamps) {
         if (LISTED.test("/" + r)) known.set(r, stamp);
@@ -284,12 +314,12 @@ function listOthers(other: string[] = []) {
   // One the Mac deleted since leaves the listing too.
   const now = new Set(other.map((r) => `${disk!.prefix}/${r}`));
   let gone = false;
-  for (const [p, e] of files) if (e.unread && !now.has(p)) gone = files.delete(p);
+  for (const [p, e] of files) if (e.unread && !now.has(p)) gone = deleteFile(p);
   if (gone) pruneDirs();
   for (const r of other) {
     const p = `${disk!.prefix}/${r}`;
     if (files.has(p)) continue;
-    files.set(p, { text: "", mtime: 0, unread: true });
+    setFile(p, { text: "", mtime: 0, unread: true });
     addDirs(p);
   }
 }
@@ -303,7 +333,7 @@ export async function load(p: string): Promise<boolean> {
   if (!disk) return false;
   const b64 = await disk.invoke<string | null>("library_bytes", { root: disk.root, path: rel(p) });
   if (b64 == null) return false;
-  files.set(p, binary(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)), e.mtime, true));
+  setFile(p, binary(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)), e.mtime, true));
   return true;
 }
 
@@ -334,7 +364,7 @@ async function read(list: Stamped[]): Promise<number> {
       known.set(r, stamp);
       landed++;
       const p = `${disk!.prefix}/${r}`;
-      files.set(p, { text, mtime: Math.max(mtime, (files.get(p)?.mtime ?? -1) + 1) });
+      setFile(p, { text, mtime: Math.max(mtime, (files.get(p)?.mtime ?? -1) + 1) });
       addDirs(p);
     });
   });
@@ -354,7 +384,7 @@ export async function rescan(): Promise<boolean> {
   const gone = [...known.keys()].filter((r) => !seen.has(r) && !unsent.has(r));
   for (const r of gone) {
     known.delete(r);
-    files.delete(`${disk.prefix}/${r}`);
+    deleteFile(`${disk.prefix}/${r}`);
   }
   if (gone.length) pruneDirs();
   for (const r of failed.keys()) if (!seen.has(r)) failed.delete(r);
@@ -369,7 +399,7 @@ export async function rescan(): Promise<boolean> {
 function pruneDirs() {
   const full = new Set<string>(["/"]);
   for (const f of files.keys()) for (let d = parent(f); !full.has(d); d = parent(d)) full.add(d);
-  for (const d of [...dirs]) if (d.startsWith(disk!.prefix + "/") && !full.has(d)) dirs.delete(d);
+  for (const d of [...dirs]) if (d.startsWith(disk!.prefix + "/") && !full.has(d)) deleteDir(d);
 }
 
 // ---- the node:fs functions the core uses.
@@ -409,7 +439,7 @@ export function rmSync(p: string, _o?: unknown) {
     queue(p, null);
   }
   for (const f of [...files.keys()]) if (f === p || f.startsWith(p + "/")) drop(f);
-  for (const d of [...dirs]) if (d === p || d.startsWith(p + "/")) dirs.delete(d);
+  for (const d of [...dirs]) if (d === p || d.startsWith(p + "/")) deleteDir(d);
 }
 export function renameSync(a: string, b: string) {
   copyFileSync(a, b);
@@ -431,16 +461,7 @@ export const mkdtempSync = (prefix: string) => {
 type Dirent = { name: string; isDirectory: () => boolean; isFile: () => boolean };
 export function readdirSync(p: string, o?: { withFileTypes?: boolean }): any {
   if (!dirs.has(p)) throw err("ENOENT", p);
-  const pre = p.endsWith("/") ? p : p + "/";
-  const names = new Map<string, boolean>();
-  for (const f of files.keys()) {
-    if (!f.startsWith(pre)) continue;
-    const rest = f.slice(pre.length);
-    const i = rest.indexOf("/");
-    names.set(i < 0 ? rest : rest.slice(0, i), i >= 0);
-  }
-  for (const d of dirs) if (d.startsWith(pre) && d.length > pre.length && !d.slice(pre.length).includes("/")) names.set(d.slice(pre.length), true);
-  const list = [...names].sort(([a], [b]) => (a < b ? -1 : 1));
+  const list = [...(children.get(p) ?? [])].sort(([a], [b]) => (a < b ? -1 : 1));
   return o?.withFileTypes ? list.map(([name, dir]): Dirent => ({ name, isDirectory: () => dir, isFile: () => !dir })) : list.map(([n]) => n);
 }
 export function statSync(p: string) {

@@ -20,7 +20,7 @@ import {
   enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, wordCount, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
-  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, tryingNow, tryLine, markTried, planTry, addTry, useCount, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemPriority, checkPriority, setItemArchived, setItemPinned, setItemSkills, itemCardSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
+  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, tryingNow, tryLine, markTried, planTry, addTry, useCount, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemPriority, checkPriority, setItemArchived, setItemPinned, fileItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
   type AnchoredAnnotation, type Annotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
@@ -594,9 +594,9 @@ export const itemCommands: Record<string, Command> = {
       if (f.author !== undefined) meta = await setItemAuthor(lib, id, str(f.author) ?? "");
       if (f.priority !== undefined) meta = await setItemPriority(lib, id, str(f.priority) ?? "");
       const cards = f.cards === undefined ? undefined : (JSON.parse(str(f.cards)!) as Record<string, string[]>);
-      const before = f.skills !== undefined ? itemCardSkills(lib, id) : undefined;
-      if (f.skills !== undefined) meta = await setItemSkills(lib, id, strs(f.skills), cards);
-      return { data: before ? { ...meta, cards_before: before } : meta, text: `${meta.title}${meta.skills.length ? ` (${meta.skills.join(", ")})` : ""}` };
+      const filing = f.skills !== undefined ? await fileItemSkills(lib, id, strs(f.skills), cards) : undefined;
+      if (filing) meta = filing.meta;
+      return { data: filing ? { ...meta, cards_before: filing.cards_before } : meta, text: `${meta.title}${meta.skills.length ? ` (${meta.skills.join(", ")})` : ""}` };
     },
   },
 
