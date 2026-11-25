@@ -29,6 +29,9 @@ export function passage(runs: string[], text: string): [number, number] | null {
     if (last >= from) to = Math.max(to, last + size - 1);
   }
   if (from < 0 || to < from) return null;
+  // Endpoints alone do not establish a passage: PDF runs can alternate columns.
+  // Every letter between the probes must belong to the clicked passage, in order.
+  if (!want.includes(page.slice(from, to + 1))) return null;
   /** The run that holds a place in the page's letters: the last one starting at or before it. */
   const run = (pos: number) => {
     let lo = 0, hi = starts.length - 1;

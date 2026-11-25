@@ -134,7 +134,7 @@ export function pptxToDoc(data: Uint8Array): OfficeDoc {
     const notesRel = read(posix.join(posix.dirname(path), "_rels", posix.basename(path) + ".rels")).match(/Target="([^"]*notesSlide[^"]*)"/)?.[1];
     // A notes page also repeats the slide number; only its body placeholder is the speaker's notes.
     const notes = notesRel
-      ? [...read(posix.normalize(posix.join(posix.dirname(path), notesRel))).matchAll(/<p:sp>([\s\S]*?)<\/p:sp>/g)].filter((s) => /<p:ph\b[^>]*type="body"/.test(s[1]!)).flatMap((s) => paragraphs(s[1]!)).map((p) => p.text)
+      ? [...read(packageTarget(posix.dirname(path), notesRel)).matchAll(/<p:sp>([\s\S]*?)<\/p:sp>/g)].filter((s) => /<p:ph\b[^>]*type="body"/.test(s[1]!)).flatMap((s) => paragraphs(s[1]!)).map((p) => p.text)
       : [];
     const n = slides.length + 1;
     first ??= title || undefined;
@@ -167,6 +167,11 @@ function slidePictures(xml: string, rels: string, dir: string): { media: string;
     const target = targets.get(m[1]!.match(/<a:blip\b[^>]*r:embed="([^"]+)"/)?.[1]);
     if (!target || /^https?:/.test(target)) return [];
     const descr = xmlText(m[1]!.match(/<p:cNvPr\b[^>]*descr="([^"]*)"/)?.[1] ?? "").replace(/[\[\]\n]/g, " ").trim();
-    return [{ media: posix.normalize(posix.join(dir, target)), alt: /^[\w -]+\.(png|jpe?g|gif|svg|emf|wmf|tiff?)$/i.test(descr) ? "" : descr }];
+    return [{ media: packageTarget(dir, target), alt: /^[\w -]+\.(png|jpe?g|gif|svg|emf|wmf|tiff?)$/i.test(descr) ? "" : descr }];
   });
+}
+
+/** OOXML targets starting with / address the package root, not the referring part's folder. */
+function packageTarget(dir: string, target: string): string {
+  return posix.normalize(target.startsWith("/") ? target.slice(1) : posix.join(dir, target));
 }

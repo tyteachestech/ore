@@ -4,7 +4,7 @@ import { AnnotationSchema, anchorAnnotations, annotationRevs, annotationsPath, r
 import { cardFiles, readCardFile } from "./cards.ts";
 import { syncIndex } from "./db.ts";
 import { errorLine, logFiles, readJsonlLines, sha256, subdirs, visible } from "./fsutil.ts";
-import { ID_END, itemDirs, readItemDir, type Item } from "./items.ts";
+import { ID_END, itemDirs, readItemDir, sourceFile, type Item } from "./items.ts";
 import { brokenLinks } from "./links.ts";
 import { recoverReimport, reimportRecovery } from "./ingest/index.ts";
 import { lockStale, tryWithLock, withLock } from "./lock.ts";
@@ -103,6 +103,9 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
     if (!ID_END.test(dir)) add("error", doc, `the folder name doesn't end in its id, so search skips it: rename it back to end in -${item.meta.id}`);
     else if (!dir.endsWith(item.meta.id)) add("error", doc, `id ${item.meta.id} does not match folder name`);
     checkRefs(doc, item.meta.skills, item.meta.topics);
+    // Plain text and snippets need no original to read again; a deferred transcript has not kept one yet.
+    if (item.meta.type !== "markdown" && item.meta.type !== "snippet" && !item.meta.owed?.length && !sourceFile(item))
+      add("warn", dir, "no kept original; add the file again to restore it, or reimport from its link if it has one");
     const annPath = annotationsPath(dir);
     for (const f of logFiles(annPath))
       for (const l of readJsonlLines(f)) {

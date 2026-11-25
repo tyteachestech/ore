@@ -390,3 +390,24 @@ describe("reimport", () => {
     expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
   });
 });
+
+test("reimport reanchors highlights added after a hand edit with a stale body hash", async () => {
+  const lib = await tempLibrary();
+  page = V1;
+  serve();
+  const item = await addSource(lib, URL_);
+  const extra = "A personal example written directly into the document.\n\nWhy do rivers meander?";
+  writeFileSync(item.docPath, readFileSync(item.docPath, "utf8") + "\n" + extra + "\n");
+  const edited = findItem(lib, item.meta.id);
+  const gone = addHighlight(edited, { exact: "A personal example written directly into the document.", intent: "keep", note: "Remember this example." });
+  const question = addHighlight(edited, { exact: "Why do rivers meander?", intent: "question", note: "How does this work?" });
+  const kept = addHighlight(edited, { exact: "Sleep consolidates memory.", intent: "keep" });
+  const result = await reimportSource(lib, item.meta.id);
+  expect(result.changed).toBe(true);
+  expect(result.removed.map(a => a.id)).toEqual([gone.id]);
+  expect(result.unplaced.map(a => a.id)).toEqual([question.id]);
+  expect(readAnnotations(result.item).map(a => a.id).sort()).toEqual([question.id, kept.id].sort());
+  const back = await undoReimport(lib, item.meta.id, result.step);
+  expect(back.body).toContain(extra);
+  expect(readAnnotations(back).find(a => a.id === gone.id)?.note).toBe(gone.note);
+});

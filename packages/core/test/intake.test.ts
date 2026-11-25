@@ -2330,3 +2330,97 @@ test("office-11: Markdown reference images keep titles and leave code examples a
   expect(item.body).toContain("`![Example](diagram.svg)`");
   expect(item.body).toContain("```md\n![Example](diagram.svg)\n```");
 });
+
+test("PowerPoint: package-root notes preserve content and highlights on reimport", async () => {
+  const lib = await tempLibrary();
+  const item = await addSource(lib, file("deck-root-notes.pptx"));
+  expect(item.meta.title).toBe("How memory works");
+  expect(item.meta.author).toBeUndefined();
+  expect(item.meta.published).toBeUndefined();
+  expect(item.body.match(/^## .+$/gm)).toEqual(["## Encoding", "## Storage", "## Retrieval"]);
+  expect(item.body).toContain("Attention decides what gets in");
+  expect(item.body).toContain("Start with the cocktail party example.");
+  expect(item.body).toContain("Sub point for Retrieval");
+  expect(images(item.body)).toEqual([]);
+  expect(item.body).not.toContain("```");
+  const other = await tempLibrary();
+  const relative = await addSource(other, file("deck.pptx"));
+  const h = addHighlight(relative, { exact: "Start with the cocktail party example.", note: "Keep this example.", intent: "keep" });
+  writeFileSync(join(relative.dir, "source.pptx"), readFileSync(file("deck-root-notes.pptx")));
+  const result = await reimportSource(other, relative.meta.id);
+  expect(result.changed).toBe(false);
+  expect(readAnnotations(result.item)).toContainEqual(h);
+});
+
+test("text originals retain their input bytes and declared encoding", async () => {
+  for (const name of ["shift-jis.html", "utf16.csv", "utf16.md", "bom-notebook.ipynb", "lecture.srt"]) {
+    const lib = await tempLibrary();
+    const input = readFileSync(file(name));
+    const item = await addSource(lib, file(name));
+    const ext = name.split(".").at(-1)!;
+    expect(readFileSync(join(item.dir, `source.${ext}`))).toEqual(input);
+    expect(item.meta.author).toBeUndefined();
+    expect(item.meta.published).toBeUndefined();
+    expect(images(item.body)).toEqual([]);
+    if (name === "utf16.csv") {
+      expect(item.meta.title).toBe("utf16");
+      expect(item.body).toBe("| Topic | Answer |\n| --- | --- |\n| Spacing | Wait one day |\n");
+    } else if (name === "utf16.md") {
+      expect(item.meta.title).toBe("Spacing");
+      expect(item.body).toBe("# Spacing\n\nWait one day before retrieving.\n");
+    } else if (name === "bom-notebook.ipynb") {
+      expect(item.meta.title).toBe("Introducing NumPy");
+      expect(item.body).toBe(readFileSync(join(import.meta.dir, "golden/notebook.md"), "utf8").split("---\n").slice(2).join("---\n"));
+    } else if (name === "lecture.srt") {
+      expect(item.meta.title).toBe("lecture");
+      expect(item.body).toBe("[00:01] Welcome to the lecture on memory. Today we cover spacing and retrieval.\n\n[00:41] Now the forgetting curve.\n");
+      expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
+    }
+    if (name !== "bom-notebook.ipynb") expect(item.body).not.toContain("```");
+    if (name === "shift-jis.html") {
+      expect(item.meta.title).toBe("日本の文学");
+      expect(item.meta.author).toBeUndefined();
+      expect(item.meta.published).toBeUndefined();
+      expect(item.body).toContain("吾輩は猫である。");
+      expect(item.body.trim().endsWith("吾輩は猫である。")).toBe(true);
+      expect(images(item.body)).toEqual([]);
+      expect(item.body).not.toContain("```");
+      expect(new TextDecoder("shift_jis").decode(input)).toContain(`<h1>${item.meta.title}</h1>`);
+      expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
+    }
+  }
+});
+
+test("adding a file again repairs a missing original without replacing learning records", async () => {
+  const { unlinkSync } = await import("node:fs");
+  const { setItemArchived } = await import("../src/items.ts");
+  for (const archived of [false, true]) {
+    const lib = await tempLibrary();
+    const item = await addSource(lib, file("notes.docx"));
+    const h = addHighlight(item, { exact: item.body.match(/\w[^\n]+/)![0], intent: "keep", note: "My note" });
+    const source = join(item.dir, "source.docx");
+    unlinkSync(source);
+    if (archived) await setItemArchived(lib, item.meta.id, true);
+    const added = await addSource(lib, file("notes.docx"));
+    expect(added.meta.id).toBe(item.meta.id);
+    expect(added.body).toBe(item.body);
+    expect(added.meta.author).toBe(item.meta.author);
+    expect(added.meta.title).toBe(item.meta.title);
+    expect(added.meta.published).toBe(item.meta.published);
+    expect(added.meta.archived_at).toBeUndefined();
+    expect(existsSync(source)).toBe(true);
+    expect(readFileSync(source)).toEqual(readFileSync(file("notes.docx")));
+    expect(readAnnotations(added)).toContainEqual(h);
+    expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
+  }
+});
+
+test("PowerPoint: package-root picture targets keep the same figures", async () => {
+  const relative = await addSource(await tempLibrary(), file("deck-pictures.pptx"));
+  const rooted = await addSource(await tempLibrary(), file("deck-root-pictures.pptx"));
+  expect(images(relative.body).length).toBeGreaterThan(0);
+  expect(rooted.body).toBe(relative.body);
+  expect(rooted.meta.title).toBe(relative.meta.title);
+  for (const image of images(rooted.body))
+    expect(readFileSync(join(rooted.dir, image.path))).toEqual(readFileSync(join(relative.dir, image.path)));
+});

@@ -210,21 +210,21 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
   const text = decodeText(bytes);
   if (kind === "csv" || kind === "tsv") {
     const s = (await import("./sheets.ts")).csvToDoc(text, kind === "tsv");
-    return { type: "article", title: fileStem(name), url, body: s.body, source: { ext: kind, data: text } };
+    return { type: "article", title: fileStem(name), url, body: s.body, source: { ext: kind, data: bytes } };
   }
   if (kind === "ipynb") {
     const n = (await import("./notebook.ts")).notebookToDoc(text);
-    return { type: "article", title: n.title ?? fileStem(name), url, body: n.body, source: { ext: "ipynb", data: text }, assets: n.assets };
+    return { type: "article", title: n.title ?? fileStem(name), url, body: n.body, source: { ext: "ipynb", data: bytes }, assets: n.assets };
   }
   if (kind === "srt" || kind === "vtt") {
     const vtt = kind === "srt" ? srtToVtt(text) : text;
-    return { type: "article", title: fileStem(name), url, body: vttToBody(vtt), source: { ext: "vtt", data: vtt } };
+    return { type: "article", title: fileStem(name), url, body: vttToBody(vtt), source: { ext: kind, data: bytes } };
   }
   if (kind === "markdown") {
     // A picture or a PDF renamed .md is not text: saved, it would be a source of junk (D96, F4).
     if (/[\0-\x08\x0e-\x1a]/.test(text.slice(0, 4096))) throw new Error(`“${basename(name)}” isn’t text, though its name says it is. If it is a PDF or a picture, give it its real ending and add it again; otherwise copy its text and paste it here.`);
     const ext = /\.(md|markdown|txt|text)$/i.exec(name)?.[1]?.toLowerCase() ?? "md";
-    return { type: "markdown", ...(await markdownFile(text, fileStem(name))), url, source: { ext, data: text } };
+    return { type: "markdown", ...(await markdownFile(text, fileStem(name))), url, source: { ext, data: bytes } };
   }
   if (/^\s*(?:<\?xml[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*)*<(?:rss|feed)\b/.test(text.slice(0, 2000)))
     throw new Error("That’s a podcast or blog feed, not one episode or post. Add the link of the episode or post you want instead.");
@@ -238,7 +238,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
   // A page that is only a wall or a shell is refused, never saved as the content.
   const why = !page.video && refusal(page.title, page.body, url ? new URL(url).host : fileStem(name));
   if (why) throw new Error(why);
-  return { ...page, url };
+  return { ...page, url, source: { ext: "html", data: bytes } };
 }
 
 /** A page that is an episode (`pageAudio`) as its episode (D215): as an episode link gives it (the
@@ -588,7 +588,7 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   const made = same ? undefined : await createItem(lib, { ...ready, skills: opts.skills, preview: opts.preview }, () => (isUrl ? byLink(lib, input, true) : sameText(lib, ready.body)));
   if (made?.already && opts.preview) return made; // a Feed post opened twice at once is still only being read
   if (made?.already) same = made;
-  const item = same ? await keep(lib, same, opts) : made!;
+  const item = same ? await keep(lib, same, opts, ready) : made!;
   if (!isUrl && resolve(input).startsWith(paths.inbox(lib) + sep)) unlinkSync(resolve(input));
   if (!same && ready.owed?.length) {
     mkdirSync(paths.inbox(lib), { recursive: true });
@@ -616,7 +616,15 @@ export type Kept = { kept: true; filed: string[]; restored: boolean; fromFeed: b
 
 /** A source already in the library, added again: filed under the new skills too, and back from the
  *  archive if it was there, since adding it again means he wants it. */
-async function keep(lib: Library, had: Item, opts: AddOptions): Promise<Item & Kept> {
+async function keep(lib: Library, had: Item, opts: AddOptions, draft?: NewItem): Promise<Item & Kept> {
+  // Deduplication keeps the learning records, but must not discard a replacement for a lost original.
+  if (draft?.source) await withLock(paths.lock(lib), () => {
+    const current = findItem(lib, had.meta.id);
+    if (!sourceFile(current) && current.body === draft.body.replace(/\r\n?/g, "\n")) {
+      for (const a of draft.assets ?? []) writeAtomic(join(current.dir, "assets", a.name), a.data);
+      writeAtomic(join(current.dir, `source.${draft.source!.ext}`), draft.source!.data);
+    }
+  });
   // A post he was previewing from the Feed, added on purpose: it is a source now.
   const fromFeed = await keepPreview(lib, had.meta.id);
   const filed = (opts.skills ?? []).filter((k) => !had.meta.skills.includes(k));
@@ -861,13 +869,13 @@ export function reimportRecovery(lib: Library, dir: string): string | undefined 
   }
 }
 
-/** Caller holds the library lock. Puts back every file of the copy that is missing, doc.md last, so the
- *  source shows again only once it is whole. */
+/** Caller holds the library lock. Restores the saved version, including originals already copied from
+ *  the other version by an interrupted Undo. Atomic replacements, doc.md last. */
 export function recoverReimport(lib: Library, dir: string): boolean {
   if (existsSync(join(dir, "doc.md"))) return false;
   const saved = reimportRecovery(lib, dir);
   if (!saved) return false;
-  for (const f of readdirSync(saved).filter((f) => REPLACED(f) && f !== "doc.md")) if (!existsSync(join(dir, f))) keepFile(join(saved, f), join(dir, f));
+  for (const f of readdirSync(saved).filter((f) => REPLACED(f) && f !== "doc.md")) writeAtomic(join(dir, f), readFileSync(join(saved, f)));
   writeAtomic(join(dir, "doc.md"), readFileSync(join(saved, "doc.md")));
   return true;
 }
@@ -1030,12 +1038,14 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     if (regions?.length) writeAtomic(join(item.dir, "layout.json"), JSON.stringify(regions));
     // Images are named by their content, so the previous version's stay for Undo and shared ones are not copied twice.
     for (const a of draft.assets ?? []) writeAtomic(join(item.dir, "assets", a.name), a.data);
-    // The old body's hash stays until the highlights are re-anchored to the new body (reanchorItem).
+    // Compare against the actual old body, not its possibly stale hash after a hand edit.
+    // Otherwise restoring the captured text can skip reanchoring highlights added to that edit.
     // A lesson read from its course page again (lessonOf) gains its page's link.
     // Read again under the lock: a background enrich may have written its questions while this one read.
-    const now = readItemDir(item.dir).meta;
+    const current = readItemDir(item.dir);
+    const now = current.meta;
     const added = tail ? recordEnd(lib, item.meta.id, draft.body.length - tail.length, tail) : undefined;
-    const meta = { ...now, type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author || draft.author?.trim() || undefined, published: draft.published?.trim() || now.published, structure: draft.structure, owed: undefined, owed_error: undefined, chapter_recalls: followChapters(now.chapter_recalls, item.body, draft.body, draft.type) };
+    const meta = { ...now, text_sha256: sha256(current.body), type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author || draft.author?.trim() || undefined, published: draft.published?.trim() || now.published, structure: draft.structure, owed: undefined, owed_error: undefined, chapter_recalls: followChapters(now.chapter_recalls, item.body, draft.body, draft.type) };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, draft.body));
   });
   const next = readItemDir(item.dir);
