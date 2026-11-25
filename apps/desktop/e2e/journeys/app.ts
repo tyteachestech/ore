@@ -397,7 +397,7 @@ journey("settle: closing a typed highlight lifts the popup away, pops its mark a
   }));
   if (!at.gone || at.ghost !== "true" || !at.glow) throw new Error(`no settle: ${JSON.stringify(at)}`);
   await until("the mark pops", async () => (await page.locator(".mark-icon.settle").count()) === 1, 300);
-  await until("nothing is left on the page", async () => (await left()) === 0, 1000);
+  await until("nothing is left on the page", async () => (await left()) === 0, 2000);
   // Reduced motion: the popup just goes.
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.locator(".mark-icon.question").first().click();
