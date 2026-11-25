@@ -125,7 +125,7 @@ test("⌘Z right after a drag takes the new highlight back once its save is in, 
   expect(t.ids()).toEqual(["b"]);
   expect(t.page).toEqual(["off b", "on b"]);
   (await t.last("annotate b --status open --intent keep --note=")).fail("offline");
-  expect(redo).rejects.toThrow("offline");
+  await expect(redo).rejects.toThrow("offline");
   await tick();
   // A Redo that fails leaves it gone again; the history says why.
   expect(t.ids()).toEqual([]);
@@ -149,7 +149,7 @@ test("a highlight whose save fails leaves the list and the history", async () =>
   expect(t.ids()).toEqual(["a"]);
   expect(seen).toEqual(["failed: no such passage"]);
   expect(t.steps[0]!.forgotten).toBe(true);
-  expect(t.hl.realId("pending-1")).rejects.toThrow("no such passage");
+  await expect(t.hl.realId("pending-1")).rejects.toThrow("no such passage");
 });
 
 test("a type that fails to save goes back to what it was, off the history, and says why", async () => {
@@ -174,7 +174,7 @@ test("a type's Undo writes the old type after it, and one that fails is the hist
   (await t.last("annotate a --intent question")).ok(); // the Undo's write waits its turn
   await tick();
   (await t.last("annotate a --intent keep")).fail("offline");
-  expect(undo).rejects.toThrow("offline");
+  await expect(undo).rejects.toThrow("offline");
   await tick();
   expect(t.hl.list()[0]!.intent).toBe("question");
   expect(t.said()).toEqual(["Changed to Question"]); // no second step, no toast of its own
@@ -260,7 +260,7 @@ test("a key point typed with nothing selected shows at once, then is the saved o
 
   const bad = t.hl.point(["highlight", "src", "--at", "50", "--note=x"], ann("pending-10", { point: true }));
   (await t.last("highlight src --at 50 --note=x")).fail("offline");
-  expect(bad).rejects.toThrow("offline");
+  await expect(bad).rejects.toThrow("offline");
   await tick();
   expect(t.ids()).toEqual(["p"]);
 });
@@ -284,7 +284,7 @@ test("writes to one highlight go out one at a time, in the order he made them", 
   // The second waits its turn; another highlight's write does not.
   expect(t.sent.map((s) => s.args)).toEqual(["annotate a --intent card", "annotate b --intent question"]);
   t.sent[0]!.fail("offline");
-  expect(first).rejects.toThrow("offline");
+  await expect(first).rejects.toThrow("offline");
   await tick();
   // A write that failed still gives the next its turn, and counts as landed.
   expect(t.sent.map((s) => s.args)).toEqual(["annotate a --intent card", "annotate b --intent question", "annotate a --note=why"]);
