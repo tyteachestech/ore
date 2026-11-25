@@ -7,8 +7,8 @@ import { errorText, type Forget, type Notify } from "./util";
 /** One card adds at most this much active time (D60, as in core). */
 const ACTIVE_CAP_MS = 3 * 60_000;
 
-/** The session receipt, and today before and after it (for the ring and level-ups). */
-/** `dig`: a skill ready to be explained whole (D325), offered once on the end screen; null when none. */
+/** The session receipt, and today before and after it (for the ring and level-ups). `dig`: a skill ready to be
+ *  explained whole (D325), offered once on the end screen; null when none. */
 export type End = { session: SessionEnd; today: Today; before: Today | null; dig?: { skill: string; goal: string } | null };
 
 /** A rating as he gave it: the exercise, his answer and how sure he was, and the AI's grade if it gave one (D21). */
@@ -39,9 +39,9 @@ export type Screen<S> = {
   press: (key: "undo" | "redo" | KeyboardEventInit) => void;
 };
 
-/** One Later on the history: the session before and after it (null: it ended the session), and what it changed.
+/** One Later on the history: the session after it (null: it ended the session), and what it changed.
  *  `elapsed`: the exercise's clock so far. */
-type Put<S> = { id: string; before: DueEntry[]; after: DueEntry[] | null; off: Set<string>; won: boolean; shown: S; elapsed: number; forget?: Forget };
+type Put<S> = { id: string; after: DueEntry[] | null; off: Set<string>; won: boolean; shown: S; elapsed: number; forget?: Forget };
 /** A rating of this session, with the session as it was before it. */
 type Rated = { card: string; ts: string; queue: DueEntry[]; done: number; activeMs: number; off: Set<string>; won: boolean; told: boolean; forget: Forget; day: string; ms: number };
 type Again = { forget: Forget; setTs: (ts: string) => void };
@@ -76,6 +76,9 @@ export class ReviewSession<S> {
 
   // What the screen draws.
   queue: DueEntry[] | null = null;
+  /** Goes up each time another exercise comes to the front. The screen starts an exercise afresh on this, not only
+   *  on a new first entry: a rating and its ⌘Z can both land between two draws, and the entry is then the same one. */
+  turn = 0;
   /** Ratings so far: every one is a step, a miss too (D59). */
   done = 0;
   /** A write is out: nothing else starts until it lands. */
@@ -176,6 +179,7 @@ export class ReviewSession<S> {
   }
 
   private setQueue(q: DueEntry[] | null) {
+    if (q?.[0] !== this.queue?.[0]) this.turn++;
     this.queue = q;
     this.changed();
   }
@@ -545,7 +549,12 @@ export class ReviewSession<S> {
   }
 
   /** The history's undo and redo of a rating while Review shows it: the write's promise, or null when it isn't the session's to do. */
-  private undoRated = (ts: string) => (this.undos.at(-1)?.ts === ts ? this.undoRating() : null);
+  private undoRated = (ts: string) => {
+    if (this.undos.at(-1)?.ts !== ts) return null;
+    // Asked for past Review's own keys, which hold a ⌘Z while a write is out (the palette over it, the phone's
+    // shake): refused, so the history keeps the step, never counted as taken back with the rating still in the log.
+    return this.busy ? Promise.reject(new Error("Still saving. Try again in a moment.")) : this.undoRating();
+  };
   // ⇧⌘Z right after ⌘Z: that card is showing again, so the rating goes in again and Review moves on.
   private redoRated(id: string, args: string[], rating: number, elapsed: number, again: Again) {
     if (this.end || this.busy || this.queue?.[0]?.id !== id) return null;
@@ -561,7 +570,7 @@ export class ReviewSession<S> {
     const on = this.screen.shown();
     const { queue } = this;
     if (!on || on.id !== queue?.[0]?.id || !queue || this.end || this.busy) return false;
-    const p: Put<S> = Object.assign(redo ?? ({} as Put<S>), { id: on.id, before: queue, after: putOff(queue, this.off), off: new Set(this.off), won: this.wonLast, shown: on.shown, elapsed: this.elapsed() });
+    const p: Put<S> = Object.assign(redo ?? ({} as Put<S>), { id: on.id, after: putOff(queue, this.off), off: new Set(this.off), won: this.wonLast, shown: on.shown, elapsed: this.elapsed() });
     this.off.add(on.id);
     // D177's one more after a miss was this one: put off, it is no answer, so the next one he answers takes that turn.
     this.wonLast = false;

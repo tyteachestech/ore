@@ -364,3 +364,40 @@ test("the next exercise loads ahead and is used only when a rating or a Later mo
   expect((await t.s.takeAhead("b"))?.id).toBe("b");
   expect(t.s.takeAhead("b")).toBeUndefined();
 });
+
+// Code review of #533: the held ⌘Z goes on as soon as the rating has landed, which can be before the screen has
+// drawn the exercise after it. The exercise then comes back as the same entry, and a screen that only compared
+// entries would leave it answered and marked, its rating gone.
+test("an exercise ⌘Z brings back is a new showing, even when the screen never drew the one between", async () => {
+  const t = await open({ slow: ["review"] });
+  const shownAs = t.s.turn;
+  void t.rate("a");
+  await tick();
+  t.s.holdUndo({ key: "z" });
+  t.waiting[0]!.land();
+  await tick();
+  expect(t.pressed).toHaveLength(1);
+  void t.steps[0]!.undo!();
+  await tick();
+  t.waiting[1]!.land();
+  await tick();
+  expect(t.ids()).toEqual(["a", "b", "c"]);
+  expect(t.s.turn).toBe(shownAs + 2);
+});
+
+// F-new-review-undo-while-saving
+test("a rating's undo that arrives while another rating saves is refused, not counted as done", async () => {
+  const t = await open({ slow: ["review"] });
+  void t.rate("a");
+  await tick();
+  t.waiting[0]!.land();
+  await tick();
+  void t.rate("b");
+  await tick();
+  // Past Review's own keys (the palette open over it, the phone's shake): the history asks for a's rating back.
+  expect(t.steps[0]!.undo!()).rejects.toThrow("Still saving. Try again in a moment.");
+  expect(t.wrote("review a --undo")).toEqual([]);
+  t.waiting[1]!.land();
+  await tick();
+  expect([t.s.done, t.s.reviewed]).toEqual([2, 2]);
+});

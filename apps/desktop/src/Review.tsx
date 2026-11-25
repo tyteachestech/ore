@@ -296,7 +296,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     return () => {
       live = false;
     };
-  }, [entry, loadTry]);
+  }, [entry, loadTry, s.turn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Once this card is on screen, the one after it loads.
   const nextUp = queue?.[1]?.id;
