@@ -8,7 +8,9 @@ import { join } from "node:path";
 // its spinner), so this reads it there.
 test("Continue says what it is waiting for: a part left out, the key points of a source finished partway, or a save", () => {
   const src = readFileSync(join(import.meta.dir, "../src/Finish.tsx"), "utf8");
-  expect(src).toContain('<Working label={leave.trim() ? "Leaving that out…" : scoped && !qs.every((p) => p.points) ? "Finding the key points…" : "Saving…"} />');
-  // The same test of "is anything left out" decides the wait and its label.
+  expect(src).toContain('<Working label={leave.trim() ? "Leaving that out…" : scoped && finding ? "Finding the key points…" : "Saving…"} />');
+  // The same test of "is anything left out" decides the wait and its label, and it says so only while the key
+  // points are still being found: not on the iPhone, which finds none, or once that has failed.
   expect(src).toContain("if (!scoped) return n;");
+  expect(src).toContain('ore<{ prequestions: Prequestion[] }>("key-points", doc.id).finally(() => setFinding(false))');
 });

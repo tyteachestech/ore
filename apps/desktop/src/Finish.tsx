@@ -132,10 +132,13 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
 
   // D56: key points for every prequestion, written while he does the free recall.
   const pointsRun = useRef<Promise<unknown> | null>(null);
+  /** The key points are being found: what Continue waits for when a part is to be left out. */
+  const [finding, setFinding] = useState(false);
   const loadPoints = () => {
     if (!qs.length || qs.every((p) => p.points)) return;
     setPointsError(null);
-    pointsRun.current = ore<{ prequestions: Prequestion[] }>("key-points", doc.id).then(
+    setFinding(true);
+    pointsRun.current = ore<{ prequestions: Prequestion[] }>("key-points", doc.id).finally(() => setFinding(false)).then(
       (r) => {
         // An empty reply would leave "Finding the key points…" up forever; say it failed instead.
         if (!r?.prequestions?.some((p) => p.points?.length)) return setPointsError("No key points came back.");
@@ -216,7 +219,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
         },
       );
     if (PHONE) return; // Cards are drafted on the Mac (D78.3); said once in the panel, not as a failure.
-    if (feedbackRun.current) void feedbackRun.current.finally(run);
+    // Being drafted from here on, the wait for the recall's feedback included: Review this source says so (F734).
+    if (feedbackRun.current) void drafting(doc.id, feedbackRun.current.then(run, run));
     else void run();
   }
 
@@ -486,7 +490,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             )}
             <Hint text={recall.trim() ? "Save to your source note and continue" : "Skip the recall"} keys="finish" side="top">
               <button className="pill-btn quiz-go" onClick={primary} disabled={busy}>
-                {busy ? <Working label={leave.trim() ? "Leaving that out…" : scoped && !qs.every((p) => p.points) ? "Finding the key points…" : "Saving…"} /> : recall.trim() ? "Continue" : n ? "Skip to questions" : "Skip"}
+                {busy ? <Working label={leave.trim() ? "Leaving that out…" : scoped && finding ? "Finding the key points…" : "Saving…"} /> : recall.trim() ? "Continue" : n ? "Skip to questions" : "Skip"}
               </button>
             </Hint>
           </div>

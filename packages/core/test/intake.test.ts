@@ -546,12 +546,14 @@ describe("import coverage: files", () => {
     const it = await addSource(await tempLibrary(), file("numbered-outline.pdf"));
     const b = it.body;
     expect(it.meta.title).toBe("Spacing is all you need");
-    expect(b.match(/^#+ .+$/gm)).toEqual(["## Spacing is all you need", "## 1 Introduction", "## 2 Background", "## 3 Method", "## 4 Results", "## 5 Conclusion"]);
-    expect([...(b.match(/^<!-- chapter \d+ -->$/gm) ?? [])]).toEqual([1, 2, 3, 4, 5].map((n) => `<!-- chapter ${n} -->`));
-    for (const name of ["Introduction", "Background", "Method", "Results", "Conclusion"]) expect(b.match(new RegExp(`^.*\\b${name}$`, "gm"))).toHaveLength(1);
+    expect(b.match(/^#+ .+$/gm)).toEqual(["## Spacing is all you need", "## 1 Introduction", "## 2 Background", "## 3 Method", "## 4 Results", "## 5 Conclusion", "## 6 A comparison of spaced and massed practice in adult learners"]);
+    expect([...(b.match(/^<!-- chapter \d+ -->$/gm) ?? [])]).toEqual([1, 2, 3, 4, 5, 6].map((n) => `<!-- chapter ${n} -->`));
+    for (const name of ["Introduction", "Background", "Method", "Results", "Conclusion", "adult learners"]) expect(b.match(new RegExp(`^.*\\b${name}$`, "gm"))).toHaveLength(1);
     // Each heading sits over its own section's words, on the page that has them.
     expect(b).toMatch(/<!-- page 2 -->\n\n<!-- chapter 1 -->\n\n## 1 Introduction\n\nEach [^#]+<!-- chapter 2 -->\n\n## 2 Background\n\nEach [^#]+<!-- chapter 3 -->\n\n## 3 Method\n\nEach /);
     expect(b).toMatch(/<!-- page 3 -->\n\n<!-- chapter 4 -->\n\n## 4 Results\n\nEach /);
+    // A paragraph that opens with the next section's name stays where it is, in Results: the heading is the line below it.
+    expect(b).toMatch(/\n\nConclusion drawn early is a habit of its own\. [^#]+\n\n<!-- chapter 5 -->\n\n## 5 Conclusion\n\nEach /);
   });
 
   test("PDF: a programming book's code keeps its lines and indents, typewriter words in a sentence are code (F65)", async () => {

@@ -12,7 +12,10 @@ body = ParagraphStyle("b", parent=ss["BodyText"], fontName="Times-Roman", fontSi
 head = ParagraphStyle("h", parent=body, fontName="Times-Bold", fontSize=12, leading=15, spaceBefore=10, spaceAfter=6)
 title = ParagraphStyle("t", parent=body, fontName="Times-Bold", fontSize=17, leading=21, alignment=1, spaceAfter=14)
 # (section, paragraphs, page break after)
-sections = [("Introduction", 2, False), ("Background", 2, False), ("Method", 3, True), ("Results", 3, False), ("Conclusion", 2, False)]
+# The last paragraph of Results opens with the next section's name, and the last section's title is longer than a line
+# of forty characters: both once put a second heading on the page.
+LONG = "A comparison of spaced and massed practice in adult learners"
+sections = [("Introduction", 2, False), ("Background", 2, False), ("Method", 3, True), ("Results", 3, False), ("Conclusion", 2, False), (LONG, 2, False)]
 nouns = ["learner", "memory", "trace", "cue", "review", "answer", "question", "habit", "lesson", "interval", "idea", "mistake"]
 verbs = ["strengthens", "weakens", "reshapes", "anchors", "recalls", "blurs", "sharpens", "links", "tests", "rebuilds"]
 adjs = ["old", "fresh", "faint", "vivid", "spaced", "massed", "early", "late", "small", "patient"]
@@ -35,6 +38,8 @@ for n, (name, paras, brk) in enumerate(sections, 1):
     story.append(h)
     for _ in range(paras):
         story.append(Paragraph(" ".join(sentence() for _ in range(4)), body))
+    if name == "Results":
+        story.append(Paragraph("Conclusion drawn early is a habit of its own. " + sentence(), body))
     if brk:
         story.append(PageBreak())
 Paper(out, pagesize=letter, title="Spacing is all you need", author="A. Reader").build(story)

@@ -24,6 +24,7 @@ import { Finish, type Reveal } from "./Finish";
 import { Grow } from "./Grow";
 import { breakList, bulletOnSpace, fromBullets, showBullets } from "./list-keys";
 import { HideDots } from "./HideDots";
+import { drafting } from "./drafting";
 import { ExerciseText } from "./ExerciseText";
 import { Hint } from "./Hint";
 import { Thumb, thumbSrc } from "./Thumb";
@@ -1304,7 +1305,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const id = p.id;
     // One run per source, whoever asked: a source left and opened again while it runs waits on the same one.
     let run = enriching.get(id);
-    if (!run) enriching.set(id, (run = ore("enrich", id).finally(() => enriching.delete(id))));
+    if (!run) enriching.set(id, (run = drafting(id, ore("enrich", id)).finally(() => enriching.delete(id))));
     try {
       await run;
       const d = (await ore<Item[]>("ls")).find((i) => i.id === p.id);

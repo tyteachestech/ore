@@ -27,6 +27,8 @@ test("an exercise's math, code and source images are drawn; plain text stays as 
   expect(html("The ____ effect")).toBe("<p>The ____ effect</p>");
   // In a one-line list (a skill's fan, "You can now explain") no paragraph wraps it.
   expect(html("Why $$x$$?", true)).not.toContain("<p>");
+  // One line is drawn inside rows and buttons (a quiz's key point): a link there is its words, code stays code (F732).
+  expect(html("See [MDN on `Promise.all`](https://developer.mozilla.org/x)", true)).toBe("See MDN on <code>Promise.all</code>");
 });
 
 test("every place an exercise's question or answer is shown draws it with ExerciseText", () => {
