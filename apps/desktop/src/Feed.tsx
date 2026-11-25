@@ -12,6 +12,7 @@ import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
 import { change } from "./change";
+import { markFeedRead } from "./feed-actions";
 import { ore, opt, type Skill } from "./ore";
 import { SkillChips, SkillPicker, unfile } from "./Skills";
 import { count, errorText, load, save, singleFlight, typedLast, useLibraryChanges, type Notify } from "./util";
@@ -160,15 +161,11 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
   if (stepOut) stepOut.current = reading ? step : null;
 
   /** Marks one post, or a pick of them at once with one Undo (F9). One write for the whole pick. */
-  const setRead = (post: FeedPost | FeedPost[], on: boolean) => {
-    const urls = new Set((Array.isArray(post) ? post : [post]).map((p) => p.url));
-    const what = urls.size > 1 ? ` ${urls.size} posts` : "";
-    return change(notify, {
-      message: on ? `Marked${what} read` : `Marked${what} unread`,
-      show: (v) => setData((d) => d && { ...d, posts: d.posts.map((p) => (urls.has(p.url) ? { ...p, read: v === on } : p)) }),
-      write: (v) => ore("feed", v === on ? "read" : "unread", ...urls),
-    });
-  };
+  const setRead = (post: FeedPost | FeedPost[], on: boolean) => markFeedRead(post, on, {
+    notify,
+    run: ore,
+    show: (update) => setData((d) => d && { ...d, posts: update(d.posts) }),
+  });
 
   const unfollow = (f: FeedInfo) => {
     const before = data;
