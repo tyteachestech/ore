@@ -13,6 +13,7 @@ import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
+import { FRONT_END, unfold } from "./front";
 import { SearchButton, SearchField } from "./HeadSearch";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
 import { paragraphRange, sentenceRange, snapRange } from "./snap";
@@ -181,7 +182,8 @@ const stamped: Components = {
 
 
 /** A figure open to fill the window (D143): its image in the text, and where it sat. */
-type Zoomed = { img: HTMLImageElement; from: DOMRect };
+/** `max`: the most it grows by (a cover is saved small, so it opens at its own size, not blown up soft). */
+type Zoomed = { img: HTMLImageElement; from: DOMRect; max?: number };
 
 /** The figure a click opens (D143): a loaded picture in the text, not a link (the link wins), and not already
  *  about as big as the window. */
@@ -192,6 +194,15 @@ function zoomable(t: EventTarget | null, doc: HTMLElement | null): Zoomed | null
   // On the phone any picture opens, to pinch in on (Books): the screen is as wide as the column.
   if (PHONE) return { img, from };
   return Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height) > 1.1 ? { img, from } : null;
+}
+
+/** The cover at the top of a book or PDF, which a click opens larger, as Quick Look does: at the size it was saved. */
+function coverOf(t: EventTarget | null): Zoomed | null {
+  const img = t instanceof HTMLImageElement && t.matches("img.doc-thumb") && t.naturalWidth ? t : null;
+  if (!img) return null;
+  const from = img.getBoundingClientRect();
+  const max = img.naturalHeight / from.height;
+  return PHONE || max > 1.1 ? { img, from, max } : null;
 }
 
 type Box = [number, number, number, number];
@@ -306,7 +317,7 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
   }, []);
   // Drawn at its open size, so a picture larger than the column comes in sharp, and shrunk back onto its place.
   const { from } = fig;
-  const scale = Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height);
+  const scale = Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height, fig.max ?? Infinity);
   const w = from.width * scale;
   const h = from.height * scale;
   const left = (innerWidth - w) / 2;
@@ -541,7 +552,19 @@ type VideoCard = { head: ReactNode; foot?: ReactNode; box: RefObject<HTMLDivElem
 /** The document body, rendered in slices so a 100k-word book stays responsive while it mounts. With a
  *  video card, the transcript before VIDEO_END goes in the card and the page's text follows it. */
 const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, card }: { markdown: string; video: boolean; dir: string; cells?: boolean; pages?: boolean; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
-  const split = card ? markdown.indexOf(VIDEO_END) : -1;
+  // A book's front matter (its title page, copyright, contents) folds under one row, shut, so it opens on its text.
+  const front = card ? -1 : markdown.indexOf(FRONT_END);
+  const split = card ? markdown.indexOf(VIDEO_END) : front;
+  const [frontOpen, setFrontOpen] = useState(false);
+  const frontBox = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = frontBox.current;
+    if (!box) return;
+    // A jump into it (`unfold`): shown at once, so what jumps can measure where to go, and kept open.
+    const open = () => ((box.hidden = false), setFrontOpen(true));
+    box.addEventListener("unfold", open);
+    return () => box.removeEventListener("unfold", open);
+  }, [front > 0]);
   const top = useMemo(() => (split > 0 ? chunks(markdown.slice(0, split)) : []), [markdown, split]);
   const rest = useMemo(() => (pages ? pageChunks : chunks)(split > 0 ? markdown.slice(split) : markdown), [markdown, split, pages]);
   const total = top.length + rest.length;
@@ -567,6 +590,19 @@ const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, c
             ))}
           </div>
           {card.foot}
+        </section>
+      )}
+      {front > 0 && (
+        <section className="front-matter">
+          <button className="front-head" data-noindex onClick={() => setFrontOpen(!frontOpen)} aria-expanded={frontOpen}>
+            <CaretRight className={`caret${frontOpen ? " open" : ""}`} size={12} aria-hidden="true" />
+            Front matter
+          </button>
+          <div className="front-body" ref={frontBox} hidden={!frontOpen}>
+            {top.slice(0, shown).map((md, i) => (
+              <Chunk key={i} md={md} video={video} dir={dir} cells={cells} />
+            ))}
+          </div>
         </section>
       )}
       {rest.slice(0, Math.max(0, shown - top.length)).map((md, i) => {
@@ -971,6 +1007,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const el = scrollRef.current;
     if (!el) return;
     if (words) following.current = false;
+    unfold(r.startContainer);
     const b = band();
     // A passage in the card's transcript: the box scrolls to it, and the page to the box.
     const fb = followBox();
@@ -1388,6 +1425,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       if (docEl.current) back = placeOf(scroll, docEl.current);
     };
     take();
+    // A book's front matter opened for a passage in it (`unfold`) grows the page the same way.
+    const onUnfold = () => {
+      unfolded.current = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => void (unfolded.current = false)));
+    };
+    docEl.current?.addEventListener("unfold", onUnfold);
     const ro = new ResizeObserver(() => {
       // Not when the page grew because a folded transcript opened to show a passage: the passage is where he
       // was taken, and putting the old place back threw it off the window (Codex UX sweep 12).
@@ -1400,7 +1443,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // and WebKit does not hold the page still for it as Chromium does (F444).
     if (docEl.current) ro.observe(docEl.current);
     scroll.addEventListener("scroll", take, { passive: true });
+    const doc = docEl.current;
     return () => {
+      doc?.removeEventListener("unfold", onUnfold);
       ro.disconnect();
       scroll.removeEventListener("scroll", take);
     };
@@ -2783,6 +2828,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       const heading = !byId && el ? Array.from(el.querySelectorAll("h1, h2, h3, h4, h5, h6")).find((h) => slug(h.textContent ?? "") === slug(dec(id))) : undefined;
       if (byId || heading) {
         markPlace();
+        unfold(byId ?? heading);
         return (byId ?? heading)!.scrollIntoView({ block: heading ? "start" : "center" });
       }
       // The phone can't reimport (D78): the step is the Mac's.
@@ -2792,7 +2838,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     p.notify(`This links to “${dec(href)}”, a file beside the original that isn’t in Ore. ${PHONE ? "Add it from Add a link › Choose a file to read it here." : `Add it with ${label(keys.file)} to read it here.`}`, "error");
   };
   const onClick = (e: MouseEvent) => {
-    const fig = zoomable(e.target, docEl.current);
+    const fig = zoomable(e.target, docEl.current) ?? coverOf(e.target);
     if (fig) return setZoom(fig);
     const a = (e.target as Element).closest?.("a[href]");
     if (!a || !docEl.current?.contains(a)) return;

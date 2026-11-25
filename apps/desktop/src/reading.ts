@@ -133,13 +133,15 @@ function topBlock(scroll: HTMLElement, doc: HTMLElement): { el: HTMLElement; ind
     else hi = mid - 1;
   }
   const el = blocks[found];
-  if (!el) return null;
+  // Above every block that shows (a book's folded front matter measures as the page's top): no place to keep.
+  if (!el || el.closest("[hidden]")) return null;
   const r = el.getBoundingClientRect();
   return { el, index: found, at: r.height ? (top - r.top) / r.height : 0 };
 }
 
 /** Scrolls so the view's top is `at` of the way into `el`. */
 function toBlock(scroll: HTMLElement, el: HTMLElement, at: number) {
+  if (el.closest("[hidden]")) return; // folded away since: nowhere to go back to
   const n = el.getBoundingClientRect();
   scroll.scrollTop += n.top + at * n.height - scroll.getBoundingClientRect().top;
 }

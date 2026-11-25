@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { FRONT_END } from "./front";
 import { Hint } from "./Hint";
 import { Signpost } from "./icons";
 import { renderedNodeAt, type Skeleton, type TextIndex } from "./text";
@@ -31,10 +32,13 @@ export function chapterMarks(body: string, type?: string): { n: number; at: numb
  *  that follows it in the source. Chapters under ~500 words (title pages, contents, intros) get none. */
 export function findChapterEnds(body: string, src: Skeleton, idx: TextIndex, article: HTMLElement, type?: string): ChapterEnd[] {
   const marks = chapterMarks(body, type);
+  // A book's front matter (its copyright page, its praise) is no chapter to recall.
+  const front = body.indexOf(FRONT_END);
   const out: ChapterEnd[] = [];
   for (let i = 0; i + 1 < marks.length; i++) {
     const cur = marks[i]!;
     const next = marks[i + 1]!;
+    if (cur.at < front) continue;
     const text = body.slice(cur.text, next.at);
     if (words(text) < MIN_WORDS) continue;
     let el = renderedNodeAt(src, idx, next.text)?.parentElement ?? null;

@@ -1131,6 +1131,37 @@ describe("import coverage: EPUB", () => {
     expect(r.item.meta.chapter_recalls?.map((c) => c.n)).toEqual([1]);
   });
 
+  // make-study-epubs.ts: front-matter.epub is a trade publisher's book as Tyler's opened (F-new-front-matter): links,
+  // "Thank you for buying", newsletter buttons and a rights notice before the prologue, which the publisher marks
+  // "frontmatter" too. Every page stays, in the book's order (D122); the mark is where the reader's fold ends.
+  const FRONT_END = "<!-- end of front matter -->";
+  test("EPUB: a publisher's pages before the text are kept and marked as front matter; the prologue is the text", async () => {
+    const item = await addSource(await tempLibrary(), file("front-matter.epub"));
+    const [front, text] = item.body.split(FRONT_END);
+    expect(item.body.match(new RegExp(FRONT_END, "g"))).toHaveLength(1);
+    for (const kept of ["Begin Reading", "Thank you for buying this Lantern House ebook.", "sign up for our newsletters", "[![Sign Up](assets/", "for your personal use only", "To the night shift, who kept the lamp lit"]) expect(front).toContain(kept);
+    expect(front).not.toContain("Prologue");
+    expect(text).toMatch(/^\n\n<!-- chapter 4 -->\n\n# Prologue: The First Evening\n/);
+    for (const kept of ["nobody hurried it.", "# Part I", "# What a Lamp Remembers", "burns evenly for years."]) expect(text).toContain(kept);
+    // Chapters keep their numbers, front matter included, so a recall saved before this stays with its chapter.
+    expect([...(item.body.match(/<!-- chapter \d+ -->/g) ?? [])]).toEqual([1, 2, 3, 4, 5, 6].map((n) => `<!-- chapter ${n} -->`));
+  });
+
+  test("EPUB: a book with no marks folds its title, copyright and contents pages by what they say, and nothing after the text starts", async () => {
+    const item = await addSource(await tempLibrary(), file("front-matter-plain.epub"));
+    const [front, text] = item.body.split(FRONT_END);
+    for (const kept of ["TIDE TABLES FOR BEGINNERS", "All rights reserved.", "ISBN 978-0-00-000000-2", "CONTENTS"]) expect(front).toContain(kept);
+    // The text starts early, on a two-line note: it is the author's, so it shows.
+    expect(text).toMatch(/^\n\n<!-- chapter 4 -->\n\nA NOTE TO THE READER\n\nRead chapter 1 with a real tide table open beside you\./);
+    expect(text).toContain("READING THE TABLE");
+    // The copyright page at the back of the book is not front matter: it stays where it is.
+    expect(text).toMatch(/Copyright © 2019 by Ada Learner\. All rights reserved\.\n$/);
+  });
+
+  test("EPUB: a book that opens on its text has no front matter mark", async () => {
+    for (const name of ["chapters.epub", "book.epub", "plates.epub"]) expect((await addSource(await tempLibrary(), file(name))).body).not.toContain(FRONT_END);
+  });
+
   test("EPUB: the book's date, and its footnotes and endnotes as Markdown footnotes under the chapter that cites them", async () => {
     const item = await addSource(await tempLibrary(), file("book.epub"));
     expect(item.meta).toMatchObject({ type: "epub", title: "A Small Book of Remembering", author: "Ada Learner, Ben Reviewer", published: "2024-03-01" });
