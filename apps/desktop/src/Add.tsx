@@ -231,6 +231,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
             });
           }}
           onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               go();

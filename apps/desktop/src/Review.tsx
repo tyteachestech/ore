@@ -12,7 +12,7 @@ import { layer, sfx, type Sound } from "./sfx";
 import { still } from "./SideCursor";
 import { Hint } from "./Hint";
 import { MoreButton } from "./Menu";
-import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
+import { inTextField, is, label, reviewDigit, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { change } from "./change";
@@ -579,7 +579,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   if (leave) leave.current = () => s.finish(false);
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyRef.current = (e: KeyboardEvent) => {
-    if (paused || under) return;
+    // WebKit can clear isComposing on the confirmation key; 229 still belongs to the IME.
+    if (paused || under || e.isComposing || e.keyCode === 229) return;
     // A sheet over Review (its ⋯ on the phone) or a panel with its own keys (the ambience radio) is portaled out of it
     // and takes its keys: Esc closes it only, a number picks a channel instead of rating (F93).
     // Whatever has focus: in the frame before the sheet takes it, the key's target is the page (F61).
@@ -633,7 +634,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     }
     if (is(e, "retire-card")) {
       e.preventDefault();
-      void retire();
+      if (!e.repeat) void retire();
       return;
     }
     if (is(e, "later")) {
@@ -642,6 +643,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       if (!e.repeat) later();
       return;
     }
+    const digit = reviewDigit(e);
     if (phase === "answer") {
       if (is(e, "no-idea") && card.kind === "prompt") {
         e.preventDefault();
@@ -652,18 +654,19 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       } else if (is(e, "finish") && card.kind === "prompt") {
         e.preventDefault();
         void check();
-      } else if (!inTextField(e) && !e.metaKey && !e.ctrlKey && !e.altKey && /^Digit[1-3]$/.test(e.code)) {
+      } else if (!inTextField(e) && digit !== null && digit <= 3) {
         e.preventDefault();
-        pickSure(Number(e.code.slice(5)));
+        pickSure(digit);
       }
       return;
     }
-    if (inTextField(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (inTextField(e)) return;
     if (e.repeat || Date.now() - shownAnswerAt.current < 300) return;
-    if (/^Digit[1-4]$/.test(e.code)) {
+    const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
+    if (digit !== null) {
       e.preventDefault();
-      void rate(Number(e.code.slice(5)));
-    } else if (e.key === "Enter" && suggested && onSurface) {
+      void rate(digit);
+    } else if (plain && e.key === "Enter" && suggested && onSurface) {
       e.preventDefault();
       void rate(suggested);
     } else if (is(e, "edit-card")) {

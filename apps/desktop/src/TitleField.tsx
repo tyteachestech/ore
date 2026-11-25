@@ -55,12 +55,12 @@ export function TitleField({ value, label = "Title", className = "row-rename", p
       onClick={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         keepKeysIn(e); // ⌘Z still reaches the app history
-        if (busy.current) return;
+        if (busy.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
         if (e.key === "Escape") {
           settled.current = true;
           return onClose(true);
         }
-        if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+        if (e.key !== "Enter") return;
         // Its keypress would click the row the closed field hands focus back to, opening it (F47).
         e.preventDefault();
         settled.current = true;
