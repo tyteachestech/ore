@@ -16,7 +16,7 @@ import { flushSync } from "react-dom";
 import { inTextField, is, isNotes, label, useKeymap, type KeyId } from "./keys";
 import { AddBox, DropOverlay, type Dropping } from "./Add";
 import { copiedFiles, pastesFiles, watchCopies } from "./copied";
-import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, oreWith, searchFieldsOf, pinBetween, oreJob, opt, PHONE, type CardSkills, type Item, type Question as QuestionView, type Priority, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
+import { cancelOre, courseThumb, landing, lessonsOf, loadSkills, nextLesson, ore, oreWith, searchFieldsOf, oreJob, opt, PHONE, type Item, type Question as QuestionView, type SearchHit, type Skill, type Tab, type Today, inTab, touched } from "./ore";
 import { openOriginal, pathOf, revealInFinder } from "./original";
 import { Palette, snippet, type Action } from "./Palette";
 import { Tutor, TutorBubble, useTutorChat, useUnheard } from "./Tutor";
@@ -45,7 +45,8 @@ import { useToast } from "./Toast";
 import { lineAfter, lineKey, type Line } from "./lines";
 import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
 import { readGuard } from "./reads";
-import { allOrNone, change, type Change } from "./change";
+import { change, type Change } from "./change";
+import { skillActions, sourceActions, statusArgs, type Lists } from "./list-actions";
 import { listenMenu, setMenu } from "./menubar";
 import { setQuizShortcut, setTray, trayOn } from "./quick";
 import { SkillPage } from "./SkillPage";
@@ -55,7 +56,7 @@ import { Thumb } from "./Thumb";
 import { FilterButton, FilterTags } from "./FilterBar";
 import { kindLabel, kindOf, NO_SKILL, onlyNoSkill, passes, type Filter } from "./filters";
 import { importanceActions, LEVELS, sourceImportanceActions } from "./importance";
-import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, layoutOf, SkillChips, SkillEditor, skillGroups, skillMade, SkillPicker, type SkillLayout } from "./Skills";
+import { CHIP_LOOKS, chipLook, DeleteSkill, setChipLook, SkillChips, SkillEditor, skillMade, SkillPicker } from "./Skills";
 import type { Sub } from "./Forge";
 import { addArgs, dropPoint, entries, entryName, FILE_TYPES, fileKind, manyAdded, noteImage, pastedHtml, withHtml, type Entry, type FileKind } from "./paste";
 import { count, errorText, focusQuietly, keepScroll, keptScrolls, load, save, usable, wakeScreens, useNarrow } from "./util";
@@ -100,8 +101,6 @@ type CourseAdd = {
 /** A source that was in the library already: what adding it again did. */
 type Kept = { kept: true; filed: string[]; restored: boolean };
 
-/** `ore status` args to `to`: back to Done (an Undo), a source keeps the finish date it had. */
-const back = (i: Item, to: Item["status"]) => (to === "done" && i.status === "done" && i.finished_at ? [to, opt("at", i.finished_at)] : [to]);
 const lessonFirst = (l: Extract<Line, { kind: "course" }>) => l.next ?? l.lessons[0]!;
 
 const added = (iso: string) => {
@@ -337,12 +336,15 @@ export function App() {
   const writing = guard.writing;
   /** A change to the lists he can take back (change.ts): its writes count against the list's reads, and the list
    *  is read again once the newest of them settles. */
-  const listChange = (c: Change) => change(notify, { out: writing, settled: () => void refresh(), ...c });
+  const listChange = (c: Change) => change(notify, { out: writing, settled: () => void refresh(), ...c }).then((ok) => (ok || reread(), ok));
+  /** A read let go for a write that then failed: that change reads nothing again (change.ts), so this does. */
+  const missed = useRef(false);
+  const reread = () => void (missed.current && refresh());
   const refresh = useCallback(async () => {
     const read = guard.begin();
     try {
       const [all, gone] = await Promise.all([ore<Item[]>("ls"), ore<Item[]>("ls", "--archived")]);
-      if (!read.lands()) return;
+      if ((missed.current = !read.lands())) return;
       setItems(all);
       setArchived(gone);
       setListError(null);
@@ -1538,105 +1540,35 @@ export function App() {
     setRenamingRow(null);
     if (byKey) listRef.current?.focus({ preventScroll: true });
   };
-  /** False when the write failed (and a toast said why), so the field keeps what he typed. */
-  const retitle = (id: string, before: string, t: string) => {
-    if (!t || t === before) return Promise.resolve(true);
-    const show = (title: string) => setItems((all) => all?.map((i) => (i.id === id ? { ...i, title } : i)) ?? all);
-    return listChange({ message: `Renamed to “${t}”`, kind: "quiet", key: id, show: (on) => show(on ? t : before), write: (on) => ore("edit", id, "--title", on ? t : before) });
+  // What the lists do is written once for the Mac and the iPhone (list-actions.ts); here, how he asks for it.
+  const lists: Lists = {
+    ore,
+    skills,
+    items: (f) => setItems((all) => all && f(all)),
+    archived: setArchived,
+    setSkills,
+    change: listChange,
+    skillChange: (c) => change(notify, { out: skillReads.writing, settled: reloadSkills, ...c }),
+    reloadSkills,
+    cursor: { now: cursor, set: setCursor },
   };
+  const sourceList = sourceActions(lists);
+  const skillList = skillActions(lists);
+  /** A source row's title edited in place. False when the write failed (and a toast said why), so the field keeps what he typed. */
+  const retitle = sourceList.retitle;
 
   const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id, priority: "P2" };
 
-  /** Archives a source (hidden from lists and search, files and cards kept), with Undo. The row
-   *  goes at once (optimistic); a failure brings it back with the error. */
-  const archiveSource = (item: Item) => fileAway(item, true);
+  /** Archives a source (hidden from lists and search, files and cards kept), with Undo: out of the reader too. */
+  const archiveSource = (item: Item) => {
+    if (openId === item.id) setOpenId(null);
+    return sourceList.archive(item);
+  };
   /** Brings an archived source back to its tab, with Undo. */
-  const restoreSource = (item: Item) => fileAway(item, false);
-  const fileAway = (item: Item, archived: boolean) => {
-    const mark = (on: boolean) => {
-      const moved = { ...item, archived_at: on ? new Date().toISOString() : undefined };
-      setItems((all) => (on ? all?.filter((i) => i.id !== item.id) : all && [moved, ...all.filter((i) => i.id !== item.id)]) ?? all);
-      setArchived((all) => (on ? [moved, ...all.filter((i) => i.id !== item.id)] : all.filter((i) => i.id !== item.id)));
-    };
-    if (archived && openId === item.id) setOpenId(null);
-    return listChange({
-      message: `${archived ? "Archived" : "Restored"} “${item.title}”`,
-      key: item.id,
-      show: (on) => {
-        mark(on === archived);
-        // Undo selects the source it put back, as Finder selects what it puts back.
-        if (!on) setCursor(item.id);
-      },
-      write: (on) => ore("archive", item.id, ...(on === archived ? [] : ["--undo"])),
-    });
-  };
+  const restoreSource = sourceList.restore;
 
-  /** Lays out the sidebar at once, then saves through `ore skills arrange`, as a step he can take back
-   *  (change.ts): a failure puts the old layout back. Resolves false when the write was refused (said in a toast),
-   *  so a rename field can open again with his words. */
-  const arrange = (message: string, layout: SkillLayout, kind: "info" | "quiet" = "info") => {
-    const before = layoutOf(skillGroups(skills));
-    const byId = new Map(skills.map((s) => [s.id, s]));
-    const show = (l: SkillLayout) =>
-      setSkills(l.flatMap((g) => g.skills.flatMap((id) => {
-        const s = byId.get(id);
-        return s ? [{ ...s, collection: g.collection || undefined }] : [];
-      })));
-    return change(notify, {
-      message,
-      kind,
-      key: "sidebar layout",
-      show: (on) => show(on ? layout : before),
-      write: (on) => ore("skills", "arrange", JSON.stringify(on ? layout : before)),
-      out: skillReads.writing,
-      settled: reloadSkills,
-    });
-  };
-  /** Removes a collection: its skills join the ones in none, with Undo. */
-  const deleteCollection = (collection: string) => {
-    const before = layoutOf(skillGroups(skills));
-    const kept = before.filter((g) => g.collection !== collection);
-    const freed = before.find((g) => g.collection === collection)?.skills ?? [];
-    const rest = kept.find((g) => !g.collection);
-    const next = rest ? kept.map((g) => (g === rest ? { ...g, skills: [...freed, ...g.skills] } : g)) : [...kept, { collection: "", skills: freed }];
-    void arrange(`Deleted collection “${collection}”`, next);
-  };
-  /** Files a skill under another collection (or none), at the end of it, with Undo. */
-  const moveSkill = (s: Skill, collection: string) => {
-    const before = layoutOf(skillGroups(skills));
-    const out = before.map((g) => ({ ...g, skills: g.skills.filter((id) => id !== s.id) }));
-    const into = out.find((g) => g.collection === collection);
-    const next = into ? out.map((g) => (g === into ? { ...g, skills: [...g.skills, s.id] } : g)) : [...out, { collection, skills: [s.id] }];
-    const after = next.filter((g) => g.skills.length);
-    void arrange(collection ? `Moved “${s.name}” to ${collection}` : `Moved “${s.name}” out of ${s.collection}`, after);
-  };
-  const collections = [...new Set(skills.flatMap((s) => (s.collection ? [s.collection] : [])))];
-
-  /** Writes a skill's importance or archived flag (D173) at once, then saves through `ore`, as a step he can take
-   *  back; a failure puts it back. A toast for Archive and Bring back (they move it in the sidebar). */
-  type SkillPatch = Partial<Pick<Skill, "priority" | "archived">>;
-  const changeSkill = (message: string, kind: "info" | "quiet", id: string, before: SkillPatch, after: SkillPatch) =>
-    void change(notify, {
-      message,
-      kind,
-      key: `skill ${id}`,
-      show: (on) => setSkills((all) => all.map((k) => (k.id === id ? { ...k, ...(on ? after : before) } : k))),
-      write: (on) =>
-        allOrNone([
-          async (to) => void ((to ? after : before).priority && (await ore("skills", "set", id, opt("priority", (to ? after : before).priority!)))),
-          async (to) => void ((to ? after : before).archived !== undefined && (await ore("skills", "archive", id, ...((to ? after : before).archived ? [] : ["--undo"])))),
-        ], on),
-      settled: reloadSkills,
-    });
-  /** Picks a level; picking one on an archived skill brings it back too. */
-  const setImportance = (s: Skill, p: Priority) => {
-    // Archived only when it changes: a live skill's level is one write.
-    const before = { priority: s.priority ?? "P2", ...(s.archived && { archived: true }) };
-    const after = { priority: p, ...(s.archived && { archived: false }) };
-    if (before.priority === p && !s.archived) return;
-    changeSkill(`${s.name}: ${LEVELS.find((l) => l.p === p)!.label}`, before.archived ? "info" : "quiet", s.id, before, after);
-  };
-  const archiveSkill = (s: Skill, on: boolean) => changeSkill(on ? `Archived “${s.name}”` : `Brought back “${s.name}”`, "info", s.id, { archived: !on }, { archived: on });
+  const { arrange, deleteCollection, move: moveSkill, setImportance, archive: archiveSkill } = skillList;
+  const collections = skillList.collections();
 
   /** A skill's actions: the sidebar's right-click and ⋯. */
   const skillMenu = (s: Skill): MenuAction[] => [
@@ -1669,15 +1601,13 @@ export function App() {
   const courseSkills = (c: CourseLine) => [...new Set(c.lessons.flatMap((l) => l.skills))];
   /** Files every lesson of a course under a skill, or takes them all off it. Lesson by lesson, as for a
    *  selection: each keeps its other skills, and Undo gives each back exactly what it had. */
-  const fileCourse = (c: CourseLine, k: Skill, on = !c.lessons.every((l) => l.skills.includes(k.id))) => fileItems(wholeCourse(c), `“${c.title}”`, k, on);
+  const fileCourse = (c: CourseLine, k: Skill, on = !c.lessons.every((l) => l.skills.includes(k.id))) => void sourceList.fileItems(wholeCourse(c), `“${c.title}”`, k, on);
   /** Every listed lesson of the course, whatever the page shows: a skill's page rows hold only that skill's. */
   const wholeCourse = (c: CourseLine) => (items ?? []).filter((i) => i.course?.id === c.id);
-  /** Archives the lessons of a course that are listed (files and cards kept); Undo brings back those, not
-   *  one he archived before. */
   const archiveCourse = (c: CourseLine) => {
     const lessons = wholeCourse(c);
     if (openId && lessons.some((l) => l.id === openId)) setOpenId(null);
-    batch(`Archived “${c.title}”`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null, undefined, lessons);
+    void sourceList.archiveCourse(c, lessons);
   };
   const courseActions = (c: CourseLine): MenuAction[] => [
     { id: "open", label: c.next && c.next.status !== "inbox" ? "Continue" : "Open", hint: "↵", run: () => openSource(lessonFirst(c).id) },
@@ -1696,51 +1626,21 @@ export function App() {
     { id: "archive", label: "Archive course", hint: label(keys.archive), danger: true, divider: true, run: () => void archiveCourse(c) },
   ];
 
-  /** Writes each picked source in turn (the CLI owns the library), as one step with one Undo and
-   *  Redo. `patch` shows the result at once: the source as it will be, or null when it leaves the list. */
-  /** Filing under an archived skill brings it back (D173, the CLI does that); taking the filing back archives
-   *  it again. Either way the sidebar reads the skills again. */
-  const rearchive = (ids: string[]) => Promise.all(ids.map((id) => ore("skills", "archive", id))).finally(reloadSkills);
-  /** `after`: what follows the writes each way (a skill a filing brought back). */
-  const batch = (message: string, write: (i: Item, forward: boolean) => Promise<unknown>, patch?: (i: Item) => Item | null, after?: (forward: boolean) => unknown, sel = many) => {
-    const ids = new Set(sel.map((i) => i.id));
-    const was = cursor;
+  const rearchive = sourceList.rearchive;
+  /** The pick ends when what was picked is acted on (a course's lessons and a dragged set are not the pick). */
+  const acting = (sel: Item[]) => {
     if (sel === many) unpick();
-    void listChange({
-      message,
-      show: (forward) => {
-        if (patch) setItems((all) => all && (forward ? all.flatMap((i) => (ids.has(i.id) ? (patch(i) ?? []) : [i])) : [...all.filter((i) => !ids.has(i.id)), ...sel]));
-        if (!forward) setCursor(was);
-      },
-      write: (forward) => allOrNone([...sel.map((i) => (on: boolean) => write(i, on)), async (on) => void (await after?.(on))], forward),
-    });
+    return sel;
   };
   const copySources = (list: Item[]) =>
     void copyCited(citeSources(list)).then(() => notify(list.length > 1 ? `Copied ${count(list.length, "source")} as Markdown` : "Copied as Markdown"), (e) => notify(errorText(e), "error"));
   /** One path per line, as Finder's Copy as Pathname does for several files. */
   const copyPaths = (list: Item[]) =>
     void navigator.clipboard.writeText(list.map(pathOf).join("\n")).then(() => notify(list.length > 1 ? `Copied ${list.length} paths` : "Path copied"), (e) => notify(errorText(e), "error"));
-  const archiveMany = (sel = many) => batch(`Archived ${count(sel.length, "source")}`, (i, f) => ore("archive", i.id, ...(f ? [] : ["--undo"])), () => null, undefined, sel);
-  const restoreMany = (sel = many) => batch(`Restored ${count(sel.length, "source")}`, (i, f) => ore("archive", i.id, ...(f ? ["--undo"] : [])), undefined, undefined, sel);
-  const moveMany = (to: Item["status"], sel = many) =>
-    batch(`Moved ${count(sel.length, "source")} to ${to === "done" ? "Done" : "To read"}`, (i, f) => ore("status", i.id, ...back(i, f ? to : i.status)), (i) => ({ ...i, status: to }), undefined, sel);
-  const fileMany = (k: Skill, on: boolean, sel = many) => fileItems(sel, count(sel.length, "source"), k, on);
-  /** Puts `k` on each of these sources, or takes it off, each keeping its other skills. */
-  const fileItems = (sel: Item[], what: string, k: Skill, on: boolean) => {
-    const next = (i: Item) => (on ? [...new Set([...i.skills, k.id])] : i.skills.filter((s) => s !== k.id));
-    // What each source's exercises were filed under before, so Undo puts each one back as it was.
-    const was = new Map<string, CardSkills | undefined>();
-    batch(
-      on ? `Filed ${what} under ${k.name}` : `Removed ${what} from ${k.name}`,
-      (i, f) =>
-        f
-          ? ore<{ cards_before?: CardSkills }>("edit", i.id, "--skills", next(i).join(",")).then((r) => void was.set(i.id, r?.cards_before))
-          : ore("edit", i.id, "--skills", i.skills.join(","), ...(was.get(i.id) ? [opt("cards", JSON.stringify(was.get(i.id)))] : [])),
-      (i) => ({ ...i, skills: next(i) }),
-      on && k.archived ? (forward) => (forward ? reloadSkills() : rearchive([k.id])) : undefined,
-      sel,
-    );
-  };
+  const archiveMany = (sel = many) => void sourceList.archiveMany(acting(sel));
+  const restoreMany = (sel = many) => void sourceList.restoreMany(acting(sel));
+  const moveMany = (to: Item["status"], sel = many) => void sourceList.moveMany(acting(sel), to);
+  const fileMany = (k: Skill, on: boolean, sel = many) => void sourceList.fileMany(acting(sel), k, on);
   /** The picked sources' actions: the same as one row's that make sense for many, named for the count. */
   const manyActions = (sel = many): MenuAction[] => {
     const what = count(sel.length, "source");
@@ -1768,90 +1668,16 @@ export function App() {
   };
 
 
-  /** Moves a source between To read and Done, with Undo (the finish step stays the way to finish one). */
-  const moveSource = (item: Item, to: Item["status"]) =>
-    void listChange({ message: to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`, key: item.id, write: (on) => writeStatus(item, on ? to : item.status) });
-  const writeStatus = (item: Item, to: Item["status"]) => ore("status", item.id, ...back(item, to));
-
-  /** Pins a source to the top of its lists, or unpins it: at once, put back if the write fails. Undoing an unpin
-   *  puts it back where it was among the pinned. */
-  const pinSource = (item: Item) => {
-    const was = item.pinned_at;
-    const now = was ? undefined : new Date().toISOString();
-    void listChange({
-      message: now ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`,
-      kind: "quiet",
-      key: item.id,
-      show: (on) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: on ? now : was } : i)) ?? all),
-      write: (on) => ore("pin", item.id, ...(on ? (now ? [] : ["--undo"]) : was ? ["--at", was] : ["--undo"])),
-    });
-  };
-  /** Sets how much a source matters, over its skills' importance ("" hands it back to them): at once, then
-   *  through `ore`; on the history, as a skill's importance is. */
-  const setSourceImportance = (item: Item, p: Priority | "") => {
-    const before = item.priority ?? "";
-    const said = p ? LEVELS.find((l) => l.p === p)!.label : item.skills.length ? "same as its skills" : "Normal";
-    void listChange({
-      message: `${item.title}: ${said}`,
-      kind: "quiet",
-      key: item.id,
-      show: (on) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, priority: (on ? p : before) || undefined } : i)) ?? all),
-      write: (on) => ore("edit", item.id, opt("priority", on ? p : before)),
-    });
-  };
+  const moveSource = sourceList.moveTo;
+  const writeStatus = (item: Item, to: Item["status"]) => ore("status", item.id, ...statusArgs(item, to));
+  const pinSource = sourceList.pin;
+  const setSourceImportance = sourceList.setImportance;
   /** A pinned source moved among the pinned of this list (drag, or Move up/down), to `to` among them. */
-  const movePinned = (item: Item, to: number) => {
-    const pinned = tabRows.filter((i) => i.pinned_at);
-    const from = pinned.findIndex((i) => i.id === item.id);
-    if (from < 0 || to === from) return;
-    const rest = pinned.filter((i) => i.id !== item.id);
-    const at = pinBetween(rest[to - 1]?.pinned_at, rest[to]?.pinned_at);
-    void listChange({
-      message: `Moved “${item.title}”`,
-      kind: "quiet",
-      key: item.id,
-      show: (on) => setItems((all) => all?.map((i) => (i.id === item.id ? { ...i, pinned_at: on ? at : item.pinned_at } : i)) ?? all),
-      write: (on) => ore("pin", item.id, "--at", on ? at : item.pinned_at!),
-    });
-  };
+  const movePinned = (item: Item, to: number) => sourceList.movePinned(item, tabRows.filter((i) => i.pinned_at), to);
 
 
-  /** Files a source, or every lesson of a course, under exactly `next` skills (their cards follow):
-   *  optimistic, with Undo back to `before`. */
-  const refile = (what: { title: string; ids: Set<string>; write: (skills: string[], cards?: CardSkills) => Promise<unknown> }, next: string[], before: string[], changed?: Skill) => {
-    const show = (to: string[]) => setItems((all) => all?.map((i) => (what.ids.has(i.id) ? { ...i, skills: to } : i)) ?? all);
-    // Filing under an archived skill brings it back (D173): the sidebar shows it in its place again, and Undo archives it again.
-    const revived = next.filter((id) => !before.includes(id) && skills.some((s) => s.id === id && s.archived));
-    const slot = `refile:${[...what.ids].join(",")}`;
-    // Either way round: an Undo that files it under an archived skill again brings that skill back too.
-    const archivedOne = [...next, ...before].some((id) => skills.some((s) => s.id === id && s.archived));
-    const settled = () => {
-      void refresh();
-      if (archivedOne) reloadSkills();
-    };
-    if (!changed) {
-      show(next);
-      return void writing(what.write(next)).catch((e) => notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot)).finally(settled);
-    }
-    // Each exercise gets back its own skills, not every skill the source had (Codex sweep 3): the write says which.
-    let cards: CardSkills | undefined;
-    void change(notify, {
-      message: next.includes(changed.id) ? `Filed “${what.title}” under ${changed.name}` : `Removed “${what.title}” from ${changed.name}`,
-      slot,
-      // One source's filings are written in the order he ticked them.
-      key: [...what.ids].join(","),
-      show: (on) => show(on ? next : before),
-      write: (on) => (on ? what.write(next).then((r) => void (cards = (r as { cards_before?: CardSkills } | undefined)?.cards_before)) : what.write(before, cards).then(() => rearchive(revived))),
-      out: writing,
-      settled,
-    });
-  };
-  const sourceFiling = (item: Item) => ({ title: item.title, ids: new Set([item.id]), write: (ids: string[], cards?: CardSkills) => ore("edit", item.id, "--skills", ids.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : [])) });
-  /** Files a source under a skill, or takes it off one, from its ⋯ menu. */
-  const fileSource = (item: Item, k: Skill) => {
-    const on = item.skills.includes(k.id);
-    void refile(sourceFiling(item), on ? item.skills.filter((s) => s !== k.id) : [...item.skills, k.id], item.skills, k);
-  };
+  const refile = sourceList.refile;
+  const fileSource = sourceList.fileUnder;
   const skillNow = useRef(skill);
   skillNow.current = skill;
   const madeSkill = (s: Skill) =>
@@ -1869,17 +1695,8 @@ export function App() {
     }
   };
 
-  /** Move up / down among the pinned, the keyboard's way to the drag. */
-  const pinMoves = (r: Item): MenuAction[] => {
-    if (!r.pinned_at || r.archived_at) return [];
-    const pinned = tabRows.filter((i) => i.pinned_at);
-    const at = pinned.findIndex((i) => i.id === r.id);
-    if (at < 0) return [];
-    return [
-      ...(at > 0 ? [{ id: "pin-up", label: "Move up", run: () => void movePinned(r, at - 1) }] : []),
-      ...(at < pinned.length - 1 ? [{ id: "pin-down", label: "Move down", run: () => void movePinned(r, at + 1) }] : []),
-    ];
-  };
+  /** Move up / down among the pinned of this list, the keyboard's way to the drag. */
+  const pinMoves = (r: Item): MenuAction[] => sourceList.pinMoves(r, tabRows.filter((i) => i.pinned_at));
   const rowActions = (r: Item): MenuAction[] => [
     { id: "open", label: "Open", hint: "↵", run: () => openRow(r.id) },
     { id: "review-source", label: "Review this source", run: () => startReview(null, r.id) },
@@ -2004,8 +1821,8 @@ export function App() {
   const view = <ViewMenu status={status} archived={archivedInSkill.length > 0} go={go} details={details} toggle={toggleDetail} />;
   // What a row's handlers and menus call, read when they run: a row re-renders only when what it
   // shows changes (below), so ↑↓ through a long list repaints two rows, not all of them.
-  const live = useRef({ openSource, openRow, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked, boxPick });
-  live.current = { openSource, openRow, pickRange, pickToggle, retitle, doneRenaming, refile, sourceFiling, createSkill, manyActions, rowActions, many, picked, boxPick };
+  const live = useRef({ openSource, openRow, pickRange, pickToggle, retitle, doneRenaming, refile, createSkill, manyActions, rowActions, many, picked, boxPick });
+  live.current = { openSource, openRow, pickRange, pickToggle, retitle, doneRenaming, refile, createSkill, manyActions, rowActions, many, picked, boxPick };
   useEffect(() => {
     if (!listShown) return;
     const down = (e: MouseEvent) => {
@@ -2107,7 +1924,7 @@ export function App() {
             ) : !lesson && (() => {
               const by = authorOf(r);
               const picker = (
-                <SkillPicker inRow skills={skills} value={r.skills} title={r.title} onChange={(next, before, k) => void live.current.refile(live.current.sourceFiling(r), next, before, k)} onCreate={(name) => live.current.createSkill(name)}>
+                <SkillPicker inRow skills={skills} value={r.skills} title={r.title} onChange={(next, before, k) => void live.current.refile(r, next, before, k)} onCreate={(name) => live.current.createSkill(name)}>
                   {others.length > 0 && skillsOf(others)}
                 </SkillPicker>
               );
@@ -2543,7 +2360,7 @@ export function App() {
             onReview={startReview}
             onOpenSource={openSource}
             onOpenSkill={openSkill}
-            onRefile={(i, next, before, k) => void refile(sourceFiling(i), next, before, k)}
+            onRefile={(i, next, before, k) => void refile(i, next, before, k)}
             onCreateSkill={createSkill}
             onSettings={() => setSettings({ section: "review" })}
             // Home renames its own rows (onRename) and takes the lists' row keys on its focused row or pick
