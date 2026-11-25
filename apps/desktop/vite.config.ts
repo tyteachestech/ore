@@ -54,7 +54,7 @@ const dynamicType: Plugin = {
 };
 const phone = (f: string) => fileURLToPath(new URL(`./src/phone/${f}`, import.meta.url));
 const phoneAliases = [
-  // The CLI's command table (src/phone/core.ts), aliased so the app's typecheck doesn't walk the core.
+  // The CLI's command table (src/phone/core.ts), aliased so only the iPhone build bundles the core.
   { find: /^ore-commands$/, replacement: fileURLToPath(new URL("../../packages/cli/src/commands.ts", import.meta.url)) },
   { find: /^(node:)?fs$/, replacement: phone("fs.ts") },
   { find: /^(node:)?path$/, replacement: createRequire(import.meta.url).resolve("path-browserify") },

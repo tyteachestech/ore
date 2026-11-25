@@ -26,7 +26,7 @@ export function setChipLook(look: ChipLook) {
 }
 if (typeof document !== "undefined") document.documentElement.dataset.chips = chipLook();
 
-export function SkillChip({ skill }: { skill: Skill }) {
+export function SkillChip({ skill }: { skill: Pick<Skill, "id" | "name" | "icon" | "color"> }) {
   const chip = (
     <span className="chip" data-color={skill.color}>
       <SkillIcon icon={skill.icon} color={skill.color} dot className="icon" />

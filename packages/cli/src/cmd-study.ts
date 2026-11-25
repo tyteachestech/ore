@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
   CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, findItemDir, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
-  mergedReviews, readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type Variant,
+  mergedReviews, readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type LibraryIndex, type QueueEntry, type EndReceipt, type SkillStats, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
 import type { Command } from "./types.ts";
@@ -34,6 +34,7 @@ const shownJson = (lib: Library, c: Card, v?: Variant | null) => ({
   ...sourceDir(lib, c),
 });
 /** source_dir: the source's folder, where the images its question and answer name are, as the reader finds them. */
+export type ShownCard = ReturnType<typeof shownJson>;
 const sourceDir = (lib: Library, c: Card) => {
   try {
     return { source_dir: findItemDir(lib, c.meta.item) };
@@ -41,6 +42,22 @@ const sourceDir = (lib: Library, c: Card) => {
     return {}; // its source is gone: the text stands alone
   }
 };
+/** `ore due`: one exercise in queue order. */
+const dueJson = (e: QueueEntry) => ({
+  id: e.id, kind: e.kind, state: e.state, content_type: e.content_type, item: e.item, skills: e.skills, topics: e.topics,
+  priority: e.priority, question: e.question, due: e.due, retrievability: Number(e.retrievability.toFixed(4)),
+  relearn: e.relearn,
+});
+export type DueRow = ReturnType<typeof dueJson>;
+/** `ore stats --skill`: a skill's row with its strength and its solid memories at each of the last 12 week ends. */
+const skillStatsJson = (lib: Library, x: SkillStats, now: Date, index: LibraryIndex) => ({ ...x, strength: skillStrength(lib, x.skill, now, index), growth: skillGrowth(lib, x.skill, now, 12, index) });
+export type SkillStatsRow = ReturnType<typeof skillStatsJson>;
+/** `ore session end`: the receipt, with calibration on the week's first end screen only, never during a card (D69). */
+const sessionEndJson = (lib: Library, r: EndReceipt) => {
+  const cal = (r.reviews ?? 0) > 0 && firstEndThisWeek(lib) ? calibration(readReviews(lib)) : null;
+  return { ...r, calibration: cal?.sure_right != null ? cal : null };
+};
+export type SessionEnd = ReturnType<typeof sessionEndJson>;
 const pct = (x: number) => `${Math.round(x * 100)}%`;
 const oneLine = (s: string, n = 90) => {
   const t = s.replace(/\s+/g, " ").trim();
@@ -133,11 +150,7 @@ export const studyCommands: Record<string, Command> = {
       const limit = int(f.limit, "limit");
       if (limit !== undefined && limit < 0) throw new Error("--limit must be 0 or more"); // slice(0, -1) would drop the last
       const q = limit === undefined ? all : all.slice(0, limit);
-      const data = q.map((e) => ({
-        id: e.id, kind: e.kind, state: e.state, content_type: e.content_type, item: e.item, skills: e.skills, topics: e.topics,
-        priority: e.priority, question: e.question, due: e.due, retrievability: Number(e.retrievability.toFixed(4)),
-        relearn: e.relearn,
-      }));
+      const data = q.map(dueJson);
       const text = q.length
         ? q.map((e, i) => `${String(i + 1).padStart(2)}. ${e.id}  ${e.kind}${e.state === "draft" ? " (draft)" : ""}${e.relearn ? " (relearn)" : ""}  ${e.skills.join(",") || "-"} · ${e.topics.join(",") || "-"}\n    ${oneLine(e.question)}`).join("\n") +
           (q.length < all.length ? `\n(${all.length - q.length} more due)` : "")
@@ -207,7 +220,7 @@ export const studyCommands: Record<string, Command> = {
         // against the other growing ones (D246). The app never shows them.
         const now = new Date();
         const w = loadParams(lib);
-        return { data: f.skill ? rows.map((x) => ({ ...x, strength: skillStrength(lib, x.skill, now, index), growth: skillGrowth(lib, x.skill, now, 12, index) })) : { ...s, remix: remixStats(lib), calibration: calibration(readReviews(lib)), ...raterStats(mergedReviews(index.cards(), readReviews(lib), w), w) }, text };
+        return { data: f.skill ? rows.map((x) => skillStatsJson(lib, x, now, index)) : { ...s, remix: remixStats(lib), calibration: calibration(readReviews(lib)), ...raterStats(mergedReviews(index.cards(), readReviews(lib), w), w) }, text };
       } finally {
         index.close();
       }
@@ -304,10 +317,7 @@ export const studyCommands: Record<string, Command> = {
       if (sub === "end") {
         const r = await endSession(lib, new Date(), dueQueue(lib).length === 0, id);
         snapshot(lib, { force: true });
-        // Calibration on the week's first end screen only, never during a card (D69).
-        const cal = (r.reviews ?? 0) > 0 && firstEndThisWeek(lib) ? calibration(readReviews(lib)) : null;
-        const data = { ...r, calibration: cal?.sure_right != null ? cal : null };
-        return { data, text: `Session ${r.id} ended (${r.reviews} reviews, ${r.kept} kept, ${r.rescued} rescued)` };
+        return { data: sessionEndJson(lib, r), text: `Session ${r.id} ended (${r.reviews} reviews, ${r.kept} kept, ${r.rescued} rescued)` };
       }
       if (sub === "reopen") {
         await reopenSession(lib, need(id, "<id>"));

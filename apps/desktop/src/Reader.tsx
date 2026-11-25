@@ -1193,7 +1193,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
         (all) => {
           const d = all.find((i) => i.id === p.id);
           if (d && (d.enriched_at || d.prequestions?.length))
-            setDoc((cur) => cur && { ...cur, prequestions: d.prequestions, skills: filings.current === filedAt ? d.skills : cur.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at });
+            setDoc((cur) => cur && { ...cur, prequestions: d.prequestions ?? [], skills: filings.current === filedAt ? d.skills : cur.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at });
           else if (d?.enrich_error) {
             // The background run died: say why now, not after the wait runs out.
             setDoc((cur) => cur && { ...cur, enrich_error: d.enrich_error });
@@ -1242,7 +1242,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     try {
       await run;
       const d = (await ore<Item[]>("ls")).find((i) => i.id === p.id);
-      if (d) setDoc((cur) => cur && { ...cur, prequestions: d.prequestions, skills: d.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at, enrich_error: undefined, enrich_skipped: undefined });
+      if (d) setDoc((cur) => cur && { ...cur, prequestions: d.prequestions ?? [], skills: d.skills, suggested_skill: d.suggested_skill, enriched_at: d.enriched_at, enrich_error: undefined, enrich_skipped: undefined });
       p.onChanged();
     } catch (e) {
       setDoc((cur) => cur && { ...cur, enrich_error: errorText(e) });
@@ -1617,7 +1617,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       const f = await ore<ChapterFeedback>("recall", doc.id, opt("chapter", String(n)), "--feedback");
       if (undoneChapters.current.has(n)) return;
       setChapterFb({ n, title, feedback: f });
-      setDoc((cur) => cur && { ...cur, chapter_recalls: (cur.chapter_recalls ?? []).map((x) => (x.n === n ? { ...x, feedback: f } : x)) });
+      // The answer comes without the AI stamp the file keeps; the next read of the source brings it, and nothing here reads it.
+      setDoc((cur) => cur && { ...cur, chapter_recalls: (cur.chapter_recalls ?? []).map((x) => (x.n === n ? { ...x, feedback: f as NonNullable<typeof x.feedback> } : x)) });
     } catch (e) {
       if (undoneChapters.current.has(n)) return;
       setChapterFb({ n, title, error: errorText(e) });
@@ -1976,7 +1977,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       return p.notify("Couldn’t tell where you are in the text. Scroll to the part it’s about, then press Enter again.", "error");
     }
     const tmp = `pending-${Date.now()}`;
-    setAnns((l) => [...l, { id: tmp, rev: 0, intent: "card", exact: "", prefix: "", suffix: "", start: at, end: at, note: line, status: "open", point: true }]);
+    setAnns((l) => [...l, { id: tmp, item: doc.id, ts: "", rev: 0, intent: "card", exact: "", prefix: "", suffix: "", start: at, end: at, note: line, status: "open", point: true }]);
     const wake = wakeOnLanding();
     try {
       const made = ore<Annotation>("highlight", p.id, "--at", String(at), opt("note", line));
@@ -2015,7 +2016,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     ranges.current.set(tmp, range);
     vein(range, intent);
     tick.saved();
-    setAnns((l) => [...l, { id: tmp, rev: 0, intent, exact: text, prefix: "", suffix: "", start: 0, end: 0, status: "open", ...(lookedUp && { looked_up: true }) }]);
+    setAnns((l) => [...l, { id: tmp, item: doc.id, ts: "", rev: 0, intent, exact: text, prefix: "", suffix: "", start: 0, end: 0, status: "open", ...(lookedUp && { looked_up: true }) }]);
     if (intent === "card") gather(tmp);
     if (popupToo) {
       openPopup(tmp, range, "", aim);

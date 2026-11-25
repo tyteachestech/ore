@@ -1545,7 +1545,7 @@ export function App() {
     return listChange({ message: `Renamed to “${t}”`, kind: "quiet", key: id, show: (on) => show(on ? t : before), write: (on) => ore("edit", id, "--title", on ? t : before) });
   };
 
-  const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id };
+  const skillOf = (id: string): Skill => skills.find((k) => k.id === id) ?? { id, name: id, priority: "P2" };
 
   /** Archives a source (hidden from lists and search, files and cards kept), with Undo. The row
    *  goes at once (optimistic); a failure brings it back with the error. */
@@ -1614,7 +1614,7 @@ export function App() {
 
   /** Writes a skill's importance or archived flag (D173) at once, then saves through `ore`, as a step he can take
    *  back; a failure puts it back. A toast for Archive and Bring back (they move it in the sidebar). */
-  type SkillPatch = Pick<Skill, "priority" | "archived">;
+  type SkillPatch = Partial<Pick<Skill, "priority" | "archived">>;
   const changeSkill = (message: string, kind: "info" | "quiet", id: string, before: SkillPatch, after: SkillPatch) =>
     void change(notify, {
       message,

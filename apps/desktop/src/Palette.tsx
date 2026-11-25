@@ -271,7 +271,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
             value: h.key,
             label: (
               <>
-                {h.item && <Thumb item={items.find((i) => i.id === h.item) ?? { type: "article" }} />}
+                {h.item && <Thumb item={items.find((i) => i.id === h.item) ?? { type: "article", thumbnail: undefined }} />}
                 <span className="palette-hit">
                   <span className="title">{h.what ? `${h.title} · ${h.what}` : h.title}</span>
                   {h.snippet && <span className="sub">{snippet(h.snippet, query)}</span>}
