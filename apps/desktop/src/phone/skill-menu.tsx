@@ -31,7 +31,7 @@ export function skillMenu({ skills, refresh, notify, open, review, edit }: {
     const after = (into ? out.map((g) => (g === into ? { ...g, skills: [...g.skills, s.id] } : g)) : [...out, { collection, skills: [s.id] }]).filter((g) => g.skills.length);
     void arrange(collection ? `Moved “${s.name}” to ${collection}` : `Moved “${s.name}” out of ${s.collection}`, after);
   };
-  type Patch = Pick<Skill, "priority" | "archived">;
+  type Patch = Partial<Pick<Skill, "priority" | "archived">>;
   const set = (message: string, kind: "info" | "quiet", id: string, before: Patch, after: Patch) =>
     void change(notify, {
       message,

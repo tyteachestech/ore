@@ -1002,10 +1002,10 @@ journey("review: Later moves straight on to the exercise loaded ahead, and the o
   const calls = oreCalls(page);
   const q = page.locator(".review-q");
   const good = page.getByRole("button", { name: "Good", exact: true });
-  const moved = async (from: string, what: string) => {
+  const moved = async (from: string, what: string, ahead = true) => {
     const t0 = Date.now();
     await page.waitForFunction((from) => { const el = document.querySelector(".review-q"); return !!el && el.textContent !== from; }, from, { timeout: 8000 });
-    if (Date.now() - t0 > 900) throw new Error(`${what} took ${Date.now() - t0} ms: it wasn't loaded ahead`);
+    if (ahead && Date.now() - t0 > 900) throw new Error(`${what} took ${Date.now() - t0} ms: it wasn't loaded ahead`);
     return q.innerText();
   };
   try {
@@ -1022,7 +1022,15 @@ journey("review: Later moves straight on to the exercise loaded ahead, and the o
     await page.waitForTimeout(1500);
     await reveal(page);
     await good.click();
-    await until("the exercise put off comes back last", async () => (await q.innerText()) === first, 8000);
+    // F619: it comes back once every other exercise has had its turn, however many there
+    // are. A shard that began before midnight has one more here after it: the exercise drafted on the day the
+    // library was seeded is held back that day only (D65).
+    let last = third;
+    for (let n = 0; n < 4 && (last = await moved(last, "the exercise after that one", false)) !== first; n++) {
+      await reveal(page);
+      await good.click();
+    }
+    if (last !== first) throw new Error("the exercise put off never came back");
     await page.keyboard.press("Escape");
     await page.locator(".review-foot").getByRole("button", { name: "Done" }).waitFor();
     await page.keyboard.press("Enter");

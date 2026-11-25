@@ -56,7 +56,7 @@ function keptDraft(doc: Doc): Draft | undefined {
   const k = keptDrafts.get(doc.id);
   if (!k) return undefined;
   const qs = doc.prequestions ?? [];
-  if (k.asked !== askedIn(qs) || (doc.recall && Date.parse(doc.recall.at) > (keptDrafts.at(doc.id) ?? 0))) return void keptDrafts.delete(doc.id);
+  if (k.asked !== askedIn(qs) || (doc.recall && Date.parse(doc.recall.at ?? "") > (keptDrafts.at(doc.id) ?? 0))) return void keptDrafts.delete(doc.id);
   const { asked: _asked, ...d } = k;
   return { ...d, qs };
 }
