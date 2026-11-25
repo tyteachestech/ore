@@ -215,13 +215,17 @@ export function highlights(io: {
       making.set(tmp, save);
       set((l) => [...l, draft]);
       let s: ReturnType<typeof step> | undefined;
-      const act = (f: "remove" | "bring") => () => save.then((ann) => (s ??= step(ann.id, ann))[f](), () => {});
+      let existed = false;
+      // Nothing to take back when the passage's own highlight came back: a ⌘Z pressed before the save landed must
+      // not remove that older one.
+      const act = (f: "remove" | "bring") => () => save.then((ann) => (existed ? undefined : (s ??= step(ann.id, ann))[f]()), () => {});
       const forget = io.notify("Highlighted", "quiet", act("remove"), act("bring"));
       save.then(
         (ann) => {
           saved.set(tmp, ann.id);
           landedAt.set(ann.id, ++landings);
           const was = list.find((a) => a.id === ann.id);
+          existed = !!was;
           on.saved(ann, was);
           if (was) forget(); // no new highlight: nothing of this one to take back
           set((l) => (was ? l.filter((a) => a.id !== tmp).map((a) => (a.id === ann.id ? { ...a, exact: ann.exact, prefix: ann.prefix, suffix: ann.suffix, start: ann.start, end: ann.end, rev: ann.rev } : a)) : l.map((a) => (a.id === tmp ? { ...ann, intent: a.intent, note: a.note } : a))));
@@ -241,12 +245,13 @@ export function highlights(io: {
       set((l) => [...l, draft]);
       const wake = wakeOnLanding();
       try {
-        const save = io.run<Annotation>(...args);
+        const save = track(io.run<Annotation>(...args));
+        making.set(draft.id, save); // a change to it meanwhile waits for its id
         wake(save);
         const ann = await whileOut(save); // ⌘Z meanwhile waits for its step (F481)
         landedAt.set(ann.id, ++landings);
         saved.set(draft.id, ann.id); // so a read again landing before the swap doesn't list it twice
-        set((l) => l.map((a) => (a.id === draft.id ? ann : a)));
+        set((l) => l.map((a) => (a.id === draft.id ? { ...ann, intent: a.intent, note: a.note } : a))); // a type or note changed meanwhile stays
         const s = step(ann.id);
         io.notify("Key point added", "quiet", s.remove, s.bring);
         return ann;
@@ -264,6 +269,14 @@ export function highlights(io: {
      *  history holds its Undo and Redo until the removal has landed (history.ts `hold`), so they never land first.
      *  `undoable` false: a selection he dropped (Esc, or one made only to point) leaves no step behind. */
     async remove(rid: string, undoable = true) {
+      const made = making.get(rid);
+      if (made) {
+        try {
+          rid = (await made).id; // still saving: removed under its saved id
+        } catch {
+          return; // never saved: its draft is already off the list
+        }
+      }
       if (!undoable) steps.get(rid)?.();
       const s = step(rid);
       s.drop();

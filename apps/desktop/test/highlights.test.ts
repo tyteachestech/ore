@@ -373,6 +373,49 @@ test("a highlight he removed stays gone, and one ⌘Z brought back stays, when t
   expect(t.hl.find("a")!.rev).toBe(3);
 });
 
+test("⌘Z right after a drag over a passage already highlighted leaves that older highlight alone", async () => {
+  const t = open([ann("a", { note: "mine" })]);
+  const { save } = making(t);
+  const undo = t.steps[0]!.undo!(); // before the save is back
+  save.ok(ann("a", { rev: 2 })); // the core gives back the one already there
+  await undo;
+  await tick();
+  expect(t.ids()).toEqual(["a"]);
+  expect(t.sent.map((s) => s.args)).toEqual(["highlight src --exact=words"]);
+});
+
+test("a highlight removed from the list while it is still saving is removed under its saved id", async () => {
+  const t = open();
+  const { save } = making(t);
+  const gone = t.hl.remove("pending-1");
+  await tick();
+  expect(t.sent.map((s) => s.args)).toEqual(["highlight src --exact=words"]); // waits for its id
+  save.ok(ann("b"));
+  (await t.last("annotate b --status deleted")).ok();
+  await gone;
+  expect(t.ids()).toEqual([]);
+  expect(t.steps.filter((s) => s.kind === "error")).toEqual([]);
+});
+
+test("a typed key point still saving takes a change under its saved id", async () => {
+  const t = open();
+  const made = t.hl.point(["highlight", "src", "--at", "3", "--note=a line"], ann("pending-1", { point: true, intent: "card", note: "a line" }));
+  const save = t.sent.at(-1)!;
+  void t.hl.setIntent("pending-1", "question");
+  await tick();
+  expect(t.sent.length).toBe(1); // waits for its id
+  let closed = false;
+  void t.hl.allSaved().then(() => (closed = true));
+  await tick();
+  expect(closed).toBe(false); // the closing count waits for the key point's save
+  save.ok(ann("b", { point: true, intent: "card", note: "a line" }));
+  await made;
+  (await t.last("annotate b --intent question")).ok();
+  await tick();
+  expect(t.hl.list()[0]).toMatchObject({ id: "b", intent: "question" });
+  expect(t.steps.filter((s) => s.kind === "error")).toEqual([]);
+});
+
 test("another source opened takes the library's list whole", () => {
   const t = open([ann("a")]);
   making(t);
