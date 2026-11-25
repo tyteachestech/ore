@@ -6,7 +6,8 @@ import { syncIndex } from "./db.ts";
 import { errorLine, logFiles, readJsonlLines, sha256, subdirs, visible } from "./fsutil.ts";
 import { ID_END, itemDirs, readItemDir, type Item } from "./items.ts";
 import { brokenLinks } from "./links.ts";
-import { lockStale } from "./lock.ts";
+import { recoverReimport, reimportRecovery } from "./ingest/index.ts";
+import { lockStale, tryWithLock, withLock } from "./lock.ts";
 import { paths, type Library } from "./library.ts";
 import { VariantSchema } from "./remix.ts";
 import { reviewLogFiles, ReviewSchema, UndoSchema } from "./reviews.ts";
@@ -67,6 +68,20 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
     for (const t of topics) if (!topicSlugs.has(t)) add("warn", path, `topic "${t}" has no topics/${t}.md`);
   };
 
+  // An add stopped before doc.md was written (Ore quit or was killed): its folder lists nowhere, so say so (Codex sweep 4).
+  const root = paths.items(lib);
+  for (const y of subdirs(root))
+    for (const d of subdirs(join(root, y)))
+      if (!existsSync(join(root, y, d, "doc.md"))) {
+        const dir = join(root, y, d);
+        if (reimportRecovery(lib, dir)) {
+          if (opts.fix) {
+            await withLock(paths.lock(lib), () => recoverReimport(lib, dir));
+            fixed.push(`${rel(dir)}: restored doc.md from an interrupted reimport`);
+          } else add("warn", dir, "an interrupted reimport left doc.md missing; run ore doctor --fix to restore its saved copy");
+        } else add("warn", dir, "an add that stopped before it finished (no doc.md), so it is not in the library; delete this folder, then add the source again");
+      }
+
   const items = new Map<string, Item>();
   // Folders named as Ore names them first, so a copy is the one called a copy (Ore shows the other, oncePerId).
   for (const dir of itemDirs(lib).sort((a, b) => Number(!ID_END.test(a)) - Number(!ID_END.test(b)))) {
@@ -110,12 +125,6 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
       for (const a of anchorAnnotations(item)) if (!a.anchor) add("warn", annPath, `annotation ${a.id} is orphaned (quote not found)`);
     }
   }
-
-  // An add stopped before doc.md was written (Ore quit or was killed): its folder lists nowhere, so say so (Codex sweep 4).
-  const root = paths.items(lib);
-  for (const y of subdirs(root))
-    for (const d of subdirs(join(root, y)))
-      if (!existsSync(join(root, y, d, "doc.md"))) add("warn", join(root, y, d), "an add that stopped before it finished (no doc.md), so it is not in the library; delete this folder, then add the source again");
 
   const cardIds = new Set<string>();
   for (const path of cardFiles(lib)) {
@@ -183,8 +192,8 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
   // An empty lock (a crash between create and write) read as pid 0, which kill() takes as our own group.
   if (existsSync(lock)) {
     if (lockStale(lock)) {
-      if (opts.fix) { unlinkSync(lock); fixed.push(".ore/lock: removed stale lock"); }
-      else add("warn", lock, "stale lock (its process is gone, or it is over a minute old) — run ore doctor --fix");
+      if (opts.fix) { if (tryWithLock(lock, () => true)) fixed.push(".ore/lock: removed stale lock"); }
+      else add("warn", lock, "stale lock (its process is gone, or an incomplete legacy lock is over a minute old) — run ore doctor --fix");
     }
   }
   const session = paths.openSession(lib);
