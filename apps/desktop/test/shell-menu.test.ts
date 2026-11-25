@@ -14,7 +14,9 @@ test("native menu commands reach the focused webview without raising main first"
   expect(route).not.toContain('.emit("menu",');
   expect(route).not.toContain('app.emit_to("main", "menu", id)');
   const setter = rust.slice(rust.indexOf("fn set_app_menu("), rust.indexOf("/// Red underlines"));
-  expect(setter).toContain("window.is_focused()");
+  // The focused window's menu stands; with none focused (Ore opened behind another app), the main window's.
+  expect(setter).toContain("find(|w| w.is_focused()");
+  expect(setter).toContain('None => window.label() == "main"');
 });
 
 test("both webviews install the shared menu lifecycle, including focus refresh", () => {
