@@ -18032,6 +18032,31 @@ journey("phone: a pinned source moves up among the pinned from its long press, w
   await page.keyboard.press("Meta+z");
   await until("Undo put it back", async () => (await order()) === "AT");
 }, "phone");
+journey("phone: Undo of a filing under an archived skill archives the skill again, as on the Mac (F620)", async (page) => {
+  // Architecture review 2026-11-24 (2): the phone's own copy of the Mac's refile left the skill it had brought back.
+  type Core = { run: <T>(args: string[], input: string | null) => Promise<T> };
+  const run = <T,>(...args: string[]) => page.evaluate(async (args) => ((await import("/src/phone/core.ts" as string)) as Core).run<unknown>([...args, "--json"], null), args) as Promise<T>;
+  const shelved = await run<{ id: string }>("skills", "add", "Shelved skill");
+  try {
+    await run("skills", "archive", shelved.id);
+    const archived = async () => !!(await run<{ id: string; archived?: boolean }[]>("skills")).find((k) => k.id === shelved.id)?.archived;
+    await Bun.sleep(1000); // the page's writes reach IndexedDB in the background
+    await page.reload();
+    await tap(page, page.getByRole("button", { name: "Open menu" }));
+    await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
+    const row = page.locator(".phone-sources li").filter({ hasText: AGENTS }).first();
+    await press(page, row);
+    await tap(page, page.getByRole("menuitem", { name: "Skills" }));
+    await tap(page, page.getByRole("menuitemcheckbox", { name: "Shelved skill" }));
+    await until("filing under it brought the skill back", async () => !(await archived()));
+    await tap(page, page.locator(".toast").filter({ hasText: "under Shelved skill" }).getByRole("button", { name: "Undo" }));
+    await until("Undo archived the skill again", archived);
+    await Bun.sleep(400);
+    if (!(await archived())) throw new Error("the skill came back after Undo archived it");
+  } finally {
+    await run("skills", "rm", shelved.id);
+  }
+}, "phone");
 journey("phone: Sources narrows by kind and skill from Filter, each a tag under the title that a tap lets go (F493, D286)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
