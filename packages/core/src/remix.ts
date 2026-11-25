@@ -306,7 +306,8 @@ export async function setVariant(lib: Library, cardRef: string, variantRef: stri
       // Each point stands for one of the original's (maps): reword them, don't add or drop one.
       if (edit.rubric.length !== v.rubric.length) throw new Error(`This version keeps its ${v.rubric.length} key points: reword them, or drop the version for the original.`);
     }
-    const next = { ...v, ...(edit.ai !== undefined ? { ai: AiStamp.parse(edit.ai) } : {}), rev: v.rev + 1, question: edit.question?.trim() || v.question, answer: edit.answer?.trim() || v.answer, rubric: edit.rubric?.map((p) => p.trim()) ?? v.rubric };
+    // A version is always the AI's: an Undo back to "no stamp" (null) keeps the one it has.
+    const next = { ...v, ...(edit.ai ? { ai: AiStamp.parse(edit.ai) } : {}), rev: v.rev + 1, question: edit.question?.trim() || v.question, answer: edit.answer?.trim() || v.answer, rubric: edit.rubric?.map((p) => p.trim()) ?? v.rubric };
     appendJsonl(paths.variants(lib, v.card), VariantSchema.parse(next));
     return next;
   });
