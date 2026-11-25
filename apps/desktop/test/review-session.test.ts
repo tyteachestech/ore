@@ -509,3 +509,17 @@ test("time with Ore out of sight is not review time: an hour in the background a
     Date.now = real;
   }
 });
+
+test("Review this source while its exercises are still being drafted says so, not that nothing is due (F-new-drafting-silent)", async () => {
+  const { nothingDue } = await import("../src/review-session");
+  const { drafting } = await import("../src/drafting");
+  expect(nothingDue(null, null, "I")).toBe("Nothing from this source is due right now.");
+  const done = drafting("I", new Promise<void>((r) => setTimeout(r, 5)));
+  expect(nothingDue(null, null, "I")).toBe("This source’s exercises are still being drafted.");
+  expect(nothingDue(null, null, "J")).toBe("Nothing from this source is due right now.");
+  await done;
+  // Drafted, or failed (which says so itself, with Try again): the plain line again.
+  expect(nothingDue(null, null, "I")).toBe("Nothing from this source is due right now.");
+  await drafting("I", Promise.reject(new Error("no"))).catch(() => {});
+  expect(nothingDue(null, null, "I")).toBe("Nothing from this source is due right now.");
+});

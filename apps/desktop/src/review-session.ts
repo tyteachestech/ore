@@ -1,3 +1,4 @@
+import { isDrafting } from "./drafting";
 import { rememberToday } from "./ReviewPick";
 import { waiting } from "./Home";
 import { newSession, rated, sfx, warm } from "./sfx";
@@ -55,7 +56,7 @@ export const variantOpt = (c: CardFull) => (c.variant ? [opt("variant", c.varian
 /** Why a session has no cards, honestly: the pick leaves out skills with cards due, or the daily limits hold
  *  new cards back (D65), and only then "nothing is due". */
 export function nothingDue(t: Today | null, pick: string[] | null, source?: string): string {
-  if (source) return "Nothing from this source is due right now.";
+  if (source) return isDrafting(source) ? "This source’s exercises are still being drafted." : "Nothing from this source is due right now.";
   if (pick && t && t.due > 0) return `Nothing is due in the skills you picked today. ${t.due} ${t.due === 1 ? "exercise waits" : "exercises wait"} in the others.`;
   if (t && !t.exercises) return "No exercises yet. Mark Key points in a source and Finish it: they start the next day.";
   return t?.new_waiting ? `All caught up. ${waiting(t)}` : "All caught up. Nothing is due right now.";

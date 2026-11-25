@@ -3,7 +3,9 @@ import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Grow } from "./Grow";
 import { PixelGem } from "./PixelIcon";
+import { drafting } from "./drafting";
 import { ExerciseText } from "./ExerciseText";
+import { finishBusy } from "./finish-busy";
 import { Hint } from "./Hint";
 import { is } from "./keys";
 import { ore, opt, PHONE, whileOut, type Annotation, type Doc, type Evidence, type Feedback, type Notes, type Prequestion, type Skill } from "./ore";
@@ -202,7 +204,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     // Run in the app, not detached, so a failure says why at once, wherever he has gone, with a retry.
     // Its Try again is the only way back to the cards, so the failure stays until he acts on it.
     const run = (): Promise<boolean> =>
-      ore<{ cards?: unknown[]; skipped?: string } | null>("enrich", doc.id).then(
+      drafting(doc.id, ore<{ cards?: unknown[]; skipped?: string } | null>("enrich", doc.id)).then(
         (r) => {
           // A run with something to draft from that drafted nothing: say so, and what gives it something.
           if (r && !r.skipped && !r.cards?.length) void back.then(() => notify(`No exercises came from “${doc.title}”: mark a Key point to draft some.`, "info"));
@@ -230,10 +232,12 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     dropDraft(doc.id);
   }
 
+  /** Some questions are to be left out before the quiz (D100). */
+  const scoped = !!qs.length && (partway || !!leave.trim() || !!doc.leave_out || qs.some((p) => p.skipped));
   /** D100: before the questions, leave out the ones past where he stopped or that his note rules out
    *  (that needs the key points, being found meanwhile). Returns how many questions are left. */
   async function applyScope(): Promise<number | null> {
-    if (!qs.length || (!partway && !leave.trim() && !doc.leave_out && !qs.some((p) => p.skipped))) return n;
+    if (!scoped) return n;
     await pointsRun.current?.catch(() => {});
     let r: { prequestions: Prequestion[] };
     try {
@@ -483,7 +487,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
             )}
             <Hint text={recall.trim() ? "Save to your source note and continue" : "Skip the recall"} keys="finish" side="top">
               <button className="pill-btn quiz-go" onClick={primary} disabled={busy}>
-                {busy ? <Working label={leave.trim() ? "Leaving that out…" : "Saving…"} /> : recall.trim() ? "Continue" : n ? "Skip to questions" : "Skip"}
+                {busy ? <Working label={finishBusy(leave, scoped && !qs.every((p) => p.points))} /> : recall.trim() ? "Continue" : n ? "Skip to questions" : "Skip"}
               </button>
             </Hint>
           </div>

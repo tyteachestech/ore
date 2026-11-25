@@ -545,7 +545,7 @@ describe("import coverage: files", () => {
     const b = it.body;
     expect(it.meta.title).toBe("Spacing is all you need");
     expect(b.match(/^#+ .+$/gm)).toEqual(["## Spacing is all you need", "## 1 Introduction", "## 2 Background", "## 3 Method", "## 4 Results", "## 5 Conclusion"]);
-    expect(b.match(/^<!-- chapter \d+ -->$/gm)).toEqual([1, 2, 3, 4, 5].map((n) => `<!-- chapter ${n} -->`));
+    expect([...(b.match(/^<!-- chapter \d+ -->$/gm) ?? [])]).toEqual([1, 2, 3, 4, 5].map((n) => `<!-- chapter ${n} -->`));
     for (const name of ["Introduction", "Background", "Method", "Results", "Conclusion"]) expect(b.match(new RegExp(`^.*\\b${name}$`, "gm"))).toHaveLength(1);
     // Each heading sits over its own section's words, on the page that has them.
     expect(b).toMatch(/<!-- page 2 -->\n\n<!-- chapter 1 -->\n\n## 1 Introduction\n\nEach [^#]+<!-- chapter 2 -->\n\n## 2 Background\n\nEach [^#]+<!-- chapter 3 -->\n\n## 3 Method\n\nEach /);
