@@ -4326,6 +4326,7 @@ function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
  *  jump to one, and ‹ › go to the previous and next lesson. */
 function CourseLine({ id, course, lessons, onOpen }: { id: string; course: NonNullable<Item["course"]>; lessons: Item[]; onOpen: (id: string) => void }) {
   const at = lessons.findIndex((l) => l.id === id);
+  if (at < 0) return null;
   const prev = lessons[at - 1];
   const next = lessons[at + 1];
   return (
@@ -4352,7 +4353,7 @@ function CourseLine({ id, course, lessons, onOpen }: { id: string; course: NonNu
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
       <span className="course-at">
-        Lesson {course.part} of {lessons.length}
+        Lesson {at + 1} of {lessons.length}
       </span>
       <span className="course-step">
         <Hint text={prev ? `Previous: ${prev.title}` : "First lesson"} keys="lesson-prev">

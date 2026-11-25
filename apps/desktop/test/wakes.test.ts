@@ -19,3 +19,15 @@ test("a source filed in or out of a skill wakes open screens", () => {
   expect(wakesScreens(["edit", "01ABC", "--skills="])).toBe(true);
 });
 
+
+// A course changes the same sources as the individual commands, including selective Undo/Redo.
+test("course Archive, Restore, filing and rename wake dependent screens; course reads do not", () => {
+  for (const args of [
+    ["course", "archive", "course-id"],
+    ["course", "archive", "course-id", "--lessons=one,two"],
+    ["course", "archive", "course-id", "--undo", "--lessons=one,two"],
+    ["course", "set", "course-id", "--skills=learning"],
+    ["course", "set", "course-id", "--title=Renamed"],
+  ]) expect(wakesScreens(args)).toBe(true);
+  expect(wakesScreens(["course", "show", "course-id"])).toBe(false);
+});

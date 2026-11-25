@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { courseLessons, renameCourse, setCourseArchived, setCourseSkills } from "../src/courses.ts";
 import { academyLessons, addCourse, isCourseUrl, type CoursePlan } from "../src/ingest/course.ts";
 import { addSource, courseCoverFile } from "../src/ingest/index.ts";
-import { findItem, listItems, setItemArchived } from "../src/items.ts";
+import { findItem, listItems, setItemArchived, setItemStatus } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
 const COURSE = `<html><head><title>AI Fluency: Framework and foundations · Claude Academy</title></head><body>
@@ -185,4 +185,24 @@ describe("adding a link again", () => {
     expect(again).toMatchObject({ kept: true, filed: ["ai"], restored: true });
     expect(listItems(lib).map((i) => i.meta.id)).toEqual([first.meta.id]);
   });
+});
+
+
+test("changed course plans match URLs, retain removed lessons and preserve saved progress", async () => {
+  const lib = await tempLibrary();
+  serve(new Set());
+  const first = await addCourse(lib, plan);
+  const original = first.added.map((i) => i.meta.id);
+  await setItemStatus(lib, original[0]!, "done");
+  const inserted = { title: "new", url: `${plan.url}/new` };
+  const changed = { ...plan, lessons: [inserted, plan.lessons[2]!, plan.lessons[0]!] };
+  const again = await addCourse(lib, changed);
+  expect(again.failed).toEqual([]);
+  expect(again.added.map((i) => i.meta.url)).toEqual([inserted.url]);
+  const lessons = courseLessons(lib, first.course.id);
+  expect(lessons.slice(0, 3).map((i) => i.meta.url)).toEqual(changed.lessons.map((l) => l.url));
+  expect(lessons.map((i) => i.meta.id)).toEqual([again.added[0]!.meta.id, original[2]!, original[0]!, original[1]!]);
+  for (const item of first.added) expect(findItem(lib, item.meta.id).body).toBe(item.body);
+  expect(findItem(lib, original[0]!).meta.status).toBe("done");
+  expect((await addCourse(lib, changed)).added).toEqual([]);
 });

@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
 import { addPageText, addSource, addTab, addText, audioOf, fillOwed, hasPageText, redoPageText, reimportSource, undoPageText, undoReimport } from "../src/ingest/index.ts";
+import { addCourse, planCourse } from "../src/ingest/course.ts";
+import { courseLessons } from "../src/courses.ts";
 import { setChapterRecall } from "../src/notes.ts";
 import { addHighlight, readAnnotations } from "../src/annotations.ts";
 import { cutText } from "../src/cut.ts";
@@ -909,6 +911,47 @@ describe("import coverage: video", () => {
   });
   afterAll(() => {
     process.env.PATH = realPath;
+  });
+
+  test("a changed YouTube playlist keeps lesson identity, order and complete transcripts", async () => {
+    // Written for Ore: no remote playlist or subprocess is used.
+    const fixture = JSON.parse(readFileSync(join(FIX, "video/playlist-changes.json"), "utf8"));
+    ytdlp({}); // Make the executable discoverable; its process boundary is replaced below.
+    const spawn = Bun.spawn;
+    let entries = fixture.before;
+    Bun.spawn = ((args: string[]) => {
+      const url = args.at(-1)!;
+      const info = args.includes("--flat-playlist") ? { ...fixture, entries } : {
+        title: "Video title", webpage_url: url, channel: "Ore fixture teacher", upload_date: "20261124",
+        chapters: [{ start_time: 0, title: "Introduction" }],
+        subtitles: { en: [{ ext: "vtt", url: "https://captions.test/en.vtt" }] },
+      };
+      return { stdout: new Response(JSON.stringify(info)).body, stderr: new Response("").body, exited: Promise.resolve(0) };
+    }) as typeof Bun.spawn;
+    serve({ "https://captions.test/en.vtt": { body: VTT, type: "text/vtt" } });
+    try {
+      const lib = await tempLibrary();
+      const first = await addCourse(lib, await planCourse(fixture.webpage_url));
+      expect(first.failed).toEqual([]);
+      entries = fixture.after;
+      const again = await addCourse(lib, await planCourse(fixture.webpage_url));
+      expect(again.failed).toEqual([]);
+      const lessons = courseLessons(lib, first.course.id);
+      expect(lessons.map((l) => l.meta.title)).toEqual(["New", "Alpha"]);
+      expect(lessons[1]!.meta.id).toBe(first.added[0]!.meta.id);
+      expect(again.added).toHaveLength(1);
+      for (const lesson of lessons) {
+        expect(lesson.meta).toMatchObject({ author: "Ore fixture teacher", published: "2026-11-24" });
+        expect(lesson.body).toContain("### Introduction");
+        for (const phrase of ["Welcome to the talk.", "First we tokenize the text.", "Then we train the model."]) expect(lesson.body).toContain(phrase);
+        expect(lesson.body).toContain("[01:00]");
+        expect(images(lesson.body)).toEqual([]); // This fixture has no images or code.
+        expect(lesson.body).not.toContain("```");
+      }
+      expect((await addCourse(lib, await planCourse(fixture.webpage_url))).added).toEqual([]);
+    } finally {
+      Bun.spawn = spawn;
+    }
   });
 
   test("YouTube: title, channel and date; chapters become headings, the description follows the transcript", async () => {

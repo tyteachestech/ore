@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { addHighlight, anchorAnnotations } from "../src/annotations.ts";
 import { addCourse, type CoursePlan } from "../src/ingest/course.ts";
 import { addSource, embeddedVideo, reimportSource, transcriptOf } from "../src/ingest/index.ts";
-import { createItem, findItem } from "../src/items.ts";
+import { createItem, findItem, setItemArchived } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
 // A page with written text and a video (D92): one source holds the page's text, then the transcript.
@@ -145,4 +145,28 @@ describe("reimporting a lesson added as a bare video", () => {
     const a = anchorAnnotations(r.item).find((x) => x.id === hl.id)!;
     expect(r.item.body.slice(a.anchor!.start, a.anchor!.end)).toBe("Today we call the API.");
   });
+});
+
+
+test("a shifted pre-D92 lesson fills its own page and retains its new position, restoration and filing", async () => {
+  const lib = await tempLibrary();
+  const old = await createItem(lib, {
+    type: "youtube", title: "What is it?", url: "https://www.youtube.com/watch?v=abcdefghijk", body: "[00:00] Welcome to the platform tour. Today we call the API.\n",
+    source: { ext: "vtt", data: VTT }, course: { id: "c1", title: "Platform 101", part: 1, url: plan.url },
+  });
+  const highlight = addHighlight(old, { exact: "Today we call the API.", intent: "keep" });
+  await setItemArchived(lib, old.meta.id, true);
+  const intro = `${plan.url}/intro`;
+  serve({ [intro]: article(TEXT.replaceAll("Three layers", "Introduction")), [lessonUrl]: article(TEXT) });
+  const before = calls();
+  const result = await addCourse(lib, { ...plan, lessons: [{ title: "Introduction", url: intro }, ...plan.lessons] }, { skills: ["ai"] });
+  expect(result.failed).toEqual([]);
+  expect(result.added.map((i) => i.meta.url)).toEqual([intro]);
+  expect(result.filled.map((i) => i.meta.id)).toEqual([old.meta.id]);
+  expect(calls()).toBe(before);
+  const now = findItem(lib, old.meta.id);
+  expect(now.meta).toMatchObject({ type: "article", url: lessonUrl, skills: ["ai"], course: { part: 2 } });
+  expect(now.meta.archived_at).toBeUndefined();
+  expect(now.body).toContain("Three layers");
+  expect(anchorAnnotations(now).find((a) => a.id === highlight.id)?.anchor).toBeDefined();
 });

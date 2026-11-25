@@ -53,6 +53,7 @@ export function wakesScreens(args: string[]): boolean {
   if (args[0] === "skills") return ["rm", "restore", "archive"].includes(args[1]!) || (args[1] === "set" && has("--name"));
   // A source filed into or out of a skill: that skill's open page counts its questions and exercises again.
   if (args[0] === "edit") return has("--title") || has("--skills");
+  if (args[0] === "course") return args[1] === "archive" || (args[1] === "set" && (has("--title") || has("--skills")));
   return args[0] === "archive" || args[0] === "goal" || (args[0] === "card" && (args[1] === "retire" || args[1] === "restore"));
 }
 

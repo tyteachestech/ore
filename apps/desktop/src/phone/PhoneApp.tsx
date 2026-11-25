@@ -25,13 +25,14 @@ import { PixelBook, PixelNote } from "../PixelIcon";
 import type { LinkTarget, NoteEditorHandle } from "../editor/NoteEditor";
 import { holdMenu, MoreButton, WithMenu, type MenuAction } from "../Menu";
 import { PickBar } from "../PickBar";
+import { courseGroups } from "../lines";
 import { FIELDS, kindLabel, options, passes, summary, toggle, type Filter } from "../filters";
 import { Palette } from "../Palette";
 import { SkillEditor, sidebarGroups, skillMade } from "../Skills";
 import { TitleField } from "../TitleField";
 import { skillMenu } from "./skill-menu";
 import { sourceImportanceActions } from "../importance";
-import { courseThumb, fillOwed, lessonsOf, nextLesson, opt, ore, pullFromMac, searchFieldsOf, shareOpen, shareSkills, type Item, type Skill, touched } from "../ore";
+import { courseThumb, fillOwed, lessonsOf, opt, ore, pullFromMac, searchFieldsOf, shareOpen, shareSkills, type Item, type Skill, touched } from "../ore";
 import { Reader } from "../Reader";
 import { Review } from "../Review";
 import { Thumb } from "../Thumb";
@@ -361,18 +362,9 @@ const toReadOrder = (a: Item, b: Item) => Number(!a.pinned_at) - Number(!b.pinne
 
 /** The tab's rows of `list` as lines, each course once where its first lesson in the tab sorts, in To read while
  *  any lesson is left and in Done once all are (App.tsx `groups`). */
-function linesOf(list: Item[], status: "toread" | "done"): Line[] {
-  const seen = new Set<string>();
-  return list.flatMap((item): Line[] => {
-    if ((item.status === "done") !== (status === "done")) return [];
-    const c = item.course;
-    if (!c) return [{ kind: "item", item }];
-    if (seen.has(c.id)) return [];
-    seen.add(c.id);
-    const lessons = lessonsOf(list, c.id);
-    const next = nextLesson(lessons);
-    return (status === "done") === !next ? [{ kind: "course", id: c.id, title: c.title, url: c.url, lessons, next }] : [];
-  });
+function linesOf(list: Item[], status: "toread" | "done", filters: Filter[] = []): Line[] {
+  const rows = list.filter((item) => (item.status === "done") === (status === "done"));
+  return courseGroups(list, rows, status, filters).flat();
 }
 
 /** A course as one row (Podcasts' show): its picture, its title and the lesson a tap goes on with; the tap opens its lessons. */
@@ -405,7 +397,7 @@ function Rows({ lines, row, onOpen }: { lines: Line[]; row: RowActions; onOpen: 
 }
 
 /** Sources by To read and Done, as one list; `flat`: as given, no sections or courses (Archive, a course's lessons). */
-function SourceList({ title, items, onOpen, row, head, tools, flat, empty = "Nothing here yet. Add one with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; /** At the title's right: Filter and Select. */ tools?: ReactNode; flat?: boolean; empty?: ReactNode }) {
+function SourceList({ title, items, onOpen, row, head, tools, flat, filters = [], empty = "Nothing here yet. Add one with +." }: { title: string; items: Item[] | null; onOpen: (id: string) => void; row: RowActions; head?: ReactNode; /** At the title's right: Filter and Select. */ tools?: ReactNode; flat?: boolean; filters?: Filter[]; empty?: ReactNode }) {
   // Pinned first, in the order they were pinned, as on the Mac's lists; then the latest touched.
   const sorted = [...(items ?? [])].sort(toReadOrder);
   return (
@@ -421,8 +413,8 @@ function SourceList({ title, items, onOpen, row, head, tools, flat, empty = "Not
         <Rows lines={(items ?? []).map((item) => ({ kind: "item", item }))} row={row} onOpen={onOpen} />
       ) : (
         ([
-          ["To read", linesOf(sorted, "toread")],
-          ["Done", linesOf(items ?? [], "done")],
+          ["To read", linesOf(sorted, "toread", filters)],
+          ["Done", linesOf(items ?? [], "done", filters)],
         ] as const).map(([label, lines]) =>
           lines.length ? (
             <section key={label}>
@@ -1211,6 +1203,7 @@ export function PhoneApp() {
                 onOpen={open}
                 row={row}
                 flat={tab === "archive"}
+                filters={tab === "sources" ? filters : []}
                 tools={
                   <>
                     {tab === "sources" && !picking && !!items?.length && <MoreButton label="Filter by kind, skill or author" className="phone-head-tool" icon="Filter" actions={filterActions} />}
