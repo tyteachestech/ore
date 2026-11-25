@@ -28,14 +28,14 @@ describe("readGuard", () => {
     let done!: () => void;
     const undo = g.writing(new Promise<void>((ok) => (done = ok)));
     const read = g.begin();
-    expect(read.lands()).toBe(false);
+    expect(read.lands()).toBe(true);
     done();
     await undo;
     await settled();
     expect(read.lands()).toBe(false);
   });
 
-  test("a failed write lets fresh reads land, but an outstanding write keeps optimistic rows", async () => {
+  test("a failed write counts as settled too, and a write that hangs lets a later read land", async () => {
     const g = readGuard();
     const bad = g.writing(Promise.reject(new Error("offline")));
     await bad.catch(() => {});
@@ -44,7 +44,7 @@ describe("readGuard", () => {
     expect(read.lands()).toBe(true);
     g.writing(new Promise(() => {}));
     const later = g.begin();
-    expect(later.lands()).toBe(false);
+    expect(later.lands()).toBe(true);
     expect(read.lands()).toBe(false);
   });
 });
@@ -59,11 +59,20 @@ test("a source read begun during a queued skill Undo cannot put the removed skil
   const read = guard.begin();
   let skills = ["learning", "teaching"];
   const stale = ["learning", "teaching", "ai"];
-  if (read.lands()) skills = stale;
+  // The Reader reads this way (`unchanged`): the skills he set stay while any filing was out.
+  if (read.unchanged()) skills = stale;
   finishSecond(); await second;
   expect(skills).toEqual(["learning", "teaching"]);
-  expect(read.lands()).toBe(false);
-  expect(guard.begin().lands()).toBe(true);
+  expect(read.unchanged()).toBe(false);
+  expect(guard.begin().unchanged()).toBe(true);
+});
+
+test("a list read begun after a write that hangs still lands, so the list never freezes", () => {
+  const g = readGuard();
+  g.writing(new Promise(() => {}));
+  const read = g.begin();
+  expect(read.lands()).toBe(true);
+  expect(read.unchanged()).toBe(false);
 });
 
 

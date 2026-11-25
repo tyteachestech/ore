@@ -2,9 +2,10 @@ import { join, resolve, sep } from "node:path";
 import { z } from "zod";
 import { paths, type Library } from "./library.ts";
 
-// Generated ids include Unicode letters and combining marks; paths and empty ids
-// are never skills. Validate both saved YAML and callers constructing a path.
-export const SkillId = z.string().regex(/^[\p{L}\p{N}\p{M}]+(?:-[\p{L}\p{N}\p{M}]+)*$/u, "skill id must be a nonempty slug (letters, numbers and hyphens); fix skills.yaml");
+// A skill's id names its folder under skills/ (its note, its digs). Ore writes slugs, but a hand-written id
+// (spaces, underscores, capitals) worked before and must keep working, so only an id that could name another
+// folder is refused: empty, `.` or `..`, or holding a slash (deep scan 4, EDGES-03).
+export const SkillId = z.string().refine((id) => id.trim() !== "" && id !== "." && id !== ".." && !/[\/\\\0]/.test(id), "skill id can't be empty or hold a slash; fix skills.yaml");
 
 export function skillDir(lib: Library, id: string): string {
   SkillId.parse(id);

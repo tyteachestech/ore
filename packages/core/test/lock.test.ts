@@ -19,13 +19,14 @@ test("a paused live writer keeps its lock past one minute", async () => {
   });
 });
 
-test("a foreign host lock never probes a local PID or expires by age", async () => {
+test("a lock from another host is never judged by a local pid, and goes stale only by age", async () => {
   const lib = await tempLibrary();
   const path = join(lib.root, ".ore", "lock");
   writeFileSync(path, JSON.stringify({ pid: 2147483646, host: hostname() + "-other" }));
+  expect(lockStale(path)).toBe(false); // that pid is dead here, but it is not ours to ask
   const old = new Date(Date.now() - 120_000);
   utimesSync(path, old, old);
-  expect(lockStale(path)).toBe(false);
+  expect(lockStale(path)).toBe(true);
 });
 
 test("a crash while publishing a lock lets the next save proceed immediately", async () => {

@@ -108,6 +108,8 @@ When a sweep's triage is done, add a row per tester here.
 | 11-24 | [deep scan 2](2026-11-24-codex-deep-scan-2/) media | Codex, diagnosing-bugs loop | PDF reimport and background reread, diagrams, audio transcripts and podcast feeds, the phone's fs and rescan, F575/F577 | both | 6 + F577 | #525 |
 | 11-24 | [deep scan 3](2026-11-24-codex-deep-scan-3/) engine | Codex, diagnosing-bugs loop | AI drafts, checks and remixes under races and bad replies, D21, queue and FSRS replay, Undo across devices, sessions over midnight, DST, stats | both | 8 | #526 |
 | 11-24 | [deep scan 3](2026-11-24-codex-deep-scan-3/) library | Codex, diagnosing-bugs loop | Links and backlinks, the note editor's round-trips, cut and Undo, Feed previews, frontmatter and skills.yaml, CLI --json and init, Add edges, F575 | both | 11 | #526 |
+| 11-25 | [deep scan 4](2026-11-25-codex-deep-scan-4/) refactors | Codex, diagnosing-bugs loop; Codex also drafted the fixes | The six refactors of #529–#537: change.ts, list-actions.ts, review-session.ts, highlights.ts, answer types; F618, F631 | both | 9 | #PRNUM |
+| 11-25 | [deep scan 4](2026-11-25-codex-deep-scan-4/) edges | Codex, diagnosing-bugs loop; Codex also drafted the fixes | Earlier scans' Leads, writes killed mid-way (300 trials), damaged index, iCloud conflict copies, a 30-day lifecycle, Ask at scale | both | 11 | #PRNUM |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 

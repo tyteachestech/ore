@@ -13,16 +13,16 @@ function isAlive(pid: number): boolean {
   }
 }
 
-/** .ore is device-local in sync (the phone serializes commands). New locks also name
- * their host so a copied/shared library never treats a remote PID as local. Legacy
- * numeric locks are local. Only a dead local owner can lose its lock by takeover. */
+/** A lock is stale when its owner is gone: a dead local pid. A live local owner keeps its lock however long it writes (deep scan 4, EDGES-02). A lock
+ *  from another host (a copied or synced `.ore`) can't be asked, so it goes stale by age, as an empty one did.
+ *  Locks are written whole (`acquire`), so an empty one is a lock from an older Ore. */
 export function lockStale(path: string): boolean {
   try {
     const raw = readFileSync(path, "utf8").trim();
     const owner = raw.startsWith("{") ? JSON.parse(raw) as { pid: number; host: string } : { pid: Number(raw), host: hostname() };
-    if (owner.host !== hostname()) return false;
-    if (Number.isInteger(owner.pid) && owner.pid > 0) return !isAlive(owner.pid);
-    return Date.now() - statSync(path).mtimeMs > STALE_MS;
+    const age = Date.now() - statSync(path).mtimeMs;
+    if (owner.host !== hostname() || !(Number.isInteger(owner.pid) && owner.pid > 0)) return age > STALE_MS;
+    return !isAlive(owner.pid);
   } catch {
     return false;
   }

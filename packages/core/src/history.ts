@@ -18,10 +18,9 @@ export function snapshot(lib: Library, opts: { force?: boolean; now?: number } =
     const git = (...args: string[]) =>
       Bun.spawnSync(["git", "-c", "user.name=Ore", "-c", "user.email=ore@localhost", ...args], { cwd: lib.root, stdout: "pipe", stderr: "pipe" });
     mkdirSync(join(lib.root, ".ore"), { recursive: true });
+    writeFileSync(m, ""); // before git runs: a library where git fails tries again in ten minutes, not on every command
     if (git("add", "-A").exitCode !== 0) return { committed: false };
     if (git("diff", "--cached", "--quiet").exitCode === 0) return { committed: false };
-    const committed = git("commit", "-q", "--no-verify", "-m", `Snapshot ${new Date(now).toISOString()}`).exitCode === 0;
-    if (committed) writeFileSync(m, "");
-    return { committed };
+    return { committed: git("commit", "-q", "--no-verify", "-m", `Snapshot ${new Date(now).toISOString()}`).exitCode === 0 };
   }) ?? { committed: false };
 }

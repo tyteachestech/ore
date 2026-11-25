@@ -5,8 +5,10 @@
  *  optimistic write would put the row back (a second A then archives it again), and one begun while
  *  an earlier write was still saving may have read the library before that write reached it (an Undo
  *  pressed while its archive still saved: the read shows the row gone, and the selection moves off it).
- *  Each write reads the list again once it settles, so the newer read brings the truth. A read
- *  begun with writes outstanding cannot prove what is saved, even if no counter changes during it. */
+ *  Each write reads the list again once it settles, so the newer read brings the truth; a write that
+ *  hangs never settles, so a read begun after it still lands (`lands`) and never freezes the list.
+ *  `unchanged` is stricter, for one field shown as he set it (the Reader's skills, F474, F631): a read
+ *  begun while a write to it was out may have read the library before that write reached it. */
 export const readGuard = () => {
   let reads = 0;
   let writes = 0;
@@ -20,14 +22,13 @@ export const readGuard = () => {
       p.then(settled, settled);
       return p;
     },
-    /** Starts a read. `unchanged` protects individual fields without rejecting unrelated reads;
-     *  `lands` also requires this to be the newest read of the whole list. */
+    /** Starts a read: `newest()` says no later read began; `lands()` also says no write started or settled
+     *  since; `unchanged()` also says none was out when it began. */
     begin() {
       const n = ++reads;
       const w = writes;
       const out = pending;
-      const unchanged = () => out === 0 && w === writes;
-      return { newest: () => n === reads, unchanged, lands: () => n === reads && unchanged() };
+      return { newest: () => n === reads, unchanged: () => out === 0 && w === writes, lands: () => n === reads && w === writes };
     },
   };
 };

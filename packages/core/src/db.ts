@@ -508,9 +508,10 @@ export function rebuildIndex(lib: Library): SyncReport {
       db.close();
     }
   } catch (e) {
-    // Only corruption is disposable; permission, I/O and busy errors must retain
-    // the file. syncIndex performs the guarded repair below.
-    if (!corruptIndex(e)) throw e;
+    // An explicit reindex is the broad repair: an index too damaged to open is deleted and built from scratch.
+    // Another `ore` holding the lock past busy_timeout leaves the file alone: deleting it fails that one.
+    if (/^SQLITE_(BUSY|LOCKED)/.test(String((e as { code?: unknown }).code))) throw e;
+    discardDamagedIndex(lib);
   }
   const { index, report } = syncIndex(lib);
   index.close();
