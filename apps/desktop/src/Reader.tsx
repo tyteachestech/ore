@@ -13,6 +13,7 @@ import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
 import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
+import { backStart, frontEnd, unfold, unfoldFor } from "./front";
 import { SearchButton, SearchField } from "./HeadSearch";
 import { blocksOf, FocusBox, startBlock, textRange } from "./Focus";
 import { paragraphRange, sentenceRange, snapRange } from "./snap";
@@ -181,7 +182,8 @@ const stamped: Components = {
 
 
 /** A figure open to fill the window (D143): its image in the text, and where it sat. */
-type Zoomed = { img: HTMLImageElement; from: DOMRect };
+/** `max`: the most it grows by (a cover is saved small, so it opens at its own size, not blown up soft). */
+type Zoomed = { img: HTMLImageElement; from: DOMRect; max?: number };
 
 /** The figure a click opens (D143): a loaded picture in the text, not a link (the link wins), and not already
  *  about as big as the window. */
@@ -192,6 +194,16 @@ function zoomable(t: EventTarget | null, doc: HTMLElement | null): Zoomed | null
   // On the phone any picture opens, to pinch in on (Books): the screen is as wide as the column.
   if (PHONE) return { img, from };
   return Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height) > 1.1 ? { img, from } : null;
+}
+
+/** The cover at the top of a book or PDF, which a click opens larger, as Quick Look does: at the size it was saved. */
+function coverOf(t: EventTarget | null): Zoomed | null {
+  const img = t instanceof HTMLImageElement && t.matches("img.doc-thumb") && t.naturalWidth ? t : null;
+  if (!img) return null;
+  const from = img.getBoundingClientRect();
+  const max = img.naturalHeight / from.height;
+  // Opened even when it was saved no bigger than shown, as Quick Look opens a small picture: a click on it always does something.
+  return { img, from, max: Math.max(1, max) };
 }
 
 type Box = [number, number, number, number];
@@ -306,7 +318,7 @@ function FigureZoom({ fig, item, notify, onClose }: { fig: Zoomed; item: string;
   }, []);
   // Drawn at its open size, so a picture larger than the column comes in sharp, and shrunk back onto its place.
   const { from } = fig;
-  const scale = Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height);
+  const scale = Math.min((innerWidth - 48) / from.width, (innerHeight - 48) / from.height, fig.max ?? Infinity);
   const w = from.width * scale;
   const h = from.height * scale;
   const left = (innerWidth - w) / 2;
@@ -540,11 +552,16 @@ type VideoCard = { head: ReactNode; foot?: ReactNode; box: RefObject<HTMLDivElem
 
 /** The document body, rendered in slices so a 100k-word book stays responsive while it mounts. With a
  *  video card, the transcript before VIDEO_END goes in the card and the page's text follows it. */
-const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, card }: { markdown: string; video: boolean; dir: string; cells?: boolean; pages?: boolean; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
-  const split = card ? markdown.indexOf(VIDEO_END) : -1;
+const Body = memo(function Body({ markdown, video, dir, cells, pages, book, onReady, card }: { markdown: string; video: boolean; dir: string; cells?: boolean; pages?: boolean; book?: boolean; onReady: (el: HTMLElement) => void; card?: VideoCard }) {
+  // A book's front matter (its title page, copyright, contents) folds under one row, shut, so it opens on its text;
+  // the publisher's last pages (also by, about the author) fold the same way under the text.
+  const front = card ? -1 : frontEnd(markdown, !!book);
+  const back = card ? -1 : backStart(markdown, !!book);
+  const split = card ? markdown.indexOf(VIDEO_END) : front;
   const top = useMemo(() => (split > 0 ? chunks(markdown.slice(0, split)) : []), [markdown, split]);
-  const rest = useMemo(() => (pages ? pageChunks : chunks)(split > 0 ? markdown.slice(split) : markdown), [markdown, split, pages]);
-  const total = top.length + rest.length;
+  const rest = useMemo(() => (pages ? pageChunks : chunks)(markdown.slice(Math.max(split, 0), back > 0 ? back : undefined)), [markdown, split, back, pages]);
+  const tail = useMemo(() => (back > 0 ? chunks(markdown.slice(back)) : []), [markdown, back]);
+  const total = top.length + rest.length + tail.length;
   const [shown, setShown] = useState(() => Math.min(total, 2));
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -569,6 +586,13 @@ const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, c
           {card.foot}
         </section>
       )}
+      {front > 0 && (
+        <Folded name="Front matter">
+          {top.slice(0, shown).map((md, i) => (
+            <Chunk key={i} md={md} video={video} dir={dir} cells={cells} />
+          ))}
+        </Folded>
+      )}
       {rest.slice(0, Math.max(0, shown - top.length)).map((md, i) => {
         // Where a PDF's page starts (D202), for the Original tab to follow. Page 1 needs no mark: it is what shows above the first.
         const page = pages && i > 0 ? pageOf(md) : null;
@@ -579,9 +603,41 @@ const Body = memo(function Body({ markdown, video, dir, cells, pages, onReady, c
           </Fragment>
         );
       })}
+      {back > 0 && shown > top.length + rest.length && (
+        <Folded name="Back matter">
+          {tail.slice(0, shown - top.length - rest.length).map((md, i) => (
+            <Chunk key={i} md={md} video={video} dir={dir} cells={cells} />
+          ))}
+        </Folded>
+      )}
     </article>
   );
 });
+
+/** A book's front or back matter: one row, shut, that opens its pages in place. */
+function Folded({ name, children }: { name: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    // A jump into it (`unfold`): shown at once, so what jumps can measure where to go, and kept open.
+    const show = () => ((el.hidden = false), setOpen(true));
+    el.addEventListener("unfold", show);
+    return () => el.removeEventListener("unfold", show);
+  }, []);
+  return (
+    <section className="front-matter">
+      <button className="front-head" data-noindex onClick={() => setOpen(!open)} aria-expanded={open}>
+        <CaretRight className={`caret${open ? " open" : ""}`} size={12} aria-hidden="true" />
+        {name}
+      </button>
+      <div className="front-body" ref={box} hidden={!open}>
+        {children}
+      </div>
+    </section>
+  );
+}
 
 /** `wide`: the note ran past four lines, so the popup widened for it, and stays so while it is open. */
 type Popup = { id: string; top: number; left: number; below: boolean; note: string; wide?: boolean };
@@ -971,6 +1027,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     const el = scrollRef.current;
     if (!el) return;
     if (words) following.current = false;
+    unfold(r.startContainer);
     const b = band();
     // A passage in the card's transcript: the box scrolls to it, and the page to the box.
     const fb = followBox();
@@ -1279,6 +1336,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       // transcript folded away opens, since Find looks only at what shows (Codex UX sweep 10).
       const [query = "", near] = p.jumpTo.slice(5).split("\n");
       showTranscriptFor(null, query);
+      unfoldFor(docEl.current, query);
       setFind((f) => ({ open: true, focus: f.focus + 1, query, near }));
     }
     else if (p.jumpTo?.startsWith("note:")) {
@@ -1388,6 +1446,12 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       if (docEl.current) back = placeOf(scroll, docEl.current);
     };
     take();
+    // A book's front matter opened for a passage in it (`unfold`) grows the page the same way.
+    const onUnfold = () => {
+      unfolded.current = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => void (unfolded.current = false)));
+    };
+    docEl.current?.addEventListener("unfold", onUnfold);
     const ro = new ResizeObserver(() => {
       // Not when the page grew because a folded transcript opened to show a passage: the passage is where he
       // was taken, and putting the old place back threw it off the window (Codex UX sweep 12).
@@ -1400,7 +1464,9 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // and WebKit does not hold the page still for it as Chromium does (F444).
     if (docEl.current) ro.observe(docEl.current);
     scroll.addEventListener("scroll", take, { passive: true });
+    const doc = docEl.current;
     return () => {
+      doc?.removeEventListener("unfold", onUnfold);
       ro.disconnect();
       scroll.removeEventListener("scroll", take);
     };
@@ -2783,6 +2849,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       const heading = !byId && el ? Array.from(el.querySelectorAll("h1, h2, h3, h4, h5, h6")).find((h) => slug(h.textContent ?? "") === slug(dec(id))) : undefined;
       if (byId || heading) {
         markPlace();
+        unfold(byId ?? heading);
         return (byId ?? heading)!.scrollIntoView({ block: heading ? "start" : "center" });
       }
       // The phone can't reimport (D78): the step is the Mac's.
@@ -2792,7 +2859,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     p.notify(`This links to “${dec(href)}”, a file beside the original that isn’t in Ore. ${PHONE ? "Add it from Add a link › Choose a file to read it here." : `Add it with ${label(keys.file)} to read it here.`}`, "error");
   };
   const onClick = (e: MouseEvent) => {
-    const fig = zoomable(e.target, docEl.current);
+    const fig = zoomable(e.target, docEl.current) ?? coverOf(e.target);
     if (fig) return setZoom(fig);
     const a = (e.target as Element).closest?.("a[href]");
     if (!a || !docEl.current?.contains(a)) return;
@@ -3724,7 +3791,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
             </div>
           )}
           <TableCtx.Provider value={tables}>
-            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} pages={!!pdf || !!deck} onReady={onReady} card={cardMode ? videoCard : undefined} />
+            <Body markdown={shownBody ?? ""} video={!!video} dir={doc.dir} cells={/\.ipynb$/i.test(doc.source_file ?? "")} pages={!!pdf || !!deck} book={doc.type === "epub"} onReady={onReady} card={cardMode ? videoCard : undefined} />
           </TableCtx.Provider>
           {!doc.body.trim() && (
             <p className="doc-empty">
