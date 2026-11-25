@@ -104,7 +104,7 @@ test("Archive takes a source to the Archive list at once; Undo brings it back an
   expect(e.calls).toEqual(["archive z --undo", "archive z"]);
 });
 
-test("a Restore asked for while the source's Archive still saves is written after it (F619)", async () => {
+test("a Restore asked for while the source's Archive still saves is written after it (F622)", async () => {
   const d = await device({ items: [item("a")] });
   d.lib.hold = true;
   await act(async () => void d.sources().archive(d.state.items[0]!));
@@ -144,7 +144,7 @@ test("Undo of an Unpin puts the source back where it was among the pinned; Move 
   expect(d.state.items[2]!.pinned_at).toBe("2026-11-01T00:00:05.000Z");
 });
 
-test("Undo of a filing under an archived skill archives the skill again, and each exercise gets its own skills back (F617)", async () => {
+test("Undo of a filing under an archived skill archives the skill again, and each exercise gets its own skills back (F620)", async () => {
   const old: Skill = { id: "old", name: "Old", archived: true };
   const d = await device({ items: [item("a", { skills: ["ai"] })], skills: [{ id: "ai", name: "AI" }, old], answers: (a) => (a[0] === "edit" ? { cards_before: { c1: ["ai"] } } : undefined) });
   await act(async () => void d.sources().fileUnder(d.state.items[0]!, old));
@@ -159,7 +159,7 @@ test("Undo of a filing under an archived skill archives the skill again, and eac
   expect(d.calls).toEqual(["edit a --skills ai,old", `edit a --skills ai --cards=${JSON.stringify({ c1: ["ai"] })}`, "skills archive old"]);
 });
 
-test("several sources filed under an archived skill: one Undo gives each its skills back and archives the skill again (F617)", async () => {
+test("several sources filed under an archived skill: one Undo gives each its skills back and archives the skill again (F620)", async () => {
   const old: Skill = { id: "old", name: "Old", archived: true };
   const d = await device({ items: [item("a", { skills: ["ai"] }), item("b"), item("c")], skills: [old] });
   const sel = d.state.items.slice(0, 2);
@@ -230,7 +230,7 @@ test("a skill moved to a collection shows at once and is written as a whole layo
   await tick();
 });
 
-test("a collection renamed or deleted takes its archived skills with it (F618)", async () => {
+test("a collection renamed or deleted takes its archived skills with it (F621)", async () => {
   const skills: Skill[] = [{ id: "a", name: "A" }, { id: "b", name: "B", collection: "Work" }, { id: "gone", name: "Gone", collection: "Work", archived: true }];
   const d = await device({ skills });
   let ok: boolean | undefined;

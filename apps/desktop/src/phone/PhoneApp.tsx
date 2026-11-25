@@ -660,7 +660,7 @@ export function PhoneApp() {
   // Whether the library has answered for the source the saved place opens on (below, F120).
   const [startKnown, setStartKnown] = useState(!start.openId);
   // Which list reads land, against the writes around them (reads.ts), as on the Mac: a read that began before a
-  // change's write settled would put the row back where it was (F619).
+  // change's write settled would put the row back where it was (F622).
   const guard = useRef(readGuard()).current;
   /** A change to the lists he can take back (change.ts): its writes count against the lists' reads, and the lists
    *  are read again once its newest write settles. */

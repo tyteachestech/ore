@@ -7697,10 +7697,10 @@ journey("review: Later moves straight on to the exercise loaded ahead, and the o
   const calls = oreCalls(page);
   const q = page.locator(".review-q");
   const good = page.getByRole("button", { name: "Good", exact: true });
-  const moved = async (from: string, what: string) => {
+  const moved = async (from: string, what: string, ahead = true) => {
     const t0 = Date.now();
     await page.waitForFunction((from) => { const el = document.querySelector(".review-q"); return !!el && el.textContent !== from; }, from, { timeout: 8000 });
-    if (Date.now() - t0 > 900) throw new Error(`${what} took ${Date.now() - t0} ms: it wasn't loaded ahead`);
+    if (ahead && Date.now() - t0 > 900) throw new Error(`${what} took ${Date.now() - t0} ms: it wasn't loaded ahead`);
     return q.innerText();
   };
   try {
@@ -7717,7 +7717,15 @@ journey("review: Later moves straight on to the exercise loaded ahead, and the o
     await page.waitForTimeout(1500);
     await reveal(page);
     await good.click();
-    await until("the exercise put off comes back last", async () => (await q.innerText()) === first, 8000);
+    // F619: it comes back once every other exercise has had its turn, however many there
+    // are. A shard that began before midnight has one more here after it: the exercise drafted on the day the
+    // library was seeded is held back that day only (D65).
+    let last = third;
+    for (let n = 0; n < 4 && (last = await moved(last, "the exercise after that one", false)) !== first; n++) {
+      await reveal(page);
+      await good.click();
+    }
+    if (last !== first) throw new Error("the exercise put off never came back");
     await page.keyboard.press("Escape");
     await page.locator(".review-foot").getByRole("button", { name: "Done" }).waitFor();
     await page.keyboard.press("Enter");
@@ -18024,7 +18032,7 @@ journey("phone: a pinned source moves up among the pinned from its long press, w
   await page.keyboard.press("Meta+z");
   await until("Undo put it back", async () => (await order()) === "AT");
 }, "phone");
-journey("phone: Undo of a filing under an archived skill archives the skill again, as on the Mac (F617)", async (page) => {
+journey("phone: Undo of a filing under an archived skill archives the skill again, as on the Mac (F620)", async (page) => {
   // Architecture review 2026-11-24 (2): the phone's own copy of the Mac's refile left the skill it had brought back.
   type Core = { run: <T>(args: string[], input: string | null) => Promise<T> };
   const run = <T,>(...args: string[]) => page.evaluate(async (args) => ((await import("/src/phone/core.ts" as string)) as Core).run<unknown>([...args, "--json"], null), args) as Promise<T>;

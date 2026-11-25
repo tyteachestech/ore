@@ -45,6 +45,8 @@ A **deep module** hides substantial behavior behind a small **interface**: every
 
 ### 1. Own Review's session lifecycle
 
+**Built 2026-11-24** as `apps/desktop/src/review-session.ts`, tested in `apps/desktop/test/review-session.test.ts`.
+
 **Modules involved.** `apps/desktop/src/Review.tsx`, `ore.ts`, `history.ts`; existing persistence in `packages/core/src/study.ts`, `sessions.ts`, and `reviews.ts`. The core modules keep ownership of library writes and FSRS. The proposed module belongs with the shared desktop/phone Review implementation, not inside the renderer or FSRS.
 
 **Friction encountered.** To establish when one rating becomes the next exercise, I had to trace session startup (`Review.tsx:244–283`), finish (`400–428`), queued undo presses (`437–458`), rating and goal behavior (`583–640`), save/history registration (`644–678`), undo/reopen (`682–719`), and Later (`737–794`). `sessionReady`, `busyNow`, queue snapshots, retired/put-off sets, and mounted-state fallbacks form an interface carried by convention inside closures. `submit` moves the queue, while `rate` subsequently decides whether the goal notification or an extra likely recall is due. Undo restores those choices separately. This is coordination knowledge, not just a long JSX file.

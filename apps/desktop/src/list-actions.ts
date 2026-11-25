@@ -8,7 +8,7 @@ import { count } from "./util";
 // What the lists of sources and skills do, once for the Mac (App.tsx) and the iPhone (phone/PhoneApp.tsx): archive,
 // restore, move, file, pin, rename, importance, several at once, and the skills' layout. Each device keeps only how
 // he asks for one (keys, drags and right-clicks; swipes, sheets and long presses) and where he goes after. Written
-// twice, the two drifted (F442, F486, F492 to F494, F573, F617, F618, F619); here a fix reaches both.
+// twice, the two drifted (F442, F486, F492 to F494, F573, F620, F621, F622); here a fix reaches both.
 // Reopen it if a device needs an action to behave differently on purpose: that one takes the difference as an
 // argument here, and says why.
 
