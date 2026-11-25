@@ -1,3 +1,4 @@
+import { History } from "../src/history";
 import { expect, test } from "bun:test";
 import type { CardFull, DueEntry, SessionEnd, Today } from "../src/ore";
 import type { Forget } from "../src/util";
@@ -20,7 +21,7 @@ const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
 type Call = { args: string[]; land: (v?: unknown) => void; fail: (why: string) => void };
 /** A session on a fake library and a fake history. Commands in `slow` wait until the test lands or fails them. */
-async function open(o: { queue?: DueEntry[]; quick?: boolean; slow?: string[]; today?: Today; begin?: boolean } = {}) {
+async function open(o: { queue?: DueEntry[]; quick?: boolean; slow?: string[]; today?: Today; begin?: boolean; failReopen?: boolean } = {}) {
   const calls: string[] = [];
   const waiting: Call[] = [];
   const slow = new Set(o.slow ?? []);
@@ -37,6 +38,7 @@ async function open(o: { queue?: DueEntry[]; quick?: boolean; slow?: string[]; t
   };
   const run = ((...args: string[]) => {
     calls.push(args.join(" "));
+    if (o.failReopen && args[0] === "session" && args[1] === "reopen") return Promise.reject(new Error("reopen refused"));
     if (!slow.has(args[0]!)) return Promise.resolve(answer(args));
     return new Promise((ok, no) => waiting.push({ args, land: (v) => ok(v ?? answer(args)), fail: (why) => no(new Error(why)) }));
   }) as never;
@@ -400,4 +402,62 @@ test("a rating's undo that arrives while another rating saves is refused, not co
   t.waiting[1]!.land();
   await tick();
   expect([t.s.done, t.s.reviewed]).toEqual([2, 2]);
+});
+
+// Use the real window history: its queued callbacks can run after a step entered Redo.
+function withHistory(t: Awaited<ReturnType<typeof open>>) {
+  const h = new History();
+  t.s.screen.notify = (message, kind, undo, redo) => {
+    const step = { message, undo: undo!, redo };
+    if (undo) h.push(step);
+    return Object.assign(() => h.forget(step), { undo: () => h.take(step), hold: (p: Promise<unknown>) => h.hold(step, p) });
+  };
+  const press = () => t.s.busy ? t.s.holdUndo({ key: "z", metaKey: true }) : h.undo();
+  t.s.screen.press = press;
+  return { h, press };
+}
+
+test("two Undos held during review saving can both be redone in the same session", async () => {
+  const t = await open({ slow: ["review"] });
+  const { h, press } = withHistory(t);
+  void t.rate("a");
+  await tick(); t.waiting[0]!.land(); await tick();
+  void t.rate("b");
+  await tick(); t.waiting[1]!.land(); await tick();
+  press();
+  await tick();
+  press();
+  t.waiting[2]!.land();
+  await tick(); t.waiting[3]!.land(); await tick();
+  expect(t.s.done).toBe(0);
+  h.redo();
+  await tick(); t.waiting[4]!.land(); await tick();
+  h.redo();
+  await tick();
+  expect(t.waiting).toHaveLength(6);
+  t.waiting[5]!.land(); await tick();
+  expect(t.s.done).toBe(2);
+  expect(t.ids()).toEqual(["c"]);
+  expect(t.wrote("review").slice(-2).every((c) => c.includes("--session=S1"))).toBe(true);
+  t.stop(); t.s.gone();
+});
+
+test("end-screen Undo stays removed when reopening fails and can be redone after recovery", async () => {
+  const options = { queue: [due("a")], failReopen: true };
+  const t = await open(options);
+  const { h } = withHistory(t);
+  await t.rate("a"); await tick();
+  expect(t.s.end).not.toBeNull();
+  t.s.undoLast(); await tick();
+  expect([t.s.done, t.s.reviewed, t.s.canUndo, h.canUndo]).toEqual([0, 0, false, false]);
+  expect(t.s.end).toBeNull();
+  expect(t.ids()).toEqual(["a"]);
+  t.s.undoLast(); await tick();
+  expect(t.wrote("review a --undo")).toHaveLength(1);
+  options.failReopen = false;
+  h.redo(); await tick();
+  expect(t.s.done).toBe(1);
+  expect(t.wrote("session reopen")).toHaveLength(2);
+  expect(t.wrote("session end")).toHaveLength(2);
+  t.stop(); t.s.gone();
 });

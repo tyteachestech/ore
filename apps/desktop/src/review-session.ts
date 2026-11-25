@@ -475,6 +475,11 @@ export class ReviewSession<S> {
   private async submit(args: string[], rating: number, elapsed: number, again?: Again) {
     const { run } = this;
     const was = { queue: this.queue ?? [], done: this.done, activeMs: this.activeMs, off: new Set(this.off), won: this.wonLast, told: this.goalTold };
+    // A committed Undo can outlive a failed reopen. Resume before recording another rating.
+    if (this.session && !this.session.open) {
+      await run("session", "reopen", this.session.id);
+      this.session.open = true;
+    }
     const r = await run<{ ts: string }>("review", ...args);
     this.reviewed++;
     const id = args[0]!;
@@ -517,13 +522,19 @@ export class ReviewSession<S> {
     const { end } = this;
     this.screen.unrated();
     this.dropAhead();
-    last.forget();
+    // The history is already moving this step to Redo. Forgetting it here can erase that
+    // entry when a held Undo runs behind the history's previous write.
     this.setBusy(true);
     try {
       await this.run("review", last.card, opt("undo", last.ts));
       if (end) {
-        await this.run("session", "reopen", end.session.id);
-        if (this.session) this.session.open = true;
+        try {
+          await this.run("session", "reopen", end.session.id);
+          if (this.session) this.session.open = true;
+        } catch (e) {
+          // The rating is already gone. Keep its Undo completed; the next rating retries reopening.
+          this.screen.notify(errorText(e), "error");
+        }
         this.end = null;
       }
       this.reviewed--;
