@@ -1,0 +1,53 @@
+bun test v1.4.4 (38afee6c8)
+
+apps/desktop/test/ask.test.ts:
+(pass) applying an Ask rewrite passes its author to the shared card command [209.86ms]
+10 | 
+11 | for (const mode of ["stop", "normal"]) {
+12 |   test(`Ask owns the request after listener registration (${mode})`, async () => {
+13 |     const p = Bun.spawn([process.execPath, join(import.meta.dir, "fixtures/ask-stop.tsx"), mode], { stdout: "pipe", stderr: "pipe" });
+14 |     const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
+15 |     expect({ code, output: code ? out + err : "" }).toEqual({ code: 0, output: "" });
+                                                         ^
+error: expect(received).toEqual(expected)
+
+  {
+-   "code": 0,
+-   "output": "",
++   "code": 1,
++   "output": 
++ "[DEEP] {"events":["STOP vendor job","START vendor job"],"error":"Stopped.","turns":[{"role":"me","text":"Why is this the answer?"}]}
++ Warning: KaTeX doesn't work in quirks mode. Make sure your website has a suitable doctype.
++ 29 |  if(!stop)throw Error('Stop not found: '+document.body.innerHTML);
++ 30 |  if(!normal)await act(async()=>stop.click());
++ 31 |  if(!normal)check(!state.busy,'Stop marks the request stopped before the vendor starts');
++ 32 |  await act(async()=>{listening();await new Promise(r=>setTimeout(r,10));});
++ 33 |  console.log('[DEEP]',JSON.stringify({events,error:state.error,turns:state.turns}));
++ 34 |  check(normal?events.join()==='START vendor job':ids.length===1,'Stop prevents starting the job, or the no-Stop control starts once');
++       ^
++ AssertionError: Stop prevents starting the job, or the no-Stop control starts once
++  generatedMessage: false,
++      actual: false,
++    expected: true,
++    operator: "==",
++        diff: "simple",
++        code: "ERR_ASSERTION"
++ 
++       at /Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/apps/desktop/test/fixtures/ask-stop.tsx:34:2
++ 
++ Bun v1.4.4 (macOS arm64)
++ "
++ ,
+  }
+
+- Expected  - 2
++ Received  + 24
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/apps/desktop/test/ask.test.ts:15:53)
+(fail) Ask owns the request after listener registration (stop) [151.51ms]
+(pass) Ask owns the request after listener registration (normal) [154.23ms]
+
+ 2 pass
+ 1 fail
+ 3 expect() calls
+Ran 3 tests across 1 file. [523.00ms]

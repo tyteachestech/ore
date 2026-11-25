@@ -1,0 +1,10 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-rewrite.test.ts:
+(pass) card set saves AI wording and attribution together, and restores an unstamped original [39.17ms]
+(pass) rewriting a variant saves and returns its own author without changing the original [16.94ms]
+
+ 2 pass
+ 0 fail
+ 9 expect() calls
+Ran 2 tests across 1 file. [88.00ms]

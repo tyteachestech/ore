@@ -20,6 +20,13 @@ describe("phone fs stand-in", () => {
     expect(() => fs.readdirSync(`${ROOT}/nope`)).toThrow(/ENOENT/);
   });
 
+  test("a text file read with no encoding is its bytes, as Node gives them: a shared .md came in empty (PHONE-04)", () => {
+    fs.writeFileSync(`${ROOT}/inbox/01A/notes.md`, "# Shared\n\nWords é");
+    const bytes = new Uint8Array(fs.readFileSync(`${ROOT}/inbox/01A/notes.md`) as unknown as Uint8Array);
+    expect(new TextDecoder().decode(bytes)).toBe("# Shared\n\nWords é");
+    expect(fs.readFileSync(`${ROOT}/inbox/01A/notes.md`, "utf8")).toBe("# Shared\n\nWords é");
+  });
+
   test("a folder made where none of its parents are yet (a first source in an empty library) makes them too (F68)", () => {
     fs.mkdirSync(`${ROOT}/items/2026/a-source-01A`, { recursive: true });
     fs.writeFileSync(`${ROOT}/items/2026/a-source-01A/doc.md`, "# Hi");
@@ -31,7 +38,7 @@ describe("phone fs stand-in", () => {
     fs.writeFileSync(`${ROOT}/skills.yaml`, "old");
     fs.writeFileSync(`${ROOT}/.skills.yaml.tmp`, "new");
     fs.renameSync(`${ROOT}/.skills.yaml.tmp`, `${ROOT}/skills.yaml`);
-    expect(fs.readFileSync(`${ROOT}/skills.yaml`)).toBe("new");
+    expect(fs.readFileSync(`${ROOT}/skills.yaml`, "utf8")).toBe("new");
     expect(fs.existsSync(`${ROOT}/.skills.yaml.tmp`)).toBe(false);
     expect(fs.readdirSync(ROOT)).toEqual(["skills.yaml"]);
   });
@@ -40,7 +47,7 @@ describe("phone fs stand-in", () => {
     const log = `${ROOT}/reviews.jsonl`;
     fs.appendFileSync(log, '{"a":1}\n');
     fs.appendFileSync(log, '{"b":2}');
-    expect(fs.readFileSync(log)).toBe('{"a":1}\n{"b":2}');
+    expect(fs.readFileSync(log, "utf8")).toBe('{"a":1}\n{"b":2}');
     const fd = fs.openSync(log, "r");
     const buf = new Uint8Array(1);
     expect(fs.readSync(fd, buf, 0, 1, fs.statSync(log).size - 1)).toBe(1);
@@ -88,9 +95,32 @@ describe("phone fs stand-in", () => {
     expect(fs.statSync(p).mtimeMs).toBeGreaterThan(Date.now() - 5000);
     fs.utimesSync(p, 0, new Date(1_700_000_000_000));
     expect(fs.statSync(p).mtimeMs).toBe(1_700_000_000_000);
-    expect(fs.readFileSync(p)).toBe("a");
+    expect(fs.readFileSync(p, "utf8")).toBe("a");
     fs.copyFileSync(p, `${ROOT}/items/01A/copy.md`);
-    expect(fs.readFileSync(`${ROOT}/items/01A/copy.md`)).toBe("a");
+    expect(fs.readFileSync(`${ROOT}/items/01A/copy.md`, "utf8")).toBe("a");
     expect(() => fs.utimesSync(`${ROOT}/none`, 0, 0)).toThrow(/ENOENT/);
   });
+});
+
+test("same-length writes get distinct modification times even within one millisecond (PHONE-07)", () => {
+  const now = Date.now;
+  Date.now = () => 1_795_521_600_000;
+  try {
+    const p = `${ROOT}/skills/learning/notes.md`;
+    fs.writeFileSync(p, "alpha");
+    const first = fs.statSync(p);
+    fs.writeFileSync(p, "bravo");
+    expect(fs.statSync(p).size).toBe(first.size);
+    expect(fs.statSync(p).mtimeMs).toBeGreaterThan(first.mtimeMs);
+    const second = fs.statSync(p).mtimeMs;
+    fs.writeFileSync(`${ROOT}/.note.tmp`, "delta");
+    fs.renameSync(`${ROOT}/.note.tmp`, p);
+    expect(fs.statSync(p).mtimeMs).toBeGreaterThan(second);
+    const third = fs.statSync(p).mtimeMs;
+    fs.unlinkSync(p);
+    fs.writeFileSync(p, new TextEncoder().encode("gamma"));
+    expect(fs.statSync(p).mtimeMs).toBeGreaterThan(third);
+  } finally {
+    Date.now = now;
+  }
 });

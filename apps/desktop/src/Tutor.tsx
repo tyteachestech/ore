@@ -965,7 +965,8 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
               }}
               onSelect={(e) => at && track(e.currentTarget.value, e.currentTarget.selectionStart)}
               onKeyDown={(e) => {
-                if (at && !e.nativeEvent.isComposing) {
+                if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+                if (at) {
                   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                     e.preventDefault();
                     if (matches.length) setPick((p) => (p + (e.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
@@ -983,7 +984,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
                     return;
                   }
                 }
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   send(input, true);
                 }

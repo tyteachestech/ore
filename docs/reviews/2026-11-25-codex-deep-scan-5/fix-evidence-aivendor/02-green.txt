@@ -1,0 +1,10 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [304.60ms]
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [278.01ms]
+
+ 2 pass
+ 0 fail
+ 4 expect() calls
+Ran 2 tests across 1 file. [616.00ms]

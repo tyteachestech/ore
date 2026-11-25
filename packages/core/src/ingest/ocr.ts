@@ -17,10 +17,15 @@ export type OcrPage = { lines: OcrLine[] };
 
 /** The text on each page of a PDF, or in an image, as Vision reads it. Mac only. */
 export async function recognize(path: string): Promise<OcrPage[]> {
-  // ORE_OCR names a stand-in helper (tests).
-  if (process.env.ORE_OCR) return (JSON.parse(await run(process.env.ORE_OCR, [path])) as { pages: OcrPage[] }).pages;
-  if (process.platform !== "darwin") throw new Error("Reading scanned pages works on a Mac only. Copy the text and paste it here instead.");
-  return (JSON.parse(await run(await swiftHelper("ocr"), [path])) as { pages: OcrPage[] }).pages;
+  // ORE_OCR names a stand-in helper (tests); both paths have the same recovery message.
+  if (!process.env.ORE_OCR && process.platform !== "darwin") throw new Error("Reading scanned pages works on a Mac only. Copy the text and paste it here instead.");
+  try {
+    const helper = process.env.ORE_OCR ?? await swiftHelper("ocr");
+    return (JSON.parse(await run(helper, [path])) as { pages: OcrPage[] }).pages;
+  } catch (cause) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    throw new Error(`Text recognition failed: ${reason}. Export a fresh PDF or image and add that copy, or paste the text you need.`, { cause });
+  }
 }
 
 const median = (xs: number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0;

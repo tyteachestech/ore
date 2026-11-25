@@ -198,14 +198,22 @@ export function rubricProblem(kind: Card["meta"]["kind"], rubric: string[]): str
 
 // Edit a card's question, answer or key points in place (D59: a new draft is finished in review);
 // what isn't given and the frontmatter are kept. The caller holds the library lock.
-export function writeCardContent(card: Card, edit: { question?: string; answer?: string; rubric?: string[] }): Card {
+export type CardEdit = { question?: string; answer?: string; rubric?: string[]; ai?: AiStamp | null };
+
+export function writeCardContent(card: Card, edit: CardEdit): Card {
   const rubric = edit.rubric?.map((p) => p.trim()) ?? card.rubric;
   if (edit.rubric) {
     const problem = rubricProblem(card.meta.kind, edit.rubric);
     if (problem) throw new Error(problem);
   }
   const content = { question: edit.question?.trim() || card.question, answer: edit.answer?.trim() || card.answer, rubric };
-  writeAtomic(card.path, stringifyFrontmatter(card.meta, renderCardBody(content)));
+  // An omitted stamp preserves old data; null restores an unstamped original on Undo.
+  const meta = { ...card.meta };
+  if (edit.ai !== undefined) {
+    if (edit.ai === null) delete meta.ai;
+    else meta.ai = AiStamp.parse(edit.ai);
+  }
+  writeAtomic(card.path, stringifyFrontmatter(meta, renderCardBody(content)));
   return readCardFile(card.path);
 }
 

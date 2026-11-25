@@ -1,0 +1,21 @@
+bun test v1.4.4 (38afee6c8)
+
+apps/desktop/test/sfx.test.ts:
+(pass) review sounds > Again is the miss; Hard, Good and Easy are the recall [0.24ms]
+(pass) review sounds > recalls in a row climb a semitone each, up to four; Hard holds the note and a miss starts over [0.03ms]
+(pass) review sounds > a new session starts the climb again [0.03ms]
+(pass) review sounds > turned off in Settings, nothing plays, and the climb still starts over on a miss [0.02ms]
+(pass) review sounds > a review's own sounds are these; undo, Later and an edit stay silent [0.47ms]
+(pass) review sounds > a layer plays over what is sounding, higher by its semitones, and the sound effects' switch silences it [0.04ms]
+(pass) review sounds > the mole's switch silences his voice and his pop and nothing else; the sound effects' switch leaves him be [0.07ms]
+(pass) review sounds > the mole speaks only at a session's end worth a word: a new level, a rare recall, the day's goal met [0.22ms]
+(pass) review sounds > the build takes every sound from the Mac's folder, never from git [0.45ms]
+(pass) review sounds > one review sound at a time: a new one cuts the one still playing, and the goal's chime waits for it to end [0.05ms]
+(pass) review sounds > rate again during the goal's wait: the rating cuts the sound still playing, never the chime waiting its turn [0.02ms]
+(pass) review sounds > a slow first file still takes its turn first: sounds are placed in the order they were asked for [0.12ms]
+(pass) review sounds > nothing plays while the page is hidden [0.04ms]
+
+ 13 pass
+ 0 fail
+ 50 expect() calls
+Ran 13 tests across 1 file. [17.00ms]

@@ -1,0 +1,30 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [286.75ms]
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [265.99ms]
+(pass) recall feedback checks its prequestion input at save (after) [169.88ms]
+(pass) recall feedback checks its prequestion input at save (before) [175.64ms]
+(pass) recall feedback checks its prequestion input at save (question) [256.87ms]
+(pass) recall feedback checks its prequestion input at save (skipped) [198.52ms]
+(pass) recall feedback checks its prequestion input at save (removed) [183.91ms]
+(pass) recall feedback checks its prequestion input at save (reordered) [199.60ms]
+(pass) recall feedback checks its prequestion input at save (unchanged) [174.35ms]
+(pass) recall feedback checks its prequestion input at save (marks) [187.75ms]
+(pass) a late prequestion check matches the current question and ordered points (more) [171.43ms]
+(pass) a late prequestion check matches the current question and ordered points (text) [206.14ms]
+(pass) a late prequestion check matches the current question and ordered points (order) [162.68ms]
+(pass) a late prequestion check matches the current question and ordered points (question) [176.31ms]
+(pass) a late prequestion check matches the current question and ordered points (unchanged) [166.85ms]
+(pass) a late prequestion check matches the current question and ordered points (evidence) [163.42ms]
+(pass) ending a Dig prevents the late first-stage reply from changing its saved record [191.50ms]
+(pass) a failed Claude process cannot save its otherwise valid Try feedback [154.88ms]
+(pass) Claude chat rejects a failed process with a valid result (stream: %s) [163.39ms]
+(pass) Claude chat rejects a failed process with a valid result (stream: %s) [147.84ms]
+(pass) blank Try feedback is rejected after retry and never saved [205.61ms]
+(pass) Try feedback retries a blank reply and trims the readable replacement [195.90ms]
+
+ 22 pass
+ 0 fail
+ 44 expect() calls
+Ran 22 tests across 1 file. [4.24s]

@@ -41,15 +41,21 @@ export const useCount = (a: Annotation): number => (a.uses?.length ?? 0) + (a.st
 /** Tries filed under `skill` (the skills of the source they were highlighted in): to try first, then
  *  tried; newest first in each. With a skill, one open try is `active`. */
 export function listTries(lib: Library, opts: { skill?: string } = {}): TryView[] {
-  const all = listItems(lib)
-    .filter((i) => !opts.skill || i.meta.skills.includes(opts.skill))
+  return activeTry(collectTries(listItems(lib).filter((i) => !opts.skill || i.meta.skills.includes(opts.skill))).map((t) => t.tried), !!opts.skill);
+}
+
+function collectTries(items: Item[]): { tried: TryView; skills: string[] }[] {
+  return items
     .flatMap((i) =>
       readAnnotations(i)
         .filter((a) => a.intent === "apply")
-        .map((a): TryView => ({ ...a, item_title: i.meta.title, ...(a.point ? {} : { section: sectionAt(i.body, a.start) }) })),
+        .map((a) => ({ skills: i.meta.skills, tried: { ...a, item_title: i.meta.title, ...(a.point ? {} : { section: sectionAt(i.body, a.start) }) } })),
     )
-    .sort((a, b) => (a.status === b.status ? b.id.localeCompare(a.id) : a.status === "open" ? -1 : 1));
-  if (!opts.skill) return all;
+    .sort(({ tried: a }, { tried: b }) => (a.status === b.status ? b.id.localeCompare(a.id) : a.status === "open" ? -1 : 1));
+}
+
+function activeTry(all: TryView[], withSkill: boolean): TryView[] {
+  if (!withSkill) return all;
   const open = all.filter((t) => t.status === "open");
   // The one he picked last; before any pick, the first he marked (ids sort by time).
   const active = open.filter((t) => t.picked).sort((a, b) => b.picked!.localeCompare(a.picked!))[0] ?? open.at(-1);
@@ -58,8 +64,12 @@ export function listTries(lib: Library, opts: { skill?: string } = {}): TryView[
 
 /** The one try he is trying now in each skill (D322), each once however many skills its source is filed under. */
 export function tryingNow(lib: Library): TryView[] {
+  const skills = loadSkills(lib).skills;
+  if (!skills.length) return [];
+  const tries = collectTries(listItems(lib));
   const seen = new Set<string>();
-  return loadSkills(lib).skills.flatMap((s) => listTries(lib, { skill: s.id }).filter((t) => t.active && !seen.has(t.id) && !!seen.add(t.id)));
+  return skills.flatMap((s) => activeTry(tries.filter((t) => t.skills.includes(s.id)).map((t) => t.tried), true)
+    .filter((t) => t.active && !seen.has(t.id) && !!seen.add(t.id)));
 }
 
 /** Every "how it went" he wrote on a try, earlier rounds first: what enrich drafts the card from. */

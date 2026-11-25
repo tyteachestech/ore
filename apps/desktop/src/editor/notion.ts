@@ -384,7 +384,7 @@ export function tsvRows(text: string): string[][] | null {
 
 /** Plain text the Markdown paste would garble (Codex sweep 5): tab-separated rows paste as a table (Notion,
  *  Google Docs); other lines indented with tabs, and no Markdown, paste as a code block, which keeps their
- *  lines and plain tabs in the file. In a table cell either goes in on the cell's one line. Markdown, text
+ *  lines and plain tabs in the file. In a table cell tabs and newlines go in on the cell's one line. Markdown, text
  *  with HTML or VS Code's data beside it, and a paste into code keep their own paste. */
 export const pastePlain = $prose(
   () =>
@@ -393,12 +393,13 @@ export const pastePlain = $prose(
         handlePaste: (view, e) => {
           const text = e.clipboardData?.getData("text/plain") ?? "";
           const { schema, selection } = view.state;
-          if (!text.includes("\t") || e.clipboardData?.getData("text/html") || e.clipboardData?.getData("vscode-editor-data") || selection.$from.parent.type.spec.code) return false;
+          if (!/[\t\r\n]/.test(text) || e.clipboardData?.getData("text/html") || e.clipboardData?.getData("vscode-editor-data") || selection.$from.parent.type.spec.code) return false;
           const lines = linesOf(text);
           if (inTable(selection.$from)) {
             view.dispatch(view.state.tr.insertText(lines.map((l) => l.trim()).filter(Boolean).join(" ")).scrollIntoView());
             return true;
           }
+          if (!text.includes("\t")) return false;
           const n = schema.nodes;
           const rows = tsvRows(text);
           if (rows && n.table) {

@@ -26,6 +26,7 @@ import { pickRun, typeSelect } from "./typeahead";
 import { keepFocusNear } from "./focus-near";
 import { ExerciseText } from "./ExerciseText";
 import { PickBar } from "./PickBar";
+import { readGuard } from "./reads";
 
 const DAYS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -144,20 +145,27 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   // paint, so the goal line is already there instead of pushing the list down a moment later (F125).
   useLayoutEffect(() => { const t = lastToday(); if (t) setToday(t); }, [reload]);
 
+  const todayReads = useRef(readGuard()).current;
   const refresh = useCallback(() => {
+    const read = todayReads.begin();
     ore<Today>("today").then(
       (t) => {
+        if (!read.newest()) return;
         rememberToday(t);
         setToday(t);
         setError(null);
       },
-      (e) => setError(errorText(e)),
+      (e) => { if (read.newest()) setError(errorText(e)); },
     );
   }, []);
   const changes = useLibraryChanges();
   // A new day after midnight: the minutes start again and what is due grows, without a reload.
   const day = useDay();
-  useEffect(refresh, [refresh, reload, changes, day]);
+  useEffect(() => {
+    refresh();
+    // A late reply from a Home that closed must not replace the next Home's cached Today.
+    return () => { todayReads.begin(); };
+  }, [refresh, reload, changes, day]);
 
   const [picking, setPicking] = useState(false);
   /** Start review shows once the skill list has loaded too: a click before it would start every skill unasked. */

@@ -1,0 +1,13 @@
+bun test v1.4.4 (38afee6c8)
+
+apps/desktop/test/exercise-text.test.tsx:
+(pass) an exercise's math, code and source images are drawn; plain text stays as it was [15.27ms]
+(pass) every place an exercise's question or answer is shown draws it with ExerciseText [0.95ms]
+(pass) text in an exercise that looks like a tag shows as typed [1.08ms]
+(pass) in a one-line spot an exercise is one line: blocks joined by a space, code and formulas inline [1.77ms]
+(pass) an image with no source folder to load from shows its alt text [0.54ms]
+
+ 5 pass
+ 0 fail
+ 23 expect() calls
+Ran 5 tests across 1 file. [78.00ms]

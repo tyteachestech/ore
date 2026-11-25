@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {open,select,ops,history} from './harness';
+const kind=(process.argv[2]??'toggle') as any;
+const md='Equation $$x+1$$\n';
+const h=await open(md);select(h.view,'Equation');
+const before=h.md();h.view.dispatch(ops.turnInto(h.view.state,ops.selectedBlock(h.view.state)!,kind)!);
+const out=h.md();let math=0;h.view.state.doc.descendants((n:any)=>{if(n.type.name==='math_inline')math++;});
+console.log('[DEEP]',JSON.stringify({kind,before,after:out,mathNodesAfterCommand:math}));
+history.undo(h.view.state,h.view.dispatch);console.log('[DEEP] undoExact',h.md()===before);
+await h.close();assert.ok(out.includes('x+1'),'Turn into must retain the equation contents');

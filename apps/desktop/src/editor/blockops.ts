@@ -219,6 +219,16 @@ function joinLists(tr: Transaction, from: number, to: number) {
   for (const pos of joins.reverse()) tr.join(pos);
 }
 
+/** Text-only destinations must keep the payload of inline atoms, not replace them with spaces. */
+function leafText(node: PMNode): string {
+  if (node.type.name === "math_inline") return node.attrs.value;
+  if (node.type.name === "image") {
+    const { alt, src, title } = node.attrs;
+    return `![${alt ?? ""}](${src}${title ? ` ${JSON.stringify(title)}` : ""})`;
+  }
+  return " ";
+}
+
 function turnOne(state: EditorState, b: Block, kind: Kind): Transaction | null {
   const { schema } = state;
   const s = schema.nodes;
@@ -247,11 +257,14 @@ function turnOne(state: EditorState, b: Block, kind: Kind): Transaction | null {
   if (listKind) made = [listType(kind).create(null, item())];
   else if (kind === "text") made = [para(), ...rest];
   else if (kind === "h1" || kind === "h2" || kind === "h3") made = [s.heading!.create({ level: Number(kind[1]) }, lead), ...rest];
-  else if (kind === "code") made = [s.code_block!.create(null, lead.size ? schema.text(lead.textBetween(0, lead.size, "\n", " ")) : null), ...rest];
+  else if (kind === "code") {
+    const text = lead.textBetween(0, lead.size, "\n", leafText);
+    made = [s.code_block!.create(null, text ? schema.text(text) : null), ...rest];
+  }
   else if (kind === "quote") made = [s.blockquote!.create(null, [para(), ...rest])];
   else if (kind === "callout") made = [s.callout!.create({ kind: "note" }, [para(), ...rest])];
   else {
-    const title = lead.textBetween(0, lead.size, " ", " ").trim();
+    const title = lead.textBetween(0, lead.size, " ", leafText).trim();
     const level = kind === "toggle" ? 0 : Number(kind[2]);
     made = [s.toggle!.create({ level }, [s.toggle_summary!.create(null, title ? schema.text(title) : null), ...(rest.length ? rest : [s.paragraph!.create()])])];
   }

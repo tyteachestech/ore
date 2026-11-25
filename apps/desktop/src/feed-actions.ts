@@ -1,4 +1,4 @@
-import { change } from "./change";
+import { allOrNone, change } from "./change";
 import type { Notify } from "./util";
 
 /** One post or a selection, with one history step. Kept outside the screen so mixed selections
@@ -12,10 +12,19 @@ export function markFeedRead<T extends { url: string; read: boolean }>(post: T |
   const urls = new Set((Array.isArray(post) ? post : [post]).filter((p) => p.read !== on).map((p) => p.url));
   if (!urls.size) return Promise.resolve(true);
   const what = urls.size > 1 ? ` ${urls.size} posts` : "";
+  const values = [...urls].map((url) => ({ field: `feed post ${url}`, before: !on, after: on }));
   return change(io.notify, {
+    values,
     key: [...urls].map((url) => `feed post ${url}`),
     message: on ? `Marked${what} read` : `Marked${what} unread`,
-    show: (v) => io.show((posts) => posts.map((p) => urls.has(p.url) ? { ...p, read: v === on } : p)),
-    write: (v) => io.run("feed", v === on ? "read" : "unread", ...urls),
+    show: (v, owned) => {
+      const states = new Map(values.filter((value) => !owned || owned.includes(value.field)).map((value) => [value.field, v ? value.after : value.before]));
+      io.show((posts) => posts.map((p) => states.has(`feed post ${p.url}`) ? { ...p, read: states.get(`feed post ${p.url}`)! } : p));
+    },
+    write: (v) => allOrNone([true, false].flatMap((read) => {
+      const group = [...urls].filter((_, i) => values[i]!.before === read);
+      if (!group.length) return [];
+      return [(forward: boolean) => io.run("feed", (forward ? on : read) ? "read" : "unread", ...group)];
+    }), v),
   });
 }

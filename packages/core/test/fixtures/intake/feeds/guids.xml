@@ -1,0 +1,7 @@
+<rss version="2.0"><channel><title>GUID examples</title>
+  <item><title>Opaque</title><guid isPermaLink="false">opaque-123</guid></item>
+  <item><title>Lowercase legacy</title><guid ispermalink="false">opaque-456</guid></item>
+  <item><title>Default permalink</title><guid>https://example.test/default</guid></item>
+  <item><title>Explicit permalink</title><guid isPermaLink="true">https://example.test/explicit</guid></item>
+  <item><title>Linked opaque</title><guid isPermaLink="false">opaque-789</guid><link>https://example.test/linked</link></item>
+</channel></rss>

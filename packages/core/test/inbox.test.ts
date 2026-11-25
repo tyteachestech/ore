@@ -1,6 +1,6 @@
 // Links added on the iPhone wait in inbox/ for the Mac to import them (D223).
 import { expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink } from "../src/inbox.ts";
 import { paths } from "../src/library.ts";
@@ -99,4 +99,93 @@ test("a file waits beside its item, is handed to the import by its path, and lea
   expect(queuedLinks(lib).map((l) => l.url)).toEqual(["report..final.md"]);
   writeFileSync(join(paths.inbox(lib), `${dotted.id}.file.json`), JSON.stringify({ ...dotted, file: "../skills.yaml" }));
   expect(queuedLinks(lib)).toEqual([]);
+});
+
+test("removing a waiting file with Undo keeps its bytes and descriptor through repeated restore (PHONE-02)", async () => {
+  const { restoreQueuedLink } = await import("../src/inbox.ts");
+  const lib = await tempLibrary();
+  const input = join(lib.root, "paper.pdf");
+  const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46, 0xff, 0x00]);
+  writeFileSync(input, bytes);
+  const q = queueFile(lib, input, ["ai"]);
+  unlinkSync(input);
+  const descriptor = join(paths.inbox(lib), `${q.id}.file.json`);
+  const original = readFileSync(descriptor, "utf8");
+  for (let i = 0; i < 2; i++) {
+    removeQueuedLink(lib, q.id, true);
+    expect(queuedLinks(lib)).toEqual([]);
+    expect(readFileSync(join(paths.inbox(lib), q.file!))).toEqual(bytes);
+    restoreQueuedLink(lib, q.id);
+    expect(queuedLinks(lib)).toEqual([q]);
+    expect(readFileSync(descriptor, "utf8")).toBe(original);
+  }
+  removeQueuedLink(lib, q.id);
+  expect(existsSync(join(paths.inbox(lib), q.file!))).toBe(false);
+});
+
+test("Undo of a waiting link keeps its original metadata and refuses to replace a live entry (PHONE-02)", async () => {
+  const { restoreQueuedLink } = await import("../src/inbox.ts");
+  const lib = await tempLibrary();
+  const q = queueLink(lib, "https://example.com/a", ["ai"]);
+  removeQueuedLink(lib, q.id, true);
+  const descriptor = join(paths.inbox(lib), `${q.id}.link.json`);
+  writeFileSync(descriptor, JSON.stringify({ ...q, url: "https://example.com/new" }));
+  expect(() => restoreQueuedLink(lib, q.id)).toThrow(/already waiting/);
+  expect(queuedLinks(lib)[0]!.url).toBe("https://example.com/new");
+  unlinkSync(descriptor);
+  restoreQueuedLink(lib, q.id);
+  expect(queuedLinks(lib)).toEqual([q]);
+});
+
+test("a removed entry kept for Undo is dropped, with its file, a day after it was removed (PHONE-02)", async () => {
+  const { restoreQueuedLink, KEEP_REMOVED_MS } = await import("../src/inbox.ts");
+  const lib = await tempLibrary();
+  const input = join(lib.root, "old.pdf");
+  writeFileSync(input, "x");
+  const old = queueFile(lib, input);
+  const fresh = queueLink(lib, "https://example.com/b");
+  removeQueuedLink(lib, old.id, true);
+  const kept = join(paths.inbox(lib), "removed", `${old.id}.file.json`);
+  // Queued long ago, removed just now: still there for an Undo.
+  removeQueuedLink(lib, fresh.id, true);
+  expect(existsSync(kept)).toBe(true);
+  const then = new Date(Date.now() - KEEP_REMOVED_MS - 1000);
+  utimesSync(kept, then, then);
+  restoreQueuedLink(lib, fresh.id);
+  removeQueuedLink(lib, fresh.id, true);
+  expect(existsSync(kept)).toBe(false);
+  expect(existsSync(join(paths.inbox(lib), old.id))).toBe(false);
+  expect(() => restoreQueuedLink(lib, old.id)).toThrow(/no removed link/);
+});
+
+for (const removeOriginal of [false, true]) {
+  test(`removing ${removeOriginal ? "the original" : "a sync copy"} preserves a queued file's surviving descriptor (feeds-01)`, async () => {
+    const { copyFileSync } = await import("node:fs");
+    const lib = await tempLibrary();
+    const input = join(lib.root, "capture.md");
+    writeFileSync(input, "Captured words");
+    const q = queueFile(lib, input);
+    const copyId = `${q.id} 2`;
+    copyFileSync(join(paths.inbox(lib), `${q.id}.file.json`), join(paths.inbox(lib), `${copyId}.file.json`));
+    removeQueuedLink(lib, removeOriginal ? q.id : copyId);
+    expect(queuedLinks(lib).map((p) => p.id)).toEqual([removeOriginal ? copyId : q.id]);
+    expect(readFileSync(join(paths.inbox(lib), q.file!), "utf8")).toBe("Captured words");
+    removeQueuedLink(lib, removeOriginal ? copyId : q.id);
+    expect(existsSync(join(paths.inbox(lib), q.file!))).toBe(false);
+  });
+}
+
+test("a removed sync copy keeps its payload for Undo when the live copy is consumed (feeds-01)", async () => {
+  const { copyFileSync } = await import("node:fs");
+  const { restoreQueuedLink } = await import("../src/inbox.ts");
+  const lib = await tempLibrary();
+  const input = join(lib.root, "capture.md");
+  writeFileSync(input, "Captured words");
+  const q = queueFile(lib, input);
+  copyFileSync(join(paths.inbox(lib), `${q.id}.file.json`), join(paths.inbox(lib), `${q.id} 2.file.json`));
+  removeQueuedLink(lib, `${q.id} 2`, true);
+  removeQueuedLink(lib, q.id);
+  restoreQueuedLink(lib, `${q.id} 2`);
+  expect(queuedLinks(lib)).toHaveLength(1);
+  expect(readFileSync(join(paths.inbox(lib), q.file!), "utf8")).toBe("Captured words");
 });

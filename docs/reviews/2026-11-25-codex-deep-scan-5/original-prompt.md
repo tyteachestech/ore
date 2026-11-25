@@ -1,0 +1,8 @@
+# Your run: original (the kept original and reimport from it)
+
+Your name is `original`. D122 keeps each source's original "so a better reader can reimport it". No prompt has aimed at it (sweeps.md ground 7). **Stay off EPUB front matter.**
+
+1. **What is kept** (`packages/core/src/ingest/index.ts`, `assets.ts`, `check.ts`, `rendered.ts`, `page.ts`): for every type, is the original saved, byte-identical, under a stable name, and never overwritten by a reimport or a rename? Two sources from one file, a file re-added after its source was archived, an original larger than a limit, a web page whose saved HTML references assets that were not kept.
+2. **OriginalPage and OriginalSlides** (`apps/desktop/src/OriginalPage.tsx`, `OriginalSlides.tsx`, `original.ts`, `original-match.ts`): the matching between doc.md text and the original's pages (a highlight jumping to the wrong page, a page count off by one, a scanned page with no text, slides with notes). Drive the matching functions headlessly with real fixtures.
+3. **Reimport from the original** (`reimport` in core and the CLI): with highlights, notes, exercises and a review history on the source, reimport from the kept original after a reader change; which highlights move, which are orphaned, which exercises lose their anchor; doc.md edits he made by hand; reimport when the original is missing or damaged (refused with the next step, never a half source). Deep scan 1 checked anchoring on web pages: read its intake report and take the other types.
+4. **Doctor** (`packages/core/src/doctor.ts`): what it reports and repairs for a missing original, a missing doc.md, a stray swap file; does a repair ever pick the wrong version?

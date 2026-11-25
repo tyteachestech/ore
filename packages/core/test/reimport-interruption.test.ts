@@ -54,3 +54,16 @@ for (const recover of ["Undo", "Doctor"] as const) test(`${recover} recovers a s
     expect(report.fixed.some(s => s.includes("reimport"))).toBe(true);
   }
 });
+
+test("Doctor restores the saved original with its document after a partially copied Undo", async () => {
+  const { lib, item, step } = await setup();
+  const stash = join(lib.root, ".ore", "reimport", item.meta.id, step);
+  const swap = stash + ".swap";
+  mkdirSync(swap);
+  for (const name of ["doc.md", "source.md"]) copyFileSync(join(item.dir, name), join(swap, name));
+  unlinkSync(item.docPath);
+  copyFileSync(join(stash, "source.md"), join(item.dir, "source.md"));
+  await doctor(lib, { fix: true });
+  expect(findItem(lib, item.meta.id).body).toContain("Revised version.");
+  expect(readFileSync(join(item.dir, "source.md"), "utf8")).toContain("Revised version.");
+});

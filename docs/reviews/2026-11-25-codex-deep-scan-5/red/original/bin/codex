@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "AI disabled for reading scout" >&2
+exit 97

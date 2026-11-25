@@ -1,0 +1,5 @@
+$ bun codex-out/aivendor/small-paths.ts dig-stamps
+[DEEP] {"firstStamp":{"vendor":"claude","model":"claude-first","prompt_version":"dig@1"},"saved":{"id":"01M86PTPG0DV6C1A4ZXPG09G9R","at":"2026-11-24T12:00:00.000Z","goal":"Explain learning","text":"I remember retrieval.","ideas":[{"id":"01M88K0Z3GAXN8Q6N900N1QC81","item":"01M88K0Z375ADW2363DJFJW0MM","source":"Learning","text":"Space practice over time.","state":"own"},{"id":"01M88K0Z3GAXN8Q6N900N1QC80","item":"01M88K0Z375ADW2363DJFJW0MM","source":"Learning","text":"Recall strengthens memory.","state":"nudge"}],"asks":[{"idea":"01M88K0Z3GAXN8Q6N900N1QC80","q":"What about spacing?","answer":"I should space practice."}],"done_at":"2026-11-25T05:32:00.107Z","ai":{"vendor":"codex","model":"codex-second","prompt_version":"dig@1"}}}
+[DEEP] FAIL the saved dig must retain the author of the question and own marks from stage one
+
+Exit: 1

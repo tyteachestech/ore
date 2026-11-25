@@ -6,6 +6,7 @@ import { Boundary } from "./Boundary";
 import { loadPick } from "./ReviewPick";
 import { loadSkills, type Skill } from "./ore";
 import { Review } from "./Review";
+import { useMenu } from "./menubar";
 import { useToast } from "./Toast";
 
 /** The quick quiz (D76): the system-wide shortcut or the menu bar item shows this window over any app,
@@ -14,6 +15,7 @@ import { useToast } from "./Toast";
 export function QuickQuiz() {
   /** Counts showings, so each mounts a fresh Review with today's skill pick (D58); 0 while put away. */
   const [run, setRun] = useState(0);
+  useMenu({ reader: false, review: run > 0 }, true);
   const [pick, setPick] = useState<string[] | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const { notify, clear, view } = useToast();

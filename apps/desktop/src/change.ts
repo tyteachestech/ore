@@ -8,7 +8,7 @@ export type Change = {
   kind?: "info" | "quiet";
   /** Puts the change on the screen (true) or takes it off (false), at once, before anything is written. Called
    *  again with the other value when a write fails, so calling it twice with the same value must be harmless. */
-  show?: (on: boolean) => void;
+  show?: (on: boolean, fields?: readonly string[]) => void;
   /** Writes the change (true) or its inverse (false). */
   write: (on: boolean) => Promise<unknown>;
   /** Once the newest write of this change has settled: read the screen's data again. Never between an action
@@ -24,6 +24,8 @@ export type Change = {
   slot?: string;
   /** Supplied by valueChange: a field whose inverse follows successful preceding writes. */
   value?: { field: string; before: unknown; after: unknown; rebase?: (saved: unknown) => unknown };
+  /** A batch owns each field separately; show receives only the fields it still owns. */
+  values?: NonNullable<Change["value"]>[];
 };
 
 /** A field edit: its initial inverse is the displayed value, rebased to the last successful value
@@ -38,6 +40,29 @@ export function valueChange<T>(c: Omit<Change, "show" | "write" | "value"> & {
   const { field, before, after, rebase, show, write, ...rest } = c;
   const value = { field, before, after, rebase: rebase ? (saved: unknown) => rebase(saved as T) : undefined };
   return { ...rest, value, show: (on) => show?.(on ? value.after : value.before), write: (on) => write(on ? value.after : value.before, on ? value.before : value.after) };
+}
+
+/** The write of a change whose Undo and Redo must leave alone a value set outside since (F175: `ore edit`, the
+ *  phone): the first write goes through; each later one reads the value first and, if it isn't what the step
+ *  before left, keeps it and says so. `newer()` is that value until the next write, for the screen to show. */
+export function keepNewer<T>(read: () => Promise<T>, write: (to: T) => Promise<unknown>, said: (now: T) => string) {
+  let first = true;
+  let newer: { v: T } | undefined;
+  return {
+    newer: () => newer?.v,
+    write: async (to: T, from: T) => {
+      newer = undefined;
+      if (!first) {
+        const now = await read();
+        if (now !== from) {
+          newer = { v: now };
+          throw new Error(said(now));
+        }
+      }
+      first = false;
+      await write(to);
+    },
+  };
 }
 
 type Field = { saved: unknown; pending: number; owner: symbol };
@@ -79,28 +104,35 @@ export function change(notify: Notify, c: Change): Promise<boolean> {
     // A Redo whose turn comes after the first write failed: there is nothing to do again.
     if (failed) return Promise.resolve();
     const n = ++asked;
-    const value = c.value;
+    const edits = c.values ?? (c.value ? [c.value] : []);
     const owner = Symbol();
-    const field = value ? values.get(value.field) ?? { saved: on ? value.before : value.after, pending: 0, owner } : undefined;
-    if (field && value) {
+    const tracked = edits.map((value) => {
+      const field = values.get(value.field) ?? { saved: on ? value.before : value.after, pending: 0, owner };
       field.pending++;
       field.owner = owner;
       values.set(value.field, field);
-    }
+      return { value, field };
+    });
+    const showOwned = (on: boolean) => {
+      const owned = tracked.filter(({ field }) => field.owner === owner).map(({ value }) => value.field);
+      if (!tracked.length || owned.length) c.show?.(on, tracked.length ? owned : undefined);
+    };
     c.show?.(on);
     // An Undo asked for before the first write failed has nothing to take back.
     const write = inOrder(key, async () => {
-      if (field?.owner === owner && n > 1) c.show?.(failed ? false : on);
+      if (tracked.length && n > 1) showOwned(failed ? false : on);
       if (failed) return;
       try {
-        if (n === 1 && value && field) {
-          value.before = field.saved;
-          if (value.rebase) value.after = value.rebase(field.saved);
-          // Rebase the inverse before writing, and repair an Undo shown while this waited.
-          if (field.owner === owner) c.show?.(on);
+        if (n === 1 && tracked.length) {
+          for (const { value, field } of tracked) {
+            value.before = field.saved;
+            if (value.rebase) value.after = value.rebase(field.saved);
+          }
+          // Rebase each inverse before writing; never repaint a newer field edit.
+          showOwned(on);
         }
         await c.write(on);
-        if (field && value) field.saved = on ? value.after : value.before;
+        for (const { value, field } of tracked) field.saved = on ? value.after : value.before;
       } catch (e) {
         if (n === 1) failed = true;
         throw e;
@@ -109,10 +141,10 @@ export function change(notify: Notify, c: Change): Promise<boolean> {
     c.out?.(write);
     void write.then(() => true, () => false).then((ok) => {
       if (n === asked) {
-        if (!ok && (!field || field.owner === owner)) c.show?.(!on);
+        if (!ok) showOwned(!on);
         if (!failed) c.settled?.();
       }
-      if (field && value && --field.pending === 0 && values.get(value.field) === field) values.delete(value.field);
+      for (const { value, field } of tracked) if (--field.pending === 0 && values.get(value.field) === field) values.delete(value.field);
     });
     return write;
   };
@@ -121,7 +153,7 @@ export function change(notify: Notify, c: Change): Promise<boolean> {
   return first.then(() => true, (e) => {
     forget();
     // Whatever was pressed meanwhile (an Undo, then a Redo): it was never written, so it is off the screen.
-    if (asked > 1 && !c.value) c.show?.(false);
+    if (asked > 1 && !c.value && !c.values) c.show?.(false);
     // In the slot of the toast that said it was done.
     notify(errorText(e), "error", undefined, undefined, undefined, undefined, slot);
     return false;

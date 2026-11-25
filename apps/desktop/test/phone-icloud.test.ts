@@ -2,7 +2,7 @@
 // Mac's edits (arriving through iCloud) reach the core. The folder here is a map standing in for the
 // phone shell's file commands (apps/phone/src-tauri/src/lib.rs).
 import { expect, test } from "bun:test";
-import fs, { flush, load, mountDisk, rescan } from "../src/phone/fs";
+import fs, { flush, load, mountDisk, rescan, syncState } from "../src/phone/fs";
 
 const P = "/icloud";
 let clock = 1000;
@@ -65,7 +65,7 @@ test("the phone reads the folder, writes back to it, and reads in the Mac's edit
   folder.set("skills.yaml", { text: "skills: []\n", mtime: 1 });
   folder.set("items/a-01/doc.md", { text: "# A", mtime: 1 });
   await mountDisk(P, "/root", invoke);
-  expect(fs.readFileSync(`${P}/items/a-01/doc.md`)).toBe("# A");
+  expect(fs.readFileSync(`${P}/items/a-01/doc.md`, "utf8")).toBe("# A");
   expect(fs.statSync(`${P}/items/a-01/doc.md`).mtimeMs).toBe(1);
 
   // An atomic write sends the file once, never its temp file.
@@ -85,7 +85,7 @@ test("the phone reads the folder, writes back to it, and reads in the Mac's edit
   mac("items/a-01/doc.md", "# A, edited");
   mac("items/b-02/doc.md", "# B");
   expect(await rescan()).toBe(true);
-  expect(fs.readFileSync(`${P}/items/a-01/doc.md`)).toBe("# A, edited");
+  expect(fs.readFileSync(`${P}/items/a-01/doc.md`, "utf8")).toBe("# A, edited");
   mac("items/b-02/doc.md", null);
   expect(await rescan()).toBe(true);
   expect(fs.existsSync(`${P}/items/b-02`)).toBe(false);
@@ -95,7 +95,7 @@ test("the phone reads the folder, writes back to it, and reads in the Mac's edit
   folder.delete("items/a-01/doc.md");
   waiting = ["items/a-01/doc.md"];
   expect(await rescan()).toBe(false);
-  expect(fs.readFileSync(`${P}/items/a-01/doc.md`)).toBe("# A, edited");
+  expect(fs.readFileSync(`${P}/items/a-01/doc.md`, "utf8")).toBe("# A, edited");
   waiting = [];
 
   // Deleting a file the folder never had sends nothing.
@@ -229,8 +229,8 @@ test("a big folder is read in parts asked for together, not one after another", 
   reading.most = 0;
   expect(await rescan()).toBe(true);
   expect(reading.most).toBe(3);
-  expect(fs.readFileSync(`${P}/items/big-0/doc.md`)).toBe("# Big 0");
-  expect(fs.readFileSync(`${P}/items/big-899/doc.md`)).toBe("# Big 899");
+  expect(fs.readFileSync(`${P}/items/big-0/doc.md`, "utf8")).toBe("# Big 0");
+  expect(fs.readFileSync(`${P}/items/big-899/doc.md`, "utf8")).toBe("# Big 899");
 });
 
 test("a failed save's retry never writes over a newer save of the same file that went through (F559)", async () => {
@@ -285,4 +285,72 @@ test("a file that never reads is asked a few scans in a row, then again only onc
   mac(r, "Readable now.");
   await rescan();
   expect(fs.readFileSync(`${P}/${r}`, "utf8")).toBe("Readable now.");
+});
+
+test("a failed read blocks append and replacement until the existing file can be read (PHONE-01)", async () => {
+  const r = "reviews/failed-read.iphone.jsonl";
+  mac(r, '{"earlier":true}\n');
+  unreadable.add(r);
+  await rescan();
+  expect(() => fs.appendFileSync(`${P}/${r}`, '{"new":true}\n')).toThrow(/could not be read/);
+  fs.writeFileSync(`${P}/.replacement.tmp`, "replacement");
+  expect(() => fs.renameSync(`${P}/.replacement.tmp`, `${P}/${r}`)).toThrow(/could not be read/);
+  await flush();
+  expect(folder.get(r)!.text).toBe('{"earlier":true}\n');
+  await rescan();
+  fs.appendFileSync(`${P}/${r}`, '{"new":true}\n');
+  await flush();
+  expect(folder.get(r)!.text).toBe('{"earlier":true}\n{"new":true}\n');
+  fs.unlinkSync(`${P}/.replacement.tmp`);
+  await flush();
+});
+
+test("sync stays pending through in-flight and queued batches, including a failed batch (PHONE-06)", async () => {
+  let release!: () => void;
+  const held = new Promise<void>((r) => release = r);
+  let calls = 0;
+  applyHook = async () => { if (++calls === 1) { await held; throw new Error("offline"); } };
+  fs.writeFileSync(`${P}/pending-a.md`, "A");
+  const first = flush();
+  fs.writeFileSync(`${P}/pending-b.md`, "B");
+  const second = flush();
+  try {
+    expect(syncState().unsent).toBe(2);
+  } finally {
+    release();
+    await first;
+    await second;
+    applyHook = null;
+  }
+  expect(syncState().unsent).toBe(1); // failed A is still waiting to be retried
+  await flush();
+  expect(syncState().unsent).toBe(0);
+  expect(folder.get("pending-a.md")!.text).toBe("A");
+  expect(folder.get("pending-b.md")!.text).toBe("B");
+});
+
+test("a folder acknowledgment never reuses an indexed time for a newer local edit (PHONE-07)", async () => {
+  const p = `${P}/skills/stamps/notes.md`;
+  fs.writeFileSync(p, "alpha");
+  const indexed = fs.statSync(p).mtimeMs;
+  let release!: () => void;
+  const held = new Promise<void>((r) => release = r);
+  applyHook = () => held;
+  const first = flush();
+  fs.writeFileSync(p, "bravo");
+  const newer = fs.statSync(p).mtimeMs;
+  release();
+  try {
+    await first;
+    expect(fs.statSync(p).mtimeMs).toBeGreaterThanOrEqual(newer);
+    expect(fs.statSync(p).mtimeMs).toBeGreaterThan(indexed);
+  } finally {
+    applyHook = null;
+    await flush();
+  }
+  const saved = fs.statSync(p).mtimeMs;
+  mac("skills/stamps/notes.md", "delta");
+  await rescan();
+  expect(fs.statSync(p).mtimeMs).toBeGreaterThan(saved);
+  expect(fs.readFileSync(p, "utf8")).toBe("delta");
 });

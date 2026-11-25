@@ -1,0 +1,4 @@
+$ bun run typecheck
+$ tsc -p tsconfig.json --noEmit && tsc -p apps/desktop/tsconfig.json --noEmit
+
+Exit: 0

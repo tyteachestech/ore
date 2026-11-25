@@ -1,0 +1,7 @@
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Learn &lt;T&gt; &amp; practice</title>
+  <entry><title type="text">Use &lt;T&gt; in TypeScript</title><link href="https://example.test/text"/></entry>
+  <entry><title>Use &lt;U&gt; by default</title><link href="https://example.test/default"/></entry>
+  <entry><title type="html">&lt;b&gt;Use &amp;lt;V&amp;gt;&lt;/b&gt; &amp;amp; practice</title><link href="https://example.test/html"/></entry>
+  <entry><title type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><b>Use &lt;W&gt;</b> &amp; practice</div></title><link href="https://example.test/xhtml"/></entry>
+</feed>

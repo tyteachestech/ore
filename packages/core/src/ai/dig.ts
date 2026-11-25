@@ -35,7 +35,7 @@ export async function digAsk(lib: Library, skill: string): Promise<Dig> {
     },
   });
   return reviseDig(lib, skill, d.id, (cur) => {
-    if (cur.text !== d.text || cur.asks) throw new Error("the dig changed while the mole was reading");
+    if (cur.done_at || cur.text !== d.text || cur.asks) throw new Error("the dig changed while the mole was reading");
     const came = new Set(data.came);
     const asked = new Set(data.asks.map((a) => a.n));
     return {
@@ -43,6 +43,7 @@ export async function digAsk(lib: Library, skill: string): Promise<Dig> {
       ideas: cur.ideas.map((i, n) => (came.has(n + 1) ? { ...i, state: "own" as const } : asked.has(n + 1) || data.asks.length ? i : { ...i, state: "missed" as const })),
       asks: data.asks.map((a) => ({ idea: cur.ideas[a.n - 1]!.id, q: a.q.trim() })),
       ...(data.asks.length ? {} : { done_at: nowIso() }),
+      ask_ai: ai,
       ai,
     };
   });
@@ -56,6 +57,7 @@ export async function digAnswer(lib: Library, skill: string, answers: string[]):
   const answered = asks.filter((a) => a.answer);
   const n = (id: string) => d.ideas.findIndex((i) => i.id === id) + 1;
   let came = new Set<number>();
+  const askAi = d.ask_ai ?? d.ai; // A still-open legacy dig has only its first-stage stamp.
   let ai = d.ai;
   if (answered.length) {
     const r = await runAgent(lib, {
@@ -73,6 +75,6 @@ export async function digAnswer(lib: Library, skill: string, answers: string[]):
   }
   return reviseDig(lib, skill, d.id, (cur) => {
     if (cur.done_at || cur.text !== d.text) throw new Error("the dig changed while the mole was reading");
-    return { ...cur, asks, ideas: cur.ideas.map((i, k) => ({ ...i, state: i.state ?? (came.has(k + 1) ? ("nudge" as const) : ("missed" as const)) })), done_at: nowIso(), ...(ai ? { ai } : {}) };
+    return { ...cur, asks, ideas: cur.ideas.map((i, k) => ({ ...i, state: i.state ?? (came.has(k + 1) ? ("nudge" as const) : ("missed" as const)) })), done_at: nowIso(), ...(askAi ? { ask_ai: askAi } : {}), ...(ai ? { ai } : {}) };
   });
 }

@@ -1,0 +1,11 @@
+bun test v1.4.4 (38afee6c8)
+
+apps/desktop/test/waits.test.ts:
+(pass) waits show they are working > every AI or network call is listed with its wait label [0.07ms]
+(pass) waits show they are working > the list names only calls that exist [0.01ms]
+(pass) waits show they are working > each listed label is drawn with the working spinner on its screen [0.54ms]
+
+ 3 pass
+ 0 fail
+ 3 expect() calls
+Ran 3 tests across 1 file. [13.00ms]

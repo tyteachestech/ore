@@ -1,0 +1,6 @@
+$ bun codex-out/aivendor/ask-provenance.tsx
+Warning: KaTeX doesn't work in quirks mode. Make sure your website has a suitable doctype.
+[DEEP] {"replyAI":{"vendor":"codex","model":"rewrite-author","prompt_version":"chat@2"},"turn":{"role":"ai","text":"Try this wording.","proposal":{"question":"What strengthens memory?","answer":"Retrieval practice."},"was":{"question":"What helps?","answer":"Recall."}},"proposal":{"question":"What strengthens memory?","answer":"Retrieval practice."},"savedQuestion":"What strengthens memory?","savedAI":{"vendor":"claude","model":"first-author","prompt_version":"enrich@25"}}
+[DEEP] FAIL applying an AI rewrite must retain who wrote the new text
+
+Exit: 1

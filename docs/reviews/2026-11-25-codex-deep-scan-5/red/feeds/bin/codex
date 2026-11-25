@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "AI forbidden in feeds scout" >&2
+exit 99

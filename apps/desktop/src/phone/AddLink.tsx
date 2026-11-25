@@ -7,7 +7,7 @@ import { Working } from "../Working";
 import { useEffect, useRef, useState } from "react";
 import { Grow } from "../Grow";
 import { Trap } from "../Trap";
-import { ore, oreWith, queuePicked } from "../ore";
+import { ore, oreWith, queuePicked, type Waiting } from "../ore";
 import { addArgs, entries, pastedHtml, withHtml, type Pasted } from "../paste";
 import { errorText, useFocusWhileMounted } from "../util";
 import { letDown, sheetLayer, useSwipeDown } from "./sheet";
@@ -15,7 +15,7 @@ import { letDown, sheetLayer, useSwipeDown } from "./sheet";
 /** What the importers read from a file (FILE_TYPES in the core, less video, which needs the Mac's tools to hear). */
 const PICKED = "image/*,.pdf,.epub,.md,.markdown,.txt,.html,.htm,.docx,.pptx,.rtf,.xlsx,.csv,.tsv,.ipynb,.srt,.vtt,.mp3,.m4a,.wav";
 
-export type Waiting = { id: string; url: string; skills: string[]; error?: string };
+export type { Waiting } from "../ore";
 
 /** Words typed or pasted and left with a tap outside, a swipe down or Esc, by where it was typed (a skill's page files
  *  it there): that sheet opens with them selected, so Add takes them and typing replaces them, as the Mac's Add box

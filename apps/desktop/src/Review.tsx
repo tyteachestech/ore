@@ -12,7 +12,7 @@ import { layer, sfx, type Sound } from "./sfx";
 import { still } from "./SideCursor";
 import { Hint } from "./Hint";
 import { MoreButton } from "./Menu";
-import { inTextField, is, label, useKeymap, type KeyId } from "./keys";
+import { inTextField, is, label, reviewDigit, useKeymap, type KeyId } from "./keys";
 import { keydownFor } from "./menubar";
 import { ownsUndo } from "./history";
 import { change } from "./change";
@@ -510,8 +510,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   /** A card's new wording, and an Explain card's key points when given, on the history: undo puts the old
    *  ones back (and on screen, if it still is). */
   /** Only what changed from `from` is written, so a field edited outside meanwhile keeps its edit (F174). */
-  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true, from: { question: string; answer: string; rubric?: string[] } = c) => {
-    const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric };
+  const setText = async (c: CardFull, question: string, answer: string, rubric?: string[], undoable = true, from: { question: string; answer: string; rubric?: string[] } = c, ai?: CardFull["ai"] | null) => {
+    const was = { question: c.question, answer: c.answer, rubric: rubric && c.rubric, ai: c.ai ?? null };
     const changed = [
       ...(question !== from.question ? [opt("question", question)] : []),
       ...(answer !== from.answer ? [opt("answer", answer)] : []),
@@ -519,7 +519,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     ];
     if (!changed.length) return;
     dropAhead();
-    const saved = await ore<CardFull>("card", "set", c.id, ...changed, ...variantOpt(c));
+    const saved = await ore<CardFull>("card", "set", c.id, ...changed, ...(ai !== undefined ? [opt("ai", JSON.stringify(ai))] : []), ...variantOpt(c));
     const s = now.current;
     setCard((cur) => (cur?.id === c.id ? saved : cur));
     // New key points: the AI's grade was for the old ones, so it goes (and one still on its way). A point
@@ -541,8 +541,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       setDraft(loaded.current);
     }
     if (undoable) {
-      const put = (w: typeof was, f: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false, f);
-      notify("Exercise edit", "quiet", put(was, { question, answer, rubric }), put({ question, answer, rubric }, was));
+      const put = (w: typeof was, f: typeof was) => () => setText(c, w.question, w.answer, w.rubric, false, f, ai === undefined ? undefined : w.ai);
+      notify("Exercise edit", "quiet", put(was, { question, answer, rubric, ai: saved.ai ?? null }), put({ question, answer, rubric, ai: saved.ai ?? null }, was));
     }
   };
 
@@ -579,7 +579,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   if (leave) leave.current = () => s.finish(false);
   const keyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyRef.current = (e: KeyboardEvent) => {
-    if (paused || under) return;
+    // WebKit can clear isComposing on the confirmation key; 229 still belongs to the IME.
+    if (paused || under || e.isComposing || e.keyCode === 229) return;
     // A sheet over Review (its ⋯ on the phone) or a panel with its own keys (the ambience radio) is portaled out of it
     // and takes its keys: Esc closes it only, a number picks a channel instead of rating (F93).
     // Whatever has focus: in the frame before the sheet takes it, the key's target is the page (F61).
@@ -633,7 +634,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     }
     if (is(e, "retire-card")) {
       e.preventDefault();
-      void retire();
+      if (!e.repeat) void retire();
       return;
     }
     if (is(e, "later")) {
@@ -642,6 +643,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       if (!e.repeat) later();
       return;
     }
+    const digit = reviewDigit(e);
     if (phase === "answer") {
       if (is(e, "no-idea") && card.kind === "prompt") {
         e.preventDefault();
@@ -652,18 +654,19 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       } else if (is(e, "finish") && card.kind === "prompt") {
         e.preventDefault();
         void check();
-      } else if (!inTextField(e) && !e.metaKey && !e.ctrlKey && !e.altKey && /^Digit[1-3]$/.test(e.code)) {
+      } else if (!inTextField(e) && digit !== null && digit <= 3) {
         e.preventDefault();
-        pickSure(Number(e.code.slice(5)));
+        pickSure(digit);
       }
       return;
     }
-    if (inTextField(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (inTextField(e)) return;
     if (e.repeat || Date.now() - shownAnswerAt.current < 300) return;
-    if (/^Digit[1-4]$/.test(e.code)) {
+    const plain = !e.metaKey && !e.ctrlKey && !e.altKey;
+    if (digit !== null) {
       e.preventDefault();
-      void rate(Number(e.code.slice(5)));
-    } else if (e.key === "Enter" && suggested && onSurface) {
+      void rate(digit);
+    } else if (plain && e.key === "Enter" && suggested && onSurface) {
       e.preventDefault();
       void rate(suggested);
     } else if (is(e, "edit-card")) {
@@ -1051,7 +1054,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                     setChat={(f) => setAsks((a) => ({ ...a, [card.id]: f(a[card.id] ?? NO_ASK) }))}
                     onApply={async (p) => {
                       try {
-                        await setText(card, p.question, p.answer);
+                        await setText(card, p.question, p.answer, undefined, true, card, p.ai);
                       } catch (e) {
                         notify(errorText(e), "error");
                         throw e;

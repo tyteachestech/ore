@@ -20,15 +20,19 @@ export function passage(runs: string[], text: string): [number, number] | null {
   // holds to the last, and never past what was found. A probe that comes again elsewhere on the page says
   // nothing about where he is (a passage may repeat itself, within its own length).
   const size = Math.min(32, want.length);
-  let from = -1, to = -1;
+  let from = -1, to = -1, wantFrom = 0, wantTo = 0;
   for (const at of want.length <= size ? [0] : [0, Math.floor((want.length - size) / 2), want.length - size]) {
     const probe = want.slice(at, at + size);
     const first = page.indexOf(probe), last = page.lastIndexOf(probe);
     if (first < 0 || last - first >= want.length) continue;
-    if (from < 0) from = first;
-    if (last >= from) to = Math.max(to, last + size - 1);
+    if (from < 0) [from, wantFrom] = [first, at];
+    if (last >= from && last + size - 1 > to) [to, wantTo] = [last + size - 1, at + size - 1];
   }
   if (from < 0 || to < from) return null;
+  // Endpoints alone do not establish a passage: a PDF's runs can alternate columns, and then the page holds
+  // about twice the letters between the probes that the passage does. A fifth more is a formula or a footnote
+  // mark spelled another way; asking for the very same letters lit nothing on a real textbook page.
+  if (to - from + 1 > (wantTo - wantFrom + 1) * 1.2 + 4) return null;
   /** The run that holds a place in the page's letters: the last one starting at or before it. */
   const run = (pos: number) => {
     let lo = 0, hi = starts.length - 1;

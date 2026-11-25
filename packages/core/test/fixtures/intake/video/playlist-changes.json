@@ -1,0 +1,6 @@
+{
+  "title": "Learning fixture playlist",
+  "webpage_url": "https://www.youtube.com/playlist?list=PL_ore_fixture",
+  "before": [{ "id": "aaaaaaaaaaa", "title": "Alpha" }],
+  "after": [{ "id": "nnnnnnnnnnn", "title": "New" }, { "id": "aaaaaaaaaaa", "title": "Alpha" }]
+}

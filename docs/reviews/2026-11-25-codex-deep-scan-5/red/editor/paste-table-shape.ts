@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {open,paste} from './harness';
+const variant=process.argv[2]??'rowspan';
+const html=variant==='paragraphs'?'<table><tr><th>Title</th></tr><tr><td><p>Alpha</p><p>Beta</p></td></tr></table>':'<table><tr><th>Group</th><th>Value</th></tr><tr><td rowspan="2">Alpha</td><td>Beta</td></tr><tr><td>Gamma</td></tr></table>';
+const h=await open('');
+const event=new window.Event('paste',{bubbles:true,cancelable:true});Object.defineProperty(event,'clipboardData',{value:{getData:(t:string)=>t==='text/html'?html:t==='text/plain'?(variant==='paragraphs'?'Title\nAlpha\nBeta':'Group\tValue\nAlpha\tBeta\n\tGamma'):'',files:[],types:['text/plain','text/html']}});h.view.dom.dispatchEvent(event);
+const out=h.md();const r=await open(out);
+const rows=(v:any)=>v.state.doc.firstChild.content.content.map((row:any)=>row.content.content.map((c:any)=>({text:c.textContent,rowspan:c.attrs.rowspan,colspan:c.attrs.colspan})));
+console.log('[DEEP]',JSON.stringify({variant,live:rows(h.view),saved:out,reopened:rows(r.view)}));
+const after=rows(r.view);await h.close();await r.close();
+if(variant==='paragraphs')assert.equal(after[1].length,1,'Pasting two paragraphs in one HTML table cell must not create a second column');
+else assert.equal(after[2][1].text,'Gamma','A row-spanning HTML table must retain Gamma under Value after save/reopen');

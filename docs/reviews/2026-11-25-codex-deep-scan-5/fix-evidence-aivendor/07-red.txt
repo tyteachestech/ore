@@ -1,0 +1,67 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [314.97ms]
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [249.21ms]
+(pass) recall feedback checks its prequestion input at save (after) [187.26ms]
+(pass) recall feedback checks its prequestion input at save (before) [170.51ms]
+(pass) recall feedback checks its prequestion input at save (question) [172.54ms]
+(pass) recall feedback checks its prequestion input at save (skipped) [168.18ms]
+(pass) recall feedback checks its prequestion input at save (removed) [170.90ms]
+(pass) recall feedback checks its prequestion input at save (reordered) [157.37ms]
+(pass) recall feedback checks its prequestion input at save (unchanged) [168.80ms]
+(pass) recall feedback checks its prequestion input at save (marks) [170.00ms]
+(pass) a late prequestion check matches the current question and ordered points (more) [154.93ms]
+(pass) a late prequestion check matches the current question and ordered points (text) [158.48ms]
+(pass) a late prequestion check matches the current question and ordered points (order) [157.99ms]
+(pass) a late prequestion check matches the current question and ordered points (question) [160.04ms]
+(pass) a late prequestion check matches the current question and ordered points (unchanged) [159.36ms]
+(pass) a late prequestion check matches the current question and ordered points (evidence) [176.09ms]
+(pass) ending a Dig prevents the late first-stage reply from changing its saved record [191.09ms]
+184 | }
+185 | 
+186 | test("a failed Claude process cannot save its otherwise valid Try feedback", async () => {
+187 |   const a = await tried();
+188 |   fake([{ data: { line: "Keep recalling." }, exit: 1, stderr: "fatal transport failure" }]);
+189 |   await expect(tryLine(lib, a.id)).rejects.toThrow(/claude failed \(exit 1\): fatal transport failure/);
+                                                 ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:189:44)
+(fail) a failed Claude process cannot save its otherwise valid Try feedback [159.91ms]
+191 |   expect(readFileSync(join(dir, "count"), "utf8")).toBe("1");
+192 | });
+193 | 
+194 | test.each([false, true])("Claude chat rejects a failed process with a valid result (stream: %s)", async (stream) => {
+195 |   fake([{ data: { reply: "Partial candidate", card: null }, exit: 1, stderr: "fatal transport failure" }]);
+196 |   await expect(runChatTurn(lib, { system: "Explain", message: "Why?", schema: {}, cwd: lib.root, ...(stream ? { onProgress: () => {} } : {}) })).rejects.toThrow(/claude failed \(exit 1\): fatal transport failure/);
+                                                                                                                                                               ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:196:154)
+(fail) Claude chat rejects a failed process with a valid result (stream: %s) [173.65ms]
+191 |   expect(readFileSync(join(dir, "count"), "utf8")).toBe("1");
+192 | });
+193 | 
+194 | test.each([false, true])("Claude chat rejects a failed process with a valid result (stream: %s)", async (stream) => {
+195 |   fake([{ data: { reply: "Partial candidate", card: null }, exit: 1, stderr: "fatal transport failure" }]);
+196 |   await expect(runChatTurn(lib, { system: "Explain", message: "Why?", schema: {}, cwd: lib.root, ...(stream ? { onProgress: () => {} } : {}) })).rejects.toThrow(/claude failed \(exit 1\): fatal transport failure/);
+                                                                                                                                                               ^
+error: expect(received).rejects.toThrow(expected)
+
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:196:154)
+(fail) Claude chat rejects a failed process with a valid result (stream: %s) [152.90ms]
+
+ 17 pass
+ 3 fail
+ 37 expect() calls
+Ran 20 tests across 1 file. [3.61s]

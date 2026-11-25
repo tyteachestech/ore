@@ -1,0 +1,22 @@
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { lessonsOf, nextLesson } from '../../apps/desktop/src/ore.ts';
+import { passes } from '../../apps/desktop/src/filters.ts';
+// Run the screen's actual grouping bodies, extracted verbatim: no DOM, mount, or browser.
+const app=readFileSync('apps/desktop/src/App.tsx','utf8');
+const phone=readFileSync('apps/desktop/src/phone/PhoneApp.tsx','utf8');
+const macBody=app.split('const groups = useMemo((): Line[][] => {')[1]!.split('}, [tabRows, inSkill, status, openCourses, filters]);')[0]!;
+const phoneFn=phone.slice(phone.indexOf('function linesOf('),phone.indexOf('/** A course as one row'));
+const compile=(code:string)=>new Bun.Transpiler({loader:'ts'}).transformSync(code);
+const mac=new Function('lessonsOf','nextLesson','passes',compile(`return function(inSkill,tabRows,status,openCourses,filters){${macBody}}`))(lessonsOf,nextLesson,passes);
+const mobile=new Function('lessonsOf','nextLesson',compile(`${phoneFn}\nreturn linesOf;`))(lessonsOf,nextLesson);
+const base={skills:[],captured_at:'2026-11-01T00:00:00Z',dir:'/unused'};
+const items=[{...base,id:'video',title:'Video lesson',type:'youtube',status:'done',course:{id:'c',title:'Course',part:1}}, {...base,id:'article',title:'Unread text lesson',type:'article',status:'inbox',course:{id:'c',title:'Course',part:2}}];
+const filters=process.argv[2]==='control'?[]:[{field:'kind',values:['youtube']}];
+const narrowed=items.filter(i=>passes(i as any,filters as any));
+const a=['toread','done'].flatMap(status=>mac(items,narrowed.filter(i=>(i.status==='done')===(status==='done')),status,[],filters).flat());
+const b=['toread','done'].flatMap(status=>mobile(narrowed,status));
+console.log('[DEEP]',JSON.stringify({filters,narrowed:narrowed.map(i=>i.id),mac:a.map((x:any)=>({kind:x.kind,id:x.id??x.item?.id,next:x.next?.id})),phone:b.map((x:any)=>({kind:x.kind,id:x.id??x.item?.id,next:x.next?.id}))}));
+assert.ok(a.length>0,'Mac source filter must retain the matching completed lesson');
+assert.equal(a.length,b.length,'Mac and phone must agree for the same filtered library');
+console.log('[DEEP] PASS');

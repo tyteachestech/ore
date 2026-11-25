@@ -61,3 +61,16 @@ describe("sidebar layout (arrangeSkills)", () => {
     expect(loadSkills(lib).skills.find((s) => s.id === "ai")?.collection).toBe("Physics Lab");
   });
 });
+
+test("a collection name that differs from another only in its capitals is refused, by add and by a skill's own setting (COURSES-05)", async () => {
+  const lib = await tempLibrary();
+  await addSkill(lib, "Alpha", "Work");
+  await expect(addSkill(lib, "Beta", "work")).rejects.toThrow('already a collection named "Work"');
+  const beta = await addSkill(lib, "Beta", " Work ");
+  await expect(setSkillLook(lib, beta.id, { collection: "WORK" })).rejects.toThrow('already a collection named "Work"');
+  expect(loadSkills(lib).skills.filter((s) => s.collection).map((s) => s.collection)).toEqual(["Work", "Work"]);
+  // The only skill in a collection may change its capitals: no other collection has the name.
+  const solo = await addSkill(lib, "Gamma", "play");
+  await setSkillLook(lib, solo.id, { collection: "Play" });
+  expect(loadSkills(lib).skills.find((s) => s.id === solo.id)!.collection).toBe("Play");
+});

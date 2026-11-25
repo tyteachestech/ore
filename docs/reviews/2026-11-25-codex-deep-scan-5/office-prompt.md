@@ -1,0 +1,10 @@
+# Your run: office (import of documents, slides, sheets, notebooks, RTF, Markdown and screenshots)
+
+Your name is `office`. The core promise (CLAUDE.md, D122) is that every type imports whole. Earlier scans covered web pages, EPUB, PDF and audio; you take the rest. **Stay off EPUB.** Build small inputs in your folder (by hand, with a script, or from `packages/core/test/fixtures/intake/`) and import them with `bun packages/cli/src/ore.ts add <file> --json` into scratch libraries, then read the doc.md, its assets and the kept original.
+
+1. **Word, PowerPoint, Keynote/Pages if handled** (`packages/core/src/ingest/office.ts`): headings by style vs by outline level, numbered and nested lists, tables with merged cells, footnotes and endnotes, comments and tracked changes (inserted/deleted text must not both land), text boxes, equations (OMML), images (inline, floating, EMF/WMF, duplicated), hyperlinks, slide notes, hidden slides, slide order vs file order, a password-protected or corrupt file (refused with the next step, D96).
+2. **Spreadsheets** (`sheets.ts`): several sheets, formulas vs cached values, dates stored as numbers, merged cells, empty rows, huge sheets, CSV/TSV with quotes, BOM, `;` separators, CRLF.
+3. **Notebooks** (`notebook.ts`): markdown and code cells, outputs (text, images, HTML, errors), attachments, nbformat 3 vs 4, a cell's source as a string vs a list.
+4. **RTF, plain text, Markdown files** (`rtf.ts`, `markdown.ts`, `tab.ts`): encodings (cp1252, UTF-16 with BOM), front matter in an imported .md (title/author/date taken or clobbered?), relative image links, wiki links, a .md with its own `# ` title and a different file name.
+5. **Screenshots and OCR** (`ocr.ts`, `thumbnail.ts`, `swift.ts`): what happens off macOS or when the Swift helper is missing or fails (refused with a next step, never a blank source), HEIC, huge images, many images at once.
+For each type, check title, author, date, headings, images, tables, math and code against what the file holds, and the `intake-grid.test.ts` row: a cell marked covered that the code doesn't really cover is a finding.

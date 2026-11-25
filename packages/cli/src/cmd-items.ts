@@ -20,7 +20,7 @@ import {
   enrichLogs, markEnrichSkipped, type Item, type Library,
   acceptSuggestedSkill, keepPreview, addHighlight, addPoint, backfillSource, courseCoverFile, makeCourseCover, thumbnailFile, wordCount, addSnippet, addSource, addTab, addText, anchorAnnotations, AnnotationStatus, dismissSuggestedSkill, findAnnotation, findItem, Intent, isQuestionOnly, ItemStatus, ItemType, undoSuggestedSkill,
   addCourse, courseLessons, isCourseUrl, planCourse, renameCourse, setCourseArchived, setCourseSkills,
-  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, tryingNow, tryLine, markTried, planTry, addTry, useCount, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemPriority, checkPriority, setItemArchived, setItemPinned, setItemSkills, itemCardSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
+  appendNote, attachToNote, backlinks, getDiagram, getNotes, linkDiagram, newDiagram, renameDiagram, setDiagram, listItems, answerQuestion, matchQuestion, questionFor, checkSkills, listQuestions, listTries, tryingNow, tryLine, markTried, planTry, addTry, useCount, loadSkills, readNotes, openLibrary, setSkillLook, archiveSkill, addSkill, arrangeSkills, SkillLayoutSchema, removeSkill, restoreSkill, renameItem, setItemAuthor, setItemPriority, checkPriority, setItemArchived, setItemPinned, fileItemSkills, SkillColor, sourceFile, reviseAnnotation, moveHighlight, setItemStatus, markOpened, transcriptOf, setNotes, setPrequestionAttempt, stringifyFrontmatter, audioOf,
   type AnchoredAnnotation, type Annotation, type AnnotationPatch,
 } from "@ore/core";
 import type { Command } from "./types.ts";
@@ -36,7 +36,7 @@ function afterAdd(lib: Library, item: Awaited<ReturnType<typeof addSource>>, noE
 }
 import { fromBase64, int, need, oneOf, progress, readStdin, str, strs, table } from "./util.ts";
 import { startEnrich, startEnrichMany, startTables } from "./background.ts";
-import { canFill, fillOwed, importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink } from "@ore/core";
+import { canFill, fillOwed, importQueued, queueFile, queueLink, queuedLinks, removeQueuedLink, restoreQueuedLink } from "@ore/core";
 
 const INTENTS = Intent.options;
 
@@ -133,8 +133,8 @@ export const itemCommands: Record<string, Command> = {
   },
 
   inbox: {
-    usage: "[--add <url> | --add-file <path> [--name n]] [--skill s] [--remove <id>] [--import [--owe]]   links and files saved on a device, waiting to be imported (D223, D227): --add saves a link, --add-file a copy of a file (under the name it should be titled by), --import adds each that is this device's to import (its own; another device's after five minutes, or at once when that one couldn't) with the whole import, --remove drops one; with none, lists them",
-    options: { add: { type: "string" }, "add-file": { type: "string" }, name: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, import: { type: "boolean" }, owe: { type: "boolean" } },
+    usage: "[--add <url> | --add-file <path> [--name n]] [--skill s] [--remove <id> [--keep] | --restore <id>] [--import [--owe]]   links and files saved on a device, waiting to be imported (D223, D227): --add saves a link, --add-file a copy of a file (under the name it should be titled by), --import adds each that is this device's to import (its own; another device's after five minutes, or at once when that one couldn't) with the whole import, --remove drops one (--keep retains it for Undo), --restore brings a kept entry back; with none, lists them",
+    options: { add: { type: "string" }, "add-file": { type: "string" }, name: { type: "string" }, skill: { type: "string", multiple: true }, remove: { type: "string" }, keep: { type: "boolean" }, restore: { type: "string" }, import: { type: "boolean" }, owe: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();
       if (f["add-file"] !== undefined) {
@@ -148,8 +148,12 @@ export const itemCommands: Record<string, Command> = {
         return { data: l, text: `Coming in: ${l.url}` };
       }
       if (f.remove !== undefined) {
-        removeQueuedLink(lib, need(str(f.remove), "<id>"));
+        removeQueuedLink(lib, need(str(f.remove), "<id>"), !!f.keep);
         return { data: queuedLinks(lib), text: "Removed" };
+      }
+      if (f.restore !== undefined) {
+        restoreQueuedLink(lib, need(str(f.restore), "<id>"));
+        return { data: queuedLinks(lib), text: "Restored" };
       }
       if (f.import) {
         const r = await importQueued(lib, async (url, skills) => {
@@ -590,9 +594,9 @@ export const itemCommands: Record<string, Command> = {
       if (f.author !== undefined) meta = await setItemAuthor(lib, id, str(f.author) ?? "");
       if (f.priority !== undefined) meta = await setItemPriority(lib, id, str(f.priority) ?? "");
       const cards = f.cards === undefined ? undefined : (JSON.parse(str(f.cards)!) as Record<string, string[]>);
-      const before = f.skills !== undefined ? itemCardSkills(lib, id) : undefined;
-      if (f.skills !== undefined) meta = await setItemSkills(lib, id, strs(f.skills), cards);
-      return { data: before ? { ...meta, cards_before: before } : meta, text: `${meta.title}${meta.skills.length ? ` (${meta.skills.join(", ")})` : ""}` };
+      const filing = f.skills !== undefined ? await fileItemSkills(lib, id, strs(f.skills), cards) : undefined;
+      if (filing) meta = filing.meta;
+      return { data: filing ? { ...meta, cards_before: filing.cards_before } : meta, text: `${meta.title}${meta.skills.length ? ` (${meta.skills.join(", ")})` : ""}` };
     },
   },
 

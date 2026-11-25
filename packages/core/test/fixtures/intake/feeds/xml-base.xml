@@ -1,0 +1,9 @@
+<feed xmlns="http://www.w3.org/2005/Atom" xml:base="https://site.example.test/learn/">
+  <title>Ore feed fixture</title><link href="index"/>
+  <entry xml:base="lessons/">
+    <title>Lesson one</title><author><name>Ada</name></author><published>2026-11-20T12:00:00Z</published>
+    <link xml:base="../articles/" href="one"/>
+    <content type="html" xml:base="../images/">&lt;p&gt;Opening words &lt;img src="diagram.png"&gt; Closing words&lt;/p&gt;</content>
+  </entry>
+  <entry><title>Lesson two</title><link href="two"/><enclosure xml:base="pictures/" type="image/png" url="two.png"/></entry>
+</feed>

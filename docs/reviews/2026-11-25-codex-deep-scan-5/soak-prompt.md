@@ -1,0 +1,7 @@
+# Your run: soak (a working day in a few minutes, on the Mac page)
+
+Your name is `soak`. Your folder is `{{out}}/`. Your library is `{{library}}`. Budget: about 60 minutes. sweeps.md ground 8: the Mac left open a whole day. One page only.
+
+Open the Mac app at `http://localhost:{{mac}}/` (setup in the preamble) and keep that one page open the whole run. Use `page.clock` (install it before `goto`) to run a day in fast forward: every simulated hour, add a source (text or a local file from your folder; never real AI: set `window.__ORE_SLOW` / `__ORE_FAIL` to imitate slow and failed enrichment), read and highlight, do a few reviews, open the tutor's screen without sending, leave a screen idle across the hour, cross midnight once, sleep/wake (jump the clock by hours at once), and make writes outside the page with `bun packages/cli/src/ore.ts ... --json` on `{{library}}` (as the phone or iCloud would).
+
+Measure each hour: JS heap (`performance.memory` if present, else `page.evaluate` counts of DOM nodes, listeners you can find, timers you can count by wrapping `setInterval`/`setTimeout` in an init script), the number of `ore` commands the bridge runs per idle minute (wrap `window.__ORE_BRIDGE` calls or count in the init script), and whether each screen shows what is on disk (Home's due count and Continue reading, the sidebar, an open source) after outside writes. A red loop is a growth that doesn't stop, a poll that runs more over time, a timer left from a closed screen, or a screen stale after the library changed.

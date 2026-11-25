@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
 import { addPageText, addSource, addTab, addText, audioOf, fillOwed, hasPageText, redoPageText, reimportSource, undoPageText, undoReimport } from "../src/ingest/index.ts";
+import { addCourse, planCourse } from "../src/ingest/course.ts";
+import { courseLessons } from "../src/courses.ts";
 import { setChapterRecall } from "../src/notes.ts";
 import { addHighlight, readAnnotations } from "../src/annotations.ts";
 import { cutText } from "../src/cut.ts";
@@ -909,6 +911,47 @@ describe("import coverage: video", () => {
   });
   afterAll(() => {
     process.env.PATH = realPath;
+  });
+
+  test("a changed YouTube playlist keeps lesson identity, order and complete transcripts", async () => {
+    // Written for Ore: no remote playlist or subprocess is used.
+    const fixture = JSON.parse(readFileSync(join(FIX, "video/playlist-changes.json"), "utf8"));
+    ytdlp({}); // Make the executable discoverable; its process boundary is replaced below.
+    const spawn = Bun.spawn;
+    let entries = fixture.before;
+    Bun.spawn = ((args: string[]) => {
+      const url = args.at(-1)!;
+      const info = args.includes("--flat-playlist") ? { ...fixture, entries } : {
+        title: "Video title", webpage_url: url, channel: "Ore fixture teacher", upload_date: "20261124",
+        chapters: [{ start_time: 0, title: "Introduction" }],
+        subtitles: { en: [{ ext: "vtt", url: "https://captions.test/en.vtt" }] },
+      };
+      return { stdout: new Response(JSON.stringify(info)).body, stderr: new Response("").body, exited: Promise.resolve(0) };
+    }) as typeof Bun.spawn;
+    serve({ "https://captions.test/en.vtt": { body: VTT, type: "text/vtt" } });
+    try {
+      const lib = await tempLibrary();
+      const first = await addCourse(lib, await planCourse(fixture.webpage_url));
+      expect(first.failed).toEqual([]);
+      entries = fixture.after;
+      const again = await addCourse(lib, await planCourse(fixture.webpage_url));
+      expect(again.failed).toEqual([]);
+      const lessons = courseLessons(lib, first.course.id);
+      expect(lessons.map((l) => l.meta.title)).toEqual(["New", "Alpha"]);
+      expect(lessons[1]!.meta.id).toBe(first.added[0]!.meta.id);
+      expect(again.added).toHaveLength(1);
+      for (const lesson of lessons) {
+        expect(lesson.meta).toMatchObject({ author: "Ore fixture teacher", published: "2026-11-24" });
+        expect(lesson.body).toContain("### Introduction");
+        for (const phrase of ["Welcome to the talk.", "First we tokenize the text.", "Then we train the model."]) expect(lesson.body).toContain(phrase);
+        expect(lesson.body).toContain("[01:00]");
+        expect(images(lesson.body)).toEqual([]); // This fixture has no images or code.
+        expect(lesson.body).not.toContain("```");
+      }
+      expect((await addCourse(lib, await planCourse(fixture.webpage_url))).added).toEqual([]);
+    } finally {
+      Bun.spawn = spawn;
+    }
   });
 
   test("YouTube: title, channel and date; chapters become headings, the description follows the transcript", async () => {
@@ -2258,4 +2301,351 @@ test("a ZIP named Word explains how to export a valid document", async () => {
   const lib = await tempLibrary();
   await expect(addSource(lib, file("not-word.docx"))).rejects.toThrow(/(Word|damaged).*(save|export|download)/i);
   expect(listItems(lib)).toHaveLength(0);
+});
+
+// Deep scan 5: Ore-authored office examples; keep the saved source, not just converter output, under test.
+const officeFile = (name: string) => join(FIX, "office", name);
+test("office-01: Word merged cells keep outcomes in their columns", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("word-merged.docx"));
+  expect(item.meta.title).toBe("Retrieval practice notes");
+  expect(item.meta.author).toBe("Ada Learner");
+  expect(item.body).toContain("| Treatment | Outcome |");
+  expect(item.body).toContain("| Training | Improved |");
+  expect(item.body).toContain("|  | Retained |");
+});
+
+test("office-02: RTF literal bytes use the declared code page", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("rtf-cp1251.rtf"));
+  expect(item.body).toBe("Привет\n");
+  // The same decoder must handle escaped bytes, mixed runs and font-specific charsets.
+  expect(rtfToDoc(new Uint8Array([...new TextEncoder().encode("{\\rtf1\\ansi\\ansicpg1251 "), 0xcf, 0xf0, ...new TextEncoder().encode("\\'e8\\'e2"), 0xe5, 0xf2, 125])).body).toBe("Привет\n");
+  expect(rtfToDoc(new Uint8Array([...new TextEncoder().encode("{\\rtf1\\ansi\\ansicpg1252 "), 0x80, 125])).body).toBe("€\n");
+});
+
+test("office-03: Word equations refuse partial import with an export step", async () => {
+  const lib = await tempLibrary();
+  await expect(addSource(lib, officeFile("word-equation.docx"))).rejects.toThrow(/equation.*export.*PDF/i);
+  expect(listItems(lib)).toHaveLength(0);
+});
+
+test("office-04: PowerPoint native tables keep their rows and columns", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("slides-table.pptx"));
+  expect(item.meta.title).toBe("How memory works");
+  expect(item.body).toContain("<!-- slide 1 -->");
+  expect(item.body).toContain("| Method | Score |\n| --- | --- |\n| Practice | 92 |");
+});
+
+test("office-06: Excel uncached formulas remain visible", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("sheets-formula.xlsx"));
+  expect(item.meta.title).toBe("Spanish vocabulary");
+  expect(item.meta.author).toBe("Ada Learner");
+  expect(item.body).toContain("## Lesson");
+  expect(item.body).toContain("| Result |");
+  expect(item.body).toContain("| =1+1 |");
+});
+
+test("office-07: Excel clock time wraps at midnight while duration keeps days", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("sheets-time.xlsx"));
+  expect(item.body).toContain("| Clock | Duration |");
+  expect(item.body).toContain("| 12:00 | 36:00 |");
+});
+
+test("office-08: notebook Markdown attachments are saved as usable images", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("notebook-attachment.ipynb"));
+  const name = item.body.match(/!\[Diagram\]\(<?assets\/([^)>]+)/)?.[1];
+  expect(name).toBeDefined();
+  expect(readFileSync(join(item.dir, "assets", name!), "utf8")).toContain("Left ventricle");
+  expect(item.body).not.toContain("attachment:");
+});
+
+test("office-09: notebook errors and HTML-only results survive import", async () => {
+  const error = await addSource(await tempLibrary(), officeFile("notebook-error.ipynb"));
+  expect(error.body).toContain("```python\n1 / 0\n```");
+  expect(error.body).toContain("ZeroDivisionError: division by zero");
+  const html = await addSource(await tempLibrary(), officeFile("notebook-html.ipynb"));
+  expect(html.body).toContain("show_results()");
+  expect(html.body).toContain("| Improved |");
+  expect(html.body).not.toContain("<table>");
+});
+
+test("office-10: notebook output figures and explanations keep execution order", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("notebook-order.ipynb"));
+  expect(item.body).toContain("plot_then_explain()");
+  expect(item.body).toContain("![](assets/");
+  expect(item.body.indexOf("![](assets/")).toBeLessThan(item.body.indexOf("AFTER FIGURE"));
+});
+
+test("office-11: a Markdown file saves its adjacent image inside the library", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("text-relative.md"));
+  const name = item.body.match(/!\[Diagram\]\(assets\/([^)]+)\)/)?.[1];
+  expect(name).toBeDefined();
+  expect(readFileSync(join(item.dir, "assets", name!), "utf8")).toBe(readFileSync(officeFile("diagram.svg"), "utf8"));
+  expect(readFileSync(join(item.dir, "source.md"), "utf8")).toBe(readFileSync(officeFile("text-relative.md"), "utf8"));
+});
+
+test("office-12: Word outline levels become reader headings", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("word-outline.docx"));
+  expect(item.meta.title).toBe("Retrieval practice notes");
+  expect(item.meta.author).toBe("Ada Learner");
+  expect(item.body).toBe("# Chapter one\n");
+});
+
+test("office-13: PowerPoint refuses a missing listed slide without saving a source", async () => {
+  const lib = await tempLibrary();
+  await expect(addSource(lib, officeFile("slides-missing.pptx"))).rejects.toThrow(/damaged.*Download it again/);
+  expect(listItems(lib)).toHaveLength(0);
+});
+
+test("office-14: Excel refuses a missing listed worksheet without saving a partial workbook", async () => {
+  const lib = await tempLibrary();
+  await expect(addSource(lib, officeFile("sheets-missing.xlsx"))).rejects.toThrow(/damaged.*Download it again/);
+  expect(listItems(lib)).toHaveLength(0);
+});
+
+test("office-15: OCR helper failure gives a recovery step and saves no source", async () => {
+  const previous = process.env.ORE_OCR;
+  const dir = mkdtempSync(join(tmpdir(), "ore-office-ocr-"));
+  const helper = join(dir, "ocr-failure");
+  writeFileSync(helper, readFileSync(officeFile("ocr-failure.sh")));
+  chmodSync(helper, 0o755);
+  process.env.ORE_OCR = helper;
+  const lib = await tempLibrary();
+  try {
+    await expect(addSource(lib, officeFile("ocr-failure.png"))).rejects.toThrow(/can't open the image.*paste/i);
+    expect(listItems(lib)).toHaveLength(0);
+  } finally {
+    if (previous === undefined) delete process.env.ORE_OCR;
+    else process.env.ORE_OCR = previous;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("office-12: an empty paragraph-properties element does not borrow the next heading", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("word-outline-after-plain.docx"));
+  expect(item.body).toBe("Opening paragraph\n\n# Chapter one\n");
+});
+
+test("office-08: notebook attachment references are cell-local and code examples stay literal", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("notebook-cell-attachments.ipynb"));
+  const images = [...item.body.matchAll(/!\[(?:Diagram|Second)\]\(assets\/([^)]+)\)/g)];
+  expect(images).toHaveLength(2);
+  expect(readFileSync(join(item.dir, "assets", images[0]![1]!), "utf8")).toContain("Left ventricle");
+  expect(readFileSync(join(item.dir, "assets", images[1]![1]!), "utf8")).toContain("Right ventricle");
+  expect(item.body).toContain("`![Example](attachment:heart.svg)`");
+});
+
+test("office-11: Markdown reference images keep titles and leave code examples alone", async () => {
+  const item = await addSource(await tempLibrary(), officeFile("text-reference.md"));
+  expect(item.body).toMatch(/!\[Diagram\]\(assets\/[^)]+ "The heart"\)/);
+  expect(item.body).toContain("`![Example](diagram.svg)`");
+  expect(item.body).toContain("```md\n![Example](diagram.svg)\n```");
+});
+
+test("PowerPoint: package-root notes preserve content and highlights on reimport", async () => {
+  const lib = await tempLibrary();
+  const item = await addSource(lib, file("deck-root-notes.pptx"));
+  expect(item.meta.title).toBe("How memory works");
+  expect(item.meta.author).toBeUndefined();
+  expect(item.meta.published).toBeUndefined();
+  expect(item.body.match(/^## .+$/gm)).toEqual(["## Encoding", "## Storage", "## Retrieval"]);
+  expect(item.body).toContain("Attention decides what gets in");
+  expect(item.body).toContain("Start with the cocktail party example.");
+  expect(item.body).toContain("Sub point for Retrieval");
+  expect(images(item.body)).toEqual([]);
+  expect(item.body).not.toContain("```");
+  const other = await tempLibrary();
+  const relative = await addSource(other, file("deck.pptx"));
+  const h = addHighlight(relative, { exact: "Start with the cocktail party example.", note: "Keep this example.", intent: "keep" });
+  writeFileSync(join(relative.dir, "source.pptx"), readFileSync(file("deck-root-notes.pptx")));
+  const result = await reimportSource(other, relative.meta.id);
+  expect(result.changed).toBe(false);
+  expect(readAnnotations(result.item)).toContainEqual(h);
+});
+
+test("text originals retain their input bytes and declared encoding", async () => {
+  for (const name of ["shift-jis.html", "utf16.csv", "utf16.md", "bom-notebook.ipynb", "lecture.srt"]) {
+    const lib = await tempLibrary();
+    const input = readFileSync(file(name));
+    const item = await addSource(lib, file(name));
+    const ext = name.split(".").at(-1)!;
+    expect(readFileSync(join(item.dir, `source.${ext}`))).toEqual(input);
+    expect(item.meta.author).toBeUndefined();
+    expect(item.meta.published).toBeUndefined();
+    expect(images(item.body)).toEqual([]);
+    if (name === "utf16.csv") {
+      expect(item.meta.title).toBe("utf16");
+      expect(item.body).toBe("| Topic | Answer |\n| --- | --- |\n| Spacing | Wait one day |\n");
+    } else if (name === "utf16.md") {
+      expect(item.meta.title).toBe("Spacing");
+      expect(item.body).toBe("# Spacing\n\nWait one day before retrieving.\n");
+    } else if (name === "bom-notebook.ipynb") {
+      expect(item.meta.title).toBe("Introducing NumPy");
+      expect(item.body).toBe(readFileSync(join(import.meta.dir, "golden/notebook.md"), "utf8").split("---\n").slice(2).join("---\n"));
+    } else if (name === "lecture.srt") {
+      expect(item.meta.title).toBe("lecture");
+      expect(item.body).toBe("[00:01] Welcome to the lecture on memory. Today we cover spacing and retrieval.\n\n[00:41] Now the forgetting curve.\n");
+      expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
+    }
+    if (name !== "bom-notebook.ipynb") expect(item.body).not.toContain("```");
+    if (name === "shift-jis.html") {
+      expect(item.meta.title).toBe("日本の文学");
+      expect(item.meta.author).toBeUndefined();
+      expect(item.meta.published).toBeUndefined();
+      expect(item.body).toContain("吾輩は猫である。");
+      expect(item.body.trim().endsWith("吾輩は猫である。")).toBe(true);
+      expect(images(item.body)).toEqual([]);
+      expect(item.body).not.toContain("```");
+      expect(new TextDecoder("shift_jis").decode(input)).toContain(`<h1>${item.meta.title}</h1>`);
+      expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
+    }
+  }
+});
+
+test("adding a file again repairs a missing original without replacing learning records", async () => {
+  const { unlinkSync } = await import("node:fs");
+  const { setItemArchived } = await import("../src/items.ts");
+  for (const archived of [false, true]) {
+    const lib = await tempLibrary();
+    const item = await addSource(lib, file("notes.docx"));
+    const h = addHighlight(item, { exact: item.body.match(/\w[^\n]+/)![0], intent: "keep", note: "My note" });
+    const source = join(item.dir, "source.docx");
+    unlinkSync(source);
+    if (archived) await setItemArchived(lib, item.meta.id, true);
+    const added = await addSource(lib, file("notes.docx"));
+    expect(added.meta.id).toBe(item.meta.id);
+    expect(added.body).toBe(item.body);
+    expect(added.meta.author).toBe(item.meta.author);
+    expect(added.meta.title).toBe(item.meta.title);
+    expect(added.meta.published).toBe(item.meta.published);
+    expect(added.meta.archived_at).toBeUndefined();
+    expect(existsSync(source)).toBe(true);
+    expect(readFileSync(source)).toEqual(readFileSync(file("notes.docx")));
+    expect(readAnnotations(added)).toContainEqual(h);
+    expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
+  }
+});
+
+test("PowerPoint: package-root picture targets keep the same figures", async () => {
+  const relative = await addSource(await tempLibrary(), file("deck-pictures.pptx"));
+  const rooted = await addSource(await tempLibrary(), file("deck-root-pictures.pptx"));
+  expect(images(relative.body).length).toBeGreaterThan(0);
+  expect(rooted.body).toBe(relative.body);
+  expect(rooted.meta.title).toBe(relative.meta.title);
+  for (const image of images(rooted.body))
+    expect(readFileSync(join(rooted.dir, image.path))).toEqual(readFileSync(join(relative.dir, image.path)));
+});
+
+test("feed intake resolves inherited and element xml:base for posts, site and pictures (feeds-05)", async () => {
+  const { parseFeed } = await import("../src/feeds.ts");
+  const xml = readFileSync(join(FIX, "feeds/xml-base.xml"), "utf8");
+  const parsed = await parseFeed(xml, "https://feeds.example.test/rss/feed.xml");
+  expect(parsed.title).toBe("Ore feed fixture");
+  expect(parsed.site).toBe("https://site.example.test/learn/index");
+  expect(parsed.posts).toEqual([
+    { title: "Lesson one", author: "Ada", published: "2026-11-20T12:00:00.000Z", url: "https://site.example.test/learn/articles/one", image: "https://site.example.test/learn/images/diagram.png" },
+    { title: "Lesson two", author: undefined, published: undefined, url: "https://site.example.test/learn/two", image: "https://site.example.test/learn/pictures/two.png" },
+  ]);
+});
+
+test("feed intake decodes declared XML and HTTP encodings before reading titles and URLs (feeds-06)", async () => {
+  const { findFeed, followFeed, refreshFeeds, feedView } = await import("../src/feeds.ts");
+  const published = new Date(Date.now() - 86400_000).toUTCString();
+  const xml = readFileSync(join(FIX, "feeds/latin1.xml")).toString("latin1").replace("20 Nov 2026 12:00:00 GMT", published);
+  const bytes = Buffer.from(xml, "latin1");
+  const url = "https://feeds.example.test/rss/feed.xml";
+  const cases: [Uint8Array, string][] = [
+    [bytes, "application/rss+xml; charset=ISO-8859-1"],
+    [bytes, "application/rss+xml"],
+    [Buffer.from(xml.replace(' encoding="ISO-8859-1"', ""), "latin1"), 'application/rss+xml; charset="ISO-8859-1"'],
+    [Buffer.from(xml.replace("ISO-8859-1", "UTF-8"), "utf8"), "application/rss+xml"],
+    [Buffer.from("\uFEFF" + xml.replace("ISO-8859-1", "UTF-16"), "utf16le"), "application/rss+xml"],
+  ];
+  for (const [body, type] of cases) {
+    serve({ [url]: { body: body as BodyInit, type } });
+    expect((await findFeed(url)).title).toBe("Café");
+    const lib = await tempLibrary();
+    await followFeed(lib, url);
+    expect((await refreshFeeds(lib)).failed).toEqual([]);
+    expect(feedView(lib).posts[0]).toMatchObject({ title: "Café lesson", url: "https://example.test/caf%C3%A9", author: "Ada", published: new Date(published).toISOString() });
+  }
+});
+
+test("feed intake uses permalink GUIDs and real links but never opaque GUIDs (feeds-07)", async () => {
+  const { parseFeed } = await import("../src/feeds.ts");
+  const parsed = await parseFeed(readFileSync(join(FIX, "feeds/guids.xml"), "utf8"), "https://feeds.example.test/rss/feed.xml");
+  expect(parsed.posts.map((p) => [p.title, p.url])).toEqual([
+    ["Default permalink", "https://example.test/default"],
+    ["Explicit permalink", "https://example.test/explicit"],
+    ["Linked opaque", "https://example.test/linked"],
+  ]);
+});
+
+test("feed intake preserves plain Atom titles and reads HTML and XHTML titles as text (feeds-08)", async () => {
+  const { parseFeed } = await import("../src/feeds.ts");
+  const parsed = await parseFeed(readFileSync(join(FIX, "feeds/text-titles.xml"), "utf8"), "https://feeds.example.test/rss/feed.xml");
+  expect(parsed.title).toBe("Learn <T> & practice");
+  expect(parsed.posts.map((p) => p.title)).toEqual(["Use <T> in TypeScript", "Use <U> by default", "Use <V> & practice", "Use <W> & practice"]);
+});
+
+test("feed intake discovers and refreshes prefixed Atom while rejecting a truncated root (feeds-09)", async () => {
+  const { parseFeed, findFeed, followFeed, refreshFeeds, feedView } = await import("../src/feeds.ts");
+  const xml = readFileSync(join(FIX, "feeds/prefixed-atom.xml"), "utf8");
+  const url = "https://feeds.example.test/feed.xml";
+  const parsed = await parseFeed(xml, url);
+  expect(parsed.title).toBe("Prefixed lessons");
+  expect(parsed.site).toBe("https://example.test/lessons/");
+  expect(parsed.posts[0]).toEqual({ title: "Use <T>", url: "https://example.test/post", author: "Ada", published: "2026-11-20T12:00:00.000Z", image: "https://example.test/diagram.png" });
+  serve({ [url]: { body: xml.replace("2026-11-20T12:00:00Z", new Date(Date.now() - 86400_000).toISOString()), type: "application/atom+xml" } });
+  expect((await findFeed(url)).posts).toBe(1);
+  const lib = await tempLibrary();
+  await followFeed(lib, url);
+  expect((await refreshFeeds(lib)).failed).toEqual([]);
+  expect(feedView(lib).posts).toHaveLength(1);
+  await expect(parseFeed(xml.replace("</a:feed>", ""), url)).rejects.toThrow("stops partway");
+  expect(await parseFeed(xml.replaceAll("a:", "alt:").replace("xmlns:a=", "xmlns:alt="), url)).toEqual(parsed);
+});
+
+test("Excel: a formula whose saved result is empty text is a blank cell, not a pending formula or a refusal", async () => {
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const book = unzipSync(new Uint8Array(readFileSync(officeFile("sheets-formula.xlsx"))));
+  const sheet = strFromU8(book["xl/worksheets/sheet1.xml"]!);
+  book["xl/worksheets/sheet1.xml"] = strToU8(sheet.replace("</sheetData>", `<row r="3"><c r="A3" t="str"><f t="shared" ref="A3:A4" si="0">IF(B3="","",B3*2)</f><v></v></c><c r="B3"><v>7</v></c></row><row r="4"><c r="A4" t="str"><f t="shared" si="0"/><v></v></c><c r="B4"><v>8</v></c></row></sheetData>`));
+  const dir = mkdtempSync(join(tmpdir(), "ore-xlsx-"));
+  writeFileSync(join(dir, "blank-results.xlsx"), zipSync(book));
+  const item = await addSource(await tempLibrary(), join(dir, "blank-results.xlsx"));
+  expect(item.body).toContain("| =1+1 |");
+  expect(item.body).toContain("7");
+  expect(item.body).toContain("8");
+  expect(item.body).not.toContain("=IF");
+});
+
+test("Word: an outline level a tracked change took away does not make a heading", async () => {
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const doc = unzipSync(new Uint8Array(readFileSync(officeFile("word-outline-after-plain.docx"))));
+  const xml = strFromU8(doc["word/document.xml"]!);
+  doc["word/document.xml"] = strToU8(xml.replace("<w:p><w:pPr/><w:r><w:t>Opening paragraph", `<w:p><w:pPr><w:jc w:val="left"/><w:pPrChange w:id="1" w:author="A"><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:pPrChange></w:pPr><w:r><w:t>Opening paragraph`));
+  const dir = mkdtempSync(join(tmpdir(), "ore-docx-"));
+  writeFileSync(join(dir, "tracked.docx"), zipSync(doc));
+  const item = await addSource(await tempLibrary(), join(dir, "tracked.docx"));
+  expect(item.body).toContain("Opening paragraph\n\n# Chapter one");
+  expect(item.body).not.toContain("# Opening paragraph");
+});
+
+test("a Markdown file's picture that isn't beside it stays as written, never a link into this Mac's folders", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "ore-md-"));
+  writeFileSync(join(dir, "notes.md"), "# Notes\n\nA chart of the forgetting curve, described in words long enough to be a source.\n\n![chart](img/chart.png)\n");
+  const item = await addSource(await tempLibrary(), join(dir, "notes.md"));
+  expect(item.body).toContain("![chart](img/chart.png)");
+  expect(item.body).not.toContain("file:");
+});
+
+test("PowerPoint: a large figure that comes again on three slides is kept on each; only a small repeated logo is left out (office-05)", async () => {
+  const { unzipSync, strFromU8 } = await import("fflate");
+  const deck = unzipSync(new Uint8Array(readFileSync(file("deck-pictures.pptx"))));
+  // The sample's logo, drawn as large as its figure on all three slides: a diagram each slide builds on.
+  for (const n of [1, 2, 3]) deck[`ppt/slides/slide${n}.xml`] = strToU8(strFromU8(deck[`ppt/slides/slide${n}.xml`]!).replaceAll('cx="1016000" cy="508000"', 'cx="5080000" cy="3048000"'));
+  const dir = mkdtempSync(join(tmpdir(), "ore-pptx-"));
+  writeFileSync(join(dir, "steps.pptx"), zipSync(deck));
+  const item = await addSource(await tempLibrary(), join(dir, "steps.pptx"));
+  expect(item.body.split(/<!-- slide \d+ -->/).slice(1).map((s) => images(s).length)).toEqual([2, 2, 1]);
 });

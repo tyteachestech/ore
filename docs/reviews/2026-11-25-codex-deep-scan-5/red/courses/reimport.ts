@@ -1,0 +1,26 @@
+import { mkdirSync, rmSync } from 'node:fs';
+import { resolve } from 'node:path';
+import assert from 'node:assert/strict';
+import { addCourse, type CoursePlan } from '../../packages/core/src/ingest/course.ts';
+import { courseLessons } from '../../packages/core/src/courses.ts';
+import { setItemStatus } from '../../packages/core/src/items.ts';
+const mode = process.argv[2] ?? 'insert';
+const root = resolve(`codex-out/courses/libs/reimport-${mode}`);
+rmSync(root, { recursive: true, force: true }); mkdirSync(root, { recursive: true });
+const lib = {root};
+process.env.ORE_NO_ENRICH = '1';
+globalThis.fetch = (async (input: any) => {
+ const title = String(input).split('/').pop();
+ return new Response(`<html><head><title>${title}</title></head><body><article><h1>${title}</h1>${`<p>${title} explains an important idea in this course, with enough text to preserve the complete lesson and its examples.</p>`.repeat(6)}</article></body></html>`, { headers: {'content-type':'text/html'} });
+}) as typeof fetch;
+const plan = (names: string[]): CoursePlan => ({title:'Course',url:'https://example.test/course',lessons:names.map(title=>({title,url:`https://example.test/${title}`}))});
+const first = await addCourse(lib, plan(['alpha','beta']));
+assert.equal(first.failed.length,0);
+await setItemStatus(lib, first.added[0]!.meta.id, 'done');
+const wanted = mode === 'insert' ? ['new','alpha','beta'] : mode === 'remove' ? ['beta','new'] : mode === 'reorder' ? ['beta','alpha'] : ['alpha','beta','new'];
+const again = await addCourse(lib,plan(wanted));
+const actual = courseLessons(lib,first.course.id).map(i=>({part:i.meta.course!.part,title:i.meta.title,url:i.meta.url,status:i.meta.status}));
+console.log('[DEEP]', JSON.stringify({mode,wanted,added:again.added.map(i=>i.meta.title),kept:again.kept,failed:again.failed,actual}));
+assert.ok(actual.some(i=>i.title === 'new') || mode === 'reorder', 'a newly added lesson must not be silently skipped');
+if(mode !== 'remove') assert.deepEqual(actual.map(i=>i.title),wanted,'course order and lesson identity must match the new plan');
+console.log('[DEEP] PASS');

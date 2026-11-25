@@ -1,0 +1,76 @@
+bun test v1.4.4 (38afee6c8)
+
+packages/core/test/ai-vendor-regressions.test.ts:
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [261.50ms]
+(pass) a Dig retains both stages' authors after a vendor switch (legacy: %s) [236.46ms]
+(pass) recall feedback checks its prequestion input at save (after) [167.15ms]
+(pass) recall feedback checks its prequestion input at save (before) [180.45ms]
+(pass) recall feedback checks its prequestion input at save (question) [157.94ms]
+(pass) recall feedback checks its prequestion input at save (skipped) [174.10ms]
+(pass) recall feedback checks its prequestion input at save (removed) [168.47ms]
+(pass) recall feedback checks its prequestion input at save (reordered) [159.08ms]
+(pass) recall feedback checks its prequestion input at save (unchanged) [158.48ms]
+(pass) recall feedback checks its prequestion input at save (marks) [150.04ms]
+153 |   const check = findItem(lib, item.meta.id).meta.prequestions![0]!.check;
+154 |   if (change === "unchanged" || change === "evidence") {
+155 |     expect(result.error).toBeUndefined();
+156 |     expect(check?.covered).toEqual([true, false]);
+157 |   } else {
+158 |     expect(String(result.error)).toMatch(/changed.*checking/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*checking/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:158:34)
+(fail) a late prequestion check matches the current question and ordered points (more) [163.73ms]
+153 |   const check = findItem(lib, item.meta.id).meta.prequestions![0]!.check;
+154 |   if (change === "unchanged" || change === "evidence") {
+155 |     expect(result.error).toBeUndefined();
+156 |     expect(check?.covered).toEqual([true, false]);
+157 |   } else {
+158 |     expect(String(result.error)).toMatch(/changed.*checking/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*checking/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:158:34)
+(fail) a late prequestion check matches the current question and ordered points (text) [186.24ms]
+153 |   const check = findItem(lib, item.meta.id).meta.prequestions![0]!.check;
+154 |   if (change === "unchanged" || change === "evidence") {
+155 |     expect(result.error).toBeUndefined();
+156 |     expect(check?.covered).toEqual([true, false]);
+157 |   } else {
+158 |     expect(String(result.error)).toMatch(/changed.*checking/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*checking/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:158:34)
+(fail) a late prequestion check matches the current question and ordered points (order) [175.30ms]
+153 |   const check = findItem(lib, item.meta.id).meta.prequestions![0]!.check;
+154 |   if (change === "unchanged" || change === "evidence") {
+155 |     expect(result.error).toBeUndefined();
+156 |     expect(check?.covered).toEqual([true, false]);
+157 |   } else {
+158 |     expect(String(result.error)).toMatch(/changed.*checking/);
+                                       ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /changed.*checking/
+Received: "undefined"
+
+      at <anonymous> (/Users/tylerpoelking/Developer/ore-wt/deep5-fix-aivendor/packages/core/test/ai-vendor-regressions.test.ts:158:34)
+(fail) a late prequestion check matches the current question and ordered points (question) [178.14ms]
+(pass) a late prequestion check matches the current question and ordered points (unchanged) [180.88ms]
+(pass) a late prequestion check matches the current question and ordered points (evidence) [169.60ms]
+
+ 12 pass
+ 4 fail
+ 28 expect() calls
+Ran 16 tests across 1 file. [2.90s]

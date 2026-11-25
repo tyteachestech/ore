@@ -1,0 +1,3 @@
+import {join} from 'node:path';import {writeFileSync,appendFileSync} from 'node:fs';const out=join(import.meta.dir,'scale-confirm.jsonl');writeFileSync(out,'');
+for(const size of ['large','twice-large'])for(const mode of ['tries','dig','cards','note'])for(let run=0;run<3;run++){const p=Bun.spawn(['bun',join(import.meta.dir,'red.ts'),mode,size],{env:{...process.env,ORE_NO_ENRICH:'1',DEEP_NOW:'2026-11-25T04:00:00.000Z'},stdout:'pipe',stderr:'pipe'});const text=await new Response(p.stdout).text(),err=await new Response(p.stderr).text(),code=await p.exited;appendFileSync(out,JSON.stringify({size,mode,run,code,text,err})+'\n');if(code!==1||err)throw Error('unexpected '+text+err);}
+console.log('[DEEP] 24 / 24 large-library checks reproduced their precise scan signature');

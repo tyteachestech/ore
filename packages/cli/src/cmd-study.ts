@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
-  CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, findItemDir, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
+  AiStamp, CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, findItemDir, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
   mergedReviews, readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type LibraryIndex, type QueueEntry, type EndReceipt, type SkillStats, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
@@ -22,7 +22,7 @@ const figureJson = (lib: Library, c: Card) => {
 // graded like an Explain card, with the original alongside.
 const variantJson = (lib: Library, c: Card, v: Variant) => ({
   ...cardJson(lib, c), kind: "prompt" as const, question: v.question, answer: v.answer, rubric: v.rubric,
-  variant: v.id, original: { question: c.question, answer: c.answer, rubric: c.rubric },
+  ai: v.ai, variant: v.id, original: { question: c.question, answer: c.answer, rubric: c.rubric },
 });
 /** A card, or one of its variants, as review shows it: every `card show` and `card set` answers in this one
  *  shape, so an edit or a bad version keeps what review draws. history: its reviews and where each rating puts
@@ -84,8 +84,8 @@ export const studyCommands: Record<string, Command> = {
   },
 
   card: {
-    usage: 'show|edit|set|retire|restore <id> [--review] [--variant v] [--question "<q>"] [--answer "<a>"] [--point "<key point>"]... [--state draft|live]   show parses the card (--review: the version review shows now, a variant in its turn, D66); edit opens $EDITOR; set replaces the question, answer or key points (--point, one per key point, in order: the whole rubric an Explain card is graded against; --variant edits that variant, its points one for one); retire removes it from review; restore undoes a retire, back to --state; figure <source> --src <image> --box x,y,w,h --answer <label>: a Fact card that hides that box of one of the source’s figures (fractions of its size, D166); cell <source> --row <row> --column <heading> --answer <cell>: a Fact card that asks one cell of one of the source’s tables (D200)',
-    options: { question: { type: "string" }, answer: { type: "string" }, point: { type: "string", multiple: true }, state: { type: "string" }, review: { type: "boolean" }, variant: { type: "string" }, src: { type: "string" }, box: { type: "string" }, row: { type: "string" }, column: { type: "string" } },
+    usage: 'show|edit|set|retire|restore <id> [--review] [--variant v] [--question "<q>"] [--answer "<a>"] [--point "<key point>"]... [--ai <stamp JSON or null>] [--state draft|live]   show parses the card (--review: the version review shows now, a variant in its turn, D66); edit opens $EDITOR; set replaces the question, answer or key points (--point, one per key point, in order: the whole rubric an Explain card is graded against; --variant edits that variant, its points one for one); retire removes it from review; restore undoes a retire, back to --state; figure <source> --src <image> --box x,y,w,h --answer <label>: a Fact card that hides that box of one of the source’s figures (fractions of its size, D166); cell <source> --row <row> --column <heading> --answer <cell>: a Fact card that asks one cell of one of the source’s tables (D200)',
+    options: { ai: { type: "string" }, question: { type: "string" }, answer: { type: "string" }, point: { type: "string", multiple: true }, state: { type: "string" }, review: { type: "boolean" }, variant: { type: "string" }, src: { type: "string" }, box: { type: "string" }, row: { type: "string" }, column: { type: "string" } },
     async run([sub, ref], f) {
       if (!["show", "edit", "set", "retire", "restore", "figure", "cell"].includes(sub ?? "")) throw new Error("usage: ore card show|edit|set|retire|restore <id> | figure <source> | cell <source>");
       const lib = openLibrary();
@@ -117,12 +117,13 @@ export const studyCommands: Record<string, Command> = {
       }
       if (sub === "set") {
         const question = str(f.question), answer = str(f.answer), rubric = f.point === undefined ? undefined : ([] as string[]).concat(f.point as string | string[]); // not strs: a point may hold a comma
+        const ai = f.ai === undefined ? undefined : AiStamp.nullable().parse(JSON.parse(need(str(f.ai), "--ai <stamp JSON or null>")));
         if (!question?.trim() && !answer?.trim() && !rubric) throw new Error("give --question, --answer or --point");
         if (f.variant) {
-          const v = await setVariant(lib, id, str(f.variant)!, { question, answer, rubric });
+          const v = await setVariant(lib, id, str(f.variant)!, { question, answer, rubric, ai });
           return { data: shownJson(lib, findCard(lib, id), v), text: `Saved variant ${v.id}` };
         }
-        const c = await withLock(paths.lock(lib), () => writeCardContent(findCard(lib, id), { question, answer, rubric }));
+        const c = await withLock(paths.lock(lib), () => writeCardContent(findCard(lib, id), { question, answer, rubric, ai }));
         return { data: shownJson(lib, c), text: `Saved ${c.meta.id}` };
       }
       if (sub === "retire" || sub === "restore") {

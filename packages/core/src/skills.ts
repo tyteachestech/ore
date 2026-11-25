@@ -263,7 +263,7 @@ export async function setSkillLook(lib: Library, id: string, look: Partial<Recor
     }
     for (const key of ["icon", "color", "collection", "hook", "goal"] as const) {
       const raw = look[key];
-      const v = raw === undefined ? undefined : key === "collection" ? collectionName(raw) : key === "hook" || key === "goal" ? raw.trim().replace(/\s+/g, " ") : raw.trim();
+      const v = raw === undefined ? undefined : key === "collection" ? collectionName(raw, loadSkills(lib).skills.filter((s) => s.id !== id).map((s) => s.collection)) : key === "hook" || key === "goal" ? raw.trim().replace(/\s+/g, " ") : raw.trim();
       if (v === undefined) continue;
       if (key === "color" && v && !SkillColor.options.includes(v as SkillColor))
         throw new Error(`color must be one of ${SkillColor.options.join("|")}`);
@@ -311,9 +311,14 @@ export function unarchiveFiled(lib: Library, ids: string[]): string[] {
 }
 
 // A collection's name as saved; a collection named Other would show as a second Other (collection-name.ts).
-function collectionName(name: string): string {
+// `others`: the collections the other skills are in. A name that differs from one of them only in its
+// capitals is refused (Tyler, 2026-11-25): saved as a second collection, "work" beside "Work" made the
+// sidebar's layout one arrangeSkills would not take again. Collections saved that way before still read.
+function collectionName(name: string, others: (string | undefined)[] = []): string {
   const c = tidyCollection(name);
   if (isOther(c)) throw new Error(`"${c}" is the name of the skills in no collection`);
+  const near = others.find((o) => o && o !== c && o.toLowerCase() === c.toLowerCase());
+  if (near && !others.includes(c)) throw new Error(`There is already a collection named "${near}". Use that name, or one that differs by more than its capitals.`);
   return c;
 }
 
@@ -367,7 +372,7 @@ export async function addSkill(lib: Library, name: string, collection = ""): Pro
     const existing = skills.find((s) => sameName(s.name, n));
     if (existing) throw new Error(`skill "${existing.name}" already exists`);
     const id = newSkillId(lib, skills, n);
-    const c = collectionName(collection);
+    const c = collectionName(collection, skills.map((s) => s.collection));
     const skill: Skill = { id, name: n, priority: NEW_SKILL_PRIORITY, ...(c ? { collection: c } : {}) };
     (doc.get("skills") as YAMLLib.YAMLSeq).add(doc.createNode(skill));
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
@@ -490,6 +495,11 @@ function keepSkillPeaks(lib: Library, ids: string[]): void {
  *  loses each removed one). `cards` (an Undo, from `itemCardSkills` taken before) puts each card listed
  *  back to exactly its skills instead, so a card that never had an added skill doesn't gain it. */
 export async function setItemSkills(lib: Library, ref: string, ids: string[], cards?: Record<string, string[]>): Promise<ItemMeta> {
+  return (await fileItemSkills(lib, ref, ids, cards)).meta;
+}
+
+/** The filing and its Undo snapshot share one exercise collection under the same lock. */
+export async function fileItemSkills(lib: Library, ref: string, ids: string[], cards?: Record<string, string[]>): Promise<{ meta: ItemMeta; cards_before: Record<string, string[]> }> {
   return withLock(paths.lock(lib), () => {
     checkSkills(lib, [...ids, ...Object.values(cards ?? {}).flat()]);
     const item = findItem(lib, ref);
@@ -497,11 +507,12 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[], ca
     const added = next.filter((id) => !item.meta.skills.includes(id));
     const removed = item.meta.skills.filter((id) => !next.includes(id));
     const exercises = listCards(lib).filter((c) => c.meta.item === item.meta.id);
+    const before = Object.fromEntries(exercises.map((c) => [c.meta.id, c.meta.skills]));
     // Not on an Undo (`cards`): a filing taken back gave its skill nothing to keep (code review of #538).
     if (!cards) keepSkillPeaks(lib, exercises.flatMap((c) => c.meta.skills.filter((s) => removed.includes(s))));
     const meta = parseItemMeta({ ...item.meta, skills: next });
     unarchiveFiled(lib, added);
-    for (const c of listCards(lib).filter((c) => c.meta.item === meta.id)) {
+    for (const c of exercises) {
       const skills = cards?.[c.meta.id] ?? [...new Set([...c.meta.skills.filter((s) => !removed.includes(s)), ...added])];
       if (skills.join() !== c.meta.skills.join()) writeCardMeta(c, { ...c.meta, skills });
     }
@@ -510,7 +521,7 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[], ca
     // Commit the source last. Until then its old skills retain the delta needed
     // by a retry; exercise/topic updates above are idempotent, including Undo.
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
-    return meta;
+    return { meta, cards_before: before };
   });
 }
 
