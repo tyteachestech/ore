@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { backPages, frontPages, pageKind, type PageFacts } from "../src/ingest/front-matter.ts";
 
-// Which of a book's first pages fold away as front matter (F-new-front-matter). Each case is the shape of a page
+// Which of a book's first pages fold away as front matter (F649). Each case is the shape of a page
 // in a real book from one of 59 checked (trade, academic and self-published EPUBs, Standard Ebooks, Project
 // Gutenberg), with its words rewritten. The rule under test: fold only on evidence, and never the author's text.
 

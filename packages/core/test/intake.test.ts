@@ -1131,7 +1131,7 @@ describe("import coverage: EPUB", () => {
     expect(r.item.meta.chapter_recalls?.map((c) => c.n)).toEqual([1]);
   });
 
-  // make-study-epubs.ts: front-matter.epub is a trade publisher's book as Tyler's opened (F-new-front-matter): links,
+  // make-study-epubs.ts: front-matter.epub is a trade publisher's book as Tyler's opened (F649): links,
   // "Thank you for buying", newsletter buttons and a rights notice before the prologue, which the publisher marks
   // "frontmatter" too. Every page stays, in the book's order (D122); the mark is where the reader's fold ends.
   const FRONT_END = "<!-- end of front matter -->";

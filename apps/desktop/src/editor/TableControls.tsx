@@ -186,7 +186,7 @@ function spot(v: EditorView, host: HTMLElement, cell: HTMLTableCellElement): At 
 }
 
 /** Whether a table still starts at `pos`. It may be gone (deleted with the pointer still on it): past the note's
- *  end, `nodeAt` throws (F-new-table-controls). */
+ *  end, `nodeAt` throws (F650). */
 const tableAt = (v: EditorView, pos: number) => pos < v.state.doc.content.size && v.state.doc.nodeAt(pos)?.type.spec.tableRole === "table";
 
 /** The same table after an edit or a scroll, on the same cell or the nearest one left. */

@@ -1730,7 +1730,7 @@ journey("source note: a new table fits the side panel, its three columns whole (
   await page.keyboard.press("Backspace");
 });
 
-journey("note table: its controls let go when the table is deleted under them, and the / menu scrolling after throws nothing (F-new-table-controls)", async (page) => {
+journey("note table: its controls let go when the table is deleted under them, and the / menu scrolling after throws nothing (F650)", async (page) => {
   const thrown: string[] = [];
   const onError = (e: Error) => void thrown.push(e.message);
   page.on("pageerror", onError);

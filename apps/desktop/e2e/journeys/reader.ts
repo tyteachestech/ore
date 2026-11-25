@@ -2349,7 +2349,7 @@ journey("reader: a source with pictures above his place reopens on the passage h
   }
 });
 
-journey("reader: a book opens on its text, its publisher's pages under one shut row that opens in place, and a click on its cover shows it larger (D-new-front-matter)", async (page) => {
+journey("reader: a book opens on its text, its publisher's pages under one shut row that opens in place, and a click on its cover shows it larger (D354)", async (page) => {
   const made = (await ore("add", join(FIXTURES, "front-matter.epub"), "--no-enrich")) as { id: string };
   try {
     await page.reload();

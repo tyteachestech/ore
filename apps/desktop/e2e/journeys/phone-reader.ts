@@ -1187,7 +1187,7 @@ journey("phone: Back from a note's link returns to that note, and a Linked from 
   await page.locator(".mynotes").filter({ hasText: "Bus link:" }).waitFor();
 }, "phone");
 
-journey("phone: a book's publisher pages sit under one shut row a finger can hit, and a tap on its cover opens it (D-new-front-matter)", async (page) => {
+journey("phone: a book's publisher pages sit under one shut row a finger can hit, and a tap on its cover opens it (D354)", async (page) => {
   const epub = join(import.meta.dir, "../../../../packages/core/test/fixtures/intake/files/front-matter.epub");
   await phoneWith(page, async () => {
     const r = JSON.parse(await $`bun ${join(import.meta.dir, "../../../../packages/cli/src/ore.ts")} add ${epub} --no-enrich --json`.env({ ...process.env, ORE_LIBRARY: PHONE_LIB, ORE_NO_ENRICH: "1" }).text()) as { path: string };

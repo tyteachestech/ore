@@ -4,7 +4,7 @@
 //   chapter, and a last plate page whose picture is missing.
 // - files/chapters.epub, chapters-reordered.epub, chapters-renamed.epub: one two-chapter book as first made, with
 //   its chapters swapped, and with its first chapter's heading reworded.
-// - files/front-matter.epub: a trade publisher's book (F-new-front-matter): a title page, an unmarked page of links
+// - files/front-matter.epub: a trade publisher's book (F649): a title page, an unmarked page of links
 //   with "Thank you for buying" and two newsletter buttons, an unmarked copyright notice, a dedication, then a
 //   prologue the publisher marks "frontmatter", a part page and a chapter; then acknowledgments and notes, and the
 //   publisher's last pages (also by, a note about the author, the newsletter page again), all marked "backmatter".
