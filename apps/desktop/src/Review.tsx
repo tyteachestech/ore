@@ -278,6 +278,9 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     setCard(null);
     setError(null);
     reset();
+    // Each exercise opens at the top of its question, not where the last one's long answer was scrolled to.
+    const body = root.current?.querySelector(".review-body");
+    if (body) body.scrollTop = 0;
     const back = s.takeRestored(entry.id);
     if (back) return void showAgain(back);
     // The card loaded ahead, if a rating or Later just moved on to it; one whose early load failed loads again.
@@ -912,7 +915,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                             ) : (
                               <span className="quiz-mark wait" aria-hidden="true" />
                             )}
-                            <span className="quiz-point">{p}</span>
+                            <span className="quiz-point"><ExerciseText text={p} inline /></span>
                           </li>
                         );
                       })}
@@ -922,7 +925,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                 {card.kind === "prompt" && !marks && !gradeError && (
                   <p className="loading review-grading"><Working stage="check" label="Checking your answer…" slow="This can take about 20 seconds." /></p>
                 )}
-                {grade?.feedback && <p className="review-feedback">{grade.feedback}</p>}
+                {grade?.feedback && <p className="review-feedback"><ExerciseText text={grade.feedback} inline /></p>}
                 {gradeError && PHONE ? (
                   // The phone can't run the AI that checks answers (D7); a retry would fail the same way.
                   <p className="review-grade-failed">{gradeError === KEY_POINTS_CHANGED ? gradeError : "Checking answers runs on your Mac for now."} Mark what you got.</p>

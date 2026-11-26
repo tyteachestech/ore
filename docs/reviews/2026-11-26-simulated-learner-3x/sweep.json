@@ -1,0 +1,5 @@
+{ "testers": [
+  { "name": "owner", "seed": "seed", "from": "/tmp/ore-learner/library" },
+  { "name": "commuter", "seed": "seed", "from": "/tmp/ore-learner/library" },
+  { "name": "newcomer", "seed": "init" }
+] }

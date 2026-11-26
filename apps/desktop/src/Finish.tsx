@@ -111,6 +111,9 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const [checkError, setCheckError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | string | null>(null); // a string is an error
   const feedbackRun = useRef<Promise<unknown> | null>(null);
+  /** His recall is saved and wants feedback, which starts on the closing card: it reads the quiz's answers too, and
+   *  started before them it was refused as stale once one was saved (simulated learner run, 2026-11-26). */
+  const [wantFeedback, setWantFeedback] = useState(false);
   const [at, setAt] = useState(0);
   const moved = useRef(false);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -268,7 +271,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       if (recall.trim()) {
         onNotes((await ore<{ notes: string }>("recall", doc.id, opt("text", recall.trim()))).notes);
         // Feedback on the recall is AI, which the phone can't run (D78.3): nothing to wait for or fail.
-        if (!PHONE) feedbackRun.current = ore<Feedback>("recall", doc.id, "--feedback").then(setFeedback, (e) => setFeedback(errorText(e)));
+        if (!PHONE) setWantFeedback(true);
       }
       setStep(1);
     } catch (e) {
@@ -380,6 +383,12 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       () => {},
     );
   }, [step > n]);
+
+  useEffect(() => {
+    if (step <= n || !wantFeedback || feedbackRun.current) return;
+    feedbackRun.current = ore<Feedback>("recall", doc.id, "--feedback").then(setFeedback, (e) => setFeedback(errorText(e)));
+    setWantFeedback(false);
+  }, [step > n, wantFeedback]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Leaving the closing card any way (Done, Esc, ×) finishes, so the cards always get drafted.
    *  Not while Done is saving or its moment shows: that would append his note and draft twice. */

@@ -38,6 +38,12 @@ test("every place an exercise's question or answer is shown draws it with Exerci
   }
 });
 
+// Simulated learner run 2026-11-26 (owner): Review's key points and the grader's feedback showed code's backticks raw.
+test("Review draws an exercise's key points and the grader's feedback with ExerciseText", () => {
+  const src = readFileSync(join(import.meta.dir, "../src/Review.tsx"), "utf8");
+  expect(src.match(/className="quiz-point">\{\w+\}|\{grade\??\.feedback\}\s*</g)).toBeNull();
+});
+
 // F340 (review of #440): text that looks like a tag was dropped, so "List<T>" read "List".
 test("text in an exercise that looks like a tag shows as typed", () => {
   expect(html("What does List<T> return?")).toBe("<p>What does List&lt;T&gt; return?</p>");
