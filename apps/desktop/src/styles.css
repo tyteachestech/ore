@@ -2390,10 +2390,10 @@ button.home-plan:hover { color: var(--text); }
 .review-answer { margin: 0; font-size: 16px; line-height: 1.55; user-select: text; -webkit-user-select: text; overflow-wrap: anywhere; }
 /* An exercise's text (ExerciseText): a paragraph keeps the line breaks he typed, and a blank line between two
    reads as one, as when it was plain text; its formulas, code and source images as a tutor reply's. */
-:is(.review-q, .review-answer) > :nth-child(n) { margin: 0; }
-:is(.review-q, .review-answer) > :nth-child(n + 2) { margin-top: 1lh; }
+:is(.review-q, .review-answer, .review-feedback) > :nth-child(n) { margin: 0; }
+:is(.review-q, .review-answer, .review-feedback) > :nth-child(n + 2) { margin-top: 1lh; }
 :is(.review-q, .review-answer) p { white-space: pre-wrap; }
-:is(.review-q, .review-answer) :is(ul, ol) { padding-left: 20px; }
+:is(.review-q, .review-answer, .review-feedback) :is(ul, ol) { padding-left: 20px; }
 :is(.review-q, .review-answer) pre { padding: 10px 12px; border-radius: 8px; background: var(--bg-raised); font-size: 14px; line-height: 1.5; font-weight: 400; overflow-x: auto; }
 :is(.review-q, .review-answer) code { font-family: var(--mono); font-size: 0.92em; padding: 1px 4px; border-radius: 4px; background: var(--bg-raised); }
 :is(.review-q, .review-answer) pre code { padding: 0; background: none; }

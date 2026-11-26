@@ -216,7 +216,9 @@ function wikiMath(doc: Document) {
  *  Transformer came in as raw TeX: simulated learner run, 2026-11-26). */
 function pandocMath(doc: Document) {
   for (const el of doc.querySelectorAll("span.math.inline, span.math.display")) {
-    const raw = (el.textContent ?? "").trim();
+    // Drawn already (a page saved from a tab after MathJax or KaTeX ran): its TeX is the annotation, if it kept one.
+    const drawn = el.children.length > 0;
+    const raw = ((drawn ? el.querySelector('annotation[encoding="application/x-tex"]')?.textContent : el.textContent) ?? "").trim();
     const tex = (raw.match(/^\\\(([\s\S]*)\\\)$/)?.[1] ?? raw.match(/^\\\[([\s\S]*)\\\]$/)?.[1] ?? raw).trim();
     if (!tex) continue;
     const math = doc.createElement("span");

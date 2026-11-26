@@ -925,7 +925,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                 {card.kind === "prompt" && !marks && !gradeError && (
                   <p className="loading review-grading"><Working stage="check" label="Checking your answer…" slow="This can take about 20 seconds." /></p>
                 )}
-                {grade?.feedback && <p className="review-feedback"><ExerciseText text={grade.feedback} inline /></p>}
+                {grade?.feedback && <div className="review-feedback"><ExerciseText text={grade.feedback} /></div>}
                 {gradeError && PHONE ? (
                   // The phone can't run the AI that checks answers (D7); a retry would fail the same way.
                   <p className="review-grade-failed">{gradeError === KEY_POINTS_CHANGED ? gradeError : "Checking answers runs on your Mac for now."} Mark what you got.</p>
