@@ -36,6 +36,12 @@ Ore's core promise is that whatever someone learns from imports as fully and rob
 - Commit task-related work with clear messages; keep unrelated edits out.
 - Shipping (`docs/WORKFLOW.md`): once `/code-review` is clean, `bun run ship --reviewed` merges your PR when CI is green and pulls `~/Developer/ore` on the Mac, which reinstalls the app. `~/Developer/ore` stays on `master`; branches live in worktrees. Git housekeeping is yours, never Tyler's.
 
+## Agent skills (Tyler, 2026-11-26, D355)
+Big builds (Ore Cloud first) run through Matt Pocock's planning skills in `.claude/skills/`: `/grill-with-docs` to settle the plan, `/to-spec`, `/to-tickets`, then `/implement` or `/implement-spec`, each slice test-first with `/tdd`; `/wayfinder` when the way is still foggy; `/ask-matt` names the next step. Logins, payments, secrets and anything taking outside input also run Addy Osmani's `/security-and-hardening`. Ore's own rules still win where they differ: `/code-review` and `bun run ship` to merge, `triage-report` and `findings.md` for bugs, `DECISIONS.md` for decisions. Where they live and why some were left out: `.claude/skills-licenses/README.md`.
+- Issue tracker: GitHub Issues on this repo. See `docs/agents/issue-tracker.md`.
+- Triage labels: the default five. See `docs/agents/triage-labels.md`.
+- Domain docs: single context, `docs/DECISIONS.md` in place of ADRs. See `docs/agents/domain.md`.
+
 ## UI work (apps/desktop, the iPhone screens in apps/desktop/src/phone)
 Before any UI change, read `apps/desktop/CLAUDE.md`: the quality bar (which app to match, proven controls, shortcuts, style rules, motion, looking at it at 2× and 4×) and the interaction checklist every UI change runs.
 
