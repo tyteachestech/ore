@@ -1253,7 +1253,7 @@ journey("phone: Finish holds the questions it has no key points for: the recall 
   // Still in To read: Finish is offered again (the Mac's asks the questions), and his recall is in the source note.
   await tap(page, page.getByRole("button", { name: "Source actions" }));
   await page.locator(".action-sheet button").filter({ hasText: /^Finish/ }).waitFor();
-  // Esc goes to what holds the keys: pressed the frame before the sheet took them, it left the source (F-new-esc-sheet).
+  // Esc goes to what holds the keys: pressed the frame before the sheet took them, it left the source (F747).
   await until("the sheet holds the keys", () => page.evaluate(() => !!document.activeElement?.closest(".action-sheet")));
   await page.keyboard.press("Escape");
   await page.locator(".action-sheet").waitFor({ state: "detached" });

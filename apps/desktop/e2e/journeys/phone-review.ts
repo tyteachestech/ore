@@ -810,7 +810,7 @@ journey("phone: a tap on an exercise's history line lists each review's rating a
   await page.locator(".timeline-list").filter({ hasText: /(Again|Hard|Good|Easy) · / }).waitFor();
 }, "phone");
 
-journey("phone: after a rating scrolled down a long answer, the next exercise opens at the top of its question (F-new-review-scroll)", async (page) => {
+journey("phone: after a rating scrolled down a long answer, the next exercise opens at the top of its question (F740)", async (page) => {
   // A long answer scrolls (the largest text); the scroller kept its place for the next exercise, which opened
   // mid-question. Every exercise here is made tall enough to scroll, so a kept place can't hide in a short one.
   await page.addStyleTag({ content: ".phone-full .review-body::after { content: ''; display: block; height: 2000px; }" });
