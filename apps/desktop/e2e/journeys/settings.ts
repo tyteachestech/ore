@@ -16,6 +16,8 @@ journey("Settings keeps focus inside as Tab and ⌥Tab run past its last control
     }
   }
   await page.keyboard.press("Escape");
+  // What Settings read as it opened answers before the page closes: cut off, WebKit called it a page error (F749).
+  await settled(page);
 }, "webkit");
 
 journey("shortcuts: resetting one to a default another command took since asks before replacing it", async (page) => {
