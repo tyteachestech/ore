@@ -464,3 +464,30 @@ journey("prequestions: a source added with --no-enrich offers to write them, nev
     await ore("archive", made.id);
   }
 });
+
+journey("finish: feedback on the recall starts once the quiz's answers are saved, so they don't make it stale (simulated learner run 2026-11-26)", async (page) => {
+  // Started before the quiz, the feedback read the answers as they were then; the core refused to save it once an
+  // answer landed, and he saw "prequestions changed while feedback was running; run ore recall --feedback again".
+  await openSource(page, TESTING);
+  const calls: string[] = [];
+  await page.route(/\/ore$/, async (route) => {
+    if (route.request().method() === "POST") calls.push(route.request().postData() ?? "");
+    await route.fallback();
+  });
+  await page.getByRole("button", { name: "Finish", exact: true }).click();
+  await page.getByLabel("Free recall").fill("Retrieval makes memories last; rereading only feels fluent.");
+  const doneQ = page.getByRole("heading", { name: "Done with this source?" });
+  for (let i = 0; i < 14 && !(await doneQ.isVisible()); i++) {
+    const next = page.getByRole("button", { name: /^(Continue|No idea|Next|Next question)$/ }).first();
+    if (await next.isVisible().catch(() => false)) await next.click().catch(() => {});
+    await Bun.sleep(400);
+  }
+  await doneQ.waitFor();
+  await until("the feedback started", async () => calls.some((c) => c.includes('"--feedback"')));
+  await page.unroute(/\/ore$/);
+  const feedback = calls.findIndex((c) => c.includes('"--feedback"'));
+  const answers = calls.flatMap((c, i) => (c.includes('"prequestion",') && c.includes("--after") ? [i] : []));
+  if (!answers.length) throw new Error("no quiz answer was saved");
+  if (feedback < answers.at(-1)!) throw new Error(`the recall's feedback started before the quiz's last answer was saved: ${calls.map((c) => JSON.parse(c).args.slice(0, 3).join(" ")).join(" | ")}`);
+  await page.getByRole("button", { name: "Keep reading", exact: true }).click();
+});

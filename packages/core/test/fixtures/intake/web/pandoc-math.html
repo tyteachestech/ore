@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="generator" content="pandoc" />
+<title>Scaled attention, by hand</title>
+</head>
+<body>
+<header id="title-block-header"><h1 class="title">Scaled attention, by hand</h1></header>
+<!-- Written for Ore's intake tests in the markup Pandoc and Quarto write for formulas (the Annotated Transformer's). -->
+<main>
+<p>Attention compares each query with every key. The keys have dimension <span class="math inline">d_k</span> and the values dimension <span class="math inline">\(d_v\)</span>; a sum of <span class="math inline">d_k</span> products grows with it, so each score is divided by <span class="math inline">\sqrt{d_k}</span> before the softmax.</p>
+<p>Written out in full, for queries, keys and values stacked as matrices:</p>
+<p><span class="math display">\mathrm{Attention}(Q, K, V) = \mathrm{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V</span></p>
+<p>Without the division, a few scores dominate and the softmax saturates, which leaves the gradients small. Dividing keeps the scores near unit variance whatever the dimension, so learning stays steady as the model grows.</p>
+<p><span class="math display">\[\mathrm{PE}_{(pos,2i)} = \sin(pos / 10000^{2i/d_{\text{model}}})\]</span></p>
+<p>The positions are added as waves like this one, so the model can tell the order of the words apart from their meaning. Prices such as $5 and $10 are not formulas.</p>
+</main>
+</body>
+</html>

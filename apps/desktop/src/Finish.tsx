@@ -46,7 +46,7 @@ type Props = NotesSync & {
 const SURE = ["Guess", "Think so", "Sure"] as const;
 
 // Typed text survives closing the panel (Esc) and reopening it while the reader stays open (D52).
-type Draft = { step: number; recall: string; answers: string[]; conf: (number | undefined)[]; use: string; leave: string; qs: Prequestion[] };
+type Draft = { step: number; recall: string; answers: string[]; conf: (number | undefined)[]; use: string; leave: string; qs: Prequestion[]; feedback?: boolean };
 const drafts = new Map<string, Draft>();
 /** It survives quitting the app too (for a day, `kept`), once he has typed something: kept without the questions
  *  (they are read from the source again) but with what they were and when it was written, so a draft for questions
@@ -111,6 +111,9 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const [checkError, setCheckError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Feedback | string | null>(null); // a string is an error
   const feedbackRun = useRef<Promise<unknown> | null>(null);
+  /** His recall is saved and wants feedback, which starts on the closing card: it reads the quiz's answers too, and
+   *  started before them it was refused as stale once one was saved (simulated learner run, 2026-11-26). */
+  const [wantFeedback, setWantFeedback] = useState(draft?.feedback ?? false);
   const [at, setAt] = useState(0);
   const moved = useRef(false);
   const field = useRef<HTMLTextAreaElement>(null);
@@ -127,12 +130,12 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
   const isChecked = qi >= 0 && checked[qi]!;
 
   useEffect(() => {
-    drafts.set(doc.id, { step, recall, answers, conf, use, leave, qs });
+    drafts.set(doc.id, { step, recall, answers, conf, use, leave, qs, feedback: wantFeedback });
     // Once the source is Done only the closing card's line is his unsaved work.
-    const typed = marked ? !!use.trim() : recall !== (doc.recall?.text ?? "") || answers.some((a, i) => a !== (qs[i]?.after ?? "")) || !!use.trim() || leave !== (doc.leave_out?.text ?? "");
-    if (typed) keptDrafts.set(doc.id, marked ? { step, recall: "", answers: [], conf: [], use, leave: "", asked: askedIn(qs) } : { step, recall, answers, conf, use, leave, asked: askedIn(qs) });
+    const typed = marked ? !!use.trim() : wantFeedback || recall !== (doc.recall?.text ?? "") || answers.some((a, i) => a !== (qs[i]?.after ?? "")) || !!use.trim() || leave !== (doc.leave_out?.text ?? "");
+    if (typed) keptDrafts.set(doc.id, marked ? { step, recall: "", answers: [], conf: [], use, leave: "", asked: askedIn(qs) } : { step, recall, answers, conf, use, leave, feedback: wantFeedback, asked: askedIn(qs) });
     else keptDrafts.delete(doc.id);
-  }, [doc.id, step, recall, answers, conf, use, leave, qs, marked]);
+  }, [doc.id, step, recall, answers, conf, use, leave, qs, marked, wantFeedback]);
 
   // D56: key points for every prequestion, written while he does the free recall.
   const pointsRun = useRef<Promise<unknown> | null>(null);
@@ -268,7 +271,7 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       if (recall.trim()) {
         onNotes((await ore<{ notes: string }>("recall", doc.id, opt("text", recall.trim()))).notes);
         // Feedback on the recall is AI, which the phone can't run (D78.3): nothing to wait for or fail.
-        if (!PHONE) feedbackRun.current = ore<Feedback>("recall", doc.id, "--feedback").then(setFeedback, (e) => setFeedback(errorText(e)));
+        if (!PHONE) setWantFeedback(true);
       }
       setStep(1);
     } catch (e) {
@@ -380,6 +383,16 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
       () => {},
     );
   }, [step > n]);
+
+  const askFeedback = () => {
+    setFeedback(null);
+    feedbackRun.current = ore<Feedback>("recall", doc.id, "--feedback").then(setFeedback, (e) => setFeedback(errorText(e)));
+  };
+  useEffect(() => {
+    if (step <= n || !wantFeedback || feedbackRun.current) return;
+    askFeedback();
+    setWantFeedback(false);
+  }, [step > n, wantFeedback]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Leaving the closing card any way (Done, Esc, ×) finishes, so the cards always get drafted.
    *  Not while Done is saving or its moment shows: that would append his note and draft twice. */
@@ -669,7 +682,14 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
               {!!made?.questions && <li>{made.questions} {made.questions === 1 ? "question" : "questions"}, {doc.skills.length ? "waiting on the skill page" : "in Collected"}</li>}
             </ul>
           )}
-          {typeof feedback === "string" && <p className="err">Recall feedback failed: {feedback}</p>}
+          {typeof feedback === "string" && (
+            <p className="err">
+              Recall feedback failed: {feedback.replace(/; run ore recall --feedback again$/, ".")}{" "}
+              <button className="link" disabled={busy} onClick={askFeedback}>
+                Try again
+              </button>
+            </p>
+          )}
           {feedbackRun.current && !feedback && (
             <p className="loading">
               <Working stage="read" label="Reading your recall against the source…" />

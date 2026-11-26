@@ -211,6 +211,24 @@ function wikiMath(doc: Document) {
   }
 }
 
+/** Pandoc's and Quarto's formulas (`<span class="math inline">`, `math display`), whose TeX is the span's text,
+ *  with or without MathJax's `\(…\)` and `\[…\]`, in the shape the converter reads as math (the Annotated
+ *  Transformer came in as raw TeX: simulated learner run, 2026-11-26). */
+function pandocMath(doc: Document) {
+  for (const el of doc.querySelectorAll("span.math.inline, span.math.display")) {
+    // Drawn already (a page saved from a tab after MathJax or KaTeX ran): its TeX is the annotation, if it kept one.
+    const drawn = el.children.length > 0;
+    const raw = ((drawn ? el.querySelector('annotation[encoding="application/x-tex"]')?.textContent : el.textContent) ?? "").trim();
+    const tex = (raw.match(/^\\\(([\s\S]*)\\\)$/)?.[1] ?? raw.match(/^\\\[([\s\S]*)\\\]$/)?.[1] ?? raw).trim();
+    if (!tex) continue;
+    const math = doc.createElement("span");
+    math.className = el.classList.contains("display") ? "math math-display" : "math math-inline";
+    math.setAttribute("data-latex", tex);
+    math.textContent = tex;
+    el.replaceWith(math);
+  }
+}
+
 /** Whether every brace in a TeX string closes one opened before it. */
 function balanced(tex: string): boolean {
   let depth = 0;
@@ -397,6 +415,7 @@ async function readHtml(html: string, url: string, min: number): Promise<WebDoc>
     flatTables(document as unknown as Document);
     footnoteLists(document as unknown as Document);
     wikiMath(document as unknown as Document);
+    pandocMath(document as unknown as Document);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document);
     // linkedom's window is the real one where there is one (the iPhone's web view), and its

@@ -809,3 +809,28 @@ journey("phone: a tap on an exercise's history line lists each review's rating a
   await tap(page, line);
   await page.locator(".timeline-list").filter({ hasText: /(Again|Hard|Good|Easy) · / }).waitFor();
 }, "phone");
+
+journey("phone: after a rating scrolled down a long answer, the next exercise opens at the top of its question (F740)", async (page) => {
+  // A long answer scrolls (the largest text); the scroller kept its place for the next exercise, which opened
+  // mid-question. Every exercise here is made tall enough to scroll, so a kept place can't hide in a short one.
+  await page.addStyleTag({ content: ".phone-full .review-body::after { content: ''; display: block; height: 2000px; }" });
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const body = page.locator(".phone-full .review-body");
+  const question = () => page.locator(".phone-full .review-q").first().textContent();
+  const sure = page.getByRole("radio", { name: "Think so" });
+  for (let i = 0; i < 2; i++) {
+    await sure.waitFor();
+    const was = await question();
+    // No idea, then Again: Good after No idea asks him to confirm.
+    const typed = (await page.locator(".phone-full textarea:visible").count()) > 0;
+    await tap(page, typed ? page.getByRole("button", { name: "No idea" }) : sure);
+    const rate = page.getByRole("button", { name: typed ? "Again" : "Good", exact: true });
+    await rate.waitFor();
+    await body.evaluate((b) => (b.scrollTop = 600));
+    await tap(page, rate);
+    await until("the next exercise is up", async () => (await sure.count()) > 0 && (await question()) !== was);
+    const top = await body.evaluate((b) => b.scrollTop);
+    if (top > 1) throw new Error(`the next exercise opened ${top}px down its screen, below the start of its question`);
+  }
+}, "phone");

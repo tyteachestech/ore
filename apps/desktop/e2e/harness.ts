@@ -160,8 +160,12 @@ async function open(url: string, engine: Engine): Promise<Page> {
   const page = await (engine === "webkit" ? await safariBrowser() : browser).newPage({ viewport: { width: 1280, height: 800 } });
   page.setDefaultTimeout(8000);
   // Named for the journey that opened the page, also when it comes as the page closes (a request still in flight).
+  // A fetch WebKit refused "due to access control checks" also names the ore calls in flight then (F749).
   const of = running;
-  page.on("pageerror", (e) => errors.push(`${of}: ${e.message}`));
+  page.on("pageerror", async (e) => {
+    const calls = /access control/.test(e.message) ? await page.evaluate(() => JSON.stringify((window as unknown as { __ORE_INFLIGHT?: string[] }).__ORE_INFLIGHT)).catch(() => "page closed") : "";
+    errors.push(`${of}: ${e.message}${calls ? ` (in flight: ${calls})` : ""}`);
+  });
   await page.addInitScript(`window.__ORE_BRIDGE = ${BRIDGE}`);
   await page.addInitScript({ path: join(MOCK, "tauri.js") });
   await page.addInitScript(HYGIENE);

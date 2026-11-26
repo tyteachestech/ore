@@ -126,6 +126,9 @@ When a sweep's triage is done, add a row per tester here.
 | 11-25 | [simulated learner](2026-11-25-simulated-learner/) commuter | Codex | Five days of short bursts on the phone, backgrounded mid-exercise, a missed day | iPhone | 1 (+1 for Tyler) | #542 |
 | 11-25 | [simulated learner](2026-11-25-simulated-learner/) newcomer | Codex | A first week from an empty library: a real article, video, arXiv PDF and Wikipedia page, real AI | Mac | 3 | #542 |
 | 11-25 | [simulated learner](2026-11-25-simulated-learner/) stopwatch | Codex | Every wait in his day timed on his real library, three runs each, Mac and iPhone | both | 2 (open) | — |
+| 11-26 | [simulated learner 3×](2026-11-26-simulated-learner-3x/) owner | Codex | The 11-25 owner again, three testers at once to measure the Mac's load | Mac | 2 | #544 |
+| 11-26 | [simulated learner 3×](2026-11-26-simulated-learner-3x/) commuter | Codex | The 11-25 commuter again, at once with two others | iPhone | 1 | #544 |
+| 11-26 | [simulated learner 3×](2026-11-26-simulated-learner-3x/) newcomer | Codex | A first day on a new subject (transformers): a Quarto article, a video, BERT's PDF, Wikipedia (refused, 429) | both | 3 (1 fixed, 2 open) | #544 |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 

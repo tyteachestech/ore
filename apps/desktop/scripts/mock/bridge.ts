@@ -11,8 +11,20 @@ Bun.serve({
   // Never hang up on a quiet connection. Bun's default closes one idle for 10 s, and a journey that sends its next
   // call down that connection as it closes gets ECONNRESET (F452); a long `ore` run is quiet too.
   idleTimeout: 0,
+  // A throw in here answered a bare 500 with no CORS header, which WebKit reports only as a fetch refused "due to
+  // access control checks", naming nothing (F749): it answers with the error, and the log says which call threw.
   async fetch(req) {
-    const h = { "access-control-allow-origin": "*", "access-control-allow-headers": "*" };
+    try {
+      return await answer(req);
+    } catch (e) {
+      console.error(`bridge: ${req.method} ${new URL(req.url).pathname} threw: ${(e as Error).stack ?? e}`);
+      return new Response(JSON.stringify(`bridge: ${(e as Error).message}`), { status: 500, headers: H });
+    }
+  },
+});
+const H = { "access-control-allow-origin": "*", "access-control-allow-headers": "*" };
+async function answer(req: Request): Promise<Response> {
+    const h = H;
     if (req.method === "OPTIONS") return new Response(null, { headers: h });
     // convertFileSrc in tauri.js: files inside the library (thumbnails, note images), as the asset protocol serves them.
     const url = new URL(req.url);
@@ -52,6 +64,5 @@ Bun.serve({
     const line = lines.find((l) => l.startsWith("ore:"))?.slice(4).trim() ?? lines.pop();
     if (code !== 0) return new Response(JSON.stringify(line || "ore failed"), { status: 500, headers: h });
     return new Response(out.trim() || "null", { headers: h });
-  },
-});
+}
 console.log(`ore bridge on ${process.env.PORT ?? 1421}, library ${process.env.ORE_LIBRARY}`);

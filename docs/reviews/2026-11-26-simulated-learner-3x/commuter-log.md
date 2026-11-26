@@ -1,0 +1,57 @@
+# Commuter friction log
+
+- Day 1: Open: Today usable 1106 ms; Opening your library shown.
+- Day 1: Interaction: [role="dialog"] button:text-is("Start review") → .review 124 ms (includes Playwright actionability).
+- Day 1: Interaction: .review button:text-is("Easy") → tap returned 108 ms (includes Playwright actionability).
+- Day 1: Interaction: .review button:text-is("Sure") → tap returned 229 ms (includes Playwright actionability).
+- Day 1: Interaction: .review button:text-is("Sure") → tap returned 263 ms (includes Playwright actionability).
+- Day 1: Interaction: .review button:text-is("Sure") → tap returned 222 ms (includes Playwright actionability).
+- Day 1: Interaction: .review button:text-is("Sure") → tap returned 212 ms (includes Playwright actionability).
+- Day 1: Interaction: .review button:text-is("Sure") → tap returned 212 ms (includes Playwright actionability).
+- Day 1: Interaction: button:has-text("Values Guide") → .reader 175 ms (includes Playwright actionability).
+- Day 2: Interaction: button:text-is("Start review") → tap returned 395 ms (includes Playwright actionability).
+- Day 2: Interaction: [role="dialog"] button:text-is("Start review") → .review-q 495 ms (includes Playwright actionability).
+- Day 2: Interaction: .review button:text-is("Check") → tap returned 117 ms (includes Playwright actionability).
+- Day 2: Interaction: button:has-text("Values Guide") → tap returned 146 ms (includes Playwright actionability).
+- Day 2: Interaction: button:text-is("Back") → tap returned 300 ms (includes Playwright actionability).
+- Day 2: Interaction: button:text-is("Start review") → tap returned 422 ms (includes Playwright actionability).
+- Day 2: Review: after 3 ratings and a source detour, Start resumed the same next question; one Start tap, no picker once only Computer Science remained.
+- Day 2: Interaction: button[aria-label="Undo last rating"] → .review-q 137 ms (includes Playwright actionability).
+- Day 2: Interaction: .review button:text-is("Sure") → tap returned 237 ms (includes Playwright actionability).
+- Day 3: Interaction: button:has-text("Values Guide") → .reader 114 ms (includes Playwright actionability).
+- Day 3: Review check from Day 2: two hour-long hidden intervals were excluded; reratings saved 38,313 ms and 15,458 ms. Typed draft survived.
+- Day 3: Interaction: button:text-is("Finish") → tap returned 149 ms (includes Playwright actionability).
+- Day 3: Interaction: button:text-is("Done") → tap returned 150 ms (includes Playwright actionability).
+- Day 3: Interaction: button[aria-label="Search"] → tap returned 404 ms (includes Playwright actionability).
+- Day 3: Read/search: remembered word prioritize → first result 189 ms.
+- Day 3: Interaction: [role="option"]:has-text("Values Guide · key point") → .reader 116 ms (includes Playwright actionability).
+- Day 3: Interaction: button:text-is("Back") → tap returned 285 ms (includes Playwright actionability).
+- Day 3: Interaction: button[aria-label="Add a source"] → tap returned 387 ms (includes Playwright actionability).
+- Day 3: Interaction: [role="dialog"] button:text-is("Add") → tap returned 111 ms (includes Playwright actionability).
+- Day 3: Interaction: [role="dialog"] button:text-is("Add") → tap returned 486 ms (includes Playwright actionability).
+- Day 4: Interaction: button[aria-label="Open menu"] → tap returned 366 ms (includes Playwright actionability).
+- Day 4: Interaction: button:text-is("Start review") → tap returned 371 ms (includes Playwright actionability).
+- Day 4: Interaction: [role="dialog"] button:text-is("Start review") → tap returned 439 ms (includes Playwright actionability).
+- Day 4: Review, small phone at --type 1.647: next Explain question begins scrolled down, hiding its opening. Seen on rational-action and export-deadline questions; had to scroll back up to read what I was being asked.
+- Day 4: Interaction: [role="radiogroup"][aria-label="New exercises a day"] button:text-is("10") → tap returned 425 ms (includes Playwright actionability).
+- Day 5: Interaction: button:text-is("Start review") → tap returned 112 ms (includes Playwright actionability).
+- Day 5: Interaction: [role="dialog"] button:text-is("Start review") → tap returned 447 ms (includes Playwright actionability).
+- Day 5: Review confirmation: at 390×844, --type 1.647, --keyboard 0px, rational-action question arrived at y=-134.375 (scrollTop 269); export-deadline question y=-294.375 (scrollTop 429). Two independent transitions confirm hidden openings without the Day 4 resize artifact.
+- Day 5: Review startup actual touchstart → question + two frames: 107 ms; confirmation 1.
+- Day 5: Interaction: button[aria-label="Leave review"] → tap returned 395 ms (includes Playwright actionability).
+- Day 5: Review startup actual touchstart → question + two frames: 97 ms; confirmation 2.
+- Day 5: Interaction: button[aria-label="Leave review"] → tap returned 390 ms (includes Playwright actionability).
+
+## Reconciled task friction and limits
+
+- Day 1 · Review: long answers required scrolling to rate; four of seven helper-captured answers had Good partly or wholly below the viewport. Known F14; IDs in exercise-audit.md. The two API exercises had source links but no passage, matching their anchor-free note-derived seed data.
+- Day 1 · Read: two double-tap paragraph highlights saved; the second became a Key point; the first retained its note. An early attempt immediately after programmatic scrolling did not open the popup; repeated after scroll settlement worked. This is excluded as an automation timing mistake.
+- Day 2 · Review: after the first 3 ratings and source detour, the second burst exhausted today's queue after 2 ratings. The planned sixth exercise was unavailable under the one-real-day setup. Used Undo last rating for two hidden-hour diagnostics; both kept place, the second kept a typed draft. This changes the exact requested journey, not a product defect.
+- Day 3 · Read/Finish: four questions wait on the Mac; the recall was saved and the source stays in To read. I cannot complete this source's quiz on the bus. This is the accepted F738 behavior, clearly explained, not a new finding.
+- Day 3 · Add: ncase.me/remember/ could not be fetched here; the link is queued and the screen names the Mac as the next step. Native fetching is not available in this browser. Pasted text succeeded, including heading and both paragraphs.
+- Day 4 · Open/Settings: there is no app-wide text-size control in Ore's phone Settings; it follows iOS Settings. Native iOS Settings cannot be changed in this browser, so the supported scale was supplied through --type=1.647. The screen cannot explain this browser-only test limitation.
+- Day 4 · Review setup: increased New exercises a day to 20 through Settings because today's cap was exhausted; restored 10 through Settings afterward. All changes were in this test page's copy.
+- Day 4 · Review: 3/3 rated exercises needed scrolling at 375×667. The next three questions arrived partway down. Resizing a live page from 844 to 667 also made the keyboard adapter infer a 177px inset, so Day 4 clipping/end-ring evidence alone cannot prove a native-device defect.
+- Day 5 · Review: independent large-text confirmation at 390×844, keyboard inset 0, reproduced hidden question openings twice; extra upward scrolling was required. No recovery-time estimate was recorded.
+- Day 5 · Open/Close: after the simulated missed day, Today showed 0 of 10 without guilt copy. Six ratings saved 604,928ms, and the final ring showed 10. Its 6 memories kept / +31 days match the saved summary.
+- All days: simulator pauses, selector errors, one screenshot timeout, and a PTY command-length stall are tester overhead, excluded from product findings and wait totals. Some Day 1 elapsed review time includes that overhead; it is not a human learning-speed measurement.

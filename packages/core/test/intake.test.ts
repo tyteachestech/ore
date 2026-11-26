@@ -331,6 +331,28 @@ describe("import coverage: web pages", () => {
     expect(b).not.toContain("\\left(\\right.");
   });
 
+  test("a Pandoc or Quarto page's formulas: inline and on their own line, not raw TeX", async () => {
+    // pandoc-math.html: written for Ore in the markup Pandoc and Quarto write (the Annotated Transformer, simulated
+    // learner run 2026-11-26): each formula's TeX in a <span class="math inline|display">, with or without \( \[.
+    const b = (await htmlToDoc(web("pandoc-math.html"), "https://example.org/attention")).markdown;
+    expect(b).toContain("dimension $$d_k$$ and the values dimension $$d_v$$;");
+    expect(b).toContain("divided by $$\\sqrt{d_k}$$ before");
+    expect(b).toContain("\n$$\n\\mathrm{Attention}(Q, K, V) = \\mathrm{softmax}\\left(\\frac{QK^T}{\\sqrt{d_k}}\\right)V\n$$\n");
+    expect(b).toContain("\n$$\n\\mathrm{PE}_{(pos,2i)} = \\sin(pos / 10000^{2i/d_{\\text{model}}})\n$$\n");
+    expect(b).toContain("such as $5 and $10 are not");
+    expect(b).not.toContain("d\\_k");
+    // The page whole: its title, its first and last words.
+    const doc = await htmlToDoc(web("pandoc-math.html"), "https://example.org/attention");
+    expect(doc.title).toBe("Scaled attention, by hand");
+    expect(b).toContain("Attention compares each query with every key.");
+    expect(b).toContain("apart from their meaning.");
+    // Saved from a tab after KaTeX drew it: the TeX it kept, not the drawn letters.
+    const words = `<p>${"Words about attention that fill out the page. ".repeat(10)}</p>`;
+    const katex = `<p>Scale by <span class="math inline"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></mrow><annotation encoding="application/x-tex">\\sqrt{d_k}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">√dk</span></span></span> first.</p>`;
+    const drawn = (await htmlToDoc(`<html><head><title>T</title></head><body><article><h1>T</h1>${words}${katex}${words}</article></body></html>`, "https://example.org/t")).markdown;
+    expect(drawn).toContain("Scale by $$\\sqrt{d_k}$$ first.");
+  });
+
   test("Wikipedia's formula corners: indented on its own, older pages, chemistry, a page of stories", async () => {
     const words = `<p>${"Words about memory and forgetting that fill out the page. ".repeat(10)}</p>`;
     const page = (body: string) => `<html><head><title>T</title></head><body><article><h1>T</h1>${words}${body}${words}</article></body></html>`;
