@@ -45,7 +45,6 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
   // Mammoth does not expose w:outlineLvl. Map explicit outline levels to its heading styles
   // in a conversion copy only; the original document kept by intake stays byte-for-byte intact.
   const files = unzip(data);
-  let mapped = false;
   for (const path of ["word/document.xml", "word/footnotes.xml", "word/endnotes.xml"]) {
     if (!files[path]) continue;
     const xml = strFromU8(files[path]!);
@@ -56,9 +55,11 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
       const style = `<w:pStyle w:val="Heading${Math.min(6, Number(level) + 1)}"/>`;
       return props.replace(/<w:pStyle\b[^>]*(?:\/>|>[\s\S]*?<\/w:pStyle>)/g, "").replace(/(<w:pPr\b[^>]*>)/, `$1${style}`);
     });
-    if (headings !== xml) { files[path] = strToU8(headings); mapped = true; }
+    if (headings !== xml) files[path] = strToU8(headings);
   }
-  const converted = mapped ? zipSync(files) : data;
+  // Always the parts unzip() unpacked, never the file itself: mammoth unpacks a part however big it really is
+  // (F753), and unzip() stopped each at the size it declared.
+  const converted = zipSync(files);
   // Node's build of mammoth takes a Buffer; its browser build (the iPhone app) takes the bytes themselves.
   const input = (typeof Buffer !== "undefined" ? { buffer: Buffer.from(converted) } : { arrayBuffer: converted.buffer.slice(converted.byteOffset, converted.byteOffset + converted.byteLength) }) as { buffer: Buffer };
   // Code paragraphs (Word's and Pandoc's "Source Code" style) keep their lines and indent, fenced (F177);

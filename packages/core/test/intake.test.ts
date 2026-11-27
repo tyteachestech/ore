@@ -2197,12 +2197,9 @@ describe("import coverage: the grid's small holes", () => {
   });
 
   test("a zip bomb (an EPUB, Word, PowerPoint or Excel file that unpacks past a gigabyte) is refused at once, not unpacked (F753)", async () => {
-    // A few hundred bytes whose directory says one part unpacks to 4 GB: unpacked, a 1.5 MB Word file of
-    // this kind took the import to 6.6 GB of memory. The sizes a zip declares are what fflate allocates.
-    const { zipSync } = await import("fflate");
-    const zip = zipSync({ "mimetype": new TextEncoder().encode("application/epub+zip"), "big.xml": new TextEncoder().encode(" ".repeat(4096)) }, { level: 9 });
-    const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
-    for (let i = 0; i < zip.length - 4; i++) if (view.getUint32(i, true) === 0x02014b50 && view.getUint16(i + 10, true) === 8) view.setUint32(i + 24, 0xfffffff0, true);
+    // A few hundred bytes whose directory says one part unpacks to 4 GB (files/zip-bomb.zip): unpacked, a
+    // 1.5 MB Word file of this kind took the import to 6.6 GB of memory. fflate allocates the declared sizes.
+    const zip = readFileSync(file("zip-bomb.zip"));
     const dir = mkdtempSync(join(tmpdir(), "ore-bomb-"));
     for (const name of ["book.epub", "notes.docx", "deck.pptx", "vocab.xlsx"]) {
       writeFileSync(join(dir, name), zip);
@@ -2210,6 +2207,18 @@ describe("import coverage: the grid's small holes", () => {
       await expect(addSource(await tempLibrary(), join(dir, name))).rejects.toThrow(/unpacks to more than 1 GB/);
       expect(Date.now() - t).toBeLessThan(2000);
     }
+  });
+
+  test("a Word file whose parts unpack past the sizes they declare is refused as damaged, never unpacked past them (F753)", async () => {
+    // Mammoth unpacks a part however big it really is; it is handed only what unzip() unpacked.
+    const docx = new Uint8Array(readFileSync(file("notes.docx")));
+    const view = new DataView(docx.buffer, docx.byteOffset, docx.byteLength);
+    const name = new TextEncoder().encode("word/document.xml");
+    for (let i = 0; i < docx.length - 46; i++)
+      if (view.getUint32(i, true) === 0x02014b50 && view.getUint16(i + 28, true) === name.length && docx.subarray(i + 46, i + 46 + name.length).every((b, k) => b === name[k])) view.setUint32(i + 24, 200, true);
+    const dir = mkdtempSync(join(tmpdir(), "ore-lie-"));
+    writeFileSync(join(dir, "notes.docx"), docx);
+    await expect(addSource(await tempLibrary(), join(dir, "notes.docx"))).rejects.toThrow(/That Word file is damaged/);
   });
 
   test("a private Google Doc's sign-in page is refused with how to share it", async () => {

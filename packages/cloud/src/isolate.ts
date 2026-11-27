@@ -1,3 +1,5 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ImportJob } from "./import.ts";
 
@@ -10,7 +12,7 @@ export const WORKER = join(import.meta.dir, "import-worker.ts");
 /** Longer than a 200 MB file takes to download and read; reopen if real sources are cut off by it. */
 export const JOB_SECONDS = 300;
 /** All an import reads from its environment (packages/core); a secret added to the server later stays out. */
-const KEPT = ["PATH", "HOME", "TMPDIR", "LANG", "LC_ALL", "TZ", "ORE_TRANSCRIBE", "ORE_NO_TOOLS", "ORE_OCR", "ORE_PADDLE", "ORE_PADDLE_HOME"];
+const KEPT = ["PATH", "HOME", "LANG", "LC_ALL", "TZ", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY", "https_proxy", "http_proxy", "no_proxy", "SSL_CERT_FILE", "NODE_EXTRA_CA_CERTS", "ORE_TRANSCRIBE", "ORE_NO_TOOLS", "ORE_OCR", "ORE_PADDLE", "ORE_PADDLE_HOME", "ORE_PADDLE_LOCK"];
 
 const TOO_LONG = "That took Ore's server too long to read. Add it on your Mac.";
 const FAILED = "Ore's server couldn't read that just now. Try again, or add it on your Mac.";
@@ -20,12 +22,22 @@ const FAILED = "Ore's server couldn't read that just now. Try again, or add it o
 export async function isolated(job: ImportJob, { script = WORKER, seconds = JOB_SECONDS } = {}): Promise<string> {
   const files = "url" in job ? [] : [job.bytes, ...Object.values(job.beside ?? {})];
   const head = "url" in job ? { url: job.url } : { name: job.name, sizes: files.map((f) => f.byteLength), beside: Object.keys(job.beside ?? {}) };
-  const env = Object.fromEntries(KEPT.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]!]));
-  const proc = Bun.spawn([process.execPath, script], { stdin: "pipe", stdout: "pipe", stderr: "inherit", env });
+  // Its scratch space is made and removed here: a process that is killed can't clean up after itself.
+  const scratch = mkdtempSync(join(tmpdir(), "ore-cloud-job-"));
+  const env = { ...Object.fromEntries(KEPT.filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]!])), TMPDIR: scratch };
+  // In a process group of its own, so the time limit stops the tools it started too (git, a page reader).
+  const proc = Bun.spawn([process.execPath, script], { stdin: "pipe", stdout: "pipe", stderr: "inherit", env, detached: true });
+  const stop = () => {
+    try {
+      process.kill(-proc.pid, 9);
+    } catch {
+      proc.kill(9);
+    }
+  };
   let late = false;
   const timer = setTimeout(() => {
     late = true;
-    proc.kill(9);
+    stop();
   }, seconds * 1000);
   const send = (async () => {
     proc.stdin.write(JSON.stringify(head) + "\n");
@@ -42,5 +54,7 @@ export async function isolated(job: ImportJob, { script = WORKER, seconds = JOB_
     return out;
   } finally {
     clearTimeout(timer);
+    stop(); // anything it left running
+    rmSync(scratch, { recursive: true, force: true });
   }
 }

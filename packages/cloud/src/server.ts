@@ -94,11 +94,12 @@ export const makeHandler = (auth: Auth, allowed = limiter(), run: Run = isolated
   const mine = running.get(sub) ?? 0;
   if (mine >= IMPORTS.perAccount) return json({ refused: "Ore's server is still reading the last ones you sent. Wait for one to finish, then send this again." }, 429);
   if (total >= IMPORTS.total) return json({ refused: "Ore's server is busy just now. Try again in a minute." }, 503);
-  if (!hourly(sub)) return json({ refused: "That's a lot of imports in an hour. Wait a little, then send this again." }, 429);
   running.set(sub, mine + 1);
   total++;
+  // Counted toward the hour only once the request is one the server reads, not a refused or malformed one.
+  const go = async (job: ImportJob) => (hourly(sub) ? reply(await run(job)) : json({ refused: "That's a lot of imports in an hour. Wait a little, then send this again." }, 429));
   try {
-    return await importRoute(req, url, run);
+    return await importRoute(req, url, go);
   } finally {
     total--;
     const left = (running.get(sub) ?? 1) - 1;
@@ -108,7 +109,7 @@ export const makeHandler = (auth: Auth, allowed = limiter(), run: Run = isolated
   };
 };
 
-async function importRoute(req: Request, url: URL, run: Run): Promise<Response> {
+async function importRoute(req: Request, url: URL, go: (job: ImportJob) => Promise<Response>): Promise<Response> {
   if (Number(req.headers.get("content-length") ?? 0) > MAX_UPLOAD) return json({ refused: "This file is too big for Ore's server. Add it on your Mac." }, 413);
   const type = (req.headers.get("content-type") ?? "").toLowerCase();
   if (type.startsWith("application/json")) {
@@ -123,17 +124,17 @@ async function importRoute(req: Request, url: URL, run: Run): Promise<Response> 
       const beside = b.beside && typeof b.beside === "object" ? (b.beside as Record<string, unknown>) : {};
       if (Object.values(beside).some((v) => typeof v !== "string")) return json({ error: "beside holds base64 files by name" }, 400);
       const bytes = (v: string) => new Uint8Array(Buffer.from(v, "base64"));
-      return reply(await run({ name: b.name, bytes: bytes(b.bytes), beside: Object.fromEntries(Object.entries(beside).map(([n, v]) => [n, bytes(v as string)])) }));
+      return go({ name: b.name, bytes: bytes(b.bytes), beside: Object.fromEntries(Object.entries(beside).map(([n, v]) => [n, bytes(v as string)])) });
     }
     const link = b.url;
     if (typeof link !== "string" || !/^https?:\/\//i.test(link)) return json({ error: "give a link starting with http:// or https://" }, 400);
-    return reply(await run({ url: link }));
+    return go({ url: link });
   }
   const name = url.searchParams.get("name");
   if (!name) return json({ error: "a file needs its name in ?name=" }, 400);
   const bytes = new Uint8Array(await req.arrayBuffer());
   if (bytes.byteLength > MAX_UPLOAD) return json({ refused: "This file is too big for Ore's server. Add it on your Mac." }, 413);
-  return reply(await run({ name, bytes }));
+  return go({ name, bytes });
 }
 
 /** Tools that open links themselves, past the guard on private addresses (guard.ts): the server won't
