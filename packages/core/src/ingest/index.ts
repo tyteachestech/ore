@@ -8,7 +8,7 @@ import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { deviceName, latestRevs, realNow, sha256, subdirs, writeAtomic } from "../fsutil.ts";
 import { isUlid, nowIso, ulid } from "../ids.ts";
 import { THEIRS_FIRST_MS } from "../inbox.ts";
-import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
+import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDir, setItemArchived, sourceFile, updateItemMeta, writeSource, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
 import { paths, type Library } from "../library.ts";
 import { proseLines } from "../links.ts";
 import { withLock } from "../lock.ts";
@@ -140,7 +140,7 @@ const damaged = (what: string, app?: string, bytes?: Uint8Array) => (e: Error): 
 };
 
 /** An audio file's title, artist and chapters from its own tags (ID3, MP4); none when it has none or they won't read. */
-async function audioTags(bytes: Uint8Array, ext: string): Promise<{ title?: string; author?: string; chapters: { title: string; start_time: number }[] }> {
+async function audioTags(bytes: Uint8Array, ext: string): Promise<{ title?: string; author?: string; published?: string; chapters: { title: string; start_time: number }[] }> {
   try {
     const { parseBuffer } = await import("music-metadata");
     const mimeType = ({ m4a: "audio/mp4", mp4: "audio/mp4", aac: "audio/aac", mp3: "audio/mpeg", wav: "audio/wav", flac: "audio/flac", aiff: "audio/aiff" } as Record<string, string>)[ext];
@@ -148,7 +148,13 @@ async function audioTags(bytes: Uint8Array, ext: string): Promise<{ title?: stri
     // A chapter track the reader can't follow still leaves the title and artist.
     const m = await parseBuffer(bytes, info, { includeChapters: true, skipCovers: true }).catch(() => parseBuffer(bytes, info, { skipCovers: true }));
     const chapters = (m.format.chapters ?? []).filter((c) => c.title?.trim()).map((c) => ({ title: c.title, start_time: c.timeScale ? c.start / c.timeScale : c.start }));
-    return { title: m.common.title?.trim() || undefined, author: m.common.artist?.trim() || undefined, chapters };
+    // Its date as tagged: a full day (ID3's year and day, an MP4's date), not a year alone.
+    // ID3v2.3 keeps the year (TYER) and the day and month (TDAT, "DDMM") apart; not every reader joins them.
+    const tdat = Object.values(m.native).flat().find((t) => t.id === "TDAT")?.value;
+    const joined = m.common.year && typeof tdat === "string" && /^\d{4}$/.test(tdat) ? `${m.common.year}-${tdat.slice(2)}-${tdat.slice(0, 2)}` : undefined;
+    const date = m.common.date ?? joined;
+    const day = /^\d{4}-\d{2}-\d{2}/.test(date ?? "") ? cleanDate(date) : undefined;
+    return { title: m.common.title?.trim() || undefined, author: m.common.artist?.trim() || undefined, published: day, chapters };
   } catch {
     return { chapters: [] };
   }
@@ -177,7 +183,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     const stem = fileStem(name).replace(/^\d{5,}[-_ ]+/, "").replace(/[-_]+/g, " ").trim() || fileStem(name);
     const title = tags.title ?? stem[0]!.toUpperCase() + stem.slice(1);
     // The audio itself is the original, kept to play in place (D122, D167); the timed transcript beside it.
-    return { type: "article", title, author: tags.author, url, body: vttToBody(vtt, tags.chapters), source: { ext: kind, data: bytes }, transcript: vtt };
+    return { type: "article", title, author: tags.author, published: tags.published, url, body: vttToBody(vtt, tags.chapters), source: { ext: kind, data: bytes }, transcript: vtt };
   }
   if (kind === "pdf") {
     const stale = !!opts.regions?.length && !!opts.regionsOf && !(await fits(opts.regionsOf, bytes));
@@ -385,7 +391,9 @@ async function fromUrl(url: string, opts: AddOptions): Promise<NewItem> {
     const mb = (n: number) => Math.max(1, Math.round(n / 1e6));
     const bytes = await readCapped(res, (got, of) => opts.onProgress?.(got / of, `Downloading ${mb(got)} of ${mb(of)} MB`));
     const draft = await fromBytes(bytes, ext, ep.title ?? "Episode", url, url, { ...opts, language: ep.language ?? opts.language });
-    return { ...draft, title: ep.title ?? draft.title, author: ep.show, published: ep.published, picture: ep.artwork };
+    // Its show notes after the transcript, as a video's description (deep import pass).
+    const notes = ep.description ? (await import("./youtube.ts")).description(ep.description) : "";
+    return { ...draft, title: ep.title ?? draft.title, author: ep.show, published: ep.published, picture: ep.artwork, body: draft.body + notes };
   }
   if (VIDEO_SITE.test(url)) {
     // Played on its own site (the reader's player is YouTube's); the transcript reads like an article.
@@ -530,9 +538,10 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
   const ext = extname(path).slice(1).toLowerCase();
   if (VIDEO_TYPES.includes(ext) && !opts.type) {
     // A lecture recording or a downloaded course video: heard from its sound where it lies, never
-    // read into memory, so no size limit (D122). Only its transcript is kept.
+    // read into memory, so no size limit (D122). The video is the original, copied in beside its transcript
+    // (Tyler 2026-11-27: one added from the inbox was deleted with only its transcript kept).
     const vtt = await (await import("./audio.ts")).transcribeFile(path, opts.onProgress);
-    return { type: "article", title: fileStem(path), body: vttToBody(vtt), source: { ext: "vtt", data: vtt } };
+    return { type: "article", title: fileStem(path), body: vttToBody(vtt), source: { ext, file: path }, transcript: vtt };
   }
   if (stat.size > MAX_BYTES) throw new Error(tooBig());
   const bytes = new Uint8Array(readFileSync(path));
@@ -648,7 +657,7 @@ async function keep(lib: Library, had: Item, opts: AddOptions, draft?: NewItem):
     const current = findItem(lib, had.meta.id);
     if (!sourceFile(current) && current.body === draft.body.replace(/\r\n?/g, "\n")) {
       for (const a of draft.assets ?? []) writeAtomic(join(current.dir, "assets", a.name), a.data);
-      writeAtomic(join(current.dir, `source.${draft.source!.ext}`), draft.source!.data);
+      writeSource(current.dir, draft.source!);
     }
   });
   // A post he was previewing from the Feed, added on purpose: it is a source now.
@@ -963,6 +972,12 @@ async function lessonOf(item: Item): Promise<CourseLesson> {
   return { title, url: url!, video: video ?? (type === "youtube" ? url : undefined) };
 }
 
+/** A video file's source read again: its transcript, as heard when it was added; the video stays as it is. */
+function videoAgain(item: Item, kept: string): NewItem {
+  const vtt = readFileSync(join(item.dir, "transcript.vtt"), "utf8");
+  return { type: "article", title: item.meta.title, body: vttToBody(vtt), source: { ext: extname(kept).slice(1), file: join(item.dir, kept) }, transcript: vtt };
+}
+
 /** Fetches a source's original again and puts its new text in place: the same source (id, cards,
  *  notes, progress, title he gave it), its highlights re-anchored where their passage still is, and
  *  the ones whose passage is gone removed, except questions (his own words, listed on the skill page).
@@ -981,7 +996,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
   const regions = read ?? layoutOf(item.dir);
   // A pasted page (source.html beside a Markdown source) is read as it was pasted.
   const pasted = type === "markdown" && !url && kept === "source.html";
-  const draft = await (async () => withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, regionsOf: savedPdf, episode: existsSync(pageFile(item)), onProgress }) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions })))().catch(async (e: Error) => {
+  const draft = await (async () => withImages(pasted ? { type: "markdown" as const, ...(await pastedDraft(readFileSync(join(item.dir, kept), "utf8"))) } : course && !kept ? await lessonDraft(await lessonOf(item)) : !kept ? await fromUrl(url!, { regions, regionsOf: savedPdf, episode: existsSync(pageFile(item)), onProgress }) : VIDEO_TYPES.includes(extname(kept).slice(1)) ? videoAgain(item, kept) : await fromBytes(new Uint8Array(readFileSync(join(item.dir, kept))), kindOf(kept)!, kept, url, url, { regions })))().catch(async (e: Error) => {
     // A recording that can't be heard again here, from its file or its link, keeps the transcript it has: nothing to paste.
     const { PASTE_STEP } = await import("./audio.ts");
     throw PASTE_STEP.test(e.message) ? new Error(e.message.replace(PASTE_STEP, " Its transcript is as it was.")) : e;
@@ -1017,7 +1032,7 @@ function savedPictures(body: string, item: Item): string {
 /** The original a file source is read again from: the copy kept beside it (source.*), so a better reader
  *  reaches it (a recording heard again, D167; a Word file, a screenshot). Text (a Markdown file, pasted
  *  text) reads the same every time, so there is nothing to read again. */
-const keptOriginal = (dir: string) => readdirSync(dir).find((f) => f.startsWith("source.") && !/\.(md|markdown|txt|text)$/i.test(f) && kindOf(f));
+const keptOriginal = (dir: string) => readdirSync(dir).find((f) => f.startsWith("source.") && !/\.(md|markdown|txt|text)$/i.test(f) && (kindOf(f) || VIDEO_TYPES.includes(extname(f).slice(1))));
 
 /** Whether Reimport has an original to read: a link, or a file's kept copy (D93). The ⋯ menu offers it by this. */
 export const canReimport = (item: Item) => item.meta.type !== "snippet" && (!!item.meta.url || !!keptOriginal(item.dir));
@@ -1061,7 +1076,7 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     // A file read again from its kept copy keeps that copy as it is: the same bytes need no second write.
     const same = draft.source && kept === `source.${draft.source.ext}` ? kept : undefined;
     for (const f of readdirSync(item.dir).filter((f) => REPLACED(f) && f !== "doc.md" && f !== same)) unlinkSync(join(item.dir, f));
-    if (draft.source && !same) writeAtomic(join(item.dir, `source.${draft.source.ext}`), draft.source.data);
+    if (draft.source && !same) writeSource(item.dir, draft.source);
     if (draft.transcript) writeAtomic(join(item.dir, "transcript.vtt"), draft.transcript);
     if (draft.page) writeAtomic(join(item.dir, "page.html"), draft.page);
     if (regions?.length) writeAtomic(join(item.dir, "layout.json"), JSON.stringify(regions));

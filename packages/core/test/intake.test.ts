@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
@@ -22,6 +22,7 @@ import { chapterLines } from "../src/ai/recall.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { tempLibrary } from "./helpers.ts";
+import { paths } from "../src/library.ts";
 
 // Import coverage (docs/reviews/2026-10-28-import-coverage.md): every content type Ore reads has a
 // saved example here, and each must keep what a learner needs from it. Pages are real ones, saved
@@ -1698,6 +1699,27 @@ describe("import coverage: audio and podcasts", () => {
     }
   });
 
+  test("an audio file's own date tags (ID3's year and day) come in as its date (deep import pass)", async () => {
+    // chaptered.mp3's sound under a new ID3v2.3 tag: a title, TYER 2026 and TDAT 2711 (day and month).
+    const src = new Uint8Array(readFileSync(join(FIX, "audio", "chaptered.mp3")));
+    const syncsafe = (b: Uint8Array) => ((b[6]! & 127) << 21) | ((b[7]! & 127) << 14) | ((b[8]! & 127) << 7) | (b[9]! & 127);
+    const frame = (id: string, text: string) => {
+      const f = new Uint8Array(11 + text.length);
+      f.set(strToU8(id));
+      new DataView(f.buffer).setUint32(4, text.length + 1);
+      f.set(strToU8(text), 11);
+      return f;
+    };
+    const frames = [frame("TIT2", "Field Notes"), frame("TYER", "2026"), frame("TDAT", "2711")];
+    const n = frames.reduce((s, f) => s + f.length, 0);
+    const tag = new Uint8Array([0x49, 0x44, 0x33, 3, 0, 0, (n >> 21) & 127, (n >> 14) & 127, (n >> 7) & 127, n & 127]);
+    const f = join(mkdtempSync(join(tmpdir(), "ore-mp3-")), "notes.mp3");
+    writeFileSync(f, Buffer.concat([tag, ...frames, src.subarray(10 + syncsafe(src))]));
+    const item = await addSource(await tempLibrary(), f);
+    expect(item.meta.title).toBe("Field Notes");
+    expect(item.meta.published).toBe("2026-11-27");
+  });
+
   test("an audio link is titled by its own file name, not where it redirects", async () => {
     const url = "https://www.buzzsprout.com/123/episodes/17456166-travel-with-kids.mp3";
     globalThis.fetch = (async () => {
@@ -1750,13 +1772,15 @@ describe("import coverage: audio and podcasts", () => {
   test("an Apple Podcasts episode: its audio through Apple's lookup, titled as the episode", async () => {
     const audio = "https://traffic.megaphone.fm/HSW1.mp3";
     serve({
-      "https://itunes.apple.com/lookup?id=1545953110&entity=podcastEpisode&limit=200": { body: JSON.stringify({ results: [{ wrapperType: "track", trackId: 1545953110 }, { trackId: 1000560140000, episodeUrl: "https://traffic.megaphone.fm/OTHER.mp3", trackName: "Another episode" }, { trackId: 1000560143046, episodeUrl: audio, trackName: "Master your sleep", collectionName: "Huberman Lab", releaseDate: "2021-01-11T08:00:00Z" }] }), type: "application/json" },
+      "https://itunes.apple.com/lookup?id=1545953110&entity=podcastEpisode&limit=200": { body: JSON.stringify({ results: [{ wrapperType: "track", trackId: 1545953110 }, { trackId: 1000560140000, episodeUrl: "https://traffic.megaphone.fm/OTHER.mp3", trackName: "Another episode" }, { trackId: 1000560143046, episodeUrl: audio, trackName: "Master your sleep", collectionName: "Huberman Lab", releaseDate: "2021-01-11T08:00:00Z", description: "How light, temperature and timing set your sleep.\nTools: morning light, a cool room." }] }), type: "application/json" },
       [audio]: { body: new Uint8Array(4096), type: "audio/mpeg" },
     });
     const url = "https://podcasts.apple.com/us/podcast/master-your-sleep/id1545953110?i=1000560143046&uo=4";
     const item = await addSource(await tempLibrary(), url);
     expect(item.meta).toMatchObject({ title: "Master your sleep", author: "Huberman Lab", published: "2021-01-11T08:00:00Z", url });
     expect(item.body).toContain("[01:00] Thanks for listening.");
+    // Its show notes, as a video's description comes in (deep import pass).
+    expect(item.body).toMatch(/## From the description\n\nHow light, temperature and timing set your sleep\. {2}\nTools: morning light, a cool room\.\n$/);
   });
 
   test("an episode on Apple Podcasts older than the lookup's last 200 is found in the show's own feed (F62)", async () => {
@@ -2229,7 +2253,24 @@ describe("import coverage: videos heard from their sound", () => {
     expect(item.meta).toMatchObject({ type: "article", title: "Week 3 lecture" });
     expect(item.body).toBe("[00:00] Testing yourself beats rereading.\n\n[01:00] Teachers can quiz every week.\n");
     expect(readFileSync(join(dir, "args"), "utf8").trim()).toBe(f);
-    expect(existsSync(join(item.dir, "source.mov"))).toBe(false);
+    expect(statSync(join(item.dir, "source.mov")).size).toBe(300 * 1024 * 1024);
+  });
+
+  test("a video file keeps its original beside its transcript, so one added from the inbox isn't lost (Tyler 2026-11-27)", async () => {
+    const lib = await tempLibrary();
+    mkdirSync(paths.inbox(lib), { recursive: true });
+    const f = join(paths.inbox(lib), "Lab demo.mp4");
+    writeFileSync(f, "the video's own bytes");
+    const item = await addSource(lib, f);
+    expect(existsSync(f)).toBe(false);
+    expect(readFileSync(join(item.dir, "source.mp4"), "utf8")).toBe("the video's own bytes");
+    expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toContain("Testing yourself beats rereading.");
+    // Read again from what is kept, without hearing it again.
+    rmSync(join(dir, "args"));
+    const again = await reimportSource(lib, item.meta.id);
+    expect(existsSync(join(dir, "args"))).toBe(false);
+    expect(readFileSync(join(again.item.dir, "source.mp4"), "utf8")).toBe("the video's own bytes");
+    expect(again.item.body).toBe(item.body);
   });
 
   test("speech in a language the Mac has no model for says so", async () => {

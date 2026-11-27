@@ -74,12 +74,18 @@ function captionLines(vtt: string): { t: number; text: string; words: Word[] }[]
   const out: { t: number; text: string; words: Word[] }[] = [];
   let last = "";
   let lastEnd = -Infinity;
+  // A cue streamed captions send again at a segment's edge (TED's HLS): the same start and lines (deep import pass).
+  const sent = new Set<string>();
   for (const cue of cues(vtt)) {
     const fresh: { raw: string; text: string }[] = [];
     const texts = cue.lines.map(clean);
+    const key = `${cue.start}\n${texts.join("\n")}`;
+    if (texts.length > 1 && sent.has(key)) continue;
+    sent.add(key);
     texts.forEach((text, i) => {
       const rolls = cue.start <= lastEnd + 1 || texts.slice(i + 1).some((t) => t && t !== text);
-      if (!text || (text === last && rolls)) return;
+      // A line with its own word times is being said now: the same words said twice in a row stay twice (F582).
+      if (!text || (text === last && rolls && !taggedWords(cue.lines[i]!, cue.start))) return;
       fresh.push({ raw: cue.lines[i]!, text });
       last = text;
     });
@@ -178,7 +184,7 @@ export const ytDlp = () => Bun.which("yt-dlp", { PATH: process.env.PATH });
 
 /** The video's description under its own heading after the transcript: the links and resources its
  *  maker lists. Empty when there is none. */
-const description = (d: string | undefined) => (d?.trim() ? `\n${DESCRIPTION_HEADING}\n\n${d.trim().replace(/\n{3,}/g, "\n\n").replace(/\n(?!\n)/g, "  \n")}\n` : "");
+export const description = (d: string | undefined) => (d?.trim() ? `\n${DESCRIPTION_HEADING}\n\n${d.trim().replace(/\n{3,}/g, "\n\n").replace(/\n(?!\n)/g, "  \n")}\n` : "");
 export const DESCRIPTION_HEADING = "## From the description";
 
 /** A caption track's WebVTT. Some sites (TED) serve it as an HLS playlist of short VTT segments,
