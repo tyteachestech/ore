@@ -387,7 +387,7 @@ let unseen = false;
 /** Before each command (core.ts `run`): the folder's changes read in first, at most one scan in `within` ms. A
  *  file is written whole from memory, so a command run on a copy older than the folder's saved it over the Mac's
  *  edit: a rename, an archive, a new skill or a note line the phone, on screen, hadn't scanned for yet (up to 30 s,
- *  F-new-phone-stale-write). What iCloud hasn't brought down yet still keeps iCloud's latest (D222). */
+ *  F756). What iCloud hasn't brought down yet still keeps iCloud's latest (D222). */
 export const FRESH_MS = 1000;
 /** True when it read something in. It waits for no write: while this phone's own are still going out (an hour's
  *  audio can take a while) it leaves the folder for the next scan, so a command never waits on an upload. */
