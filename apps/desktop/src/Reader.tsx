@@ -572,7 +572,8 @@ const Body = memo(function Body({ markdown, video, dir, cells, pages, book, onRe
   const pace = useRef({ at: 0, added: 0, per: 4 });
   useLayoutEffect(() => {
     const p = pace.current;
-    if (p.added) (p.per = (performance.now() - p.at) / p.added), (p.added = 0);
+    // The span can hold a scroll's work while the transition yielded: let one slow pass raise the estimate by half at most.
+    if (p.added) (p.per = Math.min((performance.now() - p.at) / p.added, p.per * 1.5)), (p.added = 0);
   }, [shown]);
   useEffect(() => {
     if (shown < total)

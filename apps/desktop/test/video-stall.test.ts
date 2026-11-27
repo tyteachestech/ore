@@ -49,6 +49,14 @@ test("F2: sustained buffering after playback reports a stall and recovery clears
   } finally { p.close(); }
 });
 
+test("F2: a slow first load is not called a stall: only buffering after the video has played is", async () => {
+  const p = await player();
+  try {
+    p.state(3); p.advance(8000); expect(p.error()).toBeNull();
+    p.state(1); p.state(3); p.advance(6000); expect(p.error()).toBe(-4);
+  } finally { p.close(); }
+});
+
 test("buffering detection resets on seek, pause, end and a new buffering period", async () => {
   const { bufferingState } = await import("../src/video-stall");
   expect(bufferingState(null, 3, 100)).toEqual({ since: 100, stalled: false });

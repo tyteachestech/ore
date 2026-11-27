@@ -100,8 +100,11 @@ export function useYouTube(video: string | undefined, id: string): Player {
     if (!video || !origin) return;
     let heard = false;
     let buffering: number | null = null;
+    // A stall is mid-play (F2): the wait before the first frame is the load, which LOAD_WAIT covers.
+    let played = false;
     const checkBuffering = () => {
-      const next = bufferingState(buffering, state.current, performance.now(), seekedAt.current);
+      if (state.current === 1) played = true;
+      const next = bufferingState(played ? buffering : null, played ? state.current : -1, performance.now(), seekedAt.current);
       buffering = next.since;
       // A real YouTube failure keeps its own reason; a stall recovers as soon as playback does.
       setError((e) => e === null || e === -4 ? (next.stalled ? -4 : null) : e);

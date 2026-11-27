@@ -677,7 +677,7 @@ export function PhoneApp() {
       if ((missed.current = !read.lands())) return;
       if (ids) {
         setItems((before) => mergeSourceRows(before, all, ids, false));
-        setArchived((before) => mergeSourceRows(before, all, ids, true));
+        setArchived((before) => before && mergeSourceRows(before, all, ids, true)); // Archive unread yet stays unread
       } else setItems(all);
       setSkills(sk);
       void shareSkills(sk.filter((k) => !k.archived));
