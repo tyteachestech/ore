@@ -333,14 +333,16 @@ function collectionName(name: string, others: (string | undefined)[] = []): stri
 }
 
 // The sidebar's layout: collections in order, each with its skills in order ("" holds the skills in
-// no collection). Every skill appears exactly once.
+// no collection). Every skill appears at most once: one the layout leaves out (added on the other device since
+// it was drawn) keeps its place, and one it names that is gone is passed over (arrangeSkills).
 export const SkillLayoutSchema = z.array(z.object({ collection: z.string(), skills: z.array(z.string()) }));
 export type SkillLayout = z.infer<typeof SkillLayoutSchema>;
 
 // Lay out the sidebar in one write: sorts skills.yaml into the given order (each collection's skills
 // contiguous, since a collection's place is where its first skill appears) and sets or clears each
 // skill's collection. Moving a skill, reordering, renaming or removing a collection, and undoing any
-// of them are all this call. Comments on each skill's entry move with it.
+// of them are all this call. Comments on each skill's entry move with it. A layout drawn before the other device
+// added or deleted a skill still saves.
 export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<Skill[]> {
   return withLock(paths.lock(lib), () => {
     const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
@@ -355,7 +357,8 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
       names.add(c.toLowerCase());
       for (const id of g.skills) {
         const node = byId.get(id);
-        if (!node) throw new Error(`unknown skill "${id}"`);
+        // Deleted on the other device since this layout was drawn: nothing to place.
+        if (!node) continue;
         if (seen.has(id)) throw new Error(`skill "${id}" is listed twice`);
         seen.add(id);
         if (c) node.set("collection", c);
@@ -363,8 +366,20 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
         order.push(node);
       }
     }
-    const missing = [...byId.keys()].filter((id) => !seen.has(id));
-    if (missing.length) throw new Error(`layout leaves out ${missing.map((id) => `"${id}"`).join(", ")}`);
+    // Added on the other device since this layout was drawn (the iPhone and the Mac share skills.yaml, D222): it
+    // keeps its collection, after the skills laid out there, rather than the whole move failing (F766).
+    // A collection the layout spells otherwise ("work" for "Work") is the same one: it takes the layout's spelling,
+    // or the next save would find two that differ only by capitals.
+    for (const [id, node] of byId) {
+      if (seen.has(id)) continue;
+      const c = String(node.get("collection") ?? "").toLowerCase();
+      const last = order.findLastIndex((n) => String(n.get("collection") ?? "").toLowerCase() === c);
+      if (last >= 0) {
+        const spelled = order[last]!.get("collection");
+        if (spelled) node.set("collection", spelled);
+      }
+      order.splice(last < 0 ? order.length : last + 1, 0, node);
+    }
     list.items = order;
     const skills = parseSkillsFile(doc.toJSON()).file.skills;
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));

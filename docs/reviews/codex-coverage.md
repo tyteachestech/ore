@@ -25,7 +25,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 1. **running** Learners over days (the "Run another Codex learner pass" thread: asker, importer, returner, real clock).
 2. **Burn down the open rows.** About twenty `open` rows in `findings.md` need no call from Tyler (F1, F2, F3, F6, F13, F294, F421, F538, F547, F548, F660, F662, F684, F727, F729, F737 among them). Reading scouts write a red script for each, Codex drafts a fix, Claude QAs. The bugs are already known, so every hour goes to fixing.
 3. **done (#564)** Flaky tests are races. Causes found for F142, F347, F348, F397, F516, F575 and a new one in the corners journey (F751); each failing journey now prints the `ore` calls in flight. Still open: F515, F623, F651 (not reproduced under load), F349 and F748 (need Tyler's Mac), and the new office-03 "error: undefined" (F752). A pass on the Mac takes the last two.
-4. **Mac and iPhone writing at once.** Both on one iCloud folder: a rating on each, a note edited on both, Archive on one while the source is open on the other, a conflict copy. Deep scan 1 and 4 did it below the screens; nobody has run both apps.
+4. **done** Mac and iPhone writing at once ([two devices 11-27](2026-11-27-two-devices/), Claude in the cloud: both apps on one folder; 2 fixed). Left: real iCloud between his two devices, below.
 5. **Import at real breadth, deep (D122).** The running importer brings one file of each kind as a learner; start from its report and go deep: many files per type read against their source from start to end, EPUB books from his Calibre library, long textbooks, scans with and without the page reader downloaded (#494; refused with the next step when it is missing), and `bun run intake:live` over fifty popular sites. Fixtures for any bug are rewritten or openly licensed (D96).
 6. **Upgrade from an older library, rich.** Sweep 9 found nothing on a small seed with no media, PDF or chats. Redo with a copy of ~/Ore as written by a commit from 11-10, 11-17 and 11-24.
 7. **partly (11-27, Claude, computer use in the background)** **The real Mac window.** The menu bar was read on the installed app for the first time: its items were the shortcut sheet's sentences (fixed, F756), and three items don't say their state (F757, open). Still to do, and it writes, so it needs the app on a scratch library (the "Ore Debug" copy with its own bundle id, `scripts/mock/README.md`, or his Ore quit and reopened with `ORE_LIBRARY`): ⌘Q with drafts open (F15), the quick quiz's global shortcut, open at login, the updater relaunching it, drag and paste from Finder, Safari, Preview and Notes.
@@ -36,7 +36,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 12. **New learners.** An exam crammer (deadline, a big new batch, Importance), a language learner (vocabulary, audio, another script), a researcher with fifty papers. Each a five-day run with real AI.
 13. **CLI and `/ore` skill recheck.** Sweep 3 found 10; many commands changed since. Every `--json` answer against `packages/cli/src/answers.ts`, exit codes, the library's AGENTS.md.
 14. *Claude lane:* **Hostile content** in sources and feeds (scripts, paths, commands, huge files), which Codex refused.
-15. *Claude lane:* **Ore Cloud security** (`packages/cloud`: `guard.ts`, `server.ts`, `import.ts`) with `/security-and-hardening`, before it takes outside input (D355).
+15. **done (#572)** *Claude lane:* **Ore Cloud security.** Sign-in, sessions, account deletion and the private-address guard held; four bugs fixed (a zip bomb, an import that could take the server down, no import limits, yt-dlp past the guard), one wording row open. Still open, each needing the server online or Tyler: Apple tokens revoked on delete (his .p8 key, #551), IPv6 egress if the host gets it (the firewall in #571 covers IPv4), and a pass on the live server once #550 deploys it.
 
 ## Angles
 
@@ -103,7 +103,8 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | iPhone in the real Simulator, next to Apple's apps | done | codex phone 11-12, native scout 11-19 |
 | The real Mac window (menus, shortcuts, ⌘Q, updater) | partly | ux real UI 11-27 (menu bar); ⌘Q, shortcuts, updater: queue 7 (F15 open since 11-11) |
 | Drag and paste from other apps | open | queue 7 |
-| Mac and iPhone writing at once | partly | deep scan 1 data, deep scan 4 edges (files only): queue 4 |
+| Mac and iPhone writing at once | done | deep scan 1 data, deep scan 4 edges (files only), [two devices 11-27](2026-11-27-two-devices/) (both apps on one folder; `e2e/journeys/two-devices.ts` keeps it) |
+| Real iCloud between his Mac and iPhone (its delay, conflict versions) | open | needs his two devices, not a Codex pass |
 | Upgrade from an older library | partly | sweep 9 (small seed): queue 6 |
 
 ### Data integrity
@@ -135,7 +136,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | VoiceOver and keyboard only | partly | sweep 3 a11y, 11-13 pass, deep scan 5 keys: queue 11 |
 | Light, dark, sizes, zoom, reduced motion | done | sweep 6 looks |
 | Hostile content | partly | sweep 3 hostile; Codex refused the deep version: queue 14, Claude lane |
-| Ore Cloud security | open | queue 15, Claude lane |
+| Ore Cloud security | partly | security pass 11-27 (#572), reading and local tests; the live server once it is up (#550) |
 
 ### The suite and the backlog
 | Angle | Status | Runs |

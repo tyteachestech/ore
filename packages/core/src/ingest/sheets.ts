@@ -1,4 +1,5 @@
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8 } from "fflate";
+import { unzip } from "./unzip.ts";
 import { posix } from "node:path";
 import { escapeMarkdown } from "./check.ts";
 import { coreProps, xmlText } from "./office.ts";
@@ -105,7 +106,7 @@ function clock(days: number, elapsed: boolean): string {
 
 /** An Excel workbook's sheets, each as a table under its name; a hidden or empty sheet is left out. */
 export function xlsxToDoc(data: Uint8Array): SheetDoc {
-  const files = unzipSync(data);
+  const files = unzip(data);
   const read = (p: string) => (files[p] ? bare(strFromU8(files[p])) : "");
   const rels = (part: string) => {
     const xml = read(posix.join(posix.dirname(part), "_rels", `${posix.basename(part)}.rels`));
