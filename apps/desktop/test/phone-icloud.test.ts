@@ -355,7 +355,7 @@ test("a folder acknowledgment never reuses an indexed time for a newer local edi
   expect(fs.readFileSync(p, "utf8")).toBe("delta");
 });
 
-test("a command reads the Mac's newer copy before it writes, so the phone never saves over an edit it hadn't read (F-new-phone-stale-write)", async () => {
+test("a command reads the Mac's newer copy before it writes, so the phone never saves over an edit it hadn't read (F765)", async () => {
   const p = `${P}/items/b-01/source.md`;
   mac("items/b-01/source.md", "title: Old\nstatus: inbox\n");
   await rescan();
