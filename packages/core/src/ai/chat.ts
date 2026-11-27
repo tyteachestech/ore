@@ -49,7 +49,7 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
     message = `Exercise (JSON):\n${JSON.stringify(context, null, 2)}\n\nHis message:\n${message}`;
   }
   const onProgress = a.onProgress && ((p: { reply: string; session: string }) => a.onProgress!({ ...p, session: `${vendor}:${p.session}` }));
-  const r = await runChatTurn(lib, { system: prompt.text, message, schema: vendorSchema(ChatOutput), session, cwd: lib.root, onProgress });
+  const r = await runChatTurn(lib, { prompt: "chat", system: prompt.text, message, schema: vendorSchema(ChatOutput), session, cwd: lib.root, onProgress });
   const out = ChatOutput.parse(parseOutput(r.output));
   return { card: card.meta.id, reply: out.reply, proposal: out.card, session: `${r.vendor}:${r.session}`, ai: { vendor: r.vendor, model: r.model, prompt_version: prompt.version } };
 }
