@@ -1,0 +1,1104 @@
+diff --git a/FIX-NOTES-editor.md b/FIX-NOTES-editor.md
+new file mode 100644
+index 0000000..7c0b1a5
+--- /dev/null
++++ b/FIX-NOTES-editor.md
+@@ -0,0 +1,206 @@
++# Editor open rows — draft fixes
++
++Worktree: `/Users/tylerpoelking/Developer/ore-wt/rows-editor`.
++
++Result: **F6 and F547 fixed in this draft; F1 and F548 skipped**. Findings and decisions files were not edited. No existing test was edited. No commits, pushes, browser, app, development server, e2e, or bench were started. The required full suite itself attempted local test servers; two failed to bind, as recorded below. All checks were headless. Visual and native interaction checks remain for the reviewing Claude; this is a draft, not a shipped change.
++
++Full command output and runnable reproductions are under `codex-out/editor/` (ignored by Git, present in this worktree). The reports below are in the requested order.
++
++## F1 — skipped: confirmed, but no durable history-preserving update drafted
++
++The actual `NoteBody`/Milkdown reproduction is `codex-out/editor/f1-red.ts`. Run `bun codex-out/editor/f1-red.ts`. It types in the live editor, passes outside text through a new notes version, and asks the new editor to undo. It captures the real ProseMirror view by instrumenting its `someProp` method; it does not substitute an editor implementation.
++
++Red output (`codex-out/editor/f1-red.log`, exit 1):
++
++```text
++remounted: true,
++undone: false,
++text: "Typed My sentence.Outside paragraph."
++AssertionError: F1: an outside update must preserve the note's typing undo history
++false !== true
++```
++
++Cause and ownership:
++
++- `useNotes.apply` in `apps/desktop/src/Notes.tsx` clears the pull reader and increments `version`; `NoteBody` uses that version as the editor's React key. React destroys the old editor and its history.
++- Merely dropping the key cannot fix it. `apps/desktop/src/editor/NoteEditor.tsx` creates its editor once, captures `original` and `base` inside that effect, and never ingests later text props. Those snapshots also drive `keepUnedited` and the synchronous pull reader.
++- A single replacement transaction with `addToHistory: false` also fails. `codex-out/editor/f1-transaction-probe.ts` applies outside edits before and after an unchanged, locally edited paragraph. Undo returns true, but the locally typed words remain: the replacement has mapped their history away. Its output is saved in `f1-transaction-probe.log`:
++
++```text
++undone: true,
++text: "Outside before.Typed My sentence.Outside after."
++```
++
++What the durable fix would take: an editor-owned update path that produces separate, schema-valid ProseMirror edits around unchanged content, maps selection and undo/redo through them, and refreshes the original/serialized Markdown snapshots together. It also needs to account for typing during asynchronous saves and Milkdown's delayed update callback, rather than treating every text prop as a new outside version. Tests should cover separated changes, formatting/node changes, pending typing, redo, switching notes, and byte-identical untouched Markdown. The bundled `prosemirror-changeset` is not an automatic answer: its default comparison ignores marks/attributes, merges short unchanged spans, and collapses large changes into replacements.
++
++Changed files: only the two reproduction scripts and their logs. No production note code changed. New permanent regression test: none; the deliberate red reproducer remains outside the test suite. Green output: not applicable to a skipped fix. Existing editor baseline: `bun test apps/desktop/test/editor.test.ts` → **21 pass, 0 fail**, 76 assertions (`editor-baseline.log`).
++
++Durability: left open rather than retaining an Undo entry that silently fails to undo the user's text. No decision or data-format change is proposed.
++
++## F6 — fixed: one Markdown map in core, shared with the reader
++
++Confirmed mismatch: the reader maps shown `Tom & Jerry` to `Tom &amp; Jerry`; core `locate` returned null. A phrase spanning a Markdown link also failed in core. A separate reader regression selects `. Second` at offset 8 instead of `Second.` at offset 10 after an emoji.
++
++Changed files:
++
++- `packages/core/src/text-map.ts`: the existing pure Markdown/shown-text implementation moved out of the app, with its source offsets, entity lengths, code handling, math placeholders, and passage text helper. No DOM or platform imports. `plainSkeleton` also accepts code context, using the same character policy as the DOM index.
++- `apps/desktop/src/text.ts`: imports/re-exports the core map and retains only DOM operations and reader chunk/footnote helpers. Selection offsets now measure the normalized string in UTF-16 units, just like DOM offsets and the map; the old code-point loop undercounted emoji.
++- `packages/core/src/anchoring.ts`: uses the shared map for non-exact creation lookups, retaining the exact-source fast path. Entity/formula end positions consume their whole source spelling. Copied code without a fence retains literal punctuation; supplied TeX is checked against the actual formula, not just its placeholder.
++- `packages/core/package.json`, `apps/desktop/package.json`, `bun.lock`: move the already-installed `decode-named-character-reference` **1.3.0** dependency from desktop to core. No version change or new package. Frozen-lockfile install passed using a temporary cache directory; initial attempts hit the sandbox cache restriction and a network resolution failure, before the successful frozen-lockfile install (`f6-install.log`).
++- `packages/core/test/anchor-shown-text.test.ts` and `apps/desktop/test/anchor-reader.test.ts`: new guards.
++
++New tests in `packages/core/test/anchor-shown-text.test.ts`:
++
++1. `rendered text locates links and whole character references in Markdown (F6)`
++2. `raw source quotes still locate old data, including image alt text and link destinations (F6)`
++3. `a copied code passage keeps its punctuation when whitespace differs (F6)`
++4. `a formula's placeholder cannot make a different formula match (F6)`
++
++New tests in `apps/desktop/test/anchor-reader.test.ts`:
++
++1. `core locates the same shown passage as the reader across links and entities (F6)`
++2. `a selection after an emoji uses the same offsets as the shown-text map (F6)`
++
++Red output before the fix:
++
++```text
++# f6-red.log — reader/core test
++Expected: { "end": 15, "start": 0 }
++Received: null
++0 pass
++1 fail
++2 expect() calls
++
++# f6-core-red.log — core tests
++1 pass
++1 fail
++5 expect() calls
++
++# f6-emoji-red.log — before replacing the original DOM offset loop
++Expected: { "exact": "Second.", "start": 10 }
++Received: { "exact": ". Second", "start": 8 }
++1 pass
++1 fail
++16 expect() calls
++```
++
++The first shared-map draft exposed two additional compatibility issues. Their failing outputs are retained in `f6-code-red.log` (copied code returned null) and `f6-math-red.log` (a minus formula matched an earlier plus formula). These are draft regressions, not claims about new bugs at master; both were corrected before final verification.
++
++Green output:
++
++```text
++# bun test packages/core/test/anchor-shown-text.test.ts — f6-core-green.log
++4 pass
++0 fail
++12 expect() calls
++
++# bun test apps/desktop/test/anchor-reader.test.ts — f6-green.log
++2 pass
++0 fail
++17 expect() calls
++```
++
++Existing files covering the affected mapping/anchoring code, each run separately (full logs `codex-out/editor/f6-<filename>.log`):
++
++| Test file | Passed | Failed |
++| --- | ---: | ---: |
++| `packages/core/test/anchoring.test.ts` | 13 | 0 |
++| `packages/core/test/annotations.test.ts` | 14 | 0 |
++| `packages/core/test/reimport.test.ts` | 18 | 0 |
++| `apps/desktop/test/highlight-map.test.ts` | 75 | 0 |
++| `apps/desktop/test/footnotes.test.ts` | 2 | 0 |
++| `apps/desktop/test/math.test.ts` | 1 | 0 |
++| `apps/desktop/test/text-pages.test.ts` | 4 | 0 |
++| `apps/desktop/test/transcript.test.ts` | 4 | 0 |
++
++Durability: core creation and both devices' reader now share the same Markdown interpretation and character normalization; existing raw quotes and stored-selector reanchoring retain their paths. No library files are rewritten. No intake or `doc.md` output changes, so no golden update was required or run.
++
++## F547 — fixed: keyboard entry selects and reveals the current source row
++
++The shared source-list element lives in `apps/desktop/src/App.tsx`, used for All sources and skill-page source lists; there is no separate SourceList component to fix. `currentLine` already resolves the last cursor, its surviving neighbour, or the first row. The missing part was activating it on focus entry. The phone does not have a duplicated desktop Tab-selection handler.
++
++Changed files: `apps/desktop/src/App.tsx`, `apps/desktop/test/list-entry-focus.test.tsx`.
++
++The new focus handler sets keyboard selection, records the current row, and scrolls it into view immediately. It checks the existing `data-keys` input mode and acts only when the list itself receives focus. Pointer focus, focus bubbling from row controls, and empty lists remain unchanged. No new screen element or style was added or removed.
++
++New tests in `apps/desktop/test/list-entry-focus.test.tsx`:
++
++1. `Tab entering a source list makes its first or last-current row visible and current (F547)`
++2. `pointer entry, child controls and an empty source list do not select a row (F547)`
++
++The headless harness extracts and renders the real list's opening JSX, including its handlers, rather than copying the proposed handler. It follows the existing `focus-reload.test.ts` approach to isolate App behavior without booting the app.
++
++Red output (`f547-red.log`):
++
++```text
++Expected: "row-first"
++Received: null
++1 pass
++1 fail
++10 expect() calls
++```
++
++Green output (`f547-green.log`):
++
++```text
++2 pass
++0 fail
++15 expect() calls
++Ran 2 tests across 1 file.
++```
++
++Existing tests each run separately, all green, with full logs in `codex-out/editor/f547-<filename>.log`: `lines` (2), `input-mode` (4), `focus-reload` (3), `focus-ring` (1), `course-filters` (3), `course-add-undo` (3), `glide` (4), `impeccable-round-9` (9), `hints` (10), `one-name` (2), `phone-waiting-undo` (2), `pick-bar` (4), `undo-waits` (1), `source-filters` (10), `shell-menu` (3), `waits` (3). All under `apps/desktop/test/`, with their existing `.test.ts` or `.test.tsx` extensions.
++
++Durability: focus entry is handled once on the shared list, using its existing cursor resolution and input mode, rather than simulating an arrow key or fixing one list view.
++
++## F548 — skipped: existing tests explicitly require these exceptions
++
++Confirmed at master with `bun codex-out/editor/f548-red.ts`. The native title is on the icon cell button in `IconPicker.tsx` and the timestamp span in `Reader.tsx`.
++
++Red output (`f548-red.log`, exit 1):
++
++```text
++actual: [
++  { file: 'IconPicker.tsx', line: 130 },
++  { file: 'Reader.tsx', line: 175 }
++]
++expected: []
++AssertionError: F548: icon cells and transcript timestamps still use native title hints
++```
++
++There already is a native-title guard in `apps/desktop/test/hints.test.ts`: `no control explains itself with a native title=`. Its `TITLE_OK` list explicitly permits the icon grid and transcript timestamps because they can mount hundreds/thousands of controls. A second guard, `the list holds only icon-only buttons with no hint`, requires the icon grid's `ICON_ONLY_OK` exception to remain live. The tests reject stale exceptions, so replacing both controls with Hint necessarily requires changing existing tests.
++
++This pass explicitly says: **“Never edit an existing test to fit your fix. If one must change, it is a behaviour change: stop and explain in your notes instead.”** I therefore left both controls and the existing tests unchanged. The reviewer needs to resolve those recorded performance exceptions before replacing the titles. A durable follow-up should establish acceptable Hint mounting cost (or a shared/delegated hint design), replace the native titles, and deliberately remove the obsolete exceptions. No browser or bench was run to infer performance here.
++
++Changed files: only `codex-out/editor/f548-red.ts` and its log. New permanent test: none; the requested guard already exists. Green output for a fix: not applicable. The existing `hints.test.ts` run passed **10 tests, 0 failures**, 12 assertions, and is saved in `f547-hints.test.ts.log`.
++
++Durability: kept the known exception explicit rather than weakening its tests or hiding a native title from the scan.
++
++## Final checks
++
++`bun run typecheck` — run once, **passed**, exit 0. Log: `codex-out/editor/final-typecheck.log`.
++
++```text
++$ tsc -p tsconfig.json --noEmit && tsc -p apps/desktop/tsconfig.json --noEmit
++```
++
++`bun test packages/core/test apps/desktop/test` — run once, **failed**, exit 1. Log: `codex-out/editor/final-tests.log`.
++
++```text
++2151 pass
++3 fail
++10061287 expect() calls
++Ran 2154 tests across 275 files. [125.03s]
++```
++
++All eight newly added tests passed in the full run. Three existing tests failed:
++
++| Existing test | Evidence | Where to investigate |
++| --- | --- | --- |
++| `packages/core/test/intake.test.ts:1510` — `a very tall or very wide screenshot is read whole, each line once (F188)` | `tall.png` fails at line 1514 with `Found no text in that image. Add a screenshot with text, or paste what you need.` | The test removes its OCR stand-in and invokes native macOS Vision. `scannedText` in `packages/core/src/ingest/ocr.ts:73` received fewer than 20 non-whitespace characters. The underlying reason is **not established**; no claim that this is a flaky test or proven baseline failure. |
++| `packages/core/test/cli-contract.test.ts:52` — `an inbox import where every link fails exits non-zero and keeps them` | `Bun.serve({ port: 0, ... })` throws `EADDRINUSE`, `Failed to start server. Is port 0 in use?`, at line 54, before the test's CLI operation. | Local listener availability in this execution environment. No test server successfully started for this case. |
++| `packages/core/test/cancel.test.ts:11` — `SIGTERM after the source is written takes it back out` | The same `Bun.serve` bind failure at line 16, before the cancellation scenario. | Local listener availability in this execution environment. No test server successfully started for this case. |
++
++These failures need reviewer triage; their causes were not established by retries, and no test was rerun, skipped, weakened or edited to obtain green. The intake/native-OCR and local-server code paths are outside the changed files. As requested, no findings row was added here; the reviewing Claude owns findings/decision edits. **The full suite is not green; this draft is not ready to merge on the strength of this run.**
++
++`git diff --check` — passed. Verified the moved Markdown parser against the original: only its exports and shared plain-text normalization changed during the move. No `doc.md` or golden files changed. All commands have completed; no process from this pass was left running.
+diff --git a/apps/desktop/package.json b/apps/desktop/package.json
+index 41af397..c379d6a 100644
+--- a/apps/desktop/package.json
++++ b/apps/desktop/package.json
+@@ -36,7 +36,6 @@
+     "@tauri-apps/plugin-notification": "2.8.0",
+     "@tauri-apps/plugin-opener": "^2.7.2",
+     "cmdk": "^1.1.1",
+-    "decode-named-character-reference": "1.3.0",
+     "katex": "0.16.22",
+     "lowlight": "^3.3.0",
+     "mdast-util-from-markdown": "2.1.0",
+diff --git a/apps/desktop/src/App.tsx b/apps/desktop/src/App.tsx
+index 2471d16..75a97d5 100644
+--- a/apps/desktop/src/App.tsx
++++ b/apps/desktop/src/App.tsx
+@@ -2015,6 +2015,14 @@ export function App() {
+       role="group"
+       aria-label={TABS.find((s) => s.id === status)?.label ?? "Archived"}
+       aria-activedescendant={keyed && currentLine ? `row-${lineKey(currentLine)}` : undefined}
++      onFocus={(e) => {
++        // Finder/Mail: keyboard entry reveals the remembered row (or the first). A row's
++        // own button taking focus, or focus restored after a pointer action, keeps its target.
++        if (e.target !== e.currentTarget || !document.documentElement.hasAttribute("data-keys") || !currentLine) return;
++        setKeyed(true);
++        setCursor(lineKey(currentLine));
++        document.getElementById(`row-${lineKey(currentLine)}`)?.scrollIntoView({ block: "nearest" });
++      }}
+       onKeyDown={onListKey}
+       onPointerMove={() => keyed && setKeyed(false)}
+     >
+diff --git a/apps/desktop/src/text.ts b/apps/desktop/src/text.ts
+index 15e082d..8671981 100644
+--- a/apps/desktop/src/text.ts
++++ b/apps/desktop/src/text.ts
+@@ -1,288 +1,9 @@
+-// Mapping between the rendered reader text and the Markdown source, for highlights.
+-// Both sides are reduced to a "skeleton": the characters that render as text, minus whitespace
+-// and, outside code, the punctuation Markdown uses for emphasis, code, links and tables (in code each
+-// one is a character he reads, `items[0]`). A formula is one character of its own (MATH), drawn by
+-// KaTeX from its TeX: a selection touching it takes all of it, quoted as its `$$…$$`. A selection is matched
+-// in the source skeleton to recover the exact source text (so `ore highlight` gets an exact
+-// match), and a stored annotation's `exact` is matched in the rendered skeleton to paint it.
++// DOM half of highlight mapping. Markdown interpretation lives in core for every caller.
++import { MATH, plainSkeleton, skipped, sourceSkeleton, type Skeleton } from "../../../packages/core/src/text-map";
++export { passageText, plainSkeleton, sourceSkeleton, type Skeleton } from "../../../packages/core/src/text-map";
+ 
+-import { decodeNamedCharacterReference } from "decode-named-character-reference";
+-
+-const BLANK = new Set([..." \t\n\r\f\v   "]);
+-const IGNORED = new Set([...BLANK, ..."*_`[]|~"]);
+-/** A formula's place in both skeletons: one character, never one of the text's. */
+-const MATH = "\uFFFC";
+ /** A rendered formula: KaTeX's drawing, or its error showing the TeX it could not draw. */
+ const MATH_EL = ".katex, .katex-error";
+-const skipped = (c: string, code: boolean) => (code ? BLANK : IGNORED).has(c);
+-
+-/** `refs`: where a character reference (`&amp;`) starts in the source, and how long it is there. */
+-export type Skeleton = { chars: string; map: number[]; refs: Map<number, number> };
+-
+-// A link's destination and optional title (CommonMark): balanced or escaped parens, `<…>`, or a quoted
+-// title, as Wikipedia writes them (`…/Memory_\(psychology\) "Memory (psychology)"`).
+-const DEST = String.raw`(?:<[^<>\n]*>|(?:[^\s()\\]|\\.|\((?:[^\s()\\]|\\.)*\))*)`;
+-const TITLE = String.raw`(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\((?:[^()\\]|\\.)*\))`;
+-const TAIL = String.raw`\(\s*${DEST}(?:\s+${TITLE})?\s*\)`;
+-const LABEL = String.raw`(?:[^\[\]\\\n]|\\.)*`;
+-const label = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
+-const IMAGE = new RegExp(String.raw`!\[[^\]\n]*\]${TAIL}`, "g");
+-const LINK_TAIL = new RegExp(String.raw`\]${TAIL}`, "g");
+-const DEFINITION = new RegExp(String.raw`^ {0,3}\[(${LABEL})\]:[ \t]*(?:<[^<>\n]*>|\S+)(?:[ \t]+${TITLE})?[ \t]*$`, "gm");
+-const FULL_REF = new RegExp(String.raw`\[(${LABEL})\]\[(${LABEL})\]`, "g");
+-const FOOTNOTE_REF = /\[\^[^\]\s]+\]/g;
+-const WORD = /[\p{L}\p{N}]/u;
+-const SPACE = /\s/;
+-
+-/** A line's indent in columns (a tab to the next multiple of 4) and where its text starts. */
+-function indentOf(line: string): { cols: number; lead: number } {
+-  let cols = 0;
+-  let lead = 0;
+-  for (; line[lead] === " " || line[lead] === "\t"; lead++) cols = line[lead] === "\t" ? cols + 4 - (cols % 4) : cols + 1;
+-  return { cols, lead };
+-}
+-const LIST_ITEM = /^( {0,3}(?:[-+*]|\d{1,9}[.)]))([ \t]+|$)/;
+-
+-/** Which characters are code (a fenced block's lines, an indented block's, a code span's text), where Markdown
+- *  syntax does not apply: the reader shows each one as written. 1 marks code, 2 a fence line (never shown).
+- *  An indented block is CommonMark's: 4 columns in, not a paragraph's lazy line, and in a list 4 past the item's text. */
+-function codeOf(md: string): Uint8Array {
+-  const code = new Uint8Array(md.length);
+-  let open: { ch: string; len: number; quotes: number } | null = null;
+-  let at = 0;
+-  /** The line before was a paragraph's (an indented line then continues it), and the open list's text column. */
+-  let para = false;
+-  let list = -1;
+-  for (const line of md.split("\n")) {
+-    const end = at + line.length;
+-    const { cols, lead } = indentOf(line);
+-    const blank = lead === line.length;
+-    if (!open && !blank) {
+-      if (list >= 0 && cols < list && !LIST_ITEM.test(line) && !para) list = -1; // a line left of the item's text ends the list
+-      if (!para && cols >= (list >= 0 ? list : 0) + 4) {
+-        code.fill(1, at + lead, end);
+-        at = end + 1;
+-        continue;
+-      }
+-    }
+-    if (open) {
+-      const close = line.match(/^[ \t>]*(`{3,}|~{3,})[ \t]*$/);
+-      if (close && close[1]![0] === open.ch && close[1]!.length >= open.len) {
+-        open = null;
+-        code.fill(2, at + line.indexOf(close[1]!), end);
+-      } else {
+-        // Inside a quote each code line starts with the quote's ">", which is not code.
+-        let lead = 0;
+-        for (let q = 0; q < open.quotes; q++) {
+-          let k = lead;
+-          while (line[k] === " " || line[k] === "\t") k++;
+-          if (line[k] !== ">") break;
+-          lead = k + 1 + (line[k + 1] === " " || line[k + 1] === "\t" ? 1 : 0);
+-        }
+-        while (line[lead] === " " || line[lead] === "\t") lead++;
+-        code.fill(1, at + lead, end);
+-      }
+-    } else {
+-      const m = line.match(/^((?:[ \t]*(?:>[ \t]?|[-+*][ \t]+|\d{1,9}[.)][ \t]+))*[ \t]*)(`{3,}|~{3,})(.*)$/);
+-      if (m && !(m[2]![0] === "`" && m[3]!.includes("`"))) {
+-        open = { ch: m[2]![0]!, len: m[2]!.length, quotes: (m[1]!.match(/>/g) ?? []).length };
+-        code.fill(2, at + m[1]!.length, end);
+-      }
+-    }
+-    if (!open && !blank) {
+-      const item = line.match(LIST_ITEM);
+-      // Its text starts past the marker and 1 to 4 spaces (more, and the text is 1 past the marker: code).
+-      const w = item && indentOf(item[2]!).cols;
+-      if (item) list = item[1]!.length + (w! >= 1 && w! <= 4 ? w! : 1);
+-    }
+-    // A paragraph goes on until a blank line; a heading, a fence or a rule is a line of its own.
+-    para = !blank && !open && !code[at + lead] && !/^ {0,3}(#{1,6}([ \t]|$)|(\*[ \t]*){3,}$|(-[ \t]*){3,}$|(_[ \t]*){3,}$)/.test(line);
+-    at = end + 1;
+-  }
+-  // Code spans: a run of backticks up to the next run of the same length in the same paragraph.
+-  const blank = /\n[ \t]*\n/g;
+-  for (let i = 0; i < md.length; i++) {
+-    if (md[i] !== "`" || code[i]) continue;
+-    let n = 1;
+-    while (md[i + n] === "`") n++;
+-    blank.lastIndex = i;
+-    const stop = md[i - 1] === "\\" ? -1 : (blank.exec(md)?.index ?? md.length);
+-    let close = -1;
+-    for (let j = md.indexOf("`", i + n); j >= 0 && j < stop && !code[j]; ) {
+-      let m = 1;
+-      while (md[j + m] === "`") m++;
+-      if (m === n) {
+-        close = j;
+-        break;
+-      }
+-      j = md.indexOf("`", j + m);
+-    }
+-    if (close >= 0) code.fill(1, i + n, close);
+-    i = (close >= 0 ? close : i) + n - 1;
+-  }
+-  return code;
+-}
+-
+-/** The text an HTML character reference shows as (`&amp;` is "&"), or null when it is not one. */
+-function entity(ref: string): string | null {
+-  const num = ref.match(/^&#(?:(\d{1,7})|[xX]([0-9a-fA-F]{1,6}));$/);
+-  if (num) {
+-    const cp = num[1] ? parseInt(num[1], 10) : parseInt(num[2]!, 16);
+-    return cp === 0 || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff) ? "�" : String.fromCodePoint(cp);
+-  }
+-  const named = decodeNamedCharacterReference(ref.slice(1, -1));
+-  return named === false ? null : named;
+-}
+-
+-/** What of Markdown source shows on the page: `mask` 1 hides a character, `sub` gives one that shows
+- *  as other text (a character reference), `code` marks code. Syntax is looked for outside code only, so a
+- *  `# comment`, `List<String>` or `echo $$` in code stays text. Emphasis, code and link brackets are left
+- *  to the caller (the skeleton ignores them outside code). `math` is each formula's start and length. */
+-function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<number, { text: string; len: number }>; math: Map<number, number> } {
+-  const code = codeOf(md);
+-  // Code is blanked out (same length, lines kept), so the patterns below never match inside it.
+-  let prose = md;
+-  if (code.includes(1)) {
+-    const cs: string[] = [];
+-    for (let i = 0; i < md.length; i++) cs.push(code[i] === 1 && md[i] !== "\n" ? "\x01" : md[i]!);
+-    prose = cs.join("");
+-  }
+-  const mask = code.map((c) => (c === 2 ? 1 : 0)); // code fences and their info strings
+-  const hide = (re: RegExp, from = 0) => {
+-    for (const m of prose.matchAll(re)) mask.fill(1, m.index + from, m.index + m[0].length);
+-  };
+-  hide(/<!--[\s\S]*?-->/g);
+-  // Math, drawn by KaTeX: hidden as text (the caller shows each formula whole, at its start) and blanked
+-  // like code, so no pattern below reads its TeX as Markdown.
+-  const math = new Map<number, number>();
+-  for (const m of prose.matchAll(/\$\$[\s\S]*?\$\$/g)) {
+-    if (mask[m.index]) continue;
+-    math.set(m.index, m[0].length);
+-    mask.fill(1, m.index, m.index + m[0].length);
+-  }
+-  if (math.size) {
+-    const cs = prose.split("");
+-    for (const [at, len] of math) for (let i = at; i < at + len; i++) if (cs[i] !== "\n") cs[i] = "\x01";
+-    prose = cs.join("");
+-  }
+-  hide(IMAGE); // images
+-  hide(LINK_TAIL, 1); // link destinations
+-  // Reference links: a definition never shows, and `[text][label]` shows only its text.
+-  const defined = new Set<string>();
+-  for (const m of prose.matchAll(DEFINITION)) {
+-    if (m[1]!.startsWith("^") || !label(m[1]!)) continue;
+-    defined.add(label(m[1]!));
+-    mask.fill(1, m.index, m.index + m[0].length);
+-  }
+-  for (const m of prose.matchAll(FULL_REF)) {
+-    if (defined.has(label(m[2]! || m[1]!))) mask.fill(1, m.index + m[1]!.length + 2, m.index + m[0].length);
+-  }
+-  // An autolink shows without its angle brackets.
+-  for (const m of prose.matchAll(/<(?:[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*|[^\s<>@]+@[^\s<>@]+)>/g)) mask[m.index] = mask[m.index + m[0].length - 1] = 1;
+-  hide(/<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^>\n]*)?\/?>/g); // inline HTML tags (never rendered)
+-  hide(/^[ \t]*(?:#{1,6}[ \t]+|(?:>[ \t]?)+|(?:[-+*]|\d{1,9}[.)])[ \t]+)+/gm); // block markers
+-  hide(/^[ \t]*(?:[-*_][ \t]*){3,}$/gm); // thematic breaks
+-  hide(/^[ \t|:-]*-{3,}[ \t|:-]*$/gm); // table separator rows
+-  for (const m of prose.matchAll(/\\[!-/:-@[-`{-~]/g)) mask[m.index] = 1; // backslash escapes: the "\" goes, the mark stays
+-  hide(/(?<=^ {0,3}\[\^[^\]\s]+\]):/gm); // a footnote's "[^7]:" shows as its number alone (`footnotes`)
+-  // A character reference shows as its character ("&amp;" is "&"), kept at its "&".
+-  const sub = new Map<number, { text: string; len: number }>();
+-  for (const m of prose.matchAll(/(?<!\\)&(?:#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/g)) {
+-    const text = mask[m.index] ? null : entity(m[0]);
+-    if (text === null) continue;
+-    sub.set(m.index, { text, len: m[0].length });
+-    mask.fill(1, m.index + 1, m.index + m[0].length);
+-  }
+-  return { code, mask, sub, math };
+-}
+-
+-/** Skeleton of Markdown source; `map[i]` is the source offset of skeleton char i. */
+-export function sourceSkeleton(md: string): Skeleton {
+-  const { code, mask, sub, math } = shown(md);
+-  const parts: string[] = [];
+-  const map: number[] = [];
+-  const refs = new Map<number, number>();
+-  for (const [at, r] of sub) refs.set(at, r.len);
+-  for (const [at, len] of math) refs.set(at, len);
+-  for (let i = 0; i < md.length; i++) {
+-    if (math.has(i)) {
+-      parts.push(MATH);
+-      map.push(i);
+-      continue;
+-    }
+-    if (mask[i]) continue;
+-    const t = sub.get(i)?.text ?? md[i]!;
+-    for (let k = 0; k < t.length; k++) {
+-      if (skipped(t[k]!, code[i] === 1)) continue;
+-      parts.push(t[k]!);
+-      map.push(i);
+-    }
+-  }
+-  return { chars: parts.join(""), map, refs };
+-}
+-
+-/** A passage's Markdown as it reads on the page, on one line (a highlight in a list): `a [link](…)` is
+- *  "a link", `\#` "#", `**bold**` "bold"; code keeps every character. */
+-export function passageText(md: string): string {
+-  const { code, mask, sub, math } = shown(md);
+-  // Cut from the body, a passage has no definitions: `[text][label]` shows its text alone, and a
+-  // footnote mark (a raised number on the page) goes; a note's own "[^3]:" shows its number.
+-  for (const m of md.matchAll(FULL_REF)) {
+-    const at = m.index + m[1]!.length + 2;
+-    if (code[at] !== 1 && !mask[at]) mask.fill(1, at, m.index + m[0].length);
+-  }
+-  for (const m of md.matchAll(FOOTNOTE_REF)) {
+-    if (code[m.index] === 1 || mask[m.index]) continue;
+-    const end = m.index + m[0].length;
+-    if (md[end] === ":") {
+-      mask.fill(1, m.index, m.index + 2);
+-      mask[end - 1] = 1;
+-    } else mask.fill(1, m.index, end);
+-  }
+-  const syntax = (i: number) => !mask[i] && code[i] !== 1 && md[i - 1] !== "\\";
+-  // A closed pair of brackets that isn't a link's is text ("[1]"); one the passage's edge cuts off is a link's.
+-  const text = new Set<number>();
+-  const open: number[] = [];
+-  for (let i = 0; i < md.length; i++) {
+-    if (!syntax(i)) continue;
+-    if (md[i] === "[") open.push(i);
+-    else if (md[i] === "]" && open.length) {
+-      const o = open.pop()!;
+-      if (md[i + 1] !== "(" && md[i + 1] !== "[") text.add(o).add(i);
+-    }
+-  }
+-  const word = (c: string | undefined) => !!c && WORD.test(c);
+-  let out = "";
+-  for (let i = 0; i < md.length; i++) {
+-    const tex = math.get(i);
+-    if (tex) out += md.slice(i + 2, i + tex - 2); // a formula reads as its TeX
+-    if (mask[i]) continue;
+-    const c = md[i]!;
+-    if (syntax(i)) {
+-      if (c === "`" || ((c === "[" || c === "]") && !text.has(i)) || (c === "~" && (md[i + 1] === "~" || md[i - 1] === "~"))) continue;
+-      if (c === "*" || c === "_") {
+-        // Emphasis: a run that touches a word on one side; an underscore inside a word is text.
+-        let a = i;
+-        let b = i;
+-        while (md[a - 1] === c) a--;
+-        while (md[b + 1] === c) b++;
+-        const before = md[a - 1];
+-        const after = md[b + 1];
+-        const flanks = (!!before && !SPACE.test(before)) || (!!after && !SPACE.test(after));
+-        if (flanks && !(c === "_" && word(before) && word(after))) continue;
+-      }
+-    }
+-    out += sub.get(i)?.text ?? c;
+-  }
+-  return out.replace(/\s+/g, " ").trim();
+-}
+-
+-/** Skeleton of plain rendered text. */
+-export function plainSkeleton(text: string): string {
+-  let out = "";
+-  for (const c of text) if (!IGNORED.has(c)) out += c;
+-  return out;
+-}
+ 
+ /** Skeleton of the rendered DOM text, with each char's text node and offset. A formula is one MATH
+  *  character at its first text node; `math` gives each formula's place. */
+@@ -356,9 +77,9 @@ export function skeletonOffset(idx: TextIndex, node: Node, offset: number, end =
+   const base = node.nodeType === Node.TEXT_NODE ? idx.first.get(node as Text) : undefined;
+   if (base !== undefined) {
+     const code = !!node.parentElement?.closest("code");
+-    let n = 0;
+-    for (const c of (node as Text).data.slice(0, offset)) if (!skipped(c, code)) n++;
+-    return base + n;
++    // DOM offsets and the map count UTF-16 units. Counting code points shifted everything
++    // after an emoji; use the shared normalization and measure its string in the same units.
++    return base + plainSkeleton((node as Text).data.slice(0, offset), code).length;
+   }
+   // Between elements, or in text left out of the index: the first indexed text after the point.
+   const at = document.createRange();
+diff --git a/apps/desktop/test/anchor-reader.test.ts b/apps/desktop/test/anchor-reader.test.ts
+new file mode 100644
+index 0000000..0b35e6a
+--- /dev/null
++++ b/apps/desktop/test/anchor-reader.test.ts
+@@ -0,0 +1,48 @@
++import { expect, test } from "bun:test";
++import { Window } from "happy-dom";
++import { createElement } from "react";
++import { renderToStaticMarkup } from "react-dom/server";
++import ReactMarkdown from "react-markdown";
++import remarkGfm from "remark-gfm";
++import { locate, quoteSelector } from "../../../packages/core/src/anchoring";
++import { footnotes, indexText, rangeFor, sourceQuote, sourceSkeleton } from "../src/text";
++
++const w = new Window();
++for (const k of ["document", "NodeFilter", "Node", "Range"] as const) (globalThis as any)[k] = (w as any)[k];
++
++test("core locates the same shown passage as the reader across links and entities (F6)", () => {
++  for (const [body, shown, exact] of [
++    ["Tom &amp; Jerry", "Tom & Jerry", "Tom &amp; Jerry"],
++    ["Read [this paper](https://example.com) today.", "Read this paper today.", "Read [this paper](https://example.com) today."],
++    ["A copyright &copy;", "A copyright ©", "A copyright &copy;"],
++    ["Meet &#x1F600;", "Meet 😀", "Meet &#x1F600;"],
++    ["One&nbsp;two", "One two", "One&nbsp;two"],
++  ]) {
++    const root = document.createElement("article");
++    root.innerHTML = renderToStaticMarkup(createElement(ReactMarkdown, { remarkPlugins: [remarkGfm], skipHtml: true }, footnotes(body!)));
++    const idx = indexText(root as unknown as HTMLElement);
++    const src = sourceSkeleton(body!);
++    const selection = document.createRange();
++    selection.selectNodeContents(root);
++    const fromReader = sourceQuote(src, body!, idx, selection as unknown as Range);
++    expect(fromReader).toEqual({ exact, start: 0 });
++    const fromCore = locate(body!, shown!);
++    expect(fromCore).toEqual({ start: 0, end: exact!.length });
++    const q = quoteSelector(body!, fromCore!.start, fromCore!.end);
++    expect(rangeFor(idx, src, body!, q)?.toString().replace(/\s/g, " ")).toBe(shown);
++  }
++});
++
++test("a selection after an emoji uses the same offsets as the shown-text map (F6)", () => {
++  const body = "😀 First. Second.";
++  const root = document.createElement("article");
++  root.textContent = body;
++  const selection = document.createRange();
++  selection.setStart(root.firstChild!, body.indexOf("Second"));
++  selection.setEnd(root.firstChild!, body.length);
++  const idx = indexText(root as unknown as HTMLElement);
++  const src = sourceSkeleton(body);
++  const q = sourceQuote(src, body, idx, selection as unknown as Range);
++  expect(q).toEqual({ exact: "Second.", start: body.indexOf("Second") });
++  expect(locate(body, q!.exact)).toEqual({ start: q!.start, end: body.length });
++});
+diff --git a/apps/desktop/test/list-entry-focus.test.tsx b/apps/desktop/test/list-entry-focus.test.tsx
+new file mode 100644
+index 0000000..6b8fb27
+--- /dev/null
++++ b/apps/desktop/test/list-entry-focus.test.tsx
+@@ -0,0 +1,65 @@
++import { expect, test } from "bun:test";
++import { readFileSync } from "node:fs";
++import { Window } from "happy-dom";
++import { lineKey, type Line } from "../src/lines";
++import { trackInput } from "../src/input-mode";
++
++const w = new Window();
++for (const k of ["window", "document", "HTMLElement", "Node", "navigator"] as const) (globalThis as any)[k] = (w as any)[k];
++(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
++trackInput(document);
++const React = await import("react");
++const { act } = React;
++const { createRoot } = await import("react-dom/client");
++
++// Run the actual shared list's props in isolation, as focus-reload.test.ts does for App's loaders.
++// No mock of the focus handler: this is also the integration guard for its wiring in App.
++const source = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
++const start = source.indexOf('<div\n      className="list"');
++const end = source.indexOf("\n    >", start);
++if (start < 0 || end < 0) throw new Error("Shared source list opening tag not found");
++const code = new Bun.Transpiler({ loader: "tsx", tsconfig: { compilerOptions: { jsx: "react" } } })
++  .transformSync(`return (${source.slice(start, end)} />);`);
++const draw = new Function("React", "listRef", "TABS", "status", "keyed", "currentLine", "lineKey", "onListKey", "setKeyed", "setCursor", code);
++const row = (id: string) => ({ kind: "item", item: { id } }) as Line;
++
++async function list(currentLine: Line | undefined, keyboard = true) {
++  const host = document.body.appendChild(document.createElement("div"));
++  const root = createRoot(host);
++  let cursor: string | null = null;
++  const scrolled: string[] = [];
++  const Probe = () => {
++    const [keyed, setKeyed] = React.useState(false);
++    const listRef = React.useRef(null);
++    return React.cloneElement(draw(React, listRef, [], "toread", keyed, currentLine, lineKey, () => {}, setKeyed, (id: string) => { cursor = id; }), {},
++      <div id={currentLine ? `row-${lineKey(currentLine)}` : "empty"} ref={(el) => { if (el) el.scrollIntoView = () => { scrolled.push(el.id); }; }}><button>Row actions</button></div>);
++  };
++  await act(async () => root.render(<Probe />));
++  document.dispatchEvent(keyboard ? new w.KeyboardEvent("keydown", { key: "Tab", bubbles: true }) as unknown as Event : new w.Event("pointerdown", { bubbles: true }) as unknown as Event);
++  const group = host.querySelector<HTMLElement>(".list")!;
++  return { group, scrolled, cursor: () => cursor, close: async () => { await act(async () => root.unmount()); host.remove(); } };
++}
++
++test("Tab entering a source list makes its first or last-current row visible and current (F547)", async () => {
++  for (const id of ["first", "last-current"]) {
++    const a = await list(row(id));
++    try {
++      await act(async () => a.group.focus());
++      expect(a.group.getAttribute("aria-activedescendant")).toBe(`row-${id}`);
++      expect(a.cursor()).toBe(id);
++      expect(a.scrolled).toEqual([`row-${id}`]);
++    } finally { await a.close(); }
++  }
++});
++
++test("pointer entry, child controls and an empty source list do not select a row (F547)", async () => {
++  for (const [line, keyboard, child] of [[row("first"), false, false], [row("first"), true, true], [undefined, true, false]] as const) {
++    const a = await list(line, keyboard);
++    try {
++      await act(async () => (child ? a.group.querySelector("button")! : a.group).focus());
++      expect(a.group.hasAttribute("aria-activedescendant")).toBe(false);
++      expect(a.cursor()).toBeNull();
++      expect(a.scrolled).toEqual([]);
++    } finally { await a.close(); }
++  }
++});
+diff --git a/bun.lock b/bun.lock
+index 1d18e30..cf4b0a2 100644
+--- a/bun.lock
++++ b/bun.lock
+@@ -41,7 +41,6 @@
+         "@tauri-apps/plugin-notification": "2.8.0",
+         "@tauri-apps/plugin-opener": "^2.7.2",
+         "cmdk": "^1.1.1",
+-        "decode-named-character-reference": "1.3.0",
+         "katex": "0.16.22",
+         "lowlight": "^3.3.0",
+         "mdast-util-from-markdown": "2.1.0",
+@@ -97,6 +96,7 @@
+         "@mozilla/readability": "^0.6.0",
+         "@open-spaced-repetition/binding": "^0.5.0",
+         "approx-string-match": "^2.0.1",
++        "decode-named-character-reference": "1.3.0",
+         "defuddle": "^0.19.4",
+         "fflate": "^0.8.3",
+         "linkedom": "^0.18.13",
+diff --git a/packages/core/package.json b/packages/core/package.json
+index da629d2..14c462c 100644
+--- a/packages/core/package.json
++++ b/packages/core/package.json
+@@ -11,6 +11,7 @@
+     "@mozilla/readability": "^0.6.0",
+     "@open-spaced-repetition/binding": "^0.5.0",
+     "approx-string-match": "^2.0.1",
++    "decode-named-character-reference": "1.3.0",
+     "defuddle": "^0.19.4",
+     "fflate": "^0.8.3",
+     "linkedom": "^0.18.13",
+diff --git a/packages/core/src/anchoring.ts b/packages/core/src/anchoring.ts
+index cc37702..eb397a0 100644
+--- a/packages/core/src/anchoring.ts
++++ b/packages/core/src/anchoring.ts
+@@ -1,4 +1,5 @@
+ import search from "approx-string-match";
++import { MATH, plainSkeleton, sourceSkeleton } from "./text-map";
+ 
+ // W3C-style selectors over the doc body: TextQuoteSelector (exact, prefix,
+ // suffix) + TextPositionSelector (start, end). Re-anchoring follows the
+@@ -40,23 +41,9 @@ function occurrences(text: string, needle: string): number[] {
+   return out;
+ }
+ 
+-// Text with whitespace and Markdown emphasis markers removed, plus a map
+-// from each kept character back to its offset in the original.
+-const IGNORED = /[\s*_`]/;
+-function skeleton(text: string): { chars: string; map: number[] } {
+-  let chars = "";
+-  const map: number[] = [];
+-  for (let i = 0; i < text.length; i++) {
+-    if (IGNORED.test(text[i]!)) continue;
+-    chars += text[i];
+-    map.push(i);
+-  }
+-  return { chars, map };
+-}
+-
+ // For creating a highlight from user-supplied text: exact match, then a match
+-// that ignores whitespace and Markdown emphasis (text copied from a rendered
+-// page has neither line breaks nor ** or _ markers). With several hits, the
++// over the reader's shown-text map (links, entities, math and code included).
++// Exact source quotes still win, including old quotes in hidden markup. With several hits, the
+ // one nearest `hint` wins (the first one without a hint).
+ export function locate(text: string, exact: string, hint = 0): { start: number; end: number } | null {
+   const needle = exact.trim();
+@@ -65,10 +52,24 @@ export function locate(text: string, exact: string, hint = 0): { start: number;
+     xs.sort((a, b) => Math.abs(a.start - hint) - Math.abs(b.start - hint))[0] ?? null;
+   const hits = occurrences(text, needle).map((s) => ({ start: s, end: s + needle.length }));
+   if (hits.length) return nearest(hits);
+-  const doc = skeleton(text);
+-  const pat = skeleton(needle).chars;
+-  if (!pat) return null;
+-  return nearest(occurrences(doc.chars, pat).map((s) => ({ start: doc.map[s]!, end: doc.map[s + pat.length - 1]! + 1 })));
++  const doc = sourceSkeleton(text);
++  const query = sourceSkeleton(needle);
++  const formulas = query.chars.split("").flatMap((c, i) => c === MATH && needle.startsWith("$$", query.map[i]) ? [i] : []);
++  const formula = (body: string, at: number, size: number) => body.slice(at, at + size).replace(/\s/g, "");
++  // A copied code fragment has no fence to identify it: try its literal punctuation as well
++  // as Markdown. Both are compared against the same source map the reader uses.
++  return nearest([plainSkeleton(needle, true), query.chars].flatMap((pat, kind) =>
++    occurrences(doc.chars, pat).filter((s) => kind === 0 || formulas.every((i) => {
++      // The reader treats a formula as one selectable object; locating supplied TeX must
++      // additionally check which formula it is, not mistake every equation for the same one.
++      const a = query.map[i]!, b = doc.map[s + i]!;
++      return formula(needle, a, query.refs.get(a)!) === formula(text, b, doc.refs.get(b) ?? 1);
++    })).map((s) => {
++      const last = doc.map[s + pat.length - 1]!;
++      // An entity or formula is one shown token; the saved quote takes its whole source spelling.
++      return { start: doc.map[s]!, end: last + (doc.refs.get(last) ?? 1) };
++    }),
++  ));
+ }
+ 
+ // Normalized similarity 0..1 by Levenshtein distance (short strings only).
+diff --git a/packages/core/src/text-map.ts b/packages/core/src/text-map.ts
+new file mode 100644
+index 0000000..c47dd8d
+--- /dev/null
++++ b/packages/core/src/text-map.ts
+@@ -0,0 +1,285 @@
++// Shared Markdown-to-shown-text map for core anchoring and the Mac/iPhone reader.
++// This module has no DOM or platform dependencies.
++// Both sides are reduced to a "skeleton": the characters that render as text, minus whitespace
++// and, outside code, the punctuation Markdown uses for emphasis, code, links and tables (in code each
++// one is a character he reads, `items[0]`). A formula is one character of its own (MATH), drawn by
++// KaTeX from its TeX: a selection touching it takes all of it, quoted as its `$$…$$`. A selection is matched
++// in the source skeleton to recover the exact source text (so `ore highlight` gets an exact
++// match), and a stored annotation's `exact` is matched in the rendered skeleton to paint it.
++
++import { decodeNamedCharacterReference } from "decode-named-character-reference";
++
++const BLANK = new Set([..." \t\n\r\f\v   "]);
++const IGNORED = new Set([...BLANK, ..."*_`[]|~"]);
++/** A formula's place in both skeletons: one character, never one of the text's. */
++export const MATH = "\uFFFC";
++export const skipped = (c: string, code: boolean) => (code ? BLANK : IGNORED).has(c);
++
++/** `refs`: where a character reference (`&amp;`) starts in the source, and how long it is there. */
++export type Skeleton = { chars: string; map: number[]; refs: Map<number, number> };
++
++// A link's destination and optional title (CommonMark): balanced or escaped parens, `<…>`, or a quoted
++// title, as Wikipedia writes them (`…/Memory_\(psychology\) "Memory (psychology)"`).
++const DEST = String.raw`(?:<[^<>\n]*>|(?:[^\s()\\]|\\.|\((?:[^\s()\\]|\\.)*\))*)`;
++const TITLE = String.raw`(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\((?:[^()\\]|\\.)*\))`;
++const TAIL = String.raw`\(\s*${DEST}(?:\s+${TITLE})?\s*\)`;
++const LABEL = String.raw`(?:[^\[\]\\\n]|\\.)*`;
++const label = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
++const IMAGE = new RegExp(String.raw`!\[[^\]\n]*\]${TAIL}`, "g");
++const LINK_TAIL = new RegExp(String.raw`\]${TAIL}`, "g");
++const DEFINITION = new RegExp(String.raw`^ {0,3}\[(${LABEL})\]:[ \t]*(?:<[^<>\n]*>|\S+)(?:[ \t]+${TITLE})?[ \t]*$`, "gm");
++const FULL_REF = new RegExp(String.raw`\[(${LABEL})\]\[(${LABEL})\]`, "g");
++const FOOTNOTE_REF = /\[\^[^\]\s]+\]/g;
++const WORD = /[\p{L}\p{N}]/u;
++const SPACE = /\s/;
++
++/** A line's indent in columns (a tab to the next multiple of 4) and where its text starts. */
++function indentOf(line: string): { cols: number; lead: number } {
++  let cols = 0;
++  let lead = 0;
++  for (; line[lead] === " " || line[lead] === "\t"; lead++) cols = line[lead] === "\t" ? cols + 4 - (cols % 4) : cols + 1;
++  return { cols, lead };
++}
++const LIST_ITEM = /^( {0,3}(?:[-+*]|\d{1,9}[.)]))([ \t]+|$)/;
++
++/** Which characters are code (a fenced block's lines, an indented block's, a code span's text), where Markdown
++ *  syntax does not apply: the reader shows each one as written. 1 marks code, 2 a fence line (never shown).
++ *  An indented block is CommonMark's: 4 columns in, not a paragraph's lazy line, and in a list 4 past the item's text. */
++function codeOf(md: string): Uint8Array {
++  const code = new Uint8Array(md.length);
++  let open: { ch: string; len: number; quotes: number } | null = null;
++  let at = 0;
++  /** The line before was a paragraph's (an indented line then continues it), and the open list's text column. */
++  let para = false;
++  let list = -1;
++  for (const line of md.split("\n")) {
++    const end = at + line.length;
++    const { cols, lead } = indentOf(line);
++    const blank = lead === line.length;
++    if (!open && !blank) {
++      if (list >= 0 && cols < list && !LIST_ITEM.test(line) && !para) list = -1; // a line left of the item's text ends the list
++      if (!para && cols >= (list >= 0 ? list : 0) + 4) {
++        code.fill(1, at + lead, end);
++        at = end + 1;
++        continue;
++      }
++    }
++    if (open) {
++      const close = line.match(/^[ \t>]*(`{3,}|~{3,})[ \t]*$/);
++      if (close && close[1]![0] === open.ch && close[1]!.length >= open.len) {
++        open = null;
++        code.fill(2, at + line.indexOf(close[1]!), end);
++      } else {
++        // Inside a quote each code line starts with the quote's ">", which is not code.
++        let lead = 0;
++        for (let q = 0; q < open.quotes; q++) {
++          let k = lead;
++          while (line[k] === " " || line[k] === "\t") k++;
++          if (line[k] !== ">") break;
++          lead = k + 1 + (line[k + 1] === " " || line[k + 1] === "\t" ? 1 : 0);
++        }
++        while (line[lead] === " " || line[lead] === "\t") lead++;
++        code.fill(1, at + lead, end);
++      }
++    } else {
++      const m = line.match(/^((?:[ \t]*(?:>[ \t]?|[-+*][ \t]+|\d{1,9}[.)][ \t]+))*[ \t]*)(`{3,}|~{3,})(.*)$/);
++      if (m && !(m[2]![0] === "`" && m[3]!.includes("`"))) {
++        open = { ch: m[2]![0]!, len: m[2]!.length, quotes: (m[1]!.match(/>/g) ?? []).length };
++        code.fill(2, at + m[1]!.length, end);
++      }
++    }
++    if (!open && !blank) {
++      const item = line.match(LIST_ITEM);
++      // Its text starts past the marker and 1 to 4 spaces (more, and the text is 1 past the marker: code).
++      const w = item && indentOf(item[2]!).cols;
++      if (item) list = item[1]!.length + (w! >= 1 && w! <= 4 ? w! : 1);
++    }
++    // A paragraph goes on until a blank line; a heading, a fence or a rule is a line of its own.
++    para = !blank && !open && !code[at + lead] && !/^ {0,3}(#{1,6}([ \t]|$)|(\*[ \t]*){3,}$|(-[ \t]*){3,}$|(_[ \t]*){3,}$)/.test(line);
++    at = end + 1;
++  }
++  // Code spans: a run of backticks up to the next run of the same length in the same paragraph.
++  const blank = /\n[ \t]*\n/g;
++  for (let i = 0; i < md.length; i++) {
++    if (md[i] !== "`" || code[i]) continue;
++    let n = 1;
++    while (md[i + n] === "`") n++;
++    blank.lastIndex = i;
++    const stop = md[i - 1] === "\\" ? -1 : (blank.exec(md)?.index ?? md.length);
++    let close = -1;
++    for (let j = md.indexOf("`", i + n); j >= 0 && j < stop && !code[j]; ) {
++      let m = 1;
++      while (md[j + m] === "`") m++;
++      if (m === n) {
++        close = j;
++        break;
++      }
++      j = md.indexOf("`", j + m);
++    }
++    if (close >= 0) code.fill(1, i + n, close);
++    i = (close >= 0 ? close : i) + n - 1;
++  }
++  return code;
++}
++
++/** The text an HTML character reference shows as (`&amp;` is "&"), or null when it is not one. */
++function entity(ref: string): string | null {
++  const num = ref.match(/^&#(?:(\d{1,7})|[xX]([0-9a-fA-F]{1,6}));$/);
++  if (num) {
++    const cp = num[1] ? parseInt(num[1], 10) : parseInt(num[2]!, 16);
++    return cp === 0 || cp > 0x10ffff || (cp >= 0xd800 && cp <= 0xdfff) ? "�" : String.fromCodePoint(cp);
++  }
++  const named = decodeNamedCharacterReference(ref.slice(1, -1));
++  return named === false ? null : named;
++}
++
++/** What of Markdown source shows on the page: `mask` 1 hides a character, `sub` gives one that shows
++ *  as other text (a character reference), `code` marks code. Syntax is looked for outside code only, so a
++ *  `# comment`, `List<String>` or `echo $$` in code stays text. Emphasis, code and link brackets are left
++ *  to the caller (the skeleton ignores them outside code). `math` is each formula's start and length. */
++function shown(md: string): { code: Uint8Array; mask: Uint8Array; sub: Map<number, { text: string; len: number }>; math: Map<number, number> } {
++  const code = codeOf(md);
++  // Code is blanked out (same length, lines kept), so the patterns below never match inside it.
++  let prose = md;
++  if (code.includes(1)) {
++    const cs: string[] = [];
++    for (let i = 0; i < md.length; i++) cs.push(code[i] === 1 && md[i] !== "\n" ? "\x01" : md[i]!);
++    prose = cs.join("");
++  }
++  const mask = code.map((c) => (c === 2 ? 1 : 0)); // code fences and their info strings
++  const hide = (re: RegExp, from = 0) => {
++    for (const m of prose.matchAll(re)) mask.fill(1, m.index + from, m.index + m[0].length);
++  };
++  hide(/<!--[\s\S]*?-->/g);
++  // Math, drawn by KaTeX: hidden as text (the caller shows each formula whole, at its start) and blanked
++  // like code, so no pattern below reads its TeX as Markdown.
++  const math = new Map<number, number>();
++  for (const m of prose.matchAll(/\$\$[\s\S]*?\$\$/g)) {
++    if (mask[m.index]) continue;
++    math.set(m.index, m[0].length);
++    mask.fill(1, m.index, m.index + m[0].length);
++  }
++  if (math.size) {
++    const cs = prose.split("");
++    for (const [at, len] of math) for (let i = at; i < at + len; i++) if (cs[i] !== "\n") cs[i] = "\x01";
++    prose = cs.join("");
++  }
++  hide(IMAGE); // images
++  hide(LINK_TAIL, 1); // link destinations
++  // Reference links: a definition never shows, and `[text][label]` shows only its text.
++  const defined = new Set<string>();
++  for (const m of prose.matchAll(DEFINITION)) {
++    if (m[1]!.startsWith("^") || !label(m[1]!)) continue;
++    defined.add(label(m[1]!));
++    mask.fill(1, m.index, m.index + m[0].length);
++  }
++  for (const m of prose.matchAll(FULL_REF)) {
++    if (defined.has(label(m[2]! || m[1]!))) mask.fill(1, m.index + m[1]!.length + 2, m.index + m[0].length);
++  }
++  // An autolink shows without its angle brackets.
++  for (const m of prose.matchAll(/<(?:[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*|[^\s<>@]+@[^\s<>@]+)>/g)) mask[m.index] = mask[m.index + m[0].length - 1] = 1;
++  hide(/<\/?[A-Za-z][A-Za-z0-9-]*(?:\s[^>\n]*)?\/?>/g); // inline HTML tags (never rendered)
++  hide(/^[ \t]*(?:#{1,6}[ \t]+|(?:>[ \t]?)+|(?:[-+*]|\d{1,9}[.)])[ \t]+)+/gm); // block markers
++  hide(/^[ \t]*(?:[-*_][ \t]*){3,}$/gm); // thematic breaks
++  hide(/^[ \t|:-]*-{3,}[ \t|:-]*$/gm); // table separator rows
++  for (const m of prose.matchAll(/\\[!-/:-@[-`{-~]/g)) mask[m.index] = 1; // backslash escapes: the "\" goes, the mark stays
++  hide(/(?<=^ {0,3}\[\^[^\]\s]+\]):/gm); // a footnote's "[^7]:" shows as its number alone (`footnotes`)
++  // A character reference shows as its character ("&amp;" is "&"), kept at its "&".
++  const sub = new Map<number, { text: string; len: number }>();
++  for (const m of prose.matchAll(/(?<!\\)&(?:#\d{1,7}|#[xX][0-9a-fA-F]{1,6}|[A-Za-z][A-Za-z0-9]{1,31});/g)) {
++    const text = mask[m.index] ? null : entity(m[0]);
++    if (text === null) continue;
++    sub.set(m.index, { text, len: m[0].length });
++    mask.fill(1, m.index + 1, m.index + m[0].length);
++  }
++  return { code, mask, sub, math };
++}
++
++/** Skeleton of Markdown source; `map[i]` is the source offset of skeleton char i. */
++export function sourceSkeleton(md: string): Skeleton {
++  const { code, mask, sub, math } = shown(md);
++  const parts: string[] = [];
++  const map: number[] = [];
++  const refs = new Map<number, number>();
++  for (const [at, r] of sub) refs.set(at, r.len);
++  for (const [at, len] of math) refs.set(at, len);
++  for (let i = 0; i < md.length; i++) {
++    if (math.has(i)) {
++      parts.push(MATH);
++      map.push(i);
++      continue;
++    }
++    if (mask[i]) continue;
++    const t = sub.get(i)?.text ?? md[i]!;
++    for (let k = 0; k < t.length; k++) {
++      if (skipped(t[k]!, code[i] === 1)) continue;
++      parts.push(t[k]!);
++      map.push(i);
++    }
++  }
++  return { chars: parts.join(""), map, refs };
++}
++
++/** A passage's Markdown as it reads on the page, on one line (a highlight in a list): `a [link](…)` is
++ *  "a link", `\#` "#", `**bold**` "bold"; code keeps every character. */
++export function passageText(md: string): string {
++  const { code, mask, sub, math } = shown(md);
++  // Cut from the body, a passage has no definitions: `[text][label]` shows its text alone, and a
++  // footnote mark (a raised number on the page) goes; a note's own "[^3]:" shows its number.
++  for (const m of md.matchAll(FULL_REF)) {
++    const at = m.index + m[1]!.length + 2;
++    if (code[at] !== 1 && !mask[at]) mask.fill(1, at, m.index + m[0].length);
++  }
++  for (const m of md.matchAll(FOOTNOTE_REF)) {
++    if (code[m.index] === 1 || mask[m.index]) continue;
++    const end = m.index + m[0].length;
++    if (md[end] === ":") {
++      mask.fill(1, m.index, m.index + 2);
++      mask[end - 1] = 1;
++    } else mask.fill(1, m.index, end);
++  }
++  const syntax = (i: number) => !mask[i] && code[i] !== 1 && md[i - 1] !== "\\";
++  // A closed pair of brackets that isn't a link's is text ("[1]"); one the passage's edge cuts off is a link's.
++  const text = new Set<number>();
++  const open: number[] = [];
++  for (let i = 0; i < md.length; i++) {
++    if (!syntax(i)) continue;
++    if (md[i] === "[") open.push(i);
++    else if (md[i] === "]" && open.length) {
++      const o = open.pop()!;
++      if (md[i + 1] !== "(" && md[i + 1] !== "[") text.add(o).add(i);
++    }
++  }
++  const word = (c: string | undefined) => !!c && WORD.test(c);
++  let out = "";
++  for (let i = 0; i < md.length; i++) {
++    const tex = math.get(i);
++    if (tex) out += md.slice(i + 2, i + tex - 2); // a formula reads as its TeX
++    if (mask[i]) continue;
++    const c = md[i]!;
++    if (syntax(i)) {
++      if (c === "`" || ((c === "[" || c === "]") && !text.has(i)) || (c === "~" && (md[i + 1] === "~" || md[i - 1] === "~"))) continue;
++      if (c === "*" || c === "_") {
++        // Emphasis: a run that touches a word on one side; an underscore inside a word is text.
++        let a = i;
++        let b = i;
++        while (md[a - 1] === c) a--;
++        while (md[b + 1] === c) b++;
++        const before = md[a - 1];
++        const after = md[b + 1];
++        const flanks = (!!before && !SPACE.test(before)) || (!!after && !SPACE.test(after));
++        if (flanks && !(c === "_" && word(before) && word(after))) continue;
++      }
++    }
++    out += sub.get(i)?.text ?? c;
++  }
++  return out.replace(/\s+/g, " ").trim();
++}
++
++/** Skeleton of plain rendered text. Code keeps its literal punctuation, as the DOM index does. */
++export function plainSkeleton(text: string, code = false): string {
++  let out = "";
++  for (const c of text) if (!skipped(c, code)) out += c;
++  return out;
++}
++
+diff --git a/packages/core/test/anchor-shown-text.test.ts b/packages/core/test/anchor-shown-text.test.ts
+new file mode 100644
+index 0000000..0058f30
+--- /dev/null
++++ b/packages/core/test/anchor-shown-text.test.ts
+@@ -0,0 +1,33 @@
++import { expect, test } from "bun:test";
++import { locate } from "../src/anchoring";
++
++test("rendered text locates links and whole character references in Markdown (F6)", () => {
++  for (const [body, query, exact] of [
++    ["Tom &amp; Jerry", "Tom & Jerry", "Tom &amp; Jerry"],
++    ["Read [this paper](https://example.com) today.", "Read this paper today.", "Read [this paper](https://example.com) today."],
++    ["A copyright &copy;", "A copyright ©", "A copyright &copy;"],
++    ["Meet &#x1F600;", "Meet 😀", "Meet &#x1F600;"],
++    ["One&nbsp;two", "One two", "One&nbsp;two"],
++  ] as const) {
++    expect(locate(body, query)).toEqual({ start: 0, end: exact.length });
++  }
++});
++
++test("raw source quotes still locate old data, including image alt text and link destinations (F6)", () => {
++  const body = "![a caption](images/figure.png) and [paper](https://example.com).";
++  for (const query of ["a caption", "images/figure.png", "https://example.com", body]) {
++    expect(locate(body, query)).toEqual({ start: body.indexOf(query), end: body.indexOf(query) + query.length });
++  }
++});
++
++test("a copied code passage keeps its punctuation when whitespace differs (F6)", () => {
++  const exact = "items[0] = first_value;\nitems[1] = second_value;";
++  const body = `Code:\n\n\`\`\`js\n${exact}\n\`\`\`\n`;
++  expect(locate(body, exact.replace("\n", " "))).toEqual({ start: body.indexOf(exact), end: body.indexOf(exact) + exact.length });
++});
++
++test("a formula's placeholder cannot make a different formula match (F6)", () => {
++  const body = "Result $$x + y$$ follows.\n\nResult $$x - y$$ follows.";
++  expect(locate(body, "Result $$x-y$$ follows.")).toEqual({ start: body.lastIndexOf("Result"), end: body.length });
++  expect(locate(body, "Result $$x * y$$ follows.")).toBeNull();
++});
