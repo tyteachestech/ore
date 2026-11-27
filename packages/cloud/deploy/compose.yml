@@ -1,0 +1,55 @@
+# Ore Cloud on one box (#550): Caddy takes HTTPS on the domain and hands requests to the server.
+# deploy.sh puts it there and starts it, with ORE_DOMAIN and ORE_SESSION_SECRET from the host's
+# /etc/ore-cloud.env (never in git).
+name: ore-cloud
+services:
+  server:
+    build:
+      context: ../../..
+      dockerfile: packages/cloud/deploy/Dockerfile
+    restart: unless-stopped
+    environment:
+      ORE_SESSION_SECRET: ${ORE_SESSION_SECRET:?set ORE_SESSION_SECRET in .env}
+    volumes:
+      - accounts:/data
+    # A job's library lives in memory and is gone with it: the server keeps nothing (#545).
+    tmpfs:
+      - /tmp:size=2g,mode=1777
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 3g
+    # `out` is the server's alone: firewall.sh closes it to every private address by its subnet.
+    networks: [inside, out]
+    healthcheck:
+      test: ["CMD", "bun", "-e", "process.exit((await fetch('http://127.0.0.1:8787/health')).ok ? 0 : 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging: &logs
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      ORE_DOMAIN: ${ORE_DOMAIN:?set ORE_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    networks: [inside, web]
+    depends_on: [server]
+    logging: *logs
+volumes:
+  accounts:
+  caddy:
+networks:
+  # Caddy to the server, and nowhere else.
+  inside:
+    internal: true
+  web:
+  out:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24

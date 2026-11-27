@@ -1,0 +1,12 @@
+# Puts firewall.sh's rules back after a restart of the host. deploy.sh installs it.
+[Unit]
+Description=Ore Cloud: close the server's network to private addresses
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /opt/ore/packages/cloud/deploy/firewall.sh
+
+[Install]
+WantedBy=multi-user.target
