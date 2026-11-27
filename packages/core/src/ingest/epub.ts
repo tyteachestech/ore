@@ -1,4 +1,5 @@
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8 } from "fflate";
+import { unzip } from "./unzip.ts";
 import { DOMParser, parseHTML } from "linkedom";
 import { posix } from "node:path";
 import type { Asset } from "../items.ts";
@@ -80,7 +81,7 @@ function chapterMarkdown(document: Document, image: (src: string) => string | nu
 }
 
 export function epubToDoc(data: Uint8Array): EpubDoc {
-  const files = unzipSync(data);
+  const files = unzip(data);
   const read = (p: string) => {
     const f = files[p];
     if (!f) throw new Error(`EPUB is missing ${p}`);
