@@ -575,6 +575,24 @@ const byLink = (lib: Library, url: string, preview = false) => allItems(lib, { p
 // Ingest a URL or file into items/ with status inbox. Files dropped in
 // inbox/ are removed after a successful ingest (they now live as source.*).
 // A link already in the library isn't added twice: it comes back `kept`, filed under the new skills too.
+/** An arXiv paper's authors and first date from arXiv's own listing (its metadata is CC0): its HTML version names no
+ *  date and its PDF neither date nor authors (deep import pass, 2026-11-27). Only what the paper left blank is
+ *  filled, and a title that is arXiv's margin stamp; with no listing (offline, arXiv down) it comes in as it was. */
+export async function arxivListing(url: string, draft: NewItem): Promise<NewItem> {
+  const id = url.match(/^https?:\/\/(?:www\.)?arxiv\.org\/(?:abs|pdf|html)\/((?:\d{4}\.\d{4,5})|(?:[a-z-]+(?:\.[A-Z]{2})?\/\d{7}))(?:v\d+)?(?:\.pdf)?\/?(?:[?#].*)?$/)?.[1];
+  // A title that is arXiv's margin stamp ("arXiv:hep-th/9711200v3 22 Jan 1998"), an older PDF's first line.
+  const stamp = /^arXiv:\S+/i.test(draft.title ?? "");
+  if (!id || (draft.author && draft.published && !stamp)) return draft;
+  const res = await fetch(`https://export.arxiv.org/api/query?id_list=${id}`, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(8000) }).catch(() => null);
+  const xml = res?.ok ? await res.text().catch(() => "") : "";
+  const entry = xml.match(/<entry>([\s\S]*?)<\/entry>/)?.[1] ?? "";
+  const names = [...entry.matchAll(/<author>\s*<name>([^<]+)<\/name>/g)].map((m) => m[1]!.replace(/&amp;/g, "&").replace(/&apos;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim()).filter(Boolean);
+  const published = entry.match(/<published>([^<]+)<\/published>/)?.[1]?.trim();
+  const author = names.length === 1 ? names[0] : names.length === 2 ? names.join(" and ") : names.length ? `${names[0]} et al.` : undefined;
+  const title = entry.match(/<title>([^<]+)<\/title>/)?.[1]?.replace(/\s+/g, " ").trim();
+  return { ...draft, title: stamp && title ? title : draft.title, author: draft.author ?? author, published: draft.published ?? published };
+}
+
 export async function addSource(lib: Library, input: string, opts: AddOptions = {}): Promise<Item & Partial<Kept>> {
   input = input.replace(/^~(?=\/)/, homedir());
   const isUrl = /^https?:\/\//i.test(input);
@@ -584,7 +602,7 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   const had = isUrl ? byLink(lib, input, true) : undefined;
   if (had && opts.preview) return had;
   if (had) return keep(lib, had, opts);
-  const draft = isUrl ? await fromUrl(input, opts) : await fromFile(resolve(input), opts, input);
+  const draft = isUrl ? await arxivListing(input, await fromUrl(input, opts)) : await fromFile(resolve(input), opts, input);
   if (!draft.body.trim() && !draft.owed?.length) throw new Error("Found no text to read in that. Copy the text and paste it here instead.");
   const ready = await withImages(draft, opts.imagesIn);
   // The same file added again (dropped twice, or a copy) is the source already here.

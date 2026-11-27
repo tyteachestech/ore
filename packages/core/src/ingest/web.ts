@@ -68,6 +68,56 @@ function footnoteLists(document: Document) {
   }
 }
 
+/** A Sphinx cross-reference to its own page (`<a class="reference internal" href="#…">`, the Python, Django and
+ *  PyTorch docs' "As discussed in A Word About Names and Objects"): Defuddle takes an in-page link classed
+ *  `reference` for a citation marker and drops it with its words. A real marker's text is a number or a mark. */
+function crossRefs(document: Document) {
+  for (const a of Array.from(document.querySelectorAll('a.reference[href^="#"]')))
+    if (!/^\s*[\[(]?\s*(\d+|[*†‡§a-z])\s*[\])]?\s*$/i.test(a.textContent ?? "")) a.classList.remove("reference");
+}
+
+/** A page's own element inside a sentence (Distill's `<dt-cite>` and `<dt-fn>`, `<d-cite>`, `<d-footnote>`) read as
+ *  inline: the extractor doesn't know the tag, takes it for a block, and splits the sentence into three paragraphs
+ *  ("a popular story about momentum", "[1, 2, 3]", ": gradient descent is…"). Its formulas keep their own tags. */
+function inlineCustom(document: Document) {
+  for (const el of Array.from(document.querySelectorAll("p *, li *")).reverse()) {
+    if (!el.tagName.includes("-") || /-math$/i.test(el.tagName) || el.closest("svg, math")) continue;
+    const span = document.createElement("span");
+    while (el.firstChild) span.appendChild(el.firstChild);
+    el.replaceWith(span);
+  }
+}
+
+/** A section's heading in a `<header>` of its own (Brilliant's wiki: `<header class="section-header"><h2>…`): the
+ *  extractor drops every header as the site's, with the heading. One that holds a section heading and nothing
+ *  else is that heading. And a box in the running text classed as a modal (Brilliant's worked problems,
+ *  `problem-modal-container`) is content: the extractor drops modals as pop-ups, which sit outside the text. */
+function sectionHeaders(document: Document) {
+  const text = (e: Element) => (e.textContent ?? "").replace(/\s+/g, "");
+  for (const h of Array.from(document.querySelectorAll("header"))) {
+    const heads = Array.from(h.querySelectorAll("h2, h3, h4, h5, h6"));
+    if (!heads.length || h.querySelector("h1, nav") || heads.map(text).join("") !== text(h)) continue;
+    h.replaceWith(...Array.from(h.childNodes));
+  }
+  // A section whose id is its heading's words with a word the extractor reads as a box of links ("more-examples":
+  // "more-") is dropped whole. Such an id is cleared when the heading says what the section teaches, not what a box
+  // of links says ("More stories", "Related posts" keep theirs). Markdown keeps no ids, so nothing else is lost.
+  const BOX = new Set(["more", "related", "comment", "comments", "share", "popular", "recommended", "promo", "newsletter", "subscribe", "sponsored", "trending"]);
+  const LINKS = new Set([...BOX, "posts", "articles", "stories", "reading", "from", "you", "also", "like", "may", "our", "the", "this", "on", "in", "next", "read"]);
+  const slug = (t: string) => t.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
+  const slugs = Array.from(document.querySelectorAll("h2, h3, h4, h5, h6"))
+    .map((h) => slug(h.textContent ?? ""))
+    .filter((t) => t.split("-").some((w) => BOX.has(w)) && t.split("-").some((w) => !LINKS.has(w)));
+  for (const el of Array.from(document.querySelectorAll("[id]")))
+    if (slugs.some((t) => el.id.toLowerCase().endsWith(t))) el.removeAttribute("id");
+  for (const m of Array.from(document.querySelectorAll('[class*="modal" i]'))) {
+    let prev = m.previousElementSibling;
+    while (prev && !(prev.textContent ?? "").trim()) prev = prev.previousElementSibling;
+    if (prev?.tagName !== "P") continue;
+    m.className = m.className.split(/\s+/).filter((c) => !/modal/i.test(c)).join(" ");
+  }
+}
+
 /** Merged cells spread out, so each row reads whole as a Markdown table: a cell spanning rows repeats
  *  its text in each, one spanning columns leaves the rest empty. Without it the rows below a merged
  *  cell shift left under the wrong headings. */
@@ -418,6 +468,9 @@ async function readHtml(html: string, url: string, min: number): Promise<WebDoc>
     videoCards(document as unknown as Document);
     flatTables(document as unknown as Document);
     footnoteLists(document as unknown as Document);
+    crossRefs(document as unknown as Document);
+    inlineCustom(document as unknown as Document);
+    sectionHeaders(document as unknown as Document);
     wikiMath(document as unknown as Document);
     pandocMath(document as unknown as Document);
     const charts = await drawCharts(document as unknown as Document, html);

@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, tr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
-import { addPageText, addSource, addTab, addText, audioOf, fillOwed, hasPageText, redoPageText, reimportSource, undoPageText, undoReimport } from "../src/ingest/index.ts";
+import { addPageText, addSource, addTab, addText, arxivListing, audioOf, fillOwed, hasPageText, redoPageText, reimportSource, undoPageText, undoReimport } from "../src/ingest/index.ts";
 import { addCourse, planCourse } from "../src/ingest/course.ts";
 import { courseLessons } from "../src/courses.ts";
 import { setChapterRecall } from "../src/notes.ts";
@@ -100,7 +100,7 @@ interface Case {
 const PAGES: Case[] = [
   { name: "essay", url: "https://paulgraham.com/greatwork.html", fixture: "essay.html", title: "How to Do Great Work", minWords: 11000, has: ["If you research drill of elaboration", "But the note reading gap of forgetting concept", "for elaboration and for example writing"], paragraphs: 100, links: 20 },
   { name: "blog with diagrams and code", url: "https://lilianweng.github.io/posts/2023-06-23-agent/", fixture: "blog-images.html", title: "LLM Powered Autonomous Agents", author: "Lilian Weng", published: "2023-06-23T00:00:00Z", minWords: 6000, has: ["In a LLM-powered autonomous index reading", "In the FACT-Check interval", "Test model answer idea review and plan"], headings: 12, images: 13, code: 6 },
-  { name: "docs with code (Python)", url: "https://docs.python.org/3/tutorial/classes.html", fixture: "docs-python.html", title: "9. Classes", minWords: 5000, has: ["Compared with other programming languages", "If the same attribute name occurs in", "Some simple generators can be coded succinctly"], headings: 15, code: 30 },
+  { name: "docs with code (Python)", url: "https://docs.python.org/3/tutorial/classes.html", fixture: "docs-python.html", title: "9. Classes", minWords: 5000, has: ["Compared with other programming languages", "If the same attribute name occurs in", "Some simple generators can be coded succinctly", "As discussed in [A Word About Names and Objects](#tut-object), shared data", "(except see below [Private Variables](#tut-private))"], headings: 15, code: 30 },
   { name: "docs with code (MDN)", url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Closures", fixture: "docs-mdn.html", title: "Closures", published: "2025-11-04T07:08:26.000Z", minWords: 2500, has: ["closure", "One solution in this case is to", "However, redefining the prototype is not recommended."], headings: 6, code: 25 },
   { name: "Wikipedia", url: "https://en.wikipedia.org/wiki/Spaced_repetition", fixture: "wikipedia.html", title: "Spaced repetition", author: "Wikipedia", published: "2001-08-09T02:05:34Z", minWords: 3500, has: ["Spaced repetition is", "In the Leitner system, correctly answered cards"], headings: 8, images: 3 },
   { name: "newsletter (Substack)", url: "https://www.astralcodexten.com/p/the-psychopolitics-of-trauma", fixture: "substack.html", title: "The Psychopolitics Of Trauma", author: "Scott Alexander", published: "2024-01-25T03:34:57+00:00", minWords: 5000, has: ["Research prompt teacher mind learn habit", "As chunk, this learn’t habit drill to", "But feedback of focus this deck step"], headings: 5, images: 3 },
@@ -200,6 +200,33 @@ describe("import coverage: web pages", () => {
     expect(item.body).toContain("\\sqrt{d_{k}}");
     expect(count(item.body, /^#{1,6} /gm)).toBeGreaterThanOrEqual(20);
     expect(count(item.body, /!\[[^\]]*\]\(https:\/\/arxiv\.org\/html\//g)).toBeGreaterThanOrEqual(2);
+  });
+
+  test("an arXiv paper, by its abstract or its PDF link, has its authors and first date from arXiv's listing", async () => {
+    // Deep import pass 2026-11-27: arXiv's HTML version names no date and its PDF neither date nor authors, so
+    // "Attention Is All You Need" came in with no date, and with no author from its PDF link. arxiv-api.xml is
+    // arXiv's own listing of the paper (its metadata is CC0).
+    const listing = { "https://export.arxiv.org/api/query?id_list=1706.03762": { body: web("arxiv-api.xml"), type: "application/atom+xml" } };
+    serve({ "https://arxiv.org/html/1706.03762": { body: web("arxiv-html.html"), type: HTML }, ...listing });
+    const abs = await addSource(await tempLibrary(), "https://arxiv.org/abs/1706.03762");
+    expect(abs.meta.author).toBe("Ashish Vaswani et al.");
+    expect(abs.meta.published).toBe("2017-06-12T17:57:34Z");
+    serve({ "https://arxiv.org/pdf/1706.03762v7": { body: readFileSync(file("paper.pdf")), type: "application/pdf" }, "https://export.arxiv.org/api/query?id_list=1706.03762": listing["https://export.arxiv.org/api/query?id_list=1706.03762"] });
+    const pdf = await addSource(await tempLibrary(), "https://arxiv.org/pdf/1706.03762v7");
+    expect(pdf.meta.type).toBe("pdf");
+    expect(pdf.meta.author).toBe("Ashish Vaswani et al.");
+    expect(pdf.meta.published).toBe("2017-06-12T17:57:34Z");
+    // An older paper whose first line is arXiv's margin stamp ("arXiv:hep-th/9711200v3 22 Jan 1998", Maldacena) is
+    // titled from the listing, not the stamp.
+    const stamped = { type: "pdf" as const, title: "arXiv:hep-th/9711200v3 22 Jan 1998", body: "x" };
+    const old = `<feed><entry><title>The Large N Limit of Superconformal Field Theories and Supergravity</title><published>1997-11-27T23:53:13Z</published><author><name>Juan M. Maldacena</name></author></entry></feed>`;
+    serve({ "https://export.arxiv.org/api/query?id_list=hep-th/9711200": { body: old, type: "application/atom+xml" } });
+    const fixed = await arxivListing("https://arxiv.org/abs/hep-th/9711200", stamped);
+    expect(fixed.title).toBe("The Large N Limit of Superconformal Field Theories and Supergravity");
+    expect(fixed.author).toBe("Juan M. Maldacena");
+    // No listing (offline, or arXiv down): the paper still comes in, as before.
+    serve({ "https://arxiv.org/pdf/1706.03762v7": { body: readFileSync(file("paper.pdf")), type: "application/pdf" } });
+    expect((await addSource(await tempLibrary(), "https://arxiv.org/pdf/1706.03762v7")).meta.published).toBeUndefined();
   });
 
   test("GitHub repo reads its README, relative images pointed at the repo", async () => {
@@ -351,6 +378,34 @@ describe("import coverage: web pages", () => {
     const katex = `<p>Scale by <span class="math inline"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></mrow><annotation encoding="application/x-tex">\\sqrt{d_k}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">√dk</span></span></span> first.</p>`;
     const drawn = (await htmlToDoc(`<html><head><title>T</title></head><body><article><h1>T</h1>${words}${katex}${words}</article></body></html>`, "https://example.org/t")).markdown;
     expect(drawn).toContain("Scale by $$\\sqrt{d_k}$$ first.");
+  });
+
+  test("a Distill page's citations and footnotes stay inside their sentence", async () => {
+    // distill-inline.html: written for Ore in the markup Distill writes (Why Momentum Really Works, deep import pass
+    // 2026-11-27): <dt-cite>, <dt-fn>, <d-cite> and <d-footnote> inside a paragraph split it in three.
+    const b = (await htmlToDoc(web("distill-inline.html"), "https://distill.pub/2017/rolling/")).markdown;
+    expect(b).toContain("the usual picture of a step \\[1, 2\\]: a walker going down");
+    expect(b).toContain("on many slopes. <sup>1</sup> That is no small gain");
+    expect(b).toContain("the same thing as \\[3\\] and a note kept beside its mark, still inside one sentence");
+    expect(b).toContain("Written for Ore in the markup");
+    expect(b).toContain("both of them stop.");
+  });
+
+  test("a section's heading in a header of its own, and a worked problem boxed as a modal, are kept", async () => {
+    // section-headers.html: written for Ore in the markup Brilliant's wiki writes (Bayes' Theorem, deep import pass
+    // 2026-11-27): every <h2> sat in a <header>, which the extractor drops as the site's, and each worked problem in a
+    // box classed "problem-modal-container", which it drops as a pop-up. The page kept no heading and lost its problems.
+    const b = (await htmlToDoc(web("section-headers.html"), "https://brilliant.org/wiki/updating/")).markdown;
+    expect(b).toContain("## Counting the cases");
+    expect(b).toContain("## A test that errs");
+    expect(b).toContain("## More examples");
+    expect(b).toContain("One in ten of the town has the fever.");
+    expect(b).toContain("The answer is one in four");
+    expect(b).toContain("the last example ends here.");
+    // A section whose id is its heading's words ("more-examples") is not a "more-" box of links.
+    // The site's own header and a real pop-up stay out.
+    expect(b).not.toContain("Log in");
+    expect(b).not.toContain("Sign up to keep learning");
   });
 
   test("a chart the page draws with Vega (Altair) is kept as a picture where it stood; one that can't be drawn says so", async () => {
