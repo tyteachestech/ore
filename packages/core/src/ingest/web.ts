@@ -1,6 +1,8 @@
 import { Readability } from "@mozilla/readability";
 import { Defuddle } from "defuddle/node";
 import { parseHTML } from "linkedom";
+import type { Asset } from "../items.ts";
+import { chartLinks, drawCharts } from "./charts.ts";
 import { cleanAuthor, cleanDate, escapeMarkdown, flattenRuby, FROM_TAB } from "./check.ts";
 import { td } from "./markdown.ts";
 import { chatMarkdown, notionMarkdown } from "./rendered.ts";
@@ -13,6 +15,8 @@ export interface WebDoc {
   markdown: string;
   /** A chat he had with an AI, shared from its app: whose it is. */
   chat?: "claude";
+  /** Pictures the page draws itself (its Vega charts), which the Markdown shows as `assets/<name>`. */
+  assets?: Asset[];
 }
 
 /** An embedded player's page: YouTube, Vimeo or Loom, else null. */
@@ -416,15 +420,18 @@ async function readHtml(html: string, url: string, min: number): Promise<WebDoc>
     footnoteLists(document as unknown as Document);
     wikiMath(document as unknown as Document);
     pandocMath(document as unknown as Document);
+    const charts = await drawCharts(document as unknown as Document, html);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document);
     // linkedom's window is the real one where there is one (the iPhone's web view), and its
     // getComputedStyle throws on a parsed element: without a window Defuddle reads styles as it does on the Mac.
     Object.defineProperty(document, "defaultView", { value: null });
     const r = await quiet(() => Defuddle(document as unknown as Document, url, { markdown: true }));
-    const markdown = inlineMath(htmlTables(r.content.trim()));
+    const markdown = chartLinks(inlineMath(htmlTables(r.content.trim())));
     if (markdown.length > min) {
-      return { title: siteless(r.title, h1) || url, author: paper ?? poster ?? cleanAuthor(r.author) ?? cleanAuthor(linked), published: cleanDate(r.published), markdown: markdown + "\n" };
+      // Only the charts the article kept (one in a sidebar is gone with it).
+      const assets = charts.filter((a) => markdown.includes(`assets/${a.name}`));
+      return { title: siteless(r.title, h1) || url, author: paper ?? poster ?? cleanAuthor(r.author) ?? cleanAuthor(linked), published: cleanDate(r.published), markdown: markdown + "\n", ...(assets.length ? { assets } : {}) };
     }
   } catch {
     // fall through to Readability

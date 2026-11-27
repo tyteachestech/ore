@@ -8,10 +8,10 @@ import type { Asset, NewItem } from "../items.ts";
 // that won't download keeps its link, so a slow or broken host never fails the add.
 
 /** An image past this size is left as a link: a source is for reading, not an image archive. */
-const MAX_IMAGE = 5 * 1024 * 1024;
+export const MAX_IMAGE = 5 * 1024 * 1024;
 /** Images per source, and bytes in all, past which the rest stay links. */
 const MAX_IMAGES = 80;
-const MAX_TOTAL = 60 * 1024 * 1024;
+export const MAX_TOTAL = 60 * 1024 * 1024;
 /** Smaller than this is a tracking pixel or a spacer. */
 const MIN_IMAGE = 100;
 

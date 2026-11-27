@@ -282,7 +282,7 @@ async function pageSection(html: string, url: string | undefined, title: string)
   const w = await (await import("./web.ts")).htmlToDoc(html, url ?? "about:blank");
   const { body, assets } = await saveImages(dropTitle(w.markdown, title), { referer: url });
   if (!body.trim()) throw new Error("Found no text on the page to add.");
-  return { text: `${PAGE_HEADING}\n\n${body.trim()}\n`, assets };
+  return { text: `${PAGE_HEADING}\n\n${body.trim()}\n`, assets: [...(w.assets ?? []), ...assets] };
 }
 /** The section after a body, a blank line between them. */
 const below = (body: string, section: string) => `${body.endsWith("\n") ? "" : "\n"}\n${section}`;
