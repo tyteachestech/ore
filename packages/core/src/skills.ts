@@ -363,7 +363,7 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
       }
     }
     // Added on the other device since this layout was drawn (the iPhone and the Mac share skills.yaml, D222): it
-    // keeps its collection, after the skills laid out there, rather than the whole move failing (F-new-stale-skill-layout).
+    // keeps its collection, after the skills laid out there, rather than the whole move failing (F752).
     // A collection the layout spells otherwise ("work" for "Work") is the same one: it takes the layout's spelling,
     // or the next save would find two that differ only by capitals.
     for (const [id, node] of byId) {
