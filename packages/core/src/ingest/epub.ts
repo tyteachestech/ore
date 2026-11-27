@@ -90,7 +90,7 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
   if (!opfPath) throw new Error("EPUB container.xml has no rootfile");
   const opf = new DOMParser().parseFromString(read(opfPath), "text/xml");
   // An element by its name without its prefix: a package may write `<opf:item>` or `<dc:Title>` (deep import pass).
-  const all = Array.from(opf.querySelectorAll("*"));
+  const all = Array.from(opf.querySelectorAll("*")) as Element[];
   const tags = (tag: string) => {
     const local = tag.replace(/^.*:/, "").toLowerCase();
     return all.filter((e) => e.nodeName.replace(/^.*:/, "").toLowerCase() === local);
