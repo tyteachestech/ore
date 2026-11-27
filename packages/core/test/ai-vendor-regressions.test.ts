@@ -193,7 +193,7 @@ test("a failed Claude process cannot save its otherwise valid Try feedback", asy
 
 test.each([false, true])("Claude chat rejects a failed process with a valid result (stream: %s)", async (stream) => {
   fake([{ data: { reply: "Partial candidate", card: null }, exit: 1, stderr: "fatal transport failure" }]);
-  await expect(runChatTurn(lib, { system: "Explain", message: "Why?", schema: {}, cwd: lib.root, ...(stream ? { onProgress: () => {} } : {}) })).rejects.toThrow(/claude failed \(exit 1\): fatal transport failure/);
+  await expect(runChatTurn(lib, { prompt: "chat", system: "Explain", message: "Why?", schema: {}, cwd: lib.root, ...(stream ? { onProgress: () => {} } : {}) })).rejects.toThrow(/claude failed \(exit 1\): fatal transport failure/);
 });
 
 test("blank Try feedback is rejected after retry and never saved", async () => {

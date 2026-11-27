@@ -28,7 +28,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 5. **Import at real breadth, deep (D122).** The running importer brings one file of each kind as a learner; start from its report and go deep: many files per type read against their source from start to end, EPUB books from his Calibre library, long textbooks, scans with and without the page reader downloaded (#494; refused with the next step when it is missing), and `bun run intake:live` over fifty popular sites. Fixtures for any bug are rewritten or openly licensed (D96).
 6. **Upgrade from an older library, rich.** Sweep 9 found nothing on a small seed with no media, PDF or chats. Redo with a copy of ~/Ore as written by a commit from 11-10, 11-17 and 11-24.
 7. **The real Mac window** (Codex computer use on the installed app). Menu bar, ⌘Q with drafts open (F15), the quick quiz's global shortcut, open at login, the updater relaunching it, drag and paste from Finder, Safari, Preview and Notes. Every tester so far drove a browser page.
-8. **What merged since the last pass.** AI per job (#560), Ore Cloud's import (#558), the book front matter fold (#539), highlight animations (#540), the end screen and its sounds (D330, D336). Fresh code finds the most.
+8. **done (#570)** What merged since the last pass (#542 to #566), read by Claude in the cloud: three bugs fixed test first (a lock's boot read from a clock that stops in sleep, a wrong `jobs:` in skills.yaml blanking every screen, Ask about this missing from usage.jsonl). Left for their own passes: Ore Cloud's server (queue 15, Claude lane), Vega charts on a hostile page (queue 14), the end screen's sounds by ear. Next time, start from the last commit this row names: f9bfe6d.
 9. **Recover from the library's git history.** Restore a source, a note or a whole day from the snapshots, then see what each screen and the index show.
 10. **A day-long soak.** The Mac open eight hours with background enrichment, many adds, timers: memory growth, stale screens, the midnight turn.
 11. **A11y recheck.** VoiceOver and keyboard only over the whole loop. The last full pass was 11-15; most screens changed since.
@@ -80,7 +80,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | Tutor chat | done | sweep 5 tutor, deep scan 2 chat |
 | Ask your library | running | deep scan 2 chat; on his real library: learner days asker |
 | Search and ⌘K | done | deep scan 2 chat, ux 9 |
-| Settings, every setting mid-use | partly | sweep 4 settings; AI per job (#560) new: queue 8 |
+| Settings, every setting mid-use | partly | sweep 4 settings; AI per job (#560) read in the merged-since pass 11-27 |
 | End screen, ring, sounds, mole voice | partly | ux rounds by sight; sounds and voice never checked: queue 8 |
 | Finish a source | done | ux 17 (F538 open) |
 | Quick quiz window | partly | deep scan 5 shell (reading); real window: queue 7 |
@@ -110,7 +110,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 |---|---|---|
 | Slow, missing or failing AI | done | sweep 2 ai, deep scan 3 engine |
 | Codex against Claude, switches mid-job, stamps (D21) | done | deep scan 5 aivendor |
-| An AI per job | open | queue 8 |
+| An AI per job | partly | merged-since pass 11-27 (reading; F754) |
 | Real AI on real sources | done | learner runs 11-25 and 11-26 |
 | Exercise and grading quality | eval, not a pass | `bun run eval:questions`, `eval:grade` |
 
