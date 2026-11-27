@@ -104,7 +104,9 @@ export async function drawCharts(doc: Document, html: string): Promise<Asset[]> 
     const id = code.match(/getElementById\(\s*["']([^"']+)["']/)?.[1] ?? code.match(/vegaEmbed\(\s*["']#([^"']+)["']/)?.[1];
     const target = (id && doc.getElementById(id)) || script.previousElementSibling;
     script.remove();
-    if (!target) continue;
+    // A script that only mentions vegaEmbed (a helper, a loader) and holds no spec leaves the page alone: only an
+    // empty div was a chart's place.
+    if (!target || (!spec && (target.textContent?.trim() || target.children.length))) continue;
     const p = doc.createElement("p");
     try {
       if (!spec) throw new Error("no spec");
