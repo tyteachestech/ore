@@ -10,7 +10,7 @@ cache = modal.Volume.from_name("ore-paddle-cache", create_if_missing=True)
 
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04", add_python="3.12")
-    .apt_install("libgl1", "libglib2.0-0", "curl")
+    .apt_install("libgl1", "libglib2.0-0", "curl", "build-essential")  # Triton compiles kernels at warm-up
     # The page reader's own process: layout model on the GPU (paddlepaddle-gpu), as on the Mac but CUDA.
     .run_commands("pip install paddlepaddle-gpu==3.2.1 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/")
     .pip_install("paddleocr[doc-parser]==3.7.0", "pypdf", "requests")
@@ -20,6 +20,8 @@ image = (
         "/opt/vllm/bin/pip install 'paddleocr[doc-parser]==3.7.0'",
         # Its own paddlex first on PATH: the system one imports paddle-gpu, which needs a GPU the build lacks.
         "PATH=/opt/vllm/bin:$PATH /opt/vllm/bin/paddleocr install_genai_server_deps vllm",
+        # flash-attn is skipped above with no GPU at build time, and the server needs it: its prebuilt wheel.
+        "/opt/vllm/bin/pip install https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.8cxx11abiTRUE-cp312-cp312-linux_x86_64.whl",
     )
 )
 
@@ -38,7 +40,7 @@ def bench() -> str:
     os.environ["HF_HOME"] = "/cache/hf"
     os.environ["PADDLE_PDX_CACHE_HOME"] = "/cache/paddlex"
     t0 = time.time()
-    srv = subprocess.Popen(["/opt/vllm/bin/paddleocr", "genai_server", "--model_name", "PaddleOCR-VL-1.6-0.9B", "--backend", "vllm", "--port", "8118"], env={**os.environ, "PATH": "/opt/vllm/bin:" + os.environ["PATH"]})
+    srv = subprocess.Popen(["/opt/vllm/bin/paddlex_genai_server", "--model_name", "PaddleOCR-VL-1.6-0.9B", "--backend", "vllm", "--host", "127.0.0.1", "--port", "8118"], env={**os.environ, "PATH": "/opt/vllm/bin:" + os.environ["PATH"]})
     while True:
         if srv.poll() is not None:
             raise RuntimeError("the model's server stopped")
