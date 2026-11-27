@@ -25,6 +25,8 @@ import { appendNote, setChapterRecall, setNotes, setRecall } from "../src/notes.
 import { acceptSuggestedSkill, addSkill, archiveSkill, dismissSuggestedSkill, loadSkills, setItemSkills, undoSuggestedSkill } from "../src/skills.ts";
 import { readTopic } from "../src/topics.ts";
 import { tempLibrary } from "./helpers.ts";
+import { usageSummary } from "../src/usage.ts";
+import { paths } from "../src/library.ts";
 
 // A fake `claude` on PATH that replays canned structured outputs in order.
 let binDir = "";
@@ -134,6 +136,26 @@ console.log(JSON.stringify({ type: "thread.started", thread_id: "codex-thread-1"
 });
 
 describe("AI adapter", () => {
+  // #547: only the tutor logged what it spent, so Ore Cloud's price rested on an estimate.
+  test("every run logs its job, vendor, model, prompt and tokens to usage.jsonl, a failed one too, and ore usage sums them by month", async () => {
+    const lib = await tempLibrary();
+    fakeClaude([{ rating: 3 }]);
+    await runAgent(lib, { prompt: "grade", cwd: lib.root, schema: Schema, input: {} });
+    fakeClaude([{ nope: 1 }, { nope: 2 }]);
+    await expect(runAgent(lib, { prompt: "enrich", cwd: lib.root, schema: Schema, input: {} })).rejects.toThrow(/invalid enrich output twice/);
+    const lines = readFileSync(join(paths.logs(lib), "usage.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(lines.map((l) => [l.job, l.vendor, l.model, l.runs, l.ok, typeof l.output_tokens])).toEqual([
+      ["grade", "claude", "claude-fake-1", 1, true, "number"],
+      ["enrich", "claude", "claude-fake-1", 2, false, "number"],
+    ]);
+    expect(String(lines[0]!.prompt_version)).toMatch(/^grade@/);
+    const month = new Date().toISOString().slice(0, 7);
+    const m = usageSummary(lib).months[month]!;
+    expect(m.total.runs).toBe(3);
+    expect(m.jobs.grade!.runs).toBe(1);
+    expect(m.jobs.enrich!.runs).toBe(2);
+  });
+
   test("invalid output is retried once, then accepted; stamp records vendor/model/prompt version", async () => {
     const lib = await tempLibrary();
     fakeClaude([{ rating: 9 }, { rating: 3 }]);

@@ -83,6 +83,13 @@
         "@ore/core": "workspace:*",
       },
     },
+    "packages/cloud": {
+      "name": "@ore/cloud",
+      "version": "0.0.0",
+      "dependencies": {
+        "@ore/core": "workspace:*",
+      },
+    },
     "packages/core": {
       "name": "@ore/core",
       "version": "0.0.0",
@@ -276,6 +283,8 @@
     "@open-spaced-repetition/binding-win32-ia32-msvc": ["@open-spaced-repetition/binding-win32-ia32-msvc@0.5.0", "", { "os": "win32", "cpu": "ia32" }, "sha512-SvLc/Uh9jCtPSWvFa8WaYSN1put96tP6kqpu3clDLsoI9scuHuNQ+uoB4dzlApzHNsFmImNYvrbs5IOZ4z8TpA=="],
 
     "@open-spaced-repetition/binding-win32-x64-msvc": ["@open-spaced-repetition/binding-win32-x64-msvc@0.5.0", "", { "os": "win32", "cpu": "x64" }, "sha512-V6p+7dkK7K4Abol7AKh5c160wPhA7bpdmLgym1Nj60xRSwvKJ3DXhrZmt8kE0u/gp0In7YuCvYdetcHS2lYZSg=="],
+
+    "@ore/cloud": ["@ore/cloud@workspace:packages/cloud"],
 
     "@ore/core": ["@ore/core@workspace:packages/core"],
 
