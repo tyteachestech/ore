@@ -22,7 +22,7 @@ Status: **done** (a pass covered it and nothing points back), **partly** (covere
 Ranked by what it does for the foundation: data that can't be lost, imports that come in whole (D122), and a test suite CI can trust. Rewrite this list when a pass lands.
 
 1. **running** Learners over days (the "Run another Codex learner pass" thread: asker, importer, returner, real clock).
-2. **Open rows, the hard four.** The 2026-11-27 pass (`2026-11-27-open-rows/`) fixed 10 and left four that each need a design, its notes say where: F1 (a note's ⌘Z after an outside edit: an editor-owned update), F662 (an ownerless update lock: an owner-aware installer lock), F729 (Ask's eighth-source cut: room for a distinct part of the question, then `eval:ask`), F684 (Tyler picked the offline viewing copy; drafting).
+2. **Open rows, the hard four.** The 2026-11-27 pass (`2026-11-27-open-rows/`) fixed nine and left four that each need a design, its notes say where: F1 (a note's ⌘Z after an outside edit: an editor-owned update), F662 (an ownerless update lock: an owner-aware installer lock), F729 (Ask's eighth-source cut: room for a distinct part of the question, then `eval:ask`), F684 (Tyler picked the offline viewing copy; drafting).
 3. **Flaky tests are races.** The open flaky rows (F142, F347, F348, F349, F397, F515, F516, F575, F623, F651, F748): find each cause (`triage-report` step 3), never a retry. A suite that fails at random hides real breaks.
 4. **Mac and iPhone writing at once.** Both on one iCloud folder: a rating on each, a note edited on both, Archive on one while the source is open on the other, a conflict copy. Deep scan 1 and 4 did it below the screens; nobody has run both apps.
 5. **Import at real breadth, deep (D122).** The running importer brings one file of each kind as a learner; start from its report and go deep: many files per type read against their source from start to end, EPUB books from his Calibre library, long textbooks, scans with and without the page reader downloaded (#494; refused with the next step when it is missing), and `bun run intake:live` over fifty popular sites. Fixtures for any bug are rewritten or openly licensed (D96).
@@ -132,5 +132,5 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 |---|---|---|
 | Tests missing for recent merges | partly | test-gap hunt 11-13 |
 | Flaky tests traced to their cause | open | queue 3 |
-| Open rows that need no call from Tyler | partly | open-rows 2026-11-27 (10 fixed, F13 stale, F548 kept on purpose); four left: queue 2 |
+| Open rows that need no call from Tyler | partly | open-rows 2026-11-27 (9 fixed, F13 stale, F548 kept on purpose); four left: queue 2 |
 | The `ore` CLI and `/ore` skill as an agent uses them | partly | sweep 3 cli, deep scan 3 library: queue 13 |
