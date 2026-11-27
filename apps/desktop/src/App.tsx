@@ -1,3 +1,4 @@
+import { lastKey } from "./input-mode";
 import { mergeSourceRows } from "./source-rows";
 import { ranked } from "./match";
 import { Archive, ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, Folder, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple, X } from "./icons";
@@ -2028,9 +2029,9 @@ export function App() {
       aria-label={TABS.find((s) => s.id === status)?.label ?? "Archived"}
       aria-activedescendant={keyed && currentLine ? `row-${lineKey(currentLine)}` : undefined}
       onFocus={(e) => {
-        // Finder/Mail: keyboard entry reveals the remembered row (or the first). A row's
+        // Finder/Mail: Tab into the list reveals the remembered row (or the first). A row's
         // own button taking focus, or focus restored after a pointer action, keeps its target.
-        if (e.target !== e.currentTarget || !document.documentElement.hasAttribute("data-keys") || !currentLine) return;
+        if (e.target !== e.currentTarget || lastKey() !== "Tab" || !currentLine) return;
         setKeyed(true);
         setCursor(lineKey(currentLine));
         document.getElementById(`row-${lineKey(currentLine)}`)?.scrollIntoView({ block: "nearest" });

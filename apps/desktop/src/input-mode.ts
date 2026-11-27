@@ -8,10 +8,19 @@ export function keyInput(was: boolean, e: { type: string; key?: string }): boole
   return was;
 }
 
+let last: string | null = null;
+/** The last key he pressed, or null since a pointer press: a list lights a row when Tab brings focus in (F547),
+ *  not when a menu he worked by keys hands focus back to it. */
+export const lastKey = () => last;
+
 /** Keeps `data-keys` on the root while `keyInput` says so; the stylesheet reads it (`.popover` in styles.css). */
 export function trackInput(doc: Document) {
   const root = doc.documentElement;
-  const on = (e: Event) => root.toggleAttribute("data-keys", keyInput(root.hasAttribute("data-keys"), e as KeyboardEvent));
+  const on = (e: Event) => {
+    if (e.type === "pointerdown") last = null;
+    else if (!MODIFIERS.has((e as KeyboardEvent).key)) last = (e as KeyboardEvent).key;
+    root.toggleAttribute("data-keys", keyInput(root.hasAttribute("data-keys"), e as KeyboardEvent));
+  };
   doc.addEventListener("keydown", on, true);
   doc.addEventListener("pointerdown", on, true);
 }

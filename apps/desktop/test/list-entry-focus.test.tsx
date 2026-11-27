@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { Window } from "happy-dom";
 import { lineKey, type Line } from "../src/lines";
-import { trackInput } from "../src/input-mode";
+import { lastKey, trackInput } from "../src/input-mode";
 
 const w = new Window();
 for (const k of ["window", "document", "HTMLElement", "Node", "navigator"] as const) (globalThis as any)[k] = (w as any)[k];
@@ -20,7 +20,7 @@ const end = source.indexOf("\n    >", start);
 if (start < 0 || end < 0) throw new Error("Shared source list opening tag not found");
 const code = new Bun.Transpiler({ loader: "tsx", tsconfig: { compilerOptions: { jsx: "react" } } })
   .transformSync(`return (${source.slice(start, end)} />);`);
-const draw = new Function("React", "listRef", "TABS", "status", "keyed", "currentLine", "lineKey", "onListKey", "setKeyed", "setCursor", code);
+const draw = new Function("React", "listRef", "TABS", "status", "keyed", "currentLine", "lineKey", "onListKey", "setKeyed", "setCursor", "lastKey", code);
 const row = (id: string) => ({ kind: "item", item: { id } }) as Line;
 
 async function list(currentLine: Line | undefined, keyboard = true) {
@@ -31,7 +31,7 @@ async function list(currentLine: Line | undefined, keyboard = true) {
   const Probe = () => {
     const [keyed, setKeyed] = React.useState(false);
     const listRef = React.useRef(null);
-    return React.cloneElement(draw(React, listRef, [], "toread", keyed, currentLine, lineKey, () => {}, setKeyed, (id: string) => { cursor = id; }), {},
+    return React.cloneElement(draw(React, listRef, [], "toread", keyed, currentLine, lineKey, () => {}, setKeyed, (id: string) => { cursor = id; }, lastKey), {},
       <div id={currentLine ? `row-${lineKey(currentLine)}` : "empty"} ref={(el) => { if (el) el.scrollIntoView = () => { scrolled.push(el.id); }; }}><button>Row actions</button></div>);
   };
   await act(async () => root.render(<Probe />));
