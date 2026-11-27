@@ -2340,7 +2340,11 @@ journey("original: both pages of a JPEG 2000 scan show ink, in WebKit, which run
     await page.getByRole("tab", { name: "Original" }).click();
     for (const n of [1, 2]) {
       const sheet = page.locator(`.original canvas[data-page="${n}"]`);
-      await sheet.waitFor();
+      // pdf.js's JavaScript JPEG 2000 decoder takes seconds a page in WebKit (over 8 s on CI's runner); a page that
+      // failed says so in place of the canvas instead.
+      const failed = page.getByText("This page can’t be shown here");
+      await sheet.or(failed).first().waitFor({ timeout: 30_000 });
+      if (await failed.isVisible()) throw new Error(`page ${n} failed to draw`);
       const ink = await sheet.evaluate((c: HTMLCanvasElement) => {
         const pixels = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
         let inked = 0;
