@@ -25,13 +25,36 @@ describe("sidebar layout (arrangeSkills)", () => {
     expect(skillGroupsOf(loadSkills(lib).skills)).toEqual(before);
   });
 
-  test("refuses a layout that drops, repeats or invents a skill", async () => {
+  test("refuses a layout that repeats a skill", async () => {
     const lib = await tempLibrary();
     const all = loadSkills(lib).skills.map((s) => s.id);
-    await expect(arrangeSkills(lib, [{ collection: "", skills: all.slice(1) }])).rejects.toThrow("leaves out");
     await expect(arrangeSkills(lib, [{ collection: "", skills: [...all, all[0]!] }])).rejects.toThrow("twice");
-    await expect(arrangeSkills(lib, [{ collection: "", skills: [...all, "nope"] }])).rejects.toThrow("unknown");
     await expect(arrangeSkills(lib, [{ collection: "A", skills: all.slice(0, 1) }, { collection: "a", skills: all.slice(1) }])).rejects.toThrow("twice");
+  });
+
+  test("a layout drawn before the other device added or deleted a skill still saves: the new one keeps its place, the gone one is passed over (F766)", async () => {
+    const lib = await tempLibrary();
+    await setSkillLook(lib, "ai", { collection: "Work" });
+    await setSkillLook(lib, "habits", { collection: "Work" });
+    // The Mac's sidebar as it was drawn, then the iPhone adds "Juggling" to Work and the Mac's drag lands.
+    const drawn = skillGroupsOf(loadSkills(lib).skills);
+    await addSkill(lib, "Juggling", "Work");
+    const work = drawn.find((g) => g.collection === "Work")!;
+    const moved = drawn.map((g) => (g === work ? { ...g, skills: [...g.skills].reverse() } : g));
+    // And a skill deleted on the phone is still in the Mac's drawing.
+    moved[moved.length - 1]!.skills.push("gone-elsewhere");
+    await arrangeSkills(lib, moved);
+    const after = skillGroupsOf(loadSkills(lib).skills);
+    expect(after.find((g) => g.collection === "Work")!.skills).toEqual([...work.skills].reverse().concat("juggling"));
+    expect(after.flatMap((g) => g.skills)).not.toContain("gone-elsewhere");
+    expect(after.flatMap((g) => g.skills).sort()).toEqual(loadSkills(lib).skills.map((s) => s.id).sort());
+    // The Mac's layout respelled Work as "work" meanwhile: the phone's new skill joins it, never a second Work.
+    await addSkill(lib, "Unicycling", "Work");
+    const respelled = skillGroupsOf(loadSkills(lib).skills).map((g) => (g.collection === "Work" ? { collection: "work", skills: g.skills.filter((s) => s !== "unicycling") } : g));
+    await arrangeSkills(lib, respelled);
+    const groups = skillGroupsOf(loadSkills(lib).skills);
+    expect(groups.filter((g) => g.collection.toLowerCase() === "work")).toEqual([{ collection: "work", skills: [...respelled.find((g) => g.collection === "work")!.skills, "unicycling"] }]);
+    await arrangeSkills(lib, groups);
   });
 
   test("refuses a collection named Other, the name the sidebar and Home give the skills in no collection", async () => {
