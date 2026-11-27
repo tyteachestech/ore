@@ -233,6 +233,11 @@ test("the caller's address is the socket's; a forwarded header counts only behin
   expect(caller(new Request("http://x/"), undefined, false)).toBe("unknown");
 });
 
+test("the health check answers without a session and tells nothing", async () => {
+  const res = await makeHandler(auth)(new Request("http://x/health"));
+  expect([res.status, await res.json()]).toEqual([200, { ok: true }]);
+});
+
 test("answers are never cached or sniffed", async () => {
   const res = await makeHandler(auth)(new Request("http://x/nope"));
   expect([res.headers.get("cache-control"), res.headers.get("x-content-type-options")]).toEqual(["no-store", "nosniff"]);
