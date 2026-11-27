@@ -95,6 +95,11 @@ test("Apple's token answers one request: sent again, with another nonce, a made-
   expect(good.res.status).toBe(200);
   // The same token and nonce again (read from a log, say).
   expect((await post(handle, "/auth/apple", { identityToken: good.identityToken, nonce: good.nonce })).status).toBe(401);
+  // The same token and nonce twice at once: one session, not two.
+  const { nonce: n2 } = (await (await post(handle, "/auth/nonce")).json()) as { nonce: string };
+  const t2 = await apple({ nonce: await sha(n2) });
+  const both = await Promise.all([post(handle, "/auth/apple", { identityToken: t2, nonce: n2 }), post(handle, "/auth/apple", { identityToken: t2, nonce: n2 })]);
+  expect(both.map((r) => r.status).sort()).toEqual([200, 401]);
   // A token asked with no nonce, or with another one's hash.
   const { nonce } = (await (await post(handle, "/auth/nonce")).json()) as { nonce: string };
   expect((await post(handle, "/auth/apple", { identityToken: await apple(), nonce })).status).toBe(401);
@@ -213,6 +218,8 @@ test("the limit counts an IPv6 network as one caller, and forgets the oldest cal
   const ok = limiter(2, 900, () => NOW, 3);
   expect([ok("2001:db8:1:2::1"), ok("2001:db8:1:2:ffff::9"), ok("2001:db8:1:2::3")]).toEqual([true, true, false]);
   expect(ok("2001:db8:1:3::1")).toBe(true);
+  const short = limiter(1, 900, () => NOW);
+  expect([short("2001:db8::1"), short("2001:0db8:0:0::2"), short("2001:db8:0:1::1")]).toEqual([true, false, true]);
   // Three more callers push the first network out of memory; nothing grows past the cap.
   for (const who of ["a", "b", "c"]) ok(who);
   expect(ok("2001:db8:1:2::1")).toBe(true);

@@ -121,9 +121,9 @@ export function nonces(auth: Pick<Auth, "secret" | "now">) {
       const now = clock(auth);
       for (const [n, exp] of used) if (exp <= now) used.delete(n);
       const claims = await opened("n1", nonce, auth);
-      if (!claims || used.has(nonce)) return false;
       const hash = Buffer.from(await crypto.subtle.digest("SHA-256", text.encode(nonce))).toString("hex");
-      if (claimed !== hash) return false;
+      // Checked and marked with no wait between: two requests at once can't both spend it.
+      if (!claims || claimed !== hash || used.has(nonce)) return false;
       used.set(nonce, claims.exp as number);
       return true;
     },
@@ -174,7 +174,15 @@ export async function openSession(token: string, auth: Pick<Auth, "secret" | "no
 }
 
 /** An address as the limiter counts it: an IPv6 one by its /64, which is one network's to hand out. */
-const network = (who: string) => (who.includes(":") && !who.startsWith("::ffff:") ? who.split(":").slice(0, 4).join(":") : who);
+function network(who: string): string {
+  if (!who.includes(":") || who.startsWith("::ffff:")) return who;
+  // `::` stands for however many zero groups make eight.
+  const [head = "", tail] = who.split("::");
+  const a = head ? head.split(":") : [];
+  const b = tail ? tail.split(":") : [];
+  const groups = tail === undefined ? a : [...a, ...Array<string>(Math.max(0, 8 - a.length - b.length)).fill("0"), ...b];
+  return groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":");
+}
 
 /** How many sign-ins one address may try in a quarter hour, in this process's memory: one server (#545).
  *  Reopen with a shared store if a second server ever runs. It remembers at most `cap` addresses: past
