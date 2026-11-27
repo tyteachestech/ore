@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // Keeps test runs from freezing Tyler's Mac (2026-11-15: five Codex testers at once froze it until it restarted).
-//   bun apps/desktop/scripts/mac-load.ts check [--alone]  fails below 25% free memory, or when two Codex testers
+//   bun apps/desktop/scripts/mac-load.ts check [--alone]  fails below 25% free memory, or when three Codex testers
 //                                                          already run across every thread (--alone: when any runs)
 //   bun apps/desktop/scripts/mac-load.ts clean <dir>       stops every process started from <dir> (a worktree)
 // `bun run sweep` calls both itself. Written in TypeScript because macOS's /bin/sh (bash 3.2) misparsed the shell version.
@@ -8,7 +8,9 @@ import { realpathSync } from "node:fs";
 import { homedir } from "node:os";
 
 export const MIN_FREE = 25;
-export const MAX_TESTERS = 2;
+// Three (Tyler, 2026-11-26): three at once held at 25% free and warning pressure for six minutes, never critical
+// (docs/reviews/2026-11-26-simulated-learner-3x/). Reopen if a run with three goes below 25% or reaches critical.
+export const MAX_TESTERS = 3;
 
 export type Proc = { pid: number; ppid: number; pgid: number; command: string; cwd?: string };
 

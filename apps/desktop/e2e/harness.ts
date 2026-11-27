@@ -432,6 +432,15 @@ export async function inLibrary(page: Page, titles: string[]) {
   });
 }
 
+/** Until no `ore` call has been in flight for 300 ms, up to three seconds; never fails. */
+async function calm(page: Page) {
+  let quietSince = Date.now();
+  for (const end = Date.now() + 3000; Date.now() < end && Date.now() - quietSince < 300; await Bun.sleep(50)) {
+    const busy = await page.evaluate(() => !!(window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING).catch(() => false);
+    if (busy) quietSince = Date.now();
+  }
+}
+
 /** Waits for every `ore` call the page has made to answer, however long a slow machine takes (past the library
  *  lock's 15 s, so a write stuck there answers with its error first); a call that never answers is named. */
 export async function settled(page: Page, ms = 20_000) {
@@ -850,6 +859,10 @@ export async function run() {
         const why = [...(log < 0 ? lines : lines.slice(0, log)).slice(0, 2), ...(log < 0 ? [] : lines.slice(log + 1).slice(-4))].join("\n      ");
         console.log(`FAIL  ${name}\n      ${why}${page ? `\n      screenshot: ${shot}` : ""}`);
       }
+      // A call the app makes as a journey ends (Settings closing, the window taking focus back) was cut off by the
+      // close, which WebKit reports as a page error "due to access control checks" (F749): the page closes once no
+      // ore call has been in flight for 300 ms, or after three seconds whatever is left.
+      if (page) await calm(page);
       await page?.close();
     }
     await done();
