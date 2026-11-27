@@ -131,14 +131,30 @@ export { paddleHome, paddlePath } from "./paddle-path.ts";
 
 /** The reader's driver, run by its own Python as `<script> <pdf> <out.json>` (or `--warm`, which only
  *  fetches the models). On Apple silicon the model runs in mlx-vlm's server, started here on a free
- *  port and stopped after: one request at a time, since mlx-vlm 0.8.0 garbles pages read side by side. */
+ *  port and stopped after: one request at a time, since mlx-vlm 0.8.0 garbles pages read side by side.
+ *
+ *  Boxes first (D-new-boxes-first): the layout model finds every page's blocks, and the reading model
+ *  reads only the ones Ore takes its words from, as `swapRegions` in pdf.ts does: a table, a formula,
+ *  every block of a page with no text of its own (a scan), and a caption with none in its box. Every
+ *  other block keeps the PDF's own text, which is what Ore uses there anyway, so the reading model's
+ *  call for it was thrown away: 909 of 924 calls on 16 PDFs with text. The page is pictured by the
+ *  pipeline's own PDF reader, so its blocks are the ones it finds when handed the whole PDF. */
 export const DRIVER = `
-import json, os, signal, socket, subprocess, sys, time
+import json, os, re, signal, socket, subprocess, sys, time
 signal.signal(signal.SIGTERM, lambda *a: sys.exit(1))  # a stopped read still stops its server
 MODEL = "PaddlePaddle/PaddleOCR-VL-1.6"
+CAPTION = ("figure_title", "vision_footnote")
 mlx = sys.platform == "darwin" and os.uname().machine == "arm64"
 warm = sys.argv[1] == "--warm"
 srv = None
+cur = {}  # the page being read: its own text, the picture's pixels per point, its height in points
+
+def own(box):
+    """The PDF's own text inside a block's box, which is in the picture's pixels."""
+    s, h = cur["scale"], cur["h"]
+    t = cur["text"].get_text_bounded(left=box[0] / s, bottom=h - box[3] / s, right=box[2] / s, top=h - box[1] / s)
+    return " ".join(t.replace("\\x02", "").replace("\\ufffe", "").split())
+
 try:
     if warm:
         from huggingface_hub import snapshot_download
@@ -157,10 +173,25 @@ try:
     else:
         pipe = PaddleOCRVL(pipeline_version="v1.6")
     if not warm:
+        import pypdfium2 as pdfium
+        from paddlex.inference.utils.io.readers import PDFReaderBackend
+        inner = pipe.paddlex_pipeline
+        while "_pipeline" in vars(inner): inner = inner._pipeline
+        collect = inner._paddleocr_vl_collect_page_vlm_entries_core
+        def needed(page_idx, blocks, imgs, cfg):
+            entries, spotting, drop = collect(page_idx, blocks, imgs, cfg)
+            # An entry is (page, block, picture, prompt, ...): "OCR:" is plain text, a table or a formula has its own prompt.
+            if not cur["scan"]: entries = [e for e in entries if e[3] != "OCR:" or (blocks[e[1]]["label"] in CAPTION and not own(blocks[e[1]]["box"]))]
+            return entries, spotting, drop
+        inner._paddleocr_vl_collect_page_vlm_entries_core = needed
+        render = PDFReaderBackend()
+        doc = pdfium.PdfDocument(sys.argv[1])
         pages = []
-        for r in pipe.predict(sys.argv[1]):
-            j = r.json; j = j.get("res", j)
-            pages.append({"page": j["page_index"] + 1, "width": j["width"], "height": j["height"], "blocks": [{"label": b["block_label"], "content": b["block_content"] or "", "bbox": b["block_bbox"]} for b in j["parsing_res_list"]]})
+        for n in range(len(doc)):
+            page = doc[n]; img = render._render_page(page, page_index=n + 1); text = page.get_textpage()
+            cur.update(text=text, scale=img.shape[1] / page.get_width(), h=page.get_height(), scan=len(re.findall(r"\\w{2,}", text.get_text_range())) < 5)
+            j = next(iter(pipe.predict(img))).json; j = j.get("res", j)
+            pages.append({"page": n + 1, "width": j["width"], "height": j["height"], "blocks": [{"label": b["block_label"], "content": b["block_content"] or ("" if cur["scan"] or b["block_label"] == "table" or "formula" in b["block_label"] else own(b["block_bbox"])), "bbox": b["block_bbox"]} for b in j["parsing_res_list"]]})
         json.dump(pages, open(sys.argv[2], "w"))
 finally:
     if srv: srv.terminate()
@@ -218,7 +249,8 @@ export async function removePaddle(): Promise<void> {
   await rm(paddleHome(), { recursive: true, force: true });
 }
 
-/** Reads a PDF with PaddleOCR-VL and returns its pages. About 6 s a page on Apple silicon, so it runs
+/** Reads a PDF with PaddleOCR-VL and returns its pages. About 1.6 s a page on Apple silicon where the PDF
+ *  has its own text and about 6 s where it is a scan (D-new-boxes-first), so it runs
  *  in the background after the PDF is added, never while he waits to open it. */
 export async function runPaddle(pdf: string, bin = paddlePath()): Promise<PaddlePage[]> {
   if (!bin) throw new Error("The PDF page reader isn't installed. Get it in Settings › AI.");
