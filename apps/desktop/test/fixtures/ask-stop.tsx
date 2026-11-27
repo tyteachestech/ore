@@ -1,9 +1,8 @@
 import { strict as assert } from "node:assert";
 import { mock } from "bun:test";
 import { Window } from "happy-dom";
-import { act, useState } from "react";
+import { act } from "react";
 import type { CardFull } from "../../src/ore";
-import type { AskChat } from "../../src/Ask";
 
 const w = new Window();
 w.document.write("<!doctype html><html><body></body></html>");
@@ -24,20 +23,22 @@ const ids: string[] = [];
 const normal = process.argv[2] === "normal";
 mock.module("@tauri-apps/api/event", () => ({ listen: () => waiting }));
 mock.module("../../src/ore.ts", () => ({
+  ore: async () => ({ id: "ask-exercise", exercise: "exercise", turns: [] }),
+  oreWith: async () => {},
   oreJob: async (job: string) => { ids.push(job); events.push("START"); return { reply: "Done.", proposal: null, session: "claude:fake" }; },
   cancelOre: async (job: string) => { ids.push(job); events.push("STOP"); },
   opt: (k: string, v: string) => `--${k}=${v}`,
 }));
-const { Ask, NO_ASK } = await import("../../src/Ask.tsx");
+const { Ask, useAskChats } = await import("../../src/Ask.tsx");
 const { createRoot } = await import("react-dom/client");
 const { TooltipProvider } = await import("@radix-ui/react-tooltip");
-let state!: AskChat;
+let state: ReturnType<typeof useAskChats>["chats"][string] | undefined;
 function Host() {
-  const [chat, setChat] = useState(NO_ASK);
-  state = chat;
+  const asks = useAskChats((message) => { throw new Error(message); });
+  state = asks.chats.exercise;
   return <TooltipProvider><Ask
     card={{ id: "exercise", question: "What helps?", answer: "Recall.", rubric: [], kind: "card" } as CardFull}
-    answer="Recall" chat={chat} setChat={setChat} onApply={async () => {}} onClose={() => {}}
+    answer="Recall" store={asks} onApply={async () => {}} onClose={() => {}}
   /></TooltipProvider>;
 }
 const at = document.createElement("div");
@@ -46,17 +47,17 @@ const root = createRoot(at);
 try {
   await act(async () => root.render(<Host />));
   await act(async () => { [...document.querySelectorAll("button")].find(b => b.textContent === "Why is this the answer?")!.click(); });
-  assert.ok(state.busy, "the request waits for its progress listener");
-  const job = state.job;
+  assert.ok(state?.run, "the request waits for its progress listener");
+  const job = state.run.id;
   if (!normal) {
     await act(async () => document.querySelector<HTMLButtonElement>('button[aria-label="Stop the reply"]')!.click());
-    assert.equal(state.busy, false);
-    assert.equal(state.error, "Stopped.");
+    assert.equal(state.run, undefined);
+    assert.equal(state.turns.at(-1)?.error, "Stopped.");
   }
   await act(async () => { listening(); });
   assert.deepEqual(events, normal ? ["START"] : ["STOP"], "a stopped request never starts after its listener resolves");
   assert.deepEqual(ids, [job]);
-  if (normal) assert.equal(state.turns.at(-1)?.text, "Done.");
+  if (normal) assert.equal(state.turns.at(-1)?.reply, "Done.");
   assert.equal(removed, 1, "the progress listener is removed on cancellation and completion");
 } finally {
   await act(async () => root.unmount());

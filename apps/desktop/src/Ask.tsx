@@ -1,5 +1,5 @@
 import { ArrowUp, Sparkle, Stop } from "./icons";
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { mend } from "./mend";
 import { useSteady } from "./steady";
@@ -7,36 +7,90 @@ import { aiMath, reply as math, wholeFormulas } from "./math-md";
 import { Grow } from "./Grow";
 import { Hint } from "./Hint";
 import { listen } from "@tauri-apps/api/event";
-import { cancelOre, oreJob, opt, type CardFull, type AskReply } from "./ore";
+import { cancelOre, ore, oreJob, oreWith, opt, type CardFull, type AskReply, type SavedExerciseChat } from "./ore";
 import { is } from "./keys";
-import { errorText } from "./util";
+import { errorText, type Notify } from "./util";
 import { wordDiff } from "./worddiff";
+import { Working } from "./Working";
 
-type Proposal = NonNullable<AskReply["proposal"]> & { ai: AskReply["ai"] };
-/** `was`: the card as it stood when the proposal came, so the change it shows survives Use this card (D161). */
-/** `stopped`: he stopped this reply part way; what was written by then is the reply. */
-type Turn = { role: "me" | "ai"; text: string; proposal?: Proposal | null; was?: AskReply["proposal"]; stopped?: boolean };
+type Turn = SavedExerciseChat["turns"][number];
+type Proposal = NonNullable<Turn["proposal"]> & { ai?: Turn["ai"] };
 
 const STARTERS = ["Why is this the answer?", "Give me an example", "Make this exercise clearer"];
 
-/** One card's chat: what he has typed, the thread, and the AI session. Review keeps it by card id,
- *  so closing Ask (or a reply landing while it is closed) loses nothing. */
-/** `partial`: the reply so far while it is written (D296); `job`: the run writing it, which Stop ends. */
-export type AskChat = { turns: Turn[]; input: string; busy: boolean; error: string | null; session?: string; failed?: string; partial?: string; job?: string };
-export const NO_ASK: AskChat = { turns: [], input: "", busy: false, error: null };
+type Run = { id: string; turn: string; session?: string; ai?: AskReply["ai"]; stopped?: boolean };
+type AskChat = SavedExerciseChat & { input: string; partial?: string; run?: Run };
+
+/** Like Tutor's chat, a reply can land while its panel or Review is closed. */
+export function useAskChats(notify: Notify) {
+  const [chats, setChats] = useState<Record<string, AskChat>>({});
+  const pending = useRef<Promise<unknown>>(Promise.resolve());
+  return {
+    chats,
+    async load(exercise: string) {
+      await pending.current;
+      const saved = await ore<SavedExerciseChat>("chat", exercise, "--exercise");
+      setChats((all) => all[exercise] ? all : {
+        ...all,
+        [exercise]: { ...saved, input: "", turns: saved.turns.map((t) => t.reply === undefined && !t.error ? { ...t, error: "No reply came: Ore closed before it did." } : t) },
+      });
+    },
+    update(exercise: string, change: (c: AskChat) => AskChat) {
+      setChats((all) => ({ ...all, [exercise]: change(all[exercise]!) }));
+    },
+    save(chat: SavedExerciseChat, title: string, turns: Turn[]) {
+      const { id, exercise } = chat;
+      const body = JSON.stringify({ id, exercise, title: title.trim().slice(0, 120) || "Exercise chat", turns });
+      // As in Tutor, an older snapshot finishes writing before the one with its reply.
+      pending.current = pending.current.then(() => oreWith(body, "chat", "--set", "--merge")).catch((e) => {
+        notify(errorText(e, "save the exercise chat"), "error");
+      });
+    },
+  };
+}
+
+type ChatProps = { card: CardFull; answer: string; onApply: (p: Proposal) => Promise<void>; onClose: () => void };
 
 /** Ask about this (D61): a chat about the card he just answered, like ChatGPT's thread under a
  *  message. It runs on his own plan through `ore ask` (claude -p or codex); a proposed card is
  *  applied only when he clicks Use this card. Never shown before the answer, never rates. */
-export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: CardFull; answer: string; chat: AskChat; setChat: (f: (c: AskChat) => AskChat) => void; onApply: (p: Proposal) => Promise<void>; onClose: () => void }) {
-  const { turns, input, busy, error } = chat;
+export function Ask({ store, ...props }: ChatProps & { store: ReturnType<typeof useAskChats> }) {
+  const { card } = props;
+  const chat = store.chats[card.id];
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, retry] = useState(0);
+  useEffect(() => {
+    if (chat) return;
+    let open = true;
+    store.load(card.id).catch((e) => { if (open) setError(errorText(e, "open the exercise chat")); });
+    return () => { open = false; };
+  }, [card.id, !!chat, attempt]);
+  if (!chat) {
+    return <section className="ask" aria-label="Ask about this">
+      {error
+        ? <p className="err" role="alert">{error} <button className="link" onClick={() => { setError(null); retry((n) => n + 1); }}>Try again</button></p>
+        : <Working label="Opening your chat…" />}
+    </section>;
+  }
+  return <AskThread {...props} chat={chat} setChat={(f) => store.update(card.id, f)} save={(turns) => store.save(chat, card.question, turns)} />;
+}
+
+function AskThread({ card, answer, chat, setChat, save, onApply, onClose }: ChatProps & {
+  chat: AskChat;
+  setChat: (f: (c: AskChat) => AskChat) => void;
+  save: (turns: Turn[]) => void;
+}) {
+  const { turns, input, run } = chat;
+  const busy = !!run;
+  const last = turns.at(-1);
+  const error = busy ? undefined : last?.error;
   /** Read off the card itself, never remembered: an undo or a later edit makes a suggestion usable again. */
   const same = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
-  const applied = (p: Proposal) => same(p.question, card.question) && same(p.answer, card.answer);
+  const applied = (p: NonNullable<Turn["proposal"]>) => same(p.question, card.question) && same(p.answer, card.answer);
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
   // The reply so far typed out at a steady pace, as the tutor's is (D321).
-  const { shown } = useSteady(chat.job, chat.partial ?? "", true);
+  const { shown } = useSteady(run?.id, chat.partial ?? "", true);
 
   useEffect(() => {
     field.current?.focus();
@@ -48,33 +102,41 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
 
   /** `again`: Try again on a message that failed; it is in the thread already, and what he has typed since stays. */
   /** One request at a time: a double click on Try again sends once (busy is a render behind). */
-  const sending = useRef<string | null>(null);
-  /** The session the reply on its way is written in: a run stopped part way never returns it. */
-  const live = useRef<string | undefined>(undefined);
-  const send = async (text: string, again = false) => {
+  const sending = useRef<Run | null>(null);
+  const settle = (job: Run, before: Turn[], result: Partial<Turn>) => {
+    const next = before.map((t) => t.id === job.turn ? { ...t, ...result } : t);
+    save(next);
+    setChat((c) => c.run === job ? { ...c, turns: next, run: undefined, partial: undefined } : c);
+  };
+  const send = async (text: string, again?: Turn) => {
     const message = text.trim();
-    if (!message || busy || sending.current) return;
+    if (!message || busy || (sending.current && !sending.current.stopped)) return;
     // The reply lands on this run alone: Stop ends it, and whatever it still sends or returns is dropped.
-    const job = `ask-${crypto.randomUUID()}`;
+    const id = `ask-${crypto.randomUUID()}`;
+    const turn: Turn = { id: again?.id ?? id, message };
+    const job: Run = { id, turn: turn.id };
+    const next = again ? turns.map((t) => t.id === turn.id ? turn : t) : [...turns, turn];
     sending.current = job;
-    live.current = undefined;
-    const mine = (c: AskChat) => c.job === job;
-    setChat((c) => (again ? { ...c, error: null, busy: true, partial: undefined, job } : { ...c, turns: [...c.turns, { role: "me", text: message }], input: "", error: null, busy: true, partial: undefined, job }));
+    setChat((c) => ({ ...c, turns: next, input: again ? c.input : "", run: job }));
+    save(next);
     // The reply as it is written (ChatGPT's streaming), as the tutor's comes: the first words in place of the dots.
-    const off = await listen<{ stream?: string; reply?: string; session?: string }>("ore-progress", ({ payload: p }) => {
-      if (p.stream === job && sending.current === job && p.session) live.current = p.session;
-      if (p.stream === job && p.reply !== undefined) setChat((c) => (mine(c) ? { ...c, partial: p.reply } : c));
+    const off = await listen<{ stream?: string; reply?: string; session?: string; ai?: AskReply["ai"] }>("ore-progress", ({ payload: p }) => {
+      if (p.stream !== id || job.stopped) return;
+      job.session = p.session ?? job.session;
+      job.ai = p.ai ?? job.ai;
+      if (p.reply !== undefined) setChat((c) => c.run === job ? { ...c, partial: p.reply } : c);
     }).catch(() => () => {});
     try {
       // Stop can run while listener registration is pending, before there is a native job to cancel.
-      if (sending.current !== job) return;
+      if (job.stopped) return;
       // His answer goes with every turn: a session from the AI he used before he switched starts a new one with it.
-      const r = await oreJob<AskReply>(job, null, "ask", card.id, opt("message", message), opt("stream", job), ...(chat.session ? [opt("session", chat.session)] : []), opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : []));
+      const session = turns.findLast((t) => t.session)?.session;
+      const r = await oreJob<AskReply>(id, null, "ask", card.id, opt("message", message), opt("stream", id), ...(session ? [opt("session", session)] : []), opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : []));
       // Checked here, outside the updater: a throw inside one escapes this catch and takes Review down with it.
       if (typeof r?.reply !== "string" || !r.reply.trim()) throw new TypeError("ask gave no reply");
-      setChat((c) => (mine(c) ? { ...c, session: r.session, busy: false, failed: undefined, partial: undefined, job: undefined, turns: [...c.turns, { role: "ai", text: r.reply, proposal: r.proposal && { ...r.proposal, ai: r.ai }, was: { question: card.question, answer: card.answer } }] } : c));
+      if (!job.stopped) settle(job, next, { reply: r.reply, proposal: r.proposal, ai: r.ai, session: r.session, was: { question: card.question, answer: card.answer } });
     } catch (e) {
-      setChat((c) => (mine(c) ? { ...c, busy: false, partial: undefined, job: undefined, error: errorText(e, "answer that"), failed: message } : c));
+      if (!job.stopped) settle(job, next, { error: errorText(e, "answer that") });
     } finally {
       off();
       // Stop already let go of it, and a message sent since then holds it now.
@@ -85,12 +147,12 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
   /** Stops the reply being written (the tutor's Stop, ChatGPT's): the words so far stay as its reply; with none
    *  it says Stopped and offers Try again. The next message can go at once, in the same conversation. */
   const stop = () => {
-    if (!chat.job) return;
-    void cancelOre(chat.job);
-    sending.current = null;
-    const session = live.current;
-    const asked = turns.findLast((t) => t.role === "me")?.text;
-    setChat((c) => (c.job !== chat.job ? c : { ...c, busy: false, job: undefined, partial: undefined, ...(c.partial ? { session: c.session ?? session, turns: [...c.turns, { role: "ai", text: c.partial, stopped: true }] } : { error: "Stopped.", failed: asked }) }));
+    if (!run || run.stopped) return;
+    run.stopped = true;
+    void cancelOre(run.id);
+    settle(run, turns, chat.partial
+      ? { reply: chat.partial, session: run.session, ai: run.ai, stopped: true }
+      : { error: "Stopped." });
     field.current?.focus();
   };
   // ⌘. stops it, as it stops the tutor's reply (the Mac's own cancel key).
@@ -113,31 +175,28 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
         </div>
       )}
       <div className="ask-turns" aria-live="polite">
-        {turns.map((t, i) =>
-          t.role === "me" ? (
-            <p key={i} className="ask-me">
-              {t.text}
-            </p>
-          ) : (
-            <div key={i} className="ask-ai">
+        {turns.map((t) => (
+          <Fragment key={t.id}>
+            <p className="ask-me">{t.message}</p>
+            {t.reply !== undefined && <div className="ask-ai">
               <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />
               <div className="ask-text">
-                <ReactMarkdown {...math}>{aiMath(t.text)}</ReactMarkdown>
+                <ReactMarkdown {...math}>{aiMath(t.reply)}</ReactMarkdown>
                 {t.stopped && <p className="tutor-general">Stopped</p>}
                 {t.proposal && (
                   <div className="ask-card">
                     <div className="quiz-kicker">Suggested exercise</div>
                     <p className="ask-card-q"><Changes was={t.was?.question} now={t.proposal.question} /></p>
                     <p className="ask-card-a"><Changes was={t.was?.answer} now={t.proposal.answer} /></p>
-                    <button className="ask-use" disabled={applied(t.proposal)} onClick={() => void onApply(t.proposal!).catch(() => {})}>
+                    <button className="ask-use" disabled={applied(t.proposal)} onClick={() => void onApply({ ...t.proposal!, ai: t.ai }).catch(() => {})}>
                       {applied(t.proposal) ? "Exercise updated" : "Use this exercise"}
                     </button>
                   </div>
                 )}
               </div>
-            </div>
-          ),
-        )}
+            </div>}
+          </Fragment>
+        ))}
         {busy && (
           <div className="ask-ai">
             <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />
@@ -157,10 +216,10 @@ export function Ask({ card, answer, chat, setChat, onApply, onClose }: { card: C
         {error && (
           <p className={error === "Stopped." ? "tutor-stopped" : "err"}>
             {error}
-            {chat.failed && (
+            {last && (
               <>
                 {" "}
-                <button className="link" onClick={() => void send(chat.failed!, true)}>
+                <button className="link" onClick={() => void send(last.message, last)}>
                   Try again
                 </button>
               </>

@@ -2,18 +2,32 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync,
 import { basename, dirname, extname, join, relative, resolve, sep } from "node:path";
 import { z } from "zod";
 import { visible, writeAtomic } from "./fsutil.ts";
-import { nowIso } from "./ids.ts";
+import { isUlid, nowIso } from "./ids.ts";
+import { AiStamp } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 
-// D172: every tutor chat is saved in the library, one file each (chats/<id>.json), so + starts a new one
-// without losing the old and a restart loses nothing. The app keeps the turns as it shows them; core
-// checks the shape it relies on (an id, a title, his messages) and keeps the rest as given.
+// D172 and D61: each chat is saved in the library as chats/<id>.json. Tutor names its own chats
+// by their first turn; Review uses the exercise id so the same exercise can reopen its chat.
 
 const Turn = z.looseObject({ id: z.string().min(1), message: z.string() });
+const ExerciseText = z.object({ question: z.string(), answer: z.string() });
+const ExerciseTurn = Turn.extend({
+  reply: z.string().optional(),
+  session: z.string().optional(),
+  proposal: ExerciseText.nullish(),
+  was: ExerciseText.optional(),
+  stopped: z.boolean().optional(),
+  error: z.string().optional(),
+  ai: AiStamp.optional(),
+});
+export type ExerciseChatTurn = z.infer<typeof ExerciseTurn>;
+const exerciseChatId = (id: string) => `ask-${id}`;
+
 export const Chat = z.strictObject({
-  // The first turn's id, which the app makes before anything is saved.
+  // The first turn's id for Tutor, or ask-<exercise> for Review.
   id: z.string().regex(/^[A-Za-z0-9-]{1,40}$/, "a chat id is letters, digits and dashes"),
+  exercise: z.string().refine(isUlid, "must be an exercise id").optional(),
   title: z.string().trim().min(1).max(120),
   created: z.string().optional(),
   updated: z.string().optional(),
@@ -38,13 +52,17 @@ function parse(text: string, where: string): Chat {
   }
   const r = Chat.safeParse(json);
   if (!r.success) throw new Error(`${where}: ${r.error.issues[0]!.path.join(".") || "chat"} ${r.error.issues[0]!.message}`);
+  if (r.data.exercise) {
+    if (r.data.id !== exerciseChatId(r.data.exercise)) throw new Error(`${where}: the chat id must match its exercise`);
+    ExerciseTurn.array().parse(r.data.turns);
+  }
   return r.data;
 }
 
 // What the list needs of a chat, checked without walking every turn's citations and steps.
-const Head = z.looseObject({ id: Chat.shape.id, title: Chat.shape.title, created: z.string().optional(), updated: z.string().optional(), turns: z.array(z.unknown()).min(1) });
+const Head = z.looseObject({ id: Chat.shape.id, exercise: Chat.shape.exercise, title: Chat.shape.title, created: z.string().optional(), updated: z.string().optional(), turns: z.array(z.unknown()).min(1) });
 
-/** Every chat, last changed first: what the tutor's list shows. A file that isn't a chat is skipped. */
+/** Tutor chats, last changed first. Exercise chats open from Review. A file that isn't a chat is skipped. */
 export function listChats(lib: Library): ChatRow[] {
   const dir = paths.chats(lib);
   return visible(dir)
@@ -52,6 +70,7 @@ export function listChats(lib: Library): ChatRow[] {
     .flatMap((n) => {
       try {
         const c = Head.parse(JSON.parse(readFileSync(join(dir, n), "utf8")));
+        if (c.exercise) return [];
         return [{ id: c.id, title: c.title, updated: c.updated ?? c.created ?? "" }];
       } catch {
         return [];
@@ -64,6 +83,16 @@ export function readChat(lib: Library, id: string): Chat {
   const f = file(lib, id);
   if (!existsSync(f)) throw new Error(`no chat "${id}"`);
   return parse(readFileSync(f, "utf8"), `chat ${id}`);
+}
+
+/** The chat that belongs to this exercise. A first visit has no turns to reopen. */
+export function readExerciseChat(lib: Library, exercise: string) {
+  if (!isUlid(exercise)) throw new Error("expected an exercise id");
+  const id = exerciseChatId(exercise);
+  const f = file(lib, id);
+  const c = existsSync(f) ? parse(readFileSync(f, "utf8"), `chat ${id}`) : null;
+  if (c && c.exercise !== exercise) throw new Error(`chat ${id} does not belong to this exercise`);
+  return { id, exercise, turns: c ? ExerciseTurn.array().parse(c.turns) : [] };
 }
 
 type Turn = Chat["turns"][number];

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { attachToChat, chatFilePath, deleteChat, listChats, readChat, saveChat } from "../src/chats.ts";
+import { attachToChat, chatFilePath, deleteChat, listChats, readChat, readExerciseChat, saveChat } from "../src/chats.ts";
 import { tempLibrary } from "./helpers.ts";
 
 // D172: the tutor's chats are saved in the library, one file each.
@@ -142,6 +142,30 @@ describe("tutor chats", () => {
     writeFileSync(join(lib.root, "chats", ".DS_Store"), "junk");
     expect(listChats(lib).map((r) => r.id)).toEqual(["a-1"]);
   });
+});
+
+// F-new-review-ask-history
+test("an exercise chat reads back with its turns and session outside the tutor list", async () => {
+  const lib = await tempLibrary();
+  const exercise = "01KB0000000000000000000000";
+  const id = `ask-${exercise}`;
+  const first = {
+    id: "turn-1",
+    message: "Why an endpoint?",
+    reply: "It controls what the client can do.",
+    session: "codex:example-thread",
+    ai: { vendor: "codex", model: "mock", prompt_version: "chat@1" },
+    proposal: { question: "What can the endpoint control?", answer: "What the client can do." },
+    was: { question: "Why use an endpoint?", answer: "To control access." },
+  };
+  const next = { id: "turn-2", message: "Can you give me an example?", reply: "Checking permissions.", stopped: true };
+  const opened = readExerciseChat(lib, exercise);
+  expect(opened).toEqual({ id, exercise, turns: [] });
+  const save = (turn: object) => saveChat(lib, JSON.stringify({ ...opened, title: "Why use an endpoint?", turns: [turn] }), { merge: true });
+  await save(first);
+  await save(next);
+  expect(readExerciseChat({ root: lib.root }, exercise)).toEqual({ id, exercise, turns: [first, next] });
+  expect(listChats(lib)).toEqual([]);
 });
 
 // D189: a file attached to a message is copied into chats/files/, named by its content.

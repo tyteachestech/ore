@@ -3,7 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { Children, useEffect, useReducer, useRef, useState, type MutableRefObject } from "react";
 import { Grow } from "./Grow";
-import { Ask, NO_ASK, type AskChat } from "./Ask";
+import { Ask, type useAskChats } from "./Ask";
 import { Cutting, Gem } from "./Gem";
 import { EndMark } from "./EndMark";
 import { Mole, Mound } from "./Mole";
@@ -83,7 +83,7 @@ const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id,
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
+function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged, notify, asks, quick = false, paused = false, under = false, leave, giveBack }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
   /** Review this source: only its exercises, its new ones included. */
@@ -102,6 +102,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   /** A rating taken back (⌘Z) or given again after Review closed: today's numbers changed. */
   onLogged?: () => void;
   notify: Notify;
+  asks?: ReturnType<typeof useAskChats>;
   quick?: boolean;
   /** Where focus goes as it closes when what started it is gone (the What to review sheet): the screen's own place. */
   giveBack?: () => HTMLElement | null | undefined;
@@ -149,8 +150,6 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     const t = setTimeout(() => setMoment(null), moment.tone === "miss" ? 6000 : 4000);
     return () => clearTimeout(t);
   }, [moment]);
-  /** Each card's Ask chat, kept while he closes and reopens it. */
-  const [asks, setAsks] = useState<Record<string, AskChat>>({});
   /** Why the exercise could not load; why the session could not start is the session's. */
   const [cardError, setError] = useState<string | null>(null);
   const error = cardError ?? s.error;
@@ -1057,12 +1056,12 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                     </Hint>
                   )}
                 </div>}
-                {asking && (
+                {asking && asks && (
                   <Ask
+                    key={card.id}
                     card={card}
                     answer={answer}
-                    chat={asks[card.id] ?? NO_ASK}
-                    setChat={(f) => setAsks((a) => ({ ...a, [card.id]: f(a[card.id] ?? NO_ASK) }))}
+                    store={asks}
                     onApply={async (p) => {
                       try {
                         await setText(card, p.question, p.answer, undefined, true, card, p.ai);

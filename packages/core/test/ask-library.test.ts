@@ -112,13 +112,22 @@ The Leitner system was proposed by Sebastian Leitner, who wrote about the Leitne
     expect(ps[1]!.text).toStartWith("A new paragraph");
   });
 
-  test("finds the passages that hold the question's words, best first; archived sources and unrelated ones stay out", async () => {
+  test("finds the passages that hold the question's words, best first; unrelated sources stay out", async () => {
     const { lib, a } = await library();
     const hits = retrieve(lib, "What happens to a missed card in the Leitner boxes?");
     expect(hits[0]).toMatchObject({ id: "P1", item: a.meta.id, title: "Flashcard boxes", heading: "The Leitner system" });
     expect(hits.some((h) => h.title === "Bread")).toBe(false);
-    await setItemArchived(lib, a.meta.id, true);
-    expect(retrieve(lib, "Leitner boxes")).toEqual([]);
+  });
+
+  test("an unarchived source ranks ahead of an equally relevant archived source", async () => {
+    const lib = await tempLibrary();
+    const lesson = { type: "article", title: "Flashcard boxes", body: "A missed card goes back to the first box." } as const;
+    const archived = await createItem(lib, lesson);
+    await setItemArchived(lib, archived.meta.id, true);
+    // Open the index before adding the other source, so the archived source is indexed first.
+    retrieve(lib, "missed card");
+    const active = await createItem(lib, lesson);
+    expect(retrieve(lib, "missed card").map((p) => p.item)).toEqual([active.meta.id, archived.meta.id]);
   });
 });
 
