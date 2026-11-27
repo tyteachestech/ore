@@ -20,6 +20,8 @@ GlobalWorkerOptions.workerSrc = workerUrl;
 export default function OriginalPage({ file, page, lit }: { file: string; page: number; lit?: { page: number; text: string } | null }) {
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [error, setError] = useState(false);
+  /** A page that failed to draw (a damaged image or font on it): it says so; the other pages still turn. */
+  const [broken, setBroken] = useState<number | null>(null);
   /** A page he turned to himself; the reading's page takes over again when it changes. */
   const [own, setOwn] = useState<number | null>(null);
   const [width, setWidth] = useState(0);
@@ -84,8 +86,9 @@ export default function OriginalPage({ file, page, lit }: { file: string; page: 
         c.getContext("2d")?.drawImage(draft, 0, 0);
         c.dataset.page = String(shown);
         setDrawn(shown);
+        setBroken(null);
       });
-    }).catch(() => !gone && setError(true));
+    }).catch(() => !gone && setBroken(shown));
     return () => {
       gone = true;
       task?.cancel();
@@ -115,7 +118,8 @@ export default function OriginalPage({ file, page, lit }: { file: string; page: 
   useEffect(() => void (bars.length && first.current?.scrollIntoView({ block: "nearest" })), [bars]);
   const sheet = (
     <div className="original-page">
-      <canvas ref={canvas} role="img" aria-label={`Page ${shown} of the original`} />
+      <canvas ref={canvas} role="img" aria-label={`Page ${shown} of the original`} hidden={broken === shown} />
+      {broken === shown && <p className="loading">{PHONE ? "This page can’t be shown here. Its text is in the source." : "This page can’t be shown here. Open the original from ⋯ to see it."}</p>}
       {bars.map((b, i) => <i key={i} ref={i ? undefined : first} className="original-lit" style={{ left: `${b.left}%`, top: `${b.top}%`, width: `${b.width}%`, height: `${b.height}%` }} />)}
     </div>
   );

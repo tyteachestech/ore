@@ -2036,6 +2036,14 @@ describe("import coverage: audio and podcasts", () => {
     expect(fetched.filter((u) => /\.(mp3|m4a|mp4)(?:\?|$)/.test(u) && !/cdn\.(radio|show)\.test\/(17|sleep|18)/.test(u))).toEqual([]);
   });
 
+  test("a download link is an episode's recording only beside its video twin: a series page's lone MP3 link, or a story's clip under /podcasts/, stays the page", () => {
+    const twin = `<a href="https://media.pod.test/talk.mp4">Video</a><a href="https://media.pod.test/talk.mp3">Audio</a>`;
+    expect(pageAudio(twin, "https://podcasts.pod.test/talk")).toBe("https://media.pod.test/talk.mp3");
+    const lone = `<p>Lectures.</p><a href="https://media.pod.test/latest.mp3">Download latest (MP3)</a>`;
+    expect(pageAudio(lone, "https://podcasts.pod.test/series/lectures")).toBeUndefined();
+    expect(pageAudio(lone, "https://news.test/podcasts/a-story")).toBeUndefined();
+  });
+
   test("one episode under two addresses is one audio; a show's og:type is not an episode's; player pages hear any audio type and a Megaphone player", async () => {
     // A redirector (Podtrac) in front of the Megaphone file the player plays; og:audio beside a player of two formats.
     expect(pageAudio(`<audio src="https://dts.podtrac.com/redirect.mp3/traffic.megaphone.fm/ABC1234567.mp3"></audio><iframe src="https://playlist.megaphone.fm/?e=ABC1234567"></iframe>`, "https://show.test/podcast/episode/21")).toBe("https://dts.podtrac.com/redirect.mp3/traffic.megaphone.fm/ABC1234567.mp3");

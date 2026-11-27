@@ -64,15 +64,17 @@ export function beforeFlushKept(capture: () => void) {
   return () => void beforeKeptFlush.delete(capture);
 }
 /** Writes every kept draft now. */
-export const flushKept = () => {
-  beforeKeptFlush.forEach((capture) => capture());
+/** `leaving`: the page goes or the app quits, so a screen's live state (Review's time on a draft) is taken too. A page
+ *  only hidden (⌘Tab away) keeps running: taking its time then would let another window (the quick quiz) count it again. */
+export const flushKept = (leaving = true) => {
+  if (leaving) beforeKeptFlush.forEach((capture) => capture());
   flushers.forEach((flush) => flush());
 };
 if (typeof window !== "undefined") {
-  addEventListener("pagehide", flushKept);
-  addEventListener("beforeunload", flushKept);
-  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flushKept());
-  if ("__TAURI_INTERNALS__" in window) void listen("quitting", flushKept).catch(() => {});
+  addEventListener("pagehide", () => flushKept());
+  addEventListener("beforeunload", () => flushKept());
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flushKept(false));
+  if ("__TAURI_INTERNALS__" in window) void listen("quitting", () => flushKept()).catch(() => {});
 }
 export function kept<V>(key: string): Kept<V> {
   const fresh = (e: Stamped<V>) => Date.now() - e.at <= DRAFT_MS;

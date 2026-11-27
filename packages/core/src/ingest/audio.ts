@@ -258,9 +258,14 @@ export function pageAudio(html: string, url: string, player = false): string | u
     if (MEGAPHONE_ID.test(id)) add(`https://traffic.megaphone.fm/${id}.mp3`);
   }
   if (player) return [...found.values()][0];
-  // A page can offer the recording as a download, alongside a video of the same episode.
+  // A page can offer the recording as a download beside a video of the same episode, both under one name
+  // (Oxford's `…/talk.mp3` and `…/talk.mp4`). A lone audio link (a series page's latest, a story's clip) is not
+  // enough: only one with its video twin is the episode.
   if (found.size === 0) {
-    for (const m of html.matchAll(/<a(?=\s)[^>]*?\shref\s*=\s*(?:"([^"]+)"|'([^']+)')/gi)) add(abs(m[1] ?? m[2]));
+    const links = [...html.matchAll(/<a(?=\s)[^>]*?\shref\s*=\s*(?:"([^"]+)"|'([^']+)')/gi)].map((m) => abs(m[1] ?? m[2])).filter((u): u is string => !!u && /^https?:/.test(u));
+    const stem = (u: string) => new URL(u).pathname.replace(/\.\w+$/, "").toLowerCase();
+    const videos = new Set(links.filter((u) => /\.(?:mp4|m4v|mov|webm)$/i.test(new URL(u).pathname)).map(stem));
+    for (const u of links) if (videos.has(stem(u))) add(u);
   }
   return found.size === 1 ? [...found.values()][0] : undefined;
 }

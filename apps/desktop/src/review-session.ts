@@ -375,7 +375,8 @@ export class ReviewSession<S> {
   private elapsed = () => Math.max(0, (this.awaySince ?? Date.now()) - this.shownAt);
 
   keepDraftTime = () => {
-    if (!this.end) this.screen.keepDraftTime?.(this.elapsed());
+    // Capped as the goal counts it: a draft left open for hours carries no more than one exercise can.
+    if (!this.end) this.screen.keepDraftTime?.(Math.min(this.elapsed(), ACTIVE_CAP_MS));
   };
 
   /** One write on the exercise on screen (an edit, a version dropped): nothing else starts until it is done.

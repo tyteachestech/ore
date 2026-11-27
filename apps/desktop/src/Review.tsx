@@ -75,7 +75,8 @@ const draftFor = (c: CardFull) => {
   if (d && d.asked !== askedOf(c)) return void drafts.delete(c.id);
   return d;
 };
-const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id, { text, conf, asked: askedOf(c) });
+// The time he spent on it before (kept as he left) stays with the words as he types more.
+const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id, { text, conf, asked: askedOf(c), elapsedMs: draftFor(c)?.elapsedMs });
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
  *  Explain cards (AI marks the rubric and suggests a rating; he decides), self-rated Fact cards. Every
