@@ -3,7 +3,8 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, unlinkSync } from "node
 import { tmpdir } from "node:os";
 import { basename, join, posix } from "node:path";
 import { promisify } from "node:util";
-import { strFromU8, unzipSync } from "fflate";
+import { strFromU8 } from "fflate";
+import { unzip } from "./unzip.ts";
 import { writeAtomic } from "../fsutil.ts";
 import { sourceFile, type Item } from "../items.ts";
 import { youtubeId } from "./youtube.ts";
@@ -67,7 +68,7 @@ async function download(url: string): Promise<Picture | undefined> {
 /** EPUB cover: the manifest item marked cover-image (EPUB 3), else the one `<meta name="cover">`
  *  names (EPUB 2), else an image whose id or file name says cover. */
 export function epubCover(epub: Uint8Array): Picture | undefined {
-  const files = unzipSync(epub, { filter: (f) => !/\.(x?html?|css|ttf|otf|woff2?)$/i.test(f.name) });
+  const files = unzip(epub, (f) => !/\.(x?html?|css|ttf|otf|woff2?)$/i.test(f.name));
   const opfPath = files["META-INF/container.xml"] && strFromU8(files["META-INF/container.xml"]).match(/full-path="([^"]+)"/)?.[1];
   if (!opfPath || !files[opfPath]) return undefined;
   const opf = strFromU8(files[opfPath]);

@@ -26,7 +26,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 2. **Burn down the open rows.** About twenty `open` rows in `findings.md` need no call from Tyler (F1, F2, F3, F6, F13, F294, F421, F538, F547, F548, F660, F662, F684, F727, F729, F737 among them). Reading scouts write a red script for each, Codex drafts a fix, Claude QAs. The bugs are already known, so every hour goes to fixing.
 3. **done (#564)** Flaky tests are races. Causes found for F142, F347, F348, F397, F516, F575 and a new one in the corners journey (F751); each failing journey now prints the `ore` calls in flight. Still open: F515, F623, F651 (not reproduced under load), F349 and F748 (need Tyler's Mac), and the new office-03 "error: undefined" (F752). A pass on the Mac takes the last two.
 4. **Mac and iPhone writing at once.** Both on one iCloud folder: a rating on each, a note edited on both, Archive on one while the source is open on the other, a conflict copy. Deep scan 1 and 4 did it below the screens; nobody has run both apps.
-5. **done (#567)** Import at real breadth, deep (D122): 86 live pages, 357 Office files, 12 notebooks, 38 EPUBs, 26 PDFs and 31 media links, each read against its original. 26 bugs fixed test first; a scanned page among text pages (F783) left to the learner pass's scanned-PDF fix. Not yet run: PDFs with the page reader downloaded, and listening to what was transcribed. Leads: script-drawn figures (ciechanow.ski), Distill's hidden formula cache, an arXiv margin stamp left in a PDF's text, Speaker Deck just under its word floor, CSS-drawn fractions (mathsisfun), a book's language never saved.
+5. **done (#567)** Import at real breadth, deep (D122): 86 live pages, 357 Office files, 12 notebooks, 38 EPUBs, 26 PDFs and 31 media links, each read against its original. 26 bugs fixed test first; a scanned page among text pages (F788) left to the learner pass's scanned-PDF fix. Not yet run: PDFs with the page reader downloaded, and listening to what was transcribed. Leads: script-drawn figures (ciechanow.ski), Distill's hidden formula cache, an arXiv margin stamp left in a PDF's text, Speaker Deck just under its word floor, CSS-drawn fractions (mathsisfun), a book's language never saved.
 6. **Upgrade from an older library, rich.** Sweep 9 found nothing on a small seed with no media, PDF or chats. Redo with a copy of ~/Ore as written by a commit from 11-10, 11-17 and 11-24.
 7. **partly (11-27, Claude, computer use in the background)** **The real Mac window.** The menu bar was read on the installed app for the first time: its items were the shortcut sheet's sentences (fixed, F756), and three items don't say their state (F757, open). Still to do, and it writes, so it needs the app on a scratch library (the "Ore Debug" copy with its own bundle id, `scripts/mock/README.md`, or his Ore quit and reopened with `ORE_LIBRARY`): ⌘Q with drafts open (F15), the quick quiz's global shortcut, open at login, the updater relaunching it, drag and paste from Finder, Safari, Preview and Notes.
 8. **done (#570)** What merged since the last pass (#542 to #566), read by Claude in the cloud: three bugs fixed test first (a lock's boot read from a clock that stops in sleep, a wrong `jobs:` in skills.yaml blanking every screen, Ask about this missing from usage.jsonl). Left for their own passes: Ore Cloud's server (queue 15, Claude lane), Vega charts on a hostile page (queue 14), the end screen's sounds by ear. Next time, start from the last commit this row names: f9bfe6d.
@@ -36,7 +36,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 12. **New learners.** An exam crammer (deadline, a big new batch, Importance), a language learner (vocabulary, audio, another script), a researcher with fifty papers. Each a five-day run with real AI.
 13. **CLI and `/ore` skill recheck.** Sweep 3 found 10; many commands changed since. Every `--json` answer against `packages/cli/src/answers.ts`, exit codes, the library's AGENTS.md.
 14. *Claude lane:* **Hostile content** in sources and feeds (scripts, paths, commands, huge files), which Codex refused.
-15. *Claude lane:* **Ore Cloud security** (`packages/cloud`: `guard.ts`, `server.ts`, `import.ts`) with `/security-and-hardening`, before it takes outside input (D355).
+15. **done (#572)** *Claude lane:* **Ore Cloud security.** Sign-in, sessions, account deletion and the private-address guard held; four bugs fixed (a zip bomb, an import that could take the server down, no import limits, yt-dlp past the guard), one wording row open. Still open, each needing the server online or Tyler: Apple tokens revoked on delete (his .p8 key, #551), IPv6 egress if the host gets it (the firewall in #571 covers IPv4), and a pass on the live server once #550 deploys it.
 
 ## Angles
 
@@ -59,7 +59,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | YouTube and other video | done | sweep 5 media, ux 7, ux 13, deep import 11-27 media (19 videos word by word; 4 fixed) |
 | Podcasts and audio, recordings | done | sweep 5 media, deep scan 2 media (recording in the learner pass) |
 | PDF papers | done | deep scan 2 media, newcomer 11-26 (BERT) |
-| Long textbooks, scans, the page reader | partly | deep import 11-27 PDFs (26 files, 5,131 pages; 7 fixed); with the page reader downloaded: not yet run; a scanned page among text pages: F783 |
+| Long textbooks, scans, the page reader | partly | deep import 11-27 PDFs (26 files, 5,131 pages; 7 fixed); with the page reader downloaded: not yet run; a scanned page among text pages: F788 |
 | EPUB books | done | deep import 11-27 books (38 books, his Calibre library; 7 fixed); left: real DRM, layout by sight |
 | Word, RTF, PowerPoint, Excel, notebooks, Markdown, screenshots | done | deep scan 5 office (reading only); deep import 11-27 (357 real Office files, 12 notebooks; 3 fixed) |
 | Shared AI chats | done | deep scan 2 chat |
@@ -135,7 +135,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | VoiceOver and keyboard only | partly | sweep 3 a11y, 11-13 pass, deep scan 5 keys: queue 11 |
 | Light, dark, sizes, zoom, reduced motion | done | sweep 6 looks |
 | Hostile content | partly | sweep 3 hostile; Codex refused the deep version: queue 14, Claude lane |
-| Ore Cloud security | open | queue 15, Claude lane |
+| Ore Cloud security | partly | security pass 11-27 (#572), reading and local tests; the live server once it is up (#550) |
 
 ### The suite and the backlog
 | Angle | Status | Runs |

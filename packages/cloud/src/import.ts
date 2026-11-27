@@ -82,3 +82,7 @@ function folder(dir: string): Record<string, Uint8Array> {
   walk(dir);
   return out;
 }
+
+/** A reply as the server sends it: the files in base64. */
+export const encode = (r: ImportReply) =>
+  "refused" in r ? r : { id: r.id, files: Object.fromEntries(Object.entries(r.files).map(([p, b]) => [p, Buffer.from(b).toString("base64")])) };
