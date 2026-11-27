@@ -13,6 +13,7 @@ Every angle a Codex test-and-fix pass can take on Ore, what has been covered and
 Rules every pass keeps:
 - **Mac load:** `apps/desktop/scripts/mac-load.sh check` before starting; at most three Codex testers across all threads, started two minutes apart (#557); a big-library run goes alone; `clean <worktree>` after. With the app's AI on Codex, each grade and draft is a `codex exec` that counts as a tester (F746).
 - **Codex runs outside its sandbox** only on Tyler's typed yes in that thread itself.
+- **Every pass goes through the screens and logs what using them was like** (Tyler, 2026-11-27: "is codex using the UI in its tests still? would want to make sure we're optimizing ui/ux along the way"; the passes of that week ran scripts below the screens). Whatever its angle, a pass reaches what it tests through the app at least once where a screen shows it: the Mac screens and the phone build in WebKit on the mock (in the cloud: `bunx playwright install webkit && bunx playwright install-deps webkit` from `apps/desktop`; WebKit crashes at launch on his Mac), and the installed app's own window through computer use in the background (grant `com.tylerpoelking.ore` by its bundle id, since the name "Ore" resolves to the phone app; reading only while it is on ~/Ore). On the way it writes a `findings.md` row for each UX miss it meets, not only each bug: more presses than the app Ore copies there, a wait that shows nothing, a Mac or iPhone convention missing, a thing the Mac does that the iPhone doesn't, an element with no purpose (the purpose rule), wording that isn't the app's own. A plain miss is fixed in the pass, test first; a taste call is a `Tyler:` row with two or three options, one element at a time. Its `sweeps.md` row counts UX misses beside bugs. Reopen this if three passes in a row log no UX row: then UX gets its own passes again and the others go back to scripts.
 - **Count only real bugs:** a red script or a reproduced step for each, as deep scan 1 asked. Mock-only drops are suspect (F329, F330).
 - **OpenAI's filter refuses hostile-content prompts** (deep scan 5, untrusted). Angles marked *Claude lane* run as Claude passes, not Codex.
 
@@ -27,7 +28,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 4. **done** Mac and iPhone writing at once ([two devices 11-27](2026-11-27-two-devices/), Claude in the cloud: both apps on one folder; 2 fixed). Left: real iCloud between his two devices, below.
 5. **Import at real breadth, deep (D122).** The running importer brings one file of each kind as a learner; start from its report and go deep: many files per type read against their source from start to end, EPUB books from his Calibre library, long textbooks, scans with and without the page reader downloaded (#494; refused with the next step when it is missing), and `bun run intake:live` over fifty popular sites. Fixtures for any bug are rewritten or openly licensed (D96).
 6. **Upgrade from an older library, rich.** Sweep 9 found nothing on a small seed with no media, PDF or chats. Redo with a copy of ~/Ore as written by a commit from 11-10, 11-17 and 11-24.
-7. **The real Mac window** (Codex computer use on the installed app). Menu bar, ⌘Q with drafts open (F15), the quick quiz's global shortcut, open at login, the updater relaunching it, drag and paste from Finder, Safari, Preview and Notes. Every tester so far drove a browser page.
+7. **partly (11-27, Claude, computer use in the background)** **The real Mac window.** The menu bar was read on the installed app for the first time: its items were the shortcut sheet's sentences (fixed, F756), and three items don't say their state (F757, open). Still to do, and it writes, so it needs the app on a scratch library (the "Ore Debug" copy with its own bundle id, `scripts/mock/README.md`, or his Ore quit and reopened with `ORE_LIBRARY`): ⌘Q with drafts open (F15), the quick quiz's global shortcut, open at login, the updater relaunching it, drag and paste from Finder, Safari, Preview and Notes.
 8. **done (#570)** What merged since the last pass (#542 to #566), read by Claude in the cloud: three bugs fixed test first (a lock's boot read from a clock that stops in sleep, a wrong `jobs:` in skills.yaml blanking every screen, Ask about this missing from usage.jsonl). Left for their own passes: Ore Cloud's server (queue 15, Claude lane), Vega charts on a hostile page (queue 14), the end screen's sounds by ear. Next time, start from the last commit this row names: f9bfe6d.
 9. **Recover from the library's git history.** Restore a source, a note or a whole day from the snapshots, then see what each screen and the index show.
 10. **A day-long soak.** The Mac open eight hours with background enrichment, many adds, timers: memory growth, stale screens, the midnight turn.
@@ -85,13 +86,22 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | Finish a source | done | ux 17 (F538 open) |
 | Quick quiz window | partly | deep scan 5 shell (reading); real window: queue 7 |
 
+### UX (what using it is like; every pass adds to these)
+| Angle | Status | Runs |
+|---|---|---|
+| The core loop by hand in WebKit: add, read, highlight, review, end | partly | ux 1 to 18 (Codex, Chromium and WebKit); ux real UI 11-27 (Mac and iPhone, a walk: F758) |
+| Mac conventions in the installed app: menu bar, window, shortcuts | partly | ux real UI 11-27 (menu bar read); the rest: queue 7 |
+| iPhone against the Mac, screen by screen | partly | release loop s1 to s5, native scout 11-19, ux real UI 11-27 (Today, Add, a source); a gap is a fix, not a question (Tyler 11-22) |
+| Presses and waits counted per task against the reference app | open | no pass has counted; the stopwatch learner timed waits only |
+| The purpose rule, element by element | partly | design critique rounds to 11-23; screens added since unchecked |
+
 ### Platform
 | Angle | Status | Runs |
 |---|---|---|
 | Release build under its CSP in WebKit | done | release loop 11-11 |
 | iPhone build at 390 pt with touch | done | release loop, s1 to s5, ux rounds |
 | iPhone in the real Simulator, next to Apple's apps | done | codex phone 11-12, native scout 11-19 |
-| The real Mac window (menus, shortcuts, ⌘Q, updater) | open | queue 7 (F15 open since 11-11) |
+| The real Mac window (menus, shortcuts, ⌘Q, updater) | partly | ux real UI 11-27 (menu bar); ⌘Q, shortcuts, updater: queue 7 (F15 open since 11-11) |
 | Drag and paste from other apps | open | queue 7 |
 | Mac and iPhone writing at once | done | deep scan 1 data, deep scan 4 edges (files only), [two devices 11-27](2026-11-27-two-devices/) (both apps on one folder; `e2e/journeys/two-devices.ts` keeps it) |
 | Real iCloud between his Mac and iPhone (its delay, conflict versions) | open | needs his two devices, not a Codex pass |
