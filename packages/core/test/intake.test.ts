@@ -1843,7 +1843,7 @@ describe("import coverage: audio and podcasts", () => {
     asEpisode(await addSource(await tempLibrary(), EPISODE));
   });
 
-  // F-new-podcast-download: the episode has a root-level slug and links to both audio and video.
+  // F754: the episode has a root-level slug and links to both audio and video.
   test("a podcast host's episode with audio and video downloads keeps its audio and timed transcript", async () => {
     const url = "https://podcasts.ox.ac.uk/probability-puzzle";
     const audio = "https://media.podcasts.ox.ac.uk/conted/2014-MT-emergent-multiverse/2014-11-22_wallace_probability_puzzle.mp3";
