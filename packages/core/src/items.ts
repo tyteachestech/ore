@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.ts";
@@ -149,7 +149,8 @@ export interface NewItem {
   chat?: "claude";
   skills?: string[];
   course?: CourseRef;
-  source?: { ext: string; data: string | Uint8Array };
+  /** The original: its bytes, or (`file`) a file too big to read into memory, a video, copied in as it is. */
+  source?: { ext: string; data: string | Uint8Array } | { ext: string; file: string };
   /** Images the body shows, saved beside it as `assets/<name>` (D96). */
   assets?: Asset[];
   /** Opened from the Feed, not kept yet. */
@@ -207,13 +208,22 @@ export async function createItem(lib: Library, input: NewItem, already?: () => I
     had = already?.();
     if (had) return;
     madeThisRun(dir);
-    if (input.source) writeAtomic(join(dir, `source.${input.source.ext}`), input.source.data);
+    if (input.source) writeSource(dir, input.source);
     if (input.transcript) writeAtomic(join(dir, "transcript.vtt"), input.transcript);
     if (input.page) writeAtomic(join(dir, "page.html"), input.page);
     for (const a of input.assets ?? []) writeAtomic(join(dir, "assets", a.name), a.data);
     writeAtomic(docPath, stringifyFrontmatter(meta, body));
   });
   return had ? { ...had, already: true } : { meta, body, dir, docPath };
+}
+
+/** A source's original as `source.<ext>`: written, or copied in whole (a clone on the Mac's APFS), never half there. */
+export function writeSource(dir: string, source: NonNullable<NewItem["source"]>) {
+  const to = join(dir, `source.${source.ext}`);
+  if ("data" in source) return writeAtomic(to, source.data);
+  mkdirSync(dir, { recursive: true });
+  copyFileSync(source.file, `${to}.part`, constants.COPYFILE_FICLONE);
+  renameSync(`${to}.part`, to);
 }
 
 export function readItemDir(dir: string): Item {

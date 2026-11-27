@@ -89,6 +89,8 @@ export interface Episode {
   language?: string;
   /** The episode's or show's own picture, where the directory or page names one. */
   artwork?: string;
+  /** The episode's show notes, as Apple's directory gives them. */
+  description?: string;
 }
 
 /** A feed's or page's language tag in its usual spelling ("en-us" → "en-US"); none when it isn't one. */
@@ -137,7 +139,7 @@ export async function episode(url: string, fetcher: typeof fetch = fetch): Promi
     // The show's own feed names the language it speaks.
     const feed = results.find((r) => r.feedUrl)?.feedUrl;
     if (!hit) return older(url, results.find((r) => r.feedUrl), fetcher);
-    return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate, artwork: hit.artworkUrl600 ?? hit.artworkUrl160, language: feed ? await showLanguage(feed, fetcher) : undefined };
+    return { audio: hit.episodeUrl!, title: hit.trackName, show: hit.collectionName, published: hit.releaseDate, artwork: hit.artworkUrl600 ?? hit.artworkUrl160, language: feed ? await showLanguage(feed, fetcher) : undefined, description: hit.description ?? hit.shortDescription };
   }
   const res = await fetcher(url, { headers: { "user-agent": "Mozilla/5.0 (Macintosh)" } }).catch(() => null);
   const html = res?.ok ? await res.text() : "";

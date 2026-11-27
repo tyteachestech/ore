@@ -27,6 +27,8 @@ export type Structure = "tables" | "formulas";
 
 const MAX_FIGURES = 80;
 const MAX_FIGURE = 5 * 1024 * 1024;
+/** Where a figure past the first MAX_FIGURES was: marked, as a missing one is (D351), not left out unsaid (deep import pass, pdfs-06). */
+const PAST_FIGURES = `[missing figure: Ore keeps a PDF's first ${MAX_FIGURES} figures; this one is in the original]`;
 
 interface Item {
   str: string;
@@ -66,7 +68,10 @@ interface Line {
 
 function toItem(it: TextItem, font: (name: string) => string): Item {
   const [a = 0, b = 0, c = 0, d = 0, x = 0, y = 0] = it.transform;
-  const size = b || c ? 0 : Math.round(Math.hypot(c, d) * 10) / 10;
+  // Turned text (a margin stamp, an axis label) has no size; a scan's text layer, tilted a degree or two with
+  // the page, is the text's own size, or the page's text reads as a margin to drop (deep import pass, pdfs-01).
+  const tilted = Math.abs(Math.atan2(b, a)) > 0.1 || Math.abs(Math.atan2(-c, d)) > 0.1 || a <= 0 || d <= 0;
+  const size = (b || c) && tilted ? 0 : Math.round(Math.hypot(c, d) * 10) / 10;
   // Arabic set in its shaped letters (how word processors write it) reads as plain Arabic letters,
   // which search, highlights and the tutor can match.
   const str = it.str.replace(/[\uFB50-\uFDFF\uFE70-\uFEFE]+/g, (s) => s.normalize("NFKC"));
@@ -126,7 +131,13 @@ function splitMargins(items: Item[], body: number): { items: Item[]; notes: stri
   let last: Item | undefined;
   for (const i of items.filter((i) => beside(i) && i.size)) {
     const same = last && i.x >= right === last.x >= right && Math.abs(i.y - last.y) <= last.size * 1.4;
-    if (same) groups.at(-1)!.push(i);
+    // A small table's rows set further apart than a note's lines, each starting where the one above does, are one
+    // note: alone, a row of three words ("Year Bend Shift") read as too short to say anything (deep import pass, pdfs-03).
+    // A row is cells side by side; terms stacked one to a line down the margin (AIMA's) stay notes of their own.
+    const head = groups.at(-1)?.[0];
+    const cells = head ? groups.at(-1)!.filter((c) => Math.abs(c.y - head.y) <= 1 && c.str.trim()).length : 0;
+    const row = last && head && cells >= 2 && i.x >= right === last.x >= right && Math.abs(i.x - head.x) <= 2 && Math.abs(i.y - last.y) <= last.size * 2.5;
+    if (same || row) groups.at(-1)!.push(i);
     else groups.push([i]);
     last = i;
   }
@@ -673,19 +684,51 @@ function table(r: Extract<Region, { kind: "table" }>, items: Item[]): string {
 
 type Doc = Awaited<ReturnType<typeof openPdf>["promise"]>;
 
-/** The PDF's own outline (its bookmarks): each top-level entry's title and the page it opens on
- *  (0-based). The author's chapters, where the outline has them (D115). */
-async function outlineOf(doc: Doc): Promise<{ title: string; page: number }[]> {
-  const top = (await doc.getOutline()) ?? [];
-  const out: { title: string; page: number }[] = [];
-  for (const e of top) {
-    const dest = typeof e.dest === "string" ? await doc.getDestination(e.dest) : e.dest;
-    const ref = Array.isArray(dest) ? dest[0] : null;
-    if (!ref || !e.title?.trim()) return []; // one it can't place: trust none of them
-    const page = typeof ref === "number" ? ref : await doc.getPageIndex(ref);
-    out.push({ title: e.title.replace(/\s+/g, " ").trim(), page });
+/** A filled form's answers on a page, each as "Field: value": the values live in the form's fields, not the
+ *  page's text, so a filled form came in blank (deep import pass, pdfs-04). A box ticked is ✓; one left empty, none. */
+async function formValues(page: Awaited<ReturnType<Doc["getPage"]>>): Promise<string[]> {
+  type Widget = { subtype?: string; fieldName?: string; alternativeText?: string; fieldValue?: unknown; checkBox?: boolean; radioButton?: boolean; buttonValue?: string; exportValue?: string };
+  const out: string[] = [];
+  for (const a of (await page.getAnnotations()) as Widget[]) {
+    if (a.subtype !== "Widget") continue;
+    const name = (a.alternativeText || a.fieldName || "").replace(/\s+/g, " ").trim();
+    const raw = [a.fieldValue ?? ""].flat().map(String).join(", ").trim();
+    // A ticked box is ✓; a choice of several is the one picked, once for its group (code review).
+    const value = a.checkBox ? (raw && raw !== "Off" ? "✓" : "") : a.radioButton ? (raw && raw !== "Off" && raw === a.buttonValue ? raw : "") : raw;
+    if (name && value) out.push(`${name}: ${value}`);
   }
   return out;
+}
+
+/** The PDF's own outline (its bookmarks): each top-level entry's title and the page it opens on
+ *  (0-based). The author's chapters, where the outline has them (D115). */
+type Entry = { title: string; page: number };
+async function outlineOf(doc: Doc): Promise<{ chapters: Entry[]; sections: (Entry & { depth: number })[] }> {
+  const top = (await doc.getOutline()) ?? [];
+  type Node = (typeof top)[number];
+  const place = async (e: Node): Promise<Entry | null> => {
+    const dest = typeof e.dest === "string" ? await doc.getDestination(e.dest) : e.dest;
+    const ref = Array.isArray(dest) ? dest[0] : null;
+    if (!ref || !e.title?.trim()) return null;
+    return { title: e.title.replace(/\s+/g, " ").trim(), page: typeof ref === "number" ? ref : await doc.getPageIndex(ref) };
+  };
+  const chapters: Entry[] = [];
+  for (const e of top) {
+    const at = await place(e);
+    if (!at) return { chapters: [], sections: [] }; // one it can't place: trust none of them
+    chapters.push(at);
+  }
+  // The sections inside each chapter, as subheadings (deep import pass, pdfs-07): one that can't be placed is left out alone.
+  const sections: (Entry & { depth: number })[] = [];
+  const walk = async (list: Node[], depth: number) => {
+    for (const e of list) {
+      const at = depth > 1 ? await place(e).catch(() => null) : null;
+      if (at) sections.push({ ...at, depth });
+      if (depth < 3 && e.items?.length) await walk(e.items, depth + 1);
+    }
+  };
+  await walk(top, 1);
+  return { chapters, sections };
 }
 
 /** Each outline entry becomes a chapter: a `<!-- chapter N -->` marker and a `## title` where its
@@ -696,8 +739,9 @@ async function outlineOf(doc: Doc): Promise<{ title: string; page: number }[]> {
  *  first, so a paragraph that only opens with the same word never takes the heading from the line below it.
  *  Each entry goes below the one before it on its page: one with no line of its own went in at the page's top,
  *  last first, above the page's own headings (F733). */
-function markChapters(paras: { text: string; note: boolean }[][], outline: { title: string; page: number }[]) {
-  if (outline.length < 2 || outline.some((e, i) => e.page >= paras.length || (i > 0 && e.page < outline[i - 1]!.page))) return;
+function markChapters(paras: { text: string; note: boolean }[][], outline: { title: string; page: number; depth?: number }[], sections = false): boolean {
+  if (sections) outline = outline.filter((e) => e.page < paras.length);
+  else if (outline.length < 2 || outline.some((e, i) => e.page >= paras.length || (i > 0 && e.page < outline[i - 1]!.page))) return false;
   const words = (t: string) => plain(t).replace(/^#+\s*/, "").replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
   const fold = (t: string) => words(t).toLowerCase();
   const NUMBER = /^\d+(\.\d+)*\.?\s+(?=\S)/;
@@ -715,15 +759,19 @@ function markChapters(paras: { text: string; note: boolean }[][], outline: { tit
     const short = (got: string) => unnumbered(got).length <= unnumbered(full).length + 3;
     let at = find((got) => short(got) && (starts(full.slice(0, 40))(got) || starts(unnumbered(full).slice(0, 40))(unnumbered(got))));
     const line = at >= 0 ? page[at]!.text : null;
+    // A section is marked only on its own line: the page shows it, the outline only names it.
+    if (sections && line === null) return;
     // No such line: a paragraph that opens with the title, which the heading goes above.
     if (at < 0) at = find(starts(full.slice(0, 40)));
     // The page's section number, when the outline left it off.
     const number = line !== null && !NUMBER.test(full) ? (NUMBER.exec(words(line))?.[0].trim() ?? "") : "";
-    const head = { text: `<!-- chapter ${n + 1} -->\n\n## ${number ? `${number} ` : ""}${e.title}`, note: false };
+    const title = `${number ? `${number} ` : ""}${e.title}`;
+    const head = { text: sections ? `${"#".repeat(Math.min(6, 2 + (e.depth ?? 1) - 1))} ${title}` : `<!-- chapter ${n + 1} -->\n\n## ${title}`, note: false };
     if (line !== null) page[at] = head;
     else page.splice((at = at >= 0 ? at : from), 0, head);
     last.set(e.page, at);
   });
+  return true;
 }
 
 /** Each page's box in points ([left, bottom, right, top]), for placing what the page reader saw in
@@ -751,9 +799,10 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   const task = openPdf(data);
   const doc = await task.promise;
   const meta = await pdfMeta(doc);
-  const outline = await outlineOf(doc).catch(() => []);
+  const outline = await outlineOf(doc).catch(() => ({ chapters: [], sections: [] }));
   const items: Item[][] = [];
   const figures: Asset[][] = [];
+  const fields: string[][] = [];
   const seen = new Map<string, number>();
   for (let n = 1; n <= doc.numPages; n++) {
     const page = await doc.getPage(n);
@@ -769,6 +818,7 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
       }
     };
     items.push(tc.items.filter((i): i is TextItem => "str" in i).map((i) => toItem(i, font)));
+    fields.push(await formValues(page).catch(() => []));
     for (const name of new Set(figs.map((f) => f.name))) seen.set(name, (seen.get(name) ?? 0) + 1);
     figures.push(figs);
   }
@@ -803,7 +853,8 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
       next.shift();
     }
   });
-  markChapters(paras, outline);
+  // Sections only under chapters it could mark: an outline out of page order is no table of chapters (code review).
+  if (markChapters(paras, outline.chapters)) markChapters(paras, outline.sections, true);
   // A margin glossary's definitions after the page's text, above its footnotes.
   paras.forEach((page, i) => {
     const at = page.findIndex((p) => p.note);
@@ -811,10 +862,11 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   });
   const shown = new Set(assets.map((a) => a.name));
   const notes = footnotes(paras);
-  const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => (isBlock(x.text) ? blocks[Number(x.text.slice(1, -1))]! : notes(x.text, i))), ...kept[i]!.filter((a) => shown.has(a.name)).map((a) => `![](assets/${a.name})`)].join("\n\n")}`);
+  const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => (isBlock(x.text) ? blocks[Number(x.text.slice(1, -1))]! : notes(x.text, i))), ...kept[i]!.map((a) => (shown.has(a.name) ? `![](assets/${a.name})` : PAST_FIGURES)), ...fields[i]!].join("\n\n")}`);
   const text = pages.join("\n\n") + "\n";
   // Letters and numbers only: a font pdf.js can't map leaves its punctuation, which is no text to read.
-  if (text.replace(/<!-- page \d+ -->|!\[\]\(assets\/[^)]+\)/g, "").replace(/[^\p{L}\p{N}]/gu, "").length < 20) {
+  // The form's answers aren't the page's own text: a scanned form is still a scan (code review).
+  if (fields.flat().reduce((t, f) => t.replace(f, ""), text.replaceAll(PAST_FIGURES, "")).replace(/<!-- page \d+ -->|!\[\]\(assets\/[^)]+\)/g, "").replace(/[^\p{L}\p{N}]/gu, "").length < 20) {
     throw new ScannedPdf();
   }
   // A metadata title that is only a file or tool name ("1706", "Microsoft Word - draft.docx") loses to page 1's.

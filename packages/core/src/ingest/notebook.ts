@@ -3,7 +3,8 @@
 // and the plots it drew, saved as images (D122).
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
-import { rewriteImageUrls, td } from "./markdown.ts";
+// `fenced`: a fence longer than any run of backticks inside, so a cell that prints Markdown (or holds a ``` string) stays one block.
+import { fenced, rewriteImageUrls, td } from "./markdown.ts";
 
 export interface NotebookDoc {
   title?: string;
@@ -19,13 +20,6 @@ const MAX_OUTPUT = 2000;
 /** Output images a notebook stores, and the file type each is saved as. */
 const PLOTS = [["image/png", "png"], ["image/jpeg", "jpg"], ["image/svg+xml", "svg"]] as const;
 
-/** A code block whose fence is longer than any run of backticks inside it, so a cell that prints
- *  Markdown (or holds a ``` string) stays one block. */
-const fenced = (lang: string, text: string) => {
-  const fence = "`".repeat(Math.max(3, ...[...text.matchAll(/`+/g)].map((m) => m[0].length + 1)));
-  return `${fence}${lang}\n${text}\n${fence}`;
-};
-
 export function notebookToDoc(json: string): NotebookDoc {
   let nb: { cells?: Cell[]; metadata?: { language_info?: { name?: string }; kernelspec?: { language?: string } } };
   try {
@@ -37,6 +31,7 @@ export function notebookToDoc(json: string): NotebookDoc {
   const parts: string[] = [];
   // The title is a Markdown cell's `# heading`, never a `# comment` in a Python cell.
   let title: string | undefined;
+  let bold: string | undefined;
   const assets = new Map<string, Asset>();
   for (const c of nb.cells ?? []) {
     const src = joined(c.source).trim();
@@ -55,7 +50,10 @@ export function notebookToDoc(json: string): NotebookDoc {
         assets.set(saved, { name: saved, data });
         return `assets/${saved}`;
       }));
-      title ??= src.match(/^#\s+(.+)$/m)?.[1]?.trim();
+      // `# Title`, or `Title` underlined with `===`; else a first cell that is one bold line
+      // ("**Chapter 4 – Training Models**", before a "# Setup").
+      title ??= src.match(/^#\s+(.+)$|^(\S.*)\n=+\s*$/m)?.slice(1).find(Boolean)?.trim();
+      bold ??= parts.length === 1 ? src.match(/^\*\*([^*\n]+)\*\*$/)?.[1]?.trim() : undefined;
     }
     if (c.cell_type !== "code" || !src) continue;
     parts.push(fenced(lang, src));
@@ -89,5 +87,5 @@ export function notebookToDoc(json: string): NotebookDoc {
     flushText();
   }
   if (!parts.length) throw new Error("This notebook has no cells to read.");
-  return { title, body: parts.join("\n\n") + "\n", assets: [...assets.values()] };
+  return { title: bold ?? title, body: parts.join("\n\n") + "\n", assets: [...assets.values()] };
 }

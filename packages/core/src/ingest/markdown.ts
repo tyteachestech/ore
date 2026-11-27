@@ -1,5 +1,6 @@
 import TurndownService from "turndown";
 import { flattenRuby } from "./check.ts";
+import { mathmlToTex } from "./mathml.ts";
 
 // Plain HTML → Markdown (turndown, the converter Defuddle uses), without
 // Defuddle's article heuristics, which drop chapter headings and short chapters.
@@ -15,6 +16,25 @@ td.addRule("saved-image", {
     return src.startsWith("assets/") ? `![${((n as HTMLElement).getAttribute("alt") ?? "").replace(/[\[\]\n]/g, " ")}](${src})` : "";
   },
 });
+// MathML as TeX the reader draws, on its own lines when the book shows it as a block (deep import pass).
+td.addRule("mathml", {
+  filter: (n) => /^(?:\w+:)?math$/i.test(n.nodeName),
+  replacement: (_c, n) => {
+    const tex = mathmlToTex(n as unknown as Element);
+    if (!tex) return (n as HTMLElement).textContent ?? "";
+    return (n as HTMLElement).getAttribute("display") === "block" ? `\n\n$$\n${tex}\n$$\n\n` : `$$${tex}$$`;
+  },
+});
+/** A code block whose fence is longer than any run of backticks inside it. */
+export const fenced = (lang: string, text: string) => {
+  const fence = "`".repeat(Math.max(3, ...[...text.matchAll(/`+/g)].map((m) => m[0].length + 1)));
+  return `${fence}${lang}\n${text}\n${fence}`;
+};
+// A <pre> with no <code> inside (a book's example, a page's listing) is code too: turndown fences only <pre><code>.
+td.addRule("bare-pre", {
+  filter: (n) => n.nodeName === "PRE" && n.firstElementChild?.nodeName !== "CODE",
+  replacement: (_c, n) => `\n\n${fenced("", ((n as HTMLElement).textContent ?? "").replace(/^\n/, "").replace(/\s+$/, ""))}\n\n`,
+});
 td.addRule("internal-link", {
   filter: (n) => n.nodeName === "A" && !/^https?:/i.test(n.getAttribute("href") ?? ""),
   replacement: (content) => content,
@@ -25,13 +45,17 @@ const children = (el: Element, names: RegExp) => Array.from(el.children).filter(
 /** A cell's text, with a space where its blocks (a nested table's cells, lines, list items) meet. */
 const cellText = (el: Element): string =>
   Array.from(el.childNodes)
-    .map((n) => (n.nodeType === 3 ? n.textContent ?? "" : n.nodeType === 1 ? (/^(td|th|tr|p|div|li|br)$/i.test(n.nodeName) ? ` ${cellText(n as Element)} ` : cellText(n as Element)) : ""))
+    .map((n) => (n.nodeType === 3 ? n.textContent ?? "" : n.nodeName === "IMG" ? ` ${td.turndown((n as Element).outerHTML)} ` : n.nodeType === 1 ? (/^(td|th|tr|p|div|li|br)$/i.test(n.nodeName) ? ` ${cellText(n as Element)} ` : cellText(n as Element)) : ""))
     .join("");
 td.addRule("table", {
   filter: "table",
   replacement: (_c, node) => {
     const table = node as HTMLTableElement;
     const trs = [...children(table, /^tr$/i), ...children(table, /^(thead|tbody|tfoot)$/i).flatMap((g) => children(g, /^tr$/i))];
+    // Lines laid out in a table (a play's verse beside its line numbers) aren't data: a table cell holds one line,
+    // so a cell of several lines makes the table its cells' text in order, each line kept (deep import pass).
+    const cells = trs.flatMap((tr) => children(tr, /^(th|td)$/i));
+    if (cells.some((c) => c.querySelectorAll("br").length >= 2)) return `\n\n${cells.map((c) => td.turndown(c as unknown as HTMLElement).trim()).filter(Boolean).join("\n\n")}\n\n`;
     const occupied: number[] = [];
     const rows = trs.map((tr, rowIndex) => {
       const row: string[] = [];
