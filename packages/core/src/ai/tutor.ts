@@ -214,7 +214,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
   if (!m) throw new Error("message is empty");
   // Turns come as JSON from the app or an agent: one with no reply (or no message) is an empty one.
   earlier = earlier.map((t) => ({ ...t, message: String(t.message ?? ""), reply: String(t.reply ?? "") }));
-  const vendor = chooseVendor(lib);
+  const vendor = chooseVendor(lib, "tutor");
   const saved = chat ? readState(lib, chat) : null;
   const live = saved && saved.host === hostname() && saved.vendor === vendor && saved.turns === turnsKey(earlier) && saved.context < SESSION_ROOM ? saved : null;
   if (chat) stateFile(lib, chat); // a chat id that is no file name is refused before anything runs

@@ -30,7 +30,7 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
   const card = findCard(lib, cardRef);
   const prompt = loadPrompt("chat");
   let message = a.message.trim();
-  const vendor = chooseVendor(lib);
+  const vendor = chooseVendor(lib, "tutor");
   const session = sessionOf(a.session, vendor);
   if (!session) {
     let passage: { source: string; text: string } | undefined;
