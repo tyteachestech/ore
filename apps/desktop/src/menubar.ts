@@ -28,26 +28,48 @@ const MENUS: Spec[] = [
 
 // Review's own commands (IN_REVIEW) only work in Review; the rest of that menu works everywhere.
 
-/** Menu wording where the keymap's label is written for the shortcuts sheet. */
+/** Menu wording, where the keymap's label is written for the shortcuts sheet (sentence case, with what the key does
+ *  after a colon or in brackets): a Mac menu item is in title case and says only its name, and Go's items drop "Go to"
+ *  as Finder's do (F-new-menu-wording). `menubar.test.ts` holds every item to it. */
 const LABEL: Partial<Record<KeyId, string>> = {
   settings: "Settings…",
   add: "Add Source…",
   file: "Open File…",
+  link: "Copy Link to Original",
+  path: "Copy Path",
+  original: "Open Original",
+  filter: "Find…",
   palette: "Command Palette…",
+  sidebar: "Toggle Sidebar",
   "side-panel": "Toggle Side Panel",
   notes: "Toggle Note",
+  collected: "Collected",
   questions: "Your Questions",
-  "quick-quiz": "Quick Quiz",
+  home: "Home",
+  "go-feed": "Feed",
+  "go-toread": "To Read",
+  "go-done": "Done",
+  "nav-back": "Back",
+  "nav-forward": "Forward",
+  "lesson-prev": "Previous Lesson",
+  "lesson-next": "Next Lesson",
   "finish-source": "Finish Source",
-  section: "Main Point of Section…",
+  section: "Recall This Chapter…",
   "look-up": "Look Up Word",
   listen: "Listen / Stop Listening",
   rename: "Rename Source…",
-  path: "Copy Path",
-  shortcuts: "Keyboard Shortcuts",
-  ask: "Ask About This Exercise…",
-  "edit-card": "Edit Exercise…",
+  pin: "Pin or Unpin Source",
+  archive: "Archive Source",
+  review: "Start Review",
+  "quick-quiz": "Quick Quiz",
+  "no-idea": "No Idea",
+  "in-head": "Answered in My Head",
   later: "Later",
+  "edit-card": "Edit Exercise…",
+  "retire-card": "Retire Exercise",
+  ask: "Ask About This Exercise…",
+  "bad-version": "Show the Original Exercise",
+  shortcuts: "Keyboard Shortcuts",
 };
 
 const binding = (id: KeyId) => BINDINGS.find((b) => b.id === id)!;

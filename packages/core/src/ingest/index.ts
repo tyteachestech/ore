@@ -703,7 +703,7 @@ export async function addText(lib: Library, text: string, opts: AddOptions & { h
   const same = sameText(lib, body);
   if (same) return keep(lib, same, opts);
   const first = (body.split("\n").find((l) => VISIBLE.test(l)) ?? "").replace(/\p{Cf}/gu, "").replace(/^#+\s*/, "");
-  const title = md.title || (first.length > 80 ? first.slice(0, 77).trimEnd() + "…" : first);
+  const title = md.title || nameFromLine(first);
   const item = await createItem(lib, { type: "markdown", title, author: md.author, published: md.published, body, source: { ext: draft ? "html" : "md", data: source }, assets, skills: opts.skills });
   await unarchive(lib, opts.skills);
   return item;
@@ -744,6 +744,20 @@ async function pastedMarkdown(html: string): Promise<{ title: string; body: stri
   return { title: "", body: own(td.turndown(document.body as unknown as HTMLElement)) };
 }
 
+/** The name of pasted text with no heading, from its first line. A line that fits (80) is the name. A longer one is
+ *  a paragraph: its first sentence when that fits (without its full stop, as a title has none), else its first words
+ *  and "…", cut between words (it once stopped inside one, "eac…": F-new-paste-title). A full stop ends a sentence
+ *  only before a space and a word that doesn't start in lower case, so "1.4" and "e.g. this" don't. Text with no
+ *  spaces to cut at is cut at 77, as before. */
+export function nameFromLine(line: string): string {
+  if (line.length <= 80) return line;
+  const sentence = /^(.{9,78}?)([.!?。！？])(?=\s+[^\p{Ll}\s]|[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}])/u.exec(line);
+  if (sentence) return sentence[1]! + (/[.。]/.test(sentence[2]!) ? "" : sentence[2]!);
+  const cut = line.slice(0, 77);
+  const space = /\s/.test(line[77]!) ? 77 : cut.search(/\s\S*$/);
+  return (space > 20 ? cut.slice(0, space) : cut).trimEnd().replace(/[,;:]$/, "") + "…";
+}
+
 export interface SnippetInput {
   text: string;
   url?: string;
@@ -761,7 +775,7 @@ export async function addSnippet(lib: Library, s: SnippetInput): Promise<{ item:
   const body = s.text.trim() + "\n";
   if (!body.trim()) throw new Error("snippet text is empty");
   const firstLine = body.split("\n")[0]!;
-  const title = firstLine.length > 80 ? firstLine.slice(0, 77).trimEnd() + "…" : firstLine;
+  const title = nameFromLine(firstLine);
   const item = await createItem(lib, { type: "snippet", title, body, url: s.url, source_app: s.app, skills: s.skills });
   await unarchive(lib, s.skills);
   const annotation = addHighlight(item, { exact: item.body.trim(), intent: s.intent ?? "keep", note: s.note, point: s.point, when: s.when });
