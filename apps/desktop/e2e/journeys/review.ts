@@ -2636,12 +2636,11 @@ journey("the mole and the ambience radio never cover the last of a screen: every
     const size = page.viewportSize()!;
     for (const [width, height] of [[size.width, size.height], [720, 480]] as const) {
       await page.setViewportSize({ width, height });
-      // The app answers a new size a frame or two later (a narrow window folds the sidebar and moves the radio into
-      // the top bar, F450): read once it has drawn at this size, never after a fixed wait, which a busy runner outran
-      // and saw the radio still over the text it moves away from.
-      await page.waitForFunction(([w, h]) => innerWidth === w && innerHeight === h, [width, height] as const);
-      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(r)))));
-      const hit = await underTheCorners(page);
+      // The app answers a new size when it has drawn again (a narrow window folds the sidebar and moves the radio into
+      // the top bar, F450), which on a busy runner came after 300 ms and after two frames: read until the screen at this
+      // size is clear, so what fails is a screen that stays covered, never one still moving.
+      let hit: string[] = [];
+      await until(`${where} at ${width} × ${height} ends clear of the corners`, async () => !(hit = await underTheCorners(page)).length).catch(() => {});
       if (hit.length) throw new Error(`${where} at ${width} × ${height}: under the corners at the end: ${hit.join("; ")}`);
     }
     await page.setViewportSize(size);
