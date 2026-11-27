@@ -34,6 +34,20 @@ describe("menu bar", () => {
     expect(row("review").enabled).toBe(true);
   });
 
+  // The real menu bar read "Copy link to original" beside "Copy Path", and "Find: filter sources, or search the
+  // open source": the keymap's labels are written for the shortcuts sheet (F756).
+  test("every menu item is worded as a Mac menu item: title case, no explanation after a colon or in brackets", () => {
+    const small = new Set(["a", "an", "the", "and", "or", "in", "of", "to", "/"]);
+    for (const r of rows()) {
+      if (!r.label) continue;
+      expect(r.label).not.toMatch(/[:(]/);
+      const words = r.label.replace(/…$/, "").split(" ");
+      for (const [i, w] of words.entries()) if (i === 0 || !small.has(w)) expect([r.label, w[0]]).toEqual([r.label, w[0]!.toUpperCase()]);
+    }
+    expect(row("filter").label).toBe("Find…");
+    expect(row("nav-back").label).toBe("Back");
+  });
+
   test("every item names a real binding once", () => {
     const ids = rows().flatMap((r) => (r.id ? [r.id.slice(4)] : []));
     expect(new Set(ids).size).toBe(ids.length);
