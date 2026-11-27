@@ -80,7 +80,7 @@ ORE_LIBRARY=/tmp/lib ore init   # scratch library for manual testing; never test
 bun run app:install         # from ~/Developer/ore on master (the live checkout): builds the Tauri app with its own compiled `ore` (D30) and replaces /Applications/Ore.app; dev: `cd apps/desktop && ORE_LIBRARY=/tmp/lib bun run tauri dev` (Cargo target in ~/Library/Caches/ore)
 git config core.hooksPath .githooks   # once per clone: a commit or pull on master touching apps/desktop/ or packages/ (its compiled `ore`) reinstalls the app in the background (log: ~/Library/Caches/ore/app-install.log)
 ```
-AI vendor for enrichment and grading: `ai:` in the library's `skills.yaml` (`claude` or `codex`), `ORE_AI` overrides; its model: `models:` there (Settings › AI › Model, D116), `ORE_AI_MODEL` overrides. Background enrich logs: `<library>/.ore/logs/`.
+AI vendor for enrichment and grading: `ai:` in the library's `skills.yaml` (`claude` or `codex`), `ORE_AI` overrides; its model: `models:` there (Settings › AI › Model, D116), `ORE_AI_MODEL` overrides; one job's own AI and model: `jobs:` there (Settings › AI › By job, D356; a new prompt gets its job in `JOB_OF`, `packages/core/src/ai/models.ts`). Background enrich logs: `<library>/.ore/logs/`.
 
 ## Where things are
 - `packages/core/src/ai/prompts/*.md` — versioned prompts; bump the `version` header when you change one. How an exercise is written (D182: the process, each type, what to avoid) lives in `enrich.md`, `variant.md` and `tutor.md`, its evidence in `docs/research/brief-exercise-types.md`; a change to it is checked with `bun run eval:questions`, run twice.

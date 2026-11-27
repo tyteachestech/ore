@@ -48,9 +48,15 @@ export const ReviewSettingsSchema = z.object({
 export type ReviewSettings = Required<z.infer<typeof ReviewSettingsSchema>>;
 export const REVIEW_DEFAULTS: ReviewSettings = { goal_minutes: 10, weekdays_only: false, new_per_day: 10, remix: true, plan: "", reminder: "" };
 
+/** The AI's jobs, each of which can have its own AI (D356): the tutor chat and explaining a term; marking and
+ *  feedback on his answers; writing exercises and quiz questions; answers from his library and finding sources. */
+export const AI_JOBS = ["tutor", "grade", "write", "ask"] as const;
+export type AiJob = (typeof AI_JOBS)[number];
+const JobAiSchema = z.object({ ai: z.enum(["claude", "codex"]), model: z.string().optional() });
 export const SkillsFileSchema = z.object({
   ai: z.enum(["claude", "codex"]).optional(),
   models: z.object({ claude: z.string().optional(), codex: z.string().optional() }).optional(), // the model per vendor; ORE_AI_MODEL overrides
+  jobs: z.object({ tutor: JobAiSchema.optional(), grade: JobAiSchema.optional(), write: JobAiSchema.optional(), ask: JobAiSchema.optional() }).optional(), // an AI for one job; the rest run on `ai:`
   review: ReviewSettingsSchema.optional(),
   skills: z.array(SkillSchema),
 });
@@ -81,7 +87,7 @@ export function defaultSkillsYaml(): string {
   return (
     "# Skills (D25). Priority maps to desired retention (P1 0.92, P2 0.88, P3 0.80)\n" +
     "# and breaks ties in the review queue. It never changes FSRS math.\n" +
-    "# ai: claude | codex   (AI vendor for enrichment and grading; ORE_AI overrides)\n" +
+    "# ai: claude | codex   (the AI for every job; ORE_AI overrides. One job can have its own under `jobs:`, e.g. jobs: {grade: {ai: codex}})\n" +
     loadYaml().stringify({ ai: "claude", skills: DEFAULT_SKILLS }, { lineWidth: 0 })
   );
 }

@@ -3,8 +3,9 @@ import { loadYaml } from "../frontmatter.ts";
 import { writeAtomic } from "../fsutil.ts";
 import { paths, type Library } from "../library.ts";
 import { withLock } from "../lock.ts";
-import { loadSkills, parseSkillsFile } from "../skills.ts";
+import { loadSkills, parseSkillsFile, type AiJob } from "../skills.ts";
 import type { Vendor } from "./adapter.ts";
+import type { PromptName } from "./prompts.ts";
 
 export interface ModelOption { id: string; label: string; description?: string }
 
@@ -18,16 +19,42 @@ export const CLAUDE_MODELS: ModelOption[] = [
 ];
 const DEFAULT: Record<Vendor, string> = { claude: "sonnet", codex: "" }; // "" = Codex's own default
 
-/** The model a vendor runs with: ORE_AI_MODEL, else his pick in skills.yaml, else Sonnet for Claude
- *  and Codex's own default (`model` in ~/.codex/config.toml) for Codex. undefined passes no flag. */
-export function aiModel(lib: Library, vendor: Vendor): string | undefined {
+/** The job each prompt does: a job's AI (`jobs:` in skills.yaml) runs all of its prompts. */
+export const JOB_OF: Record<PromptName, AiJob> = {
+  tutor: "tutor", chat: "tutor", explain: "tutor",
+  grade: "grade", check: "grade", "recall-feedback": "grade", "variant-check": "grade", dig: "grade", "try-line": "grade", judge: "grade", compare: "grade",
+  enrich: "write", variant: "write", "key-points": "write", "leave-out": "write",
+  "ask-library": "ask", research: "ask",
+};
+
+const saved = (lib: Library) => {
+  try {
+    return loadSkills(lib);
+  } catch {
+    return null; // a broken skills.yaml says so on every screen; AI runs on the default
+  }
+};
+
+/** The AI he set for one job, with the model it runs; null when the job runs on the default AI. A job's
+ *  pick stands by itself: with no model it is Sonnet or Codex's own default (""), never the model saved
+ *  for the default AI, so changing that one leaves the job as he set it. */
+export function jobAi(lib: Library, job: AiJob): { ai: Vendor; model: string } | null {
+  const file = saved(lib);
+  const own = file?.jobs?.[job];
+  return own ? { ai: own.ai, model: own.model || DEFAULT[own.ai] } : null;
+}
+
+/** The model a vendor runs with: ORE_AI_MODEL, else the job's own when that job has its own AI on this vendor, else his
+ *  pick for the vendor in skills.yaml, else Sonnet for Claude and Codex's own default (`model` in
+ *  ~/.codex/config.toml) for Codex. undefined passes no flag. A job's AI is set aside while ORE_AI is
+ *  set, as its vendor is, so its model never goes to the other vendor. */
+export function aiModel(lib: Library, vendor: Vendor, job?: AiJob): string | undefined {
   const env = process.env.ORE_AI_MODEL;
   if (env) return env;
-  let saved: string | undefined;
-  try {
-    saved = loadSkills(lib).models?.[vendor];
-  } catch { /* a broken skills.yaml says so on every screen; AI runs on the default */ }
-  return saved || DEFAULT[vendor] || undefined;
+  const file = saved(lib);
+  const own = job && !process.env.ORE_AI ? file?.jobs?.[job] : undefined;
+  if (own?.ai === vendor) return own.model || DEFAULT[vendor] || undefined;
+  return file?.models?.[vendor] || DEFAULT[vendor] || undefined;
 }
 
 /** The pick shown in Settings: the saved one, or the default ("" for Codex default). */
@@ -54,6 +81,24 @@ export async function setAiModel(lib: Library, vendor: Vendor, model: string): P
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     return id || DEFAULT[vendor];
   });
+}
+
+/** Give one job its own AI (`jobs:` in skills.yaml), keeping comments; null puts it back on the default AI. */
+export async function setJobAi(lib: Library, job: AiJob, own: { ai: Vendor; model?: string } | null): Promise<{ ai: Vendor; model: string } | null> {
+  const model = own?.model?.trim() ?? "";
+  if (model && !/^[\w.:\-[\]/]+$/.test(model)) throw new Error(`"${own!.model}" isn’t a model name`);
+  await withLock(paths.lock(lib), () => {
+    const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+    if (own) {
+      doc.setIn(["jobs", job], doc.createNode(model && model !== DEFAULT[own.ai] ? { ai: own.ai, model } : { ai: own.ai }));
+    } else if (doc.hasIn(["jobs", job])) {
+      doc.deleteIn(["jobs", job]);
+      if (!Object.keys((doc.toJSON() as { jobs?: object }).jobs ?? {}).length) doc.delete("jobs");
+    }
+    parseSkillsFile(doc.toJSON());
+    writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+  });
+  return jobAi(lib, job);
 }
 
 interface CodexCatalog { models?: { slug?: string; display_name?: string; description?: string; visibility?: string; priority?: number }[] }

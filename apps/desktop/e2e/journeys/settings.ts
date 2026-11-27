@@ -248,6 +248,9 @@ journey("settings: a goal set outside the list (ore goal --minutes 7) shows pick
   await ore("goal", "--minutes", "7");
   try {
     await page.reload();
+    // The page takes keys only once it has drawn: ⌘, pressed as the reload returned opened nothing (F750).
+    await page.locator(".home-today").waitFor();
+    await loaded(page);
     await page.keyboard.press("Meta+Comma");
     await page.getByRole("tab", { name: "Review" }).click();
     const seven = page.getByRole("radio", { name: "7", exact: true });
@@ -452,4 +455,32 @@ journey("Settings: the reading sample follows each choice as it is made (D312)",
   await settings.getByRole("button", { name: "Default" }).click();
   await until("the sample is back", async () => JSON.stringify(await look()) === JSON.stringify(was));
   await page.keyboard.press("Escape");
+});
+
+journey("Settings: one job gets its own AI from one menu, saved in skills.yaml; ⌘Z puts it back on the default (D356)", async (page) => {
+  const settings = page.getByRole("dialog", { name: "Settings" });
+  await page.keyboard.press("Meta+Comma");
+  await settings.waitFor();
+  await settings.getByRole("tab", { name: "AI" }).click();
+  const job = settings.getByRole("button", { name: "Checking answers" });
+  const shown = async () => (await job.innerText()).trim();
+  const saved = () => /^jobs:\n {2}grade:\n {4}ai: claude\n {4}model: haiku$/m.test(readFileSync(join(LIB, "skills.yaml"), "utf8"));
+  await until("the job starts on the default AI", async () => (await shown()) === "Default");
+  // By keys: Enter opens the menu on the current pick, and the providers' models are listed under their names.
+  await job.focus();
+  await page.keyboard.press("Enter");
+  const menu = page.getByRole("menu");
+  await menu.getByText("Claude", { exact: true }).waitFor();
+  await menu.getByText("ChatGPT", { exact: true }).waitFor();
+  await page.waitForTimeout(350); // a pick in the menu's first moments is the click that opened it
+  await menu.getByRole("menuitemradio", { name: "Haiku" }).click();
+  await until("the row shows the job's own model", async () => (await shown()) === "Haiku");
+  await until("skills.yaml holds it", async () => saved());
+  if ((await settings.getByRole("button", { name: "Tutor" }).innerText()).trim() !== "Default") throw new Error("another job moved off the default");
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Meta+z");
+  await until("⌘Z puts the job back on the default", async () => (await shown()) === "Default");
+  await until("and takes it out of skills.yaml", async () => !/^jobs:/m.test(readFileSync(join(LIB, "skills.yaml"), "utf8")));
+  await page.keyboard.press("Escape");
+  await settled(page);
 });
