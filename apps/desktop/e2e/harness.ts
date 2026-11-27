@@ -32,15 +32,20 @@ export let url = "";
 /** A dev server that bundles a dependency late reloads every page it serves, cutting the open journey's `ore`
  *  calls (WebKit: a fetch refused "due to access control checks", F749). It does that when its scan of the
  *  imports fails, so a scan that fails or a reload fails the run, naming what vite said. */
-function watchVite(vite: { stdout: ReadableStream<Uint8Array>; stderr: ReadableStream<Uint8Array> }) {
+function watchVite(vite: { stdout: ReadableStream<Uint8Array>; stderr: ReadableStream<Uint8Array> }, echo = false) {
   const late = /Failed to run dependency scan|new dependencies optimized|optimized dependencies changed|reloading/i;
-  for (const stream of [vite.stdout, vite.stderr])
+  for (const [stream, err] of [[vite.stdout, false], [vite.stderr, true]] as const)
     void (async () => {
+      const text = new TextDecoder();
       let rest = "";
       for await (const chunk of stream) {
-        const lines = (rest + new TextDecoder().decode(chunk)).split("\n");
+        const lines = (rest + text.decode(chunk, { stream: true })).split("\n");
         rest = lines.pop() ?? "";
-        for (const l of lines) if (late.test(l)) errors.push(`vite: ${l.trim()}`);
+        for (const l of lines) {
+          if (late.test(l)) errors.push(`vite: ${l.trim()}`);
+          // The phone's server showed its errors (a build that breaks) in the run's log before: it still does.
+          else if (echo && err) console.error(l);
+        }
       }
     })();
 }
@@ -128,7 +133,7 @@ async function phoneApp(): Promise<string> {
   if (!phoneOwn) await phoneLibrary();
   const port = Number(process.env.ORE_E2E_PHONE_PORT ?? PORT + 2);
   const vite = Bun.spawn(["bunx", "vite", "--port", String(port), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_PHONE: "1", ORE_PHONE_LIBRARY: PHONE_LIB }, stdout: "pipe", stderr: "pipe" });
-  watchVite(vite);
+  watchVite(vite, true);
   const url = `http://localhost:${port}/`;
   let up = false;
   for (let i = 0; i < 150 && !up; i++) {

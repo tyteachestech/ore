@@ -73,17 +73,20 @@ function titleOf(spec: Spec): string {
   return s || "Chart";
 }
 
-/** A spec drawn as an SVG, headless: Vega-Lite compiled to Vega first. Nothing is fetched, nothing logged. */
+/** A spec drawn as an SVG, headless: Vega-Lite compiled to Vega first. Nothing is fetched, nothing logged, and
+ *  the page's expressions are interpreted, never turned into code (Vega's default compiles them with `Function`,
+ *  so a hostile page's spec could run in `ore`). */
 async function draw(spec: Spec, lite: boolean): Promise<string> {
   if (fetchesData(spec)) throw new Error("its data is at an address");
   const vega = await import("vega");
   const quiet = vega.logger(vega.None);
-  const runtime = vega.parse(lite ? (await import("vega-lite")).compile(spec as never, { logger: quiet }).spec : (spec as never));
+  const { expressionInterpreter } = await import("vega-interpreter");
+  const runtime = vega.parse(lite ? (await import("vega-lite")).compile(spec as never, { logger: quiet }).spec : (spec as never), undefined, { ast: true });
   const loader = vega.loader();
   loader.load = loader.sanitize = async () => {
     throw new Error("nothing is fetched at import");
   };
-  const view = new vega.View(runtime, { renderer: "none", loader, logger: quiet });
+  const view = new vega.View(runtime, { renderer: "none", loader, logger: quiet, expr: expressionInterpreter });
   try {
     return await view.toSVG();
   } finally {
@@ -104,9 +107,10 @@ export async function drawCharts(doc: Document, html: string): Promise<Asset[]> 
     const id = code.match(/getElementById\(\s*["']([^"']+)["']/)?.[1] ?? code.match(/vegaEmbed\(\s*["']#([^"']+)["']/)?.[1];
     const target = (id && doc.getElementById(id)) || script.previousElementSibling;
     script.remove();
-    // A script that only mentions vegaEmbed (a helper, a loader) and holds no spec leaves the page alone: only an
-    // empty div was a chart's place.
-    if (!target || (!spec && (target.textContent?.trim() || target.children.length))) continue;
+    // Only an empty element was a chart's place: a script that only mentions vegaEmbed leaves the page alone, and
+    // a chart whose div isn't found goes after the element before it, never over it.
+    const empty = !!target && !target.textContent?.trim() && !target.children.length;
+    if (!target || (!spec && !empty)) continue;
     const p = doc.createElement("p");
     try {
       if (!spec) throw new Error("no spec");
@@ -124,7 +128,8 @@ export async function drawCharts(doc: Document, html: string): Promise<Asset[]> 
     } catch {
       p.textContent = CHART_LOST;
     }
-    target.replaceWith(p);
+    if (empty) target.replaceWith(p);
+    else target.after(p);
   }
   return assets;
 }

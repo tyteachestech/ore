@@ -577,7 +577,8 @@ function swapRegions(items: Item[], regions: Region[], blocks: string[], scanned
       const n = parts.findIndex((r) => inside(i, r.box));
       if (n >= 0) return (at = n);
       const b = below(i);
-      return b >= 0 ? b : at;
+      // Just before that block's own text, whichever the PDF drew first.
+      return b >= 0 ? b - 0.5 : at;
     });
     // Its order is trusted only where it never climbs back up a column, which reading never does: on
     // a two-column paper the reader's order is sometimes scrambled, and the PDF's own is right.
