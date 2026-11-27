@@ -209,7 +209,8 @@ TOTAL_STAGES=6
 ENV_FILE="$HOME/.ore-cloud-setup"
 KEY="$HOME/.ssh/ore-cloud"
 REPO=$(cd "$(dirname "$0")/../../.." && pwd)
-on_server() { ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 ore-cloud "$@"; }
+# The address is given each time, so an older `ore-cloud` entry with another address can't mislead it.
+on_server() { ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10 -o HostName="$ORE_HOST" ore-cloud "$@"; }
 
 banner "Put Ore Cloud online"
 
@@ -222,6 +223,7 @@ pause "Press Enter when you are looking at the empty project"
 
 stage "A key for the server"
 say "The server lets in whoever holds this key, and nobody by password."
+mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
 if [[ ! -f "$KEY" ]]; then
   ssh-keygen -q -t ed25519 -N "" -C "ore-cloud" -f "$KEY"
   printf '  %s✓ made%s %s\n' "$GREEN" "$RESET" "$KEY"
@@ -243,14 +245,21 @@ ask ORE_HOST "Paste the server's IPv4 address:"
 [[ "$ORE_HOST" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { warn "That doesn't look like an IPv4 address. Run the wizard again."; exit 1; }
 write_env ORE_HOST "$ORE_HOST"
 # One name for the server, so deploy.sh and you can both say `ore-cloud`.
-mkdir -p "$HOME/.ssh" && touch "$HOME/.ssh/config"
+touch "$HOME/.ssh/config"
 if grep -q '^Host ore-cloud$' "$HOME/.ssh/config"; then
-  warn "~/.ssh/config already has ore-cloud. If the address changed, edit its HostName to $ORE_HOST."
+  grep -A4 '^Host ore-cloud$' "$HOME/.ssh/config" | grep -q "HostName $ORE_HOST\$" ||
+    { warn "~/.ssh/config has ore-cloud at another address. Change its HostName to $ORE_HOST, then run this again."; exit 1; }
 else
   printf '\nHost ore-cloud\n  HostName %s\n  User root\n  IdentityFile %s\n  IdentitiesOnly yes\n' "$ORE_HOST" "$KEY" >> "$HOME/.ssh/config"
 fi
 say "Checking the server answers..."
-until on_server true 2>/dev/null; do note "not yet, trying again in 10 s (Ctrl-C to stop)"; sleep 10; done
+tries=0
+until err=$(on_server true 2>&1); do
+  tries=$((tries + 1))
+  note "not yet, trying again in 10 s (Ctrl-C to stop)"
+  (( tries % 3 )) || note "ssh says: ${err##*$'\n'}"
+  sleep 10
+done
 printf '  %s✓ the server answers%s\n' "$GREEN" "$RESET"
 
 stage "A domain"
@@ -275,7 +284,11 @@ set -eu
 command -v docker >/dev/null 2>&1 || { curl -fsSL https://get.docker.com | sh >/dev/null; }
 umask 077
 touch /etc/ore-cloud.env
-grep -q '^ORE_SESSION_SECRET=' /etc/ore-cloud.env || echo "ORE_SESSION_SECRET=$(openssl rand -base64 48 | tr -d '\n')" >> /etc/ore-cloud.env
+if ! grep -q '^ORE_SESSION_SECRET=.' /etc/ore-cloud.env; then
+  secret=$(openssl rand -base64 48 | tr -d '\n')
+  [ "${#secret}" -ge 32 ]
+  echo "ORE_SESSION_SECRET=$secret" >> /etc/ore-cloud.env
+fi
 grep -v '^ORE_DOMAIN=' /etc/ore-cloud.env > /etc/ore-cloud.env.new || true
 echo "ORE_DOMAIN=$ORE_DOMAIN" >> /etc/ore-cloud.env.new
 mv /etc/ore-cloud.env.new /etc/ore-cloud.env
