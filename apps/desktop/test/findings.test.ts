@@ -40,11 +40,10 @@ const table = rows(readFileSync(join(root, "docs/reviews/findings.md"), "utf8"))
 
 test("findings: every row has an ID in order, a date, a place, what happened and a known status", () => {
   expect(table.length).toBeGreaterThan(0);
-  // A branch's new rows are `F-new-<slug>` at the end until `bun run ids` numbers them at merge.
-  const numbered = table.filter((r) => !r.id!.startsWith("F-new-")).length;
-  table.forEach((r, i) => {
-    if (i < numbered) expect(r.id).toBe(`F${i + 1}`);
-    else expect(r.id).toMatch(/^F-new-/);
+  // A branch's new rows are `F-new-<slug>` until `bun run ship` numbers them at merge; bringing master in puts the
+  // rows it gained since below them (#562), and numbering puts every row back in order.
+  table.filter((r) => !r.id!.startsWith("F-new-")).forEach((r, i) => expect(r.id).toBe(`F${i + 1}`));
+  table.forEach((r) => {
     expect(r.found).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(r.where.length).toBeGreaterThan(0);
     expect(r.what.length).toBeGreaterThan(0);
