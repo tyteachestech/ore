@@ -56,7 +56,7 @@ async function signIn(req: Request, auth: Auth, once: ReturnType<typeof nonces>)
   }
 }
 
-const ROUTES: Record<string, string> = { "/auth/nonce": "POST", "/auth/apple": "POST", "/account": "DELETE", "/import": "POST" };
+const ROUTES: Record<string, string> = { "/health": "GET", "/auth/nonce": "POST", "/auth/apple": "POST", "/account": "DELETE", "/import": "POST" };
 
 /** `who` is the caller's address, for the sign-in limit. */
 export const makeHandler = (auth: Auth, allowed = limiter()) => {
@@ -66,6 +66,8 @@ export const makeHandler = (auth: Auth, allowed = limiter()) => {
   const method = ROUTES[url.pathname];
   if (!method) return json({ error: "not found" }, 404);
   if (req.method !== method) return json({ error: `use ${method}` }, 405);
+  // For the deploy's own check that the server is up (#550); says nothing else.
+  if (url.pathname === "/health") return json({ ok: true });
   if (url.pathname === "/auth/nonce") return json({ nonce: await once.issue() });
   if (url.pathname === "/auth/apple") return allowed(who) ? signIn(req, auth, once) : json({ error: "Too many sign-ins. Wait a few minutes and try again." }, 429);
   // Signed in or nothing: the session is checked before any of the request is read, and its account must
