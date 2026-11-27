@@ -10,7 +10,7 @@ import * as Mdast from "mdast-util-from-markdown";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setLibraryRoot } from "./tauri-core";
-import { existsSync, load, mkdirSync, mount, mountDisk, readdirSync, readFileSync, rescan, rmSync, saved, writeFileSync } from "./fs";
+import { existsSync, fresh, load, mkdirSync, mount, mountDisk, readdirSync, readFileSync, rescan, rmSync, saved, writeFileSync } from "./fs";
 import { ready } from "./sqlite";
 import { iterableStreams } from "./streams";
 import { shareList } from "./share-skills";
@@ -242,7 +242,8 @@ export async function run<T>(args: string[], input: string | null): Promise<T> {
   try {
     const lib = await boot();
     if (args[0] === "inbox" && args.includes("--import")) await loadShared();
-    const out = await exclusive(() => command<T>(lib, args, input));
+    // The Mac's changes first: a command writes whole files, and one run on an older copy saved over them.
+    const out = await exclusive(async () => (await fresh().catch(() => {}), command<T>(lib, args, input)));
     // window.__ORE_SLOW = { course: 800 }, as the Mac's mock reads it: that command's answer comes back that much
     // later, its write already made, so a journey can widen a race (an Undo tapped before its step's answer).
     const slow = (globalThis as { __ORE_SLOW?: Record<string, number> }).__ORE_SLOW?.[args[0]!];

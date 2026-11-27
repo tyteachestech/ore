@@ -336,7 +336,8 @@ export type SkillLayout = z.infer<typeof SkillLayoutSchema>;
 // Lay out the sidebar in one write: sorts skills.yaml into the given order (each collection's skills
 // contiguous, since a collection's place is where its first skill appears) and sets or clears each
 // skill's collection. Moving a skill, reordering, renaming or removing a collection, and undoing any
-// of them are all this call. Comments on each skill's entry move with it.
+// of them are all this call. Comments on each skill's entry move with it. A layout drawn before the other device
+// added or deleted a skill still saves.
 export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<Skill[]> {
   return withLock(paths.lock(lib), () => {
     const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
@@ -351,7 +352,8 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
       names.add(c.toLowerCase());
       for (const id of g.skills) {
         const node = byId.get(id);
-        if (!node) throw new Error(`unknown skill "${id}"`);
+        // Deleted on the other device since this layout was drawn: nothing to place.
+        if (!node) continue;
         if (seen.has(id)) throw new Error(`skill "${id}" is listed twice`);
         seen.add(id);
         if (c) node.set("collection", c);
@@ -359,8 +361,14 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
         order.push(node);
       }
     }
-    const missing = [...byId.keys()].filter((id) => !seen.has(id));
-    if (missing.length) throw new Error(`layout leaves out ${missing.map((id) => `"${id}"`).join(", ")}`);
+    // Added on the other device since this layout was drawn (the iPhone and the Mac share skills.yaml, D222): it
+    // keeps its collection, after the skills laid out there, rather than the whole move failing (F-new-stale-skill-layout).
+    for (const [id, node] of byId) {
+      if (seen.has(id)) continue;
+      const c = String(node.get("collection") ?? "");
+      const last = order.findLastIndex((n) => String(n.get("collection") ?? "") === c);
+      order.splice(last < 0 ? order.length : last + 1, 0, node);
+    }
     list.items = order;
     const skills = parseSkillsFile(doc.toJSON()).file.skills;
     writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));

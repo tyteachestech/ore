@@ -371,10 +371,29 @@ async function read(list: Stamped[]): Promise<number> {
   return landed;
 }
 
-/** Reads in what changed in the folder since (the Mac's edits, through iCloud); true if anything did.
- *  A file this phone is still sending keeps the phone's version. */
+/** Reads in what changed in the folder since (the Mac's edits, through iCloud); true if anything did, here or
+ *  in a `fresh` since the last rescan. A file this phone is still sending keeps the phone's version. */
 export async function rescan(): Promise<boolean> {
+  const came = await scan();
+  const before = unseen;
+  unseen = false;
+  return came || before;
+}
+
+/** A change `fresh` read in that no rescan has reported yet: the screens redraw on the next one. */
+let unseen = false;
+let scannedAt = 0;
+/** Before each command (core.ts `run`): the folder's changes read in first, at most one scan in `within` ms. A
+ *  file is written whole from memory, so a command run on a copy older than the folder's saved it over the Mac's
+ *  edit: a rename, an archive, a new skill or a note line the phone, on screen, hadn't scanned for yet (up to 30 s,
+ *  F-new-phone-stale-write). What iCloud hasn't brought down yet still keeps iCloud's latest (D222). */
+export async function fresh(within = 1000): Promise<void> {
+  if (disk && Date.now() - scannedAt >= within && (await scan())) unseen = true;
+}
+
+async function scan(): Promise<boolean> {
   if (!disk) return false;
+  scannedAt = Date.now();
   await flush();
   const scan = await disk.invoke<Scan>("library_scan", { root: disk.root });
   setDownloading(scan.waiting);

@@ -5,6 +5,7 @@ import { chmodSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { $ } from "bun";
+import { phoneShell, serveShell } from "../scripts/mock/phone-shell";
 
 export const MOCK = join(import.meta.dir, "../scripts/mock");
 
@@ -154,8 +155,16 @@ async function phoneApp(): Promise<string> {
   return url;
 }
 
-/** The phone app as he holds it: WebKit at 390×844 with touch, dark (D78). Journeys tap with `tap()`, a real touch. */
-async function openPhone(): Promise<Page> {
+/** The iPhone on this file's library, as D222 has it: the phone build mounts LIB as its iCloud folder through the
+ *  shell's library commands (scripts/mock/phone-shell.ts), so it and the journey's Mac page write one folder, as
+ *  both apps do on his iCloud library. iCloud's own delay isn't stood in for: the phone reads the Mac's changes when
+ *  it scans, as it does when it comes back and every 30 s. */
+let shell: ReturnType<typeof serveShell> | undefined;
+export const phoneOnMacLibrary = () => openPhone((shell ??= serveShell(() => LIB)).port!);
+
+/** The phone app as he holds it: WebKit at 390×844 with touch, dark (D78). Journeys tap with `tap()`, a real touch.
+ *  `shellPort`: a stand-in for the shell's library commands, so the phone mounts a folder instead of the snapshot. */
+async function openPhone(shellPort?: number): Promise<Page> {
   const url = await phoneApp();
   const page = await (await safariBrowser()).newPage({ ...devices["iPhone 14"], viewport: { width: 390, height: 844 }, colorScheme: "dark" });
   page.setDefaultTimeout(8000);
@@ -165,6 +174,7 @@ async function openPhone(): Promise<Page> {
   // What the app's Tauri shell gives the page and a browser lacks: an image saved with a source loads through it.
   // A source's own files come from the phone build's dev server (vite.config.ts `/library-file`), as the shell's
   // asset protocol serves them from the folder.
+  if (shellPort) await page.addInitScript(phoneShell(shellPort));
   await page.addInitScript(`window.__TAURI_INTERNALS__ ??= { convertFileSrc: (p) => "/library-file" + p, transformCallback: () => 0, invoke: () => Promise.reject(new Error("no Tauri here")) }`);
   await page.addInitScript(HYGIENE);
   // The check-in before a session (D324) asks once a day about a try last touched before today: marked asked on every
@@ -875,6 +885,7 @@ export async function run() {
   await browser.close();
   await safari?.close();
   phoneVite?.stop();
+  shell?.stop(true);
   if (PHONE_LIB && !process.env.ORE_PHONE_LIBRARY) rmSync(PHONE_LIB, { recursive: true, force: true });
   // The style rules a regex can't see (nested frames, off-ramp font sizes), on a fresh library of its own.
   if (!only && !onlyFile && shard === shards) {
