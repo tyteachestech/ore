@@ -28,7 +28,7 @@ function parse(xhtml: string): Document {
 }
 
 const kind = (e: Element) => `${e.getAttribute("epub:type") ?? ""} ${e.getAttribute("role") ?? ""}`;
-const NOTE = /\b(?:doc-)?(?:foot|end|rear)note\b/;
+const NOTE = /\b(?:doc-)?(?:foot|end|rear)?note\b/;
 const BACKLINK = /\b(?:doc-)?backlink\b/;
 
 /** A chapter as Markdown, its images pointed at saved copies; `image` saves one by its path in the book
@@ -89,32 +89,39 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
   const opfPath = read("META-INF/container.xml").match(/full-path="([^"]+)"/)?.[1];
   if (!opfPath) throw new Error("EPUB container.xml has no rootfile");
   const opf = new DOMParser().parseFromString(read(opfPath), "text/xml");
+  // An element by its name without its prefix: a package may write `<opf:item>` or `<dc:Title>` (deep import pass).
+  const all = Array.from(opf.querySelectorAll("*"));
+  const tags = (tag: string) => {
+    const local = tag.replace(/^.*:/, "").toLowerCase();
+    return all.filter((e) => e.nodeName.replace(/^.*:/, "").toLowerCase() === local);
+  };
   const text = (tag: string) =>
-    Array.from(opf.getElementsByTagName(tag)).map((e) => e.textContent?.replace(/\s+/g, " ").trim()).filter(Boolean);
+    Array.from(tags(tag)).map((e) => e.textContent?.replace(/\s+/g, " ").trim()).filter(Boolean);
   const manifest = new Map(
-    Array.from(opf.getElementsByTagName("item")).map((e) => [e.getAttribute("id"), { href: e.getAttribute("href") ?? "", type: e.getAttribute("media-type") ?? "", nav: /\bnav\b/.test(e.getAttribute("properties") ?? "") }]),
+    Array.from(tags("item")).map((e) => [e.getAttribute("id"), { href: e.getAttribute("href") ?? "", type: e.getAttribute("media-type") ?? "", nav: /\bnav\b/.test(e.getAttribute("properties") ?? "") }]),
   );
   const dir = posix.dirname(opfPath);
   const chapters: string[] = [];
   const assets = new Map<string, Asset>();
   // The book's own table of contents (EPUB 3 nav document) is not a chapter to read.
-  const spine = Array.from(opf.getElementsByTagName("itemref"))
+  const spine = Array.from(tags("itemref"))
     .map((ref) => {
       const id = ref.getAttribute("idref");
       const item = manifest.get(id);
       if (!id || !item?.href) throw new Error(`This EPUB has an unresolved chapter (${id || "unnamed"}). Download the book again or export a fresh EPUB, then add it again.`);
       return item;
     })
-    .filter((item) => /html/.test(item.type) && !item.nav)
-    .map((item) => posix.join(dir, decodeURIComponent(item.href.split("#")[0]!)));
-  const docs = new Map(spine.map((path) => [path, parse(read(path))]));
+    // A fixed-layout book may list a page as its picture: that page is the picture.
+    .filter((item) => (/html/.test(item.type) && !item.nav) || /^image\//.test(item.type))
+    .map((item) => ({ path: posix.join(dir, decodeURIComponent(item.href.split("#")[0]!)), picture: /^image\//.test(item.type) }));
+  const docs = new Map(spine.map(({ path, picture }) => [path, parse(picture ? `<html><body><img src="${encodeURIComponent(posix.basename(path))}"/></body></html>` : read(path))]));
   // The cover picture as the book names it: EPUB 3's cover-image, EPUB 2's <meta name="cover">, or a picture
   // the book calls cover (cover.jpg, id="cover", coverImage), as many older books do: cover as a word of its
   // name, not inside one (discovery.png, recovery-curve.png). Known by path, held in the book or not.
-  const coverId = Array.from(opf.getElementsByTagName("meta")).find((m) => m.getAttribute("name") === "cover")?.getAttribute("content");
+  const coverId = Array.from(tags("meta")).find((m) => m.getAttribute("name") === "cover")?.getAttribute("content");
   const coverWord = (name: string) => /(?:^|[^a-z])cover(?![a-z])/i.test(name.replace(/([a-z])([A-Z])/g, "$1 $2"));
   const covers = new Set(
-    Array.from(opf.getElementsByTagName("item"))
+    Array.from(tags("item"))
       .filter((e) => /\bcover-image\b/.test(e.getAttribute("properties") ?? "") || (coverId && e.getAttribute("id") === coverId) || (/^image\//.test(e.getAttribute("media-type") ?? "") && coverWord(`${e.getAttribute("id")} ${posix.basename(e.getAttribute("href") ?? "")}`)))
       .map((e) => posix.normalize(posix.join(dir, decodeURIComponent(e.getAttribute("href") ?? "")))),
   );
@@ -132,8 +139,8 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
     }
     map.set(file, [...(map.get(file) ?? []), word]);
   };
-  for (const r of Array.from(opf.getElementsByTagName("reference"))) say(kinds, opfPath, r.getAttribute("href"), r.getAttribute("type"));
-  for (const e of Array.from(opf.getElementsByTagName("item"))) {
+  for (const r of Array.from(tags("reference"))) say(kinds, opfPath, r.getAttribute("href"), r.getAttribute("type"));
+  for (const e of Array.from(tags("item"))) {
     const file = posix.join(dir, decodeURIComponent(e.getAttribute("href") ?? ""));
     if (!files[file]) continue;
     if (/\bnav\b/.test(e.getAttribute("properties") ?? "")) {
@@ -151,7 +158,19 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
   }
   const facts: PageFacts[] = [];
   let notes = 0;
-  for (const path of spine) {
+  // Picture pages before the first page of words: a title plate or two is not the book, but a run of them
+  // (a comic, a picture book) is: past PLATES they come in as the book's first pages (deep import pass).
+  const PLATES = 2;
+  let leading: { md: string; used: Map<string, Asset> }[] = [];
+  const keepLeading = () => {
+    if (leading.length > PLATES) {
+      for (const page of leading) for (const [k, v] of page.used) assets.set(k, v);
+      facts.push({ types: [], labels: [], text: "", links: 0, linkWords: 0 });
+      chapters.push(`<!-- chapter ${chapters.length + 1} -->\n\n${leading.map((p) => p.md).join("\n\n")}`);
+    }
+    leading = [];
+  };
+  for (const { path } of spine) {
     const image = (src: string) => {
       const file = posix.normalize(posix.join(posix.dirname(path), decodeURIComponent(src.split("#")[0]!)));
       const ext = IMAGE_EXT[posix.extname(file).slice(1).toLowerCase()];
@@ -184,16 +203,27 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
       // page of its own: it stays where it is, under the chapter it follows, with no recall of its own
       // (F569). A picture missing from the book is such a page too, its gap in its place.
       const cover = /\bcover\b/.test(kind(page.body ?? page.documentElement)) || [...seen].some((f) => covers.has(f));
-      if (!md || !chapters.length || cover) continue;
+      if (!md || cover) continue;
+      if (!chapters.length) {
+        leading.push({ md, used });
+        continue;
+      }
       for (const [k, v] of used) assets.set(k, v);
       chapters[chapters.length - 1] += `\n\n${md}`;
       continue;
     }
+    if (leading.length) keepLeading();
     for (const [k, v] of used) assets.set(k, v);
     facts.push({ ...fact, heading: md.match(/^#{1,6}[ \t]+(.+)$/m)?.[1]?.replace(/[*_`\\]/g, "") });
     chapters.push(`<!-- chapter ${chapters.length + 1} -->\n\n${md}`);
   }
-  if (!chapters.length) throw new Error("EPUB has no readable text (DRM-protected?)");
+  if (!chapters.length) {
+    // A book of only pictures, however few, is its pictures.
+    leading = leading.length ? [...leading, ...Array(PLATES).fill({ md: "", used: new Map() })] : leading;
+    keepLeading();
+    if (chapters.length) chapters[0] = chapters[0]!.replace(/\n\n+$/, "");
+  }
+  if (!chapters.length) throw new Error("This EPUB has no text Ore can read: it may be locked with DRM, or its pages may be drawn as pictures Ore can't see. If you bought it, export a DRM-free copy from the store's app or add the book's PDF instead.");
   const creators = text("dc:creator");
   // The publisher's pages before the text stay, in their place; the mark after them lets the reader fold them.
   const title = text("dc:title")[0];

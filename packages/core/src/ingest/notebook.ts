@@ -3,7 +3,8 @@
 // and the plots it drew, saved as images (D122).
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
-import { rewriteImageUrls, td } from "./markdown.ts";
+// `fenced`: a fence longer than any run of backticks inside, so a cell that prints Markdown (or holds a ``` string) stays one block.
+import { fenced, rewriteImageUrls, td } from "./markdown.ts";
 
 export interface NotebookDoc {
   title?: string;
@@ -18,13 +19,6 @@ const joined = (s: string | string[] | undefined) => (Array.isArray(s) ? s.join(
 const MAX_OUTPUT = 2000;
 /** Output images a notebook stores, and the file type each is saved as. */
 const PLOTS = [["image/png", "png"], ["image/jpeg", "jpg"], ["image/svg+xml", "svg"]] as const;
-
-/** A code block whose fence is longer than any run of backticks inside it, so a cell that prints
- *  Markdown (or holds a ``` string) stays one block. */
-const fenced = (lang: string, text: string) => {
-  const fence = "`".repeat(Math.max(3, ...[...text.matchAll(/`+/g)].map((m) => m[0].length + 1)));
-  return `${fence}${lang}\n${text}\n${fence}`;
-};
 
 export function notebookToDoc(json: string): NotebookDoc {
   let nb: { cells?: Cell[]; metadata?: { language_info?: { name?: string }; kernelspec?: { language?: string } } };

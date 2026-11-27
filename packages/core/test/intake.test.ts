@@ -1397,6 +1397,65 @@ describe("import coverage: EPUB", () => {
     expect(item.body).not.toContain("↩");
     expect(item.body.match(/<!-- chapter/g)).toHaveLength(2);
   });
+
+  // make-deep-epubs.ts: the books the deep import pass found broken (2026-11-27).
+  test("EPUB: a comic's picture pages before its first page of words are the book, not a title plate", async () => {
+    const item = await addSource(await tempLibrary(), file("comic.epub"));
+    expect(images(item.body).map((i) => i.alt)).toEqual(["Page 1", "Page 2", "Page 3", "Page 4"]);
+    expect(item.body.indexOf("![Page 4]")).toBeLessThan(item.body.indexOf("# Afterword"));
+    expect(item.body).not.toContain("![Cover]");
+  });
+
+  test("EPUB: a fixed-layout picture book, its pages listed as pictures, comes in as its pictures", async () => {
+    const item = await addSource(await tempLibrary(), file("picture-book.epub"));
+    expect(images(item.body)).toHaveLength(3);
+    expect(item.meta.title).toBe("Night Garden");
+  });
+
+  test("EPUB: an example in <pre> with no <code> is a code block, and the prose after it stays", async () => {
+    const item = await addSource(await tempLibrary(), file("code-book.epub"));
+    expect(item.body).toContain("```\nfor i in range(3):\n    print(i < 2)\n```\n\nThe loop prints three lines.");
+    expect(item.body).toContain("```\n<p>Hello</p>\n<!-- a comment -->\n```\n\nThe page shows one paragraph.");
+  });
+
+  test("EPUB: a package file that writes its elements with a prefix (opf:item) is read", async () => {
+    const item = await addSource(await tempLibrary(), file("prefixed-opf.epub"));
+    expect(item.meta.title).toBe("Prefixed Package");
+    expect(item.body).toContain("The package names every element with a prefix.");
+    expect(item.body).toContain("The second chapter follows the first.");
+  });
+
+  test("EPUB: a reference to an <aside epub:type=\"note\"> becomes a footnote", async () => {
+    const item = await addSource(await tempLibrary(), file("note-book.epub"));
+    expect(item.body).toContain("The river floods each spring.[^1] The town moved uphill.");
+    expect(item.body).toContain("[^1]: Records begin in 1820.");
+  });
+
+  test("EPUB: MathML comes in as formulas, from its TeX where the book gives it", async () => {
+    const item = await addSource(await tempLibrary(), file("math-book.epub"));
+    expect(item.body).toContain("Half is $$\\frac{1}{2}$$ of a whole.");
+    expect(item.body).toContain("$$\nx^2 + \\sqrt{y}\n$$");
+    expect(item.body).toContain("$$\n\\sum_{i = 1}^n a_i \\le \\alpha\n$$");
+    expect(item.body).not.toContain("12 of a whole");
+  });
+
+  test("EPUB: a table keeps the pictures in its cells, and verse laid out in a table keeps its lines", async () => {
+    const item = await addSource(await tempLibrary(), file("table-book.epub"));
+    expect(item.body).toMatch(/\| Visits \| !\[up\]\(assets\/[0-9a-f]{16}\.png\) \|/);
+    expect(item.body).toMatch(/Who keeps the gate tonight\? {2}\nThe wind, my lord, and I\. {2}\nThen bar it well, {2}\nand sleep beside it\./);
+  });
+
+  test("EPUB: a book with no text Ore can read says what to do next, not only a guess at DRM", async () => {
+    const lib = await tempLibrary();
+    const path = join(lib.root, "empty.epub");
+    writeFileSync(path, zipSync({
+      mimetype: strToU8("application/epub+zip"),
+      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="c.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
+      "c.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>E</dc:title></metadata><manifest><item id="a" href="a.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="a"/></spine></package>`),
+      "a.xhtml": strToU8(`<html xmlns="http://www.w3.org/1999/xhtml"><body><p> </p></body></html>`),
+    }));
+    await expect(addSource(lib, path)).rejects.toThrow(/DRM-free copy|PDF/);
+  });
 });
 
 // Phase 3 of D96: the page open in his browser, as he sees it signed in.
