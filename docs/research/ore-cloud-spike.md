@@ -1,6 +1,6 @@
 # Ore Cloud spike: where PDFs are read, and YouTube captions on the phone
 
-Issue #546 (part of the Ore Cloud spec #545). Measured 2026-11-27. The scripts are in `docs/research/ore-cloud-spike/`.
+Issue #546 (part of the Ore Cloud spec #545). Measured 2026-11-26 to 27. The scripts are in `docs/research/ore-cloud-spike/`.
 
 ## 1. The PDF page reader off the Mac
 
@@ -31,9 +31,25 @@ Pages full of blocks (papers in two columns, tables) are the slow ones: each blo
 
 **Regions match the Mac's.** On the four Buyalskaya pages, the Linux reading has the same blocks as the Mac's reading from the race (`/mnt/project-files/pdf-race/paddle-pages/`): 73 of 73 with the same label and a box overlapping by more than 90%. The block text was identical in 67 of 73. The other 6 differ only by quote style (`"` against `“”`), a link icon read as "ID", or a full stop. Ore uses pdf.js's own words wherever the page has text (D346), so these differences reach doc.md only on scans and on tables or formulas that are pictures.
 
-**On a rented GPU (Modal, billed by the second):** _pending. The image builds, and Modal needs a card on file before it starts a GPU._ Modal's list prices (modal.com/pricing, 2026-11-27): T4 $0.000164/s ($0.59/h), L4 $0.000222/s ($0.80/h), A10 $0.000306/s ($1.10/h), plus about $0.22/h for CPU and memory. The Starter plan includes $30 of compute a month.
+**On a rented GPU (Modal, billed by the second).** This used the same pipeline with the model in vLLM 0.10.2 (PaddleOCR's own `paddlex_genai_server`) and the layout model on the GPU, from `modal_paddle.py`, on 15 public pages: the Transformer paper, GPT-3's tables and Think Python. Every GPU read the same 155 blocks. The model needs 1.8 GB of GPU memory; vLLM reserves more up front.
 
-**Recommendation:** _final after the GPU numbers._ Today's numbers say a CPU box works only as a slow background reader: hours a book, a few books a day. That is fine while Pro has few users, since the Mac reads the same PDF in minutes and the first device to finish wins (Q9). It is too slow to be the main way a phone-only user gets a book read.
+| GPU | s/page, 15 pages together | s/page, 5-page PDF | model server start | $/s (GPU + 2 cores, 16 GB) | per 1,000 pages |
+|---|---|---|---|---|---|
+| **A10** | **0.31** | 0.41 to 0.74 | 78 s | $0.000366 | **$0.11** |
+| L4 | 0.63 | 0.61 to 1.27 | 135 s | $0.000282 | $0.18 |
+| T4 | 4.26 | 1.79 to 9.08 | 124 s | $0.000224 | $0.95 |
+| CPU, 4 vCPU (above) | 49.5 | 26 to 62 | 2 to 19 s | €37 a month flat | n/a |
+
+Prices are from modal.com/pricing on 2026-11-27, with CPU and memory at about $0.22/h added to the GPU. The whole spike cost $0.27 of Modal's free monthly $30.
+
+- **A 300-page book on an A10: about 93 s and $0.03**, plus one cold start (about 80 s, $0.03) when nothing is warm. That is under $0.10 a book, and nothing is paid while no one imports.
+- **A 10-page paper: about 4 s of reading**, so the cold start is most of its cost and its wait. Keeping one container warm for a few minutes after a job (Modal's `scaledown_window`) or batching a few imports into one start brings that down.
+- The A10 is both the fastest and the cheapest per page, so the pricier L4 isn't worth it. The T4 is 7 to 14 times slower and costs more per page.
+- Getting it running took four fixes, all now in the script: the server is `paddlex_genai_server` (PaddleOCR 3.7 has no `genai_server` command), flash-attn's prebuilt wheel is installed by hand (the build has no GPU), `build-essential` is there for Triton's warm-up, and on a T4 `XFORMERS_IGNORE_FLASH_VERSION_CHECK=1` is set. They are the kind of thing that breaks on version bumps, so pin them.
+
+**Reading fewer pages.** D346 reads every page on the Mac, where pages cost nothing. Another thread checked the Mac's own readings of the 16 text PDFs of the race: only 13 of 937 model calls (1.4%) were tables, display formulas or algorithms. The rest is text, and Ore swaps in pdf.js's words for it anyway. The headings and the reading order come from the layout model (PP-DocLayoutV3), not the reading model, and that model alone takes 3.1 s a page on a 4 vCPU CPU (96% of the Mac's boxes matched; `/mnt/project-files/pdf-race/layout-only/`). So the server could run the layout model on every page and the reading model only on table and formula boxes, boxes with no pdf.js text, and scans. That would be about 3.8 s a page on a plain CPU box (a 300-page book in about 20 minutes) and would keep D346's headings. This is an estimate, not run end to end. It would also bend D346 on the server, so it needs Tyler's yes.
+
+**Recommendation: Modal on an A10, per second, with the same reading as the Mac.** It costs cents a book, nothing while idle, reads a 300-page book in under 3 minutes, and gives the same blocks the Mac gets, so the first device to finish can win (Q9) with no difference in what lands. A rented CPU box only makes sense with the layout-only reading above, and that is worth building only if GPU cost ever matters, which it won't at $0.11 per 1,000 pages. Revisit if Modal's prices or cold starts change, or if imports grow to where a GPU kept on all day (an A10 is about $950 a month) costs less than paying per second.
 
 ## 2. YouTube captions without yt-dlp
 

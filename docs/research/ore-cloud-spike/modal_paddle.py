@@ -39,6 +39,8 @@ def bench() -> str:
 
     os.environ["HF_HOME"] = "/cache/hf"
     os.environ["PADDLE_PDX_CACHE_HOME"] = "/cache/paddlex"
+    # On a T4 xformers rejects flash-attn 2.8.3, which that GPU never uses anyway.
+    os.environ["XFORMERS_IGNORE_FLASH_VERSION_CHECK"] = "1"
     t0 = time.time()
     srv = subprocess.Popen(["/opt/vllm/bin/paddlex_genai_server", "--model_name", "PaddleOCR-VL-1.6-0.9B", "--backend", "vllm", "--host", "127.0.0.1", "--port", "8118"], env={**os.environ, "PATH": "/opt/vllm/bin:" + os.environ["PATH"]})
     while True:
