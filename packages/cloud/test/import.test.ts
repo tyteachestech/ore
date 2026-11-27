@@ -10,9 +10,9 @@ import { makeHandler } from "../src/server.ts";
 // Signed in (auth.test.ts covers who may): every request here carries a session.
 const auth: Auth = { audience: [], secret: "s".repeat(32), keys: async () => [], accounts: accounts(":memory:") };
 const serverHandle = makeHandler(auth);
-auth.accounts.signIn("001.test");
+const me = auth.accounts.signIn("001.test");
 const handle = async (req: Request) => {
-  req.headers.set("authorization", `Bearer ${await session("001.test", auth)}`);
+  req.headers.set("authorization", `Bearer ${await session(me, auth)}`);
   return serverHandle(req);
 };
 
