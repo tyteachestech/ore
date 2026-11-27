@@ -26,7 +26,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 3. **Flaky tests are races.** The open flaky rows (F142, F347, F348, F349, F397, F515, F516, F575, F623, F651, F748): find each cause (`triage-report` step 3), never a retry. A suite that fails at random hides real breaks.
 4. **Mac and iPhone writing at once.** Both on one iCloud folder: a rating on each, a note edited on both, Archive on one while the source is open on the other, a conflict copy. Deep scan 1 and 4 did it below the screens; nobody has run both apps.
 5. **Import at real breadth, deep (D122).** The running importer brings one file of each kind as a learner; start from its report and go deep: many files per type read against their source from start to end, EPUB books from his Calibre library, long textbooks, scans with and without the page reader downloaded (#494; refused with the next step when it is missing), and `bun run intake:live` over fifty popular sites. Fixtures for any bug are rewritten or openly licensed (D96).
-6. **Upgrade from an older library, rich.** Sweep 9 found nothing on a small seed with no media, PDF or chats. Redo with a copy of ~/Ore as written by a commit from 11-10, 11-17 and 11-24.
+6. **done 11-27** **Upgrade from an older library, rich.** Libraries written by Ore of 11-06, 11-10, 11-17 and 11-24 read, written, reimported and opened by master: one bug, fixed ([upgrade rich](2026-11-27-upgrade-rich/)). Left: a copy of ~/Ore from before 11-06, opened on the Mac.
 7. **The real Mac window** (Codex computer use on the installed app). Menu bar, ⌘Q with drafts open (F15), the quick quiz's global shortcut, open at login, the updater relaunching it, drag and paste from Finder, Safari, Preview and Notes. Every tester so far drove a browser page.
 8. **What merged since the last pass.** AI per job (#560), Ore Cloud's import (#558), the book front matter fold (#539), highlight animations (#540), the end screen and its sounds (D330, D336). Fresh code finds the most.
 9. **Recover from the library's git history.** Restore a source, a note or a whole day from the snapshots, then see what each screen and the index show.
@@ -94,7 +94,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | The real Mac window (menus, shortcuts, ⌘Q, updater) | open | queue 7 (F15 open since 11-11) |
 | Drag and paste from other apps | open | queue 7 |
 | Mac and iPhone writing at once | partly | deep scan 1 data, deep scan 4 edges (files only): queue 4 |
-| Upgrade from an older library | partly | sweep 9 (small seed): queue 6 |
+| Upgrade from an older library | done | sweep 9 (small seed), upgrade rich 11-27 (11-06 to 11-24, scripted); a copy of ~/Ore from before 11-06 still unchecked |
 
 ### Data integrity
 | Angle | Status | Runs |

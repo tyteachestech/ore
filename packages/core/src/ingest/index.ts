@@ -966,7 +966,7 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
     throw PASTE_STEP.test(e.message) ? new Error(e.message.replace(PASTE_STEP, " Its transcript is as it was.")) : e;
   });
   if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
-  if (kept) draft.body = savedPictures(draft.body, item);
+  if (kept) await savedPictures(draft, item);
   return turn(() => rewrite(lib, item, draft, draft.staleLayout ? undefined : regions, kept, stash));
 }
 
@@ -982,15 +982,20 @@ function day(d: string | undefined): string | undefined {
 
 /** A file's pictures that sat beside it (a saved page's `figure.png`) are not beside its kept copy, so read
  *  again they can't be found: each one left as a `file://` link takes the picture the source already saved
- *  for it, the same alt text in the same turn (F568). */
-function savedPictures(body: string, item: Item): string {
+ *  for it, the same alt text in the same turn (F568). An Ore before 11-06 (#9) saved none and linked the file
+ *  on disk instead: that link is read now and the picture saved beside the source (F-new-old-page-picture). */
+async function savedPictures(draft: { body: string; assets?: Asset[] }, item: Item) {
   const IMG = /!\[([^\]\n]*)\]\(([^)\s]+)\)/g;
-  const saved = [...item.body.matchAll(IMG)].filter((m) => m[2]!.startsWith("assets/") && existsSync(join(item.dir, m[2]!))).map((m) => ({ alt: m[1]!, path: m[2]! }));
-  return body.replace(IMG, (all, alt: string, src: string) => {
+  const saved = [...item.body.matchAll(IMG)].filter((m) => (m[2]!.startsWith("assets/") && existsSync(join(item.dir, m[2]!))) || (m[2]!.startsWith("file:///") && localImageSaves(m[2]!))).map((m) => ({ alt: m[1]!, path: m[2]! }));
+  const body = draft.body.replace(IMG, (all, alt: string, src: string) => {
     if (!src.startsWith("file:")) return all;
     const i = saved.findIndex((p) => p.alt === alt);
     return i < 0 ? all : `![${alt}](${saved.splice(i, 1)[0]!.path})`;
   });
+  if (!/\]\(file:\/\/\//.test(body)) return void (draft.body = body);
+  const read = await saveImages(body, { local: true });
+  draft.body = read.body;
+  draft.assets = [...(draft.assets ?? []), ...read.assets];
 }
 
 /** The original a file source is read again from: the copy kept beside it (source.*), so a better reader

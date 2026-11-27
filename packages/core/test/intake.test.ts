@@ -2163,6 +2163,21 @@ describe("import coverage: figures and slide pictures", () => {
     expect(readFileSync(findItem(lib, item.meta.id).docPath, "utf8")).toBe(readFileSync(item.docPath, "utf8"));
   });
 
+  test("a saved web page Ore of 11-06 linked its picture to on disk keeps it when read again, saved beside it (F-new-old-page-picture)", async () => {
+    // Ore before #9 left a saved page's picture as a link to the file beside the page it was added from.
+    const lib = await tempLibrary();
+    const item = await addSource(lib, join(FIX, "files", "saved-lesson", "lesson.html"));
+    const figure = join(mkdtempSync(join(tmpdir(), "ore-old-page-")), "figure.png");
+    writeFileSync(figure, readFileSync(join(FIX, "files", "saved-lesson", "figure.png")));
+    const [saved] = images(item.body);
+    writeFileSync(item.docPath, readFileSync(item.docPath, "utf8").replace(saved!.path, `file://${figure}`));
+    rmSync(join(item.dir, saved!.path));
+    await reimportSource(lib, item.meta.id, { local: true });
+    const [again] = images(findItem(lib, item.meta.id).body);
+    expect(again?.path).toMatch(/^assets\/[0-9a-f]{16}\.png$/);
+    expect(readFileSync(join(item.dir, again!.path))).toEqual(readFileSync(figure));
+  });
+
   test("PDF: figures after their page's text; touching panels are one, logos and icons left out", async () => {
     const item = await addSource(await tempLibrary(), file("figures.pdf"));
     const pages = item.body.split(/<!-- page \d+ -->/).slice(1);
