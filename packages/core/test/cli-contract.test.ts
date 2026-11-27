@@ -160,4 +160,14 @@ describe("doctor", () => {
     expect((await ore(lib.root, ["card", "retire", card.meta.id, "--json"])).code).toBe(0);
     expect((await doctor(lib)).issues.filter((i) => i.path === rel)).toEqual([]);
   });
+  test("ORE_CLOCK_OFFSET_MS runs ore that far ahead, as a tester's moved page clock asks (F739)", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, "# Spacing\n\nSpaced practice beats massed practice.");
+    const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "Q?", answer: "A", rubric: [] });
+    const ahead = 3 * 86_400_000;
+    const r = await ore(lib.root, ["review", card.meta.id, "--rating", "3", "--confidence", "2", "--json"], { env: { ORE_CLOCK_OFFSET_MS: String(ahead) } });
+    expect(r.code).toBe(0);
+    const at = Date.parse(readReviews(lib)[0]!.ts);
+    expect(Math.abs(at - (Date.now() + ahead))).toBeLessThan(60_000);
+  });
 });
