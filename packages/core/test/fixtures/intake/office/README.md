@@ -28,3 +28,8 @@ Additional Ore-authored variants:
 
 Success cases are checked through `addSource` in `intake.test.ts` and as whole
 `doc.md` files in `golden.test.ts`. Damaged/unsupported cases must leave no source.
+
+Deep import pass (2026-11-27):
+
+- `word-equations.docx`: `word-equation.docx` with a body of Word equations (OMML) written for
+  Ore by `make-word-equations.py`: a fraction, a power, a sum with limits, a root, brackets.

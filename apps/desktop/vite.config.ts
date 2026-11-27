@@ -23,6 +23,19 @@ function pixelIcons(): Record<string, string> {
     out[name] = pixelSvg(FIXES[name] ?? hex.map((h) => parseInt(h, 16).toString(2).padStart(16, "0").replace(/1/g, "#").replace(/0/g, ".")));
   return (pixelCache = out);
 }
+// pdf.js's image decoders (packages/core/src/ingest/pdf-data.ts) as files with their URL, as the CMaps are: Vite would
+// otherwise load a .wasm import as a WebAssembly module, which pdf.js fetches itself.
+const pdfWasm: Plugin = {
+  name: "ore-pdf-wasm",
+  enforce: "pre",
+  load(id) {
+    if (!/pdfjs-dist\/wasm\/[\w-]+\.wasm$/.test(id)) return;
+    if (this.meta.watchMode) return `export default ${JSON.stringify(`/@fs${id}`)};`;
+    const ref = this.emitFile({ type: "asset", name: id.split("/").pop(), source: readFileSync(id) });
+    return `export default import.meta.ROLLUP_FILE_URL_${ref};`;
+  },
+};
+
 const pixelSkillIcons: Plugin = {
   name: "pixel-skill-icons",
   configureServer(server) {
@@ -188,6 +201,7 @@ export default defineConfig({
     ],
   },
   plugins: [
+    pdfWasm,
     react(),
     tailwindcss(),
     pixelSkillIcons,

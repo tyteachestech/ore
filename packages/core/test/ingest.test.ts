@@ -57,6 +57,19 @@ describe("ingest", () => {
     expect(vttWords(vtt).map((w) => w.t)).toEqual([0, 0.9, 70, 70.9]);
   });
 
+  test("words said twice in a row stay twice: a line with its own word times is speech, not a carried-over line (F582, deep import pass)", () => {
+    // A caption's blank line is one space, as YouTube writes it.
+    const vtt = ["WEBVTT", "", "00:00:00.000 --> 00:00:02.000 align:start position:0%", " ", "go<00:00:00.500><c> back</c>", "", "00:00:02.000 --> 00:00:02.010 align:start position:0%", "go back", " ", "", "00:00:02.010 --> 00:00:04.000 align:start position:0%", "go back", "go<00:00:02.500><c> back</c>", ""].join("\n");
+    expect(vttToBody(vtt)).toBe("[00:00] go back go back\n");
+    expect(vttWords(vtt).map((w) => w.t)).toEqual([0, 0.5, 2.01, 2.5]);
+  });
+
+  test("a two-line cue that streamed captions repeat at a segment's edge comes in once (deep import pass, TED)", () => {
+    const cue = "00:00:05.000 --> 00:00:08.000\nSchools were built\nfor an industrial age.\n";
+    const vtt = `WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nGood morning.\n\n${cue}\n\n${cue}\n00:00:08.500 --> 00:00:10.000\nWe teach the same way.\n`;
+    expect(vttToBody(vtt)).toBe("[00:01] Good morning. Schools were built for an industrial age. We teach the same way.\n");
+  });
+
   test("youtubeId reads watch, youtu.be, shorts and live URLs", () => {
     expect(youtubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10")).toBe("dQw4w9WgXcQ");
     expect(youtubeId("https://youtu.be/dQw4w9WgXcQ?si=x")).toBe("dQw4w9WgXcQ");

@@ -1,10 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, truncateSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
-import { addPageText, addSource, addTab, addText, audioOf, fillOwed, hasPageText, redoPageText, reimportSource, undoPageText, undoReimport } from "../src/ingest/index.ts";
+import { addPageText, addSource, addTab, addText, arxivListing, audioOf, fillOwed, hasPageText, redoPageText, reimportSource, undoPageText, undoReimport } from "../src/ingest/index.ts";
 import { addCourse, planCourse } from "../src/ingest/course.ts";
 import { courseLessons } from "../src/courses.ts";
 import { setChapterRecall } from "../src/notes.ts";
@@ -20,10 +20,15 @@ import { xlsxToDoc } from "../src/ingest/sheets.ts";
 import { episode, pageAudio, transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { htmlToDoc, inlineMath } from "../src/ingest/web.ts";
+import { mathmlToTex } from "../src/ingest/mathml.ts";
+import { ommlToTex } from "../src/ingest/omml.ts";
+import { pdfToDoc } from "../src/ingest/pdf.ts";
+import { parseHTML } from "linkedom";
 import { chapterLines } from "../src/ai/recall.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
-import { strToU8, zipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { tempLibrary } from "./helpers.ts";
+import { paths } from "../src/library.ts";
 
 // Import coverage (docs/reviews/2026-10-28-import-coverage.md): every content type Ore reads has a
 // saved example here, and each must keep what a learner needs from it. Pages are real ones, saved
@@ -102,7 +107,7 @@ interface Case {
 const PAGES: Case[] = [
   { name: "essay", url: "https://paulgraham.com/greatwork.html", fixture: "essay.html", title: "How to Do Great Work", minWords: 11000, has: ["If you research drill of elaboration", "But the note reading gap of forgetting concept", "for elaboration and for example writing"], paragraphs: 100, links: 20 },
   { name: "blog with diagrams and code", url: "https://lilianweng.github.io/posts/2023-06-23-agent/", fixture: "blog-images.html", title: "LLM Powered Autonomous Agents", author: "Lilian Weng", published: "2023-06-23T00:00:00Z", minWords: 6000, has: ["In a LLM-powered autonomous index reading", "In the FACT-Check interval", "Test model answer idea review and plan"], headings: 12, images: 13, code: 6 },
-  { name: "docs with code (Python)", url: "https://docs.python.org/3/tutorial/classes.html", fixture: "docs-python.html", title: "9. Classes", minWords: 5000, has: ["Compared with other programming languages", "If the same attribute name occurs in", "Some simple generators can be coded succinctly"], headings: 15, code: 30 },
+  { name: "docs with code (Python)", url: "https://docs.python.org/3/tutorial/classes.html", fixture: "docs-python.html", title: "9. Classes", minWords: 5000, has: ["Compared with other programming languages", "If the same attribute name occurs in", "Some simple generators can be coded succinctly", "As discussed in [A Word About Names and Objects](#tut-object), shared data", "(except see below [Private Variables](#tut-private))"], headings: 15, code: 30 },
   { name: "docs with code (MDN)", url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Closures", fixture: "docs-mdn.html", title: "Closures", published: "2025-11-04T07:08:26.000Z", minWords: 2500, has: ["closure", "One solution in this case is to", "However, redefining the prototype is not recommended."], headings: 6, code: 25 },
   { name: "Wikipedia", url: "https://en.wikipedia.org/wiki/Spaced_repetition", fixture: "wikipedia.html", title: "Spaced repetition", author: "Wikipedia", published: "2001-08-09T02:05:34Z", minWords: 3500, has: ["Spaced repetition is", "In the Leitner system, correctly answered cards"], headings: 8, images: 3 },
   { name: "newsletter (Substack)", url: "https://www.astralcodexten.com/p/the-psychopolitics-of-trauma", fixture: "substack.html", title: "The Psychopolitics Of Trauma", author: "Scott Alexander", published: "2024-01-25T03:34:57+00:00", minWords: 5000, has: ["Research prompt teacher mind learn habit", "As chunk, this learn’t habit drill to", "But feedback of focus this deck step"], headings: 5, images: 3 },
@@ -202,6 +207,39 @@ describe("import coverage: web pages", () => {
     expect(item.body).toContain("\\sqrt{d_{k}}");
     expect(count(item.body, /^#{1,6} /gm)).toBeGreaterThanOrEqual(20);
     expect(count(item.body, /!\[[^\]]*\]\(https:\/\/arxiv\.org\/html\//g)).toBeGreaterThanOrEqual(2);
+  });
+
+  test("an arXiv paper, by its abstract or its PDF link, has its authors and first date from arXiv's listing", async () => {
+    // Deep import pass 2026-11-27: arXiv's HTML version names no date and its PDF neither date nor authors, so
+    // "Attention Is All You Need" came in with no date, and with no author from its PDF link. arxiv-api.xml is
+    // arXiv's own listing of the paper (its metadata is CC0).
+    const listing = { "https://export.arxiv.org/api/query?id_list=1706.03762": { body: web("arxiv-api.xml"), type: "application/atom+xml" } };
+    serve({ "https://arxiv.org/html/1706.03762": { body: web("arxiv-html.html"), type: HTML }, ...listing });
+    const abs = await addSource(await tempLibrary(), "https://arxiv.org/abs/1706.03762");
+    expect(abs.meta.author).toBe("Ashish Vaswani et al.");
+    expect(abs.meta.published).toBe("2017-06-12T17:57:34Z");
+    serve({ "https://arxiv.org/pdf/1706.03762v7": { body: readFileSync(file("paper.pdf")), type: "application/pdf" }, "https://export.arxiv.org/api/query?id_list=1706.03762": listing["https://export.arxiv.org/api/query?id_list=1706.03762"] });
+    const pdf = await addSource(await tempLibrary(), "https://arxiv.org/pdf/1706.03762v7");
+    expect(pdf.meta.type).toBe("pdf");
+    expect(pdf.meta.author).toBe("Ashish Vaswani et al.");
+    expect(pdf.meta.published).toBe("2017-06-12T17:57:34Z");
+    // An older paper whose first line is arXiv's margin stamp ("arXiv:hep-th/9711200v3 22 Jan 1998", Maldacena) is
+    // titled from the listing, not the stamp.
+    const stamped = { type: "pdf" as const, title: "arXiv:hep-th/9711200v3 22 Jan 1998", body: "x" };
+    const old = `<feed><entry><title>The Large N Limit of Superconformal Field Theories and Supergravity</title><published>1997-11-27T23:53:13Z</published><author><name>Juan M. Maldacena</name></author></entry></feed>`;
+    serve({ "https://export.arxiv.org/api/query?id_list=hep-th/9711200": { body: old, type: "application/atom+xml" } });
+    const fixed = await arxivListing("https://arxiv.org/abs/hep-th/9711200", stamped);
+    expect(fixed.title).toBe("The Large N Limit of Superconformal Field Theories and Supergravity");
+    expect(fixed.author).toBe("Juan M. Maldacena");
+    // The listing's title is XML: its escapes are read. An id arXiv can't find answers with an error entry, not a paper.
+    serve({ "https://export.arxiv.org/api/query?id_list=2101.00001": { body: `<feed><entry><title>Q&amp;A over Graphs</title><author><name>A. Writer</name></author></entry></feed>`, type: "application/atom+xml" } });
+    expect((await arxivListing("https://arxiv.org/abs/2101.00001", { ...stamped, title: "arXiv:2101.00001v1 1 Jan 2021" })).title).toBe("Q&A over Graphs");
+    serve({ "https://export.arxiv.org/api/query?id_list=2101.99999": { body: `<feed><entry><id>http://arxiv.org/api/errors#incorrect_id_format_for_2101.99999</id><title>Error</title><author><name>arXiv api core</name></author></entry></feed>`, type: "application/atom+xml" } });
+    const missing = await arxivListing("https://arxiv.org/abs/2101.99999", stamped);
+    expect([missing.title, missing.author]).toEqual([stamped.title, undefined]);
+    // No listing (offline, or arXiv down): the paper still comes in, as before.
+    serve({ "https://arxiv.org/pdf/1706.03762v7": { body: readFileSync(file("paper.pdf")), type: "application/pdf" } });
+    expect((await addSource(await tempLibrary(), "https://arxiv.org/pdf/1706.03762v7")).meta.published).toBeUndefined();
   });
 
   test("GitHub repo reads its README, relative images pointed at the repo", async () => {
@@ -369,6 +407,36 @@ describe("import coverage: web pages", () => {
     const katex = `<p>Scale by <span class="math inline"><span class="katex"><span class="katex-mathml"><math><semantics><mrow><msqrt><msub><mi>d</mi><mi>k</mi></msub></msqrt></mrow><annotation encoding="application/x-tex">\\sqrt{d_k}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true">√dk</span></span></span> first.</p>`;
     const drawn = (await htmlToDoc(`<html><head><title>T</title></head><body><article><h1>T</h1>${words}${katex}${words}</article></body></html>`, "https://example.org/t")).markdown;
     expect(drawn).toContain("Scale by $$\\sqrt{d_k}$$ first.");
+  });
+
+  test("a Distill page's citations and footnotes stay inside their sentence", async () => {
+    // distill-inline.html: written for Ore in the markup Distill writes (Why Momentum Really Works, deep import pass
+    // 2026-11-27): <dt-cite>, <dt-fn>, <d-cite> and <d-footnote> inside a paragraph split it in three.
+    const b = (await htmlToDoc(web("distill-inline.html"), "https://distill.pub/2017/rolling/")).markdown;
+    expect(b).toContain("the usual picture of a step \\[1, 2\\]: a walker going down");
+    expect(b).toContain("on many slopes. <sup>1</sup> That is no small gain");
+    expect(b).toContain("the same thing as \\[3\\] and a note kept beside its mark, still inside one sentence");
+    expect(b).toContain("Written for Ore in the markup");
+    expect(b).toContain("both of them stop.");
+  });
+
+  test("a section's heading in a header of its own, and a worked problem boxed as a modal, are kept", async () => {
+    // section-headers.html: written for Ore in the markup Brilliant's wiki writes (Bayes' Theorem, deep import pass
+    // 2026-11-27): every <h2> sat in a <header>, which the extractor drops as the site's, and each worked problem in a
+    // box classed "problem-modal-container", which it drops as a pop-up. The page kept no heading and lost its problems.
+    const b = (await htmlToDoc(web("section-headers.html"), "https://brilliant.org/wiki/updating/")).markdown;
+    expect(b).toContain("## Counting the cases");
+    expect(b).toContain("## A test that errs");
+    expect(b).toContain("## More examples");
+    expect(b).toContain("One in ten of the town has the fever.");
+    expect(b).toContain("The answer is one in four");
+    expect(b).toContain("the last example ends here.");
+    // A section whose id is its heading's words ("more-examples") is not a "more-" box of links.
+    // The site's own header and a real pop-up stay out.
+    expect(b).not.toContain("Log in");
+    expect(b).not.toContain("Sign up to keep learning");
+    // A sign-up box classed as a modal right after the post's last paragraph is still the site's (code review).
+    expect(b).not.toContain("Get the weekly letter");
   });
 
   test("a chart the page draws with Vega (Altair) is kept as a picture where it stood; one that can't be drawn says so", async () => {
@@ -682,6 +750,20 @@ describe("import coverage: files", () => {
     expect(item.body).toStartWith('````python\n# Load the survey\nimport pandas as pd\nfence = "```"\n````');
     expect(item.body).toContain("## Cleaning the columns\nRename first, then drop the empty ones.");
     expect(item.body).toEndWith("````text\n```md\n# Report\n```\n````\n");
+  });
+
+  test("notebook: its title from a heading underlined with ===, or a first cell that is one bold line", async () => {
+    // Deep import pass 2026-11-27: Bayesian Methods for Hackers writes "Probabilistic Programming\n=====" and came in
+    // titled by its file name; Hands-On ML opens with "**Chapter 4 – Training Models**" and was titled "Setup".
+    const dir = mkdtempSync(join(tmpdir(), "ore-nb-"));
+    const nb = (cells: string[]) => JSON.stringify({ nbformat: 4, nbformat_minor: 5, metadata: {}, cells: cells.map((s) => ({ cell_type: "markdown", metadata: {}, source: s })) });
+    writeFileSync(join(dir, "ch1.ipynb"), nb(["Probabilistic Programming\n=====\nand Bayesian Methods\n\n##### Version 0.1", "Chapter 1\n======\nThe Philosophy of Bayesian Inference\n------\nA skilled programmer still finds bugs."]));
+    writeFileSync(join(dir, "ch4.ipynb"), nb(["**Chapter 4 – Training Models**", "_This notebook contains the code for chapter 4._", "# Setup\nFirst, import a few modules."]));
+    writeFileSync(join(dir, "plain.ipynb"), nb(["Some **bold** words open this cell, then more of them.", "# Real title\nText."]));
+    const lib = await tempLibrary();
+    expect((await addSource(lib, join(dir, "ch1.ipynb"))).meta.title).toBe("Probabilistic Programming");
+    expect((await addSource(lib, join(dir, "ch4.ipynb"))).meta.title).toBe("Chapter 4 – Training Models");
+    expect((await addSource(lib, join(dir, "plain.ipynb"))).meta.title).toBe("Real title");
   });
 
   test("subtitles: a timed transcript", async () => {
@@ -1346,6 +1428,69 @@ describe("import coverage: EPUB", () => {
     expect(item.body).not.toContain("↩");
     expect(item.body.match(/<!-- chapter/g)).toHaveLength(2);
   });
+
+  // make-deep-epubs.ts: the books the deep import pass found broken (2026-11-27).
+  test("EPUB: a comic's picture pages before its first page of words are the book, not a title plate", async () => {
+    const item = await addSource(await tempLibrary(), file("comic.epub"));
+    expect(images(item.body).map((i) => i.alt)).toEqual(["Page 1", "Page 2", "Page 3", "Page 4"]);
+    expect(item.body.indexOf("![Page 4]")).toBeLessThan(item.body.indexOf("# Afterword"));
+    expect(item.body).not.toContain("![Cover]");
+  });
+
+  test("EPUB: a fixed-layout picture book, its pages listed as pictures, comes in as its pictures", async () => {
+    const item = await addSource(await tempLibrary(), file("picture-book.epub"));
+    expect(images(item.body)).toHaveLength(3);
+    expect(item.meta.title).toBe("Night Garden");
+  });
+
+  test("EPUB: an example in <pre> with no <code> is a code block, and the prose after it stays", async () => {
+    const item = await addSource(await tempLibrary(), file("code-book.epub"));
+    expect(item.body).toContain("```\nfor i in range(3):\n    print(i < 2)\n```\n\nThe loop prints three lines.");
+    expect(item.body).toContain("```\n<p>Hello</p>\n<!-- a comment -->\n```\n\nThe page shows one paragraph.");
+  });
+
+  test("EPUB: a package file that writes its elements with a prefix (opf:item) is read", async () => {
+    const item = await addSource(await tempLibrary(), file("prefixed-opf.epub"));
+    expect(item.meta.title).toBe("Prefixed Package");
+    expect(item.body).toContain("The package names every element with a prefix.");
+    expect(item.body).toContain("The second chapter follows the first.");
+  });
+
+  test("EPUB: a reference to an <aside epub:type=\"note\"> becomes a footnote", async () => {
+    const item = await addSource(await tempLibrary(), file("note-book.epub"));
+    expect(item.body).toContain("The river floods each spring.[^1] The town moved uphill.");
+    expect(item.body).toContain("[^1]: Records begin in 1820.");
+  });
+
+  test("EPUB: MathML comes in as formulas, from its TeX where the book gives it", async () => {
+    const item = await addSource(await tempLibrary(), file("math-book.epub"));
+    expect(item.body).toContain("Half is $$\\frac{1}{2}$$ of a whole.");
+    expect(item.body).toContain("$$\nx^2 + \\sqrt{y}\n$$");
+    expect(item.body).toContain("$$\n\\sum_{i = 1}^n a_i \\le \\alpha\n$$");
+    expect(item.body).not.toContain("12 of a whole");
+    // Text inside a formula keeps TeX's own characters from breaking it (code review).
+    const math = (m: string) => mathmlToTex(parseHTML(`<math>${m}</math>`).document.querySelector("math") as unknown as Element);
+    expect(math("<mtext>50% off, $5 &amp; #1</mtext>")).toBe("\\text{50\\% off, \\$5 \\& \\#1}");
+    expect(math("<mi>~</mi><mo>^</mo>")).toBe("\\sim \\hat{}");
+  });
+
+  test("EPUB: a table keeps the pictures in its cells, and verse laid out in a table keeps its lines", async () => {
+    const item = await addSource(await tempLibrary(), file("table-book.epub"));
+    expect(item.body).toMatch(/\| Visits \| !\[up\]\(assets\/[0-9a-f]{16}\.png\) \|/);
+    expect(item.body).toMatch(/Who keeps the gate tonight\? {2}\nThe wind, my lord, and I\. {2}\nThen bar it well, {2}\nand sleep beside it\./);
+  });
+
+  test("EPUB: a book with no text Ore can read says what to do next, not only a guess at DRM", async () => {
+    const lib = await tempLibrary();
+    const path = join(lib.root, "empty.epub");
+    writeFileSync(path, zipSync({
+      mimetype: strToU8("application/epub+zip"),
+      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="c.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
+      "c.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>E</dc:title></metadata><manifest><item id="a" href="a.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="a"/></spine></package>`),
+      "a.xhtml": strToU8(`<html xmlns="http://www.w3.org/1999/xhtml"><body><p> </p></body></html>`),
+    }));
+    await expect(addSource(lib, path)).rejects.toThrow(/DRM-free copy|PDF/);
+  });
 });
 
 // Phase 3 of D96: the page open in his browser, as he sees it signed in.
@@ -1614,6 +1759,27 @@ describe("import coverage: audio and podcasts", () => {
     }
   });
 
+  test("an audio file's own date tags (ID3's year and day) come in as its date (deep import pass)", async () => {
+    // chaptered.mp3's sound under a new ID3v2.3 tag: a title, TYER 2026 and TDAT 2711 (day and month).
+    const src = new Uint8Array(readFileSync(join(FIX, "audio", "chaptered.mp3")));
+    const syncsafe = (b: Uint8Array) => ((b[6]! & 127) << 21) | ((b[7]! & 127) << 14) | ((b[8]! & 127) << 7) | (b[9]! & 127);
+    const frame = (id: string, text: string) => {
+      const f = new Uint8Array(11 + text.length);
+      f.set(strToU8(id));
+      new DataView(f.buffer).setUint32(4, text.length + 1);
+      f.set(strToU8(text), 11);
+      return f;
+    };
+    const frames = [frame("TIT2", "Field Notes"), frame("TYER", "2026"), frame("TDAT", "2711")];
+    const n = frames.reduce((s, f) => s + f.length, 0);
+    const tag = new Uint8Array([0x49, 0x44, 0x33, 3, 0, 0, (n >> 21) & 127, (n >> 14) & 127, (n >> 7) & 127, n & 127]);
+    const f = join(mkdtempSync(join(tmpdir(), "ore-mp3-")), "notes.mp3");
+    writeFileSync(f, Buffer.concat([tag, ...frames, src.subarray(10 + syncsafe(src))]));
+    const item = await addSource(await tempLibrary(), f);
+    expect(item.meta.title).toBe("Field Notes");
+    expect(item.meta.published).toBe("2026-11-27");
+  });
+
   test("an audio link is titled by its own file name, not where it redirects", async () => {
     const url = "https://www.buzzsprout.com/123/episodes/17456166-travel-with-kids.mp3";
     globalThis.fetch = (async () => {
@@ -1666,13 +1832,15 @@ describe("import coverage: audio and podcasts", () => {
   test("an Apple Podcasts episode: its audio through Apple's lookup, titled as the episode", async () => {
     const audio = "https://traffic.megaphone.fm/HSW1.mp3";
     serve({
-      "https://itunes.apple.com/lookup?id=1545953110&entity=podcastEpisode&limit=200": { body: JSON.stringify({ results: [{ wrapperType: "track", trackId: 1545953110 }, { trackId: 1000560140000, episodeUrl: "https://traffic.megaphone.fm/OTHER.mp3", trackName: "Another episode" }, { trackId: 1000560143046, episodeUrl: audio, trackName: "Master your sleep", collectionName: "Huberman Lab", releaseDate: "2021-01-11T08:00:00Z" }] }), type: "application/json" },
+      "https://itunes.apple.com/lookup?id=1545953110&entity=podcastEpisode&limit=200": { body: JSON.stringify({ results: [{ wrapperType: "track", trackId: 1545953110 }, { trackId: 1000560140000, episodeUrl: "https://traffic.megaphone.fm/OTHER.mp3", trackName: "Another episode" }, { trackId: 1000560143046, episodeUrl: audio, trackName: "Master your sleep", collectionName: "Huberman Lab", releaseDate: "2021-01-11T08:00:00Z", description: "How light, temperature and timing set your sleep.\nTools: morning light, a cool room." }] }), type: "application/json" },
       [audio]: { body: new Uint8Array(4096), type: "audio/mpeg" },
     });
     const url = "https://podcasts.apple.com/us/podcast/master-your-sleep/id1545953110?i=1000560143046&uo=4";
     const item = await addSource(await tempLibrary(), url);
     expect(item.meta).toMatchObject({ title: "Master your sleep", author: "Huberman Lab", published: "2021-01-11T08:00:00Z", url });
     expect(item.body).toContain("[01:00] Thanks for listening.");
+    // Its show notes, as a video's description comes in (deep import pass).
+    expect(item.body).toMatch(/## From the description\n\nHow light, temperature and timing set your sleep\. {2}\nTools: morning light, a cool room\.\n$/);
   });
 
   test("an episode on Apple Podcasts older than the lookup's last 200 is found in the show's own feed (F62)", async () => {
@@ -2174,7 +2342,24 @@ describe("import coverage: videos heard from their sound", () => {
     expect(item.meta).toMatchObject({ type: "article", title: "Week 3 lecture" });
     expect(item.body).toBe("[00:00] Testing yourself beats rereading.\n\n[01:00] Teachers can quiz every week.\n");
     expect(readFileSync(join(dir, "args"), "utf8").trim()).toBe(f);
-    expect(existsSync(join(item.dir, "source.mov"))).toBe(false);
+    expect(statSync(join(item.dir, "source.mov")).size).toBe(300 * 1024 * 1024);
+  });
+
+  test("a video file keeps its original beside its transcript, so one added from the inbox isn't lost (Tyler 2026-11-27)", async () => {
+    const lib = await tempLibrary();
+    mkdirSync(paths.inbox(lib), { recursive: true });
+    const f = join(paths.inbox(lib), "Lab demo.mp4");
+    writeFileSync(f, "the video's own bytes");
+    const item = await addSource(lib, f);
+    expect(existsSync(f)).toBe(false);
+    expect(readFileSync(join(item.dir, "source.mp4"), "utf8")).toBe("the video's own bytes");
+    expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toContain("Testing yourself beats rereading.");
+    // Read again from what is kept, without hearing it again.
+    rmSync(join(dir, "args"));
+    const again = await reimportSource(lib, item.meta.id);
+    expect(existsSync(join(dir, "args"))).toBe(false);
+    expect(readFileSync(join(again.item.dir, "source.mp4"), "utf8")).toBe("the video's own bytes");
+    expect(again.item.body).toBe(item.body);
   });
 
   test("speech in a language the Mac has no model for says so", async () => {
@@ -2187,6 +2372,61 @@ describe("import coverage: videos heard from their sound", () => {
 });
 
 // D122: figures and slide pictures come in with the text they illustrate.
+// make-deep-pdfs.py: the PDFs the deep import pass found broken (2026-11-27).
+describe("import coverage: PDF, deep import pass", () => {
+  test("PDF: a scan's text layer set at a slight tilt is the page's text, not margin to drop", async () => {
+    const item = await addSource(await tempLibrary(), file("skewed.pdf"));
+    const tilted = item.body.split("<!-- page 2 -->")[0]!;
+    expect(tilted).toContain("Rivers carry sand from the hills to the sea, a little each day.");
+    expect(tilted).toContain("Maps drawn a century apart show how far a single bend has travelled.");
+  });
+
+  test("PDF: a small table beside the text keeps every row, its header too", async () => {
+    const item = await addSource(await tempLibrary(), file("side-table.pdf"));
+    for (const row of ["Year Bend Shift", "1900 A 12 m", "1950 A 31 m", "2000 A 58 m"]) expect(item.body).toContain(row);
+  });
+
+  test("PDF: a filled form's values come in with their fields", async () => {
+    const item = await addSource(await tempLibrary(), file("form.pdf"));
+    expect(item.body).toContain("Surveyor: Ada Lovelace");
+    expect(item.body).toContain("River: Wye");
+    expect(item.body).toContain("Flooded: ✓");
+    expect(item.body).toContain("season: Spring"); // a choice's own name where it has no label
+    expect(item.body).not.toContain("season: ✓");
+    // A form whose pages hold no text of their own is a scan, whatever its fields hold (code review).
+    await expect(pdfToDoc(new Uint8Array(readFileSync(file("form-scan.pdf"))))).rejects.toThrow();
+  });
+
+  test("PDF: its bookmarks' sections inside a chapter are the source's subheadings", async () => {
+    const item = await addSource(await tempLibrary(), file("nested-outline.pdf"));
+    for (const h of ["## 1 Introduction", "### 1.1 Background", "### 1.2 Aims", "## 2 Method", "### 2.1 Data", "### 2.2 Analysis"]) expect(item.body).toContain(`\n${h}\n`);
+    expect(item.body.match(/<!-- chapter \d+ -->/g)).toHaveLength(2);
+    // Chapters out of page order are no table of chapters, and their sections aren't headings either (code review).
+    const odd = await addSource(await tempLibrary(), file("unordered-outline.pdf"));
+    expect(odd.body).toContain("\n1.1 Part\n");
+    expect(odd.body).not.toMatch(/^#+ \d\.\d Part/m);
+  });
+
+  test("PDF: figures past the 80 it keeps are marked where they were, not lost unsaid", async () => {
+    const item = await addSource(await tempLibrary(), file("many-figures.pdf"));
+    expect(images(item.body)).toHaveLength(80);
+    expect(item.body.match(/\[missing figure: [^\]]+\]/g)).toHaveLength(2);
+    expect(item.body.indexOf("Figure 82 shows")).toBeLessThan(item.body.lastIndexOf("[missing figure"));
+  });
+
+  test("PDF: a metadata title that is a figure's file name (.eps) or arXiv's stamp loses to the page's own", async () => {
+    const item = await addSource(await tempLibrary(), file("eps-title.pdf"));
+    expect(item.meta.title).toBe("Sand Bars and Islands");
+    expect(cleanTitle("arXiv:1508.07909v5 [cs.CL] 10 Jun 2016")).toBeUndefined();
+    expect(cleanTitle("fig_3.EPS")).toBeUndefined();
+  });
+
+  test("PDF: a JPEG 2000 figure is saved like any other", async () => {
+    const item = await addSource(await tempLibrary(), file("jpx.pdf"));
+    expect(images(item.body)).toHaveLength(1);
+  });
+});
+
 describe("import coverage: figures and slide pictures", () => {
   const file = (name: string) => {
     const f = join(mkdtempSync(join(tmpdir(), "ore-fig-")), name);
@@ -2267,6 +2507,33 @@ describe("import coverage: the grid's small holes", () => {
       writeFileSync(join(dir, name), cut);
       await expect(addSource(await tempLibrary(), join(dir, name))).rejects.toThrow(new RegExp(`That ${what} file is damaged or only partly downloaded\\. Download it again`));
     }
+  });
+
+  test("a Word, PowerPoint or Excel file locked with a password says how to unlock it, not that it is damaged", async () => {
+    // Deep import pass 2026-11-27 (Apache POI's protected files): Office saves a file with a password as an
+    // encrypted package inside an OLE container (D0 CF 11 E0 …), not a zip, and Ore said "damaged, download it again".
+    // A zip whose parts use a compression Ore can't read (a fuzzed file) reads as damaged, not "unknown compression type".
+    const dir = mkdtempSync(join(tmpdir(), "ore-locked-"));
+    const ole = new Uint8Array(4096);
+    ole.set([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    ole.set(new TextEncoder().encode("E\0n\0c\0r\0y\0p\0t\0i\0o\0n\0I\0n\0f\0o\0"), 1024);
+    const lib = await tempLibrary();
+    for (const [name, app] of [["essay.docx", "Word"], ["deck.pptx", "PowerPoint"], ["marks.xlsx", "Excel"]] as const) {
+      writeFileSync(join(dir, name), ole);
+      await expect(addSource(lib, join(dir, name))).rejects.toThrow(new RegExp(`That ${app} file is locked with a password\\. Open it in ${app}, remove the password`));
+    }
+    // An older Word file (.doc, the same container with no encrypted package) saved under a new name says so (code review).
+    const doc = new Uint8Array(4096);
+    doc.set([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    doc.set(new TextEncoder().encode("W\0o\0r\0d\0D\0o\0c\0u\0m\0e\0n\0t\0"), 1024);
+    writeFileSync(join(dir, "old.docx"), doc);
+    await expect(addSource(lib, join(dir, "old.docx"))).rejects.toThrow(/older Word file.*save it as \.docx/);
+    const odd = zipSync({ "word/document.xml": strToU8("<w:document/>") }, { level: 0 });
+    new DataView(odd.buffer).setUint16(8, 99, true); // the part's compression method, in its local header
+    new DataView(odd.buffer).setUint16(odd.length - 22 - (46 + "word/document.xml".length) + 10, 99, true); // and in the central directory
+    writeFileSync(join(dir, "fuzzed.docx"), odd);
+    await expect(addSource(lib, join(dir, "fuzzed.docx"))).rejects.toThrow(/That Word file is damaged or only partly downloaded/);
+    expect(listItems(lib)).toHaveLength(0);
   });
 
   test("a zip bomb (an EPUB, Word, PowerPoint or Excel file that unpacks past a gigabyte) is refused at once, not unpacked (F760)", async () => {
@@ -2493,9 +2760,36 @@ test("office-02: RTF literal bytes use the declared code page", async () => {
   expect(rtfToDoc(new Uint8Array([...new TextEncoder().encode("{\\rtf1\\ansi\\ansicpg1252 "), 0x80, 125])).body).toBe("€\n");
 });
 
-test("office-03: Word equations refuse partial import with an export step", async () => {
+test("office-03: Word equations come in as formulas, inline and on their own line", async () => {
+  // Deep import pass 2026-11-27: a 27,000-word Word book (Apache POI's stress004.docx) was refused whole for its
+  // equations. word-equations.docx (make-word-equations.py, written for Ore) holds Word's equation markup.
+  const item = await addSource(await tempLibrary(), officeFile("word-equations.docx"));
+  expect(item.body).toContain("Retention after a day is $$\\frac{1}{2}$$ and the stability grows as $${S}^{2}$$ with each review.");
+  expect(item.body).toContain("\n$$\nR={e}^{-t/S}\n$$\n");
+  expect(item.body).toContain("\n$$\n\\sum_{i=1}^{n}{{\\alpha}_{i}\\sqrt{t}}=\\left(a+b\\right)\n$$\n");
+  expect(item.body).toContain("That is the whole model.");
+  expect(item.body).not.toContain("ORE0MATH");
+  expect((await addSource(await tempLibrary(), officeFile("word-equation.docx"))).body).toContain("$$E=mc²$$");
+});
+
+test("office-03: an equation followed by a number keeps both, and a math paragraph's equations stay apart (code review)", async () => {
+  const src = unzipSync(readFileSync(officeFile("word-equation.docx")));
+  const xml = strFromU8(src["word/document.xml"]!);
+  const eq = xml.match(/<m:oMath>[\s\S]*?<\/m:oMath>/)![0];
+  src["word/document.xml"] = strToU8(xml.replace(eq, `${eq}<w:r><w:t xml:space="preserve">2 apples</w:t></w:r>`));
+  const path = join(mkdtempSync(join(tmpdir(), "ore-eq-")), "digit.docx");
+  writeFileSync(path, zipSync(src));
+  expect((await addSource(await tempLibrary(), path)).body).toContain("$$E=mc²$$2 apples");
+  expect(ommlToTex(`<m:oMathPara><m:oMath><m:r><m:t>a=b</m:t></m:r></m:oMath><m:oMath><m:r><m:t>c=d</m:t></m:r></m:oMath></m:oMathPara>`)).toBe("\\begin{aligned}a=b \\\\ c=d\\end{aligned}");
+});
+
+test("office-03: a Word equation built from a part Ore can't read refuses the file with an export step", async () => {
   const lib = await tempLibrary();
-  await expect(addSource(lib, officeFile("word-equation.docx"))).rejects.toThrow(/equation.*export.*PDF/i);
+  const src = unzipSync(readFileSync(officeFile("word-equation.docx")));
+  src["word/document.xml"] = strToU8(strFromU8(src["word/document.xml"]!).replace("<m:r><m:t>E=mc²</m:t></m:r>", "<m:unknownPart><m:r><m:t>E</m:t></m:r></m:unknownPart>"));
+  const path = join(mkdtempSync(join(tmpdir(), "ore-eq-")), "odd-equation.docx");
+  writeFileSync(path, zipSync(src));
+  await expect(addSource(lib, path)).rejects.toThrow(/equation.*export.*PDF/i);
   expect(listItems(lib)).toHaveLength(0);
 });
 

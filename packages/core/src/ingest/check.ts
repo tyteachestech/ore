@@ -70,7 +70,7 @@ export function cleanTitle(t: string | undefined, { numbers = false } = {}): str
   const s = t?.replace(/\s+/g, " ").trim();
   if (!s) return undefined;
   if (numbers && /^\d+$/.test(s)) return s;
-  const junk = /^(?:\d+|[\w.-]+\.(?:docx?|pptx?|pdf|dvi|ps|tex|indd|md|txt|pages|key|xlsx?|csv|numbers)|book\s*\d+|sheet\s*\d+|microsoft (?:word|powerpoint) - .*|powerpoint presentation|untitled(?:[ -]+(?:document|presentation|deck|\d+))*|(?:new )?(?:document|presentation|slide)\s*\d*)$/i;
+  const junk = /^(?:\d+|[\w.-]+\.(?:docx?|pptx?|pdf|dvi|e?ps|tex|indd|md|txt|pages|key|xlsx?|csv|numbers|png|jpe?g|tiff?|svg)|arxiv:\S+.*|book\s*\d+|sheet\s*\d+|microsoft (?:word|powerpoint) - .*|powerpoint presentation|untitled(?:[ -]+(?:document|presentation|deck|\d+))*|(?:new )?(?:document|presentation|slide)\s*\d*)$/i;
   return junk.test(s) ? undefined : s;
 }
 
