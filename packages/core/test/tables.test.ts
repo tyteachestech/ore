@@ -249,6 +249,19 @@ describe("PDF tables and formulas (D125)", () => {
     expect((await pdfToDoc(data, climbing)).body).toBe(drawn);
   });
 
+  test("PDF: text at the top of a column that the reader left out of every block is read where it sits, before that column's next block (F745)", async () => {
+    // BERT's page 4: the reader boxed the right column from its second block down, so the first one,
+    // drawn after a block in the left column, followed the whole page and came after Task #2.
+    // columns.pdf draws its right column first; here the reader misses the left column's first line.
+    const whole: Region = { kind: "page", page: 1, box: { l: 0, b: 0, r: 612, t: 792 } };
+    const left: Region = { kind: "text", page: 1, box: { l: 66, r: 300, t: 693, b: 664 }, text: "days" };
+    const right: Region = { kind: "text", page: 1, box: { l: 324, r: 560, t: 716, b: 664 }, text: "Second" };
+    const body = (await pdfToDoc(pdf("columns.pdf"), [whole, left, right])).body;
+    expect(body.indexOf("First, spread")).toBeGreaterThanOrEqual(0);
+    expect(body.indexOf("First, spread")).toBeLessThan(body.indexOf("days, so that"));
+    expect(body.indexOf("as the memory starts to fade.")).toBeLessThan(body.indexOf("Second, test yourself"));
+  });
+
   test("PDF: two headings one after the other stay two, and a page that is one picture and a caption keeps the picture's words in it", async () => {
     const regions = await regionsOf("tables");
     const caption = regions.find((r) => r.kind === "text" && r.text.startsWith("Table 1:"))!;

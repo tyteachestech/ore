@@ -55,7 +55,7 @@ export async function pageDraft(html: string, url: string, opts: { title?: strin
   const y = link ? await fetchYoutube(link, { listen: !!opts.video }).catch((e) => (opts.video ? Promise.reject(e) : null)) : null;
   const title = opts.title ?? w?.title ?? url;
   if (y && (!w || !hasText(w.markdown))) return { type: "youtube", title, url: y.url, author: y.author, published: y.published, body: y.body, source: { ext: "vtt", data: y.vtt } };
-  const article = { type: "article" as const, title, url, author: w!.author, published: w!.published, body: w!.markdown, source: { ext: "html", data: html }, ...(w!.chat ? { chat: w!.chat } : {}) };
+  const article = { type: "article" as const, title, url, author: w!.author, published: w!.published, body: w!.markdown, source: { ext: "html", data: html }, ...(w!.chat ? { chat: w!.chat } : {}), ...(w!.assets ? { assets: w!.assets } : {}) };
   if (!y) return article;
   return { ...article, video: y.url, transcript: y.vtt, body: withTranscript(dropTitle(w!.markdown, title), y.body) };
 }

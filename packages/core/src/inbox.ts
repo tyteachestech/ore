@@ -1,6 +1,6 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, utimesSync } from "node:fs";
 import { basename, join } from "node:path";
-import { deviceName, writeAtomic } from "./fsutil.ts";
+import { deviceName, realNow, writeAtomic } from "./fsutil.ts";
 import { nowIso, ulid } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 
@@ -120,7 +120,7 @@ const removedDir = (lib: Library) => join(paths.inbox(lib), "removed");
 export const KEEP_REMOVED_MS = 24 * 3600_000;
 
 /** Drops removed entries older than a day, with a file's attachment folder. */
-function pruneRemoved(lib: Library, now = Date.now()) {
+function pruneRemoved(lib: Library, now = realNow()) {
   if (!existsSync(removedDir(lib))) return;
   for (const name of readdirSync(removedDir(lib))) {
     const f = join(removedDir(lib), name);
