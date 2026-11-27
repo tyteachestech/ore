@@ -26,3 +26,6 @@ apps/desktop/public/sounds/
 
 # Codex sweep output (bun run sweep)
 codex-out/
+
+# Ore Cloud server data, when run from the repo
+ore-cloud.db*
