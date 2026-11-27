@@ -75,9 +75,18 @@ window.__TAURI_INTERNALS__ = {
       // And which: window.__ORE_INFLIGHT, so a journey left waiting on one can say what it is.
       const call = args.args.slice(0, 2).join(" ");
       (window.__ORE_INFLIGHT ??= []).push(call);
+      // And the last few answered, how long each took and whether it failed: what a journey that timed out was
+      // waiting behind (e2e/harness.ts prints both with every failure).
+      const t0 = performance.now();
+      let failed = false;
       try {
         return await ore(args);
+      } catch (e) {
+        failed = true;
+        throw e;
       } finally {
+        (window.__ORE_LOG ??= []).push(`${call} ${Math.round(performance.now() - t0)} ms${failed ? " failed" : ""}`);
+        if (window.__ORE_LOG.length > 8) window.__ORE_LOG.shift();
         window.__ORE_PENDING--;
         window.__ORE_INFLIGHT.splice(window.__ORE_INFLIGHT.indexOf(call), 1);
         // window.__ORE_AFTER = { highlight: fn }: fn runs once that command's answer is in, after the code awaiting
