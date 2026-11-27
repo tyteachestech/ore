@@ -2,7 +2,7 @@
 // Mac's edits (arriving through iCloud) reach the core. The folder here is a map standing in for the
 // phone shell's file commands (apps/phone/src-tauri/src/lib.rs).
 import { expect, test } from "bun:test";
-import fs, { flush, load, mountDisk, rescan, syncState } from "../src/phone/fs";
+import fs, { fresh, flush, load, mountDisk, rescan, syncState } from "../src/phone/fs";
 
 const P = "/icloud";
 let clock = 1000;
@@ -353,4 +353,35 @@ test("a folder acknowledgment never reuses an indexed time for a newer local edi
   await rescan();
   expect(fs.statSync(p).mtimeMs).toBeGreaterThan(saved);
   expect(fs.readFileSync(p, "utf8")).toBe("delta");
+});
+
+test("a command reads the Mac's newer copy before it writes, so the phone never saves over an edit it hadn't read (F765)", async () => {
+  const p = `${P}/items/b-01/source.md`;
+  mac("items/b-01/source.md", "title: Old\nstatus: inbox\n");
+  await rescan();
+  // The Mac renames it; the phone, on screen, hasn't scanned since. Its next command reads the folder first.
+  mac("items/b-01/source.md", "title: Mac's name\nstatus: inbox\n");
+  await fresh(0);
+  fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace("inbox", "reading"));
+  await flush();
+  expect(folder.get("items/b-01/source.md")!.text).toBe("title: Mac's name\nstatus: reading\n");
+  // What the command read in still counts as a change at the next rescan, so the screens show it.
+  expect(await rescan()).toBe(true);
+  expect(await rescan()).toBe(false);
+});
+
+test("a command never waits on the phone's own upload to read the folder: the scan waits for the next one", async () => {
+  let release!: () => void;
+  applyHook = () => new Promise<void>((r) => (release = r));
+  fs.writeFileSync(`${P}/items/b-01/audio-note.md`, "big");
+  const going = flush();
+  try {
+    const t = Date.now();
+    expect(await fresh(0)).toBe(false);
+    expect(Date.now() - t).toBeLessThan(50);
+  } finally {
+    release();
+    applyHook = null;
+    await going;
+  }
 });
