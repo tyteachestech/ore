@@ -10,9 +10,11 @@ git archive HEAD package.json bun.lock packages/core packages/cloud packages/cli
 ssh "$host" '
   set -eu
   cd /opt/ore/packages/cloud/deploy
-  docker compose --env-file /etc/ore-cloud.env up -d --build --wait
+  # The lock first: the server never runs without it.
   sh firewall.sh
   cp ore-egress.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable -q ore-egress.service
+  # Recreated each time: Caddy would otherwise keep the Caddyfile of the folder just replaced.
+  docker compose --env-file /etc/ore-cloud.env up -d --build --force-recreate --wait
   . /etc/ore-cloud.env
   for i in 1 2 3 4 5 6; do
     curl -fsS "https://$ORE_DOMAIN/health" && echo " Ore Cloud is up at https://$ORE_DOMAIN" && exit 0
