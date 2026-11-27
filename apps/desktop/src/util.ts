@@ -54,11 +54,20 @@ export const DRAFT_MS = 24 * 3600_000;
  *  lasts DRAFT_MS from its last change (`at`). Written a moment after the last change, and at once (flushKept) as
  *  the page is hidden or goes, or the app quits (the shell's "quitting" event: ⌘Q sends the page neither). Each write
  *  puts only its own changes over what is stored, so another window (the quick quiz) keeps its own. */
-export type Kept<V> = { get(id: string): V | undefined; at(id: string): number | undefined; set(id: string, v: V): void; delete(id: string): void };
+export type Kept<V> = { get(id: string): V | undefined; at(id: string): number | undefined; set(id: string, v: V, at?: number): void; delete(id: string): void };
 type Stamped<V> = { v: V; at: number };
+const beforeKeptFlush = new Set<() => void>();
 const flushers = new Set<() => void>();
+/** Lets a screen capture live draft state before the app puts its drafts away. */
+export function beforeFlushKept(capture: () => void) {
+  beforeKeptFlush.add(capture);
+  return () => void beforeKeptFlush.delete(capture);
+}
 /** Writes every kept draft now. */
-export const flushKept = () => flushers.forEach((f) => f());
+export const flushKept = () => {
+  beforeKeptFlush.forEach((capture) => capture());
+  flushers.forEach((flush) => flush());
+};
 if (typeof window !== "undefined") {
   addEventListener("pagehide", flushKept);
   addEventListener("beforeunload", flushKept);
@@ -126,7 +135,7 @@ export function kept<V>(key: string): Kept<V> {
   return {
     get: (id) => live(id)?.v,
     at: (id) => live(id)?.at,
-    set: (id, v) => (m.set(id, { v, at: Date.now() }), changed(id)),
+    set: (id, v, at = Date.now()) => (m.set(id, { v, at }), changed(id)),
     delete: (id) => void (m.delete(id) && changed(id)),
   };
 }

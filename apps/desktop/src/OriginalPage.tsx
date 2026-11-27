@@ -8,9 +8,7 @@ import { PHONE } from "./ore";
 import { CaretLeft, CaretRight } from "./icons";
 import { Working } from "./Working";
 import { lines, passage, type Box } from "./original-match";
-// The CMaps a CJK font names instead of carrying, the ones import reads the text with (F284): without them the
-// page of a Korean, Japanese or Chinese PDF draws blank (F379).
-import { CarriedData } from "../../../packages/core/src/ingest/pdf-data";
+import { pdfData } from "../../../packages/core/src/ingest/pdf-data";
 
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -47,7 +45,7 @@ export default function OriginalPage({ file, page, lit }: { file: string; page: 
     // The bytes are fetched here: pdf.js only fetches http(s) itself, and the app's files come over `asset:`.
     fetch(convertFileSrc(file))
       .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
-      .then((data) => (task = getDocument({ data, BinaryDataFactory: CarriedData, useWorkerFetch: false, useSystemFonts: true })).promise)
+      .then((data) => (task = getDocument({ data, ...pdfData, useSystemFonts: true })).promise)
       .then((d) => !gone && setPdf(d))
       .catch(() => !gone && setError(true));
     return () => {
@@ -79,17 +77,14 @@ export default function OriginalPage({ file, page, lit }: { file: string; page: 
       draft.width = Math.round(view.width);
       draft.height = Math.round(view.height);
       task = pg.render({ canvas: draft, viewport: view });
-      task.promise.then(
-        () => {
-          if (gone) return;
-          c.width = draft.width;
-          c.height = draft.height;
-          c.getContext("2d")?.drawImage(draft, 0, 0);
-          c.dataset.page = String(shown);
-          setDrawn(shown);
-        },
-        () => {},
-      );
+      return task.promise.then(() => {
+        if (gone) return;
+        c.width = draft.width;
+        c.height = draft.height;
+        c.getContext("2d")?.drawImage(draft, 0, 0);
+        c.dataset.page = String(shown);
+        setDrawn(shown);
+      });
     }).catch(() => !gone && setError(true));
     return () => {
       gone = true;

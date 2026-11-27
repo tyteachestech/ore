@@ -420,6 +420,8 @@ async function readHtml(html: string, url: string, min: number): Promise<WebDoc>
     footnoteLists(document as unknown as Document);
     wikiMath(document as unknown as Document);
     pandocMath(document as unknown as Document);
+    // MathML's XML annotations are alternate representations. Defuddle can turn both into one formula.
+    for (const annotation of document.querySelectorAll("math semantics > annotation-xml")) annotation.remove();
     const charts = await drawCharts(document as unknown as Document, html);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document);

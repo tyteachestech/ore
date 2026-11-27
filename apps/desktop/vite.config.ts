@@ -38,6 +38,29 @@ const pixelSkillIcons: Plugin = {
   },
 };
 
+// pdf.js imports these by filename from its wasmUrl when a web view can't run the Wasm decoder.
+const pdfDecoders = ["jbig2", "openjpeg"];
+const pdfFallbacks = new Map(pdfDecoders.map((decoder) => {
+  const name = `${decoder}_nowasm_fallback.js`;
+  return [name, createRequire(import.meta.url).resolve(`pdfjs-dist/wasm/${name}`)];
+}));
+const pdfDecoderFallbacks: Plugin = {
+  name: "pdf-decoder-fallbacks",
+  configureServer(server) {
+    server.middlewares.use("/pdf-decoders", (req, res, next) => {
+      const file = pdfFallbacks.get((req.url ?? "").slice(1));
+      if (!file) return next();
+      res.setHeader("Content-Type", "text/javascript");
+      res.end(readFileSync(file));
+    });
+  },
+  generateBundle() {
+    for (const [name, file] of pdfFallbacks) {
+      this.emitFile({ type: "asset", fileName: `pdf-decoders/${name}`, source: readFileSync(file) });
+    }
+  },
+};
+
 // The iPhone build (ORE_PHONE=1, apps/phone): the same UI with the core running inside the app
 // (src/phone/core.ts), so the Node and Bun modules the core imports get phone stand-ins.
 const PHONE = process.env.ORE_PHONE === "1";
@@ -154,10 +177,21 @@ const ambienceSounds: Plugin = {
 export default defineConfig({
   // The CMaps the core's PDF reader carries (packages/core/src/ingest/pdf-cmaps.ts): files the phone fetches.
   assetsInclude: ["**/*.bcmap"],
+  resolve: {
+    alias: [
+      // Bun's compiler embeds the decoders through the file import. Vite serves their URLs to the same loader.
+      ...pdfDecoders.map((name) => {
+        const file = `pdfjs-dist/wasm/${name}.wasm`;
+        return { find: file, replacement: `${file}?url` };
+      }),
+      ...(PHONE ? phoneAliases : []),
+    ],
+  },
   plugins: [
     react(),
     tailwindcss(),
     pixelSkillIcons,
+    pdfDecoderFallbacks,
     ambienceSounds,
     ...(PHONE ? [dynamicType] : []),
     ...(PHONE ? [phoneLibrary, textImports] : []),
@@ -174,7 +208,6 @@ export default defineConfig({
   // the dev server, which has no CSP, never shows it (e2e/release-check.ts does).
   build: { target: "safari17", outDir: PHONE ? "dist-phone" : "dist", assetsInlineLimit: (file) => (/\.(woff2?|ttf|otf|eot)$/.test(file) ? false : undefined) },
   ...(PHONE && {
-    resolve: { alias: phoneAliases },
     define: {
       "import.meta.env.VITE_PHONE": JSON.stringify("1"),
       global: "globalThis",

@@ -442,6 +442,46 @@ journey("review: a half-typed answer survives quitting the app, for a day", asyn
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: a resumed answer keeps its active time through Esc and quitting", async (page) => {
+  const app = oreCalls(page);
+  const field = page.getByRole("textbox", { name: "Your answer" });
+  const draft = "fluency feels like knowing, so they overrate it";
+  await page.clock.install();
+  await page.reload();
+  try {
+    await startReview(page, /Teaching/);
+    await field.fill(draft);
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await page.clock.fastForward(70_000);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+
+    await page.clock.fastForward("01:00:00");
+    await startReview(page, /Teaching/);
+    await until("the answer is back after Esc", async () => (await field.inputValue()) === draft);
+    await page.clock.fastForward(20_000);
+    await page.evaluate(() => (window as unknown as { __emit: (e: string) => void }).__emit("quitting"));
+    await page.reload();
+    await page.clock.fastForward("01:00:00");
+
+    await startReview(page, /Teaching/);
+    await until("the answer is back after the relaunch", async () => (await field.inputValue()) === draft);
+    await page.clock.fastForward(31_000);
+    await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 3, gaps: [], feedback: "", covered: [true, true] } }));
+    await page.getByRole("button", { name: "Check", exact: true }).click();
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the rating was saved", async () => app.rated.length === 1);
+    const rating = app.calls.find((args) => args[0] === "review");
+    const ms = Number(rating?.find((arg) => arg.startsWith("--elapsed-ms="))?.split("=")[1]);
+    // 121 seconds of answering plus the real time taken by the interactions above.
+    if (!(ms >= 121_000 && ms < 126_000)) throw new Error(`expected 121000–125999 ms of active time, recorded ${ms} ms`);
+    await page.locator(".review-foot").getByRole("button", { name: "Done" }).click();
+    await page.locator(".review").waitFor({ state: "detached" });
+  } finally {
+    await app.undoAll();
+  }
+});
+
 journey("review: the screen reader's summary counts the key points as he has marked them, not as the AI did", async (page) => {
   await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 3, gaps: [], feedback: "", covered: [true, true] } }));
   await startReview(page, /Teaching/);
