@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import { aiStampFor, chooseVendor, runAgent } from "../src/ai/adapter.ts";
 import { aiModel, jobAi, setAiModel, setJobAi } from "../src/ai/models.ts";
+import { loadSkills, skillsFileProblems } from "../src/skills.ts";
 import { tempLibrary } from "./helpers.ts";
 
 // Each AI job can have its own AI (D356): a fake `claude` and a fake `codex` on PATH, each logging what it was run with.
@@ -111,5 +112,23 @@ describe("an AI for each job", () => {
     process.env.ORE_AI = "claude";
     expect(chooseVendor(lib, "grade")).toBe("claude");
     expect(aiModel(lib, "claude", "grade")).toBe("sonnet");
+  });
+
+  // F754: `models:`, `review:` and `ai:` fall back to their defaults when a hand edit gets them wrong, but a
+  // wrong `jobs:` made skills.yaml unreadable, and every screen reads it.
+  test("a hand edit that gets a job's AI wrong leaves that job on the default AI, and the rest of skills.yaml reads", async () => {
+    const lib = await tempLibrary();
+    const file = join(lib.root, "skills.yaml");
+    const base = readFileSync(file, "utf8").replace(/^ai: claude$/m, "ai: codex");
+    writeFileSync(file, base.replace(/^ai: codex$/m, "ai: codex\njobs:\n  grade:\n    ai: gemini\n  tutor:\n    ai: claude"));
+    expect(loadSkills(lib).skills.length).toBeGreaterThan(0);
+    expect(jobAi(lib, "grade")).toBeNull();
+    expect(chooseVendor(lib, "grade")).toBe("codex");
+    expect(chooseVendor(lib, "tutor")).toBe("claude");
+    expect(skillsFileProblems(lib).join(" ")).toContain("jobs.grade");
+    // The shorthand the file's own comment almost shows: a job named with a bare vendor.
+    writeFileSync(file, base.replace(/^ai: codex$/m, "ai: codex\njobs: codex"));
+    expect(chooseVendor(lib, "write")).toBe("codex");
+    expect(skillsFileProblems(lib).join(" ")).toContain("jobs");
   });
 });

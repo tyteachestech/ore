@@ -1,6 +1,6 @@
 import { unzipSync, type UnzipFileFilter, type Unzipped } from "fflate";
 
-/** More than any book, document, deck or workbook unpacks to: past it, a zip is a zip bomb (F753),
+/** More than any book, document, deck or workbook unpacks to: past it, a zip is a zip bomb (F760),
  *  which unpacked a 1.5 MB Word file into 6.6 GB of memory. Reopen if a real source is refused by it. */
 export const MAX_UNZIPPED = 1024 ** 3;
 

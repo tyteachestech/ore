@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { ImportJob } from "./import.ts";
 
-/** Each import runs in a process of its own (F754): it reads files and pages strangers
+/** Each import runs in a process of its own (F761): it reads files and pages strangers
  *  send, and one made to eat memory (a zip bomb) or time (a page that never ends) must take down only
  *  itself, never the server and everyone signed in to it. The process gets a time limit, the first claim
  *  on being killed when memory runs out, and none of the server's secrets. */

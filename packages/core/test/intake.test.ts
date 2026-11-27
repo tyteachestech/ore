@@ -2196,7 +2196,7 @@ describe("import coverage: the grid's small holes", () => {
     }
   });
 
-  test("a zip bomb (an EPUB, Word, PowerPoint or Excel file that unpacks past a gigabyte) is refused at once, not unpacked (F753)", async () => {
+  test("a zip bomb (an EPUB, Word, PowerPoint or Excel file that unpacks past a gigabyte) is refused at once, not unpacked (F760)", async () => {
     // A few hundred bytes whose directory says one part unpacks to 4 GB (files/zip-bomb.zip): unpacked, a
     // 1.5 MB Word file of this kind took the import to 6.6 GB of memory. fflate allocates the declared sizes.
     const zip = readFileSync(file("zip-bomb.zip"));
@@ -2209,7 +2209,7 @@ describe("import coverage: the grid's small holes", () => {
     }
   });
 
-  test("a Word file whose parts unpack past the sizes they declare is refused as damaged, never unpacked past them (F753)", async () => {
+  test("a Word file whose parts unpack past the sizes they declare is refused as damaged, never unpacked past them (F760)", async () => {
     // Mammoth unpacks a part however big it really is; it is handed only what unzip() unpacked.
     const docx = new Uint8Array(readFileSync(file("notes.docx")));
     const view = new DataView(docx.buffer, docx.byteOffset, docx.byteLength);

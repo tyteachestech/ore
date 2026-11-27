@@ -6,7 +6,7 @@ import { accounts, session, type Auth } from "../src/auth.ts";
 import { isolated } from "../src/isolate.ts";
 import { inProcess, makeHandler, unsafeTools } from "../src/server.ts";
 
-// Each import runs in a process of its own (F754): a hostile file that eats memory or
+// Each import runs in a process of its own (F761): a hostile file that eats memory or
 // time takes only its own process down, never the server and everyone signed in to it.
 const script = (body: string) => {
   const p = join(mkdtempSync(join(tmpdir(), "ore-worker-")), "w.ts");
@@ -69,7 +69,7 @@ test("a file and the files beside it reach the import's process whole, and come 
   expect(there).toEqual(files(await inProcess(job)));
 });
 
-test("one account runs two imports at once and 120 an hour; the server four at once (F755)", async () => {
+test("one account runs two imports at once and 120 an hour; the server four at once (F762)", async () => {
   const auth: Auth = { audience: [], secret: "s".repeat(32), keys: async () => [], accounts: accounts(":memory:") };
   const waits: (() => void)[] = [];
   let entered: () => void = () => {};
@@ -111,7 +111,7 @@ test("the hourly count: an account's 121st import in an hour waits, and a reques
   expect((await send()).status).toBe(429);
 });
 
-test("the server won't start where yt-dlp is installed: it opens links itself, past the guard on private addresses (F756)", () => {
+test("the server won't start where yt-dlp is installed: it opens links itself, past the guard on private addresses (F763)", () => {
   const bin = mkdtempSync(join(tmpdir(), "ore-tools-"));
   const path = process.env.PATH;
   try {

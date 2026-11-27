@@ -58,7 +58,7 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
     if (headings !== xml) files[path] = strToU8(headings);
   }
   // Always the parts unzip() unpacked, never the file itself: mammoth unpacks a part however big it really is
-  // (F753), and unzip() stopped each at the size it declared.
+  // (F760), and unzip() stopped each at the size it declared.
   const converted = zipSync(files);
   // Node's build of mammoth takes a Buffer; its browser build (the iPhone app) takes the bytes themselves.
   const input = (typeof Buffer !== "undefined" ? { buffer: Buffer.from(converted) } : { arrayBuffer: converted.buffer.slice(converted.byteOffset, converted.byteOffset + converted.byteLength) }) as { buffer: Buffer };
