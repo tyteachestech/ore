@@ -29,11 +29,28 @@ export let LIB = process.env.ORE_LIBRARY ?? "";
 /** Where the app answers, once the run has started it. */
 export let url = "";
 
+/** A dev server that bundles a dependency late reloads every page it serves, cutting the open journey's `ore`
+ *  calls (WebKit: a fetch refused "due to access control checks", F749). It does that when its scan of the
+ *  imports fails, so a scan that fails or a reload fails the run, naming what vite said. */
+function watchVite(vite: { stdout: ReadableStream<Uint8Array>; stderr: ReadableStream<Uint8Array> }) {
+  const late = /Failed to run dependency scan|new dependencies optimized|optimized dependencies changed|reloading/i;
+  for (const stream of [vite.stdout, vite.stderr])
+    void (async () => {
+      let rest = "";
+      for await (const chunk of stream) {
+        const lines = (rest + new TextDecoder().decode(chunk)).split("\n");
+        rest = lines.pop() ?? "";
+        for (const l of lines) if (late.test(l)) errors.push(`vite: ${l.trim()}`);
+      }
+    })();
+}
+
 /** The app itself (vite), started once for the whole run: it holds no library, the bridge does. */
 async function app(): Promise<() => void> {
   if (process.env.E2E_URL) return (url = process.env.E2E_URL), () => {};
   // The ambience radio plays plain tones of its own (e2e/sounds), never the sounds on the Mac (D254).
-  const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_SOUNDS: join(import.meta.dir, "sounds") }, stdout: "ignore", stderr: "ignore" });
+  const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_SOUNDS: join(import.meta.dir, "sounds") }, stdout: "pipe", stderr: "pipe" });
+  watchVite(vite);
   url = `http://localhost:${PORT}/`;
   // A cold vite bundles its dependencies before it answers (pdf.js among them, D202), which took over 20 s on a
   // slow runner: the journeys then started against nothing and the first six failed on a refused connection.
@@ -110,7 +127,8 @@ async function phoneApp(): Promise<string> {
   if (phoneVite) return phoneVite.url;
   if (!phoneOwn) await phoneLibrary();
   const port = Number(process.env.ORE_E2E_PHONE_PORT ?? PORT + 2);
-  const vite = Bun.spawn(["bunx", "vite", "--port", String(port), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_PHONE: "1", ORE_PHONE_LIBRARY: PHONE_LIB }, stdout: "ignore", stderr: "inherit" });
+  const vite = Bun.spawn(["bunx", "vite", "--port", String(port), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_PHONE: "1", ORE_PHONE_LIBRARY: PHONE_LIB }, stdout: "pipe", stderr: "pipe" });
+  watchVite(vite);
   const url = `http://localhost:${port}/`;
   let up = false;
   for (let i = 0; i < 150 && !up; i++) {
