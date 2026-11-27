@@ -4,7 +4,7 @@
 // an optional preamble.md and a <name>-prompt.md per tester. In those, {{mac}} {{bridge}} {{phone}} {{webkit}}
 // {{library}} {{phoneLibrary}} {{out}} become this run's ports and folders. For each tester it seeds a scratch
 // library and a phone copy, serves the release build under its CSP with a bridge, serves the phone build, and starts
-// Codex once the Mac load check passes (mac-load.ts: at most two testers, a big library alone). It stops each
+// Codex once the Mac load check passes (mac-load.ts: at most three testers, each two minutes after the last, a big library alone). It stops each
 // tester's servers when that tester ends, and everything it started when the run ends or is stopped.
 // Output: codex-out/<name>/ (Codex writes report.md there), codex-out/<name>.log, codex-out/logs/, codex-out/done.txt.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -47,9 +47,13 @@ export function fill(text: string, vars: Record<string, string | number>): strin
 /** A tester whose library is bigger than the usual big seed runs with no other tester beside it. */
 export const alone = (t: Tester) => t.seed === "big" && (t.scale ?? 1) > 1;
 
-/** Who starts next: the first waiting tester that fits beside the ones running, or none. */
-export function next(waiting: Tester[], running: Tester[]): Tester | undefined {
-  if (running.some(alone) || running.length >= MAX_TESTERS) return;
+/** How long a tester runs before the next starts: started together, three passed the load check before the first had
+ *  taken its memory (2026-11-26), so the check never saw the load it was there to see. */
+export const STAGGER_MS = 120_000;
+
+/** Who starts next: the first waiting tester that fits beside the ones running, or none. `since`: ms since the last start. */
+export function next(waiting: Tester[], running: Tester[], since = Infinity): Tester | undefined {
+  if (running.some(alone) || running.length >= MAX_TESTERS || (running.length && since < STAGGER_MS)) return;
   return waiting.find((t) => (alone(t) ? running.length === 0 : true));
 }
 
@@ -168,8 +172,9 @@ async function main() {
   };
 
   const waiting = [...testers], running: Tester[] = [], jobs: Promise<void>[] = [];
+  let started = 0;
   while (waiting.length) {
-    const t = next(waiting, running);
+    const t = next(waiting, running, process.env.SWEEP_CODEX ? Infinity : Date.now() - started);
     const why = t && !process.env.SWEEP_CODEX ? check(alone(t), () => {}, running.length) : null;
     if (!t || why) {
       if (why) console.log(`waiting: ${why}`);
@@ -178,6 +183,7 @@ async function main() {
     }
     waiting.splice(waiting.indexOf(t), 1);
     running.push(t);
+    started = Date.now();
     const job = tester(t)
       .then((rc) => `${t.name} exit ${rc}`, (e) => `${t.name} failed: ${e.message}`)
       .then((line) => {

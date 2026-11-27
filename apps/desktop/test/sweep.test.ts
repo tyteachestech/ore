@@ -25,11 +25,12 @@ describe("mac load", () => {
     expect(testers(ps)).toBe(2);
   });
 
-  test("refuses on tight memory, two testers, or a run that must go alone", () => {
+  // Tyler 2026-11-26, after three at once held at 25% free (docs/reviews/2026-11-26-simulated-learner-3x/): three.
+  test("refuses on tight memory, three testers, or a run that must go alone", () => {
     expect(refusal(24, 0)).toContain("24%");
     expect(refusal(null, 0)).toContain("Couldn't read");
-    expect(refusal(80, 2)).toContain("at most 2");
-    expect(refusal(80, 1)).toBeNull();
+    expect(refusal(80, 3)).toContain("at most 3");
+    expect(refusal(80, 2)).toBeNull();
     expect(refusal(80, 1, true)).toContain("alone");
     expect(refusal(80, 0, true)).toBeNull();
   });
@@ -77,13 +78,18 @@ describe("sweep runner", () => {
     expect(fill("page {{mac}}, bridge {{bridge}}, {{unknown}}, { a: 1 }", { mac: 1761, bridge: 1762 })).toBe("page 1761, bridge 1762, {{unknown}}, { a: 1 }");
   });
 
-  test("two testers at most, and a big library alone", () => {
+  test("three testers at most, each two minutes after the last, and a big library alone", () => {
     const t = (name: string, extra: Partial<Tester> = {}): Tester => ({ name, seed: "seed", ...extra });
     const big = t("scale", { seed: "big", scale: 5 });
     expect(alone(big)).toBe(true);
     expect(alone(t("settings", { seed: "big" }))).toBe(false);
     expect(next([t("a"), t("b")], [])?.name).toBe("a");
-    expect(next([t("c")], [t("a"), t("b")])).toBeUndefined();
+    expect(next([t("d")], [t("a"), t("b"), t("c")])).toBeUndefined();
+    // Started together, all three passed the load check before the first had taken its memory (2026-11-26):
+    // the next waits until the last has run two minutes, so the check sees what it took.
+    expect(next([t("b")], [t("a")], 119_000)).toBeUndefined();
+    expect(next([t("b")], [t("a")], 120_000)?.name).toBe("b");
+    expect(next([t("c")], [t("a"), t("b")], 120_000)?.name).toBe("c");
     expect(next([big, t("b")], [t("a")])?.name).toBe("b");
     expect(next([big], [])?.name).toBe("scale");
     expect(next([t("b")], [big])).toBeUndefined();
