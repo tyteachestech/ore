@@ -15,7 +15,10 @@ const SAFARI = CLIENTS.mweb!.ua;
 
 // Same order as packages/core/src/ingest/youtube.ts pickTrack: English by people, English auto, else the first.
 const pick = (ts: T[]) => ts.find((t) => t.kind !== "asr" && t.languageCode.startsWith("en")) ?? ts.find((t) => t.kind === "asr" && t.languageCode === "en") ?? ts[0];
-const words = (vtt: string) => vtt.split("\n").filter((l) => l && !l.includes("-->") && !/^(WEBVTT|Kind:|Language:|\d+$)/.test(l)).join(" ").replace(/<[^>]+>/g, "").split(/\s+/).filter(Boolean);
+// Ore's own reading of a VTT (its rolling auto captions collapsed), when run inside a checkout.
+const ore = await import(`${process.env.ORE ?? process.env.HOME + "/Developer/ore"}/packages/core/src/ingest/youtube.ts`).catch(() => undefined);
+const rawWords = (vtt: string) => vtt.split("\n").filter((l) => l && !l.includes("-->") && !/^(WEBVTT|Kind:|Language:|\d+$)/.test(l)).join(" ").replace(/<[^>]+>/g, "").split(/\s+/).filter(Boolean);
+const words = (vtt: string): string[] => (ore ? ore.vttWords(vtt).map((w: { w: string }) => w.w) : rawWords(vtt));
 function same(a: string[], b: string[]) {
   const n = Math.max(a.length, b.length);
   if (!n) return 1;
@@ -26,7 +29,7 @@ function same(a: string[], b: string[]) {
 
 async function vttOf(t: T | undefined, ua: string) {
   if (!t) return { status: "no-track" as const };
-  const u = new URL(t.baseUrl);
+  const u = new URL(t.baseUrl, "https://www.youtube.com");
   u.searchParams.set("fmt", "vtt");
   const r = await fetch(u, { headers: { "User-Agent": ua } });
   const body = await r.text();
@@ -81,7 +84,7 @@ for (const id of ids) {
       const got = await run();
       const v = got.tracks ? await vttOf(pick(got.tracks), got.ua) : { status: "none" };
       const w = "vtt" in v && v.vtt ? words(v.vtt) : [];
-      console.log(JSON.stringify({ id, method: name, http: got.http, playability: got.playability, reason: got.reason, error: got.error, tracks: got.tracks?.length, capStatus: v.status, bytes: (v as any).bytes, lang: (v as any).lang, kind: (v as any).kind, words: w.length, ytdlpWords: refWords.length, sameAsYtdlp: ref ? same(w, refWords) : null, identical: ref ? (v as any).vtt === ref.vtt : null, ms: Math.round(performance.now() - t0) }));
+      console.log(JSON.stringify({ id, method: name, http: got.http, playability: got.playability, reason: got.reason, error: got.error, tracks: got.tracks?.length, capStatus: v.status, bytes: (v as any).bytes, lang: (v as any).lang, kind: (v as any).kind, words: w.length, ytdlpWords: refWords.length, sameAsYtdlp: ref ? same(w, refWords) : null, identical: ref ? (v as any).vtt === ref.vtt : null, sameBody: ref && ore && (v as any).vtt ? ore.vttToBody((v as any).vtt) === ore.vttToBody(ref.vtt) : null, head: process.env.HEAD && (v as any).vtt ? (v as any).vtt.slice(0, 400) : undefined, refHead: process.env.HEAD && ref ? ref.vtt.slice(0, 400) : undefined, ms: Math.round(performance.now() - t0) }));
     } catch (e) {
       console.log(JSON.stringify({ id, method: name, error: String(e) }));
     }
