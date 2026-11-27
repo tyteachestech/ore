@@ -133,7 +133,7 @@ export { paddleHome, paddlePath } from "./paddle-path.ts";
  *  fetches the models). On Apple silicon the model runs in mlx-vlm's server, started here on a free
  *  port and stopped after: one request at a time, since mlx-vlm 0.8.0 garbles pages read side by side.
  *
- *  Boxes first (D-new-boxes-first): the layout model finds every page's blocks, and the reading model
+ *  Boxes first (D357): the layout model finds every page's blocks, and the reading model
  *  reads only what the PDF has no words of its own for: a table, a formula, and any block of text with
  *  none in its box (a scanned page's, a caption that is a picture, every block of a page turned on its
  *  side). A block of text the PDF has words for keeps them, which is what `swapRegions` in pdf.ts uses
@@ -254,7 +254,7 @@ export async function removePaddle(): Promise<void> {
 }
 
 /** Reads a PDF with PaddleOCR-VL and returns its pages. About 1.6 s a page on Apple silicon where the PDF
- *  has its own text and about 6 s where it is a scan (D-new-boxes-first), so it runs
+ *  has its own text and about 6 s where it is a scan (D357), so it runs
  *  in the background after the PDF is added, never while he waits to open it. */
 export async function runPaddle(pdf: string, bin = paddlePath()): Promise<PaddlePage[]> {
   if (!bin) throw new Error("The PDF page reader isn't installed. Get it in Settings › AI.");

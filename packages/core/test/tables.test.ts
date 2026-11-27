@@ -308,7 +308,7 @@ describe("PDF tables and formulas (D125)", () => {
     expect(mixed).toContain("the last one.\n\nFigure 2: a screenshot.");
   });
 
-  test("PDF: on a page with its own text, what the reader wrote in a block of prose or a heading changes nothing, so it is not asked to read them (D-new-boxes-first)", async () => {
+  test("PDF: on a page with its own text, what the reader wrote in a block of prose or a heading changes nothing, so it is not asked to read them (D357)", async () => {
     // The driver sends the reading model only tables, formulas, scans and captions with no text; this is the
     // rule that makes that safe. If the doc ever takes a prose block's words from the reader, this fails first.
     const pages = JSON.parse(readFileSync(join(FIX, "tables.paddle.json"), "utf8")) as PaddlePage[];
