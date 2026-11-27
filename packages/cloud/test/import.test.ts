@@ -4,7 +4,17 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { CASES } from "../../core/test/golden-cases.ts";
 import { importJob } from "../src/import.ts";
-import { handle } from "../src/server.ts";
+import { accounts, session, type Auth } from "../src/auth.ts";
+import { makeHandler } from "../src/server.ts";
+
+// Signed in (auth.test.ts covers who may): every request here carries a session.
+const auth: Auth = { audience: [], secret: "s".repeat(32), keys: async () => [], accounts: accounts(":memory:") };
+const serverHandle = makeHandler(auth);
+auth.accounts.signIn("001.test");
+const handle = async (req: Request) => {
+  req.headers.set("authorization", `Bearer ${await session("001.test", auth)}`);
+  return serverHandle(req);
+};
 
 // Ore Cloud's import (#549): what the server reads must be what the Mac reads, byte for byte, so the
 // server can never drift from the Mac. Every golden source goes through the server and is compared with
