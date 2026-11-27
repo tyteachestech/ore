@@ -1,6 +1,6 @@
 # PDF page reader: boxes first
 
-The comparison behind D-new-boxes-first (2026-11-27): the reading model on every block (D346 as built) against the reading model only on tables, formulas, scanned pages and captions with no text of their own.
+The comparison behind D-new-boxes-first (2026-11-27): the reading model on every block (D346 as built) against the reading model only on tables, formulas, scanned pages and captions with no text of their own. The driver that shipped (`DRIVER` in `packages/core/src/ingest/paddle.ts`) decides per block: plain text is read only where the PDF has no words in its box.
 
 - `boxes_first.py` reads PDFs page by page in either mode (`all`, `boxes`) and writes the driver's pages JSON with seconds and model calls per page.
 - `layout_only.py` times PP-DocLayoutV3 alone on a CPU.

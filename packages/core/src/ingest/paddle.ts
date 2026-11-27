@@ -134,26 +134,29 @@ export { paddleHome, paddlePath } from "./paddle-path.ts";
  *  port and stopped after: one request at a time, since mlx-vlm 0.8.0 garbles pages read side by side.
  *
  *  Boxes first (D-new-boxes-first): the layout model finds every page's blocks, and the reading model
- *  reads only the ones Ore takes its words from, as `swapRegions` in pdf.ts does: a table, a formula,
- *  every block of a page with no text of its own (a scan), and a caption with none in its box. Every
- *  other block keeps the PDF's own text, which is what Ore uses there anyway, so the reading model's
- *  call for it was thrown away: 909 of 924 calls on 16 PDFs with text. The page is pictured by the
+ *  reads only what the PDF has no words of its own for: a table, a formula, and any block of text with
+ *  none in its box (a scanned page's, a caption that is a picture, every block of a page turned on its
+ *  side). A block of text the PDF has words for keeps them, which is what `swapRegions` in pdf.ts uses
+ *  there anyway, so the reading model's call for it was thrown away: about 900 of 924 calls on 16 PDFs
+ *  with text. The page is pictured by the
  *  pipeline's own PDF reader, so its blocks are the ones it finds when handed the whole PDF. */
 export const DRIVER = `
-import json, os, re, signal, socket, subprocess, sys, time
+import json, os, signal, socket, subprocess, sys, time
 signal.signal(signal.SIGTERM, lambda *a: sys.exit(1))  # a stopped read still stops its server
 MODEL = "PaddlePaddle/PaddleOCR-VL-1.6"
-CAPTION = ("figure_title", "vision_footnote")
+PICTURE = ("table", "image", "chart", "seal", "header_image", "footer_image")  # never filled with the PDF's text
 mlx = sys.platform == "darwin" and os.uname().machine == "arm64"
 warm = sys.argv[1] == "--warm"
 srv = None
-cur = {}  # the page being read: its own text, the picture's pixels per point, its height in points
+cur = {}  # the page being read: its own text, the picture's pixels per point, its left and top edges in points
 
 def own(box):
-    """The PDF's own text inside a block's box, which is in the picture's pixels."""
-    s, h = cur["scale"], cur["h"]
-    t = cur["text"].get_text_bounded(left=box[0] / s, bottom=h - box[3] / s, right=box[2] / s, top=h - box[1] / s)
-    return " ".join(t.replace("\\x02", "").replace("\\ufffe", "").split())
+    """The PDF's own text inside a block's box, which is in the picture's pixels. Nothing on a page turned on
+    its side, where the picture's corners are not the page's: every block there is read."""
+    if cur["turned"]: return ""
+    s, l, t = cur["scale"], cur["l"], cur["t"]
+    text = cur["text"].get_text_bounded(left=l + box[0] / s, bottom=t - box[3] / s, right=l + box[2] / s, top=t - box[1] / s)
+    return " ".join(text.replace("\\x02", "").replace("\\ufffe", "").split())
 
 try:
     if warm:
@@ -180,18 +183,19 @@ try:
         collect = inner._paddleocr_vl_collect_page_vlm_entries_core
         def needed(page_idx, blocks, imgs, cfg):
             entries, spotting, drop = collect(page_idx, blocks, imgs, cfg)
-            # An entry is (page, block, picture, prompt, ...): "OCR:" is plain text, a table or a formula has its own prompt.
-            if not cur["scan"]: entries = [e for e in entries if e[3] != "OCR:" or (blocks[e[1]]["label"] in CAPTION and not own(blocks[e[1]]["box"]))]
-            return entries, spotting, drop
+            # An entry is (page, block, picture, prompt, ...): "OCR:" is plain text, a table or a formula has its own
+            # prompt. Plain text the PDF has its own words for is not read, and takes those words below.
+            return [e for e in entries if e[3] != "OCR:" or not own(blocks[e[1]]["box"])], spotting, drop
         inner._paddleocr_vl_collect_page_vlm_entries_core = needed
         render = PDFReaderBackend()
         doc = pdfium.PdfDocument(sys.argv[1])
         pages = []
         for n in range(len(doc)):
             page = doc[n]; img = render._render_page(page, page_index=n + 1); text = page.get_textpage()
-            cur.update(text=text, scale=img.shape[1] / page.get_width(), h=page.get_height(), scan=len(re.findall(r"\\w{2,}", text.get_text_range())) < 5)
+            l, _, _, t = page.get_cropbox()
+            cur.update(text=text, scale=img.shape[1] / page.get_width(), l=l, t=t, turned=page.get_rotation() != 0)
             j = next(iter(pipe.predict(img))).json; j = j.get("res", j)
-            pages.append({"page": n + 1, "width": j["width"], "height": j["height"], "blocks": [{"label": b["block_label"], "content": b["block_content"] or ("" if cur["scan"] or b["block_label"] == "table" or "formula" in b["block_label"] else own(b["block_bbox"])), "bbox": b["block_bbox"]} for b in j["parsing_res_list"]]})
+            pages.append({"page": n + 1, "width": j["width"], "height": j["height"], "blocks": [{"label": b["block_label"], "content": b["block_content"] or ("" if b["block_label"] in PICTURE or "formula" in b["block_label"] else own(b["block_bbox"])), "bbox": b["block_bbox"]} for b in j["parsing_res_list"]]})
         json.dump(pages, open(sys.argv[2], "w"))
 finally:
     if srv: srv.terminate()
