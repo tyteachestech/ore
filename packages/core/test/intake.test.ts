@@ -721,6 +721,20 @@ describe("import coverage: files", () => {
     expect(item.body).toEndWith("````text\n```md\n# Report\n```\n````\n");
   });
 
+  test("notebook: its title from a heading underlined with ===, or a first cell that is one bold line", async () => {
+    // Deep import pass 2026-11-27: Bayesian Methods for Hackers writes "Probabilistic Programming\n=====" and came in
+    // titled by its file name; Hands-On ML opens with "**Chapter 4 – Training Models**" and was titled "Setup".
+    const dir = mkdtempSync(join(tmpdir(), "ore-nb-"));
+    const nb = (cells: string[]) => JSON.stringify({ nbformat: 4, nbformat_minor: 5, metadata: {}, cells: cells.map((s) => ({ cell_type: "markdown", metadata: {}, source: s })) });
+    writeFileSync(join(dir, "ch1.ipynb"), nb(["Probabilistic Programming\n=====\nand Bayesian Methods\n\n##### Version 0.1", "Chapter 1\n======\nThe Philosophy of Bayesian Inference\n------\nA skilled programmer still finds bugs."]));
+    writeFileSync(join(dir, "ch4.ipynb"), nb(["**Chapter 4 – Training Models**", "_This notebook contains the code for chapter 4._", "# Setup\nFirst, import a few modules."]));
+    writeFileSync(join(dir, "plain.ipynb"), nb(["Some **bold** words open this cell, then more of them.", "# Real title\nText."]));
+    const lib = await tempLibrary();
+    expect((await addSource(lib, join(dir, "ch1.ipynb"))).meta.title).toBe("Probabilistic Programming");
+    expect((await addSource(lib, join(dir, "ch4.ipynb"))).meta.title).toBe("Chapter 4 – Training Models");
+    expect((await addSource(lib, join(dir, "plain.ipynb"))).meta.title).toBe("Real title");
+  });
+
   test("subtitles: a timed transcript", async () => {
     const item = await addSource(await tempLibrary(), file("lecture.srt"));
     expect(item.meta.title).toBe("lecture");
