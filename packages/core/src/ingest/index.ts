@@ -746,7 +746,7 @@ async function pastedMarkdown(html: string): Promise<{ title: string; body: stri
 
 /** The name of pasted text with no heading, from its first line. A line that fits (80) is the name. A longer one is
  *  a paragraph: its first sentence when that fits (without its full stop, as a title has none), else its first words
- *  and "…", cut between words (it once stopped inside one, "eac…": F-new-paste-title). A full stop ends a sentence
+ *  and "…", cut between words (it once stopped inside one, "eac…": F758). A full stop ends a sentence
  *  only before a space and a word that doesn't start in lower case, so "1.4" and "e.g. this" don't. Text with no
  *  spaces to cut at is cut at 77, as before. */
 export function nameFromLine(line: string): string {

@@ -35,7 +35,7 @@ describe("menu bar", () => {
   });
 
   // The real menu bar read "Copy link to original" beside "Copy Path", and "Find: filter sources, or search the
-  // open source": the keymap's labels are written for the shortcuts sheet (F-new-menu-wording).
+  // open source": the keymap's labels are written for the shortcuts sheet (F756).
   test("every menu item is worded as a Mac menu item: title case, no explanation after a colon or in brackets", () => {
     const small = new Set(["a", "an", "the", "and", "or", "in", "of", "to", "/"]);
     for (const r of rows()) {

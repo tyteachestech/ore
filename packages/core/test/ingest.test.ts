@@ -118,7 +118,7 @@ describe("ingest", () => {
   });
 
   // Seen in the app: a pasted paragraph was named "Spaced practice beats cramming. When study sessions are spread
-  // over days, eac…", four lines of heading that stop inside a word (F-new-paste-title).
+  // over days, eac…", four lines of heading that stop inside a word (F758).
   test("a pasted paragraph is named by its first sentence, or cut between words, never inside one", async () => {
     const lib = await tempLibrary();
     const a = await addText(lib, "Spaced practice beats cramming. When study sessions are spread over days, each session forces retrieval after some forgetting.");

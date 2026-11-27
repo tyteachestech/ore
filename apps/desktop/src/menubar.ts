@@ -30,7 +30,7 @@ const MENUS: Spec[] = [
 
 /** Menu wording, where the keymap's label is written for the shortcuts sheet (sentence case, with what the key does
  *  after a colon or in brackets): a Mac menu item is in title case and says only its name, and Go's items drop "Go to"
- *  as Finder's do (F-new-menu-wording). `menubar.test.ts` holds every item to it. */
+ *  as Finder's do (F756). `menubar.test.ts` holds every item to it. */
 const LABEL: Partial<Record<KeyId, string>> = {
   settings: "Settings…",
   add: "Add Source…",
