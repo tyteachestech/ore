@@ -858,11 +858,17 @@ export async function run() {
         failed++;
         const shot = join(tmpdir(), `ore-e2e-${name.replace(/\W+/g, "-")}.png`);
         await page?.screenshot({ path: shot }).catch(() => {});
+        // The `ore` calls still out and the last ones answered: a step that timed out behind a slow or failed call
+        // says so, where a screenshot alone left the cause open (F142, F651).
+        const calls = await page?.evaluate(() => {
+          const w = window as unknown as { __ORE_INFLIGHT?: string[]; __ORE_LOG?: string[] };
+          return `ore in flight: ${JSON.stringify(w.__ORE_INFLIGHT ?? [])}; last answered: ${JSON.stringify(w.__ORE_LOG ?? [])}`;
+        }).catch(() => "");
         // The error's first two lines, then the end of Playwright's call log: what was in the way of a click that timed out.
         const lines = (e as Error).message.split("\n").filter((l) => l.trim());
         const log = lines.findIndex((l) => /^\s*Call log/.test(l));
         const why = [...(log < 0 ? lines : lines.slice(0, log)).slice(0, 2), ...(log < 0 ? [] : lines.slice(log + 1).slice(-4))].join("\n      ");
-        console.log(`FAIL  ${name}\n      ${why}${page ? `\n      screenshot: ${shot}` : ""}`);
+        console.log(`FAIL  ${name}\n      ${why}${calls ? `\n      ${calls}` : ""}${page ? `\n      screenshot: ${shot}` : ""}`);
       }
       // A call the app makes as a journey ends (Settings closing, the window taking focus back) was cut off by the
       // close, which WebKit reports as a page error "due to access control checks" (F749): the page closes once no
