@@ -44,7 +44,7 @@ async function ore(args) {
   }
   const port = window.__ORE_BRIDGE || 1421;
   // As the real app reports a missing `ore`: say what is down and how to start it, not "Failed to fetch".
-  const r = await fetch("http://localhost:" + port + "/ore", { method: "POST", body: JSON.stringify({ args: args.args, stdin: args.stdin ?? null, job: args.job ?? null }) }).catch(() => {
+  const r = await fetch("http://localhost:" + port + "/ore", { method: "POST", body: JSON.stringify({ args: args.args, stdin: args.stdin ?? null, job: args.job ?? null, now: Date.now() }) }).catch(() => {
     throw `The mock bridge isn’t answering on port ${port}. Start it: PORT=${port} bun scripts/mock/bridge.ts`;
   });
   const j = await r.json();

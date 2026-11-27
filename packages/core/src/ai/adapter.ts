@@ -4,8 +4,8 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 import type { AiStamp } from "../items.ts";
 import type { Library } from "../library.ts";
-import { loadSkills } from "../skills.ts";
-import { aiModel } from "./models.ts";
+import { loadSkills, type AiJob } from "../skills.ts";
+import { aiModel, JOB_OF } from "./models.ts";
 import { loadPrompt, type PromptName } from "./prompts.ts";
 import { logUsage } from "../usage.ts";
 
@@ -88,12 +88,15 @@ export function codexUsage(stdout: string): Usage {
   return u;
 }
 
-export function chooseVendor(lib: Library): Vendor {
+/** The AI that runs: ORE_AI, else the one he set for this job (`jobs:` in skills.yaml, D356), else
+ *  the library's `ai:`. With no job, the default AI. */
+export function chooseVendor(lib: Library, job?: AiJob): Vendor {
   const env = process.env.ORE_AI;
   if (env === "claude" || env === "codex") return env;
   if (env) throw new Error(`ORE_AI must be claude or codex (got "${env}")`);
   try {
-    return loadSkills(lib).ai ?? "claude";
+    const file = loadSkills(lib);
+    return (job && file.jobs?.[job]?.ai) || file.ai || "claude";
   } catch {
     return "claude";
   }
@@ -442,18 +445,20 @@ export function parseOutput(output: unknown): unknown {
 /** Who will answer a task, before it runs: a reply stopped while it streams still records its vendor, model and
  *  prompt version (F186). The model is the one picked, or the vendor's default when none is. */
 export function aiStampFor(lib: Library, name: PromptName): AiStamp {
-  const vendor = chooseVendor(lib);
-  return { vendor, model: aiModel(lib, vendor) ?? (vendor === "codex" ? codexConfiguredModel() : undefined) ?? `${vendor}-default`, prompt_version: loadPrompt(name).version };
+  const job = JOB_OF[name];
+  const vendor = chooseVendor(lib, job);
+  return { vendor, model: aiModel(lib, vendor, job) ?? (vendor === "codex" ? codexConfiguredModel() : undefined) ?? `${vendor}-default`, prompt_version: loadPrompt(name).version };
 }
 
 // Run one AI task. Invalid output (bad JSON, schema or check failure) is
 // retried once with the error appended; a second failure is an error.
 export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<AgentResult<T>> {
-  const vendor = chooseVendor(lib);
+  const job = JOB_OF[task.prompt];
+  const vendor = chooseVendor(lib, job);
   const prompt = loadPrompt(task.prompt);
   const schema = vendorSchema(task.schema);
   const run = vendor === "claude" ? runClaude : runCodex;
-  const opts: RunOpts = { model: aiModel(lib, vendor), resume: task.session?.id };
+  const opts: RunOpts = { model: aiModel(lib, vendor, job), resume: task.session?.id };
   let message = userMessage(task.input, task.files ?? []);
   let lastError = "";
   let usage: Usage = { input_tokens: 0, output_tokens: 0 };
@@ -506,8 +511,8 @@ export interface ChatRun {
 /** `onProgress` (claude only): the reply so far as it is written, a few times a second, with the session it is
  *  written in, which a run stopped part way never returns (D296). */
 export async function runChatTurn(lib: Library, a: { system: string; message: string; schema: object; session?: string; cwd: string; onProgress?: (p: { reply: string; session: string }) => void }): Promise<ChatRun & { vendor: Vendor }> {
-  const vendor = chooseVendor(lib);
-  const model = aiModel(lib, vendor);
+  const vendor = chooseVendor(lib, "tutor");
+  const model = aiModel(lib, vendor, "tutor");
   if (vendor === "claude") {
     const bin = Bun.which("claude", { PATH: process.env.PATH ?? "" });
     if (!bin) throw new Error("Claude Code isn’t installed (no `claude` on PATH). Install it, or pick Codex in Settings → AI.");

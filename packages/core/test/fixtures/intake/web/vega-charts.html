@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="generator" content="quarto" />
+<title>Forgetting, drawn by day</title>
+</head>
+<body>
+<!-- Written for Ore's intake tests in the markup Altair writes for a chart (the Annotated Transformer's): an empty
+     div, then a script that hands its Vega-Lite spec to vegaEmbed in the browser. -->
+<main>
+<h1 class="title">Forgetting, drawn by day</h1>
+<p>A list of thirty words was read once, then tested on the days after. The share still recalled falls fast at first and then levels off, which is the shape every forgetting study finds when nothing is reviewed in between.</p>
+<pre><code class="python">alt.Chart(recall).mark_line().encode(x="Day:Q", y="Recalled:Q").properties(title="Words recalled by day")</code></pre>
+<div id="altair-viz-0f3a9c1e5b7d4e2a8c6b1d9e0f2a4c6e">
+
+</div>
+<script type="text/javascript">
+  (function(spec, embedOpt){
+    let outputDiv = document.currentScript.previousElementSibling;
+    if (outputDiv.id !== "altair-viz-0f3a9c1e5b7d4e2a8c6b1d9e0f2a4c6e") {
+      outputDiv = document.getElementById("altair-viz-0f3a9c1e5b7d4e2a8c6b1d9e0f2a4c6e");
+    }
+    function displayChart(vegaEmbed) {
+      vegaEmbed(outputDiv, spec, embedOpt).catch(err => outputDiv.innerHTML = String(err));
+    }
+    displayChart(window.vegaEmbed);
+  })({"config": {"view": {"continuousWidth": 400, "continuousHeight": 300}}, "data": {"name": "data-recall"}, "mark": "line", "encoding": {"x": {"type": "quantitative", "field": "Day"}, "y": {"type": "quantitative", "field": "Recalled"}}, "height": 200, "title": "Words recalled by day", "width": 300, "$schema": "https://vega.github.io/schema/vega-lite/v4.8.1.json", "datasets": {"data-recall": [{"Day": 0, "Recalled": 30}, {"Day": 1, "Recalled": 17}, {"Day": 2, "Recalled": 13}, {"Day": 4, "Recalled": 11}, {"Day": 7, "Recalled": 9}]}}, {"mode": "vega-lite"});
+</script>
+<p>Reviewing a word just before it would be lost resets the curve, and each review makes the next fall slower. That is the whole idea behind spacing reviews out.</p>
+<div id="altair-viz-7e1b2d4c6a8f0e3d5b7c9a1e2f4d6b8a">
+
+</div>
+<script type="text/javascript">
+  (function(spec, embedOpt){
+    let outputDiv = document.currentScript.previousElementSibling;
+    vegaEmbed(outputDiv, spec, embedOpt);
+  })({"data": {"values": [{"Review": 1, "Days": 1}, {"Review": 2, "Days": 3}]}, "mark": "squiggle", "encoding": {"x": {"type": "ordinal", "field": "Review"}}, "$schema": "https://vega.github.io/schema/vega-lite/v4.8.1.json"}, {"mode": "vega-lite"});
+</script>
+<p>A chart that would not draw stood above this line, and the last words of the page come after it.</p>
+</main>
+</body>
+</html>

@@ -25,8 +25,11 @@ import * as RadioGroup from "@radix-ui/react-radio-group";
 type Vendor = "claude" | "codex";
 type Review = { goal_minutes: number; weekdays_only: boolean; new_per_day: number; remix: boolean; plan: string; reminder: string };
 /** `problems`: values in skills.yaml Ore left out for their defaults (a hand edit it can't use). */
-type Data = { library: string; ai: Vendor; ai_env: string | null; model: string; model_env: string | null; review: Review; problems?: string[] };
-type Model = { id: string; label: string; description?: string };
+type Job = "tutor" | "grade" | "write" | "ask";
+type JobAi = { ai: Vendor; model: string } | null;
+type Data = { library: string; ai: Vendor; ai_env: string | null; model: string; model_env: string | null; jobs: Record<Job, JobAi>; review: Review; problems?: string[] };
+/** `group`: the heading it sits under in a menu. */
+type Model = { id: string; label: string; description?: string; group?: string };
 
 const SECTIONS = [
   { id: "general", label: "General", icon: GearSix },
@@ -49,6 +52,14 @@ export const newOptions = (now: number) => [...new Set([...NEW, now])].sort((a, 
 const VENDORS: { id: Vendor; label: string }[] = [
   { id: "claude", label: "Claude" },
   { id: "codex", label: "ChatGPT" },
+];
+
+/** The AI's jobs, each of which can run on its own AI (D356). */
+const JOBS: { id: Job; label: string }[] = [
+  { id: "tutor", label: "Tutor" },
+  { id: "grade", label: "Checking answers" },
+  { id: "write", label: "Writing exercises" },
+  { id: "ask", label: "Ask your library" },
 ];
 
 /** Reminder times, every half hour from 6:00 to 22:00. */
@@ -106,16 +117,14 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
     return () => { live = false; };
   }, [changes]);
 
-  // The models to pick from, asked of the provider's own CLI each time Settings opens or the provider
-  // changes, so a new model shows up by itself. Until it answers, the menu shows only the saved pick.
-  const vendor = data?.ai;
-  const [models, setModels] = useState<{ vendor: Vendor; list: Model[] } | null>(null);
+  // The models to pick from, asked of each provider's own CLI each time Settings opens, so a new model
+  // shows up by itself. Until one answers, its menus show only the saved pick.
+  const [models, setModels] = useState<Partial<Record<Vendor, Model[]>>>({});
   useEffect(() => {
-    if (!vendor) return;
     let live = true;
-    ore<Model[]>("models", vendor).then((list) => live && setModels({ vendor, list }), () => live && setModels({ vendor, list: [] }));
+    for (const v of VENDORS) ore<Model[]>("models", v.id).then((list) => live && setModels((m) => ({ ...m, [v.id]: list })), () => live && setModels((m) => ({ ...m, [v.id]: [] })));
     return () => { live = false; };
-  }, [vendor]);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -204,6 +213,17 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
       const r = await ore<Data>("settings", opt("ai", v));
       const now = dataRef.current;
       if (now && now.ai === v && now.model === first) setData((dataRef.current = { ...now, model: r.model }));
+    });
+  };
+  /** One job's own AI and model, or "" for the default above. */
+  const setJob = async (job: Job, value: string): Promise<boolean> => {
+    const d = dataRef.current;
+    if (!d) return false;
+    const was = d.jobs[job];
+    const to = jobOf(value);
+    return setting(`Changed the AI for “${JOBS.find((j) => j.id === job)!.label}”`, (now, on) => ({ ...now, jobs: { ...now.jobs, [job]: on ? to : was } }), (on) => {
+      const own = on ? to : was;
+      return ore("settings", opt("job", job), opt("ai", own?.ai ?? "default"), ...(own ? [opt("model", own.model)] : []));
     });
   };
   const setModel = async (m: string): Promise<boolean> => {
@@ -322,12 +342,27 @@ export function Settings({ section: initial, onClose, notify }: { section?: Sect
                       <SelectMenu
                         label="Model"
                         value={data.model}
-                        options={modelOptions(data, models?.vendor === data.ai ? models.list : null)}
+                        options={modelOptions(data, models[data.ai] ?? null)}
                         disabled={!!data.model_env}
                         onChange={(v) => void setModel(v)}
                       />
                     </Row>
                     {!PHONE && <TablesSetting notify={notify} Row={Row} />}
+                  </Group>
+              )}
+              {data && (
+                  <Group title="By job">
+                    {JOBS.map((j) => (
+                      <Row key={j.id} title={j.label}>
+                        <SelectMenu
+                          label={j.label}
+                          value={jobValue(data.jobs[j.id])}
+                          options={jobOptions(data.jobs[j.id], models)}
+                          disabled={!!data.ai_env}
+                          onChange={(v) => void setJob(j.id, v)}
+                        />
+                      </Row>
+                    ))}
                   </Group>
               )}
             </Tabs.Content>
@@ -617,6 +652,24 @@ function modelOptions(data: Data, list: Model[] | null): Model[] {
   return [saved, ...(list ?? [])];
 }
 
+/** A job's pick as one menu value: "" is the default AI, else `vendor:model`. */
+const jobValue = (own: JobAi) => (own ? `${own.ai}:${own.model}` : "");
+const jobOf = (value: string): JobAi => {
+  const at = value.indexOf(":");
+  return at < 0 ? null : { ai: value.slice(0, at) as Vendor, model: value.slice(at + 1) };
+};
+/** One menu for a job (Raycast's model menu per AI feature): the default, then each provider's models under its name.
+ *  The saved pick always shows, also before its provider's list has come back. */
+function jobOptions(own: JobAi, lists: Partial<Record<Vendor, Model[]>>): Model[] {
+  const all: Model[] = [{ id: "", label: "Default", description: "The provider and model above" }];
+  for (const v of VENDORS) {
+    const list = lists[v.id] ?? [];
+    const mine = own?.ai === v.id && !list.some((m) => m.id === own.model) ? [{ id: own.model, label: own.model || "Codex default" }] : [];
+    all.push(...[...mine, ...list].map((m) => ({ ...m, id: `${v.id}:${m.id}`, group: v.label })));
+  }
+  return all;
+}
+
 /** A pop-up menu like macOS's and Calendar's time menu: the current pick ticked and over the button; an
  *  option's description shows on hover. */
 function SelectMenu({ label, value, options, disabled, onChange }: { label: string; value: string; options: readonly Model[]; disabled?: boolean; onChange: (v: string) => void }) {
@@ -659,7 +712,8 @@ function SelectMenu({ label, value, options, disabled, onChange }: { label: stri
           onKeyDown={(e) => e.key === "Escape" && e.stopPropagation()}
         >
           <DropdownMenu.RadioGroup value={value} onValueChange={(v) => v !== value && onChange(v)}>
-            {options.map((o) => {
+            {options.map((o, i) => {
+              const head = o.group && o.group !== options[i - 1]?.group ? <DropdownMenu.Label key={`in ${o.group}`} className="note-menu-head">{o.group}</DropdownMenu.Label> : null;
               const item = (
                 <DropdownMenu.RadioItem key={o.id || "default"} value={o.id} className="menu-item check" onPointerUp={(e) => performance.now() - opened.current < 300 && e.preventDefault()}>
                   <span className="menu-tick">
@@ -670,7 +724,8 @@ function SelectMenu({ label, value, options, disabled, onChange }: { label: stri
                   <span className="menu-label">{o.label}</span>
                 </DropdownMenu.RadioItem>
               );
-              return o.description ? <Hint key={o.id || "default"} text={o.description} side="left">{item}</Hint> : item;
+              const row = o.description ? <Hint key={o.id || "default"} text={o.description} side="left">{item}</Hint> : item;
+              return head ? [head, row] : row;
             })}
           </DropdownMenu.RadioGroup>
         </DropdownMenu.Content>

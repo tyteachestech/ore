@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { basename, extname, join, resolve, sep } from "node:path";
 import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
-import { deviceName, latestRevs, sha256, subdirs, writeAtomic } from "../fsutil.ts";
+import { deviceName, latestRevs, realNow, sha256, subdirs, writeAtomic } from "../fsutil.ts";
 import { isUlid, nowIso, ulid } from "../ids.ts";
 import { THEIRS_FIRST_MS } from "../inbox.ts";
 import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDir, setItemArchived, sourceFile, updateItemMeta, type Asset, type Item, type ItemMeta, type ItemType, type NewItem } from "../items.ts";
@@ -284,7 +284,7 @@ async function pageSection(html: string, url: string | undefined, title: string)
   const w = await (await import("./web.ts")).htmlToDoc(html, url ?? "about:blank");
   const { body, assets } = await saveImages(dropTitle(w.markdown, title), { referer: url });
   if (!body.trim()) throw new Error("Found no text on the page to add.");
-  return { text: `${PAGE_HEADING}\n\n${body.trim()}\n`, assets };
+  return { text: `${PAGE_HEADING}\n\n${body.trim()}\n`, assets: [...(w.assets ?? []), ...assets] };
 }
 /** The section after a body, a blank line between them. */
 const below = (body: string, section: string) => `${body.endsWith("\n") ? "" : "\n"}\n${section}`;
@@ -696,7 +696,10 @@ export async function addText(lib: Library, text: string, opts: AddOptions & { h
   // The same paste again is the source already here, whether or not its images were saved the first time.
   const before = sameText(lib, md.body.trim() + "\n");
   if (before) return keep(lib, before, opts);
-  const { body, assets } = await saveImages(md.body.trim() + "\n");
+  const saved = await saveImages(md.body.trim() + "\n");
+  const body = saved.body;
+  // A pasted page's charts, drawn as it was read (F744), beside the images it shows.
+  const assets = [...((draft?.assets) ?? []), ...saved.assets];
   const same = sameText(lib, body);
   if (same) return keep(lib, same, opts);
   const first = (body.split("\n").find((l) => VISIBLE.test(l)) ?? "").replace(/\p{Cf}/gu, "").replace(/^#+\s*/, "");
@@ -708,7 +711,7 @@ export async function addText(lib: Library, text: string, opts: AddOptions & { h
 
 /** Pasted HTML as a Markdown source, its paste kept whole as the original (source.html), which a
  *  reimport reads the same way. */
-async function pastedDraft(html: string): Promise<{ title: string; author?: string; published?: string; body: string; source: { ext: "html"; data: string } }> {
+async function pastedDraft(html: string): Promise<{ title: string; author?: string; published?: string; body: string; assets?: Asset[]; source: { ext: "html"; data: string } }> {
   // The clipboard holds only the selection's tags (`<meta charset><h1>…`), which a page reader can't place.
   const page = /<body[\s>]/i.test(html) ? html : `<!doctype html><html><head><meta charset="utf-8"></head><body>${html.replace(/^\s*<meta[^>]*>/i, "")}</body></html>\n`;
   return { ...(await pastedMarkdown(page)), source: { ext: "html", data: page } };
@@ -717,7 +720,7 @@ async function pastedDraft(html: string): Promise<{ title: string; author?: stri
 /** The pasted page as Markdown: read as a page is (math, tables, code), or, when that drops much of
  *  its text, converted tag by tag. A code block's own header (ChatGPT's language label and Copy
  *  button) is left out, so the code reads as written. */
-async function pastedMarkdown(html: string): Promise<{ title: string; body: string }> {
+async function pastedMarkdown(html: string): Promise<{ title: string; body: string; assets?: Asset[] }> {
   const { parseHTML } = await import("linkedom");
   const { document } = parseHTML(html);
   for (const pre of document.querySelectorAll("pre")) {
@@ -736,7 +739,7 @@ async function pastedMarkdown(html: string): Promise<{ title: string; body: stri
   const own = (md: string) => md.replace(/^[ \t]*(!\[[^\]\n]*\]\([^)\n]+\))[ \t]*$/gm, "\n$1\n").replace(/\n{3,}/g, "\n\n");
   const { htmlToDoc } = await import("./web.ts");
   const d = await htmlToDoc(page, "file:///pasted", 0).catch(() => null);
-  if (d && wordCount(d.markdown) >= all / 2) return { title: d.title === "file:///pasted" ? "" : d.title, body: own(d.markdown) };
+  if (d && wordCount(d.markdown) >= all / 2) return { title: d.title === "file:///pasted" ? "" : d.title, body: own(d.markdown), assets: d.assets };
   const { td } = await import("./markdown.ts");
   return { title: "", body: own(td.turndown(document.body as unknown as HTMLElement)) };
 }
@@ -823,7 +826,7 @@ function pruneStashes(lib: Library) {
   if (!existsSync(stashRoot(lib))) return;
   for (const id of readdirSync(stashRoot(lib))) {
     if (!statSync(stashes(lib, id)).isDirectory()) continue;
-    for (const s of steps(lib, id)) if (Date.now() - statSync(join(stashes(lib, id), s)).mtimeMs > STASH_MS) rmSync(join(stashes(lib, id), s), { recursive: true, force: true });
+    for (const s of steps(lib, id)) if (realNow() - statSync(join(stashes(lib, id), s)).mtimeMs > STASH_MS) rmSync(join(stashes(lib, id), s), { recursive: true, force: true });
     if (!readdirSync(stashes(lib, id)).length) rmSync(stashes(lib, id), { recursive: true, force: true });
   }
 }

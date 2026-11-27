@@ -160,4 +160,21 @@ describe("doctor", () => {
     expect((await ore(lib.root, ["card", "retire", card.meta.id, "--json"])).code).toBe(0);
     expect((await doctor(lib)).issues.filter((i) => i.path === rel)).toEqual([]);
   });
+  test("ORE_CLOCK_OFFSET_MS runs ore that far ahead, as a tester's moved page clock asks (F739)", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, "# Spacing\n\nSpaced practice beats massed practice.");
+    const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "Q?", answer: "A", rubric: [] });
+    const ahead = 3 * 86_400_000;
+    const r = await ore(lib.root, ["review", card.meta.id, "--rating", "3", "--confidence", "2", "--json"], { env: { ORE_CLOCK_OFFSET_MS: String(ahead) } });
+    expect(r.code).toBe(0);
+    const at = Date.parse(readReviews(lib)[0]!.ts);
+    expect(Math.abs(at - (Date.now() + ahead))).toBeLessThan(60_000);
+  });
+  test("with a moved clock, a file's age and the machine's boot still use the real time, so a lock or a prune never sees a fresh file as days old", async () => {
+    const script = `import "${join(import.meta.dir, "../../cli/src/clock.ts")}"; import { realNow } from "${join(import.meta.dir, "../src/fsutil.ts")}"; console.log(JSON.stringify([Date.now(), realNow()]));`;
+    const p = Bun.spawn(["bun", "-e", script], { env: { ...process.env, ORE_CLOCK_OFFSET_MS: String(3 * 86_400_000) }, stdout: "pipe" });
+    const [shifted, real] = JSON.parse(await new Response(p.stdout).text()) as [number, number];
+    expect(Math.abs(shifted - (Date.now() + 3 * 86_400_000))).toBeLessThan(60_000);
+    expect(Math.abs(real - Date.now())).toBeLessThan(60_000);
+  });
 });
