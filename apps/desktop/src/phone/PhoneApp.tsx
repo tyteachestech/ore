@@ -1,3 +1,4 @@
+import { mergeSourceRows } from "../source-rows";
 // The iPhone shell (phase 0 feel test): the Mac's screens in a phone layout. A drawer for Today, Sources
 // and the skills, as in Obsidian; a source and Review open full screen over it, with a way back.
 // Everything inside the screens is the Mac app's own code.
@@ -656,26 +657,33 @@ export function PhoneApp() {
   const guard = useRef(readGuard()).current;
   /** A change to the lists he can take back (change.ts): its writes count against the lists' reads, and the lists
    *  are read again once its newest write settles. */
-  const listChange = (c: Change) => change(notify, { out: guard.writing, settled: () => void refresh(), ...c }).then((ok) => (ok || reread(), ok));
+  const listChange = (c: Change) => change(notify, { out: guard.writing, settled: () => void refresh(c.sources), ...c }).then((ok) => (ok || reread(), ok));
   /** A read let go for a write that then failed: that change reads nothing again (change.ts), so this does. */
   const missed = useRef(false);
   const reread = () => void (missed.current && refresh());
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (sources?: readonly string[]) => {
+    // An overlapping or rejected read may cover other rows: finish with a full read in that case.
+    const ids = sources?.length && !missed.current ? sources : undefined;
+    missed.current = true;
     const read = guard.begin();
     try {
-      const [all, sk, w] = await Promise.all([ore<Item[]>("ls"), ore<Skill[]>("skills"), ore<Waiting[]>("inbox")]);
+      const [all, sk, w, gone] = await Promise.all([
+        ore<Item[]>("ls", ...(ids ? ["--ids", ids.join(",")] : [])), ore<Skill[]>("skills"), ore<Waiting[]>("inbox"),
+        !ids && tabNow.current === "archive" ? ore<Item[]>("ls", "--archived") : undefined,
+      ]);
       // The links waiting are no list a change shows ahead of its write: the newest read of them lands.
       if (read.newest()) setWaiting(w.filter((l) => !removing.current.has(l.id)));
+      if (!read.newest()) return;
       if ((missed.current = !read.lands())) return;
-      setItems(all);
+      if (ids) {
+        setItems((before) => mergeSourceRows(before, all, ids, false));
+        setArchived((before) => mergeSourceRows(before, all, ids, true));
+      } else setItems(all);
       setSkills(sk);
       void shareSkills(sk.filter((k) => !k.archived));
       setError(null);
-      // The Archive list, only while it shows: listed twice on every change otherwise.
-      if (tabNow.current === "archive") {
-        const gone = await ore<Item[]>("ls", "--archived");
-        if (read.lands()) setArchived(gone);
-      }
+      // A full read loads Archive only while it shows; targeted rows update either list above.
+      if (gone) setArchived(gone);
     } catch (e) {
       if (read.newest()) setError(errorText(e));
       // A library that can't be listed can't say the saved source is gone: its reader opens and says what is

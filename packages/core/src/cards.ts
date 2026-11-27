@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.ts";
@@ -115,9 +115,14 @@ export function cardFiles(lib: Library): string[] {
 }
 
 /** Every card, once per id: a copy iCloud or Finder made ("<id> 2.md") is left out for the file named
- *  by the id; `ore doctor` names the copy. */
-export function listCards(lib: Library): Card[] {
-  const cards = readable(cardFiles(lib), readCardFile);
+ *  by the id; `ore doctor` names the copy. With `item`, only that source's exercises are read after syncing
+ *  their disposable membership cache (file metadata is still checked so hand edits are noticed). */
+export function listCards(lib: Library, item?: string): Card[] {
+  if (item !== undefined) return sourceCards(lib, item);
+  return uniqueCards(readable(cardFiles(lib), readCardFile));
+}
+
+function uniqueCards<T extends { path: string; meta: { id: string } }>(cards: T[]): T[] {
   const own = new Set(cards.filter((c) => c.path.endsWith(`${c.meta.id}.md`)).map((c) => c.meta.id));
   const seen = new Set<string>();
   return cards.filter((c) => {
@@ -125,6 +130,38 @@ export function listCards(lib: Library): Card[] {
     seen.add(c.meta.id);
     return true;
   });
+}
+
+// A separate, disposable membership index: the search index deliberately omits renamed card files,
+// while listCards has always read them. Keep the same ordering and duplicate winner as that reader.
+const Membership = z.object({
+  version: z.literal(1),
+  files: z.array(z.object({ path: z.string(), mtime: z.number(), ctime: z.number().optional(), size: z.number(),
+    meta: z.object({ id: z.string(), item: z.string() }).nullable() })),
+});
+type MembershipFile = z.infer<typeof Membership>["files"][number];
+
+function sourceCards(lib: Library, item: string): Card[] {
+  const cache = join(lib.root, ".index", "cards-by-source.json");
+  let previous: MembershipFile[] = [];
+  try { previous = Membership.parse(JSON.parse(readFileSync(cache, "utf8"))).files; } catch { /* rebuild */ }
+  const known = new Map(previous.map((f) => [f.path, f]));
+  const parsed = new Map<string, Card>();
+  const files = readable(cardFiles(lib), (path): MembershipFile => {
+    const stat = statSync(path);
+    const fingerprint = { path, mtime: stat.mtimeMs, ctime: stat.ctimeMs, size: stat.size };
+    const had = known.get(path);
+    if (had && had.mtime === fingerprint.mtime && had.ctime === fingerprint.ctime && had.size === fingerprint.size) return had;
+    const card = readable([path], readCardFile)[0];
+    if (card) parsed.set(path, card);
+    return { ...fingerprint, meta: card ? { id: card.meta.id, item: card.meta.item } : null };
+  });
+  if (JSON.stringify(files) !== JSON.stringify(previous)) {
+    // Cache failures never prevent reading canonical files. A later call simply rebuilds it.
+    try { writeAtomic(cache, JSON.stringify({ version: 1, files })); } catch { /* disposable */ }
+  }
+  const members = uniqueCards(files.filter((f): f is MembershipFile & { meta: NonNullable<MembershipFile["meta"]> } => f.meta !== null));
+  return readable(members.filter((f) => f.meta.item === item).map((f) => f.path), (path) => parsed.get(path) ?? readCardFile(path));
 }
 
 export function findCard(lib: Library, ref: string): Card {

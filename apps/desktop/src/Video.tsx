@@ -1,3 +1,4 @@
+import { bufferingState } from "./video-stall";
 import { Pause, Play } from "./icons";
 import { resizeDrag } from "./drag";
 import * as Popover from "@radix-ui/react-popover";
@@ -98,6 +99,14 @@ export function useYouTube(video: string | undefined, id: string): Player {
   useEffect(() => {
     if (!video || !origin) return;
     let heard = false;
+    let buffering: number | null = null;
+    const checkBuffering = () => {
+      const next = bufferingState(buffering, state.current, performance.now(), seekedAt.current);
+      buffering = next.since;
+      // A real YouTube failure keeps its own reason; a stall recovers as soon as playback does.
+      setError((e) => e === null || e === -4 ? (next.stalled ? -4 : null) : e);
+    };
+    const stall = setInterval(checkBuffering, 250);
     const hello = setInterval(() => {
       if (heard) return clearInterval(hello);
       frame.current?.contentWindow?.postMessage(JSON.stringify({ event: "listening", id: 1, channel: "widget" }), origin);
@@ -153,6 +162,7 @@ export function useYouTube(video: string | undefined, id: string): Player {
     // -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued. Only 1 advances the clock.
     const applyState = (s: number) => {
       state.current = s;
+      checkBuffering();
       const on = s === 1;
       if (on) setBlocked(false);
       // Captions off (the transcript below shows the words): the URL's cc_load_policy loses to his
@@ -169,6 +179,7 @@ export function useYouTube(video: string | undefined, id: string): Player {
     window.addEventListener("message", onMessage);
     return () => {
       clearInterval(hello);
+      clearInterval(stall);
       window.removeEventListener("message", onMessage);
     };
   }, [video, origin, post, time, persist]);
@@ -359,6 +370,7 @@ const rateLabel = (r: number) => `${Number(r.toFixed(2))}x`;
 
 const ERRORS: Record<number, string> = {
   [-1]: "The app’s video player could not start. Quit and reopen Ore, or watch it on YouTube.",
+  [-4]: "The video has stopped to buffer. Check your internet connection; playback resumes here once YouTube catches up.",
   [-2]: "The video hasn’t loaded. Check your internet connection; the player comes back here once YouTube answers.",
   2: "YouTube rejected this video ID.",
   5: "This video can't play in the app's player.",

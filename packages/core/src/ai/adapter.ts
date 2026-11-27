@@ -127,7 +127,7 @@ function userMessage(input: unknown, files: string[]): string {
 
 const TIMEOUT_MS = 15 * 60_000;
 
-/** Past this a message is piped to claude, not passed as an argument. */
+/** Past this a message is piped to the vendor, not passed as an argument. */
 const ARG_BYTES = 64_000;
 
 interface Exec { stdout: string; stderr: string; code: number; timedOut: boolean }
@@ -416,17 +416,19 @@ async function runCodex(system: string, message: string, schema: object, task: A
   const schemaPath = join(dir, "schema.json");
   const outPath = join(dir, "last-message.json");
   writeFileSync(schemaPath, JSON.stringify(schema));
+  const prompt = resume ? message : `<instructions>\n${system}\n</instructions>\n\n${message}`;
+  const piped = Buffer.byteLength(prompt) > ARG_BYTES;
   const cmd = [
     bin, ...(task.web ? ["--search"] : []), "exec",
     "--json", "--output-schema", schemaPath, "-o", outPath,
     "--skip-git-repo-check", ...(task.session ? [] : ["--ephemeral"]), "-s", "read-only", "-C", task.cwd,
     ...(model ? ["-m", model] : []),
     // A thread picked up again already holds the instructions (as `runChatTurn` resumes one, D61).
-    ...(resume ? ["resume", resume, message] : [`<instructions>\n${system}\n</instructions>\n\n${message}`]),
+    ...(resume ? ["resume", resume] : []), piped ? "-" : prompt,
   ];
   // The schema and last message are scratch files: one folder per run, removed when it ends.
   try {
-    const r = await exec(cmd, task.cwd, task.web && task.onProgress ? (l) => { const p = codexProgress(l); if (p) task.onProgress!(p); } : undefined);
+    const r = await exec(cmd, task.cwd, task.web && task.onProgress ? (l) => { const p = codexProgress(l); if (p) task.onProgress!(p); } : undefined, piped ? prompt : undefined);
     if (r.code !== 0 || !existsSync(outPath)) throw vendorFailure("codex", r);
     const session = task.session ? (resume ?? codexThread(r.stdout)) : undefined;
     if (task.session && !session) throw new Error("codex did not report a thread id");
@@ -517,8 +519,9 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
     const bin = Bun.which("claude", { PATH: process.env.PATH ?? "" });
     if (!bin) throw new Error("Claude Code isn’t installed (no `claude` on PATH). Install it, or pick Codex in Settings → AI.");
     const session = a.session ?? crypto.randomUUID();
+    const piped = Buffer.byteLength(a.message) > ARG_BYTES;
     const cmd = [
-      bin, "-p", a.message,
+      bin, "-p", ...(piped ? [] : [a.message]),
       ...(a.onProgress ? ["--output-format", "stream-json", "--verbose", "--include-partial-messages"] : ["--output-format", "json"]),
       "--json-schema", JSON.stringify(a.schema),
       "--system-prompt", a.system,
@@ -535,7 +538,7 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
       if (!p || !("partial" in p) || Date.now() - last < 50) return;
       const reply = partialReply(p.partial);
       if (reply) (last = Date.now()), a.onProgress!({ reply, session });
-    }));
+    }), piped ? a.message : undefined);
     const out = claudeResult(r, a.onProgress ? streamEvents(r.stdout) : undefined);
     const usage = Object.entries(out.modelUsage ?? {}).sort((x, y) => (y[1].outputTokens ?? 0) - (x[1].outputTokens ?? 0));
     return { vendor, output: out.structured_output ?? out.result, model: usage[0]?.[0] ?? model ?? "claude-default", session };
@@ -547,13 +550,14 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
   const outPath = join(dir, "last-message.json");
   writeFileSync(schemaPath, JSON.stringify(a.schema));
   const message = a.session ? a.message : `<instructions>\n${a.system}\n</instructions>\n\n${a.message}`;
+  const piped = Buffer.byteLength(message) > ARG_BYTES;
   const cmd = [
     bin, "exec", "--json", "--output-schema", schemaPath, "-o", outPath,
     "--skip-git-repo-check", "-s", "read-only", "-C", a.cwd, ...(model ? ["-m", model] : []),
-    ...(a.session ? ["resume", a.session] : []), message,
+    ...(a.session ? ["resume", a.session] : []), piped ? "-" : message,
   ];
   try {
-    const r = await exec(cmd, a.cwd);
+    const r = await exec(cmd, a.cwd, undefined, piped ? message : undefined);
     if (r.code !== 0 || !existsSync(outPath)) throw vendorFailure("codex", r);
     const session = a.session ?? codexThread(r.stdout);
     if (!session) throw new Error("codex did not report a thread id");

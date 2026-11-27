@@ -238,19 +238,20 @@ export const itemCommands: Record<string, Command> = {
   },
 
   ls: {
-    usage: "[--status s] [--skill s] [--topic t] [--archived]   --archived lists only archived sources",
-    options: { status: { type: "string" }, skill: { type: "string" }, topic: { type: "string" }, archived: { type: "boolean" } },
+    usage: "[--status s] [--skill s] [--topic t] [--archived] [--ids id,id]   --archived lists only archived sources; --ids reads named sources, including archived ones",
+    options: { status: { type: "string" }, skill: { type: "string" }, topic: { type: "string" }, archived: { type: "boolean" }, ids: { type: "string" } },
     async run(_, f) {
       const lib = openLibrary();
       const status = oneOf(f.status, ItemStatus.options, "status");
-      const items = listItems(lib, { archived: !!f.archived }).filter(
-        (i) => !isQuestionOnly(i) && (!status || i.meta.status === status) && (!f.skill || i.meta.skills.includes(f.skill as string)) && (!f.topic || i.meta.topics.includes(f.topic as string)),
+      const selected = f.ids === undefined ? listItems(lib, { archived: !!f.archived }) : [...new Set(strs(f.ids))].map((id) => findItem(lib, id));
+      const items = selected.filter(
+        (i) => !i.meta.preview && !isQuestionOnly(i) && (!status || i.meta.status === status) && (!f.skill || i.meta.skills.includes(f.skill as string)) && (!f.topic || i.meta.topics.includes(f.topic as string)),
       );
       const logs = enrichLogs(lib);
       const data = items.map((i) => listedJson(lib, logs, i));
       const text = items.length
         ? table(items.map((i) => [i.meta.id, i.meta.status, i.meta.type, i.meta.enriched_at ? "enriched" : "-", i.meta.title]))
-        : f.archived ? "No archived sources." : status || f.skill || f.topic ? "No sources match."
+        : f.archived ? "No archived sources." : f.ids !== undefined || status || f.skill || f.topic ? "No sources match."
           : listItems(lib, { archived: true }).some((i) => !isQuestionOnly(i)) ? "No sources outside the archive. `ore ls --archived` lists them."
           : "No sources yet. Add one with `ore add <url|path>`.";
       return { data, text };
