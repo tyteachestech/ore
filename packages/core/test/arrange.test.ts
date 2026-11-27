@@ -32,7 +32,7 @@ describe("sidebar layout (arrangeSkills)", () => {
     await expect(arrangeSkills(lib, [{ collection: "A", skills: all.slice(0, 1) }, { collection: "a", skills: all.slice(1) }])).rejects.toThrow("twice");
   });
 
-  test("a layout drawn before the other device added or deleted a skill still saves: the new one keeps its place, the gone one is passed over (F757)", async () => {
+  test("a layout drawn before the other device added or deleted a skill still saves: the new one keeps its place, the gone one is passed over (F-new-stale-skill-layout)", async () => {
     const lib = await tempLibrary();
     await setSkillLook(lib, "ai", { collection: "Work" });
     await setSkillLook(lib, "habits", { collection: "Work" });

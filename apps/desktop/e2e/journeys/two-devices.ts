@@ -14,7 +14,7 @@ const scanDue = (phone: Page) => until("the phone's next command scans the folde
 /** An `ore` command run in the phone's own core, as its screens run them. */
 const phoneOre = (phone: Page, ...args: string[]) => phone.evaluate(async ([core, args]) => (await import(core!)).run(args, null), ["/src/phone/core.ts", args] as const);
 
-journey("two devices: a note line the Mac wrote is kept when the phone, open on that note, types in it before its next scan (F756)", async (mac) => {
+journey("two devices: a note line the Mac wrote is kept when the phone, open on that note, types in it before its next scan (F-new-phone-stale-write)", async (mac) => {
   const id = await idOf(AGENTS);
   const phone = await phoneOnMacLibrary();
   try {
@@ -38,7 +38,7 @@ journey("two devices: a note line the Mac wrote is kept when the phone, open on 
   }
 });
 
-journey("two devices: a rename and an archive made on the Mac aren't undone by the phone's next tap on that source (F756)", async (mac) => {
+journey("two devices: a rename and an archive made on the Mac aren't undone by the phone's next tap on that source (F-new-phone-stale-write)", async (mac) => {
   const id = await idOf(STORY);
   const phone = await phoneOnMacLibrary();
   try {
