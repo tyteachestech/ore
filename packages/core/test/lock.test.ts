@@ -60,7 +60,7 @@ test("a lock left before this machine last started is stale, though a new proces
   expect(lockStale(path)).toBe(false);
 });
 
-// F-new-lock-sleep: the real time was performance.timeOrigin + performance.now(), a monotonic clock that stops while
+// F753: the real time was performance.timeOrigin + performance.now(), a monotonic clock that stops while
 // a Mac sleeps. An `ore` that ran across a sleep (an enrich left running as the lid closed) wrote its lock's boot that
 // many seconds early, so every other `ore` took its live lock for one from before a restart and wrote alongside it.
 test("a writer that ran across a sleep keeps its lock: its boot comes from the wall clock, not one that stops in sleep", async () => {

@@ -106,7 +106,7 @@ describe("Ask about this (D61)", () => {
     expect(`claude:${b![b!.indexOf("--resume") + 1]}`).toBe(first.session);
   });
 
-  // F-new-chat-usage: every run's spend goes in usage.jsonl (#547), but Review's Ask about this ran outside runAgent and logged none.
+  // F755: every run's spend goes in usage.jsonl (#547), but Review's Ask about this ran outside runAgent and logged none.
   test("each turn logs what it spent to usage.jsonl, as every other AI run does", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Retrieval practice changes what is stored." });

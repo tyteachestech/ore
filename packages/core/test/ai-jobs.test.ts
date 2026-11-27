@@ -114,7 +114,7 @@ describe("an AI for each job", () => {
     expect(aiModel(lib, "claude", "grade")).toBe("sonnet");
   });
 
-  // F-new-jobs-typo: `models:`, `review:` and `ai:` fall back to their defaults when a hand edit gets them wrong, but a
+  // F754: `models:`, `review:` and `ai:` fall back to their defaults when a hand edit gets them wrong, but a
   // wrong `jobs:` made skills.yaml unreadable, and every screen reads it.
   test("a hand edit that gets a job's AI wrong leaves that job on the default AI, and the rest of skills.yaml reads", async () => {
     const lib = await tempLibrary();

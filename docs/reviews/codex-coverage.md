@@ -28,7 +28,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 5. **Import at real breadth, deep (D122).** The running importer brings one file of each kind as a learner; start from its report and go deep: many files per type read against their source from start to end, EPUB books from his Calibre library, long textbooks, scans with and without the page reader downloaded (#494; refused with the next step when it is missing), and `bun run intake:live` over fifty popular sites. Fixtures for any bug are rewritten or openly licensed (D96).
 6. **Upgrade from an older library, rich.** Sweep 9 found nothing on a small seed with no media, PDF or chats. Redo with a copy of ~/Ore as written by a commit from 11-10, 11-17 and 11-24.
 7. **The real Mac window** (Codex computer use on the installed app). Menu bar, ⌘Q with drafts open (F15), the quick quiz's global shortcut, open at login, the updater relaunching it, drag and paste from Finder, Safari, Preview and Notes. Every tester so far drove a browser page.
-8. **done (this PR)** What merged since the last pass (#542 to #566), read by Claude in the cloud: three bugs fixed test first (a lock's boot read from a clock that stops in sleep, a wrong `jobs:` in skills.yaml blanking every screen, Ask about this missing from usage.jsonl). Left for their own passes: Ore Cloud's server (queue 15, Claude lane), Vega charts on a hostile page (queue 14), the end screen's sounds by ear. Next time, start from the last commit this row names: f9bfe6d.
+8. **done (#570)** What merged since the last pass (#542 to #566), read by Claude in the cloud: three bugs fixed test first (a lock's boot read from a clock that stops in sleep, a wrong `jobs:` in skills.yaml blanking every screen, Ask about this missing from usage.jsonl). Left for their own passes: Ore Cloud's server (queue 15, Claude lane), Vega charts on a hostile page (queue 14), the end screen's sounds by ear. Next time, start from the last commit this row names: f9bfe6d.
 9. **Recover from the library's git history.** Restore a source, a note or a whole day from the snapshots, then see what each screen and the index show.
 10. **A day-long soak.** The Mac open eight hours with background enrichment, many adds, timers: memory growth, stale screens, the midnight turn.
 11. **A11y recheck.** VoiceOver and keyboard only over the whole loop. The last full pass was 11-15; most screens changed since.
@@ -110,7 +110,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 |---|---|---|
 | Slow, missing or failing AI | done | sweep 2 ai, deep scan 3 engine |
 | Codex against Claude, switches mid-job, stamps (D21) | done | deep scan 5 aivendor |
-| An AI per job | partly | merged-since pass 11-27 (reading; F-new-jobs-typo) |
+| An AI per job | partly | merged-since pass 11-27 (reading; F754) |
 | Real AI on real sources | done | learner runs 11-25 and 11-26 |
 | Exercise and grading quality | eval, not a pass | `bun run eval:questions`, `eval:grade` |
 
