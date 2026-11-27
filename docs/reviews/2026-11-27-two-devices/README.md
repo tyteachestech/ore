@@ -13,11 +13,11 @@ Not stood in for: iCloud's own transport (its delay, `.icloud` placeholders, con
 | Each rates a different exercise at once | Both reviews kept (per-device logs, D78.4); both devices show the same due list after a scan |
 | Both rate the same exercise at once | Both reviews kept; replay as deep scan 1 found it (F-rows from #522) |
 | A highlight on each in one source | Both kept (annotation logs are per device) |
-| The Mac writes a note line, then the phone, open on that note and not yet rescanned, types in it | **Lost the Mac's line** (F751) |
+| The Mac writes a note line, then the phone, open on that note and not yet rescanned, types in it | **Lost the Mac's line** (F-new-phone-stale-write) |
 | The Mac renames a source, then the phone opens it (status) | **Title put back** (same row) |
 | The Mac archives a source, then the phone pins it | **Archive undone** (same row) |
 | The Mac adds a skill, then the phone sets the daily goal | **Skill gone** (same row: skills.yaml written whole) |
-| The phone adds a skill, then the Mac moves one in its sidebar (drawn before) | **Move refused**: "layout leaves out "juggling"" (F752) |
+| The phone adds a skill, then the Mac moves one in its sidebar (drawn before) | **Move refused**: "layout leaves out "juggling"" (F-new-stale-skill-layout) |
 | The phone archives a source open in the Mac's Reader, and the reverse | Both keep showing it, as an archived source opened from Archived does; nothing lost |
 | Conflict copies | Not rerun: deep scans 4 and 5 covered them below the screens, and only real iCloud makes them |
 
