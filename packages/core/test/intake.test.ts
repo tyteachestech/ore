@@ -2283,6 +2283,53 @@ describe("import coverage: videos heard from their sound", () => {
 });
 
 // D122: figures and slide pictures come in with the text they illustrate.
+// make-deep-pdfs.py: the PDFs the deep import pass found broken (2026-11-27).
+describe("import coverage: PDF, deep import pass", () => {
+  test("PDF: a scan's text layer set at a slight tilt is the page's text, not margin to drop", async () => {
+    const item = await addSource(await tempLibrary(), file("skewed.pdf"));
+    const tilted = item.body.split("<!-- page 2 -->")[0]!;
+    expect(tilted).toContain("Rivers carry sand from the hills to the sea, a little each day.");
+    expect(tilted).toContain("Maps drawn a century apart show how far a single bend has travelled.");
+  });
+
+  test("PDF: a small table beside the text keeps every row, its header too", async () => {
+    const item = await addSource(await tempLibrary(), file("side-table.pdf"));
+    for (const row of ["Year Bend Shift", "1900 A 12 m", "1950 A 31 m", "2000 A 58 m"]) expect(item.body).toContain(row);
+  });
+
+  test("PDF: a filled form's values come in with their fields", async () => {
+    const item = await addSource(await tempLibrary(), file("form.pdf"));
+    expect(item.body).toContain("Surveyor: Ada Lovelace");
+    expect(item.body).toContain("River: Wye");
+    expect(item.body).toContain("Flooded: ✓");
+  });
+
+  test("PDF: its bookmarks' sections inside a chapter are the source's subheadings", async () => {
+    const item = await addSource(await tempLibrary(), file("nested-outline.pdf"));
+    for (const h of ["## 1 Introduction", "### 1.1 Background", "### 1.2 Aims", "## 2 Method", "### 2.1 Data", "### 2.2 Analysis"]) expect(item.body).toContain(`\n${h}\n`);
+    expect(item.body.match(/<!-- chapter \d+ -->/g)).toHaveLength(2);
+  });
+
+  test("PDF: figures past the 80 it keeps are marked where they were, not lost unsaid", async () => {
+    const item = await addSource(await tempLibrary(), file("many-figures.pdf"));
+    expect(images(item.body)).toHaveLength(80);
+    expect(item.body.match(/\[missing figure: [^\]]+\]/g)).toHaveLength(2);
+    expect(item.body.indexOf("Figure 82 shows")).toBeLessThan(item.body.lastIndexOf("[missing figure"));
+  });
+
+  test("PDF: a metadata title that is a figure's file name (.eps) or arXiv's stamp loses to the page's own", async () => {
+    const item = await addSource(await tempLibrary(), file("eps-title.pdf"));
+    expect(item.meta.title).toBe("Sand Bars and Islands");
+    expect(cleanTitle("arXiv:1508.07909v5 [cs.CL] 10 Jun 2016")).toBeUndefined();
+    expect(cleanTitle("fig_3.EPS")).toBeUndefined();
+  });
+
+  test("PDF: a JPEG 2000 figure is saved like any other", async () => {
+    const item = await addSource(await tempLibrary(), file("jpx.pdf"));
+    expect(images(item.body)).toHaveLength(1);
+  });
+});
+
 describe("import coverage: figures and slide pictures", () => {
   const file = (name: string) => {
     const f = join(mkdtempSync(join(tmpdir(), "ore-fig-")), name);

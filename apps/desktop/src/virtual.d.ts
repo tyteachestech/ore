@@ -13,6 +13,12 @@ declare module "@pkgjs/parseargs" {
   export function parseArgs(config: { args: string[]; options?: object; allowPositionals?: boolean; strict?: boolean }): { values: Record<string, unknown>; positionals: string[] };
 }
 
+// pdf.js's image decoders (packages/core/src/ingest/pdf-data.ts): Vite serves each as a file and hands back its URL.
+declare module "*.wasm" {
+  const url: string;
+  export default url;
+}
+
 // A pdf.js CMap (packages/core/src/ingest/pdf-cmaps.ts): Vite serves it as a file and hands back its URL.
 declare module "*.bcmap" {
   const url: string;
