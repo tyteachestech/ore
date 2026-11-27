@@ -130,6 +130,10 @@ When a sweep's triage is done, add a row per tester here.
 | 11-26 | [simulated learner 3×](2026-11-26-simulated-learner-3x/) commuter | Codex | The 11-25 commuter again, at once with two others | iPhone | 1 | #544 |
 | 11-26 | [simulated learner 3×](2026-11-26-simulated-learner-3x/) newcomer | Codex | A first day on a new subject (transformers): a Quarto article, a video, BERT's PDF, Wikipedia (refused, 429) | both | 3 (1 fixed, 2 open) | #544 |
 | 11-27 | merged since deep scan 5 | Claude | A read of every change from #542 to #566 (AI per job, usage log, the moved clock, Finish's feedback and held questions, Vega charts, PDF order and chapters, Review's away time), red test first for each bug | cloud | 3 (3 fixed) | #570 |
+| 11-27 | [deep import](2026-11-27-codex-deep-import/) web and files | Claude | 86 live pages read against their sites, 357 real Word, PowerPoint and Excel files (Apache POI's test set), 12 notebooks from GitHub, arXiv papers | cloud | 7 (7 fixed) | #567 |
+| 11-27 | [deep import](2026-11-27-codex-deep-import/) books | Codex | 38 EPUBs (his Calibre library read-only, Standard Ebooks, Gutenberg): every word in order against the book, its originals byte for byte, a 2,014-chapter Sanskrit epic | Mac | 7 (7 fixed) | #567 |
+| 11-27 | [deep import](2026-11-27-codex-deep-import/) PDFs | Codex | 26 public PDFs, 5,131 pages: OpenStax textbooks, arXiv papers, MIT slides, scans without the page reader, a filled form | Mac | 9 (7 fixed, 1 the same as the web lane's arXiv, 1 open: F779) | #567 |
+| 11-27 | [deep import](2026-11-27-codex-deep-import/) media | Codex | 31 links: 19 videos with 233,160 caption words compared word by word, TED, Apple episodes, chaptered MP3s | Mac | 5 (5 fixed) | #567 |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 

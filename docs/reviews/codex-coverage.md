@@ -25,7 +25,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 2. **Burn down the open rows.** About twenty `open` rows in `findings.md` need no call from Tyler (F1, F2, F3, F6, F13, F294, F421, F538, F547, F548, F660, F662, F684, F727, F729, F737 among them). Reading scouts write a red script for each, Codex drafts a fix, Claude QAs. The bugs are already known, so every hour goes to fixing.
 3. **done (#564)** Flaky tests are races. Causes found for F142, F347, F348, F397, F516, F575 and a new one in the corners journey (F751); each failing journey now prints the `ore` calls in flight. Still open: F515, F623, F651 (not reproduced under load), F349 and F748 (need Tyler's Mac), and the new office-03 "error: undefined" (F752). A pass on the Mac takes the last two.
 4. **Mac and iPhone writing at once.** Both on one iCloud folder: a rating on each, a note edited on both, Archive on one while the source is open on the other, a conflict copy. Deep scan 1 and 4 did it below the screens; nobody has run both apps.
-5. **Import at real breadth, deep (D122).** The running importer brings one file of each kind as a learner; start from its report and go deep: many files per type read against their source from start to end, EPUB books from his Calibre library, long textbooks, scans with and without the page reader downloaded (#494; refused with the next step when it is missing), and `bun run intake:live` over fifty popular sites. Fixtures for any bug are rewritten or openly licensed (D96).
+5. **done (#567)** Import at real breadth, deep (D122): 86 live pages, 357 Office files, 12 notebooks, 38 EPUBs, 26 PDFs and 31 media links, each read against its original. 26 bugs fixed test first; a scanned page among text pages (F779) left to the learner pass's scanned-PDF fix. Not yet run: PDFs with the page reader downloaded, and listening to what was transcribed. Leads: script-drawn figures (ciechanow.ski), Distill's hidden formula cache, an arXiv margin stamp left in a PDF's text, Speaker Deck just under its word floor, CSS-drawn fractions (mathsisfun), a book's language never saved.
 6. **Upgrade from an older library, rich.** Sweep 9 found nothing on a small seed with no media, PDF or chats. Redo with a copy of ~/Ore as written by a commit from 11-10, 11-17 and 11-24.
 7. **The real Mac window** (Codex computer use on the installed app). Menu bar, ⌘Q with drafts open (F15), the quick quiz's global shortcut, open at login, the updater relaunching it, drag and paste from Finder, Safari, Preview and Notes. Every tester so far drove a browser page.
 8. **done (#570)** What merged since the last pass (#542 to #566), read by Claude in the cloud: three bugs fixed test first (a lock's boot read from a clock that stops in sleep, a wrong `jobs:` in skills.yaml blanking every screen, Ask about this missing from usage.jsonl). Left for their own passes: Ore Cloud's server (queue 15, Claude lane), Vega charts on a hostile page (queue 14), the end screen's sounds by ear. Next time, start from the last commit this row names: f9bfe6d.
@@ -54,13 +54,13 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | Angle | Status | Runs |
 |---|---|---|
 | Web articles | done | sweep 2 intake, sweep 3 hostile, newcomer runs |
-| Web at breadth: fifty live sites | open | queue 5 (`intake:live` exists, never run by a pass) |
-| YouTube and other video | done | sweep 5 media, ux 7, ux 13 |
+| Web at breadth: fifty live sites | done | deep import 11-27 (86 live pages, 4 fixed); left: script-drawn figures, Distill's hidden formula cache, course pages' navigation |
+| YouTube and other video | done | sweep 5 media, ux 7, ux 13, deep import 11-27 media (19 videos word by word; 4 fixed) |
 | Podcasts and audio, recordings | done | sweep 5 media, deep scan 2 media (recording in the learner pass) |
 | PDF papers | done | deep scan 2 media, newcomer 11-26 (BERT) |
-| Long textbooks, scans, the page reader | running | learner days importer (one of each); deep: queue 5 |
-| EPUB books | running | learner days importer (one book); deep: queue 5 |
-| Word, RTF, PowerPoint, Excel, notebooks, Markdown, screenshots | partly | deep scan 5 office (reading only) |
+| Long textbooks, scans, the page reader | partly | deep import 11-27 PDFs (26 files, 5,131 pages; 7 fixed); with the page reader downloaded: not yet run; a scanned page among text pages: F779 |
+| EPUB books | done | deep import 11-27 books (38 books, his Calibre library; 7 fixed); left: real DRM, layout by sight |
+| Word, RTF, PowerPoint, Excel, notebooks, Markdown, screenshots | done | deep scan 5 office (reading only); deep import 11-27 (357 real Office files, 12 notebooks; 3 fixed) |
 | Shared AI chats | done | deep scan 2 chat |
 | Feeds and newsletters | done | sweep 11, deep scan 5 feeds |
 | Courses and playlists | partly | deep scan 5 courses (reading only), ux 8 |

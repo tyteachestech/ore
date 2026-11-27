@@ -20,3 +20,10 @@ for n in books pdfs media; do
   sleep 120
 done
 ```
+
+## Results (2026-11-27)
+The three Codex scouts ran on the Mac, one after another two minutes apart, 30 to 40 minutes each; Claude ran the web, Office and notebook lane in the cloud. Their full reports stayed on the Mac (`codex-out/`, each over 20 KB); every finding is a row in `../findings.md` (the `deep import pass` rows of 11-27) with the test that guards it, and a row per tester is in `../sweeps.md`.
+
+- Books: 38 EPUBs, 7 bugs, all fixed. What passed: every saved original byte for byte, every table of contents entry in spine order, a 2,014-chapter Sanskrit epic in exact order, Arabic, Hebrew and Japanese with its readings.
+- PDFs: 26 files, 5,131 pages, 9 bugs: 7 fixed, one the web lane's arXiv fix already covered, one (a scanned page among text pages) left open for the scanned-PDF fix. The scouts' Mac couldn't run Apple's text recognition in Codex's sandbox, so scans were judged by what was refused.
+- Media: 31 links, 5 bugs, all fixed; a video file now keeps its original (Tyler's pick). Speech to text refused in the sandbox, so captions were compared word by word, not listened to.
