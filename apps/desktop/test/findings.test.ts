@@ -7,7 +7,7 @@ import { join } from "node:path";
 // test that keeps it fixed, which must exist.
 const root = join(import.meta.dir, "../../..");
 // style-check.ts is part of the suite: `bun run e2e` ends with it, and CI fails on its findings.
-const SUITE = ["packages/core/test", "packages/cli/test", "apps/desktop/test", "apps/desktop/e2e", "apps/phone/test", "apps/desktop/scripts/mock/style-check.ts"];
+const SUITE = ["packages/core/test", "packages/cli/test", "packages/cloud/test", "apps/desktop/test", "apps/desktop/e2e", "apps/phone/test", "apps/desktop/scripts/mock/style-check.ts"];
 
 function files(dir: string): string[] {
   let entries;
