@@ -43,6 +43,7 @@ Library: `$ORE_LIBRARY` or `~/Ore`. Cards live in `cards/<id>.md`, items in `ite
 | "I read it", "ask me the prequestions", "pre <item>" | 3 Prequestions |
 | "this card is wrong / too broad / unclear", `fix <card>` | 4 Fix a card |
 | `/ore research <question>` | 5 Research |
+| "bring back…", "get back the old…", "undo what happened to…" | 7 Get something back |
 | anything else about the library | 6 Library questions |
 
 A fix request in the middle of a review runs mode 4, then the review continues with the next item.
@@ -152,3 +153,12 @@ For each chosen number: `ore add <url> --for <question-id> --json` (links the so
 ## 6 · Library questions
 
 Use `ore ls`, `ore search <query>` (also searches the source note), `ore stats [--skill s]`, `ore questions [--skill s]` (his open questions with his answer so far, D47, D75; add to an answer with `ore answer <q> --text "<his words>"`, never in your own words), `ore skills`, `ore cards`, `ore show <item>`, `ore notes <item>`, `ore notes --skill <id>`, `ore backlinks <item>|--skill <id>` (all `--json`). Reading `doc.md`, `annotations.jsonl`, and card files directly is fine for content questions. Writes go through `ore`. Answer briefly; cite item titles, not paths, unless Tyler asks for paths.
+
+## 7 · Get something back
+
+"Bring back yesterday's note", "undo what happened to that source": the library is a local git repo (D5) that `ore` snapshots at most every ten minutes and at every review session's end. Restoring from it is the one hand edit allowed:
+
+1. Commit what is there now (`git add -A && git commit -qm "Before restoring …"`), so the restore can itself be taken back.
+2. Find the snapshot: `git log --format='%h %ad %s' --date=local -- <path>`, then `git show <sha>:<path>` to check it is the version he means.
+3. Restore only the paths he named: `git checkout <sha> -- <path>` (a source is its `items/<yyyy>/<slug>-<id>/` folder; its exercises are the `cards/` files with its id as `item:`). Never `git reset`, `git stash` or a checkout of the whole folder unless he asks for the whole library as it was: the `*.jsonl` logs hold his reviews and highlights from every device, and going back drops the ones since.
+4. `ore doctor --json`; the index reads the restored files by itself, and the app shows them once he is back in its window. Tell him what came back and from when, and that the last ten minutes before a snapshot may not be in it.

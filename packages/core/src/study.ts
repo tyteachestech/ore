@@ -109,7 +109,9 @@ export async function undoReview(lib: Library, cardRef: string, ts: string, now 
     const own = readReviews(lib).filter((r) => r.card === card.meta.id);
     const since = own.filter((r) => r.ts > ts && Date.parse(r.ts) <= now.getTime());
     let at = own.filter((r) => r.ts === ts);
-    if (!at.length || since.length) throw new Error(`the review at ${ts} is not ${card.meta.id}'s latest`);
+    // In his words: the app shows this after "Couldn't undo “Rating”" (a log restored from the history drops ratings).
+    if (!at.length) throw new Error("that rating is no longer in the library");
+    if (since.length) throw new Error("it was rated again after that");
     // Another device rated it in the same millisecond, offline (Codex deep scan 3): the one taken back is the one
     // given here, in this device's own log, and the other stands.
     if (at.length > 1) {
