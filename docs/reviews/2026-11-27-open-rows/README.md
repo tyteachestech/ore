@@ -17,3 +17,6 @@ for n in editor shell perf; do
   sleep 120
 done
 ```
+
+## Result
+Codex drafted 7 fixes; Claude reworked one (`ore ls --ids` now skips a source gone since, so its row drops instead of the list failing), restored a journey a draft's stale base removed, and fixed F737 (one mount pass a frame; probe `F737-scroll-probe.ts`) and guarded F3 (fixed by #495, red in Chromium with its two guards removed). Fixed: F2, F3, F6, F294, F421, F547, F660, F727, F737. Stale: F13. Kept on purpose: F548. Left with a plan in the notes: F1, F662, F729. F684 is drafting from Tyler's pick. The three suite failures the drafters saw on the Mac (two `Bun.serve` binds, one OCR case) come from Codex's sandbox: the whole suite passes in the cloud.
