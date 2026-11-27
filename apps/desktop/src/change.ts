@@ -4,6 +4,8 @@ import { errorText, inOrder, type Notify } from "./util";
 export type Change = {
   /** What the toast, ⌘Z and VoiceOver call it. */
   message: string;
+  /** Source rows this change writes, for a bounded read after it settles. Omitted means a full refresh. */
+  sources?: readonly string[];
   /** "quiet": a small, frequent step, on the history with no toast. */
   kind?: "info" | "quiet";
   /** Puts the change on the screen (true) or takes it off (false), at once, before anything is written. Called

@@ -37,6 +37,7 @@ export const statusArgs = (i: Item, to: Item["status"]) => (to === "done" && i.s
 
 export function sourceActions(env: Lists) {
   const { ore } = env;
+  const change = (c: Change) => env.change({ sources: typeof c.key === "string" ? [c.key] : c.key, ...c });
   const patch = (id: string, to: (i: Item) => Item) => env.items((all) => all.map((i) => (i.id === id ? to(i) : i)));
   /** One field of these sources as it will be (true) or as it was; whatever else changed on a row meanwhile stays. */
   const each = <K extends keyof Item>(sel: Item[], key: K, to: (i: Item) => Item[K]) => {
@@ -59,7 +60,7 @@ export function sourceActions(env: Lists) {
   /** Archives a source (hidden from lists and search, files and exercises kept), or brings one back, with Undo.
    *  Both under the source's key, so an Archive and a Restore of one source are written in the order he made them. */
   const fileAway = (item: Item, archived: boolean) =>
-    env.change({
+    change({
       message: `${archived ? "Archived" : "Restored"} “${item.title}”`,
       key: item.id,
       show: (on) => {
@@ -73,7 +74,7 @@ export function sourceActions(env: Lists) {
 
   /** Moves a source between To read and Done, with Undo (the finish step stays the way to finish one). */
   const moveTo = (item: Item, to: Item["status"]) =>
-    env.change({
+    change({
       message: to === "done" ? `Moved “${item.title}” to Done` : `Moved “${item.title}” to To read`,
       key: item.id,
       // At once, so a swiped row doesn't come back to its old section while the write runs.
@@ -85,7 +86,7 @@ export function sourceActions(env: Lists) {
   const pin = (item: Item) => {
     const was = item.pinned_at;
     const now = was ? undefined : new Date().toISOString();
-    return env.change({
+    return change({
       message: now ? `Pinned “${item.title}”` : `Unpinned “${item.title}”`,
       kind: "quiet",
       key: item.id,
@@ -99,7 +100,7 @@ export function sourceActions(env: Lists) {
     if (from < 0 || to === from) return;
     const rest = pinned.filter((i) => i.id !== item.id);
     const at = pinBetween(rest[to - 1]?.pinned_at, rest[to]?.pinned_at);
-    void env.change({
+    void change({
       message: `Moved “${item.title}”`,
       kind: "quiet",
       key: item.id,
@@ -122,7 +123,7 @@ export function sourceActions(env: Lists) {
     const t = typed.trim();
     if (!t || t === before) return Promise.resolve(true);
     const title = keepNewer(async () => (await ore<Doc>("show", id)).title, (to: string) => ore("edit", id, "--title", to), (now) => `Left as “${now}”: it was renamed since`);
-    return env.change(valueChange({
+    return change(valueChange({
       message: `Renamed to “${t}”`, kind: "quiet", key: id, field: `source ${id} title`, before, after: t,
       show: (shown) => patch(id, (i) => ({ ...i, title: title.newer() ?? shown })),
       write: title.write,
@@ -133,7 +134,7 @@ export function sourceActions(env: Lists) {
   const setImportance = (item: Item, p: Priority | "") => {
     const before = item.priority ?? "";
     const said = p ? LEVELS.find((l) => l.p === p)!.label : item.skills.length ? "same as its skills" : "Normal";
-    return env.change(valueChange<Priority | "">({
+    return change(valueChange<Priority | "">({
       message: `${item.title}: ${said}`,
       kind: "quiet", key: item.id,
       field: `source ${item.id} priority`, before, after: p,
@@ -151,7 +152,7 @@ export function sourceActions(env: Lists) {
     const edit = (skills: string[], cards?: CardSkills) => ore<{ cards_before?: CardSkills } | undefined>("edit", item.id, "--skills", skills.join(","), ...(cards ? [opt("cards", JSON.stringify(cards))] : []));
     // Each exercise gets back its own skills, not every skill the source had (Codex sweep 3): the write says which.
     let cards: CardSkills | undefined;
-    return env.change({
+    return change({
       message: next.includes(changed.id) ? `Filed “${item.title}” under ${changed.name}` : `Removed “${item.title}” from ${changed.name}`,
       slot: `refile:${item.id}`,
       // One source's filings are written in the order he ticked them.
@@ -170,7 +171,7 @@ export function sourceActions(env: Lists) {
    *  each way (a skill a filing brought back). */
   const batch = (message: string, sel: Item[], show: (forward: boolean) => void, write: (i: Item, forward: boolean) => Promise<unknown>, after?: (forward: boolean) => unknown) => {
     const was = env.cursor?.now;
-    return env.change({
+    return change({
       message,
       key: sel.map((i) => i.id),
       show: (forward) => {
@@ -226,9 +227,10 @@ export function sourceActions(env: Lists) {
   const archiveCourse = (c: { id: string; title: string }, lessons: Item[]) => {
     let changed: string[] = [];
     const was = env.cursor?.now;
-    return env.change({
+    return change({
       message: `Archived “${c.title}”`,
       key: [`course ${c.id}`, ...lessons.map((i) => i.id)],
+      sources: lessons.map((i) => i.id),
       show: (on) => {
         away(on || !changed.length ? lessons : lessons.filter((l) => changed.includes(l.id)), on);
         if (!on && was !== undefined) env.cursor!.set(was);

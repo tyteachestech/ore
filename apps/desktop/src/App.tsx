@@ -1,3 +1,4 @@
+import { mergeSourceRows } from "./source-rows";
 import { ranked } from "./match";
 import { Archive, ArrowLeft, ArrowRight, CaretDown, CaretRight, Check, Folder, GraduationCap, Tick, MagnifyingGlass, QuestionMark, SidebarSimple, X } from "./icons";
 import { ThumbLine } from "./Ring";
@@ -336,17 +337,28 @@ export function App() {
   const writing = guard.writing;
   /** A change to the lists he can take back (change.ts): its writes count against the list's reads, and the list
    *  is read again once the newest of them settles. */
-  const listChange = (c: Change) => change(notify, { out: writing, settled: () => void refresh(), ...c }).then((ok) => (ok || reread(), ok));
+  const listChange = (c: Change) => change(notify, { out: writing, settled: () => void refresh(c.sources), ...c }).then((ok) => (ok || reread(), ok));
   /** A read let go for a write that then failed: that change reads nothing again (change.ts), so this does. */
   const missed = useRef(false);
   const reread = () => void (missed.current && refresh());
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (sources?: readonly string[]) => {
+    // An overlapping or rejected read may cover other rows: finish with a full read in that case.
+    const ids = sources?.length && !missed.current ? sources : undefined;
+    missed.current = true;
     const read = guard.begin();
     try {
-      const [all, gone] = await Promise.all([ore<Item[]>("ls"), ore<Item[]>("ls", "--archived")]);
+      const [all, gone]: [Item[], Item[]] = ids
+        ? [await ore<Item[]>("ls", "--ids", ids.join(",")), []]
+        : await Promise.all([ore<Item[]>("ls"), ore<Item[]>("ls", "--archived")]);
+      if (!read.newest()) return;
       if ((missed.current = !read.lands())) return;
-      setItems(all);
-      setArchived(gone);
+      if (ids) {
+        setItems((before) => mergeSourceRows(before, all, ids, false));
+        setArchived((before) => mergeSourceRows(before, all, ids, true));
+      } else {
+        setItems(all);
+        setArchived(gone);
+      }
       setListError(null);
     } catch (e) {
       if (read.newest()) setListError(errorText(e));
@@ -2015,6 +2027,14 @@ export function App() {
       role="group"
       aria-label={TABS.find((s) => s.id === status)?.label ?? "Archived"}
       aria-activedescendant={keyed && currentLine ? `row-${lineKey(currentLine)}` : undefined}
+      onFocus={(e) => {
+        // Finder/Mail: keyboard entry reveals the remembered row (or the first). A row's
+        // own button taking focus, or focus restored after a pointer action, keeps its target.
+        if (e.target !== e.currentTarget || !document.documentElement.hasAttribute("data-keys") || !currentLine) return;
+        setKeyed(true);
+        setCursor(lineKey(currentLine));
+        document.getElementById(`row-${lineKey(currentLine)}`)?.scrollIntoView({ block: "nearest" });
+      }}
       onKeyDown={onListKey}
       onPointerMove={() => keyed && setKeyed(false)}
     >

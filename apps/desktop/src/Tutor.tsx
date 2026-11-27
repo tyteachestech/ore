@@ -221,7 +221,8 @@ export function useTutorChat(notify: Notify) {
     try {
       if (!mine()) return; // stopped before the run began
       const pointed = (t.pointed ?? []).map((m) => opt(m.kind, m.id));
-      const r = await oreJob<Reply & { title?: string }>(job, null, "tutor", t.message, ...(t.item ? [opt("item", t.item), ...(t.at ? [opt("at", t.at)] : [])] : []), ...pointed, ...(earlier.length ? [opt("earlier", JSON.stringify(earlier))] : []), opt("chat", chat), ...(t.files?.length ? [opt("files", JSON.stringify(t.files))] : []), opt("stream", t.id));
+      const history = earlier.length ? JSON.stringify(earlier) : null;
+      const r = await oreJob<Reply & { title?: string }>(job, history, "tutor", t.message, ...(t.item ? [opt("item", t.item), ...(t.at ? [opt("at", t.at)] : [])] : []), ...pointed, ...(earlier.length ? [opt("earlier", "-")] : []), opt("chat", chat), ...(t.files?.length ? [opt("files", JSON.stringify(t.files))] : []), opt("stream", t.id));
       if (!mine()) return;
       // An empty or malformed reply is a failure, said as one with Try again, never a wait that doesn't end.
       if (typeof r?.reply !== "string" || !r.reply.trim()) throw new TypeError("The tutor gave no reply");

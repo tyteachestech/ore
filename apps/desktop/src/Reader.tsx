@@ -32,6 +32,7 @@ import { useNowPlaying } from "./now-playing";
 import { SkillIcon } from "./IconPicker";
 import { inTextField, is, isLoose, label, useKeymap } from "./keys";
 import { bigger, keepPlace, placeAt, placeOf, smaller, toPlace } from "./reading";
+import { afterPaint, slicesFor } from "./pace";
 import { againIn, define, lookable, wordAt } from "./lookup";
 import { Explain } from "./Explain";
 import { citeQuote, citeSources, copyCited, type Cited } from "./cite";
@@ -566,13 +567,22 @@ const Body = memo(function Body({ markdown, video, dir, cells, pages, book, onRe
   const total = top.length + rest.length + tail.length;
   const [shown, setShown] = useState(() => Math.min(total, 2));
   const ref = useRef<HTMLElement>(null);
+  // One pass a frame, as many slices as fit in it by how long the last took (`pace.ts`): passes back to back,
+  // 16 slices each, froze the first scroll of a long book for frames of 100 to 250 ms (F737).
+  const pace = useRef({ at: 0, added: 0, per: 4 });
+  useLayoutEffect(() => {
+    const p = pace.current;
+    // The span can hold a scroll's work while the transition yielded: let one slow pass raise the estimate by half at most.
+    if (p.added) (p.per = Math.min((performance.now() - p.at) / p.added, p.per * 1.5)), (p.added = 0);
+  }, [shown]);
   useEffect(() => {
-    if (shown < total) {
-      // Doubles while small, then 16 slices (about 200 KB) a pass: doubling all the way mounted half a 20 MB
-      // source in one go, seconds with the page frozen (Codex sweep 3).
-      const t = setTimeout(() => startTransition(() => setShown((n) => Math.min(total, n + Math.min(n, 16)))), 0);
-      return () => clearTimeout(t);
-    }
+    if (shown < total)
+      return afterPaint(() => {
+        const p = pace.current;
+        const n = Math.min(total - shown, slicesFor(p.per));
+        (p.at = performance.now()), (p.added = n);
+        startTransition(() => setShown((s) => Math.min(total, s + n)));
+      });
     if (ref.current) onReady(ref.current);
   }, [shown, total, onReady]);
   return (

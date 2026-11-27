@@ -1,0 +1,25 @@
+# Open rows: draft the fixes for `<name>`
+
+You are fixing the bugs in `docs/reviews/2026-11-27-open-rows/<name>-rows.md`: rows already open in `docs/reviews/findings.md`, read their whole row there. There are no red scripts yet: step 1 is writing one (a small `bun` script under `codex-out/<name>/`) or going straight to the failing test. Your working directory is a worktree of Ore at master, made for you alone. Read `CLAUDE.md` first and follow it: its bug-fix rule, its intake rule, and its "Where things are" list (`change.ts`, `list-actions.ts`, `review-session.ts`, `highlights.ts`, `answers.ts`). Another Claude will review every line you change before it merges, so make each change easy to judge.
+
+For each finding, in the report's order:
+1. **Check it is real at master** with its red script. If it is not, or it is a looks/taste call, or fixing it would change how Ore behaves in a way Tyler should decide (a new rule, a changed decision in `docs/DECISIONS.md`), skip it and say why.
+2. **Write the test first** where a bug of its kind would be caught next time: a core test in `packages/core/test/`, an app test in `apps/desktop/test/`, an intake case (fixture in `packages/core/test/fixtures/intake/`, a case in `intake.test.ts`, its cell in `intake-grid.test.ts`), never an e2e journey (you must not run a browser). Run it and keep the red output.
+3. **Fix the cause, not the symptom**: the smallest change that makes the whole class of bug impossible, in the module that owns it (one place, used by Mac and iPhone alike). No speculative abstractions.
+4. Run the test again and keep the green output, plus every existing test file that covers the code you changed (`bun test <file> …`).
+
+Rules learned from the last pass, where the drafts passed their own tests but 12 of them needed rework:
+- **Never refuse or rewrite valid existing data** to make a fix simpler: libraries on disk hold weeks of older formats and hand edits. Read old data as before; tighten only what is written from now on.
+- **Never edit an existing test to fit your fix.** If one must change, it is a behaviour change: stop and explain in your notes instead.
+- Locks, Undo and writes: keep the order "show, write, inverse" (`change.ts`); never leave a window where the file on disk is missing or half-written.
+- A fix in a shared screen covers both devices; a fix to one device's copy of shared logic is the wrong fix.
+- Don't edit `docs/reviews/findings.md` or `docs/DECISIONS.md`; Claude adds the rows.
+- If `doc.md` output changes on purpose, run `bun run golden:update` and say which goldens changed and why.
+
+Load on Tyler's Mac: no browser, app, server, e2e or bench. Run single test files; at the very end run `bun run typecheck` once and `bun test packages/core/test apps/desktop/test` once. Never leave a process running.
+
+You can't commit (the sandbox blocks git's lock). Leave the changes in the worktree and write `FIX-NOTES-<name>.md` at its root: for each finding, its ID, fixed or skipped (and why), the changed files, the new test's name and file, the red output and the green output (last lines), and one line on why this is the durable fix. End with the final typecheck and test summary.
+
+## This pass
+- These rows were left open by earlier passes because they looked big. Take them one at a time; a row you can't fix durably in about an hour is a skip with what you learned (the cause, where the fix belongs, what it would take). A good skip note is worth more than a hacky fix.
+- Each group file gives hints from the last pass. They are hints, not orders: if the code says otherwise, follow the code and say so.

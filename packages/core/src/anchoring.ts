@@ -1,4 +1,5 @@
 import search from "approx-string-match";
+import { MATH, plainSkeleton, sourceSkeleton } from "./text-map";
 
 // W3C-style selectors over the doc body: TextQuoteSelector (exact, prefix,
 // suffix) + TextPositionSelector (start, end). Re-anchoring follows the
@@ -40,23 +41,9 @@ function occurrences(text: string, needle: string): number[] {
   return out;
 }
 
-// Text with whitespace and Markdown emphasis markers removed, plus a map
-// from each kept character back to its offset in the original.
-const IGNORED = /[\s*_`]/;
-function skeleton(text: string): { chars: string; map: number[] } {
-  let chars = "";
-  const map: number[] = [];
-  for (let i = 0; i < text.length; i++) {
-    if (IGNORED.test(text[i]!)) continue;
-    chars += text[i];
-    map.push(i);
-  }
-  return { chars, map };
-}
-
 // For creating a highlight from user-supplied text: exact match, then a match
-// that ignores whitespace and Markdown emphasis (text copied from a rendered
-// page has neither line breaks nor ** or _ markers). With several hits, the
+// over the reader's shown-text map (links, entities, math and code included).
+// Exact source quotes still win, including old quotes in hidden markup. With several hits, the
 // one nearest `hint` wins (the first one without a hint).
 export function locate(text: string, exact: string, hint = 0): { start: number; end: number } | null {
   const needle = exact.trim();
@@ -65,10 +52,24 @@ export function locate(text: string, exact: string, hint = 0): { start: number; 
     xs.sort((a, b) => Math.abs(a.start - hint) - Math.abs(b.start - hint))[0] ?? null;
   const hits = occurrences(text, needle).map((s) => ({ start: s, end: s + needle.length }));
   if (hits.length) return nearest(hits);
-  const doc = skeleton(text);
-  const pat = skeleton(needle).chars;
-  if (!pat) return null;
-  return nearest(occurrences(doc.chars, pat).map((s) => ({ start: doc.map[s]!, end: doc.map[s + pat.length - 1]! + 1 })));
+  const doc = sourceSkeleton(text);
+  const query = sourceSkeleton(needle);
+  const formulas = query.chars.split("").flatMap((c, i) => c === MATH && needle.startsWith("$$", query.map[i]) ? [i] : []);
+  const formula = (body: string, at: number, size: number) => body.slice(at, at + size).replace(/\s/g, "");
+  // A copied code fragment has no fence to identify it: try its literal punctuation as well
+  // as Markdown. Both are compared against the same source map the reader uses.
+  return nearest([plainSkeleton(needle, true), query.chars].flatMap((pat, kind) =>
+    occurrences(doc.chars, pat).filter((s) => kind === 0 || formulas.every((i) => {
+      // The reader treats a formula as one selectable object; locating supplied TeX must
+      // additionally check which formula it is, not mistake every equation for the same one.
+      const a = query.map[i]!, b = doc.map[s + i]!;
+      return formula(needle, a, query.refs.get(a)!) === formula(text, b, doc.refs.get(b) ?? 1);
+    })).map((s) => {
+      const last = doc.map[s + pat.length - 1]!;
+      // An entity or formula is one shown token; the saved quote takes its whole source spelling.
+      return { start: doc.map[s]!, end: last + (doc.refs.get(last) ?? 1) };
+    }),
+  ));
 }
 
 // Normalized similarity 0..1 by Levenshtein distance (short strings only).

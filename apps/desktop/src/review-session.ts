@@ -104,6 +104,8 @@ export class ReviewSession<S> {
   private session: { id: string; open: boolean } | null = null;
   /** Settles once this showing's `session start` has: a rating waits for it, so it never goes in unnamed. */
   private ready: Promise<unknown> = Promise.resolve();
+  /** The rating already pressed, while its write is out. A close refreshes its receipt only if it saves. */
+  private ratingWrite: Promise<unknown> | null = null;
   /** False once Review has closed: ⌘Z and ⇧⌘Z on a rating from it then only change the log. */
   private mounted = false;
   /** It asked to be closed: nothing more starts by itself. */
@@ -245,7 +247,13 @@ export class ReviewSession<S> {
    *  this session ends, by its id, never another window's. */
   leave() {
     const s = this.session;
-    if (s?.open) void this.run("session", "end", s.id).catch(() => {});
+    if (s?.open) {
+      const ended = this.run("session", "end", s.id).catch(() => {});
+      // Close now, even while the rating saves. Once both writes settle, refresh this same receipt from
+      // the saved reviews; never count a failed save or reopen the session (F660).
+      if (this.ratingWrite) void Promise.all([ended, this.ratingWrite])
+        .then(() => this.run("session", "end", s.id)).catch(() => {});
+    }
     this.session = null;
   }
 
@@ -505,7 +513,9 @@ export class ReviewSession<S> {
         args = args.filter((a) => !a.startsWith("--session="));
       }
     }
-    const r = await run<{ ts: string }>("review", ...args);
+    const writing = run<{ ts: string }>("review", ...args);
+    this.ratingWrite = writing;
+    const r = await writing.finally(() => { if (this.ratingWrite === writing) this.ratingWrite = null; });
     this.reviewed++;
     const id = args[0]!;
     // Answered: a miss's relearn pass is a new turn, not one he put off.

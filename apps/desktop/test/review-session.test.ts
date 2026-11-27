@@ -523,3 +523,56 @@ test("Review this source while its exercises are still being drafted says so, no
   await drafting("I", Promise.reject(new Error("no"))).catch(() => {});
   expect(nothingDue(null, null, "I")).toBe("Nothing from this source is due right now.");
 });
+
+for (const fails of [false, true]) test(`F660: closing during a ${fails ? "failed" : "successful"} rating leaves an accurate stored receipt`, async () => {
+  const { tempLibrary } = await import("../../../packages/core/test/helpers");
+  const { createItem } = await import("../../../packages/core/src/items");
+  const { writeNewCard } = await import("../../../packages/core/src/cards");
+  const { startSession, endSession, readSessions, openSessionIds } = await import("../../../packages/core/src/sessions");
+  const { recordReview } = await import("../../../packages/core/src/study");
+  const { readReviews } = await import("../../../packages/core/src/reviews");
+  const { rmSync } = await import("node:fs");
+  const lib = await tempLibrary();
+  try {
+    const item = await createItem(lib, { type: "article", title: "Memory", body: "Testing helps memory." });
+    const c = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "What helps?", answer: "Testing", rubric: [] });
+    let release!: () => void;
+    const held = new Promise<void>((r) => { release = r; });
+    let began!: () => void;
+    const started = new Promise<void>((r) => { began = r; });
+    let writing!: () => void;
+    const writeStarted = new Promise<void>((r) => { writing = r; });
+    const ends: Promise<unknown>[] = [];
+    let id = "";
+    const run = (async (...args: string[]) => {
+      if (args[0] === "session" && args[1] === "start") {
+        const s = await startSession(lib); id = s.id; return s;
+      }
+      if (args[0] === "session" && args[1] === "end") {
+        const end = endSession(lib, new Date(), false, args[2]); ends.push(end); return end;
+      }
+      if (args[0] === "today") return today();
+      if (args[0] === "due") { began(); return [due(c.meta.id)]; }
+      if (args[0] === "review") {
+        writing(); await held;
+        if (fails) throw new Error("save failed");
+        return recordReview(lib, c.meta.id, { rating: 3, confidence: 2, session: args.find((a) => a.startsWith("--session="))!.slice(10) });
+      }
+      return null;
+    }) as never;
+    const s = new ReviewSession(true, run);
+    s.screen = { notify: () => Object.assign(() => {}, { undo() {}, hold() {} }), onClose() {}, shown: () => null, unrated() {}, press() {} };
+    const stop = s.begin();
+    await started;
+    const rating = s.rate({ card: card(c.meta.id), rating: 3, answer: "", grade: null, inHead: true, noteSeen: true });
+    await writeStarted;
+    stop(); s.leave(); s.gone();
+    expect(ends).toHaveLength(1); // End is issued before releasing the held save, as the existing guard requires.
+    await ends[0];
+    expect(openSessionIds(lib)).not.toContain(id);
+    release(); await rating; await tick(); await Promise.all(ends);
+    expect(readReviews(lib)).toHaveLength(fails ? 0 : 1);
+    expect(readSessions(lib).find((r) => r.type === "end" && r.id === id)?.reviews).toBe(fails ? 0 : 1);
+    expect(openSessionIds(lib)).not.toContain(id);
+  } finally { rmSync(lib.root, { recursive: true, force: true }); }
+});

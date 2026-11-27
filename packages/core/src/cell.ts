@@ -22,7 +22,7 @@ export async function addCellCard(lib: Library, ref: string, f: { row: string; c
     if (!lines.some((l) => l.includes(bare(row)) && l.includes(bare(answer)))) throw new Error(`“${row}” and “${answer}” aren’t in one row of a table in ${item.meta.title}`);
     const question = cellQuestion(row, column);
     const state = cardStates(lib);
-    if (listCards(lib).some((c) => c.meta.item === item.meta.id && c.question === question && state(c) !== "retired")) throw new Error("that cell already has an exercise");
+    if (listCards(lib, item.meta.id).some((c) => c.question === question && state(c) !== "retired")) throw new Error("that cell already has an exercise");
     return writeNewCard(lib, { kind: "card", item: item.meta.id, skills: item.meta.skills, topics: item.meta.topics.slice(0, 1), content_type: "fact", question, answer, rubric: [] });
   });
 }

@@ -409,7 +409,7 @@ export async function acceptSuggestedSkill(lib: Library, ref: string): Promise<{
     const undo = { suggestion: s, skill: id, created, filed: !item.meta.skills.includes(id), cards, topics };
     const meta = parseItemMeta({ ...item.meta, skills: [...new Set([...item.meta.skills, id])], suggested_skill: undefined });
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
-    for (const c of listCards(lib).filter((c) => c.meta.item === meta.id && !c.meta.skills.includes(id))) {
+    for (const c of listCards(lib, meta.id).filter((c) => !c.meta.skills.includes(id))) {
       writeCardMeta(c, { ...c.meta, skills: [...c.meta.skills, id] });
       cards.push(c.meta.id);
     }
@@ -475,7 +475,7 @@ export function checkSkills(lib: Library, ids: string[]): void {
 
 /** Each of a source's cards and its skills: what `setItemSkills` takes back to put them as they were (Undo). */
 export function itemCardSkills(lib: Library, itemId: string): Record<string, string[]> {
-  return Object.fromEntries(listCards(lib).filter((c) => c.meta.item === itemId).map((c) => [c.meta.id, c.meta.skills]));
+  return Object.fromEntries(listCards(lib, itemId).map((c) => [c.meta.id, c.meta.skills]));
 }
 
 /** Caller holds the library lock. Save the peak before a change discards the
@@ -512,7 +512,7 @@ export async function fileItemSkills(lib: Library, ref: string, ids: string[], c
     const next = [...new Set(ids)];
     const added = next.filter((id) => !item.meta.skills.includes(id));
     const removed = item.meta.skills.filter((id) => !next.includes(id));
-    const exercises = listCards(lib).filter((c) => c.meta.item === item.meta.id);
+    const exercises = listCards(lib, item.meta.id);
     const before = Object.fromEntries(exercises.map((c) => [c.meta.id, c.meta.skills]));
     // Not on an Undo (`cards`): a filing taken back gave its skill nothing to keep (code review of #538).
     if (!cards) keepSkillPeaks(lib, exercises.flatMap((c) => c.meta.skills.filter((s) => removed.includes(s))));

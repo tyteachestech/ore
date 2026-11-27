@@ -557,10 +557,12 @@ journey("tutor attach: the paperclip attaches an image and a text file as chips,
   const notes = join(mkdtempSync(join(tmpdir(), "ore-attach-")), "notes.txt");
   writeFileSync(notes, "spacing notes\n");
   const sent: string[][] = [];
+  const stdin: (string | undefined)[] = []; // a long chat goes on stdin, `--earlier=-` (F421)
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
     if (route.request().method() !== "POST" || !body.includes('"tutor",')) return route.fallback();
     sent.push(JSON.parse(body).args as string[]);
+    stdin.push(JSON.parse(body).stdin as string | undefined);
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: `Reply ${sent.length}`, citations: [], general: false, hint: false, exercise: null, card: null, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@14" } }) });
   });
   const pick = (paths: string[]) => page.evaluate((paths) => ((window as unknown as { __ORE_PICK: string[] }).__ORE_PICK = paths), paths);
@@ -594,7 +596,8 @@ journey("tutor attach: the paperclip attaches an image and a text file as chips,
     await page.keyboard.press("Enter");
     await tutor.getByText("Reply 2").waitFor();
     if (sent[1]!.some((x) => x.startsWith("--files="))) throw new Error("the follow-up carried a file it wasn't given");
-    const earlier = JSON.parse(sent[1]!.find((x) => x.startsWith("--earlier="))!.slice(10)) as { files?: { name: string }[] }[];
+    const said = sent[1]!.find((x) => x.startsWith("--earlier="))!.slice(10);
+    const earlier = JSON.parse(said === "-" ? stdin[1]! : said) as { files?: { name: string }[] }[];
     if (earlier[0]?.files?.[0]?.name !== "screenshot.png") throw new Error("the earlier turn's file was not sent with the follow-up");
     // Both turns name the chat they belong to, so the second picks up the first's session (D338).
     const chatOf = (args: string[]) => args.find((x) => x.startsWith("--chat="));
