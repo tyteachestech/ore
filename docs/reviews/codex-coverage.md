@@ -23,7 +23,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 
 1. **running** Learners over days (the "Run another Codex learner pass" thread: asker, importer, returner, real clock).
 2. **Burn down the open rows.** About twenty `open` rows in `findings.md` need no call from Tyler (F1, F2, F3, F6, F13, F294, F421, F538, F547, F548, F660, F662, F684, F727, F729, F737 among them). Reading scouts write a red script for each, Codex drafts a fix, Claude QAs. The bugs are already known, so every hour goes to fixing.
-3. **Flaky tests are races.** The open flaky rows (F142, F347, F348, F349, F397, F515, F516, F575, F623, F651, F748): find each cause (`triage-report` step 3), never a retry. A suite that fails at random hides real breaks.
+3. **done (#564)** Flaky tests are races. Causes found for F142, F347, F348, F397, F516, F575 and a new one in the corners journey (F751); each failing journey now prints the `ore` calls in flight. Still open: F515, F623, F651 (not reproduced under load), F349 and F748 (need Tyler's Mac), and the new office-03 "error: undefined" (F752). A pass on the Mac takes the last two.
 4. **Mac and iPhone writing at once.** Both on one iCloud folder: a rating on each, a note edited on both, Archive on one while the source is open on the other, a conflict copy. Deep scan 1 and 4 did it below the screens; nobody has run both apps.
 5. **Import at real breadth, deep (D122).** The running importer brings one file of each kind as a learner; start from its report and go deep: many files per type read against their source from start to end, EPUB books from his Calibre library, long textbooks, scans with and without the page reader downloaded (#494; refused with the next step when it is missing), and `bun run intake:live` over fifty popular sites. Fixtures for any bug are rewritten or openly licensed (D96).
 6. **Upgrade from an older library, rich.** Sweep 9 found nothing on a small seed with no media, PDF or chats. Redo with a copy of ~/Ore as written by a commit from 11-10, 11-17 and 11-24.
@@ -131,6 +131,6 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | Angle | Status | Runs |
 |---|---|---|
 | Tests missing for recent merges | partly | test-gap hunt 11-13 |
-| Flaky tests traced to their cause | open | queue 3 |
+| Flaky tests traced to their cause | partly | flaky pass 11-27 (#564): 6 of 11 traced; F349 and F748 need the Mac |
 | Open rows that need no call from Tyler | open | queue 2 |
 | The `ore` CLI and `/ore` skill as an agent uses them | partly | sweep 3 cli, deep scan 3 library: queue 13 |
