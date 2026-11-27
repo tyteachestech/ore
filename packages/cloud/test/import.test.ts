@@ -5,11 +5,11 @@ import { basename, dirname, join } from "node:path";
 import { CASES } from "../../core/test/golden-cases.ts";
 import { importJob } from "../src/import.ts";
 import { accounts, session, type Auth } from "../src/auth.ts";
-import { makeHandler } from "../src/server.ts";
+import { inProcess, makeHandler } from "../src/server.ts";
 
 // Signed in (auth.test.ts covers who may): every request here carries a session.
 const auth: Auth = { audience: [], secret: "s".repeat(32), keys: async () => [], accounts: accounts(":memory:") };
-const serverHandle = makeHandler(auth);
+const serverHandle = makeHandler(auth, undefined, inProcess);
 const me = auth.accounts.signIn("001.test");
 const handle = async (req: Request) => {
   req.headers.set("authorization", `Bearer ${await session(me, auth)}`);

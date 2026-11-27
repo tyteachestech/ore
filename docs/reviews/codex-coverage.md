@@ -36,7 +36,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 12. **New learners.** An exam crammer (deadline, a big new batch, Importance), a language learner (vocabulary, audio, another script), a researcher with fifty papers. Each a five-day run with real AI.
 13. **CLI and `/ore` skill recheck.** Sweep 3 found 10; many commands changed since. Every `--json` answer against `packages/cli/src/answers.ts`, exit codes, the library's AGENTS.md.
 14. *Claude lane:* **Hostile content** in sources and feeds (scripts, paths, commands, huge files), which Codex refused.
-15. *Claude lane:* **Ore Cloud security** (`packages/cloud`: `guard.ts`, `server.ts`, `import.ts`) with `/security-and-hardening`, before it takes outside input (D355).
+15. **done (#572)** *Claude lane:* **Ore Cloud security.** Sign-in, sessions, account deletion and the private-address guard held; four bugs fixed (a zip bomb, an import that could take the server down, no import limits, yt-dlp past the guard), one wording row open. Still open, each needing the server online or Tyler: Apple tokens revoked on delete (his .p8 key, #551), IPv6 egress if the host gets it (the firewall in #571 covers IPv4), and a pass on the live server once #550 deploys it.
 
 ## Angles
 
@@ -136,7 +136,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | VoiceOver and keyboard only | partly | sweep 3 a11y, 11-13 pass, deep scan 5 keys: queue 11 |
 | Light, dark, sizes, zoom, reduced motion | done | sweep 6 looks |
 | Hostile content | partly | sweep 3 hostile; Codex refused the deep version: queue 14, Claude lane |
-| Ore Cloud security | open | queue 15, Claude lane |
+| Ore Cloud security | partly | security pass 11-27 (#572), reading and local tests; the live server once it is up (#550) |
 
 ### The suite and the backlog
 | Angle | Status | Runs |
