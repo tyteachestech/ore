@@ -153,6 +153,11 @@ function boot() {
   return booted;
 }
 
+/** The folder's changes read in before a write (fs.ts `fresh`); when something came, the screens are told
+ *  (PhoneApp reads again), as after the 30 s scan. */
+export const FOLDER_CHANGED = "ore:folder-changed";
+const freshen = () => fresh().then((came) => void (came && dispatchEvent(new Event(FOLDER_CHANGED))), () => {});
+
 let turn: Promise<unknown> = Promise.resolve();
 /** One at a time: a command never runs while another, or a read of the Mac's changes, is halfway through. */
 function exclusive<T>(f: () => Promise<T>): Promise<T> {
@@ -195,7 +200,8 @@ export async function fill(landed: () => void): Promise<void> {
             ? (url, got, of) => url === (from ??= url) && setFilling({ id, done: Math.min(1, got / of), label: `Downloading ${mb(Math.min(got, of))} of ${mb(of)} MB` })
             : null;
       },
-      turn: exclusive,
+      // Its writes land minutes after its reads (a download, then hearing it): the Mac's changes first, as for a command.
+      turn: (f) => exclusive(async () => (await freshen(), f())),
     });
   } catch {
     // One that failed keeps its reason on the source itself (core `fillOwed`).
@@ -243,7 +249,7 @@ export async function run<T>(args: string[], input: string | null): Promise<T> {
     const lib = await boot();
     if (args[0] === "inbox" && args.includes("--import")) await loadShared();
     // The Mac's changes first: a command writes whole files, and one run on an older copy saved over them.
-    const out = await exclusive(async () => (await fresh().catch(() => {}), command<T>(lib, args, input)));
+    const out = await exclusive(async () => (await freshen(), command<T>(lib, args, input)));
     // window.__ORE_SLOW = { course: 800 }, as the Mac's mock reads it: that command's answer comes back that much
     // later, its write already made, so a journey can widen a race (an Undo tapped before its step's answer).
     const slow = (globalThis as { __ORE_SLOW?: Record<string, number> }).__ORE_SLOW?.[args[0]!];

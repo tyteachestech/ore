@@ -369,3 +369,19 @@ test("a command reads the Mac's newer copy before it writes, so the phone never 
   expect(await rescan()).toBe(true);
   expect(await rescan()).toBe(false);
 });
+
+test("a command never waits on the phone's own upload to read the folder: the scan waits for the next one", async () => {
+  let release!: () => void;
+  applyHook = () => new Promise<void>((r) => (release = r));
+  fs.writeFileSync(`${P}/items/b-01/audio-note.md`, "big");
+  const going = flush();
+  try {
+    const t = Date.now();
+    expect(await fresh(0)).toBe(false);
+    expect(Date.now() - t).toBeLessThan(50);
+  } finally {
+    release();
+    applyHook = null;
+    await going;
+  }
+});

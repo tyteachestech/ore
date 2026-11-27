@@ -329,7 +329,8 @@ function collectionName(name: string, others: (string | undefined)[] = []): stri
 }
 
 // The sidebar's layout: collections in order, each with its skills in order ("" holds the skills in
-// no collection). Every skill appears exactly once.
+// no collection). Every skill appears at most once: one the layout leaves out (added on the other device since
+// it was drawn) keeps its place, and one it names that is gone is passed over (arrangeSkills).
 export const SkillLayoutSchema = z.array(z.object({ collection: z.string(), skills: z.array(z.string()) }));
 export type SkillLayout = z.infer<typeof SkillLayoutSchema>;
 
@@ -363,10 +364,16 @@ export async function arrangeSkills(lib: Library, layout: SkillLayout): Promise<
     }
     // Added on the other device since this layout was drawn (the iPhone and the Mac share skills.yaml, D222): it
     // keeps its collection, after the skills laid out there, rather than the whole move failing (F-new-stale-skill-layout).
+    // A collection the layout spells otherwise ("work" for "Work") is the same one: it takes the layout's spelling,
+    // or the next save would find two that differ only by capitals.
     for (const [id, node] of byId) {
       if (seen.has(id)) continue;
-      const c = String(node.get("collection") ?? "");
-      const last = order.findLastIndex((n) => String(n.get("collection") ?? "") === c);
+      const c = String(node.get("collection") ?? "").toLowerCase();
+      const last = order.findLastIndex((n) => String(n.get("collection") ?? "").toLowerCase() === c);
+      if (last >= 0) {
+        const spelled = order[last]!.get("collection");
+        if (spelled) node.set("collection", spelled);
+      }
       order.splice(last < 0 ? order.length : last + 1, 0, node);
     }
     list.items = order;

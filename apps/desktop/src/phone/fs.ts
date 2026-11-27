@@ -218,10 +218,12 @@ const downloading = new Set<string>();
 let sending: Promise<void> = Promise.resolve();
 /** Operations handed to the flush chain, including batches waiting behind the current native call. */
 let inFlight = 0;
+/** When the folder was last listed (mount, rescan, `fresh`). */
+let scannedAt = 0;
 /** For Settings: when the folder last took a write or a scan, and the last write it refused. */
 let lastSync = 0;
 let lastError: string | null = null;
-export const syncState = () => ({ icloud: !!disk, at: lastSync, unsent: unsent.size + inFlight, downloading: downloading.size, error: lastError });
+export const syncState = () => ({ icloud: !!disk, at: lastSync, scanned: scannedAt, unsent: unsent.size + inFlight, downloading: downloading.size, error: lastError });
 let timer: ReturnType<typeof setTimeout> | undefined;
 
 const rel = (p: string) => p.slice(disk!.prefix.length + 1);
@@ -303,7 +305,7 @@ export async function mountDisk(prefix: string, root: string, invoke: Invoke) {
   setDownloading(scan.waiting);
   await read(scan.files);
   listOthers(scan.other);
-  lastSync = Date.now();
+  lastSync = scannedAt = Date.now();
   // iOS may suspend the app soon after it leaves the screen: what it wrote goes now.
   addEventListener("visibilitychange", () => document.hidden && void flush());
 }
@@ -382,13 +384,18 @@ export async function rescan(): Promise<boolean> {
 
 /** A change `fresh` read in that no rescan has reported yet: the screens redraw on the next one. */
 let unseen = false;
-let scannedAt = 0;
 /** Before each command (core.ts `run`): the folder's changes read in first, at most one scan in `within` ms. A
  *  file is written whole from memory, so a command run on a copy older than the folder's saved it over the Mac's
  *  edit: a rename, an archive, a new skill or a note line the phone, on screen, hadn't scanned for yet (up to 30 s,
  *  F-new-phone-stale-write). What iCloud hasn't brought down yet still keeps iCloud's latest (D222). */
-export async function fresh(within = 1000): Promise<void> {
-  if (disk && Date.now() - scannedAt >= within && (await scan())) unseen = true;
+export const FRESH_MS = 1000;
+/** True when it read something in. It waits for no write: while this phone's own are still going out (an hour's
+ *  audio can take a while) it leaves the folder for the next scan, so a command never waits on an upload. */
+export async function fresh(within = FRESH_MS): Promise<boolean> {
+  if (!disk || Date.now() - scannedAt < within || inFlight || unsent.size) return false;
+  const came = await scan();
+  if (came) unseen = true;
+  return came;
 }
 
 async function scan(): Promise<boolean> {

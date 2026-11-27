@@ -9,6 +9,8 @@ const noteOf = async (id: string) => ((await ore("notes", id)) as { text: string
 
 /** The phone's writes, in the folder. */
 const phoneSaved = (phone: Page) => until("the phone's writes are in the folder", () => phone.evaluate(async (fs) => (await import(fs)).syncState().unsent === 0, "/src/phone/fs.ts"));
+/** Until the phone's last scan is older than `fresh`'s spacing, so its next command reads the folder first. */
+const scanDue = (phone: Page) => until("the phone's next command scans the folder", () => phone.evaluate(async (fs) => { const m = await import(fs); return Date.now() - m.syncState().scanned >= m.FRESH_MS; }, "/src/phone/fs.ts"), 3000);
 /** An `ore` command run in the phone's own core, as its screens run them. */
 const phoneOre = (phone: Page, ...args: string[]) => phone.evaluate(async ([core, args]) => (await import(core!)).run(args, null), ["/src/phone/core.ts", args] as const);
 
@@ -26,7 +28,7 @@ journey("two devices: a note line the Mac wrote is kept when the phone, open on 
     await mac.keyboard.type("Mac wrote this line");
     await until("the Mac's line is saved", async () => (await noteOf(id)).includes("Mac wrote this line"), 8000);
     // A scan more than a second old is read again before the phone's next command (fs.ts `fresh`).
-    await phone.waitForTimeout(1100);
+    await scanDue(phone);
     await note.click();
     await phone.keyboard.type("Phone typed this");
     await phoneSaved(phone);
@@ -45,7 +47,7 @@ journey("two devices: a rename and an archive made on the Mac aren't undone by t
     await ore("edit", id, "--title", "Spine, renamed on the Mac");
     await ore("archive", id);
     await mac.reload();
-    await phone.waitForTimeout(1100);
+    await scanDue(phone);
     // On the phone: Pin, which writes the same source.md.
     await phoneOre(phone, "pin", id);
     await phoneSaved(phone);

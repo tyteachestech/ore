@@ -48,6 +48,13 @@ describe("sidebar layout (arrangeSkills)", () => {
     expect(after.find((g) => g.collection === "Work")!.skills).toEqual([...work.skills].reverse().concat("juggling"));
     expect(after.flatMap((g) => g.skills)).not.toContain("gone-elsewhere");
     expect(after.flatMap((g) => g.skills).sort()).toEqual(loadSkills(lib).skills.map((s) => s.id).sort());
+    // The Mac's layout respelled Work as "work" meanwhile: the phone's new skill joins it, never a second Work.
+    await addSkill(lib, "Unicycling", "Work");
+    const respelled = skillGroupsOf(loadSkills(lib).skills).map((g) => (g.collection === "Work" ? { collection: "work", skills: g.skills.filter((s) => s !== "unicycling") } : g));
+    await arrangeSkills(lib, respelled);
+    const groups = skillGroupsOf(loadSkills(lib).skills);
+    expect(groups.filter((g) => g.collection.toLowerCase() === "work")).toEqual([{ collection: "work", skills: [...respelled.find((g) => g.collection === "work")!.skills, "unicycling"] }]);
+    await arrangeSkills(lib, groups);
   });
 
   test("refuses a collection named Other, the name the sidebar and Home give the skills in no collection", async () => {
