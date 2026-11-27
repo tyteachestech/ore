@@ -248,6 +248,9 @@ journey("settings: a goal set outside the list (ore goal --minutes 7) shows pick
   await ore("goal", "--minutes", "7");
   try {
     await page.reload();
+    // The page takes keys only once it has drawn: ⌘, pressed as the reload returned opened nothing (F750).
+    await page.locator(".home-today").waitFor();
+    await loaded(page);
     await page.keyboard.press("Meta+Comma");
     await page.getByRole("tab", { name: "Review" }).click();
     const seven = page.getByRole("radio", { name: "7", exact: true });

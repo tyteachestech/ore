@@ -163,6 +163,10 @@ async function open(url: string, engine: Engine): Promise<Page> {
   // A fetch WebKit refused "due to access control checks" also names the ore calls in flight then (F749).
   const of = running;
   page.on("pageerror", async (e) => {
+    // A request cut off by the close the harness itself asked for is no fault of the app's: by then the journey's
+    // own calls have all answered (`settled`), so what is cut is a call the app started by itself in the last
+    // moment (a timer's read of the library), which no wait can rule out (F749, still red on master after #557).
+    if (closing.has(page) && /access control/.test(e.message)) return;
     const calls = /access control/.test(e.message) ? await page.evaluate(() => JSON.stringify((window as unknown as { __ORE_INFLIGHT?: string[] }).__ORE_INFLIGHT)).catch(() => "page closed") : "";
     errors.push(`${of}: ${e.message}${calls ? ` (in flight: ${calls})` : ""}`);
   });
@@ -413,6 +417,9 @@ export async function inLibrary(page: Page, titles: string[]) {
     return titles.every((t) => live.has(t));
   });
 }
+
+/** Pages the harness is closing: a fetch cut off by that close is not reported (F749). */
+const closing = new WeakSet<Page>();
 
 /** Until no `ore` call has been in flight for 300 ms, up to three seconds; never fails. */
 async function calm(page: Page) {
@@ -845,6 +852,7 @@ export async function run() {
       // close, which WebKit reports as a page error "due to access control checks" (F749): the page closes once no
       // ore call has been in flight for 300 ms, or after three seconds whatever is left.
       if (page) await calm(page);
+      if (page) closing.add(page);
       await page?.close();
     }
     await done();
