@@ -24,6 +24,9 @@ function token(text: string): string {
     .map((c) => {
       const s = SYMBOL[c];
       if (s !== undefined) return /^\\[a-zA-Z]+$/.test(s) ? `${s} ` : s;
+      if (c === "\\") return "\\backslash ";
+      if (c === "~") return "\\sim ";
+      if (c === "^") return "\\hat{}";
       return /[{}#$%&_]/.test(c) ? `\\${c}` : c;
     })
     .join("")
@@ -66,7 +69,9 @@ function tex(e: Element): string | null {
       return token(e.textContent ?? "");
     case "mtext": case "ms": {
       const t = (e.textContent ?? "").replace(/\s+/g, " ").trim();
-      return t ? `\\text{${t.replace(/[{}\\]/g, "")}}` : "";
+      // TeX's own characters escaped, so "50% off" or "$5" can't end the formula early (code review).
+      const esc = t.replace(/[\\{}]/g, "").replace(/[#$%&_]/g, "\\$&").replace(/\^/g, "\\textasciicircum{}").replace(/~/g, "\\textasciitilde{}");
+      return t ? `\\text{${esc}}` : "";
     }
     case "mfrac": {
       const [a, b] = [at(0), at(1)];

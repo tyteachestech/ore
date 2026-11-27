@@ -2,7 +2,9 @@
 # Run: python3 make-deep-pdfs.py (needs reportlab and Pillow with JPEG 2000). The text is written for Ore (AGPL).
 # - files/skewed.pdf: a page of body text set at a 1.5 degree tilt, as a scan's text layer often is.
 # - files/side-table.pdf: a column of prose with a small table of numbers set beside it.
-# - files/form.pdf: a filled form: two text fields and a ticked box, under a paragraph.
+# - files/form.pdf: a filled form: two text fields, a ticked box and a choice of season, under a paragraph.
+# - files/form-scan.pdf: a filled form whose page holds no text of its own, as a scanned form's doesn't.
+# - files/unordered-outline.pdf: bookmarks that list chapter 2 before chapter 1, with a section in each.
 # - files/nested-outline.pdf: four pages whose bookmarks have sections inside each chapter.
 # - files/many-figures.pdf: 82 pages, each with a figure of its own, past the 80 a PDF keeps.
 # - files/eps-title.pdf: metadata titled by a figure's file name ("raa_asRun.eps"), the real title on the page.
@@ -80,6 +82,34 @@ c.drawString(72, 570, "River")
 c.acroForm.textfield(name="river", tooltip="River", value="Wye", x=160, y=565, width=200, height=16)
 c.drawString(72, 540, "Flooded")
 c.acroForm.checkbox(name="flooded", tooltip="Flooded", checked=True, x=160, y=535, size=14)
+c.drawString(72, 510, "Season")
+c.acroForm.radio(name="season", tooltip="Season", value="Spring", selected=True, x=160, y=505, size=14)
+c.acroForm.radio(name="season", tooltip="Season", value="Summer", selected=False, x=200, y=505, size=14)
+c.save()
+
+c = canvas.Canvas(out("form-scan.pdf"), pagesize=letter, pageCompression=0)
+c.setTitle("")
+c.acroForm.textfield(name="surveyor", tooltip="Surveyor", value="Ada Lovelace", x=160, y=595, width=200, height=16)
+c.acroForm.textfield(name="river", tooltip="River", value="Wye", x=160, y=565, width=200, height=16)
+c.showPage()
+c.save()
+
+c = canvas.Canvas(out("unordered-outline.pdf"), pagesize=letter, pageCompression=0)
+c.setTitle("Out of Order")
+for n, (chapter, section) in enumerate([("1 First", "1.1 Part"), ("2 Second", "2.1 Part")]):
+    c.setFont("Times-Bold", 14)
+    c.drawString(72, 720, chapter)
+    c.bookmarkPage(f"c{n}", fit="XYZ", top=740)
+    body(c, 690, PROSE[3:6])
+    c.setFont("Times-Roman", 11)
+    c.drawString(72, 600, section)
+    c.bookmarkPage(f"s{n}", fit="XYZ", top=620)
+    body(c, 570, PROSE[:3])
+    c.showPage()
+c.addOutlineEntry("2 Second", "c1", level=0)
+c.addOutlineEntry("2.1 Part", "s1", level=1)
+c.addOutlineEntry("1 First", "c0", level=0)
+c.addOutlineEntry("1.1 Part", "s0", level=1)
 c.save()
 
 # Nested outline: chapters with their sections.

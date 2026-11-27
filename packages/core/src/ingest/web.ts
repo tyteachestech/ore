@@ -81,7 +81,8 @@ function crossRefs(document: Document) {
  *  ("a popular story about momentum", "[1, 2, 3]", ": gradient descent is…"). Its formulas keep their own tags. */
 function inlineCustom(document: Document) {
   for (const el of Array.from(document.querySelectorAll("p *, li *")).reverse()) {
-    if (!el.tagName.includes("-") || /-math$/i.test(el.tagName) || el.closest("svg, math")) continue;
+    // MathJax's own elements (mjx-container, mjx-mi…) are what the extractor rebuilds a formula from (code review).
+    if (!el.tagName.includes("-") || /-math$|^mjx-/i.test(el.tagName) || el.closest("svg, math")) continue;
     const span = document.createElement("span");
     while (el.firstChild) span.appendChild(el.firstChild);
     el.replaceWith(span);
@@ -113,7 +114,8 @@ function sectionHeaders(document: Document) {
   for (const m of Array.from(document.querySelectorAll('[class*="modal" i]'))) {
     let prev = m.previousElementSibling;
     while (prev && !(prev.textContent ?? "").trim()) prev = prev.previousElementSibling;
-    if (prev?.tagName !== "P") continue;
+    // A sign-up, log-in or cookie box is the site's pop-up wherever it sits (code review).
+    if (prev?.tagName !== "P" || m.closest('[role="dialog"], [aria-modal="true"]') || /sign-?up|log-?in|newsletter|subscribe|cookie|popup|consent|paywall/i.test(m.className)) continue;
     m.className = m.className.split(/\s+/).filter((c) => !/modal/i.test(c)).join(" ");
   }
 }

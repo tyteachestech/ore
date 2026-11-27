@@ -18,6 +18,10 @@ import { xlsxToDoc } from "../src/ingest/sheets.ts";
 import { episode, pageAudio, transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { htmlToDoc, inlineMath } from "../src/ingest/web.ts";
+import { mathmlToTex } from "../src/ingest/mathml.ts";
+import { ommlToTex } from "../src/ingest/omml.ts";
+import { pdfToDoc } from "../src/ingest/pdf.ts";
+import { parseHTML } from "linkedom";
 import { chapterLines } from "../src/ai/recall.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
@@ -225,6 +229,12 @@ describe("import coverage: web pages", () => {
     const fixed = await arxivListing("https://arxiv.org/abs/hep-th/9711200", stamped);
     expect(fixed.title).toBe("The Large N Limit of Superconformal Field Theories and Supergravity");
     expect(fixed.author).toBe("Juan M. Maldacena");
+    // The listing's title is XML: its escapes are read. An id arXiv can't find answers with an error entry, not a paper.
+    serve({ "https://export.arxiv.org/api/query?id_list=2101.00001": { body: `<feed><entry><title>Q&amp;A over Graphs</title><author><name>A. Writer</name></author></entry></feed>`, type: "application/atom+xml" } });
+    expect((await arxivListing("https://arxiv.org/abs/2101.00001", { ...stamped, title: "arXiv:2101.00001v1 1 Jan 2021" })).title).toBe("Q&A over Graphs");
+    serve({ "https://export.arxiv.org/api/query?id_list=2101.99999": { body: `<feed><entry><id>http://arxiv.org/api/errors#incorrect_id_format_for_2101.99999</id><title>Error</title><author><name>arXiv api core</name></author></entry></feed>`, type: "application/atom+xml" } });
+    const missing = await arxivListing("https://arxiv.org/abs/2101.99999", stamped);
+    expect([missing.title, missing.author]).toEqual([stamped.title, undefined]);
     // No listing (offline, or arXiv down): the paper still comes in, as before.
     serve({ "https://arxiv.org/pdf/1706.03762v7": { body: readFileSync(file("paper.pdf")), type: "application/pdf" } });
     expect((await addSource(await tempLibrary(), "https://arxiv.org/pdf/1706.03762v7")).meta.published).toBeUndefined();
@@ -407,6 +417,8 @@ describe("import coverage: web pages", () => {
     // The site's own header and a real pop-up stay out.
     expect(b).not.toContain("Log in");
     expect(b).not.toContain("Sign up to keep learning");
+    // A sign-up box classed as a modal right after the post's last paragraph is still the site's (code review).
+    expect(b).not.toContain("Get the weekly letter");
   });
 
   test("a chart the page draws with Vega (Altair) is kept as a picture where it stood; one that can't be drawn says so", async () => {
@@ -1438,6 +1450,10 @@ describe("import coverage: EPUB", () => {
     expect(item.body).toContain("$$\nx^2 + \\sqrt{y}\n$$");
     expect(item.body).toContain("$$\n\\sum_{i = 1}^n a_i \\le \\alpha\n$$");
     expect(item.body).not.toContain("12 of a whole");
+    // Text inside a formula keeps TeX's own characters from breaking it (code review).
+    const math = (m: string) => mathmlToTex(parseHTML(`<math>${m}</math>`).document.querySelector("math") as unknown as Element);
+    expect(math("<mtext>50% off, $5 &amp; #1</mtext>")).toBe("\\text{50\\% off, \\$5 \\& \\#1}");
+    expect(math("<mi>~</mi><mo>^</mo>")).toBe("\\sim \\hat{}");
   });
 
   test("EPUB: a table keeps the pictures in its cells, and verse laid out in a table keeps its lines", async () => {
@@ -2302,12 +2318,20 @@ describe("import coverage: PDF, deep import pass", () => {
     expect(item.body).toContain("Surveyor: Ada Lovelace");
     expect(item.body).toContain("River: Wye");
     expect(item.body).toContain("Flooded: ✓");
+    expect(item.body).toContain("season: Spring"); // a choice's own name where it has no label
+    expect(item.body).not.toContain("season: ✓");
+    // A form whose pages hold no text of their own is a scan, whatever its fields hold (code review).
+    await expect(pdfToDoc(new Uint8Array(readFileSync(file("form-scan.pdf"))))).rejects.toThrow();
   });
 
   test("PDF: its bookmarks' sections inside a chapter are the source's subheadings", async () => {
     const item = await addSource(await tempLibrary(), file("nested-outline.pdf"));
     for (const h of ["## 1 Introduction", "### 1.1 Background", "### 1.2 Aims", "## 2 Method", "### 2.1 Data", "### 2.2 Analysis"]) expect(item.body).toContain(`\n${h}\n`);
     expect(item.body.match(/<!-- chapter \d+ -->/g)).toHaveLength(2);
+    // Chapters out of page order are no table of chapters, and their sections aren't headings either (code review).
+    const odd = await addSource(await tempLibrary(), file("unordered-outline.pdf"));
+    expect(odd.body).toContain("\n1.1 Part\n");
+    expect(odd.body).not.toMatch(/^#+ \d\.\d Part/m);
   });
 
   test("PDF: figures past the 80 it keeps are marked where they were, not lost unsaid", async () => {
@@ -2425,6 +2449,12 @@ describe("import coverage: the grid's small holes", () => {
       writeFileSync(join(dir, name), ole);
       await expect(addSource(lib, join(dir, name))).rejects.toThrow(new RegExp(`That ${app} file is locked with a password\\. Open it in ${app}, remove the password`));
     }
+    // An older Word file (.doc, the same container with no encrypted package) saved under a new name says so (code review).
+    const doc = new Uint8Array(4096);
+    doc.set([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    doc.set(new TextEncoder().encode("W\0o\0r\0d\0D\0o\0c\0u\0m\0e\0n\0t\0"), 1024);
+    writeFileSync(join(dir, "old.docx"), doc);
+    await expect(addSource(lib, join(dir, "old.docx"))).rejects.toThrow(/older Word file.*save it as \.docx/);
     const odd = zipSync({ "word/document.xml": strToU8("<w:document/>") }, { level: 0 });
     new DataView(odd.buffer).setUint16(8, 99, true); // the part's compression method, in its local header
     new DataView(odd.buffer).setUint16(odd.length - 22 - 46 + 10, 99, true); // and in the central directory
@@ -2642,6 +2672,17 @@ test("office-03: Word equations come in as formulas, inline and on their own lin
   expect(item.body).toContain("That is the whole model.");
   expect(item.body).not.toContain("ORE0MATH");
   expect((await addSource(await tempLibrary(), officeFile("word-equation.docx"))).body).toContain("$$E=mc²$$");
+});
+
+test("office-03: an equation followed by a number keeps both, and a math paragraph's equations stay apart (code review)", async () => {
+  const src = unzipSync(readFileSync(officeFile("word-equation.docx")));
+  const xml = strFromU8(src["word/document.xml"]!);
+  const eq = xml.match(/<m:oMath>[\s\S]*?<\/m:oMath>/)![0];
+  src["word/document.xml"] = strToU8(xml.replace(eq, `${eq}<w:r><w:t xml:space="preserve">2 apples</w:t></w:r>`));
+  const path = join(mkdtempSync(join(tmpdir(), "ore-eq-")), "digit.docx");
+  writeFileSync(path, zipSync(src));
+  expect((await addSource(await tempLibrary(), path)).body).toContain("$$E=mc²$$2 apples");
+  expect(ommlToTex(`<m:oMathPara><m:oMath><m:r><m:t>a=b</m:t></m:r></m:oMath><m:oMath><m:r><m:t>c=d</m:t></m:r></m:oMath></m:oMathPara>`)).toBe("\\begin{aligned}a=b \\\\ c=d\\end{aligned}");
 });
 
 test("office-03: a Word equation built from a part Ore can't read refuses the file with an export step", async () => {

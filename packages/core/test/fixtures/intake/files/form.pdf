@@ -65,7 +65,7 @@ endobj
 >> /DA (/Helv 12 Tf .1 .1 .1 rg) /DV (Ada Lovelace) /F 4 /FT /Tx 
   /Ff 0 /MK <<
 /BC [ .1 .1 .1 ] /BG [ .8 .843 1 ]
->> /MaxLen 100 /P 19 0 R /Rect [ 160 595 360 611 ] /Subtype /Widget 
+>> /MaxLen 100 /P 28 0 R /Rect [ 160 595 360 611 ] /Subtype /Widget 
   /T (surveyor) /TU (Surveyor) /Type /Annot /V (Ada Lovelace)
 >>
 endobj
@@ -111,7 +111,7 @@ endobj
 >> /DA (/Helv 12 Tf .1 .1 .1 rg) /DV (Wye) /F 4 /FT /Tx 
   /Ff 0 /MK <<
 /BC [ .1 .1 .1 ] /BG [ .8 .843 1 ]
->> /MaxLen 100 /P 19 0 R /Rect [ 160 565 360 581 ] /Subtype /Widget 
+>> /MaxLen 100 /P 28 0 R /Rect [ 160 565 360 581 ] /Subtype /Widget 
   /T (river) /TU (River) /Type /Annot /V (Wye)
 >>
 endobj
@@ -205,13 +205,237 @@ endobj
 >> /F 4 /FT /Btn /Ff 2 
   /H /N /MK <<
 /BC [ .1 .1 .1 ] /BG [ .8 .843 1 ] /CA (4)
->> /P 19 0 R /Rect [ 160 535 174 549 ] /Subtype /Widget /T (flooded) 
+>> /P 28 0 R /Rect [ 160 535 174 549 ] /Subtype /Widget /T (flooded) 
   /TU (Flooded) /Type /Annot /V /Yes
 >>
 endobj
 19 0 obj
 <<
-/Annots [ 8 0 R 11 0 R 18 0 R ] /Contents 23 0 R /MediaBox [ 0 0 612 792 ] /Parent 22 0 R /Resources <<
+/FT /Btn /Ff 49154 /Kids [ 26 0 R 27 0 R ] /T (season) /TU (Season) /V /Spring
+>>
+endobj
+20 0 obj
+<<
+/BBox [ 0 0 14 14 ] /FormType 1 /Length 602 /Matrix [ 1 0 0 1 0 0 ] /Resources << /ProcSet [/PDF] >> /Subtype /Form 
+  /Type /XObject
+>>
+stream
+q 1 g 1 G .8 .843 1 rg
+1 0 0 1 4.9 4.9 cm
+4.9 0 m
+4.9 2.706319 2.706319 4.9 0 4.9 c
+-2.706319 4.9 -4.9 2.706319 -4.9 0 c
+-4.9 -2.706319 -2.706319 -4.9 0 -4.9 c
+2.706319 -4.9 4.9 -2.706319 4.9 0 c
+f
+Q
+q
+.1 .1 .1 RG 1 w
+1 0 0 1 4.9 4.9 cm
+4.55 0 m
+4.55 2.51301 2.51301 4.55 0 4.55 c
+-2.51301 4.55 -4.55 2.51301 -4.55 0 c
+-4.55 -2.51301 -2.51301 -4.55 0 -4.55 c
+2.51301 -4.55 4.55 -2.51301 4.55 0 c
+s
+Q
+q .1 .1 .1 rg .1 .1 .1 RG
+1 0 0 1 4.9 4.9 cm
+2.1 0 m
+2.1 1.159851 1.159851 2.1 0 2.1 c
+-1.159851 2.1 -2.1 1.159851 -2.1 0 c
+-2.1 -1.159851 -1.159851 -2.1 0 -2.1 c
+1.159851 -2.1 2.1 -1.159851 2.1 0 c
+f
+Qendstream
+endobj
+21 0 obj
+<<
+/BBox [ 0 0 14 14 ] /FormType 1 /Length 399 /Matrix [ 1 0 0 1 0 0 ] /Resources << /ProcSet [/PDF] >> /Subtype /Form 
+  /Type /XObject
+>>
+stream
+q 1 g 1 G .8 .843 1 rg
+1 0 0 1 4.9 4.9 cm
+4.9 0 m
+4.9 2.706319 2.706319 4.9 0 4.9 c
+-2.706319 4.9 -4.9 2.706319 -4.9 0 c
+-4.9 -2.706319 -2.706319 -4.9 0 -4.9 c
+2.706319 -4.9 4.9 -2.706319 4.9 0 c
+f
+Q
+q
+.1 .1 .1 RG 1 w
+1 0 0 1 4.9 4.9 cm
+4.55 0 m
+4.55 2.51301 2.51301 4.55 0 4.55 c
+-2.51301 4.55 -4.55 2.51301 -4.55 0 c
+-4.55 -2.51301 -2.51301 -4.55 0 -4.55 c
+2.51301 -4.55 4.55 -2.51301 4.55 0 c
+s
+Qendstream
+endobj
+22 0 obj
+<<
+/BBox [ 0 0 14 14 ] /FormType 1 /Length 614 /Matrix [ 1 0 0 1 0 0 ] /Resources << /ProcSet [/PDF] >> /Subtype /Form 
+  /Type /XObject
+>>
+stream
+q 1 g 1 G .72 .7587 .9 rg
+1 0 0 1 4.9 4.9 cm
+4.9 0 m
+4.9 2.706319 2.706319 4.9 0 4.9 c
+-2.706319 4.9 -4.9 2.706319 -4.9 0 c
+-4.9 -2.706319 -2.706319 -4.9 0 -4.9 c
+2.706319 -4.9 4.9 -2.706319 4.9 0 c
+f
+Q
+q
+.09 .09 .09 RG 1 w
+1 0 0 1 4.9 4.9 cm
+4.55 0 m
+4.55 2.51301 2.51301 4.55 0 4.55 c
+-2.51301 4.55 -4.55 2.51301 -4.55 0 c
+-4.55 -2.51301 -2.51301 -4.55 0 -4.55 c
+2.51301 -4.55 4.55 -2.51301 4.55 0 c
+s
+Q
+q .09 .09 .09 rg .09 .09 .09 RG
+1 0 0 1 4.9 4.9 cm
+2.1 0 m
+2.1 1.159851 1.159851 2.1 0 2.1 c
+-1.159851 2.1 -2.1 1.159851 -2.1 0 c
+-2.1 -1.159851 -1.159851 -2.1 0 -2.1 c
+1.159851 -2.1 2.1 -1.159851 2.1 0 c
+f
+Qendstream
+endobj
+23 0 obj
+<<
+/BBox [ 0 0 14 14 ] /FormType 1 /Length 405 /Matrix [ 1 0 0 1 0 0 ] /Resources << /ProcSet [/PDF] >> /Subtype /Form 
+  /Type /XObject
+>>
+stream
+q 1 g 1 G .72 .7587 .9 rg
+1 0 0 1 4.9 4.9 cm
+4.9 0 m
+4.9 2.706319 2.706319 4.9 0 4.9 c
+-2.706319 4.9 -4.9 2.706319 -4.9 0 c
+-4.9 -2.706319 -2.706319 -4.9 0 -4.9 c
+2.706319 -4.9 4.9 -2.706319 4.9 0 c
+f
+Q
+q
+.09 .09 .09 RG 1 w
+1 0 0 1 4.9 4.9 cm
+4.55 0 m
+4.55 2.51301 2.51301 4.55 0 4.55 c
+-2.51301 4.55 -4.55 2.51301 -4.55 0 c
+-4.55 -2.51301 -2.51301 -4.55 0 -4.55 c
+2.51301 -4.55 4.55 -2.51301 4.55 0 c
+s
+Qendstream
+endobj
+24 0 obj
+<<
+/BBox [ 0 0 14 14 ] /FormType 1 /Length 613 /Matrix [ 1 0 0 1 0 0 ] /Resources << /ProcSet [/PDF] >> /Subtype /Form 
+  /Type /XObject
+>>
+stream
+q 1 g 1 G .82 .8587 1 rg
+1 0 0 1 4.9 4.9 cm
+4.9 0 m
+4.9 2.706319 2.706319 4.9 0 4.9 c
+-2.706319 4.9 -4.9 2.706319 -4.9 0 c
+-4.9 -2.706319 -2.706319 -4.9 0 -4.9 c
+2.706319 -4.9 4.9 -2.706319 4.9 0 c
+f
+Q
+q
+.19 .19 .19 RG 1 w
+1 0 0 1 4.9 4.9 cm
+4.55 0 m
+4.55 2.51301 2.51301 4.55 0 4.55 c
+-2.51301 4.55 -4.55 2.51301 -4.55 0 c
+-4.55 -2.51301 -2.51301 -4.55 0 -4.55 c
+2.51301 -4.55 4.55 -2.51301 4.55 0 c
+s
+Q
+q .19 .19 .19 rg .19 .19 .19 RG
+1 0 0 1 4.9 4.9 cm
+2.1 0 m
+2.1 1.159851 1.159851 2.1 0 2.1 c
+-1.159851 2.1 -2.1 1.159851 -2.1 0 c
+-2.1 -1.159851 -1.159851 -2.1 0 -2.1 c
+1.159851 -2.1 2.1 -1.159851 2.1 0 c
+f
+Qendstream
+endobj
+25 0 obj
+<<
+/BBox [ 0 0 14 14 ] /FormType 1 /Length 404 /Matrix [ 1 0 0 1 0 0 ] /Resources << /ProcSet [/PDF] >> /Subtype /Form 
+  /Type /XObject
+>>
+stream
+q 1 g 1 G .82 .8587 1 rg
+1 0 0 1 4.9 4.9 cm
+4.9 0 m
+4.9 2.706319 2.706319 4.9 0 4.9 c
+-2.706319 4.9 -4.9 2.706319 -4.9 0 c
+-4.9 -2.706319 -2.706319 -4.9 0 -4.9 c
+2.706319 -4.9 4.9 -2.706319 4.9 0 c
+f
+Q
+q
+.19 .19 .19 RG 1 w
+1 0 0 1 4.9 4.9 cm
+4.55 0 m
+4.55 2.51301 2.51301 4.55 0 4.55 c
+-2.51301 4.55 -4.55 2.51301 -4.55 0 c
+-4.55 -2.51301 -2.51301 -4.55 0 -4.55 c
+2.51301 -4.55 4.55 -2.51301 4.55 0 c
+s
+Qendstream
+endobj
+26 0 obj
+<<
+/AP <<
+/D <<
+/Off 23 0 R /Spring 22 0 R
+>> /N <<
+/Off 21 0 R /Spring 20 0 R
+>> /R <<
+/Off 25 0 R /Spring 24 0 R
+>>
+>> /AS /Spring /BS <<
+/S /S /W 1
+>> /F 4 /FT /Btn /H /N 
+  /MK <<
+/BC [ .1 .1 .1 ] /BG [ .8 .843 1 ] /CA (l)
+>> /P 28 0 R /Parent 19 0 R /Rect [ 160 505 174 519 ] /Subtype /Widget /Type /Annot
+>>
+endobj
+27 0 obj
+<<
+/AP <<
+/D <<
+/Off 23 0 R /Summer 22 0 R
+>> /N <<
+/Off 21 0 R /Summer 20 0 R
+>> /R <<
+/Off 25 0 R /Summer 24 0 R
+>>
+>> /AS /Off /BS <<
+/S /S /W 1
+>> /F 4 /FT /Btn /H /N 
+  /MK <<
+/BC [ .1 .1 .1 ] /BG [ .8 .843 1 ] /CA (l)
+>> /P 28 0 R /Parent 19 0 R /Rect [ 200 505 214 519 ] /Subtype /Widget /Type /Annot
+>>
+endobj
+28 0 obj
+<<
+/Annots [ 8 0 R 11 0 R 18 0 R 26 0 R 27 0 R ] /Contents 32 0 R /MediaBox [ 0 0 612 792 ] /Parent 31 0 R /Resources <<
 /Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
 >> /Rotate 0 
   /Trans <<
@@ -219,25 +443,25 @@ endobj
 >> /Type /Page
 >>
 endobj
-20 0 obj
+29 0 obj
 <<
-/AcroForm 24 0 R /PageMode /UseNone /Pages 22 0 R /Type /Catalog
+/AcroForm 33 0 R /PageMode /UseNone /Pages 31 0 R /Type /Catalog
 >>
 endobj
-21 0 obj
+30 0 obj
 <<
-/Author (anonymous) /CreationDate (D:20261127220837+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20261127220837+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
+/Author (anonymous) /CreationDate (D:20261127222014+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20261127222014+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
   /Subject (unspecified) /Title (Field Survey Form) /Trapped /False
 >>
 endobj
-22 0 obj
+31 0 obj
 <<
-/Count 1 /Kids [ 19 0 R ] /Type /Pages
+/Count 1 /Kids [ 28 0 R ] /Type /Pages
 >>
 endobj
-23 0 obj
+32 0 obj
 <<
-/Length 574
+/Length 613
 >>
 stream
 1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
@@ -251,10 +475,11 @@ BT /F3 11 Tf 13.2 TL ET
 BT 1 0 0 1 72 600 Tm (Surveyor) Tj T* ET
 BT 1 0 0 1 72 570 Tm (River) Tj T* ET
 BT 1 0 0 1 72 540 Tm (Flooded) Tj T* ET
+BT 1 0 0 1 72 510 Tm (Season) Tj T* ET
  
 endstream
 endobj
-24 0 obj
+33 0 obj
 <<
 /DA (/Helv 0 Tf 0 g) /DR << /Encoding
 <<
@@ -262,11 +487,11 @@ endobj
 5 0 R
 >>
 /Font << /Helv 6 0 R >>
->> /Fields [ 8 0 R 11 0 R 18 0 R ]
+>> /Fields [ 8 0 R 11 0 R 18 0 R 19 0 R ]
 >>
 endobj
 xref
-0 25
+0 34
 0000000000 65535 f 
 0000000061 00000 n 
 0000000112 00000 n 
@@ -287,21 +512,30 @@ xref
 0000006985 00000 n 
 0000007236 00000 n 
 0000007583 00000 n 
-0000007811 00000 n 
-0000007898 00000 n 
-0000008169 00000 n 
-0000008230 00000 n 
-0000008855 00000 n 
+0000007684 00000 n 
+0000008459 00000 n 
+0000009031 00000 n 
+0000009818 00000 n 
+0000010396 00000 n 
+0000011182 00000 n 
+0000011759 00000 n 
+0000012089 00000 n 
+0000012416 00000 n 
+0000012658 00000 n 
+0000012745 00000 n 
+0000013016 00000 n 
+0000013077 00000 n 
+0000013741 00000 n 
 trailer
 <<
 /ID 
-[<374f1d2e49e730ad459e41f66ca39fc0><374f1d2e49e730ad459e41f66ca39fc0>]
+[<bde2b72889dd4fd398cee0b5430fc462><bde2b72889dd4fd398cee0b5430fc462>]
 % ReportLab generated PDF document -- digest (opensource)
 
-/Info 21 0 R
-/Root 20 0 R
-/Size 25
+/Info 30 0 R
+/Root 29 0 R
+/Size 34
 >>
 startxref
-9000
+13893
 %%EOF

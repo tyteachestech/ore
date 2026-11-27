@@ -34,8 +34,14 @@ function tex(n: Node): string | null {
   const arg = (tag: string) => { const k = kid(n, tag); return k ? all(k.kids) : ""; };
   switch (n.tag) {
     case "#text": return "";
-    case "#root": case "m:oMath": case "m:oMathPara": case "m:e": case "m:num": case "m:den": case "m:sub": case "m:sup": case "m:deg": case "m:fName": case "m:lim": case "m:box": case "m:borderBox": case "m:phant":
+    case "#root": case "m:oMath": case "m:e": case "m:num": case "m:den": case "m:sub": case "m:sup": case "m:deg": case "m:fName": case "m:lim": case "m:box": case "m:borderBox": case "m:phant":
       return all(n.kids.filter((k) => !k.tag.endsWith("Pr")));
+    case "m:oMathPara": {
+      // Its equations, each on a line of its own (code review: two ran together as one).
+      const eqs = n.kids.filter((k) => k.tag === "m:oMath").map(tex);
+      if (eqs.includes(null)) return null;
+      return eqs.length > 1 ? `\\begin{aligned}${eqs.join(" \\\\ ")}\\end{aligned}` : (eqs[0] ?? "");
+    }
     case "m:r": {
       const t = n.kids.filter((k) => k.tag === "m:t").map((k) => decode(k.kids.map((x) => x.text ?? "").join(""))).join("");
       return [...t].map((c) => (SYMBOL[c] ? (SYMBOL[c].startsWith("\\") ? `${SYMBOL[c]} ` : SYMBOL[c]) : /[{}#%&$_^\\]/.test(c) ? `\\${c === "\\" ? "backslash " : c}` : c)).join("");
@@ -89,7 +95,7 @@ export function ommlToTex(xml: string): string | null {
   return t === null ? null : t.replace(/\s+/g, " ").replace(/\\(\w+) (?=[^a-zA-Z])/g, "\\$1").trim();
 }
 
-/** A document's equations swapped for markers mammoth keeps (`ORE0MATH3`), and the TeX of each; null when one
+/** A document's equations swapped for markers mammoth keeps (`ORE0MATH3ORE0`, closed so a digit after it isn't read as its number), and the TeX of each; null when one
  *  can't be read. A paragraph that is only an equation (`<m:oMathPara>`) is shown on its own line. */
 export function markEquations(xml: string, from = 0): { xml: string; maths: { tex: string; display: boolean }[] } | null {
   const maths: { tex: string; display: boolean }[] = [];
@@ -98,7 +104,7 @@ export function markEquations(xml: string, from = 0): { xml: string; maths: { te
     const t = ommlToTex(eq);
     if (t === null || !t) { bad = bad || t === null; return ""; }
     maths.push({ tex: t, display: eq.startsWith("<m:oMathPara") });
-    return `<w:r><w:t xml:space="preserve">ORE0MATH${from + maths.length - 1}</w:t></w:r>`;
+    return `<w:r><w:t xml:space="preserve">ORE0MATH${from + maths.length - 1}ORE0</w:t></w:r>`;
   });
   return bad ? null : { xml: out, maths };
 }

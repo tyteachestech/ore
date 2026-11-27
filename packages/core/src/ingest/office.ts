@@ -83,8 +83,8 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
   const math = (i: string) => maths[Number(i)]?.tex ?? "";
   const body = td
     .turndown(document.body as unknown as HTMLElement)
-    .replace(/^ORE0MATH(\d+)$/gm, (all, i: string) => (maths[Number(i)]?.display ? ["$$", math(i), "$$"].join("\n") : all))
-    .replace(/ORE0MATH(\d+)/g, (_, i: string) => "$$" + math(i) + "$$")
+    .replace(/^ORE0MATH(\d+)ORE0$/gm, (all, i: string) => (maths[Number(i)]?.display ? ["$$", math(i), "$$"].join("\n") : all))
+    .replace(/ORE0MATH(\d+)ORE0/g, (_, i: string) => "$$" + math(i) + "$$")
     .trim();
   if (!body) throw new Error("This Word file has no text to read.");
   const meta = coreProps(files);

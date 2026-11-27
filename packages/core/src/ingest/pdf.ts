@@ -693,7 +693,8 @@ async function formValues(page: Awaited<ReturnType<Doc["getPage"]>>): Promise<st
     if (a.subtype !== "Widget") continue;
     const name = (a.alternativeText || a.fieldName || "").replace(/\s+/g, " ").trim();
     const raw = [a.fieldValue ?? ""].flat().map(String).join(", ").trim();
-    const value = a.checkBox || a.radioButton ? (raw && raw !== "Off" && (!a.radioButton || raw === a.buttonValue) ? "✓" : "") : raw;
+    // A ticked box is ✓; a choice of several is the one picked, once for its group (code review).
+    const value = a.checkBox ? (raw && raw !== "Off" ? "✓" : "") : a.radioButton ? (raw && raw !== "Off" && raw === a.buttonValue ? raw : "") : raw;
     if (name && value) out.push(`${name}: ${value}`);
   }
   return out;
@@ -738,9 +739,9 @@ async function outlineOf(doc: Doc): Promise<{ chapters: Entry[]; sections: (Entr
  *  first, so a paragraph that only opens with the same word never takes the heading from the line below it.
  *  Each entry goes below the one before it on its page: one with no line of its own went in at the page's top,
  *  last first, above the page's own headings (F733). */
-function markChapters(paras: { text: string; note: boolean }[][], outline: { title: string; page: number; depth?: number }[], sections = false) {
+function markChapters(paras: { text: string; note: boolean }[][], outline: { title: string; page: number; depth?: number }[], sections = false): boolean {
   if (sections) outline = outline.filter((e) => e.page < paras.length);
-  else if (outline.length < 2 || outline.some((e, i) => e.page >= paras.length || (i > 0 && e.page < outline[i - 1]!.page))) return;
+  else if (outline.length < 2 || outline.some((e, i) => e.page >= paras.length || (i > 0 && e.page < outline[i - 1]!.page))) return false;
   const words = (t: string) => plain(t).replace(/^#+\s*/, "").replace(/[*_]/g, "").replace(/\s+/g, " ").trim();
   const fold = (t: string) => words(t).toLowerCase();
   const NUMBER = /^\d+(\.\d+)*\.?\s+(?=\S)/;
@@ -770,6 +771,7 @@ function markChapters(paras: { text: string; note: boolean }[][], outline: { tit
     else page.splice((at = at >= 0 ? at : from), 0, head);
     last.set(e.page, at);
   });
+  return true;
 }
 
 /** Each page's box in points ([left, bottom, right, top]), for placing what the page reader saw in
@@ -851,8 +853,8 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
       next.shift();
     }
   });
-  markChapters(paras, outline.chapters);
-  if (outline.chapters.length >= 2) markChapters(paras, outline.sections, true);
+  // Sections only under chapters it could mark: an outline out of page order is no table of chapters (code review).
+  if (markChapters(paras, outline.chapters)) markChapters(paras, outline.sections, true);
   // A margin glossary's definitions after the page's text, above its footnotes.
   paras.forEach((page, i) => {
     const at = page.findIndex((p) => p.note);
@@ -863,7 +865,8 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => (isBlock(x.text) ? blocks[Number(x.text.slice(1, -1))]! : notes(x.text, i))), ...kept[i]!.map((a) => (shown.has(a.name) ? `![](assets/${a.name})` : PAST_FIGURES)), ...fields[i]!].join("\n\n")}`);
   const text = pages.join("\n\n") + "\n";
   // Letters and numbers only: a font pdf.js can't map leaves its punctuation, which is no text to read.
-  if (text.replaceAll(PAST_FIGURES, "").replace(/<!-- page \d+ -->|!\[\]\(assets\/[^)]+\)/g, "").replace(/[^\p{L}\p{N}]/gu, "").length < 20) {
+  // The form's answers aren't the page's own text: a scanned form is still a scan (code review).
+  if (fields.flat().reduce((t, f) => t.replace(f, ""), text.replaceAll(PAST_FIGURES, "")).replace(/<!-- page \d+ -->|!\[\]\(assets\/[^)]+\)/g, "").replace(/[^\p{L}\p{N}]/gu, "").length < 20) {
     throw new ScannedPdf();
   }
   // A metadata title that is only a file or tool name ("1706", "Microsoft Word - draft.docx") loses to page 1's.

@@ -132,8 +132,13 @@ function refuseLink(url: string): string | null {
  *  only partly downloaded: say so, never "invalid zip data". Other errors pass through. */
 const damaged = (what: string, app?: string, bytes?: Uint8Array) => (e: Error): never => {
   // A Word, PowerPoint or Excel file saved with a password is an encrypted package in an OLE container, not a zip.
-  if (bytes && app && [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1].every((b, i) => bytes[i] === b))
-    throw new Error(`That ${what} file is locked with a password. Open it in ${what}, remove the password (File › Info, or File › Passwords), save a copy and add that.`);
+  // Every older .doc, .xls or .ppt is that same container, without the encrypted package: an old file under a new name.
+  if (bytes && app && [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1].every((b, i) => bytes[i] === b)) {
+    const names = new TextDecoder("utf-16le").decode(bytes.subarray(0, Math.min(bytes.length, 1 << 20)));
+    if (/EncryptionInfo|EncryptedPackage/.test(names)) throw new Error(`That ${what} file is locked with a password. Open it in ${what}, remove the password (File › Info, or File › Passwords), save a copy and add that.`);
+    const ext = ({ Word: "docx", Excel: "xlsx", PowerPoint: "pptx" } as Record<string, string>)[what] ?? "docx";
+    throw new Error(`That is an older ${what} file (.${ext.slice(0, -1)}) saved under a new name. Open it in ${what} or ${what === "Excel" ? "Numbers" : what === "PowerPoint" ? "Keynote" : "Pages"}, save it as .${ext}, then add that copy.`);
+  }
   if (/invalid zip|zip data|unexpected EOF|is missing|no rootfile|Can't find end of central directory|Could not find file|unknown compression type/i.test(e.message))
     throw new Error(`That ${what} file is damaged or only partly downloaded. Download it again${app ? `, or open it in ${app} and save a fresh copy` : ""}.`);
   throw e;
@@ -597,11 +602,14 @@ export async function arxivListing(url: string, draft: NewItem): Promise<NewItem
   if (!id || (draft.author && draft.published && !stamp)) return draft;
   const res = await fetch(`https://export.arxiv.org/api/query?id_list=${id}`, { headers: { "user-agent": UA }, signal: AbortSignal.timeout(8000) }).catch(() => null);
   const xml = res?.ok ? await res.text().catch(() => "") : "";
-  const entry = xml.match(/<entry>([\s\S]*?)<\/entry>/)?.[1] ?? "";
-  const names = [...entry.matchAll(/<author>\s*<name>([^<]+)<\/name>/g)].map((m) => m[1]!.replace(/&amp;/g, "&").replace(/&apos;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, " ").trim()).filter(Boolean);
+  // An id arXiv can't find answers with an error entry ("Error", by "arXiv api core"), not a paper.
+  const found = xml.match(/<entry>([\s\S]*?)<\/entry>/)?.[1] ?? "";
+  const entry = /<id>[^<]*api\/errors/.test(found) ? "" : found;
+  const xmlText = (s: string) => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&apos;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  const names = [...entry.matchAll(/<author>\s*<name>([^<]+)<\/name>/g)].map((m) => xmlText(m[1]!)).filter(Boolean);
   const published = entry.match(/<published>([^<]+)<\/published>/)?.[1]?.trim();
   const author = names.length === 1 ? names[0] : names.length === 2 ? names.join(" and ") : names.length ? `${names[0]} et al.` : undefined;
-  const title = entry.match(/<title>([^<]+)<\/title>/)?.[1]?.replace(/\s+/g, " ").trim();
+  const title = xmlText(entry.match(/<title>([^<]+)<\/title>/)?.[1] ?? "") || undefined;
   return { ...draft, title: stamp && title ? title : draft.title, author: draft.author ?? author, published: draft.published ?? published };
 }
 
