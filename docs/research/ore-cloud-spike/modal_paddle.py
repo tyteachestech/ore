@@ -18,7 +18,8 @@ image = (
     .run_commands(
         "python -m venv /opt/vllm",
         "/opt/vllm/bin/pip install 'paddleocr[doc-parser]==3.7.0'",
-        "/opt/vllm/bin/paddleocr install_genai_server_deps vllm",
+        # Its own paddlex first on PATH: the system one imports paddle-gpu, which needs a GPU the build lacks.
+        "PATH=/opt/vllm/bin:$PATH /opt/vllm/bin/paddleocr install_genai_server_deps vllm",
     )
 )
 
@@ -37,7 +38,7 @@ def bench() -> str:
     os.environ["HF_HOME"] = "/cache/hf"
     os.environ["PADDLE_PDX_CACHE_HOME"] = "/cache/paddlex"
     t0 = time.time()
-    srv = subprocess.Popen(["/opt/vllm/bin/paddleocr", "genai_server", "--model_name", "PaddleOCR-VL-1.6-0.9B", "--backend", "vllm", "--port", "8118"], env={**os.environ})
+    srv = subprocess.Popen(["/opt/vllm/bin/paddleocr", "genai_server", "--model_name", "PaddleOCR-VL-1.6-0.9B", "--backend", "vllm", "--port", "8118"], env={**os.environ, "PATH": "/opt/vllm/bin:" + os.environ["PATH"]})
     while True:
         if srv.poll() is not None:
             raise RuntimeError("the model's server stopped")
