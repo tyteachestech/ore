@@ -1,0 +1,10 @@
+# HTTPS for Ore Cloud: Caddy gets and renews the certificate itself. It writes the caller's address into
+# X-Forwarded-For (dropping any the caller sent), which the server's sign-in limit reads (ORE_BEHIND_PROXY).
+{$ORE_DOMAIN} {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000"
+	request_body {
+		max_size 201MiB
+	}
+	reverse_proxy server:8787
+}
