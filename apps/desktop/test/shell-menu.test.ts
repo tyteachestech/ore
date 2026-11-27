@@ -35,6 +35,7 @@ test("quiz menu Undo stays in its history and app navigation is handed to main",
   const calls: { cmd: string; args: any }[] = [];
   let sequence = 0;
   (w as any).__TAURI_INTERNALS__ = {
+    metadata: { currentWindow: { label: "quiz" }, currentWebview: { label: "quiz", windowLabel: "quiz" } },
     transformCallback(fn: (event: { payload: string }) => void) { callbacks.set(++sequence, fn); return sequence; },
     async invoke(cmd: string, args: any) { calls.push({ cmd, args }); return args?.handler; },
   };
@@ -52,6 +53,8 @@ test("quiz menu Undo stays in its history and app navigation is handed to main",
   const unlisten = await listenMenu(() => keys, true);
   try {
     const listener = calls.find((c) => c.cmd === "plugin:event|listen" && c.args.event === "menu")!;
+    // Its own clicks only: the plain `listen` (target "Any") heard the main window's too, and handed each back (F765).
+    expect(listener.args.target).toEqual({ kind: "Window", label: "quiz" });
     callbacks.get(listener.args.handler)!({ payload: "ore:undo" });
     await Promise.resolve();
     expect(disk).toEqual({ mainArchived: true, quizRated: false });
