@@ -2441,3 +2441,27 @@ journey("reader: a book opens on its text, its publisher's pages under one shut 
     await ore("archive", made.id).catch(() => {});
   }
 });
+
+const LINKED = "A page with a link in it";
+for (const engine of ["chromium", "webkit"] as const)
+  journey(`highlight: a drag that starts inside a link's text selects from there (F3, ${engine})`, async (page) => {
+    if (engine === "chromium") {
+      const dir = mkdtempSync(join(tmpdir(), "ore-f3-"));
+      const file = join(dir, "linked.md");
+      writeFileSync(file, `# ${LINKED}\n\nSpacing works best when you read [the long review of spaced practice](https://example.com/review) and then test yourself on it a week later, without notes.\n`);
+      await ore("add", file, "--no-enrich");
+      rmSync(dir, { recursive: true, force: true });
+      await page.reload();
+    }
+    await openSource(page, LINKED);
+    const link = page.locator(".doc a[href^='http']").first();
+    await link.scrollIntoViewIfNeeded();
+    const a = (await link.boundingBox())!;
+    const popup = page.getByRole("dialog", { name: "Highlight" });
+    await page.mouse.move(a.x + a.width * 0.3, a.y + a.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(a.x + a.width * 0.3 + 160, a.y + a.height / 2 + 30, { steps: 10 });
+    await page.mouse.up();
+    await until("the drag from the link opens Highlight", async () => popup.isVisible());
+    await page.keyboard.press("Escape");
+  }, engine);

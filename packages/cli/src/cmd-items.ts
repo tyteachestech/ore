@@ -243,7 +243,10 @@ export const itemCommands: Record<string, Command> = {
     async run(_, f) {
       const lib = openLibrary();
       const status = oneOf(f.status, ItemStatus.options, "status");
-      const selected = f.ids === undefined ? listItems(lib, { archived: !!f.archived }) : [...new Set(strs(f.ids))].map((id) => findItem(lib, id));
+      const selected = f.ids === undefined ? listItems(lib, { archived: !!f.archived }) : [...new Set(strs(f.ids))].flatMap((id) => {
+        // A source gone since (removed, or deleted in Finder) is left out: the app drops its row.
+        try { return [findItem(lib, id)]; } catch { return []; }
+      });
       const items = selected.filter(
         (i) => !i.meta.preview && !isQuestionOnly(i) && (!status || i.meta.status === status) && (!f.skill || i.meta.skills.includes(f.skill as string)) && (!f.topic || i.meta.topics.includes(f.topic as string)),
       );
