@@ -89,11 +89,11 @@ const GRID: Record<string, Row> = {
   "Browser tab": { title: "a signed-in article comes in from the tab's HTML", author: na, date: na, text: "a signed-in article comes in from the tab's HTML", headings: na, images: na, code: na, tables: na, math: na, language: na, junk: "a tab still showing a sign-in says to sign in there" },
 };
 
-/** Every test title in core's tests, plus the named cases of table-driven ones (`name: "…"`). */
+/** Every test title in core's tests, plus the named cases of table-driven ones (`name: "…"`, the golden ones kept in golden-cases.ts). */
 function titles(): string[] {
   const dir = import.meta.dir;
   const out: string[] = [];
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".test.ts") && f !== "intake-grid.test.ts")) {
+  for (const f of readdirSync(dir).filter((f) => (f.endsWith(".test.ts") && f !== "intake-grid.test.ts") || f === "golden-cases.ts")) {
     const src = readFileSync(join(dir, f), "utf8");
     for (const m of src.matchAll(/\btest\(\s*(["'`])((?:\\.|(?!\1).)*)\1/g)) out.push(m[2]!.replace(/\\(.)/g, "$1"));
     for (const m of src.matchAll(/\bname: "((?:\\.|[^"])*)"/g)) out.push(m[1]!.replace(/\\(.)/g, "$1"));

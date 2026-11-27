@@ -53,6 +53,8 @@ export interface AddOptions {
   /** An episode comes in at once, by its title, show and date, with its transcript owed (D227): the
    *  download and the hearing are `fillOwed`'s, so he sees the source while they run. */
   owe?: boolean;
+  /** Ore Cloud (#549): a file's own images are read only from inside this folder (the job's upload). */
+  imagesIn?: string;
 }
 
 // The first `# ` heading outside fenced code (a `# comment` in a code block is no title).
@@ -84,7 +86,7 @@ async function markdownFile(text: string, fallback: string): Promise<{ title: st
 const fileStem = (p: string) => basename(p, extname(p));
 
 /** Video sites yt-dlp reads besides YouTube: a transcript source like a YouTube video, played on the site. */
-const VIDEO_SITE = /^https?:\/\/(?:www\.|player\.)?(?:vimeo\.com\/(?:video\/)?\d+|ted\.com\/talks\/|loom\.com\/share\/|dailymotion\.com\/video\/)/;
+export const VIDEO_SITE = /^https?:\/\/(?:www\.|player\.)?(?:vimeo\.com\/(?:video\/)?\d+|ted\.com\/talks\/|loom\.com\/share\/|dailymotion\.com\/video\/)/;
 const PLAYLIST = /^https?:\/\/(?:www\.|m\.)?youtube\.com\/playlist\?/;
 const PODCAST = /^https?:\/\/(?:podcasts\.apple\.com\/.+[?&]i=|open\.spotify\.com\/episode\/|overcast\.fm\/|pca\.st\/)/;
 const X_POST = /^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/\w+\/status\//;
@@ -544,7 +546,7 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
       // Only a picture that is there to save: a link to one that is missing stays as written, never
       // this Mac's folder in a doc.md the phone reads too.
       const href = new URL(url, base).href;
-      return localImageSaves(href) ? href : undefined;
+      return localImageSaves(href, opts.imagesIn) ? href : undefined;
     });
   }
   return draft;
@@ -584,7 +586,7 @@ export async function addSource(lib: Library, input: string, opts: AddOptions = 
   if (had) return keep(lib, had, opts);
   const draft = isUrl ? await fromUrl(input, opts) : await fromFile(resolve(input), opts, input);
   if (!draft.body.trim() && !draft.owed?.length) throw new Error("Found no text to read in that. Copy the text and paste it here instead.");
-  const ready = await withImages(draft);
+  const ready = await withImages(draft, opts.imagesIn);
   // The same file added again (dropped twice, or a copy) is the source already here.
   let same = !isUrl && sameText(lib, ready.body);
   // Looked for again under the write lock: the same link or file added at once by another add (F572).

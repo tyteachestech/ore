@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { extname } from "node:path";
+import { extname, resolve, sep } from "node:path";
 import type { Asset, NewItem } from "../items.ts";
 
 // The images a source shows are saved into its folder (D96): the library stays readable offline and
@@ -23,10 +23,12 @@ export const assetName = (data: Uint8Array, ext: string) => `${createHash("sha25
 const IMAGE = /(!\[[^\]\n]*\]\()((?:https?|file):\/\/[^)\s]+)((?:\s+"[^"\n]*")?\))/g;
 const FILE_EXT: Record<string, string> = { png: "png", jpg: "jpg", jpeg: "jpg", gif: "gif", webp: "webp", svg: "svg", avif: "avif" };
 
-/** A saved web page's own image (its `_files` folder beside it), read from disk; null when it isn't one. */
-function localImage(url: string): Uint8Array | null {
+/** A saved web page's own image (its `_files` folder beside it), read from disk; null when it isn't one,
+ *  or when it lies outside `within` (Ore Cloud: only the job's upload, never the server's own disk). */
+function localImage(url: string, within?: string): Uint8Array | null {
   try {
-    const path = decodeURIComponent(new URL(url).pathname);
+    const path = resolve(decodeURIComponent(new URL(url).pathname));
+    if (within && !path.startsWith(resolve(within) + sep)) return null;
     if (!FILE_EXT[extname(path).slice(1).toLowerCase()] || !existsSync(path) || statSync(path).size > MAX_IMAGE) return null;
     return new Uint8Array(readFileSync(path));
   } catch {
@@ -35,17 +37,17 @@ function localImage(url: string): Uint8Array | null {
 }
 
 /** Whether a `file://` image would be saved: a link to one that would not must stay as it was written. */
-export const localImageSaves = (url: string) => (localImage(url)?.length ?? 0) >= MIN_IMAGE;
+export const localImageSaves = (url: string, within?: string) => (localImage(url, within)?.length ?? 0) >= MIN_IMAGE;
 
 /** Downloads the body's remote images and points the body at the saved copies. */
-export async function saveImages(body: string, opts: { referer?: string; local?: boolean } = {}): Promise<{ body: string; assets: Asset[] }> {
+export async function saveImages(body: string, opts: { referer?: string; local?: boolean; within?: string } = {}): Promise<{ body: string; assets: Asset[] }> {
   // `file://` images are read only for a file he added himself (a saved page), never for a web page.
   const urls = [...new Set([...body.matchAll(IMAGE)].map((m) => m[2]!))].filter((u) => opts.local || !u.startsWith("file:")).slice(0, MAX_IMAGES);
   const saved = new Map<string, Asset>();
   let total = 0;
   const one = async (url: string) => {
     if (url.startsWith("file:")) {
-      const data = localImage(url);
+      const data = localImage(url, opts.within);
       if (!data || data.length < MIN_IMAGE || total + data.length > MAX_TOTAL) return;
       total += data.length;
       return void saved.set(url, { name: assetName(data, FILE_EXT[extname(url).slice(1).toLowerCase()]!), data });
@@ -67,8 +69,8 @@ export async function saveImages(body: string, opts: { referer?: string; local?:
 }
 
 /** A draft with the images its body shows saved beside it, for the kinds that show images. */
-export async function withImages<T extends Omit<NewItem, "skills" | "course">>(draft: T): Promise<T> {
+export async function withImages<T extends Omit<NewItem, "skills" | "course">>(draft: T, within?: string): Promise<T> {
   if (draft.type !== "article" && draft.type !== "markdown") return draft;
-  const { body, assets } = await saveImages(draft.body, { referer: draft.url, local: !draft.url });
+  const { body, assets } = await saveImages(draft.body, { referer: draft.url, local: !draft.url, within });
   return { ...draft, body, assets: [...(draft.assets ?? []), ...assets] };
 }
