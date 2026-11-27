@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { AnnotationSchema, anchorAnnotations, annotationRevs, annotationsPath, reanchorItem } from "./annotations.ts";
 import { cardFiles, readCardFile } from "./cards.ts";
 import { syncIndex } from "./db.ts";
-import { errorLine, logFiles, readJsonlLines, sha256, subdirs, visible } from "./fsutil.ts";
+import { errorLine, logFiles, readJsonlLines, realNow, sha256, subdirs, visible } from "./fsutil.ts";
 import { ID_END, itemDirs, readItemDir, sourceFile, type Item } from "./items.ts";
 import { brokenLinks } from "./links.ts";
 import { recoverReimport, reimportRecovery } from "./ingest/index.ts";
@@ -186,7 +186,7 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
 
   // A git killed mid-snapshot leaves index.lock, and every later snapshot (D5) quietly fails.
   const gitLock = join(lib.root, ".git", "index.lock");
-  if (existsSync(gitLock) && Date.now() - statSync(gitLock).mtimeMs > 60_000) {
+  if (existsSync(gitLock) && realNow() - statSync(gitLock).mtimeMs > 60_000) {
     if (opts.fix) { unlinkSync(gitLock); fixed.push(".git/index.lock: removed stale lock, so library history saves again"); }
     else add("warn", gitLock, "library history has stopped saving: a git run was cut off and left this lock — run ore doctor --fix");
   }
@@ -200,7 +200,7 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
     }
   }
   const session = paths.openSession(lib);
-  if (existsSync(session) && Date.now() - statSync(session).mtimeMs > 86_400_000) {
+  if (existsSync(session) && realNow() - statSync(session).mtimeMs > 86_400_000) {
     add("warn", session, "a review session has been open for over a day (ore session end)");
   }
 

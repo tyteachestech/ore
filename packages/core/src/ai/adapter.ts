@@ -4,9 +4,10 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 import type { AiStamp } from "../items.ts";
 import type { Library } from "../library.ts";
-import { loadSkills } from "../skills.ts";
-import { aiModel } from "./models.ts";
+import { loadSkills, type AiJob } from "../skills.ts";
+import { aiModel, JOB_OF } from "./models.ts";
 import { loadPrompt, type PromptName } from "./prompts.ts";
+import { logUsage } from "../usage.ts";
 
 export type Vendor = "claude" | "codex";
 
@@ -87,12 +88,15 @@ export function codexUsage(stdout: string): Usage {
   return u;
 }
 
-export function chooseVendor(lib: Library): Vendor {
+/** The AI that runs: ORE_AI, else the one he set for this job (`jobs:` in skills.yaml, D356), else
+ *  the library's `ai:`. With no job, the default AI. */
+export function chooseVendor(lib: Library, job?: AiJob): Vendor {
   const env = process.env.ORE_AI;
   if (env === "claude" || env === "codex") return env;
   if (env) throw new Error(`ORE_AI must be claude or codex (got "${env}")`);
   try {
-    return loadSkills(lib).ai ?? "claude";
+    const file = loadSkills(lib);
+    return (job && file.jobs?.[job]?.ai) || file.ai || "claude";
   } catch {
     return "claude";
   }
@@ -441,27 +445,40 @@ export function parseOutput(output: unknown): unknown {
 /** Who will answer a task, before it runs: a reply stopped while it streams still records its vendor, model and
  *  prompt version (F186). The model is the one picked, or the vendor's default when none is. */
 export function aiStampFor(lib: Library, name: PromptName): AiStamp {
-  const vendor = chooseVendor(lib);
-  return { vendor, model: aiModel(lib, vendor) ?? (vendor === "codex" ? codexConfiguredModel() : undefined) ?? `${vendor}-default`, prompt_version: loadPrompt(name).version };
+  const job = JOB_OF[name];
+  const vendor = chooseVendor(lib, job);
+  return { vendor, model: aiModel(lib, vendor, job) ?? (vendor === "codex" ? codexConfiguredModel() : undefined) ?? `${vendor}-default`, prompt_version: loadPrompt(name).version };
 }
 
 // Run one AI task. Invalid output (bad JSON, schema or check failure) is
 // retried once with the error appended; a second failure is an error.
 export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<AgentResult<T>> {
-  const vendor = chooseVendor(lib);
+  const job = JOB_OF[task.prompt];
+  const vendor = chooseVendor(lib, job);
   const prompt = loadPrompt(task.prompt);
   const schema = vendorSchema(task.schema);
   const run = vendor === "claude" ? runClaude : runCodex;
-  const opts: RunOpts = { model: aiModel(lib, vendor), resume: task.session?.id };
+  const opts: RunOpts = { model: aiModel(lib, vendor, job), resume: task.session?.id };
   let message = userMessage(task.input, task.files ?? []);
   let lastError = "";
   let usage: Usage = { input_tokens: 0, output_tokens: 0 };
   // What every attempt's web search returned: the retry's reason lists the first one's pages, so a retry
   // that cites one of them without searching again is citing a page that was returned.
   let web: WebSeen | undefined;
+  let model = opts.model ?? "";
+  // Every run's spend goes in usage.jsonl (#547), the failed ones too: what Ore Cloud's allowance is priced from.
+  const logged = (runs: number, ok: boolean) =>
+    logUsage(lib, { ts: new Date().toISOString(), job: task.prompt, vendor, model, prompt_version: prompt.version, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, ...(usage.cost_usd !== undefined ? { cost_usd: usage.cost_usd } : {}), runs, ok });
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const raw = await run(prompt.text, message, schema, task as AgentTask<unknown>, opts);
+    let raw: RawRun;
+    try {
+      raw = await run(prompt.text, message, schema, task as AgentTask<unknown>, opts);
+    } catch (e) {
+      if (attempt > 1) logged(attempt - 1, false);
+      throw e;
+    }
     usage = addUsage(usage, raw.usage);
+    model = raw.model;
     opts.resume = raw.session ?? opts.resume;
     if (raw.web) web = web ? { ...raw.web, searched: web.searched || raw.web.searched, pages: [...web.pages, ...raw.web.pages.filter((p) => !web!.pages.some((q) => samePage(q.url, p.url)))] } : raw.web;
     try {
@@ -469,6 +486,7 @@ export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<Age
       if (!parsed.success) throw new Error(parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "));
       const problem = task.check?.(parsed.data, web);
       if (problem) throw new Error(problem);
+      logged(attempt, true);
       return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage, runs: attempt, ...(web ? { web } : {}), ...(raw.session ? { session: raw.session } : {}) };
     } catch (e) {
       lastError = (e as Error).message;
@@ -476,6 +494,7 @@ export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<Age
       message = `${task.session ? "" : `${userMessage(task.input, task.files ?? [])}\n\n`}Your previous output was invalid: ${lastError}\nReturn only JSON that matches the schema.`;
     }
   }
+  logged(2, false);
   throw new Error(`${vendor} returned invalid ${task.prompt} output twice: ${lastError}`);
 }
 
@@ -491,9 +510,13 @@ export interface ChatRun {
 // up again with `exec resume`. No tools: everything the chat needs is in the first message.
 /** `onProgress` (claude only): the reply so far as it is written, a few times a second, with the session it is
  *  written in, which a run stopped part way never returns (D296). */
-export async function runChatTurn(lib: Library, a: { system: string; message: string; schema: object; session?: string; cwd: string; onProgress?: (p: { reply: string; session: string }) => void }): Promise<ChatRun & { vendor: Vendor }> {
-  const vendor = chooseVendor(lib);
-  const model = aiModel(lib, vendor);
+export async function runChatTurn(lib: Library, a: { prompt: PromptName; system: string; message: string; schema: object; session?: string; cwd: string; onProgress?: (p: { reply: string; session: string }) => void }): Promise<ChatRun & { vendor: Vendor }> {
+  const job = JOB_OF[a.prompt];
+  const vendor = chooseVendor(lib, job);
+  const model = aiModel(lib, vendor, job);
+  // Its spend goes in usage.jsonl as runAgent's does (#547).
+  const logged = (ran: string, usage: Usage) =>
+    logUsage(lib, { ts: new Date().toISOString(), job: a.prompt, vendor, model: ran, prompt_version: loadPrompt(a.prompt).version, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, ...(usage.cost_usd !== undefined ? { cost_usd: usage.cost_usd } : {}), runs: 1, ok: true });
   if (vendor === "claude") {
     const bin = Bun.which("claude", { PATH: process.env.PATH ?? "" });
     if (!bin) throw new Error("Claude Code isn’t installed (no `claude` on PATH). Install it, or pick Codex in Settings → AI.");
@@ -519,7 +542,11 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
     }));
     const out = claudeResult(r, a.onProgress ? streamEvents(r.stdout) : undefined);
     const usage = Object.entries(out.modelUsage ?? {}).sort((x, y) => (y[1].outputTokens ?? 0) - (x[1].outputTokens ?? 0));
-    return { vendor, output: out.structured_output ?? out.result, model: usage[0]?.[0] ?? model ?? "claude-default", session };
+    const ran = usage[0]?.[0] ?? model ?? "claude-default";
+    // A resumed session reports what the whole session has cost so far, so a follow-up keeps only its tokens (as runClaude).
+    const { cost_usd, ...tokens } = claudeUsage(out);
+    logged(ran, a.session ? tokens : { ...tokens, ...(cost_usd !== undefined ? { cost_usd } : {}) });
+    return { vendor, output: out.structured_output ?? out.result, model: ran, session };
   }
   const bin = Bun.which("codex", { PATH: process.env.PATH ?? "" });
   if (!bin) throw new Error("Codex isn’t installed (no `codex` on PATH). Install it, or pick Claude in Settings → AI.");
@@ -538,7 +565,9 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
     if (r.code !== 0 || !existsSync(outPath)) throw vendorFailure("codex", r);
     const session = a.session ?? codexThread(r.stdout);
     if (!session) throw new Error("codex did not report a thread id");
-    return { vendor, output: readFileSync(outPath, "utf8"), model: model ?? codexConfiguredModel() ?? "codex-default", session };
+    const ran = model ?? codexConfiguredModel() ?? "codex-default";
+    logged(ran, codexUsage(r.stdout));
+    return { vendor, output: readFileSync(outPath, "utf8"), model: ran, session };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

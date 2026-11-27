@@ -38,7 +38,9 @@ async function answer(req: Request): Promise<Response> {
       jobs.get(job)?.kill("SIGTERM");
       return new Response("null", { headers: h });
     }
-    const { args, stdin, job } = await req.json();
+    const { args, stdin, job, now } = await req.json();
+    // ORE_BRIDGE_PAGE_CLOCK=1 (a simulated learner's days): `ore` runs at the page's time, which page.clock moves (F739).
+    const gap = process.env.ORE_BRIDGE_PAGE_CLOCK && typeof now === "number" ? now - Date.now() : 0;
     // `recall --text` only stores what he wrote: it runs. `check --covered` calls no AI either, but marks a check
     // the canned AI never wrote down, so it is answered as the check was.
     const ai = callsAi(args) || args[0] === "check";
@@ -53,7 +55,7 @@ async function answer(req: Request): Promise<Response> {
       return new Response(JSON.stringify(null), { headers: h });
     }
     // No background enrichment unless ORE_MOCK_ENRICH=1: `ore add` would start the real claude or codex CLI and spend real usage.
-    const env = { ...process.env, ORE_NO_ENRICH: process.env.ORE_MOCK_ENRICH ? "" : "1" };
+    const env = { ...process.env, ORE_NO_ENRICH: process.env.ORE_MOCK_ENRICH ? "" : "1", ...(Math.abs(gap) > 60_000 && { ORE_CLOCK_OFFSET_MS: String(gap) }) };
     const p = Bun.spawn([...RUN, ...args, "--json"], { env, stdin: stdin == null ? "ignore" : new TextEncoder().encode(stdin), stdout: "pipe", stderr: "pipe" });
     if (job) jobs.set(job, p);
     const [out, err, code] = [await new Response(p.stdout).text(), await new Response(p.stderr).text(), await p.exited];

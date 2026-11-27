@@ -29,11 +29,33 @@ export let LIB = process.env.ORE_LIBRARY ?? "";
 /** Where the app answers, once the run has started it. */
 export let url = "";
 
+/** A dev server that bundles a dependency late reloads every page it serves, cutting the open journey's `ore`
+ *  calls (WebKit: a fetch refused "due to access control checks", F749). It does that when its scan of the
+ *  imports fails, so a scan that fails or a reload fails the run, naming what vite said. */
+function watchVite(vite: { stdout: ReadableStream<Uint8Array>; stderr: ReadableStream<Uint8Array> }, echo = false) {
+  const late = /Failed to run dependency scan|new dependencies optimized|optimized dependencies changed|reloading/i;
+  for (const [stream, err] of [[vite.stdout, false], [vite.stderr, true]] as const)
+    void (async () => {
+      const text = new TextDecoder();
+      let rest = "";
+      for await (const chunk of stream) {
+        const lines = (rest + text.decode(chunk, { stream: true })).split("\n");
+        rest = lines.pop() ?? "";
+        for (const l of lines) {
+          if (late.test(l)) errors.push(`vite: ${l.trim()}`);
+          // The phone's server showed its errors (a build that breaks) in the run's log before: it still does.
+          else if (echo && err) console.error(l);
+        }
+      }
+    })();
+}
+
 /** The app itself (vite), started once for the whole run: it holds no library, the bridge does. */
 async function app(): Promise<() => void> {
   if (process.env.E2E_URL) return (url = process.env.E2E_URL), () => {};
   // The ambience radio plays plain tones of its own (e2e/sounds), never the sounds on the Mac (D254).
-  const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_SOUNDS: join(import.meta.dir, "sounds") }, stdout: "ignore", stderr: "ignore" });
+  const vite = Bun.spawn(["bunx", "vite", "--port", String(PORT), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_SOUNDS: join(import.meta.dir, "sounds") }, stdout: "pipe", stderr: "pipe" });
+  watchVite(vite);
   url = `http://localhost:${PORT}/`;
   // A cold vite bundles its dependencies before it answers (pdf.js among them, D202), which took over 20 s on a
   // slow runner: the journeys then started against nothing and the first six failed on a refused connection.
@@ -110,7 +132,8 @@ async function phoneApp(): Promise<string> {
   if (phoneVite) return phoneVite.url;
   if (!phoneOwn) await phoneLibrary();
   const port = Number(process.env.ORE_E2E_PHONE_PORT ?? PORT + 2);
-  const vite = Bun.spawn(["bunx", "vite", "--port", String(port), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_PHONE: "1", ORE_PHONE_LIBRARY: PHONE_LIB }, stdout: "ignore", stderr: "inherit" });
+  const vite = Bun.spawn(["bunx", "vite", "--port", String(port), "--strictPort"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, ORE_PHONE: "1", ORE_PHONE_LIBRARY: PHONE_LIB }, stdout: "pipe", stderr: "pipe" });
+  watchVite(vite, true);
   const url = `http://localhost:${port}/`;
   let up = false;
   for (let i = 0; i < 150 && !up; i++) {
@@ -412,6 +435,15 @@ export async function inLibrary(page: Page, titles: string[]) {
     const live = new Set(((await ore("ls")) as { title: string }[]).map((i) => i.title));
     return titles.every((t) => live.has(t));
   });
+}
+
+/** Until no `ore` call has been in flight for 300 ms, up to three seconds; never fails. */
+async function calm(page: Page) {
+  let quietSince = Date.now();
+  for (const end = Date.now() + 3000; Date.now() < end && Date.now() - quietSince < 300; await Bun.sleep(50)) {
+    const busy = await page.evaluate(() => !!(window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING).catch(() => false);
+    if (busy) quietSince = Date.now();
+  }
 }
 
 /** Waits for every `ore` call the page has made to answer, however long a slow machine takes (past the library
@@ -826,12 +858,22 @@ export async function run() {
         failed++;
         const shot = join(tmpdir(), `ore-e2e-${name.replace(/\W+/g, "-")}.png`);
         await page?.screenshot({ path: shot }).catch(() => {});
+        // The `ore` calls still out and the last ones answered: a step that timed out behind a slow or failed call
+        // says so, where a screenshot alone left the cause open (F142, F651).
+        const calls = await page?.evaluate(() => {
+          const w = window as unknown as { __ORE_INFLIGHT?: string[]; __ORE_LOG?: string[] };
+          return `ore in flight: ${JSON.stringify(w.__ORE_INFLIGHT ?? [])}; last answered: ${JSON.stringify(w.__ORE_LOG ?? [])}`;
+        }).catch(() => "");
         // The error's first two lines, then the end of Playwright's call log: what was in the way of a click that timed out.
         const lines = (e as Error).message.split("\n").filter((l) => l.trim());
         const log = lines.findIndex((l) => /^\s*Call log/.test(l));
         const why = [...(log < 0 ? lines : lines.slice(0, log)).slice(0, 2), ...(log < 0 ? [] : lines.slice(log + 1).slice(-4))].join("\n      ");
-        console.log(`FAIL  ${name}\n      ${why}${page ? `\n      screenshot: ${shot}` : ""}`);
+        console.log(`FAIL  ${name}\n      ${why}${calls ? `\n      ${calls}` : ""}${page ? `\n      screenshot: ${shot}` : ""}`);
       }
+      // A call the app makes as a journey ends (Settings closing, the window taking focus back) was cut off by the
+      // close, which WebKit reports as a page error "due to access control checks" (F749): the page closes once no
+      // ore call has been in flight for 300 ms, or after three seconds whatever is left.
+      if (page) await calm(page);
       await page?.close();
     }
     await done();

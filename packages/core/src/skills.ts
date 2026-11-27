@@ -48,9 +48,15 @@ export const ReviewSettingsSchema = z.object({
 export type ReviewSettings = Required<z.infer<typeof ReviewSettingsSchema>>;
 export const REVIEW_DEFAULTS: ReviewSettings = { goal_minutes: 10, weekdays_only: false, new_per_day: 10, remix: true, plan: "", reminder: "" };
 
+/** The AI's jobs, each of which can have its own AI (D356): the tutor chat and explaining a term; marking and
+ *  feedback on his answers; writing exercises and quiz questions; answers from his library and finding sources. */
+export const AI_JOBS = ["tutor", "grade", "write", "ask"] as const;
+export type AiJob = (typeof AI_JOBS)[number];
+const JobAiSchema = z.object({ ai: z.enum(["claude", "codex"]), model: z.string().optional() });
 export const SkillsFileSchema = z.object({
   ai: z.enum(["claude", "codex"]).optional(),
   models: z.object({ claude: z.string().optional(), codex: z.string().optional() }).optional(), // the model per vendor; ORE_AI_MODEL overrides
+  jobs: z.object({ tutor: JobAiSchema.optional(), grade: JobAiSchema.optional(), write: JobAiSchema.optional(), ask: JobAiSchema.optional() }).optional(), // an AI for one job; the rest run on `ai:`
   review: ReviewSettingsSchema.optional(),
   skills: z.array(SkillSchema),
 });
@@ -81,7 +87,7 @@ export function defaultSkillsYaml(): string {
   return (
     "# Skills (D25). Priority maps to desired retention (P1 0.92, P2 0.88, P3 0.80)\n" +
     "# and breaks ties in the review queue. It never changes FSRS math.\n" +
-    "# ai: claude | codex   (AI vendor for enrichment and grading; ORE_AI overrides)\n" +
+    "# ai: claude | codex   (the AI for every job; ORE_AI overrides. One job can have its own under `jobs:`, e.g. jobs: {grade: {ai: codex}})\n" +
     loadYaml().stringify({ ai: "claude", skills: DEFAULT_SKILLS }, { lineWidth: 0 })
   );
 }
@@ -136,9 +142,13 @@ function parseFile(data: unknown): { file: SkillsFile; dropped: string[] } {
       dropped.push(`skill "${String(skill.name ?? skill.id ?? Number(n) + 1)}" has ${field} ${JSON.stringify(skill[field])}, which Ore can't use, so ${field === "priority" ? `${DEFAULT_PRIORITY} is used` : "it is left out"}`);
       if (field === "priority") skill.priority = DEFAULT_PRIORITY;
       else delete skill[field];
-    } else if ((top === "review" || top === "models") && typeof n === "string" && copy[top] && typeof copy[top] === "object" && n in (copy[top] as object)) {
-      dropped.push(`${top}.${n} is ${JSON.stringify((copy[top] as Record<string, unknown>)[n])}, which Ore can't use, so the default is used`);
+    } else if ((top === "review" || top === "models" || top === "jobs") && typeof n === "string" && copy[top] && typeof copy[top] === "object" && n in (copy[top] as object)) {
+      dropped.push(`${top}.${n} is ${JSON.stringify((copy[top] as Record<string, unknown>)[n])}, which Ore can't use, so ${top === "jobs" ? "that job runs on the default AI" : "the default is used"}`);
       delete (copy[top] as Record<string, unknown>)[n];
+    } else if ((top === "review" || top === "models" || top === "jobs") && issue.path.length === 1 && top in copy) {
+      // The whole block isn't one (`jobs: codex`): each of its values is the default.
+      dropped.push(`${top} is ${JSON.stringify(copy[top])}, which Ore can't use, so the defaults are used`);
+      delete copy[top];
     } else if (top === "ai" && issue.path.length === 1 && "ai" in copy) {
       dropped.push(`ai is ${JSON.stringify(copy.ai)} (claude or codex), so claude is used`);
       delete copy.ai;

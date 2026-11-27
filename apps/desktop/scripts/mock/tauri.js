@@ -44,7 +44,7 @@ async function ore(args) {
   }
   const port = window.__ORE_BRIDGE || 1421;
   // As the real app reports a missing `ore`: say what is down and how to start it, not "Failed to fetch".
-  const r = await fetch("http://localhost:" + port + "/ore", { method: "POST", body: JSON.stringify({ args: args.args, stdin: args.stdin ?? null, job: args.job ?? null }) }).catch(() => {
+  const r = await fetch("http://localhost:" + port + "/ore", { method: "POST", body: JSON.stringify({ args: args.args, stdin: args.stdin ?? null, job: args.job ?? null, now: Date.now() }) }).catch(() => {
     throw `The mock bridge isn’t answering on port ${port}. Start it: PORT=${port} bun scripts/mock/bridge.ts`;
   });
   const j = await r.json();
@@ -75,9 +75,18 @@ window.__TAURI_INTERNALS__ = {
       // And which: window.__ORE_INFLIGHT, so a journey left waiting on one can say what it is.
       const call = args.args.slice(0, 2).join(" ");
       (window.__ORE_INFLIGHT ??= []).push(call);
+      // And the last few answered, how long each took and whether it failed: what a journey that timed out was
+      // waiting behind (e2e/harness.ts prints both with every failure).
+      const t0 = performance.now();
+      let failed = false;
       try {
         return await ore(args);
+      } catch (e) {
+        failed = true;
+        throw e;
       } finally {
+        (window.__ORE_LOG ??= []).push(`${call} ${Math.round(performance.now() - t0)} ms${failed ? " failed" : ""}`);
+        if (window.__ORE_LOG.length > 8) window.__ORE_LOG.shift();
         window.__ORE_PENDING--;
         window.__ORE_INFLIGHT.splice(window.__ORE_INFLIGHT.indexOf(call), 1);
         // window.__ORE_AFTER = { highlight: fn }: fn runs once that command's answer is in, after the code awaiting

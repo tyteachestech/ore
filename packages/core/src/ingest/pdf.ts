@@ -559,12 +559,26 @@ function swapRegions(items: Item[], regions: Region[], blocks: string[], scanned
     const heads = parts.filter((r) => r.kind === "text" && r.head);
     out = out.map((i) => ({ ...i, head: heads.findIndex((h) => inside(i, h.box)) + 1 }));
     // And in what order its blocks are read: a designed page's text is often drawn in another. Text in
-    // no block (a running head, a page number) stays with the text drawn before it.
+    // no block goes before the nearest block below it in its own column, where it sits: the reader
+    // sometimes leaves a column's first paragraph out (BERT's page 4), and drawn after a block in the
+    // other column it followed the whole page. With none below (a page number), it stays with the
+    // text drawn before it.
+    const below = (i: Item) => {
+      const x = (i.x + i.end) / 2;
+      let best = -1;
+      parts.forEach((r, k) => {
+        if (x >= r.box.l && x <= r.box.r && r.box.t <= i.y && (best < 0 || r.box.t > parts[best]!.box.t)) best = k;
+      });
+      return best;
+    };
     let at = -1;
     const order = out.map((i) => {
-      const n = i.str.trim() ? parts.findIndex((r) => inside(i, r.box)) : -1;
-      if (n >= 0) at = n;
-      return at;
+      if (!i.str.trim()) return at;
+      const n = parts.findIndex((r) => inside(i, r.box));
+      if (n >= 0) return (at = n);
+      const b = below(i);
+      // Just before that block's own text, whichever the PDF drew first.
+      return b >= 0 ? b - 0.5 : at;
     });
     // Its order is trusted only where it never climbs back up a column, which reading never does: on
     // a two-column paper the reader's order is sometimes scrambled, and the PDF's own is right.

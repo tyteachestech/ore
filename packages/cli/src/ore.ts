@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import "./clock.ts";
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import { cancelRun, openLibrary, snapshot } from "@ore/core";
 import { commands } from "./commands.ts";

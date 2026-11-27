@@ -25,6 +25,8 @@ import { appendNote, setChapterRecall, setNotes, setRecall } from "../src/notes.
 import { acceptSuggestedSkill, addSkill, archiveSkill, dismissSuggestedSkill, loadSkills, setItemSkills, undoSuggestedSkill } from "../src/skills.ts";
 import { readTopic } from "../src/topics.ts";
 import { tempLibrary } from "./helpers.ts";
+import { usageSummary } from "../src/usage.ts";
+import { paths } from "../src/library.ts";
 
 // A fake `claude` on PATH that replays canned structured outputs in order.
 let binDir = "";
@@ -104,6 +106,21 @@ describe("Ask about this (D61)", () => {
     expect(`claude:${b![b!.indexOf("--resume") + 1]}`).toBe(first.session);
   });
 
+  // F755: every run's spend goes in usage.jsonl (#547), but Review's Ask about this ran outside runAgent and logged none.
+  test("each turn logs what it spent to usage.jsonl, as every other AI run does", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Retrieval practice changes what is stored." });
+    const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "What does retrieval change?", answer: "What is stored.", rubric: [] });
+    fakeClaude([{ reply: "Because effort strengthens it.", card: null }, { reply: "Yes.", card: null }]);
+    const first = await askAboutCard(lib, card.meta.id, { message: "Why?", answer: "x" });
+    await askAboutCard(lib, card.meta.id, { message: "Sure?", session: first.session });
+    const month = new Date().toISOString().slice(0, 7);
+    expect(usageSummary(lib).months[month]?.jobs.chat).toMatchObject({ runs: 2, output_tokens: 0 });
+    const lines = readFileSync(join(paths.logs(lib), "usage.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(lines.map((l) => [l.job, l.vendor, l.model, l.ok])).toEqual([["chat", "claude", "claude-fake-1", true], ["chat", "claude", "claude-fake-1", true]]);
+    expect(String(lines[0]!.prompt_version)).toMatch(/^chat@/);
+  });
+
   test("after he switches AI, a follow-up starts a new conversation with the card, never the other vendor's session (F588)", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Retrieval practice changes what is stored." });
@@ -134,6 +151,26 @@ console.log(JSON.stringify({ type: "thread.started", thread_id: "codex-thread-1"
 });
 
 describe("AI adapter", () => {
+  // #547: only the tutor logged what it spent, so Ore Cloud's price rested on an estimate.
+  test("every run logs its job, vendor, model, prompt and tokens to usage.jsonl, a failed one too, and ore usage sums them by month", async () => {
+    const lib = await tempLibrary();
+    fakeClaude([{ rating: 3 }]);
+    await runAgent(lib, { prompt: "grade", cwd: lib.root, schema: Schema, input: {} });
+    fakeClaude([{ nope: 1 }, { nope: 2 }]);
+    await expect(runAgent(lib, { prompt: "enrich", cwd: lib.root, schema: Schema, input: {} })).rejects.toThrow(/invalid enrich output twice/);
+    const lines = readFileSync(join(paths.logs(lib), "usage.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as Record<string, unknown>);
+    expect(lines.map((l) => [l.job, l.vendor, l.model, l.runs, l.ok, typeof l.output_tokens])).toEqual([
+      ["grade", "claude", "claude-fake-1", 1, true, "number"],
+      ["enrich", "claude", "claude-fake-1", 2, false, "number"],
+    ]);
+    expect(String(lines[0]!.prompt_version)).toMatch(/^grade@/);
+    const month = new Date().toISOString().slice(0, 7);
+    const m = usageSummary(lib).months[month]!;
+    expect(m.total.runs).toBe(3);
+    expect(m.jobs.grade!.runs).toBe(1);
+    expect(m.jobs.enrich!.runs).toBe(2);
+  });
+
   test("invalid output is retried once, then accepted; stamp records vendor/model/prompt version", async () => {
     const lib = await tempLibrary();
     fakeClaude([{ rating: 9 }, { rating: 3 }]);
@@ -161,7 +198,7 @@ describe("AI adapter", () => {
     const lib = await tempLibrary();
     fakeClaude([{ rating: 3 }, { reply: "ok", card: null }]);
     await runAgent(lib, { prompt: "grade", cwd: lib.root, schema: Schema, input: {} });
-    await runChatTurn(lib, { system: "s", message: "m", schema: {}, cwd: lib.root });
+    await runChatTurn(lib, { prompt: "chat", system: "s", message: "m", schema: {}, cwd: lib.root });
     for (const line of readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n")) {
       const args = JSON.parse(line) as string[];
       expect(args).toContain("--strict-mcp-config");

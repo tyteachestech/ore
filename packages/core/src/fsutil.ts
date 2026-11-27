@@ -12,6 +12,11 @@ export const subdirs = (dir: string): string[] =>
   existsSync(dir) ? readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory() && !d.name.startsWith(".")).map((d) => d.name).sort() : [];
 
 // Atomic write: temp file in the same directory, then rename.
+/** The real time, for a file's age and the machine's boot: `ore` can run with a moved clock (ORE_CLOCK_OFFSET_MS,
+ *  F739, whose Date carries its `offset`), and a file written a moment ago must not look days old to a lock or a prune.
+ *  The wall clock less that offset, never `performance`'s, which stops while the Mac sleeps (F753). */
+export const realNow = () => Date.now() - ((Date as unknown as { offset?: number }).offset ?? 0);
+
 export function writeAtomic(path: string, content: string | Uint8Array): void {
   mkdirSync(dirname(path), { recursive: true });
   const tmp = join(dirname(path), `.${basename(path)}.${process.pid}.${Date.now()}.tmp`);

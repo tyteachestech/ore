@@ -353,6 +353,39 @@ describe("import coverage: web pages", () => {
     expect(drawn).toContain("Scale by $$\\sqrt{d_k}$$ first.");
   });
 
+  test("a chart the page draws with Vega (Altair) is kept as a picture where it stood; one that can't be drawn says so", async () => {
+    // vega-charts.html: written for Ore in the markup Altair writes (the Annotated Transformer's eight charts, F744):
+    // an empty div and a script that hands vegaEmbed its spec. The second spec is broken.
+    const url = "https://example.org/forgetting";
+    serve({ [url]: { body: web("vega-charts.html"), type: HTML } });
+    const item = await addSource(await tempLibrary(), url);
+    const b = item.body;
+    expect(item.meta.title).toBe("Forgetting, drawn by day");
+    const chart = b.match(/!\[Words recalled by day\]\((assets\/[0-9a-f]{16}\.svg)\)/)?.[1];
+    expect(chart).toBeDefined();
+    const svg = readFileSync(join(item.dir, chart!), "utf8");
+    expect(svg).toStartWith("<svg");
+    expect(svg).toContain("Words recalled by day");
+    const at = (s: string) => b.indexOf(s);
+    expect(at("which is the shape every forgetting study finds")).toBeLessThan(at(chart!));
+    expect(at(chart!)).toBeLessThan(at("Reviewing a word just before it would be lost"));
+    // The broken one: a line in its place, between the words around it.
+    const lost = at("A chart on the page couldn’t be kept here.");
+    expect(lost).toBeGreaterThan(at("That is the whole idea behind spacing reviews out."));
+    expect(lost).toBeLessThan(at("A chart that would not draw stood above this line"));
+    expect(images(b)).toHaveLength(1);
+    expect(b).not.toContain("vegaEmbed");
+    // Written by hand (`var spec = …; vegaEmbed("#vis", spec)`): drawn too; one whose data is at an address isn't fetched.
+    const words = `<p>${"Words about charts that fill out the page. ".repeat(10)}</p>`;
+    const hand = (data: string) => `<html><head><title>T</title></head><body><article><h1>T</h1>${words}<div id="vis"></div>${words}<script>var spec = {"$schema": "https://vega.github.io/schema/vega-lite/v5.json", "data": ${data}, "mark": "bar", "encoding": {"x": {"field": "a", "type": "ordinal"}, "y": {"field": "b", "type": "quantitative"}}}; vegaEmbed("#vis", spec);</script></article></body></html>`;
+    const drawn = await htmlToDoc(hand(`{"values": [{"a": "x", "b": 1}]}`), "https://example.org/t");
+    expect(drawn.markdown).toMatch(/!\[Chart\]\(assets\/[0-9a-f]{16}\.svg\)/);
+    expect(drawn.assets).toHaveLength(1);
+    const remote = await htmlToDoc(hand(`{"url": "https://example.org/data.csv"}`), "https://example.org/t");
+    expect(remote.markdown).toContain("A chart on the page couldn’t be kept here.");
+    expect(remote.assets).toBeUndefined();
+  });
+
   test("Wikipedia's formula corners: indented on its own, older pages, chemistry, a page of stories", async () => {
     const words = `<p>${"Words about memory and forgetting that fill out the page. ".repeat(10)}</p>`;
     const page = (body: string) => `<html><head><title>T</title></head><body><article><h1>T</h1>${words}${body}${words}</article></body></html>`;

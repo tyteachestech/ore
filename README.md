@@ -59,7 +59,7 @@ cd apps/desktop && ORE_LIBRARY=/tmp/lib bun run tauri dev
 
 No Mac or no Rust? The UI also runs in a plain browser against a seeded fake library: see [`apps/desktop/scripts/mock/README.md`](apps/desktop/scripts/mock/README.md).
 
-Pick the AI vendor with `ai: claude` or `ai: codex` in the library's `skills.yaml` (or `ORE_AI=codex`).
+Pick the AI vendor with `ai: claude` or `ai: codex` in the library's `skills.yaml` (or `ORE_AI=codex`). One job (the tutor, checking answers, writing exercises, Ask your library) can run on a different one: Settings › AI › By job.
 
 ## Releasing
 

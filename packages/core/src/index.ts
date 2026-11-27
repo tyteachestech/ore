@@ -58,3 +58,4 @@ type Paddle = typeof import("./ingest/paddle.ts");
 export const installPaddle = async (...a: Parameters<Paddle["installPaddle"]>) => (await import("./ingest/paddle.ts")).installPaddle(...a);
 export const removePaddle = async () => (await import("./ingest/paddle.ts")).removePaddle();
 export * from "./inbox.ts";
+export * from "./usage.ts";

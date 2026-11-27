@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
   AiStamp, CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, findItemDir, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
-  mergedReviews, readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type Card, type Library, type LibraryIndex, type QueueEntry, type EndReceipt, type SkillStats, type Variant,
+  mergedReviews, readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, setJobAi, jobAi, AI_JOBS, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type AiJob, type Card, type Library, type LibraryIndex, type QueueEntry, type EndReceipt, type SkillStats, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
 import type { Command } from "./types.ts";
@@ -277,19 +277,25 @@ export const studyCommands: Record<string, Command> = {
   },
 
   settings: {
-    usage: "[--ai claude|codex] [--model m]   the app's Settings: library folder, AI vendor (ORE_AI overrides it), its model (\"\" for the default; ORE_AI_MODEL overrides) and daily review",
-    options: { ai: { type: "string" }, model: { type: "string" } },
+    usage: "[--ai claude|codex] [--model m] [--job tutor|grade|write|ask --ai claude|codex|default]   the app's Settings: library folder, AI vendor (ORE_AI overrides it), its model (\"\" for the default; ORE_AI_MODEL overrides) and daily review. --job: that one job's own AI and model (tutor: the chat and explaining a term; grade: marking and feedback; write: exercises and quiz questions; ask: Ask your library and finding sources); --ai default puts it back on the library's AI",
+    options: { ai: { type: "string" }, model: { type: "string" }, job: { type: "string" } },
     async run(_, f) {
       const lib = openLibrary();
-      const ai = oneOf(f.ai, ["claude", "codex"] as const, "ai");
+      const job = oneOf(f.job, AI_JOBS, "job");
+      if (job) {
+        const own = oneOf(f.ai, ["claude", "codex", "default"] as const, "ai");
+        if (!own) throw new Error("--job needs --ai claude, codex or default");
+        await setJobAi(lib, job, own === "default" ? null : { ai: own, ...(typeof f.model === "string" ? { model: f.model } : {}) });
+      }
+      const ai = job ? undefined : oneOf(f.ai, ["claude", "codex"] as const, "ai");
       if (ai) await setAiVendor(lib, ai);
       const vendor = chooseVendor(lib);
-      if (typeof f.model === "string") await setAiModel(lib, vendor, f.model);
+      if (!job && typeof f.model === "string") await setAiModel(lib, vendor, f.model);
       const env = process.env.ORE_AI || null;
       const modelEnv = process.env.ORE_AI_MODEL || null;
       // `problems`: values in skills.yaml it had to leave out for their defaults, so Settings names them instead of showing the default as his.
-      const r = { library: lib.root, ai: loadSkills(lib).ai ?? "claude", ai_env: env, model: savedModel(lib, vendor), model_env: modelEnv, review: reviewSettings(lib), problems: skillsFileProblems(lib) };
-      return { data: r, text: `Library ${r.library}\nAI ${r.ai}${env ? ` (ORE_AI=${env} overrides)` : ""}\nModel ${modelEnv ?? (r.model || "default")}${modelEnv ? " (ORE_AI_MODEL overrides)" : ""}` };
+      const r = { library: lib.root, ai: loadSkills(lib).ai ?? "claude", ai_env: env, model: savedModel(lib, vendor), model_env: modelEnv, jobs: Object.fromEntries(AI_JOBS.map((j) => [j, jobAi(lib, j)])) as Record<AiJob, ReturnType<typeof jobAi>>, review: reviewSettings(lib), problems: skillsFileProblems(lib) };
+      return { data: r, text: `Library ${r.library}\nAI ${r.ai}${env ? ` (ORE_AI=${env} overrides)` : ""}\nModel ${modelEnv ?? (r.model || "default")}${modelEnv ? " (ORE_AI_MODEL overrides)" : ""}${AI_JOBS.map((j) => (r.jobs[j] ? `\n${j}: ${r.jobs[j].ai} ${r.jobs[j].model || "default"}` : "")).join("")}` };
     },
   },
 

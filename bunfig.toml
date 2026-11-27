@@ -1,0 +1,3 @@
+[test]
+# Every test's time limit (test-limit.ts), for `bun test` run from here as CI and the Mac run it.
+preload = ["./packages/core/test/limit.ts"]
