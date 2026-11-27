@@ -1,5 +1,5 @@
 import {
-  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, listChats, readChat, saveChat, deleteChat, attachToChat, pendingItems, recallFeedback, research, setChapterRecall, clearChapterRecall, setRecall, type EnrichResult,
+  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, usageSummary, listChats, readChat, saveChat, deleteChat, attachToChat, pendingItems, recallFeedback, research, setChapterRecall, clearChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
 import { fromBase64, int, need, readStdin, str, strs } from "./util.ts";
@@ -19,6 +19,17 @@ function enrichText(r: EnrichResult): string {
 }
 
 export const aiCommands: Record<string, Command> = {
+  usage: {
+    usage: "                             what each AI job spent, by month: runs, tokens, dollars where the vendor gives them (#547; read-only, no AI)",
+    async run() {
+      const s = usageSummary(openLibrary());
+      const lines = Object.entries(s.months).sort(([a], [b]) => a.localeCompare(b)).flatMap(([month, m]) => [
+        `${month}: ${m.total.runs} runs, $${m.total.cost_usd.toFixed(2)}${m.total.unpriced_runs ? ` (+${m.total.unpriced_runs} unpriced)` : ""}`,
+        ...Object.entries(m.jobs).sort(([, a], [, b]) => b.cost_usd - a.cost_usd).map(([job, t]) => `  ${job}: ${t.runs} runs, ${t.input_tokens + t.output_tokens} tokens, $${t.cost_usd.toFixed(2)}`),
+      ]);
+      return { data: s, text: lines.length ? lines.join("\n") : "No AI runs logged yet." };
+    },
+  },
   enrich: {
     usage: "[item...|--all-pending]          AI: prequestions, skills, topics, drafts from Card highlights, changed the source note and (once done) prequestions; several items run one after another",
     options: { "all-pending": { type: "boolean" } },
