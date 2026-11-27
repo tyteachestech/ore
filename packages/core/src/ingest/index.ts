@@ -130,8 +130,11 @@ function refuseLink(url: string): string | null {
 
 /** A zipped file (EPUB, Word, PowerPoint) that won't unzip or is missing its parts is damaged or
  *  only partly downloaded: say so, never "invalid zip data". Other errors pass through. */
-const damaged = (what: string, app?: string) => (e: Error): never => {
-  if (/invalid zip|zip data|unexpected EOF|is missing|no rootfile|Can't find end of central directory|Could not find file/i.test(e.message))
+const damaged = (what: string, app?: string, bytes?: Uint8Array) => (e: Error): never => {
+  // A Word, PowerPoint or Excel file saved with a password is an encrypted package in an OLE container, not a zip.
+  if (bytes && app && [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1].every((b, i) => bytes[i] === b))
+    throw new Error(`That ${what} file is locked with a password. Open it in ${what}, remove the password (File › Info, or File › Passwords), save a copy and add that.`);
+  if (/invalid zip|zip data|unexpected EOF|is missing|no rootfile|Can't find end of central directory|Could not find file|unknown compression type/i.test(e.message))
     throw new Error(`That ${what} file is damaged or only partly downloaded. Download it again${app ? `, or open it in ${app} and save a fresh copy` : ""}.`);
   throw e;
 };
@@ -197,12 +200,12 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     return { type: "epub", title: e.title ?? fileStem(name), author: e.author, published: e.published, url, body: e.body, source: { ext: "epub", data: bytes }, assets: e.assets };
   }
   if (kind === "xlsx") {
-    const s = await Promise.resolve().then(async () => (await import("./sheets.ts")).xlsxToDoc(bytes)).catch(damaged("Excel", "Excel or Numbers"));
+    const s = await Promise.resolve().then(async () => (await import("./sheets.ts")).xlsxToDoc(bytes)).catch(damaged("Excel", "Excel or Numbers", bytes));
     return { type: "article", title: s.title ?? fileStem(name), author: s.author, url, body: s.body, source: { ext: "xlsx", data: bytes } };
   }
   if (kind === "docx" || kind === "pptx") {
     const office = await import("./office.ts");
-    const o = await Promise.resolve().then(() => (kind === "docx" ? office.docxToDoc(bytes) : office.pptxToDoc(bytes))).catch(damaged(kind === "docx" ? "Word" : "PowerPoint", kind === "docx" ? "Word or Pages" : "PowerPoint or Keynote"));
+    const o = await Promise.resolve().then(() => (kind === "docx" ? office.docxToDoc(bytes) : office.pptxToDoc(bytes))).catch(damaged(kind === "docx" ? "Word" : "PowerPoint", kind === "docx" ? "Word or Pages" : "PowerPoint or Keynote", bytes));
     return { type: "article", title: o.title ?? fileStem(name), author: o.author, url, body: o.body, source: { ext: kind, data: bytes }, assets: o.assets };
   }
   if (kind === "rtf") {

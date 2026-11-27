@@ -5,6 +5,9 @@ import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
 import { cleanTitle, fileAuthor } from "./check.ts";
 import { td } from "./markdown.ts";
+import { markEquations } from "./omml.ts";
+
+const EQUATION = "This Word file contains an equation Ore cannot read yet. Open it in Word or Pages and export it as a PDF, then add that copy.";
 
 // Word and PowerPoint files (and Google Docs and Slides, exported as them). A .docx goes through
 // mammoth (BSD-2) to HTML, then Markdown; a .pptx is read slide by slide from its XML: each slide's
@@ -45,6 +48,7 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
   // in a conversion copy only; the original document kept by intake stays byte-for-byte intact.
   const files = unzipSync(data);
   let mapped = false;
+  const maths: { tex: string; display: boolean }[] = [];
   for (const path of ["word/document.xml", "word/footnotes.xml", "word/endnotes.xml"]) {
     if (!files[path]) continue;
     const xml = strFromU8(files[path]!);
@@ -55,7 +59,11 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
       const style = `<w:pStyle w:val="Heading${Math.min(6, Number(level) + 1)}"/>`;
       return props.replace(/<w:pStyle\b[^>]*(?:\/>|>[\s\S]*?<\/w:pStyle>)/g, "").replace(/(<w:pPr\b[^>]*>)/, `$1${style}`);
     });
-    if (headings !== xml) { files[path] = strToU8(headings); mapped = true; }
+    // Word's equations, which mammoth drops, as markers it keeps; each marker becomes its TeX below (office-03).
+    const marked = markEquations(headings, maths.length);
+    if (!marked) throw new Error(EQUATION);
+    maths.push(...marked.maths);
+    if (marked.xml !== xml) { files[path] = strToU8(marked.xml); mapped = true; }
   }
   const converted = mapped ? zipSync(files) : data;
   // Node's build of mammoth takes a Buffer; its browser build (the iPhone app) takes the bytes themselves.
@@ -68,11 +76,16 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
   });
   // Mammoth reports OMML as ignored. Never save the remaining prose as a complete source.
   if (messages.some((m) => m.message.includes("/officeDocument/2006/math}") && /oMath/.test(m.message)))
-    throw new Error("This Word file contains an equation Ore cannot read yet. Open it in Word or Pages and export it as a PDF, then add that copy.");
+    throw new Error(EQUATION);
   const { document } = parseHTML(`<html><body>${value}</body></html>`);
   // A code block reads as one fenced block: its line breaks as lines, inside <code> as turndown fences it.
   for (const pre of document.querySelectorAll("pre")) pre.innerHTML = `<code>${pre.innerHTML.replace(/<br\s*\/?>/g, "\n")}</code>`;
-  const body = td.turndown(document.body as unknown as HTMLElement).trim();
+  const math = (i: string) => maths[Number(i)]?.tex ?? "";
+  const body = td
+    .turndown(document.body as unknown as HTMLElement)
+    .replace(/^ORE0MATH(\d+)$/gm, (all, i: string) => (maths[Number(i)]?.display ? ["$$", math(i), "$$"].join("\n") : all))
+    .replace(/ORE0MATH(\d+)/g, (_, i: string) => "$$" + math(i) + "$$")
+    .trim();
   if (!body) throw new Error("This Word file has no text to read.");
   const meta = coreProps(files);
   return { ...meta, title: meta.title ?? body.match(/^#+\s+(.+)$/m)?.[1]?.trim(), body: body + "\n", assets: [...assets.values()] };

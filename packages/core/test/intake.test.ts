@@ -20,7 +20,7 @@ import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { htmlToDoc, inlineMath } from "../src/ingest/web.ts";
 import { chapterLines } from "../src/ai/recall.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
-import { strToU8, zipSync } from "fflate";
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { tempLibrary } from "./helpers.ts";
 
 // Import coverage (docs/reviews/2026-10-28-import-coverage.md): every content type Ore reads has a
@@ -2251,6 +2251,27 @@ describe("import coverage: the grid's small holes", () => {
     }
   });
 
+  test("a Word, PowerPoint or Excel file locked with a password says how to unlock it, not that it is damaged", async () => {
+    // Deep import pass 2026-11-27 (Apache POI's protected files): Office saves a file with a password as an
+    // encrypted package inside an OLE container (D0 CF 11 E0 …), not a zip, and Ore said "damaged, download it again".
+    // A zip whose parts use a compression Ore can't read (a fuzzed file) reads as damaged, not "unknown compression type".
+    const dir = mkdtempSync(join(tmpdir(), "ore-locked-"));
+    const ole = new Uint8Array(4096);
+    ole.set([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+    ole.set(new TextEncoder().encode("E\0n\0c\0r\0y\0p\0t\0i\0o\0n\0I\0n\0f\0o\0"), 1024);
+    const lib = await tempLibrary();
+    for (const [name, app] of [["essay.docx", "Word"], ["deck.pptx", "PowerPoint"], ["marks.xlsx", "Excel"]] as const) {
+      writeFileSync(join(dir, name), ole);
+      await expect(addSource(lib, join(dir, name))).rejects.toThrow(new RegExp(`That ${app} file is locked with a password\\. Open it in ${app}, remove the password`));
+    }
+    const odd = zipSync({ "word/document.xml": strToU8("<w:document/>") }, { level: 0 });
+    new DataView(odd.buffer).setUint16(8, 99, true); // the part's compression method, in its local header
+    new DataView(odd.buffer).setUint16(odd.length - 22 - 46 + 10, 99, true); // and in the central directory
+    writeFileSync(join(dir, "fuzzed.docx"), odd);
+    await expect(addSource(lib, join(dir, "fuzzed.docx"))).rejects.toThrow(/That Word file is damaged or only partly downloaded/);
+    expect(listItems(lib)).toHaveLength(0);
+  });
+
   test("a private Google Doc's sign-in page is refused with how to share it", async () => {
     const lib = await tempLibrary();
     serve({ "https://docs.google.com/document/d/abc_123/export?format=docx": { body: "<html><head><title>Sign in</title></head><body>Sign in to continue to Docs</body></html>", type: HTML } });
@@ -2450,9 +2471,25 @@ test("office-02: RTF literal bytes use the declared code page", async () => {
   expect(rtfToDoc(new Uint8Array([...new TextEncoder().encode("{\\rtf1\\ansi\\ansicpg1252 "), 0x80, 125])).body).toBe("€\n");
 });
 
-test("office-03: Word equations refuse partial import with an export step", async () => {
+test("office-03: Word equations come in as formulas, inline and on their own line", async () => {
+  // Deep import pass 2026-11-27: a 27,000-word Word book (Apache POI's stress004.docx) was refused whole for its
+  // equations. word-equations.docx (make-word-equations.py, written for Ore) holds Word's equation markup.
+  const item = await addSource(await tempLibrary(), officeFile("word-equations.docx"));
+  expect(item.body).toContain("Retention after a day is $$\\frac{1}{2}$$ and the stability grows as $${S}^{2}$$ with each review.");
+  expect(item.body).toContain("\n$$\nR={e}^{-t/S}\n$$\n");
+  expect(item.body).toContain("\n$$\n\\sum_{i=1}^{n}{{\\alpha}_{i}\\sqrt{t}}=\\left(a+b\\right)\n$$\n");
+  expect(item.body).toContain("That is the whole model.");
+  expect(item.body).not.toContain("ORE0MATH");
+  expect((await addSource(await tempLibrary(), officeFile("word-equation.docx"))).body).toContain("$$E=mc²$$");
+});
+
+test("office-03: a Word equation built from a part Ore can't read refuses the file with an export step", async () => {
   const lib = await tempLibrary();
-  await expect(addSource(lib, officeFile("word-equation.docx"))).rejects.toThrow(/equation.*export.*PDF/i);
+  const src = unzipSync(readFileSync(officeFile("word-equation.docx")));
+  src["word/document.xml"] = strToU8(strFromU8(src["word/document.xml"]!).replace("<m:r><m:t>E=mc²</m:t></m:r>", "<m:unknownPart><m:r><m:t>E</m:t></m:r></m:unknownPart>"));
+  const path = join(mkdtempSync(join(tmpdir(), "ore-eq-")), "odd-equation.docx");
+  writeFileSync(path, zipSync(src));
+  await expect(addSource(lib, path)).rejects.toThrow(/equation.*export.*PDF/i);
   expect(listItems(lib)).toHaveLength(0);
 });
 
