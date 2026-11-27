@@ -1,4 +1,5 @@
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import { strFromU8, strToU8, zipSync } from "fflate";
+import { unzip } from "./unzip.ts";
 import { parseHTML } from "linkedom";
 import { posix } from "node:path";
 import type { Asset } from "../items.ts";
@@ -43,7 +44,7 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
   });
   // Mammoth does not expose w:outlineLvl. Map explicit outline levels to its heading styles
   // in a conversion copy only; the original document kept by intake stays byte-for-byte intact.
-  const files = unzipSync(data);
+  const files = unzip(data);
   let mapped = false;
   for (const path of ["word/document.xml", "word/footnotes.xml", "word/endnotes.xml"]) {
     if (!files[path]) continue;
@@ -90,7 +91,7 @@ function paragraphs(xml: string): { text: string; level: number }[] {
 }
 
 export function pptxToDoc(data: Uint8Array): OfficeDoc {
-  const files = unzipSync(data);
+  const files = unzip(data);
   const read = (p: string) => (files[p] ? strFromU8(files[p]) : "");
   // Slide order is the presentation's list of slide ids, through its relationships.
   const rels = new Map([...read("ppt/_rels/presentation.xml.rels").matchAll(/<Relationship\b[^>]*>/g)].map((r) => [r[0].match(/Id="([^"]+)"/)?.[1], r[0].match(/Target="([^"]+)"/)?.[1]]));

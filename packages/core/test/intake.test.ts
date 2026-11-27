@@ -2196,6 +2196,22 @@ describe("import coverage: the grid's small holes", () => {
     }
   });
 
+  test("a zip bomb (an EPUB, Word, PowerPoint or Excel file that unpacks past a gigabyte) is refused at once, not unpacked (F753)", async () => {
+    // A few hundred bytes whose directory says one part unpacks to 4 GB: unpacked, a 1.5 MB Word file of
+    // this kind took the import to 6.6 GB of memory. The sizes a zip declares are what fflate allocates.
+    const { zipSync } = await import("fflate");
+    const zip = zipSync({ "mimetype": new TextEncoder().encode("application/epub+zip"), "big.xml": new TextEncoder().encode(" ".repeat(4096)) }, { level: 9 });
+    const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength);
+    for (let i = 0; i < zip.length - 4; i++) if (view.getUint32(i, true) === 0x02014b50 && view.getUint16(i + 10, true) === 8) view.setUint32(i + 24, 0xfffffff0, true);
+    const dir = mkdtempSync(join(tmpdir(), "ore-bomb-"));
+    for (const name of ["book.epub", "notes.docx", "deck.pptx", "vocab.xlsx"]) {
+      writeFileSync(join(dir, name), zip);
+      const t = Date.now();
+      await expect(addSource(await tempLibrary(), join(dir, name))).rejects.toThrow(/unpacks to more than 1 GB/);
+      expect(Date.now() - t).toBeLessThan(2000);
+    }
+  });
+
   test("a private Google Doc's sign-in page is refused with how to share it", async () => {
     const lib = await tempLibrary();
     serve({ "https://docs.google.com/document/d/abc_123/export?format=docx": { body: "<html><head><title>Sign in</title></head><body>Sign in to continue to Docs</body></html>", type: HTML } });

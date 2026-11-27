@@ -129,6 +129,7 @@ When a sweep's triage is done, add a row per tester here.
 | 11-26 | [simulated learner 3×](2026-11-26-simulated-learner-3x/) owner | Codex | The 11-25 owner again, three testers at once to measure the Mac's load | Mac | 2 | #544 |
 | 11-26 | [simulated learner 3×](2026-11-26-simulated-learner-3x/) commuter | Codex | The 11-25 commuter again, at once with two others | iPhone | 1 | #544 |
 | 11-26 | [simulated learner 3×](2026-11-26-simulated-learner-3x/) newcomer | Codex | A first day on a new subject (transformers): a Quarto article, a video, BERT's PDF, Wikipedia (refused, 429) | both | 3 (1 fixed, 2 open) | #544 |
+| 11-27 | Ore Cloud security | Claude | `packages/cloud` read with `/security-and-hardening`, then hostile files and links sent to the server run locally: zip bombs, private addresses, oversized and endless input, many imports at once | server | 5 (4 fixed, 1 open) | #572 |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 
