@@ -29,6 +29,7 @@ const na = "n/a";
 const WEB_JUNK = "a bot check is never saved as the page";
 const LANG = "other languages and scripts";
 const TABLES = "embedded videos become a link where they stood; tables";
+const VEGA = "a chart the page draws with Vega (Altair)";
 
 const GRID: Record<string, Row> = {
   // Web pages
@@ -38,6 +39,7 @@ const GRID: Record<string, Row> = {
   Wikipedia: { title: "Wikipedia", author: "Wikipedia", date: "Wikipedia", text: "Wikipedia", headings: "Wikipedia", images: "Wikipedia", code: na, tables: "a table nested in a cell", math: "Wikipedia's formulas", language: LANG, junk: WEB_JUNK },
   Newsletter: { title: "newsletter (Substack)", author: "newsletter (Substack)", date: "newsletter (Substack)", text: "newsletter (Substack)", headings: "newsletter (Substack)", images: "newsletter (Substack)", code: na, tables: na, math: na, language: LANG, junk: WEB_JUNK },
   Tutorial: { title: "tutorial", author: "tutorial", date: "tutorial", text: "tutorial", headings: "tutorial", images: "tutorial", code: "tutorial", tables: na, math: "a Pandoc or Quarto page's formulas", language: LANG, junk: WEB_JUNK },
+  "Page with charts drawn by its scripts (Vega, Altair)": { title: VEGA, author: na, date: na, text: VEGA, headings: na, images: VEGA, code: na, tables: na, math: na, language: na, junk: VEGA },
   "Forum thread": { title: "a forum thread (Hacker News)", author: "a forum thread (Hacker News)", date: "a forum thread (Hacker News)", text: "a forum thread (Hacker News)", headings: "a forum topic (Discourse)", images: "a forum topic (Discourse)", code: na, tables: na, math: na, language: LANG, junk: WEB_JUNK },
   "Page built in the browser (Notion)": { title: "a page built in the browser (Notion) comes in as its visible text", author: na, date: na, text: "a page built in the browser (Notion) comes in as its visible text", headings: "a Notion page keeps its headings, images, code and tables", images: "a Notion page keeps its headings, images, code and tables", code: "a Notion page keeps its headings, images, code and tables", tables: "a Notion page keeps its headings, images, code and tables", math: na, language: LANG, junk: "a page built in the browser (Notion) says to paste it" },
   "Shared AI chat (Claude)": { title: "a chat shared from Claude comes in from the tab", author: "a chat shared from Claude comes in from the tab", date: "a chat shared from Claude comes in from the tab", text: "a chat shared from Claude comes in from the tab", headings: "a chat shared from Claude comes in from the tab", images: "gap: no shared chat with an image saved yet; its visuals and files are not in the shared copy", code: "gap: no shared chat with code saved yet", tables: "a chat shared from Claude comes in from the tab", math: "gap: no shared chat with a formula saved yet", language: LANG, junk: "a shared chat's link on its own is a page built in the browser" },

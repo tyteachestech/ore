@@ -1,6 +1,7 @@
 import fs, { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { hostname, uptime } from "node:os";
 import { dirname } from "node:path";
+import { realNow } from "./fsutil.ts";
 
 const STALE_MS = 60_000;
 
@@ -15,7 +16,7 @@ function isAlive(pid: number): boolean {
 
 /** When this machine started, in seconds, to tell a lock from before a restart: its pid may belong to a new
  *  process now. NaN on the iPhone, whose `.ore` is rebuilt each launch anyway. */
-const bootedAt = () => Math.round(Date.now() / 1000 - uptime());
+const bootedAt = () => Math.round(realNow() / 1000 - uptime());
 
 /** A lock is stale when its owner is gone: a dead local pid, or one from before this machine last started
  *  (code review of #538: a reused pid would hold it for good). A live local owner keeps its lock however long it writes (deep scan 4, EDGES-02). A lock
@@ -25,7 +26,7 @@ export function lockStale(path: string): boolean {
   try {
     const raw = readFileSync(path, "utf8").trim();
     const owner = raw.startsWith("{") ? JSON.parse(raw) as { pid: number; host: string; boot?: number } : { pid: Number(raw), host: hostname() };
-    const age = Date.now() - statSync(path).mtimeMs;
+    const age = realNow() - statSync(path).mtimeMs;
     if (owner.host !== hostname() || !(Number.isInteger(owner.pid) && owner.pid > 0)) return age > STALE_MS;
     const boot = bootedAt();
     if (Number.isFinite(boot) && typeof owner.boot === "number" && Math.abs(owner.boot - boot) > 120) return true;

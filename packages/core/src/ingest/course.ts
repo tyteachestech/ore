@@ -146,6 +146,8 @@ async function fillPage(lib: Library, item: Item, l: CourseLesson): Promise<bool
   if (!w || !hasText(w.markdown) || !vtt?.endsWith(".vtt")) return false;
   await withLock(paths.lock(lib), () => {
     writeAtomic(join(item.dir, "source.html"), html);
+    // The page's charts, drawn as it was read (F744).
+    for (const a of w.assets ?? []) writeAtomic(join(item.dir, "assets", a.name), a.data);
     renameSync(vtt, join(item.dir, "transcript.vtt"));
     const meta = { ...item.meta, type: "article" as const, url: l.url, video: item.meta.url };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, withTranscript(dropTitle(w.markdown, item.meta.title), item.body)));
