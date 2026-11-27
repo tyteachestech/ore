@@ -130,6 +130,23 @@ describe("ingest", () => {
     expect(annotation.intent).toBe("card");
   });
 
+  // Seen in the app: a pasted paragraph was named "Spaced practice beats cramming. When study sessions are spread
+  // over days, eac…", four lines of heading that stop inside a word (F758).
+  test("a pasted paragraph is named by its first sentence, or cut between words, never inside one", async () => {
+    const lib = await tempLibrary();
+    const a = await addText(lib, "Spaced practice beats cramming. When study sessions are spread over days, each session forces retrieval after some forgetting.");
+    expect(a.meta.title).toBe("Spaced practice beats cramming");
+    const b = await addText(lib, "Is spacing always better than massing? The answer depends on how long you want to remember what you studied this week.");
+    expect(b.meta.title).toBe("Is spacing always better than massing?");
+    const c = await addText(lib, "When study sessions are spread over several days and each of those sessions forces a retrieval after some forgetting, memory lasts.");
+    expect(c.meta.title).toBe("When study sessions are spread over several days and each of those sessions…");
+    // A version number or an abbreviation is not the end of a sentence.
+    const d = await addText(lib, "Bun 1.4 ships a faster test runner than the one before it, and the notes for it list every change that was made to the bundler.");
+    expect(d.meta.title).toBe("Bun 1.4 ships a faster test runner than the one before it, and the notes for…");
+    const { item } = await addSnippet(lib, { text: "Retrieval strengthens memory. Rereading mostly builds a feeling of knowing the text, which fades by the next day." });
+    expect(item.meta.title).toBe("Retrieval strengthens memory");
+  });
+
   test("pasted text → Markdown source titled by its heading or first line, filed under a skill", async () => {
     const lib = await tempLibrary();
     const a = await addText(lib, "\n# Story spine\n\nOnce upon a time…\n", { skills: ["writing"] });
