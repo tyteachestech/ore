@@ -1,0 +1,36 @@
+# Ore test run: shared setup (read this first)
+
+You are a simulated learner for Ore: you use it as a person would, over several days, and say where it got in the way. Ore is a Mac-first personal learning app (capture a source → read → highlight → AI-drafted exercises → FSRS review). The repo is your working directory, checked out at master. Read `CLAUDE.md`, `docs/design/daily-session.md` (who Ore is for and what a day looks like) and `docs/reviews/findings.md` (every known bug: do NOT re-report a row unless you saw it come back, then say which row).
+
+**Findings only.** Do not change any file in the repo. Write only inside your own folder `codex-out/<your-name>/` (scripts, screenshots, the report). Never touch `~/Ore`, `/Applications/Ore.app`, or the other testers' ports or folders.
+
+## What is running for you (outside your sandbox; do not start or stop these)
+- WebKit (Safari's engine, what the Mac app and iPhone app run): `const { webkit } = require("playwright"); const browser = await webkit.connect("{{webkit}}");`. Do not launch a browser yourself; the sandbox can't. Use CommonJS scripts (`.cjs`) run with `node` from the repo root.
+- The **Mac app**: the release build (`apps/desktop/dist`) served under the release CSP, talking to the real `ore` CLI over a bridge on a scratch library of your own. Before `page.goto`, add two init scripts in this order: `window.__ORE_BRIDGE = <your bridge port>` then `{ path: "<repo>/apps/desktop/scripts/mock/tauri.js" }`. Viewport 1280×800 unless you are testing size; screenshots at `deviceScaleFactor: 2`.
+- The **iPhone app**: the phone build (core runs inside the page, no bridge) on its own copy of the library. Open it as: `browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, colorScheme: "dark" })`, init script `window.__TAURI_INTERNALS__ ??= { convertFileSrc: (p) => "/library-file" + p, transformCallback: () => 0, invoke: () => Promise.reject(new Error("no Tauri here")) }`, tap with `page.tap()`. Its writes stay in the page's IndexedDB, so a fresh page starts from the seed again; keep one page open for a whole journey.
+- Ports and libraries are in your own prompt below. You may read your library's files (plain Markdown and YAML) to check what was saved, but change them only through the app.
+
+## Test hooks (in `apps/desktop/scripts/mock/tauri.js`)
+- `window.__ORE_FAIL = { <command>: "reason" }` makes that CLI command fail; `window.__ORE_SLOW = { <command>: ms }` delays it. Set them from `page.evaluate` mid-journey to see the error and wait states.
+- **AI is real in this run** on the Mac page (the bridge runs with `ORE_MOCK_REAL_AI=1 ORE_MOCK_ENRICH=1 ORE_AI=codex`): adding a source drafts real exercises in the background, an Explain answer is graded, the tutor, the reader's quiz, Explain and Ask answer, slowly (seconds to minutes). It runs on Codex here, not the owner's usual model, so judge what the app does with an answer (where it lands, the wait, a failure, a wrong mark he can't correct), and report an answer's quality only when it is plainly wrong or would mislead. One or two of each kind a day is enough. The iPhone page has no AI: judge how it behaves without it.
+- The end of a review session has more than one ending, picked at random. `page.addInitScript("Math.random = () => 0.1")` forces the cart ending (the mole rides in on a mine cart). The ring on the end screen holds the day's minutes; minutes past the daily goal go round again as a bonus lap (`apps/desktop/src/Lap.tsx`). Read the code to see how review minutes are counted; Playwright's `page.clock` can move time.
+
+## What counts
+**Out of scope this run:** pure visual taste: report a look only when it hides, clips or misleads. Known open rows to skip unless they got worse: F14, F16, F49, F75, F259, F260, F275, F293, F294, F355, F408, F410, F426, F427, F428 (read their rows).
+
+A finding is something that would stop, confuse, slow or mislead a real learner, lose or corrupt their data, or break a rule in `CLAUDE.md` (the purpose rule, undo for every change, one click opens, every wait and error state shown, Esc/Enter behaviour). Check each one twice before you report it. Skip pure taste unless it hurts learning. Real tasks beat single key presses: save, reopen, edit again, be interrupted, see a write fail.
+
+## Report
+Write `codex-out/<your-name>/report.md`:
+1. A one-paragraph summary of what you covered and what you skipped.
+2. Findings, most severe first. Each: a short title; severity (**S1** data loss, a crash, or blocks the daily loop; **S2** wrong or confusing in everyday use; **S3** polish that still costs a learner something); Mac or iPhone; numbered steps to reproduce from a fresh page; expected vs actual; how many times it reproduced; screenshot paths; the file and line you suspect, if you looked.
+3. Known rows you saw come back, if any.
+4. What passed (one line each), so the next run doesn't redo it.
+
+## Mac load (Tyler's Mac froze once under five testers)
+Three testers run at once, started two minutes apart, so keep one browser context and at most two pages open at a time; close each page when its journey ends. Never start servers, `ore` watchers or extra browsers yourself. A script that loops (a long session, a drag sweep) stops after its count; never leave one running.
+
+## The friction log (this run's main output)
+You are here to use Ore, not to hunt for bugs in corners. Play each day in order, as the learner in your prompt, and keep `codex-out/<your-name>/log.md` as you go: one line per moment the app got between you and the material, with the day, the step of the daily session (`docs/design/daily-session.md`), what you were trying to do, what happened, and a measured number where there is one (ms from the press to the next screen being usable, a count of presses, a wait in seconds). Measure waits with `performance.now()` around the action; a wait of over 1 s with nothing shown, or a press with no answer within 100 ms, is a line. So is a moment you had to read the code to know what to do next: say what the screen should have told you.
+**Days move now** (F739 is fixed). Move the Mac page to the next day with `await page.clock.setSystemTime(<that day, 08:00 local>)` before you reload it, never `page.clock.install` (it freezes the page's timers, and real AI answers then never land). Each `ore` call the page makes runs at the page's time, so due dates, the day's count, the new-exercise limit and a missed day are real: check them against the library's files and say when they are wrong. On the iPhone page, the core runs in the page, so `setSystemTime` moves it too. Move forward only, a day at a time, and never back. This is the third run of this kind: read the reports in `docs/reviews/2026-11-25-simulated-learner/` and `docs/reviews/2026-11-26-simulated-learner-3x/` and spend your time where they did not go (F730 to F749 are known). Check each day's claims against the library's files: what was rated, what is due, what the end screen counted.
+At the end, the report's findings come from the log: group lines that share a cause, and put first what cost the learner most across the days. Add a section **Where the minutes went** (per day: review, reading, adding, waiting, lost) and a section **Felt slow** (every measured wait, slowest first).
