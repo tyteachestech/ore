@@ -779,7 +779,9 @@ export function PhoneApp() {
     const failed = (e: Event) => notify(`Couldn’t save to iCloud: ${(e as CustomEvent<string>).detail}`, "error");
     addEventListener("visibilitychange", seen);
     addEventListener("ore:save-failed", failed);
-    return () => (clearInterval(every), removeEventListener("visibilitychange", seen), removeEventListener("ore:save-failed", failed));
+    // A command read the Mac's changes in before it ran (phone/core.ts `freshen`): the screens show them now.
+    addEventListener("ore:folder-changed", back);
+    return () => (clearInterval(every), removeEventListener("visibilitychange", seen), removeEventListener("ore:save-failed", failed), removeEventListener("ore:folder-changed", back));
   }, [refresh, notify, bringIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The on-screen keyboard covers fixed screens (Review) instead of shrinking them: lift them by its
