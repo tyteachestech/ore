@@ -48,7 +48,7 @@ export const ReviewSettingsSchema = z.object({
 export type ReviewSettings = Required<z.infer<typeof ReviewSettingsSchema>>;
 export const REVIEW_DEFAULTS: ReviewSettings = { goal_minutes: 10, weekdays_only: false, new_per_day: 10, remix: true, plan: "", reminder: "" };
 
-/** The AI's jobs, each of which can have its own AI (D-new-ai-per-job): the tutor chat and explaining a term; marking and
+/** The AI's jobs, each of which can have its own AI (D356): the tutor chat and explaining a term; marking and
  *  feedback on his answers; writing exercises and quiz questions; answers from his library and finding sources. */
 export const AI_JOBS = ["tutor", "grade", "write", "ask"] as const;
 export type AiJob = (typeof AI_JOBS)[number];

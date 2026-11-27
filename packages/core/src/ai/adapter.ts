@@ -87,7 +87,7 @@ export function codexUsage(stdout: string): Usage {
   return u;
 }
 
-/** The AI that runs: ORE_AI, else the one he set for this job (`jobs:` in skills.yaml, D-new-ai-per-job), else
+/** The AI that runs: ORE_AI, else the one he set for this job (`jobs:` in skills.yaml, D356), else
  *  the library's `ai:`. With no job, the default AI. */
 export function chooseVendor(lib: Library, job?: AiJob): Vendor {
   const env = process.env.ORE_AI;

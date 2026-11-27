@@ -54,7 +54,7 @@ const VENDORS: { id: Vendor; label: string }[] = [
   { id: "codex", label: "ChatGPT" },
 ];
 
-/** The AI's jobs, each of which can run on its own AI (D-new-ai-per-job). */
+/** The AI's jobs, each of which can run on its own AI (D356). */
 const JOBS: { id: Job; label: string }[] = [
   { id: "tutor", label: "Tutor" },
   { id: "grade", label: "Checking answers" },

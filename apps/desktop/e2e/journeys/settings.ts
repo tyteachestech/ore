@@ -454,7 +454,7 @@ journey("Settings: the reading sample follows each choice as it is made (D312)",
   await page.keyboard.press("Escape");
 });
 
-journey("Settings: one job gets its own AI from one menu, saved in skills.yaml; ⌘Z puts it back on the default (D-new-ai-per-job)", async (page) => {
+journey("Settings: one job gets its own AI from one menu, saved in skills.yaml; ⌘Z puts it back on the default (D356)", async (page) => {
   const settings = page.getByRole("dialog", { name: "Settings" });
   await page.keyboard.press("Meta+Comma");
   await settings.waitFor();

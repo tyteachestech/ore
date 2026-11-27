@@ -7,7 +7,7 @@ import { aiStampFor, chooseVendor, runAgent } from "../src/ai/adapter.ts";
 import { aiModel, jobAi, setAiModel, setJobAi } from "../src/ai/models.ts";
 import { tempLibrary } from "./helpers.ts";
 
-// Each AI job can have its own AI (D-new-ai-per-job): a fake `claude` and a fake `codex` on PATH, each logging what it was run with.
+// Each AI job can have its own AI (D356): a fake `claude` and a fake `codex` on PATH, each logging what it was run with.
 let binDir = "";
 const savedPath = process.env.PATH;
 const savedAi = process.env.ORE_AI;
