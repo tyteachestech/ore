@@ -1,0 +1,782 @@
+diff --git a/FIX-NOTES-original.md b/FIX-NOTES-original.md
+new file mode 100644
+index 0000000..ce72f09
+--- /dev/null
++++ b/FIX-NOTES-original.md
+@@ -0,0 +1,130 @@
++# Original rows — draft fixes
++
++## F684 — fixed (draft, awaiting Claude review)
++
++Confirmed on the starting checkout by writing and running the core regression test first. A saved HTML page's figure was present in its input folder and in Ore's normalized reading assets, but there was no offline viewing copy. The shared Open original action also opened only `source_file`. This implements Tyler's 2026-11-27 choice; no new product rule is proposed.
++
++### What changed
++
++- `packages/core/src/original-view.ts`: builds `original-view.html`, with copied dependencies under `original-files/` and a raw-file map in `original-view.json`. HTML attributes, responsive image candidates, inline styles, linked stylesheets and their CSS dependencies point at local copies. Filenames are generated, so input names cannot overwrite `source.*`, `thumbnail.*`, `assets/`, or other Ore records. Both lexical paths and resolved symlinks must stay inside the page folder; external and missing references remain as written. Remote base URLs retain their meaning. Reimport uses captured dependencies, not files at the former input location. Dependencies are written first and viewing HTML is published by atomic rename. Old dependency files remain available for Undo; unchanged reimports reuse the view.
++- `packages/core/src/items.ts`: carries and writes the derived view when creating a source; `sourceFile()` continues to identify the untouched original.
++- `packages/core/src/ingest/index.ts`: captures the viewing copy on file add, rebuilds it on local saved-HTML reimport (also when the reading text is unchanged), includes its HTML and manifest in the existing Undo stash, and restores these files atomically. Adding the same captured bytes again can supply a legacy source's missing viewing files. Deduplication never substitutes a view from a different original that merely produced the same reading text.
++- `packages/core/src/index.ts`: exports the core lookup for the viewing file.
++- `packages/cli/src/cmd-items.ts`: returns an optional `original_view` in both list and reader answers; the app's existing inferred answer types carry it to both devices.
++- `apps/desktop/src/original.ts`: the shared Open original action prefers the viewing copy for local sources. Web URLs retain precedence. Copy as Path and Reveal continue to use the captured original.
++- `packages/core/test/original-view.test.ts`: the saved-figure regression and boundary/lifecycle cases below.
++- `apps/desktop/test/original-view.test.ts`: headless shared-opener regression, with the native opener mocked in an isolated subprocess.
++- `packages/core/test/intake.test.ts`: one added intake case, using the new Ore-authored fixture `packages/core/test/fixtures/intake/files/saved-lesson/offline.html` and the existing figure. Checks title, author, date, start/end text, heading, image, code, original bytes, and the viewing figure.
++- `packages/core/test/intake-grid.test.ts`: the saved-HTML images cell now names that intake case. The earlier reimport-picture test remains unchanged.
++
++No existing test assertion or test body was changed. Findings and decisions were not edited. No `doc.md` output change is intended: all 42 golden tests passed, so no golden update was run and no goldens changed.
++
++**Durable fix:** the core now owns the captured original and its derived viewing bundle separately, including dependency preservation and Undo, and both devices consume the same viewing path.
++
++### New tests
++
++In `packages/core/test/original-view.test.ts`:
++
++1. `F684: the offline original resolves its figure and preserves the captured bytes through reimport`
++2. `F684: local names cannot overwrite Ore files and references outside the page folder stay as written`
++3. `F684: stylesheets, nested CSS images, srcset and inline styles keep their local files offline`
++4. `F684: reimport and Undo keep the matching viewing copy without changing the original`
++5. `F684: reimporting an older saved page creates a view without refusing its missing adjacent files`
++6. `F684: list and reader answers offer the viewing copy separately from the kept original`
++7. `F684: unchanged reimports reuse the view and re-adding a legacy original supplies its files`
++8. `F684: data srcsets, a remote base, CSS cycles and hostile destination paths stay safe`
++
++In `packages/core/test/intake.test.ts`:
++
++- `F684: a saved HTML page keeps an offline viewing copy as well as its complete reading text`
++
++In `apps/desktop/test/original-view.test.ts`:
++
++- `F684: Open original uses the offline copy, with the original and web link as fallbacks`
++
++### Red and green evidence
++
++Core red, before implementation (`codex-out/original/F684-red.log`):
++
++```text
++expect(existsSync(path)).toBe(true);
++Expected: true
++Received: false
++ 0 pass
++ 5 fail
++ 8 expect() calls
++Ran 5 tests across 1 file. [295.00ms]
++```
++
++Shared-opener red, before implementation (`codex-out/original/F684-app-red.log`):
++
++```text
++-     "/source/original-view.html",
+++     "/source/source.html",
++ 0 pass
++ 1 fail
++ 3 expect() calls
++Ran 1 test across 1 file. [18.00ms]
++```
++
++Core green, with the additional boundary cases (`codex-out/original/F684-core-green.log`):
++
++```text
++ 8 pass
++ 0 fail
++ 71 expect() calls
++Ran 8 tests across 1 file. [536.00ms]
++```
++
++Shared-opener green (`codex-out/original/F684-app-green.log`):
++
++```text
++ 1 pass
++ 0 fail
++ 3 expect() calls
++Ran 1 test across 1 file. [16.00ms]
++```
++
++Intake regression green (`codex-out/original/F684-intake-green.log`):
++
++```text
++ 1 pass
++ 193 filtered out
++ 0 fail
++ 11 expect() calls
++Ran 1 test across 1 file. [153.00ms]
++```
++
++### Existing coverage and limits
++
++Single-file runs passed: ingest (16), reimport (18), reimport-interruption (4), foundation (25), original-doctor (4), page-video (7), tables (16), intake-grid (2), golden (42), original-label (4), and phone-shims (6). Complete outputs are in `codex-out/original/<file-name>.log`.
++
++Two existing single-file checks were not green; neither failure was retried or hidden:
++
++- `intake.test.ts`: 193 pass, 1 fail. `a very tall or very wide screenshot is read whole, each line once (F188)` failed with `Found no text in that image`. The native OCR path at `packages/core/src/ingest/ocr.ts:73` is unchanged; the new viewing-copy branch runs only for HTML. This run does not establish why the native recognizer returned no text.
++- `cli-contract.test.ts`: 12 pass, 1 fail. `an inbox import where every link fails exits non-zero and keeps them` failed at the existing `Bun.serve({ port: 0, ... })` setup with `EADDRINUSE`, before it exercised import. The listener was unavailable in this environment.
++
++The offline bundle follows static HTML and CSS file references; it does not execute JavaScript to discover dynamically requested resources. Older sources cannot recover files that were never retained: their original remains usable as before, and re-adding the original with its adjacent files supplies the bundle. Dependency files are retained like reading assets so Undo can still resolve them.
++
++Interaction/security review: the existing list, Reader menu, and keyboard Open original paths all call the same helper. No visible controls were added or removed. The opener test verifies viewing-copy preference, original fallback, URL precedence, and unchanged Copy as Path. Path traversal, symlink escape, reserved-name collisions, and a hostile destination symlink have core guards. Per the task, no browser, app, simulator, development server, e2e, or benchmark was launched. Some existing required unit tests attempt local test listeners; the failed listener is recorded above. The design hook's responsive-image fixture warning was addressed by adding a real fallback `src`; no suppression or standing design finding remains.
++
++Changes are left uncommitted in this worktree as requested. No background process is intentionally retained.
++
++## Final checks
++
++- `bun run typecheck` — run once, passed (exit 0). Log: `codex-out/original/final-typecheck.log`.
++- `bun test packages/core/test apps/desktop/test` — run once, exit 1: **2,153 passed, 3 failed**, 2,156 tests across 274 files in 125.14 seconds. All **10 new F684 tests passed** in this combined run. Log: `codex-out/original/final-tests.log`.
++
++```text
++3 tests failed:
++(fail) import coverage: text recognition > a very tall or very wide screenshot is read whole, each line once (F188) [98.70ms]
++(fail) the CLI as an agent drives it > an inbox import where every link fails exits non-zero and keeps them [11.94ms]
++(fail) cancelling an add > SIGTERM after the source is written takes it back out [11.48ms]
++
++ 2153 pass
++ 3 fail
++ 10061328 expect() calls
++Ran 2156 tests across 274 files. [125.14s]
++```
++
++The OCR and CLI failures are the same ones described above. The third failure is also an existing test listener: `packages/core/test/cancel.test.ts:16` throws `EADDRINUSE` at `Bun.serve`, before add or cancellation runs. All three are also recorded in the earlier pass's `docs/reviews/2026-11-25-codex-deep-scan-5/FIX-NOTES-original.md`, under Final checks. None was rerun, skipped, or edited. The full suite is **not green** in this environment. `git diff --check` passed. All tool-managed commands finished; no persistent task process was started.
+diff --git a/apps/desktop/src/original.ts b/apps/desktop/src/original.ts
+index ce08e7c..d441f9a 100644
+--- a/apps/desktop/src/original.ts
++++ b/apps/desktop/src/original.ts
+@@ -35,7 +35,7 @@ export const playerLink = (item: Pick<Item, "video" | "url">) => item.video ?? i
+ /** Opens the web page in the browser, or the original file in its default app. */
+ export async function openOriginal(item: Item): Promise<void> {
+   if (item.url) await openUrl(item.url);
+-  else if (item.source_file) await openPath(item.source_file);
++  else if (item.original_view || item.source_file) await openPath(item.original_view ?? item.source_file!);
+   else throw new Error("This source has no original to open");
+ }
+ 
+diff --git a/apps/desktop/test/original-view.test.ts b/apps/desktop/test/original-view.test.ts
+new file mode 100644
+index 0000000..54193c4
+--- /dev/null
++++ b/apps/desktop/test/original-view.test.ts
+@@ -0,0 +1,23 @@
++import { expect, test } from "bun:test";
++
++// Isolate the opener mock so this never opens an app or changes other tests' native boundary.
++test("F684: Open original uses the offline copy, with the original and web link as fallbacks", async () => {
++  const script = `
++    import { mock } from "bun:test";
++    const opened = [];
++    mock.module("@tauri-apps/plugin-opener", () => ({
++      openPath: async p => opened.push(p), openUrl: async p => opened.push(p), revealItemInDir: async () => {},
++    }));
++    const { openOriginal, pathOf } = await import("./src/original.ts");
++    const item = { dir: "/source", source_file: "/source/source.html", original_view: "/source/original-view.html" };
++    await openOriginal(item);
++    await openOriginal({ ...item, original_view: undefined });
++    await openOriginal({ ...item, url: "https://example.com/page" });
++    console.log(JSON.stringify({ opened, copied: pathOf(item) }));
++  `;
++  const p = Bun.spawn([process.execPath, "-e", script], { cwd: `${import.meta.dir}/..`, stdout: "pipe", stderr: "pipe" });
++  const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
++  expect(err).toBe("");
++  expect(code).toBe(0);
++  expect(JSON.parse(out)).toEqual({ opened: ["/source/original-view.html", "/source/source.html", "https://example.com/page"], copied: "/source/source.html" });
++});
+diff --git a/packages/cli/src/cmd-items.ts b/packages/cli/src/cmd-items.ts
+index abffba8..55c9a46 100644
+--- a/packages/cli/src/cmd-items.ts
++++ b/packages/cli/src/cmd-items.ts
+@@ -1,4 +1,5 @@
+ import { relative } from "node:path";
++import { originalViewFile } from "@ore/core";
+ import {
+   digAnswer, digAsk, digReady, digState, dropDig, endDig, startDig, type Dig,
+   reimportSource,
+@@ -44,6 +45,11 @@ const INTENTS = Intent.options;
+  *  `enrich_skipped`: it was added with no enrich on its way, so nothing is writing its prequestions. */
+ const enrichFailure = (logs: ReturnType<typeof enrichLogs>, i: Item) => (i.meta.enriched_at ? {} : logs(i.meta.id));
+ 
++const originalView = (item: Item) => {
++  const original_view = originalViewFile(item);
++  return original_view ? { original_view } : {};
++};
++
+ function annotationLine(a: AnchoredAnnotation): string {
+   const where = a.anchor ? `${a.anchor.start}-${a.anchor.end}${a.anchor.method === "position" ? "" : ` (${a.anchor.method})`}` : "ORPHANED";
+   const quote = a.exact.replace(/\s+/g, " ");
+@@ -66,12 +72,14 @@ async function keptFromFeed(lib: Library, item: Item): Promise<boolean> {
+ 
+ /** `ore ls`: one source as a list row. */
+ const listedJson = (lib: Library, logs: ReturnType<typeof enrichLogs>, i: Item) => ({
++  ...originalView(i),
+   ...i.meta, path: relative(lib.root, i.docPath), dir: i.dir, source_file: sourceFile(i), thumbnail: thumbnailFile(i), course_cover: i.meta.course ? courseCoverFile(i) : undefined, words: wordCount(i.body), has_notes: readNotes(i).trim() !== "", ...enrichFailure(logs, i),
+ });
+ export type ListedSource = ReturnType<typeof listedJson>;
+ 
+ /** `ore show`: one source with its text and highlights, as the reader opens it. */
+ const shownJson = async (lib: Library, item: Item, annotations: AnchoredAnnotation[]) => ({
++  ...originalView(item),
+   ...item.meta, prequestions: item.meta.prequestions ?? [], path: relative(lib.root, item.docPath), dir: item.dir, source_file: sourceFile(item), thumbnail: thumbnailFile(item), ...enrichFailure(enrichLogs(lib), item), ...tablesState(lib, item),
+   body: item.body, annotations,
+   ...((item.meta.type === "youtube" || item.meta.video) && { transcript: transcriptOf(item) }),
+diff --git a/packages/core/src/index.ts b/packages/core/src/index.ts
+index 6f258a8..dbe410f 100644
+--- a/packages/core/src/index.ts
++++ b/packages/core/src/index.ts
+@@ -8,6 +8,7 @@ export * from "./ingest/index.ts";
+ export * from "./init.ts";
+ export * from "./history.ts";
+ export * from "./items.ts";
++export { originalViewFile } from "./original-view.ts";
+ export * from "./library.ts";
+ export * from "./lock.ts";
+ export * from "./notes.ts";
+diff --git a/packages/core/src/ingest/index.ts b/packages/core/src/ingest/index.ts
+index 72c81e4..3ce8ebe 100644
+--- a/packages/core/src/ingest/index.ts
++++ b/packages/core/src/ingest/index.ts
+@@ -12,6 +12,7 @@ import { allItems, createItem, findItem, keepPreview, ItemMetaSchema, readItemDi
+ import { paths, type Library } from "../library.ts";
+ import { proseLines } from "../links.ts";
+ import { withLock } from "../lock.ts";
++import { savedHtmlView, VIEW_HTML, VIEW_MANIFEST, writeOriginalView } from "../original-view.ts";
+ import { loadSkills, setItemSkills, unarchiveFiled } from "../skills.ts";
+ import { localImageSaves, saveImages, withImages } from "./assets.ts";
+ import { recordEnd } from "../cut.ts";
+@@ -538,6 +539,7 @@ async function fromFile(path: string, opts: AddOptions, input = path): Promise<N
+   const kind = opts.type ? ({ article: "html", youtube: "html", snippet: "markdown" } as Record<string, string>)[opts.type] ?? opts.type : (kindOf(path) ?? (text ? "markdown" : null));
+   if (!kind) throw new Error(`${extname(path) ? `Ore can’t read “${extname(path)}” files yet.` : "Ore can’t read that file: it has no extension and isn’t text."} It reads ${FILE_TYPES.filter((t) => !["markdown", "text", "htm"].includes(t)).join(", ")}; for anything else, copy its text and paste it here.`);
+   const draft = await fromBytes(bytes, kind, path, undefined, undefined, opts);
++  if (kind === "html") draft.originalView = await savedHtmlView(decodeText(bytes), path, decodeText, { within: opts.imagesIn });
+   if (kind === "markdown") {
+     const { rewriteImageUrls } = await import("./markdown.ts");
+     const base = new URL("file://" + resolve(path).split("/").map(encodeURIComponent).join("/"));
+@@ -629,6 +631,11 @@ async function keep(lib: Library, had: Item, opts: AddOptions, draft?: NewItem):
+       for (const a of draft.assets ?? []) writeAtomic(join(current.dir, "assets", a.name), a.data);
+       writeAtomic(join(current.dir, `source.${draft.source!.ext}`), draft.source!.data);
+     }
++    // Adding an older saved page again can supply the neighbours it never kept. Only attach the
++    // viewing copy when these are exactly this source's captured bytes, not merely the same text.
++    const original = sourceFile(current);
++    const bytes = typeof draft.source!.data === "string" ? new TextEncoder().encode(draft.source!.data) : draft.source!.data;
++    if (draft.originalView && original && Buffer.from(bytes).equals(readFileSync(original))) writeOriginalView(current.dir, draft.originalView);
+   });
+   // A post he was previewing from the Feed, added on purpose: it is a source now.
+   const fromFeed = await keepPreview(lib, had.meta.id);
+@@ -797,7 +804,7 @@ export interface Reimported {
+ // Files a reimport replaces; the previous ones wait in `.ore/reimport/<id>/<step>/` for Undo, one stash
+ // per reimport, so two in a row are undone one at a time, each to the version it replaced.
+ // layout.json (D125) belongs to the version it was read into, so Undo takes its tables back out too.
+-const REPLACED = (name: string) => name === "doc.md" || name === "transcript.vtt" || name === "layout.json" || name.startsWith("source.") || name === "page.html";
++const REPLACED = (name: string) => name === "doc.md" || name === "transcript.vtt" || name === "layout.json" || name.startsWith("source.") || name === "page.html" || name === VIEW_HTML || name === VIEW_MANIFEST;
+ const stashRoot = (lib: Library) => join(lib.root, ".ore", "reimport");
+ const stashes = (lib: Library, id: string) => join(stashRoot(lib), id);
+ /** In a stash whose reimport is undone (it holds the newer side): a step-less undo passes over it. */
+@@ -849,7 +856,10 @@ function swapFiles(item: Item, from: string) {
+   // Written over in place, never removed first, so a stop at any point leaves every file the source needs
+   // (deep scan 4, EDGES-01); only a file the other version doesn't have goes, after.
+   const theirs = readdirSync(from).filter((f) => REPLACED(f) && f !== "doc.md");
+-  for (const f of theirs) keepFile(join(from, f), join(item.dir, f));
++  for (const f of theirs) {
++    if (f === VIEW_HTML || f === VIEW_MANIFEST) writeAtomic(join(item.dir, f), readFileSync(join(from, f)));
++    else keepFile(join(from, f), join(item.dir, f));
++  }
+   // Each chapter's recall goes back with its chapter; one whose chapter the newer version lost comes back as it was.
+   const back = followChapters(item.meta.chapter_recalls, item.body, old.body, was.type) ?? [];
+   const lost = (was.chapter_recalls ?? []).filter((r) => !back.some((b) => b.n === r.n || (b.at === r.at && b.text === r.text)));
+@@ -966,6 +976,10 @@ export async function reimportSource(lib: Library, ref: string, { local = false,
+     throw PASTE_STEP.test(e.message) ? new Error(e.message.replace(PASTE_STEP, " Its transcript is as it was.")) : e;
+   });
+   if (draft.owed?.length) throw new Error("This video’s transcript comes in through your Mac.");
++  if (kept && !url && !pasted && kindOf(kept) === "html") {
++    const path = join(item.dir, kept);
++    draft.originalView = await savedHtmlView(decodeText(new Uint8Array(readFileSync(path))), path, decodeText, { keptIn: item.dir });
++  }
+   if (kept) draft.body = savedPictures(draft.body, item);
+   return turn(() => rewrite(lib, item, draft, draft.staleLayout ? undefined : regions, kept, stash));
+ }
+@@ -1026,6 +1040,7 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
+   if (draft.body === item.body && !byline) {
+     // A better reader may learn something about the same text: a PDF's tables still to be read (D125).
+     if (String(draft.structure ?? "") !== String(item.meta.structure ?? "")) item.meta = await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, structure: draft.structure }));
++    if (draft.originalView) await withLock(paths.lock(lib), () => writeOriginalView(findItem(lib, item.meta.id).dir, draft.originalView!));
+     return { item, changed: false, moved: 0, removed: [], unplaced: [] };
+   }
+   const step = stash ? ulid() : undefined;
+@@ -1039,10 +1054,11 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
+     }
+     // A file read again from its kept copy keeps that copy as it is: the same bytes need no second write.
+     const same = draft.source && kept === `source.${draft.source.ext}` ? kept : undefined;
+-    for (const f of readdirSync(item.dir).filter((f) => REPLACED(f) && f !== "doc.md" && f !== same)) unlinkSync(join(item.dir, f));
++    for (const f of readdirSync(item.dir).filter((f) => REPLACED(f) && f !== "doc.md" && f !== same && !(draft.originalView && (f === VIEW_HTML || f === VIEW_MANIFEST)))) unlinkSync(join(item.dir, f));
+     if (draft.source && !same) writeAtomic(join(item.dir, `source.${draft.source.ext}`), draft.source.data);
+     if (draft.transcript) writeAtomic(join(item.dir, "transcript.vtt"), draft.transcript);
+     if (draft.page) writeAtomic(join(item.dir, "page.html"), draft.page);
++    if (draft.originalView) writeOriginalView(item.dir, draft.originalView);
+     if (regions?.length) writeAtomic(join(item.dir, "layout.json"), JSON.stringify(regions));
+     // Images are named by their content, so the previous version's stay for Undo and shared ones are not copied twice.
+     for (const a of draft.assets ?? []) writeAtomic(join(item.dir, "assets", a.name), a.data);
+diff --git a/packages/core/src/items.ts b/packages/core/src/items.ts
+index 0782553..0b46a23 100644
+--- a/packages/core/src/items.ts
++++ b/packages/core/src/items.ts
+@@ -7,6 +7,7 @@ import { nowIso, slugify, ulid } from "./ids.ts";
+ import { paths, type Library } from "./library.ts";
+ import { withLock } from "./lock.ts";
+ import { madeThisRun } from "./cancel.ts";
++import { writeOriginalView } from "./original-view.ts";
+ 
+ export const ItemType = z.enum(["article", "pdf", "youtube", "markdown", "snippet", "epub"]);
+ export type ItemType = z.infer<typeof ItemType>;
+@@ -150,6 +151,8 @@ export interface NewItem {
+   skills?: string[];
+   course?: CourseRef;
+   source?: { ext: string; data: string | Uint8Array };
++  /** Offline viewing copy of a saved HTML page; never replaces its original bytes. */
++  originalView?: import("./original-view.ts").OriginalView;
+   /** Images the body shows, saved beside it as `assets/<name>` (D96). */
+   assets?: Asset[];
+   /** Opened from the Feed, not kept yet. */
+@@ -210,6 +213,7 @@ export async function createItem(lib: Library, input: NewItem, already?: () => I
+     if (input.source) writeAtomic(join(dir, `source.${input.source.ext}`), input.source.data);
+     if (input.transcript) writeAtomic(join(dir, "transcript.vtt"), input.transcript);
+     if (input.page) writeAtomic(join(dir, "page.html"), input.page);
++    if (input.originalView) writeOriginalView(dir, input.originalView);
+     for (const a of input.assets ?? []) writeAtomic(join(dir, "assets", a.name), a.data);
+     writeAtomic(docPath, stringifyFrontmatter(meta, body));
+   });
+diff --git a/packages/core/src/original-view.ts b/packages/core/src/original-view.ts
+new file mode 100644
+index 0000000..d379e0e
+--- /dev/null
++++ b/packages/core/src/original-view.ts
+@@ -0,0 +1,182 @@
++import { existsSync, mkdirSync, readFileSync, realpathSync, statSync } from "node:fs";
++import { dirname, extname, join, relative, resolve, sep } from "node:path";
++import { createHash } from "node:crypto";
++import { writeAtomic } from "./fsutil.ts";
++import { ulid } from "./ids.ts";
++import type { Asset } from "./items.ts";
++
++/** Only derived files: source.* remains the byte-for-byte original. The manifest keeps raw local
++ *  dependencies so reimport can rebuild the view after the input folder has gone away. */
++export type OriginalView = { html: string; manifest: string; files: Asset[] };
++type Manifest = { base: string; source: string; files: Record<string, string> };
++export const VIEW_HTML = "original-view.html";
++export const VIEW_MANIFEST = "original-view.json";
++
++export function originalViewFile(item: { dir: string }): string | undefined {
++  const path = join(item.dir, VIEW_HTML);
++  return existsSync(path) ? path : undefined;
++}
++
++export function writeOriginalView(dir: string, view: OriginalView): void {
++  // Dependencies first; publish complete HTML with a rename. Old dependencies stay for Undo.
++  mkdirSync(join(dir, "original-files"), { recursive: true });
++  if (!inside(realpathSync(join(dir, "original-files")), realpathSync(dir))) throw new Error("The saved page's viewing files must stay inside its source folder.");
++  for (const file of view.files) {
++    if (!savedName(file.name)) throw new Error("Invalid saved page viewing file name");
++    writeAtomic(join(dir, file.name), file.data);
++  }
++  writeAtomic(join(dir, VIEW_MANIFEST), view.manifest);
++  writeAtomic(join(dir, VIEW_HTML), view.html);
++}
++
++const inside = (path: string, root: string) => path.startsWith(root + sep);
++const savedName = (name: string) => /^original-files\/[a-zA-Z0-9-]+\.[a-zA-Z0-9]+$/.test(name);
++const sha256 = (data: string | Uint8Array) => createHash("sha256").update(data).digest("hex");
++// The core runs in the phone's web view too, where node:url is not available.
++const fileUrl = (path: string) => new URL("file://" + resolve(path).split(sep).map(encodeURIComponent).join("/"));
++const localPath = (url: URL) => {
++  if (url.protocol !== "file:" || (url.hostname && url.hostname !== "localhost") || /%2f|%5c/i.test(url.pathname)) throw new Error("Not a local file path");
++  return decodeURIComponent(url.pathname);
++};
++
++/** A viewing copy of a local HTML file. `keptIn` reads only previously captured dependencies on
++ *  reimport, never the old input paths recorded in the manifest. A legacy source can read its own
++ *  folder. Paths are checked both before and after resolving symlinks. */
++export async function savedHtmlView(html: string, path: string, decode: (bytes: Uint8Array) => string, opts: { within?: string; keptIn?: string } = {}): Promise<OriginalView> {
++  const { parseHTML } = await import("linkedom");
++  let previous: Manifest | undefined;
++  if (opts.keptIn) {
++    try {
++      const data = JSON.parse(readFileSync(join(opts.keptIn, VIEW_MANIFEST), "utf8"));
++      if (typeof data.base === "string" && localPath(new URL(data.base)) && data.files && typeof data.files === "object") previous = data;
++    } catch { /* Older sources have no manifest. Their original still opens and imports as before. */ }
++  }
++  const base = previous?.base ?? fileUrl(path).href;
++  const root = dirname(localPath(new URL(base)));
++  const manifest: Manifest = { base, source: sha256(html), files: {} };
++  if (previous?.source === manifest.source && opts.keptIn && existsSync(join(opts.keptIn, VIEW_HTML))) {
++    return { html: readFileSync(join(opts.keptIn, VIEW_HTML), "utf8"), manifest: JSON.stringify(previous) + "\n", files: [] };
++  }
++  const files = new Map<string, Uint8Array>();
++  const rendered = new Map<string, string>();
++  const generation = ulid();
++
++  function read(url: URL): Uint8Array | undefined {
++    try {
++      const local = resolve(localPath(url));
++      if (!inside(local, root)) return;
++      let file = local;
++      let boundary = root;
++      if (previous && opts.keptIn) {
++        const saved = previous.files[url.href];
++        if (typeof saved !== "string" || !savedName(saved)) return;
++        file = join(opts.keptIn, saved);
++        boundary = resolve(opts.keptIn);
++      }
++      const real = realpathSync(file);
++      if (!inside(real, realpathSync(boundary))) return;
++      if (opts.within && !inside(real, realpathSync(opts.within))) return;
++      if (!statSync(real).isFile()) return;
++      return new Uint8Array(readFileSync(real));
++    } catch { return; } // A missing or unreadable neighbour stays linked exactly as it was.
++  }
++
++  function reference(value: string, from: string, output: string): string {
++    if (!value.trim() || value.trim().startsWith("#")) return value;
++    let url: URL;
++    try { url = new URL(value, from); } catch { return value; }
++    if (url.protocol !== "file:") return /^https?:/.test(from) ? url.href : value;
++    const suffix = url.search + url.hash;
++    url.search = "";
++    url.hash = "";
++    let target = rendered.get(url.href);
++    if (!target) {
++      const data = read(url);
++      if (!data) return value;
++      const ext = extname(url.pathname).slice(1).toLowerCase();
++      const ending = /^[a-z0-9]{1,12}$/.test(ext) ? ext : "bin";
++      const raw = `original-files/${sha256(data)}.${ending}`;
++      manifest.files[url.href] = raw;
++      files.set(raw, data);
++      // Assign before following dependencies: two stylesheets can import each other.
++      target = ["css", "html", "htm"].includes(ext) ? `original-files/${generation}-${sha256(url.href)}.${ending}` : raw;
++      rendered.set(url.href, target);
++      if (ext === "css") files.set(target, new TextEncoder().encode(css(decode(data), url.href, target)));
++      else if (ext === "html" || ext === "htm") files.set(target, new TextEncoder().encode(page(decode(data), url.href, target)));
++    }
++    return relative(dirname(output), target).split(sep).join("/") + suffix;
++  }
++
++  function css(text: string, from: string, output: string): string {
++    // Keep strings and comments intact; rewrite URLs and the string form of @import only.
++    return text.replace(/\/\*[\s\S]*?\*\/|url\(\s*(?:"([^"\n]*)"|'([^'\n]*)'|([^\s)]+))\s*\)|(@import\s+)(["'])([^"'\n]+)\5|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/gi,
++      (all, double: string | undefined, single: string | undefined, bare: string | undefined, imp: string | undefined, quote: string, imported: string) => {
++        if (imp) return `${imp}${quote}${reference(imported, from, output)}${quote}`;
++        const value = double ?? single ?? bare;
++        if (value === undefined) return all;
++        const next = reference(value, from, output);
++        return next === value ? all : `url(${double !== undefined ? '"' : single !== undefined ? "'" : ""}${next}${double !== undefined ? '"' : single !== undefined ? "'" : ""})`;
++      });
++  }
++
++  function srcset(text: string, from: string, output: string): string {
++    let result = "", cursor = 0;
++    while (cursor < text.length) {
++      const leading = /^[\s,]*/.exec(text.slice(cursor))![0];
++      result += leading;
++      cursor += leading.length;
++      const token = /^\S+/.exec(text.slice(cursor))?.[0];
++      if (!token) break;
++      cursor += token.length;
++      const url = token.replace(/,+$/, "");
++      result += reference(url, from, output) + token.slice(url.length);
++      if (url.length !== token.length) continue;
++      // Descriptors end at the next comma, except inside parentheses. Commas inside a URL
++      // (notably data:) were consumed as part of that URL above.
++      const start = cursor;
++      let parens = 0;
++      while (cursor < text.length) {
++        const ch = text[cursor++]!;
++        if (ch === "(") parens++;
++        if (ch === ")") parens--;
++        if (ch === "," && parens === 0) break;
++      }
++      result += text.slice(start, cursor);
++    }
++    return result;
++  }
++
++  function page(text: string, from: string, output: string): string {
++    const { document } = parseHTML(text);
++    if (!document.documentElement) return text;
++    // Keep <base> semantics while making copied URLs relative to this viewing file.
++    const baseElement = document.querySelector("base[href]");
++    let at = from;
++    try { if (baseElement) at = new URL(baseElement.getAttribute("href")!, from).href; } catch {}
++    for (const element of document.querySelectorAll("*")) {
++      if (element.tagName === "BASE") continue;
++      for (const attr of ["src", "href", "poster", "data", "background", "xlink:href"]) {
++        const value = element.getAttribute(attr);
++        if (value === null) continue;
++        element.setAttribute(attr, reference(value, at, output));
++      }
++      for (const attr of ["srcset", "imagesrcset"]) {
++        const value = element.getAttribute(attr);
++        if (value !== null) element.setAttribute(attr, srcset(value, at, output));
++      }
++      const style = element.getAttribute("style");
++      if (style !== null) element.setAttribute("style", css(style, at, output));
++      if (element.tagName === "STYLE") element.textContent = css(element.textContent ?? "", at, output);
++    }
++    for (const element of document.querySelectorAll("base[href]")) element.removeAttribute("href");
++    // The derived file is UTF-8 even when the captured original used another encoding.
++    for (const meta of document.querySelectorAll('meta[charset], meta[http-equiv="Content-Type" i]')) meta.remove();
++    const charset = document.createElement("meta");
++    charset.setAttribute("charset", "utf-8");
++    document.head.prepend(charset);
++    return document.toString();
++  }
++
++  const viewing = page(html, base, VIEW_HTML);
++  return { html: viewing, manifest: JSON.stringify(manifest) + "\n", files: [...files].map(([name, data]) => ({ name, data })) };
++}
+diff --git a/packages/core/test/fixtures/intake/files/saved-lesson/offline.html b/packages/core/test/fixtures/intake/files/saved-lesson/offline.html
+new file mode 100644
+index 0000000..b3ee82c
+--- /dev/null
++++ b/packages/core/test/fixtures/intake/files/saved-lesson/offline.html
+@@ -0,0 +1,16 @@
++<!DOCTYPE html>
++<!-- A web page saved from a browser as "Web Page, HTML Only", its picture beside it. Written for Ore (AGPL). -->
++<html lang="en">
++<head><meta charset="utf-8"><title>Watching a seed sprout offline</title><meta name="author" content="Ore Example"><meta property="article:published_time" content="2026-11-27"></head>
++<body>
++<article>
++<h1>Watching a seed sprout offline</h1><h2>Keep a record</h2>
++<p>We planted a bean in a glass jar lined with wet paper, so the root could be seen from the first day. Each morning we drew what had changed and wrote down the time, the warmth of the room and how damp the paper felt.</p>
++<p>By the third day the seed coat had split and a pale root had pushed down along the glass. The drawing below shows the jar on that morning.</p>
++<img src="figure.png" alt="The bean jar on day three">
++<p>On the fifth day the shoot turned upward toward the window, even when we turned the jar around. We compare the drawings from each day to see how quickly the root and the shoot grew, and what that says about where a young plant spends its first energy.</p>
++<pre><code>day = 3
++record(day)</code></pre>
++</article>
++</body>
++</html>
+diff --git a/packages/core/test/intake-grid.test.ts b/packages/core/test/intake-grid.test.ts
+index 70fc9bd..6b22ede 100644
+--- a/packages/core/test/intake-grid.test.ts
++++ b/packages/core/test/intake-grid.test.ts
+@@ -49,7 +49,7 @@ const GRID: Record<string, Row> = {
+   "Google Docs and Slides": { title: "a public Google Doc is titled by its name", author: "Word: headings, lists, tables, title and author", date: na, text: "nbviewer and Google links", headings: "Word: headings, lists, tables, title and author", images: "Word: images are saved with the source", code: na, tables: "Word: headings, lists, tables, title and author", math: na, language: na, junk: "a private Google Doc's sign-in page is refused" },
+   "Course page and lessons": { title: "lessons come in page order", author: "course page: junk metadata is dropped", date: "course page: junk metadata is dropped", text: "a Claude Academy lesson: its page's text and its video's transcript", headings: "a Claude Academy lesson: its page's text and its video's transcript", images: "the course page's own picture becomes the course's cover", code: na, tables: na, math: na, language: na, junk: "lessons come in page order, once each, without the start button" },
+   "Page with a video": { title: "keeps the page's text, then the transcript", author: na, date: na, text: "keeps the page's text, then the transcript", headings: na, images: na, code: na, tables: na, math: na, language: na, junk: "a page that only wraps its video is the video" },
+-  "Saved web page (.html file)": { title: "a title is one line", author: na, date: na, text: "a title is one line", headings: na, images: "a saved web page read again from its kept copy keeps the pictures it saved", code: na, tables: na, math: na, language: LANG, junk: "an empty HTML file explains how to save readable content" },
++  "Saved web page (.html file)": { title: "a title is one line", author: na, date: na, text: "a title is one line", headings: na, images: "F684: a saved HTML page keeps an offline viewing copy as well as its complete reading text", code: na, tables: na, math: na, language: LANG, junk: "an empty HTML file explains how to save readable content" },
+   "Slides online (Speaker Deck)": { title: "slides online (Speaker Deck)", author: "slides online (Speaker Deck)", date: "slides online (Speaker Deck)", text: "slides online (Speaker Deck)", headings: "slides online (Speaker Deck)", images: "slides online (Speaker Deck)", code: na, tables: na, math: na, language: na, junk: WEB_JUNK },
+   "RSS or Atom feed (Follow)": { title: "Atom: title, site, posts newest first", author: "RSS 2.0: CDATA titles, dc:creator", date: "RSS 2.0: CDATA titles, dc:creator", text: "opening reads it without listing it", headings: na, images: "Atom: title, site, posts newest first", code: na, tables: na, math: na, language: na, junk: "finds the feed a page names" },
+   "Atom feed with inherited bases": { title: "feed intake resolves inherited", author: "feed intake resolves inherited", date: "feed intake resolves inherited", text: "feed intake resolves inherited", headings: na, images: "feed intake resolves inherited", code: na, tables: na, math: na, language: na, junk: na },
+diff --git a/packages/core/test/intake.test.ts b/packages/core/test/intake.test.ts
+index 56bf4ec..49bc5a3 100644
+--- a/packages/core/test/intake.test.ts
++++ b/packages/core/test/intake.test.ts
+@@ -10,6 +10,7 @@ import { setChapterRecall } from "../src/notes.ts";
+ import { addHighlight, readAnnotations } from "../src/annotations.ts";
+ import { cutText } from "../src/cut.ts";
+ import { findItem, listItems } from "../src/items.ts";
++import { originalViewFile } from "../src/original-view.ts";
+ import { doctor } from "../src/doctor.ts";
+ import { frontTab } from "../src/ingest/tab.ts";
+ import { ocrMarkdown } from "../src/ingest/ocr.ts";
+@@ -33,6 +34,23 @@ const FIX = join(import.meta.dir, "fixtures/intake");
+ const web = (f: string) => readFileSync(join(FIX, "web", f), "utf8");
+ const file = (f: string) => join(FIX, "files", f);
+ 
++test("F684: a saved HTML page keeps an offline viewing copy as well as its complete reading text", async () => {
++  const input = file("saved-lesson/offline.html");
++  const item = await addSource(await tempLibrary(), input);
++  expect(item.meta.title).toBe("Watching a seed sprout offline");
++  expect(item.meta.author).toBe("Ore Example");
++  expect(item.meta.published).toStartWith("2026-11-27");
++  expect(item.body).toContain("We planted a bean");
++  expect(item.body).toContain("where a young plant spends its first energy");
++  expect(item.body).toContain("## Keep a record");
++  expect(item.body).toContain("day = 3\nrecord(day)");
++  expect(item.body).toMatch(/!\[The bean jar on day three\]\(assets\//);
++  expect(readFileSync(join(item.dir, "source.html"))).toEqual(readFileSync(input));
++  const html = readFileSync(originalViewFile(item)!, "utf8");
++  const image = html.match(/<img[^>]+src="([^"]+)"/)![1]!;
++  expect(readFileSync(join(item.dir, image))).toEqual(readFileSync(file("saved-lesson/figure.png")));
++});
++
+ // The desktop tests leave happy-dom's `window` and `getComputedStyle` on globalThis; Defuddle then
+ // reads the page as if in a browser and fails. The CLI (where intake runs) has neither, so these
+ // tests hide them while they run.
+diff --git a/packages/core/test/original-view.test.ts b/packages/core/test/original-view.test.ts
+new file mode 100644
+index 0000000..71bcd6f
+--- /dev/null
++++ b/packages/core/test/original-view.test.ts
+@@ -0,0 +1,176 @@
++import { afterAll, afterEach, beforeAll, expect, test } from "bun:test";
++import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
++import { tmpdir } from "node:os";
++import { dirname, join, sep } from "node:path";
++import { fileURLToPath, pathToFileURL } from "node:url";
++import { parseHTML } from "linkedom";
++import { addSource, reimportSource, undoReimport } from "../src/ingest/index.ts";
++import { sourceFile } from "../src/items.ts";
++import { originalViewFile, savedHtmlView, writeOriginalView } from "../src/original-view.ts";
++import { tempLibrary } from "./helpers.ts";
++
++const fixture = join(import.meta.dir, "fixtures/intake/files/saved-lesson");
++// The combined suite includes happy-dom app tests. Intake itself runs without browser globals.
++const globals = globalThis as Record<string, unknown>;
++const browserGlobals = { window: globals.window, getComputedStyle: globals.getComputedStyle };
++beforeAll(() => { delete globals.window; delete globals.getComputedStyle; });
++afterAll(() => { for (const [key, value] of Object.entries(browserGlobals)) if (value !== undefined) globals[key] = value; });
++const roots: string[] = [];
++afterEach(() => { for (const dir of roots.splice(0)) rmSync(dir, { recursive: true, force: true }); });
++async function setup(extra = "") {
++  const lib = await tempLibrary();
++  const input = mkdtempSync(join(tmpdir(), "ore-original-view-"));
++  roots.push(lib.root, input);
++  cpSync(fixture, join(input, "page"), { recursive: true });
++  const path = join(input, "page/lesson.html");
++  writeFileSync(path, readFileSync(path, "utf8").replace("</article>", `${extra}</article>`));
++  return { lib, input, path };
++}
++function view(dir: string) {
++  const path = join(dir, "original-view.html");
++  expect(existsSync(path)).toBe(true);
++  return { path, document: parseHTML(readFileSync(path, "utf8")).document };
++}
++function linked(page: string, ref: string) {
++  const path = fileURLToPath(new URL(ref, pathToFileURL(page)));
++  expect(path.startsWith(dirname(page) + sep)).toBe(true);
++  return path;
++}
++
++test("F684: the offline original resolves its figure and preserves the captured bytes through reimport", async () => {
++  const { lib, input, path } = await setup();
++  const bytes = readFileSync(path);
++  const picture = readFileSync(join(dirname(path), "figure.png"));
++  const item = await addSource(lib, path);
++  const first = view(item.dir);
++  expect(readFileSync(linked(first.path, first.document.querySelector("img")!.getAttribute("src")!))).toEqual(picture);
++  expect(readFileSync(sourceFile(item)!)).toEqual(bytes);
++  const before = readFileSync(item.docPath);
++  rmSync(input, { recursive: true });
++  // Rebuild from the kept original and its saved files, even after the viewing HTML was removed.
++  rmSync(first.path);
++  expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
++  const again = view(item.dir);
++  expect(readFileSync(linked(again.path, again.document.querySelector("img")!.getAttribute("src")!))).toEqual(picture);
++  expect(readFileSync(sourceFile(item)!)).toEqual(bytes);
++  expect(readFileSync(item.docPath)).toEqual(before);
++});
++
++test("F684: local names cannot overwrite Ore files and references outside the page folder stay as written", async () => {
++  const { lib, input, path } = await setup(`<object data="source.html"></object><img id="thumb" src="thumbnail.png"><img id="assets" src="assets/figure.png"><a id="parent" href="../outside.txt">outside</a><a id="symlink" href="escape.txt">escape</a><a id="missing" href="missing.pdf">missing</a>`);
++  writeFileSync(join(dirname(path), "source.html"), "A different file, never Ore's original.");
++  cpSync(join(dirname(path), "figure.png"), join(dirname(path), "thumbnail.png"));
++  mkdirSync(join(dirname(path), "assets"));
++  cpSync(join(dirname(path), "figure.png"), join(dirname(path), "assets/figure.png"));
++  writeFileSync(join(input, "outside.txt"), "Outside the page folder");
++  symlinkSync(join(input, "outside.txt"), join(dirname(path), "escape.txt"));
++  const absolute = pathToFileURL(join(input, "outside.txt")).href;
++  const local = pathToFileURL(join(dirname(path), "figure.png")).href;
++  writeFileSync(path, readFileSync(path, "utf8").replace("</article>", `<a id="absolute" href="${absolute}">outside</a><img id="local" src="${local}"></article>`));
++  const bytes = readFileSync(path);
++  const item = await addSource(lib, path);
++  const { document, path: page } = view(item.dir);
++  expect(readFileSync(sourceFile(item)!)).toEqual(bytes);
++  expect(readFileSync(linked(page, document.querySelector("object")!.getAttribute("data")!), "utf8")).toBe("A different file, never Ore's original.");
++  for (const id of ["thumb", "assets", "local"]) expect(readFileSync(linked(page, document.getElementById(id)!.getAttribute("src")!))).toEqual(readFileSync(join(dirname(path), "figure.png")));
++  for (const [id, ref] of [["parent", "../outside.txt"], ["absolute", absolute], ["symlink", "escape.txt"], ["missing", "missing.pdf"]]) expect(document.getElementById(id!)!.getAttribute("href")).toBe(ref!);
++});
++
++test("F684: stylesheets, nested CSS images, srcset and inline styles keep their local files offline", async () => {
++  const { lib, path } = await setup(`<link rel="stylesheet" href="styles/main.css"><img id="responsive" src="figure.png" srcset="figure.png 1x, figure%20two.png 2x"><div id="styled" style="background: url('figure.png')"></div>`);
++  mkdirSync(join(dirname(path), "styles"));
++  writeFileSync(join(dirname(path), "styles/main.css"), '@import "colors.css"; .figure { background: url("../figure.png"); }');
++  writeFileSync(join(dirname(path), "styles/colors.css"), ".figure { color: green }");
++  cpSync(join(dirname(path), "figure.png"), join(dirname(path), "figure two.png"));
++  const item = await addSource(lib, path);
++  const { document, path: page } = view(item.dir);
++  const cssPath = linked(page, document.querySelector("link")!.getAttribute("href")!);
++  const css = readFileSync(cssPath, "utf8");
++  for (const ref of [css.match(/@import "([^"]+)"/)![1]!, css.match(/url\("([^"]+)"\)/)![1]!]) {
++    const p = fileURLToPath(new URL(ref, pathToFileURL(cssPath)));
++    expect(p.startsWith(item.dir + sep)).toBe(true);
++    expect(existsSync(p)).toBe(true);
++  }
++  for (const candidate of document.getElementById("responsive")!.getAttribute("srcset")!.split(",")) expect(existsSync(linked(page, candidate.trim().split(/\s+/)[0]!))).toBe(true);
++  expect(existsSync(linked(page, document.getElementById("styled")!.getAttribute("style")!.match(/url\('([^']+)'\)/)![1]!))).toBe(true);
++});
++
++test("F684: reimport and Undo keep the matching viewing copy without changing the original", async () => {
++  const { lib, path } = await setup();
++  const item = await addSource(lib, path);
++  const original = readFileSync(sourceFile(item)!);
++  // A hand edit to the original is still read; the derived view must follow it.
++  writeFileSync(sourceFile(item)!, original.toString().replace("third day", "fourth day"));
++  const changed = await reimportSource(lib, item.meta.id);
++  expect(changed.changed).toBe(true);
++  expect(readFileSync(view(item.dir).path, "utf8")).toContain("fourth day");
++  await undoReimport(lib, item.meta.id, changed.step);
++  expect(readFileSync(view(item.dir).path, "utf8")).toContain("third day");
++});
++
++test("F684: reimporting an older saved page creates a view without refusing its missing adjacent files", async () => {
++  const { lib, path } = await setup();
++  const item = await addSource(lib, path);
++  for (const name of ["original-view.html", "original-view.json", "original-files"]) rmSync(join(item.dir, name), { recursive: true, force: true });
++  expect(originalViewFile(item)).toBeUndefined();
++  const before = readFileSync(sourceFile(item)!);
++  expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
++  expect(readFileSync(sourceFile(item)!)).toEqual(before);
++  expect(view(item.dir).document.querySelector("img")!.getAttribute("src")).toBe("figure.png");
++});
++
++test("F684: list and reader answers offer the viewing copy separately from the kept original", async () => {
++  const { lib, path } = await setup();
++  const item = await addSource(lib, path);
++  for (const args of [["ls"], ["show", item.meta.id]]) {
++    const p = Bun.spawn([process.execPath, join(import.meta.dir, "../../cli/src/ore.ts"), ...args, "--json"], {
++      env: { ...process.env, ORE_LIBRARY: lib.root, ORE_NO_ENRICH: "1" }, stdout: "pipe", stderr: "pipe",
++    });
++    const [out, err, code] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text(), p.exited]);
++    expect(code).toBe(0);
++    expect(err).toBe("");
++    const answer = JSON.parse(out);
++    const source = Array.isArray(answer) ? answer[0] : answer;
++    expect(source.source_file).toBe(sourceFile(item));
++    expect(source.original_view).toBe(originalViewFile(item));
++  }
++});
++
++test("F684: unchanged reimports reuse the view and re-adding a legacy original supplies its files", async () => {
++  const { lib, path } = await setup('<link rel="stylesheet" href="style.css">');
++  writeFileSync(join(dirname(path), "style.css"), "body { color: green }");
++  const item = await addSource(lib, path);
++  const names = readdirSync(join(item.dir, "original-files"));
++  const html = readFileSync(view(item.dir).path);
++  expect((await reimportSource(lib, item.meta.id)).changed).toBe(false);
++  expect(readdirSync(join(item.dir, "original-files"))).toEqual(names);
++  expect(readFileSync(view(item.dir).path)).toEqual(html);
++  rmSync(join(item.dir, "original-view.html"));
++  rmSync(join(item.dir, "original-view.json"));
++  rmSync(join(item.dir, "original-files"), { recursive: true });
++  expect((await addSource(lib, path)).meta.id).toBe(item.meta.id);
++  const restored = view(item.dir);
++  expect(existsSync(linked(restored.path, restored.document.querySelector("img")!.getAttribute("src")!))).toBe(true);
++});
++
++test("F684: data srcsets, a remote base, CSS cycles and hostile destination paths stay safe", async () => {
++  const { path, input } = await setup();
++  const decode = (data: Uint8Array) => new TextDecoder().decode(data);
++  writeFileSync(join(dirname(path), "a.css"), '@import "b.css";');
++  writeFileSync(join(dirname(path), "b.css"), '@import "a.css";');
++  const result = await savedHtmlView('<html><head><link href="a.css"></head><body><img src="figure.png" srcset="figure.png, figure.png"><img src="figure.png" srcset="data:image/png;base64,AAAA 1x, figure.png 2x"></body></html>', path, decode);
++  const document = parseHTML(result.html).document;
++  const sets = [...document.querySelectorAll("img")].map(el => el.getAttribute("srcset")!);
++  expect(sets[0]!.match(/original-files\//g)).toHaveLength(2);
++  expect(sets[1]).toStartWith("data:image/png;base64,AAAA 1x, original-files/");
++  expect(result.files.filter(f => f.name.endsWith(".css"))).toHaveLength(4); // two raw, two viewing files
++  const remote = await savedHtmlView('<html><head><base href="https://example.com/page/"></head><body><img src="figure.png"><img src="figure.png" srcset="figure.png 1x, second.png 2x"><div style="background:url(figure.png)"></div></body></html>', path, decode);
++  expect(remote.html).toContain('src="https://example.com/page/figure.png"');
++  expect(remote.html).toContain("https://example.com/page/second.png 2x");
++  expect(remote.html).toContain("url(https://example.com/page/figure.png)");
++  expect(remote.files).toHaveLength(0);
++  const destination = join(input, "destination");
++  mkdirSync(destination);
++  symlinkSync(dirname(path), join(destination, "original-files"));
++  expect(() => writeOriginalView(destination, result)).toThrow("inside its source folder");
++});
