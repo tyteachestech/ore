@@ -510,9 +510,13 @@ export interface ChatRun {
 // up again with `exec resume`. No tools: everything the chat needs is in the first message.
 /** `onProgress` (claude only): the reply so far as it is written, a few times a second, with the session it is
  *  written in, which a run stopped part way never returns (D296). */
-export async function runChatTurn(lib: Library, a: { system: string; message: string; schema: object; session?: string; cwd: string; onProgress?: (p: { reply: string; session: string }) => void }): Promise<ChatRun & { vendor: Vendor }> {
-  const vendor = chooseVendor(lib, "tutor");
-  const model = aiModel(lib, vendor, "tutor");
+export async function runChatTurn(lib: Library, a: { prompt: PromptName; system: string; message: string; schema: object; session?: string; cwd: string; onProgress?: (p: { reply: string; session: string }) => void }): Promise<ChatRun & { vendor: Vendor }> {
+  const job = JOB_OF[a.prompt];
+  const vendor = chooseVendor(lib, job);
+  const model = aiModel(lib, vendor, job);
+  // Its spend goes in usage.jsonl as runAgent's does (#547).
+  const logged = (ran: string, usage: Usage) =>
+    logUsage(lib, { ts: new Date().toISOString(), job: a.prompt, vendor, model: ran, prompt_version: loadPrompt(a.prompt).version, input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, ...(usage.cost_usd !== undefined ? { cost_usd: usage.cost_usd } : {}), runs: 1, ok: true });
   if (vendor === "claude") {
     const bin = Bun.which("claude", { PATH: process.env.PATH ?? "" });
     if (!bin) throw new Error("Claude Code isn’t installed (no `claude` on PATH). Install it, or pick Codex in Settings → AI.");
@@ -538,7 +542,11 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
     }));
     const out = claudeResult(r, a.onProgress ? streamEvents(r.stdout) : undefined);
     const usage = Object.entries(out.modelUsage ?? {}).sort((x, y) => (y[1].outputTokens ?? 0) - (x[1].outputTokens ?? 0));
-    return { vendor, output: out.structured_output ?? out.result, model: usage[0]?.[0] ?? model ?? "claude-default", session };
+    const ran = usage[0]?.[0] ?? model ?? "claude-default";
+    // A resumed session reports what the whole session has cost so far, so a follow-up keeps only its tokens (as runClaude).
+    const { cost_usd, ...tokens } = claudeUsage(out);
+    logged(ran, a.session ? tokens : { ...tokens, ...(cost_usd !== undefined ? { cost_usd } : {}) });
+    return { vendor, output: out.structured_output ?? out.result, model: ran, session };
   }
   const bin = Bun.which("codex", { PATH: process.env.PATH ?? "" });
   if (!bin) throw new Error("Codex isn’t installed (no `codex` on PATH). Install it, or pick Claude in Settings → AI.");
@@ -557,7 +565,9 @@ export async function runChatTurn(lib: Library, a: { system: string; message: st
     if (r.code !== 0 || !existsSync(outPath)) throw vendorFailure("codex", r);
     const session = a.session ?? codexThread(r.stdout);
     if (!session) throw new Error("codex did not report a thread id");
-    return { vendor, output: readFileSync(outPath, "utf8"), model: model ?? codexConfiguredModel() ?? "codex-default", session };
+    const ran = model ?? codexConfiguredModel() ?? "codex-default";
+    logged(ran, codexUsage(r.stdout));
+    return { vendor, output: readFileSync(outPath, "utf8"), model: ran, session };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
