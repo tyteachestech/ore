@@ -307,6 +307,16 @@ describe("PDF tables and formulas (D125)", () => {
     expect(mixed).not.toContain("Ishmael");
     expect(mixed).toContain("the last one.\n\nFigure 2: a screenshot.");
   });
+
+  test("PDF: on a page with its own text, what the reader wrote in a block of prose or a heading changes nothing, so it is not asked to read them (D357)", async () => {
+    // The driver sends the reading model only tables, formulas, scans and captions with no text; this is the
+    // rule that makes that safe. If the doc ever takes a prose block's words from the reader, this fails first.
+    const pages = JSON.parse(readFileSync(join(FIX, "tables.paddle.json"), "utf8")) as PaddlePage[];
+    const unread = pages.map((p) => ({ ...p, blocks: p.blocks.map((b) => (b.label === "table" || b.label.includes("formula") ? b : { ...b, content: "not what the page says" })) }));
+    expect(unread.flatMap((p) => p.blocks).some((b) => b.content === "not what the page says")).toBe(true);
+    const views = await pageViews(pdf("tables.pdf"));
+    expect((await pdfToDoc(pdf("tables.pdf"), regionsFrom(unread, views))).body).toBe((await pdfToDoc(pdf("tables.pdf"), regionsFrom(pages, views))).body);
+  });
 });
 
 test("tidyLatex: a line break's backslash before a number is not a separator", () => {
