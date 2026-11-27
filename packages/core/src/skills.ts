@@ -142,9 +142,13 @@ function parseFile(data: unknown): { file: SkillsFile; dropped: string[] } {
       dropped.push(`skill "${String(skill.name ?? skill.id ?? Number(n) + 1)}" has ${field} ${JSON.stringify(skill[field])}, which Ore can't use, so ${field === "priority" ? `${DEFAULT_PRIORITY} is used` : "it is left out"}`);
       if (field === "priority") skill.priority = DEFAULT_PRIORITY;
       else delete skill[field];
-    } else if ((top === "review" || top === "models") && typeof n === "string" && copy[top] && typeof copy[top] === "object" && n in (copy[top] as object)) {
-      dropped.push(`${top}.${n} is ${JSON.stringify((copy[top] as Record<string, unknown>)[n])}, which Ore can't use, so the default is used`);
+    } else if ((top === "review" || top === "models" || top === "jobs") && typeof n === "string" && copy[top] && typeof copy[top] === "object" && n in (copy[top] as object)) {
+      dropped.push(`${top}.${n} is ${JSON.stringify((copy[top] as Record<string, unknown>)[n])}, which Ore can't use, so ${top === "jobs" ? "that job runs on the default AI" : "the default is used"}`);
       delete (copy[top] as Record<string, unknown>)[n];
+    } else if ((top === "review" || top === "models" || top === "jobs") && issue.path.length === 1 && top in copy) {
+      // The whole block isn't one (`jobs: codex`): each of its values is the default.
+      dropped.push(`${top} is ${JSON.stringify(copy[top])}, which Ore can't use, so the defaults are used`);
+      delete copy[top];
     } else if (top === "ai" && issue.path.length === 1 && "ai" in copy) {
       dropped.push(`ai is ${JSON.stringify(copy.ai)} (claude or codex), so claude is used`);
       delete copy.ai;
