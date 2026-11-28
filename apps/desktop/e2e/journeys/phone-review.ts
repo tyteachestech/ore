@@ -49,9 +49,8 @@ journey("phone: in Review the buttons he taps on every exercise sit at the foot 
     const good = page.getByRole("button", { name: "Good", exact: true });
     await good.waitFor();
     const gap = await foot(".review-rate");
-    const tall = await page.locator(".review-body").evaluate((b) => b.scrollHeight > b.clientHeight + 1);
-    // A long answer scrolls and the ratings follow it; a short one leaves them at the foot.
-    if (!tall && gap > 60) throw new Error(`the ratings end ${gap}px above the foot of the screen`);
+    // The ratings are the bar at the foot, under a short answer or a long one (F887).
+    if (gap > 60) throw new Error(`the ratings end ${gap}px above the foot of the screen`);
     if (fact) seen++;
     // After No idea, Good on an Explain one wants a second press (D237): Again moves on at one.
     await tap(page, page.getByRole("button", { name: "Again", exact: true }));
@@ -851,4 +850,29 @@ journey("phone: back after days away the mole offers two minutes on Today, a 44 
   await page.getByRole("radio", { name: "Think so" }).or(page.locator(".review-q")).first().waitFor();
   if (await page.locator(".review-pick").count()) throw new Error("two minutes asked what to review first");
   if (await page.locator(".checkin").count()) throw new Error("two minutes opened on the check-in, not an exercise");
+}, "phone");
+
+journey("phone: under an answer longer than the screen the four ratings stay at the foot, and nothing in the page moves them (F887)", async (page) => {
+  // The ratings sat in the page after the answer and passage: a long one put them a scroll away, and anything
+  // landing above them (the passage, a picture) moved them under his thumb. Every exercise here is made tall.
+  await page.addStyleTag({ content: ".phone-full .review-card::before { content: ''; display: block; flex: none; height: 1400px; order: 1; }" });
+  await tap(page, page.getByRole("button", { name: "Start review" }).first());
+  await tap(page, page.locator(".review-pick").getByRole("button", { name: "Start review" }));
+  const sure = page.getByRole("radio", { name: "Think so" });
+  await sure.waitFor();
+  const typed = (await page.locator(".phone-full .quiz-answer:visible").count()) > 0;
+  await tap(page, typed ? page.getByRole("button", { name: "No idea" }) : sure);
+  const rate = page.locator(".phone-full .review-rate");
+  await rate.waitFor();
+  const at = () => rate.evaluate((el) => { const r = el.getBoundingClientRect(); return { gap: Math.round(innerHeight - r.bottom), top: Math.round(r.top) }; });
+  const before = await at();
+  if (before.gap < 0 || before.gap > 60) throw new Error(`under a long answer the ratings end ${before.gap}px from the foot of the screen`);
+  const body = page.locator(".phone-full .review-body");
+  await body.evaluate((b) => (b.scrollTop = 500));
+  const after = await at();
+  if (after.top !== before.top) throw new Error(`scrolling the answer moved the ratings from y ${before.top} to ${after.top}`);
+  for (const b of await rate.locator("button").all()) {
+    const h = (await b.boundingBox())!.height;
+    if (h < 44) throw new Error(`a rating is ${h} pt tall`);
+  }
 }, "phone");

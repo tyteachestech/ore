@@ -771,8 +771,8 @@ function Session({ pick, source, short = false, skills, onOpenSource, onDig, onC
   const gemNow = card?.kind === "card" ? undefined : card?.history?.gem?.kind;
   const gemShown = gemNow === "ready" ? "rough" : gemNow;
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
-  // The four ratings and the warning an unexpected one gets (D237). On the Mac they are the bottom bar once the
-  // answer is shown (D364): nothing that loads above them, the passage first, can move them.
+  // The four ratings and the warning an unexpected one gets (D237). They are the bottom bar once the answer is
+  // shown, on the Mac and the iPhone (D364, F887): nothing that loads above them, the passage first, can move them.
   const rateRow = phase === "checked" && card && entry && !end && (
     <>
       <div className="review-rate" role="group" aria-label="How well did you remember it?" onMouseLeave={() => setPreview(undefined)} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setPreview(undefined)}>
@@ -1130,7 +1130,6 @@ function Session({ pick, source, short = false, skills, onOpenSource, onDig, onC
                     <Timeline history={card.history} rating={(preview ?? suggested ?? 3) as Rating} />
                   </div>
                 )}
-                {PHONE && rateRow}
                 {!PHONE && <div className="review-tools">
                   {/* The quick quiz window is too small for the mole's panel: there the chat stays under the ratings. */}
                   {quick && <Hint text="Ask about this" keys="ask" side="top">
@@ -1180,7 +1179,7 @@ function Session({ pick, source, short = false, skills, onOpenSource, onDig, onC
       {!quick && !PHONE && asks && !end && card && phase === "checked" && (asking ? askPanel : (
         <TutorBubble wave={wave} name="Ask about this" label="Ask about this" keys="ask" onOpen={() => setAsking(true)} />
       ))}
-      {!end && card && entry && (rateRow ? !PHONE && <div className="review-bar">{rateRow}</div> : <KeyFoot phase={phase} kind={card.kind} hint={cued < hints} inHead={!!card.in_head_ok} />)}
+      {!end && card && entry && (rateRow ? <div className="review-bar">{rateRow}</div> : <KeyFoot phase={phase} kind={card.kind} hint={cued < hints} inHead={!!card.in_head_ok} />)}
     </div>
     </Trap>
   );
