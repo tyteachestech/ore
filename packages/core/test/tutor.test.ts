@@ -863,7 +863,7 @@ describe("tutor: hints and cards", () => {
     expect(readdirSync(join(lib.root, "cards")).filter((f) => f.endsWith(".md")).length).toBe(before);
   });
 
-  // F-new-tutor-exercise-passages
+  // F892
   test("a kept tutor exercise anchors its cited passages on its source", async () => {
     const { lib, a, b } = await library();
     const body = findItem(lib, a.meta.id).body;

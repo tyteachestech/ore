@@ -97,7 +97,7 @@ describe("tutor chats", () => {
     expect((turn("c-2") as unknown as { alts?: object[] }).alts).toHaveLength(1);
   });
 
-  // F-new-tutor-worked-steps
+  // F894
   test("a stale chat save keeps the most revealed steps for each version of a worked reply", async () => {
     const { save, turn } = await twoWindows();
     const first = { message: "How?", reply: "Here's how.", steps: ["Start here.", "Then this.", "Finally this."] };

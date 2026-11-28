@@ -834,7 +834,7 @@ journey("tutor chats: deleting a chat while its reply is being written keeps it 
   await page.keyboard.press("Meta+j");
 });
 
-// F-new-tutor-exercise-passages
+// F892
 journey("tutor hints and cards: Show me answers the hint, + Exercise keeps the cited passage, and ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
   const source = (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === TESTING)!;
@@ -871,7 +871,7 @@ journey("tutor hints and cards: Show me answers the hint, + Exercise keeps the c
   await page.keyboard.press("Meta+j");
 });
 
-// F-new-tutor-worked-steps
+// F894
 journey("tutor steps: a reopened worked answer keeps its revealed steps and sends only those with a follow-up", async (page) => {
   await openSource(page, TESTING);
   const steps = ["The tested group pulled the facts out of memory.", "Pulling them out made the memory stronger.", "So a week later they **remembered more**."];
@@ -1022,7 +1022,7 @@ journey("tutor Practice: an exercise is written in the source note with the sour
   await page.keyboard.press("Meta+j");
 });
 
-// F-new-tutor-case-send
+// F893
 journey("tutor Practice: a tell apart can send both cases by clicking Send or pressing Enter in B", async (page) => {
   await openSource(page, AGENTS);
   const card = { kind: "prompt", content_type: "concept", question: "Which fits each: a support bot that follows fixed steps, or one that picks its own tools?", answer: "The first is a workflow, the second an agent.", rubric: ["Fixed steps make a workflow", "Choosing its own tools makes an agent"] };
