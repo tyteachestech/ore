@@ -406,7 +406,7 @@ describe("today (D60)", () => {
     expect(today(lib).unreadable).toEqual([]);
   });
 
-  test("a day he reviewed but fell short of the goal is short, not open (D361)", async () => {
+  test("a day he reviewed but fell short of the goal is short, not open (D362)", async () => {
     const { lib, cards } = await library(2);
     const at = T();
     const of = (t: ReturnType<typeof today>) => t.week.find((d) => d.date === localDay(at))!.status;

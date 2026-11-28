@@ -127,7 +127,7 @@ export function strength(cards: CardRow[], reviews: Review[], skill: string, w?:
   };
 }
 
-/** short: he reviewed that day but fell short of the goal, so showing up still shows (D361). */
+/** short: he reviewed that day but fell short of the goal, so showing up still shows (D362). */
 export type DayStatus = "met" | "short" | "open" | "off";
 
 export interface Today {

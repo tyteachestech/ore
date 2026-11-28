@@ -3016,7 +3016,7 @@ journey("review: a Fact exercise has the same Hint: its answer as first letters,
   }
 });
 
-journey("Home: a day he reviewed but is under the goal has a half-filled dot, not an empty one (D361)", async (page) => {
+journey("Home: a day he reviewed but is under the goal has a half-filled dot, not an empty one (D362)", async (page) => {
   // The seed has one review today, well under the goal.
   await page.locator(".home-day.today.short").waitFor();
   if (await page.locator(".home-day.met").count()) throw new Error("a day under the goal reads as met");

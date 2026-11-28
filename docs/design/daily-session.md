@@ -58,7 +58,7 @@ Tyler wants the daily session to be something people get hooked on in a good way
 | Wins during | The card comes in (ease-out, no spring, D185), rubric marks tick in, the words that earned each key point light up; a new card every few for variety | D62, D141 | Informational feedback (Deci, Koestner & Ryan 1999) |
 | A good ending | The goal ring closes; gems drop in for cards that became solid; "rescued" names near-misses saved | D62, D90 | Small wins noticed (`research/skill-metrics-motivation.md`) |
 | Growth over weeks | Levels that never drop, and gems a miss loosens but a recall wins back (D236); calibration once a week | D63, D90, D69 | Progress monitoring, d ≈ 0.40 (Harkin 2016) |
-| Forgiveness | No streak; this week's met days and the total; a short day shows a half dot (D361); weekdays only if they like; nothing resets | D60, D23 | Broken streaks drop below baseline (Silverman & Barasch 2022) |
+| Forgiveness | No streak; this week's met days and the total; a short day shows a half dot (D362); weekdays only if they like; nothing resets | D60, D23 | Broken streaks drop below baseline (Silverman & Barasch 2022) |
 
 **Never**, on top of D62's list (no XP, badges, hard-reset streaks, random rewards, leaderboards, guilt copy):
 
