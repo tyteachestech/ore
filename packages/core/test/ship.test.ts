@@ -17,6 +17,7 @@ function fake(over: (cmd: string) => { code?: number; out?: string } | undefined
     if (c === "git rev-parse origin/master") return { code: 0, out: masters.length > 1 ? masters.shift()! : masters[0]! };
     if (c === "git rev-parse HEAD") return { code: 0, out: "h1" };
     if (c.includes("/check-runs")) return { code: 0, out: "6" };
+    if (c.startsWith("gh pr view 431 --json mergeable")) return { code: 0, out: "MERGEABLE" };
     return { code: 0, out: "" };
   };
   return { sh, calls, setMasters: (m: string[]) => (masters = m) };
@@ -79,4 +80,18 @@ test("failed checks stop it, and master moving during the checks starts it again
   f.setMasters(["m1", "m2", "m2", "m2"]);
   expect(await go(f.sh)).toBe(431);
   expect(f.calls.filter((c) => c.startsWith("gh pr checks")).length).toBe(2);
+});
+
+test("after pushing the numbers it waits for GitHub to say the PR can merge again, rather than failing on \"not mergeable\" (#562)", async () => {
+  let numbered = false;
+  let asked = 0;
+  const f = fake((c) => {
+    if (c === "bun run ids") return (numbered = true), {};
+    if (c === "git status --porcelain" && numbered) return { out: " M docs/reviews/findings.md" };
+    if (c.startsWith("gh pr view 431 --json mergeable")) return { out: asked++ < 2 ? "UNKNOWN" : "MERGEABLE" };
+    return undefined;
+  });
+  expect(await go(f.sh)).toBe(431);
+  expect(asked).toBe(3);
+  expect(f.calls.findLastIndex((c) => c.startsWith("gh pr view 431 --json mergeable"))).toBeLessThan(f.calls.findIndex((c) => c.startsWith("gh pr merge")));
 });
