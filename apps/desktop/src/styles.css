@@ -600,7 +600,7 @@ img.thumb { filter: brightness(0.86); }
 .pick-bar .pick-x { padding: 0; width: 28px; justify-content: center; }
 .pick-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
 body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
-/* Review's ratings are its bottom bar (D-new-ratings-bar): the toasts stand above it, never over Hard and Good;
+/* Review's ratings are its bottom bar (D363): the toasts stand above it, never over Hard and Good;
    higher while the bar also holds the warning over an unexpected rating. Not while Review waits behind a source. */
 body:has(.review:not([hidden]) .review-bar) .toasts { bottom: 78px; }
 body:has(.review:not([hidden]) .review-bar .review-guard) .toasts { bottom: 108px; }
@@ -2477,7 +2477,7 @@ button.home-plan:hover { color: var(--text); }
   .review-passage { position: absolute; top: 32px; left: calc(100% + 32px); width: 300px; margin: 0; animation: card-in var(--t-3) ease-out both; }
 }
 .review-rate { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 22px; }
-/* On the Mac the rating is the bottom bar once the answer is shown (D-new-ratings-bar, in place of D314's sticky
+/* On the Mac the rating is the bottom bar once the answer is shown (D363, in place of D314's sticky
    row): it stays in view under a long answer and nothing loading above it can move it (F865). The bar keeps the
    page's side padding so the four sit under the exercise's column. In a window too narrow for the card to clear
    the radio (D254), the card and the bar start to the radio's right, so the radio never sits on Again. */

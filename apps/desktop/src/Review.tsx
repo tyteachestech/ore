@@ -733,7 +733,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   const gemShown = gemNow === "ready" ? "rough" : gemNow;
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
   // The four ratings and the warning an unexpected one gets (D237). On the Mac they are the bottom bar once the
-  // answer is shown (D-new-ratings-bar): nothing that loads above them, the passage first, can move them.
+  // answer is shown (D363): nothing that loads above them, the passage first, can move them.
   const rateRow = phase === "checked" && card && entry && !end && (
     <>
       <div className="review-rate" role="group" aria-label="How well did you remember it?" onMouseLeave={() => setPreview(undefined)} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setPreview(undefined)}>
@@ -1161,7 +1161,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
 }
 
 /** The review footer while he answers or edits: the keys for this step, Raycast's action bar (DESIGN.md). Once the
- *  answer is shown the Mac's bar is the four ratings instead (D-new-ratings-bar); the iPhone shows no key bar. */
+ *  answer is shown the Mac's bar is the four ratings instead (D363); the iPhone shows no key bar. */
 function KeyFoot({ phase, kind, hint, inHead }: { phase: Phase; kind: CardFull["kind"]; hint: boolean; inHead: boolean }) {
   const map = useKeymap();
   const k = (id: KeyId) => label(map[id]);
