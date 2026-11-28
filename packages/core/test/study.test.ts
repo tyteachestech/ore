@@ -89,12 +89,15 @@ describe("review loop", () => {
     const miss = await recordReview(lib, a.meta.id, { rating: 1, confidence: 3, now: at(1) });
     const pass = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: at(2) });
     // Only the card's latest review can go: the miss is not, while the pass stands.
-    await expect(undoReview(lib, a.meta.id, miss.ts, at(3))).rejects.toThrow();
+    await expect(undoReview(lib, a.meta.id, miss.ts, at(3))).rejects.toThrow("it was rated again after that");
     await undoReview(lib, a.meta.id, pass.ts, at(3));
     expect(dueQueue(lib, at(3)).find((e) => e.id === a.meta.id)?.relearn).toBe(true); // the pass is owed again
     await undoReview(lib, a.meta.id, miss.ts, at(4));
     await undoReview(lib, b.meta.id, rb.ts, at(5));
     expect(readReviews(lib)).toEqual([]);
+    // A rating the log no longer has (taken back, or the log restored from the library's history) says so in words,
+    // not as a timestamp and an id: the app shows this after "Couldn't undo" (history recovery pass, F-new-undo-gone-rating).
+    await expect(undoReview(lib, b.meta.id, rb.ts, at(5))).rejects.toThrow("that rating is no longer in the library");
     expect(dueQueue(lib, at(5)).map((e) => e.id).sort()).toEqual([a.meta.id, b.meta.id].sort());
     const redo = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: at(6) });
     expect(redo).toMatchObject({ finishing: true, state_after: { reps: 1, lapses: 0 } });
