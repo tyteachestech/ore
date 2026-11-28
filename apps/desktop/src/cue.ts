@@ -20,5 +20,8 @@ export function cue(text: string, level: number): string {
 
 /** What the hint is drawn from: an Explain exercise's first key point, a Fact's answer. An Explain exercise
  *  with no key point has none (its whole answer is too long to cue): "" offers no hint. */
-export const cueSource = (c: { kind: "card" | "prompt"; answer: string; rubric: string[] }): string =>
-  c.kind === "prompt" ? (c.rubric[0]?.trim() ?? "") : c.answer;
+export const cueSource = (c: { kind: "card" | "prompt"; answer: string; rubric: string[] }): string => {
+  const from = c.kind === "prompt" ? (c.rubric[0]?.trim() ?? "") : c.answer;
+  // Nothing to hide (a one-letter answer, "7"): its first hint would be the answer itself, so there is none.
+  return cue(from, 1).includes("_") ? from : "";
+};

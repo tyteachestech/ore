@@ -23,6 +23,7 @@ describe("a fading hint before No idea", () => {
     expect(cueSource({ kind: "prompt", answer: "Long model answer.", rubric: ["Retrieval strengthens memory", "Spacing"] })).toBe("Retrieval strengthens memory");
     expect(cueSource({ kind: "prompt", answer: "Only an answer.", rubric: [] })).toBe(""); // no key point: no hint
     expect(cueSource({ kind: "card", answer: "Hippocampus", rubric: [] })).toBe("Hippocampus");
+    expect(cueSource({ kind: "card", answer: "7", rubric: [] })).toBe(""); // its first letter is all of it: no hint
   });
 
   test("a number is masked like a word, so a point that turns on one doesn't give it away", () => {
