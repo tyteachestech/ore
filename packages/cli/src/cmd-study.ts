@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
   AiStamp, CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, findItemDir, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
-  mergedReviews, readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, setJobAi, jobAi, AI_JOBS, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type AiJob, type Card, type Library, type LibraryIndex, type QueueEntry, type EndReceipt, type SkillStats, type Variant,
+  mergedReviews, readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, setJobAi, jobAi, AI_JOBS, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, historyPaused, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type AiJob, type Card, type Library, type LibraryIndex, type QueueEntry, type EndReceipt, type SkillStats, type Variant,
 } from "@ore/core";
 import { startCatchUp, startRemix } from "./background.ts";
 import type { Command } from "./types.ts";
@@ -381,6 +381,16 @@ export const studyCommands: Record<string, Command> = {
       } finally {
         index.close();
       }
+    },
+  },
+
+  snapshot: {
+    usage: "                              commit the library's history now (D5), as every command does once ten minutes have passed; before restoring anything from it. Waits (committed false, paused says why) while a restore is unfinished",
+    async run() {
+      const lib = openLibrary();
+      const r = snapshot(lib, { force: true });
+      const paused = historyPaused(lib);
+      return { data: { ...r, paused }, text: paused ? `History is paused: ${paused}` : r.committed ? "Snapshot saved" : "Nothing changed since the last snapshot" };
     },
   },
 

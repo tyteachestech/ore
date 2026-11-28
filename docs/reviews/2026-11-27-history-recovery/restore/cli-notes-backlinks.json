@@ -1,0 +1,20 @@
+[
+  {
+    "from": {
+      "kind": "item",
+      "id": "01M8FPM1XN2T9Y6BRQB4C4VX7R",
+      "title": "Link target"
+    },
+    "heading": null,
+    "line": "Back"
+  },
+  {
+    "from": {
+      "kind": "skill",
+      "id": "learning",
+      "title": "Learning"
+    },
+    "heading": null,
+    "line": "amberword Source"
+  }
+]

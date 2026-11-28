@@ -1,3 +1,4 @@
+import { Stale } from "./history";
 import { opt, whileOut, type Annotation, type Intent } from "./ore";
 import { errorText, inOrder, wakeOnLanding, type Notify } from "./util";
 
@@ -174,11 +175,14 @@ export function highlights(io: {
     })());
   }
 
-  function setNote(id: string, note: string, undoable = true): Promise<void> {
+  /** `expect`: from the history, the note the step left; one changed since (a restore from the library's history,
+   *  read in) is left as it is and the step says so (history recovery pass, app-01). */
+  function setNote(id: string, note: string, undoable = true, expect?: string): Promise<void> {
     return track((async () => {
       const wake = wakeOnLanding();
       const current = editing(id, "note");
       const was = find(id)?.note ?? "";
+      if (expect !== undefined && was !== expect) throw new Stale("Left as it is: the note was changed since");
       set((l) => l.map((a) => (same(a.id, id) ? { ...a, note } : a)));
       let rid = id;
       const write = whileOut((async () => {
@@ -186,7 +190,7 @@ export function highlights(io: {
         await annotateWaking(wake, rid, opt("note", note));
       })());
       // Register when he types, before a later Remove or edit can overtake this step.
-      const forget = undoable ? io.notify(note ? "Highlight note saved" : "Removed the highlight note", "quiet", () => setNote(rid, was, false), () => setNote(rid, note, false)) : undefined;
+      const forget = undoable ? io.notify(note ? "Highlight note saved" : "Removed the highlight note", "quiet", () => setNote(rid, was, false, note), () => setNote(rid, note, false, was)) : undefined;
       forget?.hold(write);
       try {
         await write;

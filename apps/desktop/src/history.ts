@@ -37,6 +37,10 @@ export function ownsUndo(el: EventTarget | null): boolean {
 
 /** The app's undo and redo stacks (⌘Z, ⇧⌘Z). They live as long as the window, so moving between
  *  screens keeps them; a relaunch starts empty. */
+/** An undo or redo that can never apply: what it would change is gone, or was changed since (a restore from the
+ *  library's history, another device, an agent). It says why and leaves the history. */
+export class Stale extends Error {}
+
 export class History {
   private past: Step[] = [];
   private future: Step[] = [];
@@ -80,13 +84,15 @@ export class History {
     );
   }
 
-  /** A write that failed leaves the library as it was, so its step goes back: ⌘Z (or ⇧⌘Z) tries it again. */
+  /** A write that failed leaves the library as it was, so its step goes back: ⌘Z (or ⇧⌘Z) tries it again. One
+   *  that can never apply (`Stale`: what it would take back is gone or was changed since) leaves the history, so the
+   *  next ⌘Z goes on to the step before (history recovery pass, app-02). */
   private watch(step: Step, run: Promise<unknown>, what: "undo" | "redo") {
     run.then(() => this.onLanded?.(step), (e) => {
       const [from, to] = what === "undo" ? [this.future, this.past] : [this.past, this.future];
       const i = from.indexOf(step);
       if (i >= 0) from.splice(i, 1);
-      if (!to.includes(step)) to.push(step);
+      if (!(e instanceof Stale) && !to.includes(step)) to.push(step);
       this.onChange?.();
       this.onFail?.(step, e, what);
     });

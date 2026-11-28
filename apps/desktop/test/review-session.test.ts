@@ -523,3 +523,12 @@ test("Review this source while its exercises are still being drafted says so, no
   await drafting("I", Promise.reject(new Error("no"))).catch(() => {});
   expect(nothingDue(null, null, "I")).toBe("Nothing from this source is due right now.");
 });
+
+// History recovery pass: Review tells a rating Undo that can never apply by core's words, so the two must agree.
+test("RATING_GONE matches both of core's words for a rating Undo that can never apply", async () => {
+  const { RATING_GONE } = await import("../src/review-session");
+  const core = await Bun.file(new URL("../../../packages/core/src/study.ts", import.meta.url)).text();
+  const said = [...core.slice(core.indexOf("export async function undoReview")).matchAll(/throw new Error\("([^"]+)"\)/g)].slice(0, 2).map((m) => m[1]!);
+  expect(said).toEqual(["that rating is no longer in the library", "it was rated again after that"]);
+  for (const s of said) expect(RATING_GONE.test(s)).toBe(true);
+});

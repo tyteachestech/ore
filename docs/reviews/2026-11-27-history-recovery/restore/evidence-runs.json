@@ -1,0 +1,163 @@
+[
+  {
+    "name": "conflict-cli",
+    "command": [
+      "python3",
+      "codex-out/restore/conflict-cli.py"
+    ],
+    "exit": 1,
+    "expected_exit": 1,
+    "wall_seconds": 0.416,
+    "cpu_seconds": 0.397
+  },
+  {
+    "name": "conflict-stash",
+    "command": [
+      "bun",
+      "codex-out/restore/git-state.ts",
+      "stash"
+    ],
+    "exit": 1,
+    "expected_exit": 1,
+    "wall_seconds": 0.248,
+    "cpu_seconds": 0.254
+  },
+  {
+    "name": "conflict-revert",
+    "command": [
+      "bun",
+      "codex-out/restore/git-state.ts",
+      "revert"
+    ],
+    "exit": 1,
+    "expected_exit": 1,
+    "wall_seconds": 0.25,
+    "cpu_seconds": 0.268
+  },
+  {
+    "name": "cut",
+    "command": [
+      "bun",
+      "codex-out/restore/cut.ts"
+    ],
+    "exit": 1,
+    "expected_exit": 1,
+    "wall_seconds": 0.112,
+    "cpu_seconds": 0.141
+  },
+  {
+    "name": "cut-probes",
+    "command": [
+      "bun",
+      "codex-out/restore/probes-cut.ts"
+    ],
+    "exit": 0,
+    "expected_exit": 0,
+    "wall_seconds": 0.188,
+    "cpu_seconds": 0.213
+  },
+  {
+    "name": "session-minimal",
+    "command": [
+      "bun",
+      "codex-out/restore/session-minimal.ts"
+    ],
+    "exit": 1,
+    "expected_exit": 1,
+    "wall_seconds": 0.142,
+    "cpu_seconds": 0.165
+  },
+  {
+    "name": "session-probes",
+    "command": [
+      "bun",
+      "codex-out/restore/session-minimal.ts",
+      "--probe"
+    ],
+    "exit": 1,
+    "expected_exit": 1,
+    "wall_seconds": 0.161,
+    "cpu_seconds": 0.179
+  },
+  {
+    "name": "agent-guidance",
+    "command": [
+      "bun",
+      "codex-out/restore/agent-guidance.ts"
+    ],
+    "exit": 1,
+    "expected_exit": 1,
+    "wall_seconds": 0.038,
+    "cpu_seconds": 0.073
+  },
+  {
+    "name": "day-reset",
+    "command": [
+      "bun",
+      "codex-out/restore/day.ts",
+      "reset"
+    ],
+    "exit": 1,
+    "expected_exit": 1,
+    "wall_seconds": 0.212,
+    "cpu_seconds": 0.226
+  },
+  {
+    "name": "day-checkout",
+    "command": [
+      "bun",
+      "codex-out/restore/day.ts",
+      "checkout"
+    ],
+    "exit": 1,
+    "expected_exit": 1,
+    "wall_seconds": 0.214,
+    "cpu_seconds": 0.229
+  },
+  {
+    "name": "membership-reset",
+    "command": [
+      "bun",
+      "codex-out/restore/membership.ts",
+      "reset"
+    ],
+    "exit": 0,
+    "expected_exit": 0,
+    "wall_seconds": 0.249,
+    "cpu_seconds": 0.278
+  },
+  {
+    "name": "membership-checkout",
+    "command": [
+      "bun",
+      "codex-out/restore/membership.ts",
+      "checkout"
+    ],
+    "exit": 0,
+    "expected_exit": 0,
+    "wall_seconds": 0.232,
+    "cpu_seconds": 0.256
+  },
+  {
+    "name": "snapshot-after",
+    "command": [
+      "bun",
+      "codex-out/restore/snapshot-after.ts"
+    ],
+    "exit": 0,
+    "expected_exit": 0,
+    "wall_seconds": 0.951,
+    "cpu_seconds": 0.923
+  },
+  {
+    "name": "orphans",
+    "command": [
+      "bun",
+      "codex-out/restore/orphans.ts"
+    ],
+    "exit": 0,
+    "expected_exit": 0,
+    "wall_seconds": 0.241,
+    "cpu_seconds": 0.252
+  }
+]

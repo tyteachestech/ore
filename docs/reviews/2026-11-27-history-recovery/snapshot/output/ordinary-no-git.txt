@@ -1,0 +1,2 @@
+[]
+PASS: ordinary command catches missing git
