@@ -28,7 +28,7 @@ export type Structure = "tables" | "formulas";
 
 const MAX_FIGURES = 80;
 /** Stands where a scanned page's words couldn't be read. */
-export const SCAN_UNREAD = "*This page is a scan, and its words couldn’t be read here. Open the original to see it, or reimport it on your Mac.*";
+export const SCAN_UNREAD = "*This page is a scan, and its words couldn’t be read here. Open the original to see it.*";
 const MAX_FIGURE = 5 * 1024 * 1024;
 /** Where a figure past the first MAX_FIGURES was: marked, as a missing one is (D351), not left out unsaid (deep import pass, pdfs-06). */
 const PAST_FIGURES = `[missing figure: Ore keeps a PDF's first ${MAX_FIGURES} figures; this one is in the original]`;
@@ -833,10 +833,17 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   const structure = structureOf(items);
   const blocks: string[] = [];
   const split = items.map((p) => splitMargins(p, body));
+  // A scanned PDF: most of its pages have no text of their own.
+  const worded = (i: Item) => /[\p{L}\p{N}]{2}/u.test(i.str);
+  const scanned = items.filter((p) => p.filter(worded).length < 5).length * 2 > items.length;
   const needsRecognition: number[] = [];
   const raw = split.map((p, i) => {
     // A scan can have a page number or a small stamp in its text layer.
-    const scan = pageImages[i] === true && bare(items[i]!.map((item) => item.str).join("")).length < 20;
+    // A page the size of its picture with no words of its own: a page number or a stamp may be there, letters of a
+    // caption may not (a full-page figure and its caption keep the picture's words in the picture). A file that is
+    // mostly such pages (a scan stored some other way) counts every page with no text of its own.
+    const own = items[i]!.map((item) => item.str).join("");
+    const scan = (pageImages[i] === true || scanned) && bare(own).length < 20 && bare(own).replace(/\p{N}/gu, "").length < 3;
     const before = blocks.length;
     const page = i + 1;
     const lines = pageLines(swapRegions(p.items, regions.filter((r) => r.page === page), blocks, scan));
@@ -882,7 +889,8 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
     // says so, never left empty unsaid (D96).
     const recognized = await recognizedPages(data, "pdf", needsRecognition).catch(() => null);
     needsRecognition.forEach((page, i) => {
-      const words = recognized ? recognized[i] : SCAN_UNREAD;
+      // A page it read and found no words on says so too, never left empty unsaid.
+      const words = (recognized && recognized[i]?.trim()) || SCAN_UNREAD;
       if (words) pages[page - 1] = [words, pages[page - 1]].filter(Boolean).join("\n\n");
     });
   }

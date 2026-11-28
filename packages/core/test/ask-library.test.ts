@@ -131,6 +131,16 @@ The Leitner system was proposed by Sebastian Leitner, who wrote about the Leitne
   });
 });
 
+test("archived sources that match a little better never take every place from the active one that answers (code review of #582)", async () => {
+  const lib = await tempLibrary();
+  for (let n = 0; n < 9; n++) {
+    const old = await createItem(lib, { type: "article", title: `Old notes ${n}`, body: "A missed card goes back. A missed card waits." });
+    await setItemArchived(lib, old.meta.id, true);
+  }
+  const active = await createItem(lib, { type: "article", title: "Flashcard boxes", body: "A missed card goes back to the first box, where it comes up every day." });
+  expect(retrieve(lib, "missed card").map((p) => p.item)).toContain(active.meta.id);
+});
+
 describe("Ask your library: answers", () => {
   test("answers from the passages with each quote placed in its source, so the reader can jump to it", async () => {
     const { lib, a } = await library();

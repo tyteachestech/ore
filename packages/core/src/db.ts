@@ -226,7 +226,7 @@ export class LibraryIndex {
   sourcesMatching(stems: string[], limit: number): string[] {
     const match = stems.map((t) => `"${t.replace(/"/g, "")}"*`).join(" OR ");
     return this.db
-      .query<{ item: string }, [string, number]>("select item from fts where fts match ? and kind = 'item' order by bm25(fts, 0, 0, 0, 5, 1), item in (select id from items where archived = 1) limit ?")
+      .query<{ item: string }, [string, number]>("select item from fts where fts match ? and kind = 'item' order by bm25(fts, 0, 0, 0, 5, 1) * (case when item in (select id from items where archived = 1) then 0.5 else 1 end) limit ?")
       .all(match, limit)
       .map((r) => r.item);
   }

@@ -90,9 +90,15 @@ export function readExerciseChat(lib: Library, exercise: string) {
   if (!isUlid(exercise)) throw new Error("expected an exercise id");
   const id = exerciseChatId(exercise);
   const f = file(lib, id);
-  const c = existsSync(f) ? parse(readFileSync(f, "utf8"), `chat ${id}`) : null;
-  if (c && c.exercise !== exercise) throw new Error(`chat ${id} does not belong to this exercise`);
-  return { id, exercise, turns: c ? ExerciseTurn.array().parse(c.turns) : [] };
+  // A file that can't be read (cut off mid-write on another device, edited by hand) opens as a new chat, which the
+  // next message writes over: Ask never stays shut for an exercise. The library's history keeps the old file.
+  try {
+    const c = existsSync(f) ? parse(readFileSync(f, "utf8"), `chat ${id}`) : null;
+    if (c && c.exercise !== exercise) throw new Error(`chat ${id} does not belong to this exercise`);
+    return { id, exercise, turns: c ? ExerciseTurn.array().parse(c.turns) : [] };
+  } catch {
+    return { id, exercise, turns: [] };
+  }
 }
 
 type Turn = Chat["turns"][number];

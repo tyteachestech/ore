@@ -1701,6 +1701,31 @@ describe("import coverage: text recognition", () => {
     expect(images(item.body)).toEqual([]);
   });
 
+  test("PDF: a scanned page stored as strips is read; a full-page figure with its own caption is not (code review of #582)", async () => {
+    const lib = await tempLibrary();
+    const ocr = process.env.ORE_OCR;
+    // The stand-in answers only for page 2: asked for page 3 as well, it fails, and the import says so.
+    process.env.ORE_OCR = helper(file("screenshot.ocr.json"), 2);
+    const item = await addSource(lib, file("scan-strips.pdf")).finally(() => {
+      process.env.ORE_OCR = ocr;
+    });
+    expect(item.body).toContain("<!-- page 2 -->\n\n## The testing effect\n\nRetrieving a memory makes it stronger");
+    expect(item.body).not.toContain(SCAN_UNREAD);
+    expect(item.body).toContain("Figure 1: a diagram");
+  });
+
+  test("PDF: a scanned page that recognition finds no words on says so (code review of #582)", async () => {
+    const lib = await tempLibrary();
+    const ocr = process.env.ORE_OCR;
+    const empty = join(mkdtempSync(join(tmpdir(), "ore-ocr-")), "empty.json");
+    writeFileSync(empty, JSON.stringify({ pages: [{ lines: [] }] }));
+    process.env.ORE_OCR = helper(empty, 2);
+    const item = await addSource(lib, file("mixed-scan.pdf")).finally(() => {
+      process.env.ORE_OCR = ocr;
+    });
+    expect(item.body).toContain(`<!-- page 2 -->\n\n${SCAN_UNREAD}`);
+  });
+
   test("PDF: a scanned page between text pages whose words can't be read (no recognizer, as on the iPhone) says so, and the rest comes in", async () => {
     const lib = await tempLibrary();
     const ocr = process.env.ORE_OCR;

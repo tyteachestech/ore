@@ -30,9 +30,10 @@ export function useAskChats(notify: Notify) {
     async load(exercise: string) {
       await pending.current;
       const saved = await ore<SavedExerciseChat>("chat", exercise, "--exercise");
-      setChats((all) => all[exercise] ? all : {
+      // Read each time Ask opens, so the other window's turns (the quick quiz's) show, unless a reply is on its way here.
+      setChats((all) => all[exercise]?.run ? all : {
         ...all,
-        [exercise]: { ...saved, input: "", turns: saved.turns.map((t) => t.reply === undefined && !t.error ? { ...t, error: "No reply came: Ore closed before it did." } : t) },
+        [exercise]: { ...saved, input: all[exercise]?.input ?? "", turns: saved.turns.map((t) => t.reply === undefined && !t.error ? { ...t, error: "No reply came: Ore closed before it did." } : t) },
       });
     },
     update(exercise: string, change: (c: AskChat) => AskChat) {
@@ -60,11 +61,10 @@ export function Ask({ store, ...props }: ChatProps & { store: ReturnType<typeof 
   const [error, setError] = useState<string | null>(null);
   const [attempt, retry] = useState(0);
   useEffect(() => {
-    if (chat) return;
     let open = true;
     store.load(card.id).catch((e) => { if (open) setError(errorText(e, "open the exercise chat")); });
     return () => { open = false; };
-  }, [card.id, !!chat, attempt]);
+  }, [card.id, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!chat) {
     return <section className="ask" aria-label="Ask about this">
       {error

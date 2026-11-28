@@ -34,6 +34,8 @@ export async function pageFigures(page: PDFPageProxy) {
   const scanArea = (right - left) * (top - bottom) * 0.8;
   const placed: Placed[] = [];
   let pageImage = false;
+  /** How much of the page its pictures cover together: a scanner may store a page as strips or tiles. */
+  let covered = 0;
   let ctm: M = [1, 0, 0, 1, 0, 0];
   const stack: M[] = [];
   for (let i = 0; i < ops.fnArray.length; i++) {
@@ -54,16 +56,17 @@ export async function pageFigures(page: PDFPageProxy) {
       const ys = [ctm[5], ctm[5] + ctm[1], ctm[5] + ctm[3], ctm[5] + ctm[1] + ctm[3]];
       const box: Placed["box"] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
       if (box[2] - box[0] < MIN_SIDE || box[3] - box[1] < MIN_SIDE) continue;
+      const w = Math.max(0, Math.min(right, box[2]) - Math.max(left, box[0]));
+      const h = Math.max(0, Math.min(top, box[3]) - Math.max(bottom, box[1]));
+      covered += w * h;
       if ((box[2] - box[0]) * (box[3] - box[1]) > scanArea) {
-        const w = Math.max(0, Math.min(right, box[2]) - Math.max(left, box[0]));
-        const h = Math.max(0, Math.min(top, box[3]) - Math.max(bottom, box[1]));
         if (w * h > scanArea) pageImage = true;
         continue; // the page's scan is not a figure
       }
       placed.push({ box, pic });
     }
   }
-  return { figures: groups(placed).map(draw), pageImage };
+  return { figures: groups(placed).map(draw), pageImage: pageImage || covered > scanArea };
 }
 
 function resolve(page: PDFPageProxy, name: unknown): Promise<Picture | null> {

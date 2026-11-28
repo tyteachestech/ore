@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { paths } from "../src/library.ts";
 import { attachToChat, chatFilePath, deleteChat, listChats, readChat, readExerciseChat, saveChat } from "../src/chats.ts";
 import { tempLibrary } from "./helpers.ts";
 
@@ -166,6 +167,9 @@ test("an exercise chat reads back with its turns and session outside the tutor l
   await save(next);
   expect(readExerciseChat({ root: lib.root }, exercise)).toEqual({ id, exercise, turns: [first, next] });
   expect(listChats(lib)).toEqual([]);
+  // A file cut off mid-write opens as a new chat rather than shutting Ask for the exercise (code review of #582).
+  writeFileSync(paths.chat(lib, id), "{\"id\": \"ask-");
+  expect(readExerciseChat(lib, exercise)).toEqual({ id, exercise, turns: [] });
 });
 
 // D189: a file attached to a message is copied into chats/files/, named by its content.
