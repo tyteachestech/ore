@@ -676,10 +676,11 @@ function Unreadable({ list }: { list: Today["unreadable"] }) {
 
 function Week({ week }: { week: Today["week"] }) {
   const now = localDay(new Date());
+  const short = week.filter((d) => d.status === "short").length;
   return (
-    <div className="home-week" role="img" aria-label={`${week.filter((d) => d.status === "met").length} of ${count(week.filter((d) => d.status !== "off").length, "day")} met this week`}>
+    <div className="home-week" role="img" aria-label={`${week.filter((d) => d.status === "met").length} of ${count(week.filter((d) => d.status !== "off").length, "day")} met this week${short ? `, ${short} part done` : ""}`}>
       {week.map((d, i) => (
-        <Hint key={d.date} text={`${new Date(`${d.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" })} · ${d.status === "off" ? "off" : `${minutes(d.active_ms)} min`}`}>
+        <Hint key={d.date} text={`${new Date(`${d.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" })} · ${d.status === "off" ? "off" : d.status === "short" && d.active_ms === 0 ? "reviewed" : `${minutesText(d.active_ms)} min`}`}>
           <span className={`home-day ${d.status}${d.date === now ? " today" : ""}${d.date > now ? " later" : ""}`}>
             <i />
             {DAYS[i]}

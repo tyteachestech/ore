@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { type Page } from "playwright";
-import { AGENTS, answered, armGood, isFact, showAnswer, typeFact, awayAndBack, BRIDGE, browser, errors, hold, isHeld, journey, LIB, MOCK, openSource, ore, oreCalls, release, reveal, running, settled, startReview, TESTING, type TryRec, until, url } from "../harness";
+import { AGENTS, answered, armGood, isFact, showAnswer, typeFact, awayAndBack, BRIDGE, browser, errors, hold, isHeld, journey, LIB, MOCK, openSource, ore, oreCalls, passageIn, release, reveal, running, settled, startReview, TESTING, type TryRec, until, url } from "../harness";
 
 journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel, as a Mac sheet's do", async (page) => {
   const inside = (sel: string) => page.evaluate((sel) => !!document.activeElement?.closest(sel), sel);
@@ -2966,6 +2966,7 @@ journey("review: Hint before No idea shows first letters, then half the words; t
     await page.getByRole("radio", { name: "Think so" }).click();
     await page.getByRole("button", { name: "Check", exact: true }).click();
     await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+    await passageIn(page);
     // Marking every key point got would suggest Good; with hints taken the suggestion stops at Hard.
     for (const box of await page.locator(".quiz-points .quiz-mark").all()) if ((await box.getAttribute("aria-pressed")) !== "true") await box.click();
     await until("Hard is suggested", async () => (await page.locator(".rate-2.suggested").count()) === 1);
@@ -3007,6 +3008,7 @@ journey("review: a Fact exercise has the same Hint: its answer as first letters,
     await page.getByRole("radio", { name: "Think so" }).click();
     await page.getByRole("button", { name: "Check", exact: true }).click();
     await until("Hard is suggested, not Good", async () => (await page.locator(".rate-2.suggested").count()) === 1);
+    await passageIn(page);
     await page.getByRole("button", { name: "Hard", exact: true }).click();
     await until("the rating is sent with its hints", async () => calls.calls.some((a) => a[0] === "review" && a.includes("--cued=2") && a.includes("--rating=2")));
   } finally {
@@ -3014,4 +3016,25 @@ journey("review: a Fact exercise has the same Hint: its answer as first letters,
     if (await page.locator(".review").count()) await page.keyboard.press("Escape");
     await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
   }
+});
+
+journey("e2e harness: undoAll right after a rating is pressed still takes it back (F866)", async (page) => {
+  const calls = oreCalls(page);
+  const due = async () => ((await ore("due")) as { id: string }[]).map((c) => c.id);
+  await startReview(page, null);
+  const id = (await page.locator(".review-card").getAttribute("data-id"))!;
+  await reveal(page);
+  await passageIn(page);
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await until("the rating is sent", async () => calls.calls.some((a) => a[0] === "review"));
+  // At once, as a journey's `finally` does: the rating's answer may not be read yet.
+  await calls.undoAll();
+  await page.keyboard.press("Escape");
+  if (!(await due()).includes(id)) throw new Error("undoAll left the rating in the library");
+});
+
+journey("Home: a day he reviewed but is under the goal has a half-filled dot, not an empty one (D362)", async (page) => {
+  // The seed has one review today, well under the goal.
+  await page.locator(".home-day.today.short").waitFor();
+  if (await page.locator(".home-day.met").count()) throw new Error("a day under the goal reads as met");
 });
