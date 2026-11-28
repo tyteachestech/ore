@@ -777,7 +777,7 @@ describe("tutor: hints and cards", () => {
     expect(findCard(lib, c.meta.id).answer).toBe("Back to the first box.");
     await expect(addTutorCard(lib, a.meta.id, { kind: "prompt", content_type: "concept", question: "Why?", answer: "Because.", rubric: [] }, { vendor: "claude", model: "m", prompt_version: "tutor@3" })).rejects.toThrow("rubric");
     // A stamp missing its prompt version is refused before a file is written: a card written with it could never be read
-    // again, and every list skipped it with no word (history recovery pass, F807).
+    // again, and every list skipped it with no word (history recovery pass, F811).
     const before = listCards(lib).length;
     await expect(addTutorCard(lib, a.meta.id, { kind: "card", content_type: "fact", question: "Where does a known card go?", answer: "Up a box.", rubric: [] }, { vendor: "claude", model: "m", prompt: "tutor@3" } as never)).rejects.toThrow("prompt_version");
     expect(readdirSync(join(lib.root, "cards")).filter((f) => f.endsWith(".md")).length).toBe(before);

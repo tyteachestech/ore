@@ -424,7 +424,7 @@ export async function addTutorCard(lib: Library, item: string, card: TutorCard, 
   const problem = cardTextProblem(c);
   if (problem) throw new Error(problem);
   if (c.kind === "prompt" && !c.rubric.length) throw new Error("a prompt card needs rubric points");
-  // Checked as a card's read checks it: a stamp missing a field made a card no list could read (F807).
+  // Checked as a card's read checks it: a stamp missing a field made a card no list could read (F811).
   const stamp = AiStamp.safeParse(ai);
   if (!stamp.success) throw new Error(`--ai: ${stamp.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
   return withLock(paths.lock(lib), () => {

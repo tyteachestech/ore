@@ -1044,7 +1044,7 @@ journey("skill rename: pending Undo preserves the preceding source (F146)", asyn
   const title = `Source before rename ${Date.now()}`;
   try {
     await page.reload();
-    await page.locator(".side-item").first().waitFor(); // ⌘N before the app is up after a reload goes nowhere (F499, F823)
+    await page.locator(".side-item").first().waitFor(); // ⌘N before the app is up after a reload goes nowhere (F499, F827)
     await page.keyboard.press("Meta+n");
     await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nThis source must survive undoing the next rename.`);
     await page.keyboard.press("Enter");
