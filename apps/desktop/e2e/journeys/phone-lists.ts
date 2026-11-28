@@ -1,7 +1,7 @@
 import { type Locator, type Page, type Route } from "playwright";
 import { join } from "node:path";
 import { readdirSync, readFileSync } from "node:fs";
-import { AGENTS, fits44, itemFile, journey, keyboardUp, macChanges, pasteInto, PHONE_LIB, phoneSource, phoneWith, press, swipe, tap, TESTING, until, tapFact } from "../harness";
+import { AGENTS, fits44, itemFile, journey, keyboardUp, macChanges, pasteInto, PHONE_LIB, phoneReaderReady, phoneSource, phoneWith, press, swipe, tap, TESTING, until, tapFact } from "../harness";
 
 journey("phone: Today's list titles are 17 pt and the bar's buttons are 44 pt rounds (iPhone sizing A)", async (page) => {
   await page.locator(".home-read").first().waitFor();
@@ -609,7 +609,7 @@ journey("phone: a relaunch once Finish has marked the source Done never opens Fi
   await tap(page, page.getByRole("button", { name: "Just mark done" }));
   await page.locator(".quiz-foot button").filter({ hasText: /^Done/ }).waitFor();
   await page.reload();
-  await page.locator(".phone-reader .doc").first().waitFor();
+  await phoneReaderReady(page);
   await Bun.sleep(500);
   if (await page.getByPlaceholder("In your own words…").count()) throw new Error("the relaunch opened Finish's Recall for a source already Done");
 }, "phone");
@@ -669,7 +669,7 @@ journey("phone: a half-typed answer to What do you already know? survives a rela
   await page.keyboard.type("Retrieval changes what I can remember");
   await Bun.sleep(500);
   await page.reload();
-  await page.locator(".phone-reader .doc").first().waitFor();
+  await phoneReaderReady(page);
   await until("the answer comes back after a relaunch", async () => (await field.inputValue().catch(() => "")) === "Retrieval changes what I can remember");
 }, "phone");
 

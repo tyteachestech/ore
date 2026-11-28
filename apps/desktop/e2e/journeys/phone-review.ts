@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { doubleTap, journey, keyboardUp, PHONE_LIB, phoneSource, phoneWith, pointAt, press, settled, slid, swipe, tap, TESTING, until, tapFact } from "../harness";
+import { doubleTap, journey, keyboardUp, PHONE_LIB, phoneReaderReady, phoneSource, phoneWith, pointAt, press, settled, slid, swipe, tap, TESTING, until, tapFact } from "../harness";
 
 journey("phone: the check-in before a session asks about what he is trying, its buttons are 44 pt taps, and Not yet goes on to the first exercise (D324)", async (page) => {
   // The seed's library has something he is trying, last touched before today.
@@ -721,7 +721,7 @@ journey("phone: the phone ticks under his finger on four moments and no others: 
   await page.locator(".phone-sources li button").nth(1).waitFor();
   // A highlight: one light tick as it is made (a double tap on a paragraph, D224).
   await tap(page, page.locator(".phone-sources button").filter({ hasText: TESTING }));
-  await page.locator(".phone-reader .doc").first().waitFor();
+  await phoneReaderReady(page);
   await slid(page);
   const para = await pointAt(page, "familiarity is easily", ".phone-reader .doc");
   await page.waitForTimeout(300);

@@ -2,7 +2,7 @@ import { dirname, join } from "node:path";
 import { type Page } from "playwright";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { $ } from "bun";
-import { AGENTS, doubleTap, askFieldIsPlain, fits44, itemFile, journey, keyboardUp, longPassages, macChanges, pasteInto, PHONE_LIB, phoneSource, phoneWith, pointAt, press, slid, tap, TESTING, until } from "../harness";
+import { AGENTS, doubleTap, askFieldIsPlain, fits44, itemFile, journey, keyboardUp, longPassages, macChanges, pasteInto, PHONE_LIB, phoneReaderReady, phoneSource, phoneWith, pointAt, press, slid, tap, TESTING, until } from "../harness";
 
 // iPhone sizes, not the Mac's (Tyler 2026-11-13, option A): list titles 17 pt, every tap 44 pt, the bar's buttons round.
 journey("phone: Finish comes straight after a source's text, with the room for the bars under it (F88)", async (page) => {
@@ -106,7 +106,7 @@ journey("phone: a highlight's note being typed is still there after the app is q
   await field.waitFor();
   await field.fill("A note typed on the bus, then the app was quit.");
   await page.reload();
-  await page.locator(".phone-reader .doc").first().waitFor();
+  await phoneReaderReady(page);
   const kept = page.locator("aside.mynotes button").filter({ hasText: /A note typed on the bus|after one week/ });
   // The reader comes back where he was, its bars maybe hidden: back to the top brings them, then Collected.
   await Bun.sleep(500);
@@ -148,7 +148,7 @@ journey("phone: Aa sets the text size, line spacing, margins, font and page, eac
   }
   await page.reload();
   // The phone reopens on the source it was reading.
-  await page.locator(".phone-reader .doc").first().waitFor();
+  await phoneReaderReady(page);
   const after = await looks();
   if (!want(after)) throw new Error(`after a relaunch the source read at ${JSON.stringify(after)}`);
 }, "phone");
@@ -343,7 +343,7 @@ journey("phone: a skill's page is the Mac's in one column, and a course is one r
       await page.reload();
       await lessons.waitFor();
       await tap(page, lessons.locator("li button").first());
-      await page.locator(".phone-reader .doc").first().waitFor();
+      await phoneReaderReady(page);
     }),
   );
 }, "phone");
@@ -585,7 +585,7 @@ journey("phone: a relaunch with a source's Collected page open comes back to it"
   const collected = page.locator('aside.mynotes[aria-label="Collected"]');
   await collected.waitFor();
   await page.reload();
-  await page.locator(".phone-reader .doc").first().waitFor();
+  await phoneReaderReady(page);
   await until("Collected is the page beside the source again", async () => (await collected.count()) === 1 && (await page.locator(".reader.noting").count()) === 1);
 }, "phone");
 
@@ -780,20 +780,20 @@ journey("phone: a key point being typed survives a relaunch, and goes when the t
   await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
   await page.locator(".reader:not(.noting)").waitFor();
   await page.reload();
-  await page.locator(".phone-reader .doc").first().waitFor();
+  await phoneReaderReady(page);
   await Bun.sleep(300);
   await tap(page, page.locator(".phone-tools > :first-child"));
   await page.locator('aside.mynotes[aria-label="Collected"]').waitFor();
   await until("opening Collected brings it back", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");
   await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));
   await page.reload();
-  await page.locator(".phone-reader .doc").first().waitFor();
+  await phoneReaderReady(page);
   await tap(page, page.getByRole("button", { name: "Source actions" }));
   await tap(page, page.locator(".action-sheet button").filter({ hasText: "Add a key point here" }));
   await until("Add a key point here brings it back", async () => (await field.inputValue().catch(() => "")) === "Retrieval beats rereading after a week");
   await macChanges((lib) => itemFile(lib, "the-testing-effect", "doc.md"), "# The Testing Effect: Why Retrieval Beats Rereading\n", "# The Testing Effect: Why Retrieval Beats Rereading\n\nA new opening paragraph the Mac added.\n", async () => {
     await page.reload();
-    await page.locator(".phone-reader .doc").first().waitFor();
+    await phoneReaderReady(page);
     await Bun.sleep(800);
     if (await field.count()) throw new Error("the line came back over text that changed under its anchor");
     await tap(page, page.locator(".phone-back").filter({ hasText: "Source" }));

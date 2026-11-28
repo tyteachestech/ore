@@ -719,7 +719,15 @@ export async function phoneSource(page: Page, title: string) {
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Sources" }));
   await tap(page, page.locator(".phone-sources button").filter({ hasText: title }));
+  await phoneReaderReady(page);
+}
+
+/** The iPhone's reader has its text on screen and read in (its marks layer is there only then). Until that it takes
+ *  no tap on the text and has not yet gone to the place he left, so a journey that taps or measures as soon as the
+ *  text shows loses to a slow runner: a double tap made nothing, a point measured was scrolled away (F856). */
+export async function phoneReaderReady(page: Page) {
   await page.locator(".phone-reader .doc").first().waitFor();
+  await page.locator(".phone-reader .marks").first().waitFor({ state: "attached" });
 }
 
 /** A finger held still on the middle of the target for `ms`, then lifted, with the few points of drift a real
@@ -832,9 +840,8 @@ export async function textFile(name: string, text: string) {
   return path;
 }
 
-/** A double tap: both taps sent at once, so the second never waits for the first's answer to come back. Sent one
- *  after the other from here, a busy runner put them more than the Reader's 350 ms apart and they were two single
- *  taps (F856). */
+/** A double tap: both taps sent at once, so the second never waits for the first's answer to come back and the
+ *  two stay inside the Reader's 350 ms however busy the runner is. */
 export async function doubleTap(page: Page, x: number, y: number) {
   await Promise.all([page.touchscreen.tap(x, y), page.touchscreen.tap(x, y)]);
 }
