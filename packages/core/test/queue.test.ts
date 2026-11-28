@@ -79,7 +79,7 @@ describe("a session opens on a likely recall (D176)", () => {
   });
 });
 
-describe("never more than two likely misses in a row (D-new-pace-misses)", () => {
+describe("never more than two likely misses in a row (D359)", () => {
   const facts = (rs: number[]) => rs.map((retrievability, i) => e({ id: `f${i}`, topics: [`t${i}`], retrievability }));
   test("after two likely misses the next likely recall is brought forward; everything else keeps its order", () => {
     const q = facts([0.2, 0.3, 0.35, 0.4, 0.45, 0.7, 0.8, 0.9]);
