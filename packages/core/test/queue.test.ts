@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { orderQueue, winFirst, type QueueEntry } from "../src/queue.ts";
+import { orderQueue, pace, winFirst, type QueueEntry } from "../src/queue.ts";
 
 let n = 0;
 function e(over: Partial<QueueEntry>): QueueEntry {
@@ -76,5 +76,33 @@ describe("a session opens on a likely recall (D176)", () => {
     const q = facts([0.9, 0.3]);
     expect(winFirst(q)).toBe(q);
     expect(winFirst([])).toEqual([]);
+  });
+});
+
+describe("never more than two likely misses in a row (D-new-pace-misses)", () => {
+  const facts = (rs: number[]) => rs.map((retrievability, i) => e({ id: `f${i}`, topics: [`t${i}`], retrievability }));
+  test("after two likely misses the next likely recall is brought forward; everything else keeps its order", () => {
+    const q = facts([0.2, 0.3, 0.35, 0.4, 0.45, 0.7, 0.8, 0.9]);
+    expect(ids(pace(q))).toEqual(["f0", "f1", "f5", "f2", "f3", "f6", "f4", "f7"]);
+  });
+  test("with no likely recall left the misses run on: nothing is dropped or held back", () => {
+    const q = facts([0.2, 0.3, 0.35, 0.7, 0.4, 0.45, 0.3]);
+    expect(ids(pace(q))).toEqual(["f0", "f1", "f3", "f2", "f4", "f5", "f6"]);
+  });
+  test("a block (confusables, one source's definitions) is never split and never pulled forward", () => {
+    const k = [0.2, 0.3, 0.4].map((retrievability, i) => e({ id: `k${i}`, content_type: "concept", topics: ["memory"], retrievability }));
+    const d = [0.9, 0.95].map((retrievability, i) => e({ id: `d${i}`, content_type: "definition", item: "S1", topics: ["x"], retrievability }));
+    const [a, b] = facts([0.3, 0.8]) as [QueueEntry, QueueEntry];
+    // The block of three misses stays whole; the single likely recall comes right after it, ahead of the next miss.
+    expect(ids(pace([...k, a, ...d, b]))).toEqual(["k0", "k1", "k2", "f1", "f0", "d0", "d1"]);
+  });
+  test("a queue that already breathes is returned as it is", () => {
+    const q = facts([0.2, 0.7, 0.3, 0.3, 0.8]);
+    expect(pace(q)).toBe(q);
+    expect(pace([])).toEqual([]);
+  });
+  test("the opening win counts: it is not followed by a third thing moved for nothing", () => {
+    const q = winFirst(facts([0.2, 0.3, 0.9, 0.4, 0.7]));
+    expect(ids(pace(q))).toEqual(["f2", "f0", "f1", "f4", "f3"]);
   });
 });

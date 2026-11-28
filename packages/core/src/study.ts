@@ -6,7 +6,7 @@ import { itemDirs, type AiStamp } from "./items.ts";
 import { localDay, nowIso } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
-import { orderQueue, winFirst, type QueueEntry } from "./queue.ts";
+import { orderQueue, pace, winFirst, type QueueEntry } from "./queue.ts";
 import { findVariant } from "./remix.ts";
 import { appendReview, appendUndo, lineId, readReviews, reviewTimes, type FsrsState, type Review } from "./reviews.ts";
 import { emptyState, loadParams, merged, nextState, replay, retrievability } from "./scheduler.ts";
@@ -236,7 +236,7 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const fresh = [...room, ...unseen.filter((u) => !room.includes(u))].slice(0, newLeft).map((u) => u.entry);
     const ordered = orderQueue(entries);
     const due = ordered.filter((e) => !e.relearn);
-    const live = opts.start ? winFirst(due) : due;
+    const live = pace(opts.start ? winFirst(due) : due);
     const out: QueueEntry[] = [];
     for (const e of live) {
       out.push(e);

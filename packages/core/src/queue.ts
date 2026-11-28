@@ -88,3 +88,39 @@ export function winFirst(ordered: QueueEntry[]): QueueEntry[] {
   if (best <= 0 || ordered[best]!.retrievability <= ordered[0]!.retrievability) return ordered;
   return [ordered[best]!, ...ordered.slice(0, best), ...ordered.slice(best + 1)];
 }
+
+/** Below this chance of recall an exercise is a likely miss. For now: a coin flip. */
+const LIKELY_MISS = 0.5;
+/** How many likely misses may come back to back before a likely recall is brought forward. */
+const MISS_RUN = 2;
+
+// D-new-pace-misses: never more than two likely misses in a row. Most forgotten first serves a backlog as
+// one run of probable misses, and hard items in a run are what make people stop (Kang, Daniels & Schweitzer
+// 2022; guidebook L246: difficulty has to be surmountable). So once two likely misses have come, the next
+// exercise he will likely recall is brought forward to sit between them and the third. Order only: nothing
+// is dropped or held back, no schedule changes (D22), and a block (confusables, one source's definitions,
+// D24) is never split and never moved, so a block of misses can run longer than two.
+export function pace(ordered: QueueEntry[]): QueueEntry[] {
+  const size = new Map<string, number>();
+  for (const e of ordered) size.set(unitKey(e), (size.get(unitKey(e)) ?? 0) + 1);
+  const miss = (e: QueueEntry) => e.retrievability < LIKELY_MISS;
+  const rest = [...ordered];
+  const out: QueueEntry[] = [];
+  let run = 0, moved = false;
+  while (rest.length) {
+    const next = rest[0]!;
+    const inBlock = out.length > 0 && size.get(unitKey(next))! > 1 && unitKey(next) === unitKey(out.at(-1)!);
+    if (run >= MISS_RUN && miss(next) && !inBlock) {
+      const win = rest.findIndex((e) => !miss(e) && size.get(unitKey(e)) === 1);
+      if (win > 0) {
+        out.push(rest.splice(win, 1)[0]!);
+        run = 0;
+        moved = true;
+        continue;
+      }
+    }
+    out.push(rest.shift()!);
+    run = miss(next) ? run + 1 : 0;
+  }
+  return moved ? out : ordered;
+}
