@@ -1,0 +1,5 @@
+PASS: five-minute note edit has not entered git yet (designed interval)
+PASS: exactly ten minutes is eligible
+PASS: clean eligible check creates no commit
+PASS: clean check postpones a later edit until ten minutes after that CHECK
+PASS: forced session-end-style snapshot bypasses interval

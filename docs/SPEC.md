@@ -37,7 +37,7 @@ inbox/                         # dropped watcher (D95): a file added from here w
 .ore/                          # lock, open-session marker, last-snapshot marker, background enrich logs (gitignored)
 ```
 
-History (D5): every `ore` command snapshots the library into its local git repo when the last snapshot is over ten minutes old (`ore session end` always does); never pushed, never fails a command.
+History (D5): every `ore` command snapshots the library into its local git repo when the last snapshot is over ten minutes old (`ore session end` always does); never pushed, never fails a command. One snapshot runs at a time, and history waits (`ore doctor` says why) while a restore is unfinished: a git operation in progress, files in conflict, or the library checked out at an old snapshot. Getting something back is the agents' recipe in the library's AGENTS.md and the `/ore` skill.
 
 IDs: ULID (26 chars). Slugs: kebab-case title, max 60 chars. Timestamps: ISO 8601 UTC.
 

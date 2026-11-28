@@ -12,6 +12,17 @@ For AI-written replacement exercise wording, `--ai` is its actual author's `{ven
 
 **`notes.md` (the source note, and each skill note in `skills/<id>/notes.md`) is Tyler's own writing.** Never edit it except through `ore notes` (when Tyler gives you his words) and `ore recall`. Never write AI text into it: no summaries, suggestions, corrections, links or "cleaned up" versions. Read it freely for questions about his library. A link in a note is `[text](ore:item/<id>)` or `[text](ore:skill/<id>)`; `ore backlinks <item>` (or `--skill <id>`) lists the notes that link somewhere.
 
+## Getting something back
+
+The folder is a local git repo, never pushed (D5): `ore` commits a snapshot at most every ten minutes, and at the end of every review session. When Tyler asks for an earlier version of something, this is the one hand edit allowed:
+
+1. Save what is there now first with `ore snapshot --json` (under the library's lock, so it never holds half a write), so the restore can itself be taken back. If it answers `paused`, a restore is already half done: finish that first.
+2. Find the snapshot with `git log --format='%h %s' -- <path>` and look at it with `git show <sha>:<path>`.
+3. Bring back only the files he asked for: `git checkout <sha> -- <path>` (a source is its whole `items/<yyyy>/<slug>-<id>/` folder; its exercises are the `cards/` files whose `item:` is its id). Never `git reset`, `git stash` or a checkout of the whole folder unless he asks for the whole library as it was: the `*.jsonl` logs are his reviews and highlights from every device, and going back drops the ones since.
+4. Run `ore doctor`; the index reads the restored files by itself. Tell him what came back and from when. The app shows it the next time he comes back to its window.
+
+Changes from the last ten minutes may be in no snapshot yet; a cut's removed text is in `.ore/cuts/` (`ore cut --undo`), not in the history.
+
 ## Layout
 
 ```

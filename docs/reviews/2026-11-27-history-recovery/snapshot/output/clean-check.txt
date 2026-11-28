@@ -1,0 +1,12 @@
+{
+  "clean": {
+    "committed": false
+  },
+  "result": {
+    "committed": false
+  },
+  "minutesSinceLastCommit": 21,
+  "dirty": true,
+  "savedNote": "Old note."
+}
+FAIL: first write after a 20-minute-old snapshot is captured even after a clean read

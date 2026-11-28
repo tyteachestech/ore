@@ -1,0 +1,32 @@
+[
+  {
+    "id": "01M8FPM5Y8TQ3TA2AE4C81MAWS",
+    "type": "markdown",
+    "title": "Link target",
+    "captured_at": "2026-11-27T23:49:36.328Z",
+    "text_sha256": "81dfe162a915924400b2655a45394b24b190c7dc4dee9f3cd692a2f694724d91",
+    "status": "inbox",
+    "skills": [],
+    "topics": [],
+    "path": "items/2026/link-target-01M8FPM5Y8TQ3TA2AE4C81MAWS/doc.md",
+    "dir": "/Users/tylerpoelking/Developer/ore-wt/history-recovery/codex-out/restore/libs/roundtrip-archive/items/2026/link-target-01M8FPM5Y8TQ3TA2AE4C81MAWS",
+    "source_file": "/Users/tylerpoelking/Developer/ore-wt/history-recovery/codex-out/restore/libs/roundtrip-archive/items/2026/link-target-01M8FPM5Y8TQ3TA2AE4C81MAWS/source.md",
+    "words": 7,
+    "has_notes": true
+  },
+  {
+    "id": "01M8FPM5Y3J7P24NAKCZYTETWQ",
+    "type": "article",
+    "title": "Notes on retrieval practice",
+    "captured_at": "2026-11-27T23:49:36.323Z",
+    "text_sha256": "338863910194e7abc862505575d5d020814fff1fe3e5fec6e6813bfbc44be931",
+    "status": "inbox",
+    "skills": [],
+    "topics": [],
+    "path": "items/2026/notes-on-retrieval-practice-01M8FPM5Y3J7P24NAKCZYTETWQ/doc.md",
+    "dir": "/Users/tylerpoelking/Developer/ore-wt/history-recovery/codex-out/restore/libs/roundtrip-archive/items/2026/notes-on-retrieval-practice-01M8FPM5Y3J7P24NAKCZYTETWQ",
+    "source_file": "/Users/tylerpoelking/Developer/ore-wt/history-recovery/codex-out/restore/libs/roundtrip-archive/items/2026/notes-on-retrieval-practice-01M8FPM5Y3J7P24NAKCZYTETWQ/source.rtf",
+    "words": 80,
+    "has_notes": true
+  }
+]

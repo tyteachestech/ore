@@ -1,0 +1,222 @@
+{
+  "skills": [
+    {
+      "skill": "ai",
+      "name": "AI",
+      "priority": "P1",
+      "items_read": 0,
+      "items_live": 0,
+      "cards_live": 0,
+      "reviews": 0,
+      "retention": null,
+      "retention_n": 0,
+      "retention_own_words": null,
+      "retention_own_words_n": 0,
+      "retention_no_note": null,
+      "retention_no_note_n": 0,
+      "session_starts": 0
+    },
+    {
+      "skill": "learning",
+      "name": "Learning",
+      "priority": "P1",
+      "items_read": 0,
+      "items_live": 1,
+      "cards_live": 1,
+      "reviews": 1,
+      "retention": null,
+      "retention_n": 0,
+      "retention_own_words": null,
+      "retention_own_words_n": 0,
+      "retention_no_note": null,
+      "retention_no_note_n": 0,
+      "session_starts": 0
+    },
+    {
+      "skill": "teaching",
+      "name": "Teaching",
+      "priority": "P1",
+      "items_read": 0,
+      "items_live": 0,
+      "cards_live": 0,
+      "reviews": 0,
+      "retention": null,
+      "retention_n": 0,
+      "retention_own_words": null,
+      "retention_own_words_n": 0,
+      "retention_no_note": null,
+      "retention_no_note_n": 0,
+      "session_starts": 0
+    },
+    {
+      "skill": "storytelling-writing",
+      "name": "Storytelling & Writing",
+      "priority": "P2",
+      "items_read": 0,
+      "items_live": 0,
+      "cards_live": 0,
+      "reviews": 0,
+      "retention": null,
+      "retention_n": 0,
+      "retention_own_words": null,
+      "retention_own_words_n": 0,
+      "retention_no_note": null,
+      "retention_no_note_n": 0,
+      "session_starts": 0
+    },
+    {
+      "skill": "creator-business",
+      "name": "Creator Business",
+      "priority": "P2",
+      "items_read": 0,
+      "items_live": 0,
+      "cards_live": 0,
+      "reviews": 0,
+      "retention": null,
+      "retention_n": 0,
+      "retention_own_words": null,
+      "retention_own_words_n": 0,
+      "retention_no_note": null,
+      "retention_no_note_n": 0,
+      "session_starts": 0
+    },
+    {
+      "skill": "creativity",
+      "name": "Creativity",
+      "priority": "P2",
+      "items_read": 0,
+      "items_live": 0,
+      "cards_live": 0,
+      "reviews": 0,
+      "retention": null,
+      "retention_n": 0,
+      "retention_own_words": null,
+      "retention_own_words_n": 0,
+      "retention_no_note": null,
+      "retention_no_note_n": 0,
+      "session_starts": 0
+    },
+    {
+      "skill": "habits",
+      "name": "Habits",
+      "priority": "P3",
+      "items_read": 0,
+      "items_live": 0,
+      "cards_live": 0,
+      "reviews": 0,
+      "retention": null,
+      "retention_n": 0,
+      "retention_own_words": null,
+      "retention_own_words_n": 0,
+      "retention_no_note": null,
+      "retention_no_note_n": 0,
+      "session_starts": 0
+    },
+    {
+      "skill": "focus-attention",
+      "name": "Focus & Attention",
+      "priority": "P3",
+      "items_read": 0,
+      "items_live": 0,
+      "cards_live": 0,
+      "reviews": 0,
+      "retention": null,
+      "retention_n": 0,
+      "retention_own_words": null,
+      "retention_own_words_n": 0,
+      "retention_no_note": null,
+      "retention_no_note_n": 0,
+      "session_starts": 0
+    },
+    {
+      "skill": "self-regulation-motivation",
+      "name": "Self-Regulation & Motivation",
+      "priority": "P3",
+      "items_read": 0,
+      "items_live": 0,
+      "cards_live": 0,
+      "reviews": 0,
+      "retention": null,
+      "retention_n": 0,
+      "retention_own_words": null,
+      "retention_own_words_n": 0,
+      "retention_no_note": null,
+      "retention_no_note_n": 0,
+      "session_starts": 0
+    }
+  ],
+  "total": {
+    "skill": "all",
+    "items_read": 0,
+    "items_live": 1,
+    "cards_live": 1,
+    "reviews": 1,
+    "retention": null,
+    "retention_n": 0,
+    "retention_own_words": null,
+    "retention_own_words_n": 0,
+    "retention_no_note": null,
+    "retention_no_note_n": 0,
+    "session_starts": 0
+  },
+  "remix": {
+    "variant": {
+      "reviews": 0,
+      "pass_rate": null
+    },
+    "original": {
+      "reviews": 0,
+      "pass_rate": null
+    }
+  },
+  "calibration": {
+    "sure_n": 0,
+    "sure_right": null,
+    "levels": [
+      {
+        "confidence": 1,
+        "n": 0,
+        "right": null
+      },
+      {
+        "confidence": 2,
+        "n": 0,
+        "right": null
+      },
+      {
+        "confidence": 3,
+        "n": 0,
+        "right": null
+      }
+    ]
+  },
+  "ai_agreement": {
+    "n": 0,
+    "same": 0,
+    "share": null,
+    "his_higher": 0,
+    "his_lower": 0
+  },
+  "explain": {
+    "typed": {
+      "reviews": 0,
+      "pass_rate": null
+    },
+    "in_head": {
+      "reviews": 0,
+      "pass_rate": null
+    }
+  },
+  "near_cut": {
+    "near": {
+      "reviews": 0,
+      "pass_rate": null,
+      "recall": null
+    },
+    "other": {
+      "reviews": 0,
+      "pass_rate": null,
+      "recall": null
+    }
+  }
+}

@@ -1,0 +1,13 @@
+import {check} from './helpers.ts';
+import {agentsTemplate} from '../../packages/core/src/init.ts';
+import {readFileSync} from 'node:fs';
+import {commands} from '../../packages/cli/src/commands.ts';
+const agents=await agentsTemplate();
+const skill=readFileSync('skills/ore/SKILL.md','utf8');
+console.log('Library rule:',agents.split('\n').find(l=>l.startsWith('Never edit a library file')));
+console.log('Skill rule:',skill.split('\n').find(l=>l.includes('**`ore` is the only writer.**')));
+const recoveryCommands=Object.entries(commands).filter(([name,c])=>/history|snapshot|rollback/.test(name+' '+c.usage)).map(([name])=>name);
+console.log('History/recovery commands:',JSON.stringify(recoveryCommands));
+const guidance=(s:string)=>/\bgit\b|\bsnapshots?\b|history.{0,40}restor|restor.{0,40}history/i.test(s);
+check(recoveryCommands.length>0 || guidance(agents),'library agent is told how to discover historical versions');
+check(recoveryCommands.length>0 || guidance(skill),'Ore skill is told how to discover historical versions');

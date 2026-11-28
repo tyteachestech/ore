@@ -1,3 +1,4 @@
+import { historyPaused } from "./history.ts";
 import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
 import { basename, join, relative, resolve } from "node:path";
 import { AnnotationSchema, anchorAnnotations, annotationRevs, annotationsPath, reanchorItem } from "./annotations.ts";
@@ -228,6 +229,10 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
     if (opts.fix) { unlinkSync(gitLock); fixed.push(".git/index.lock: removed stale lock, so library history saves again"); }
     else add("warn", gitLock, "library history has stopped saving: a git run was cut off and left this lock — run ore doctor --fix");
   }
+
+  // A restore left half done holds history back until it is finished (history recovery pass): say so, and how.
+  const paused = historyPaused(lib);
+  if (paused) add("warn", join(lib.root, ".git"), `library history is paused: ${paused}`);
 
   const lock = paths.lock(lib);
   // An empty lock (a crash between create and write) read as pid 0, which kill() takes as our own group.

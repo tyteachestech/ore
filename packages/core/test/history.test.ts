@@ -73,3 +73,76 @@ test("history skips a half-written change without delaying the next complete sna
   expect(snapshot(lib, { force: true }).committed).toBe(true);
   expect(log(lib.root)).toHaveLength(2);
 });
+
+// History recovery pass (coverage queue 9): git states an agent's restore can leave, and what a snapshot does there.
+describe("library history after a restore (D5)", () => {
+  const git = (root: string, ...args: string[]) => Bun.spawnSync(["git", "-c", "user.name=T", "-c", "user.email=t@t", ...args], { cwd: root, stdout: "pipe", stderr: "pipe" });
+  const note = (root: string, text: string) => writeFileSync(join(root, "note.md"), text);
+
+  test("a restore left in conflict is never committed: history waits, and doctor says why", async () => {
+    const { doctor } = await import("../src/doctor.ts");
+    const lib = await tempLibrary();
+    note(lib.root, "base\n");
+    snapshot(lib, { force: true });
+    git(lib.root, "checkout", "-q", "-b", "other");
+    note(lib.root, "other\n");
+    git(lib.root, "commit", "-qam", "other");
+    git(lib.root, "checkout", "-q", "-");
+    note(lib.root, "mine\n");
+    snapshot(lib, { force: true });
+    git(lib.root, "merge", "other");
+    expect(git(lib.root, "ls-files", "-u").stdout.toString()).not.toBe("");
+    const head = git(lib.root, "rev-parse", "HEAD").stdout.toString();
+    expect(snapshot(lib, { force: true }).committed).toBe(false);
+    expect(git(lib.root, "rev-parse", "HEAD").stdout.toString()).toBe(head);
+    expect(git(lib.root, "ls-files", "-u").stdout.toString()).not.toBe(""); // his conflict is left for him to settle
+    expect((await doctor(lib)).issues.map((i) => i.message).join("\n")).toContain("library history is paused");
+  });
+
+  test("checked out at an old snapshot, history waits instead of committing where no branch holds it", async () => {
+    const lib = await tempLibrary();
+    note(lib.root, "old\n");
+    snapshot(lib, { force: true });
+    const old = git(lib.root, "rev-parse", "HEAD").stdout.toString().trim();
+    note(lib.root, "new\n");
+    snapshot(lib, { force: true });
+    git(lib.root, "checkout", "-q", old);
+    note(lib.root, "made while detached\n");
+    const all = () => git(lib.root, "rev-list", "--all", "--count").stdout.toString().trim();
+    const before = all();
+    expect(snapshot(lib, { force: true }).committed).toBe(false);
+    expect(git(lib.root, "rev-list", "HEAD@{0}", "-n1").stdout.toString().trim()).toBe(old);
+    expect(all()).toBe(before);
+  });
+
+  test("a second snapshot while one is running leaves the first one's staged files alone", async () => {
+    const { tryWithLock } = await import("../src/lock.ts");
+    const lib = await tempLibrary();
+    snapshot(lib, { force: true });
+    note(lib.root, "half\n");
+    const nested = tryWithLock(join(lib.root, ".ore", "snapshot.lock"), () => snapshot(lib, { force: true }));
+    expect(nested).toEqual({ committed: false });
+    expect(git(lib.root, "diff", "--cached", "--quiet").exitCode).toBe(0); // nothing staged by the second one
+  });
+
+  test("session end with no git on PATH still answers with its receipt: history never fails a command", async () => {
+    const lib = await tempLibrary();
+    const cli = join(import.meta.dir, "../../cli/src/ore.ts");
+    const env = { ...process.env, ORE_LIBRARY: lib.root, ORE_NO_ENRICH: "1" };
+    expect(Bun.spawnSync([process.execPath, cli, "session", "start", "--json"], { env }).exitCode).toBe(0);
+    const end = Bun.spawnSync([process.execPath, cli, "session", "end", "--json"], { env: { ...env, PATH: "/nonexistent" }, stdout: "pipe", stderr: "pipe" });
+    expect(end.stderr.toString()).toBe("");
+    expect(end.exitCode).toBe(0);
+  });
+});
+
+test("ore doctor and ore snapshot with no git on PATH answer, never crash (code review of the history recovery pass)", async () => {
+  const lib = await tempLibrary();
+  const cli = join(import.meta.dir, "../../cli/src/ore.ts");
+  const env = { ...process.env, ORE_LIBRARY: lib.root, ORE_NO_ENRICH: "1", PATH: "/nonexistent" };
+  for (const cmd of ["doctor", "snapshot"]) {
+    const r = Bun.spawnSync([process.execPath, cli, cmd, "--json"], { env, stdout: "pipe", stderr: "pipe" });
+    expect(r.stderr.toString()).toBe("");
+    expect(JSON.parse(r.stdout.toString())).not.toHaveProperty("error");
+  }
+});

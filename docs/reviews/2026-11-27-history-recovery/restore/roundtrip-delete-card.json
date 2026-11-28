@@ -1,0 +1,54 @@
+{
+  "id": "01M8FPM6M3XCC2YSYR4VJ9XAX8",
+  "kind": "card",
+  "item": "01M8FPM6M08HCRPW36V6MCM29E",
+  "annotation": "01M8FPM6M29DVXJBM60M87NPC9",
+  "skills": [
+    "learning"
+  ],
+  "topics": [],
+  "content_type": "fact",
+  "state": "live",
+  "created": "2026-11-27T23:49:37.027Z",
+  "question": "What did this source say?",
+  "answer": "Testing yourself beats rereading. A café study group that quizzes each other learns more than one that rereads its notes together — even when the rereading feels better.",
+  "rubric": [],
+  "path": "cards/01M8FPM6M3XCC2YSYR4VJ9XAX8.md",
+  "in_head_ok": false,
+  "history": {
+    "reviews": [
+      {
+        "ts": "2026-11-20T12:00:00.000Z",
+        "rating": 3
+      }
+    ],
+    "next": {
+      "1": "2026-11-28T23:49:37.200Z",
+      "2": "2026-12-07T23:49:37.200Z",
+      "3": "2026-12-13T23:49:37.200Z",
+      "4": "2026-12-25T23:49:37.200Z"
+    },
+    "gem": {
+      "kind": "ready",
+      "after": {
+        "1": {
+          "kind": "rough",
+          "days": 0
+        },
+        "2": {
+          "kind": "ready",
+          "days": 11
+        },
+        "3": {
+          "kind": "cut",
+          "days": 19
+        },
+        "4": {
+          "kind": "cut",
+          "days": 36
+        }
+      }
+    }
+  },
+  "source_dir": "/Users/tylerpoelking/Developer/ore-wt/history-recovery/codex-out/restore/libs/roundtrip-delete/items/2026/notes-on-retrieval-practice-01M8FPM6M08HCRPW36V6MCM29E"
+}

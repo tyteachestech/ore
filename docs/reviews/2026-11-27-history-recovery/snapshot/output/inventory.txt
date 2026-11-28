@@ -1,0 +1,49 @@
+TRACKED
+.gitignore
+AGENTS.md
+CLAUDE.md
+cards/test.md
+cards/test.variants.jsonl
+chats/test.json
+feeds.yaml
+feeds/read.iphone.jsonl
+fsrs-params.json
+inbox/01M8FPSTQHQE60P3NVH4CX9X2Y.link.json
+inbox/01M8FPSTQJVTKRPRX0B7PJK253/shared.md
+inbox/removed/01M8FPSTQJVTKRPRX0B7PJK253.file.json
+items/2026/title-<item>/assets/test.png
+items/2026/title-<item>/diagrams/test.excalidraw
+items/2026/title-<item>/doc.md
+items/2026/title-<item>/images/test.png
+items/2026/title-<item>/map.excalidraw
+items/2026/title-<item>/notes.md
+items/2026/title-<item>/source.md
+items/2026/title-<item>/source.mp3
+items/2026/title-<item>/source.mp4
+items/2026/title-<item>/source.pdf
+items/2026/title-<item>/source.vtt
+items/2026/title-<item>/tables.json
+items/2026/title-<item>/thumbnail.png
+items/2026/title-<item>/transcript.vtt
+reviews/2026-11.iphone.jsonl
+sessions/2026-11.tys-mac.jsonl
+skills.yaml
+skills/learning/digs.json
+skills/learning/images/test.png
+skills/learning/notes.md
+topics/test.md
+IGNORED
+.index/feeds.json
+.index/library.sqlite
+.ore/catch-up
+.ore/cuts/01M8FPSTQC0JYCB18Z0ZBX6CGY/01M8FPSTQHQE60P3NVH4CX9X2X.json
+.ore/last-snapshot
+.ore/logs/test.log
+.ore/reimport/test/doc.md
+.ore/session
+.ore/tutor/test.json
+PASS: all visible layout families are committed, including original media bytes
+PASS: .ore and .index are excluded
+PASS: queued and removed-for-Undo inbox attachments are committed
+cut record present locally: true
+PASS: kept original retains removed text even though cut receipt is ignored

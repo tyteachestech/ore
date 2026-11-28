@@ -558,3 +558,19 @@ test("an older note failure on a stand-in cannot hide an edit under its saved id
   expect(t.hl.find("saved-edit")?.note).toBe("latest note");
   expect(t.unsaved.size).toBe(0);
 });
+
+// History recovery pass (app-01): a highlight's note restored from the library's history and read in, then ⌘Z on
+// the note change made before it wrote that change's older note over the restore.
+test("Undo of a note change leaves a note restored since, and says so", async () => {
+  const t = open([ann("a", { note: "B" })]);
+  const done = t.hl.setNote("a", "C");
+  (await t.last("annotate a --note=C")).ok(ann("a", { rev: 2, note: "C" }));
+  await done;
+  t.hl.read([ann("a", { rev: 1, note: "A" })], false); // git checkout <sha> -- annotations, then the window comes back
+  expect(t.hl.list()[0]!.note).toBe("A");
+  const sentBefore = t.sent.length;
+  await expect(t.steps.at(-1)!.undo!()).rejects.toThrow("changed since");
+  await tick();
+  expect(t.sent.length).toBe(sentBefore);
+  expect(t.hl.list()[0]!.note).toBe("A");
+});

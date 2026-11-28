@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import {utimesSync,readFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {setup,snap,git,pinClock,advance} from './support';
+import {setNotes,getNotes} from '../../packages/core/src/notes';
+import {mountDisk,rescan,flush,syncState,readFileSync as phoneRead,writeFileSync as phoneWrite,statSync as phoneStat} from '../../apps/desktop/src/phone/fs';
+import {command} from '../../apps/desktop/scripts/mock/phone-shell';
+pinClock();
+const events=new EventTarget();
+(globalThis as any).addEventListener=events.addEventListener.bind(events);
+(globalThis as any).dispatchEvent=events.dispatchEvent.bind(events);
+const {lib,item}=await setup('phone-controls');
+await setNotes(lib,item.meta.id,'Recovered older note');const old=snap(lib);
+await setNotes(lib,item.meta.id,'Newer Mac note');snap(lib);
+const path=getNotes(lib,item.meta.id).path, diskPath=resolve(lib.root,path),phonePath=`/phone/${path}`;
+let applies=0;
+await mountDisk('/phone',lib.root,async (cmd,args,opts)=>{
+  if(cmd==='library_apply')applies++;
+  return command(lib.root,cmd,args,args instanceof Uint8Array?args:undefined,opts?.headers['x-path']) as any;
+});
+assert.equal(phoneRead(phonePath,'utf8'),'Newer Mac note');
+const before=phoneStat(phonePath).mtimeMs;
+git(lib,'restore','--source',old,'--',path);
+// Also test a transport reporting an older mtime, rather than checkout's normally newer one.
+utimesSync(diskPath,new Date('2020-01-01'),new Date('2020-01-01'));
+advance();
+assert.equal(await rescan(),true);
+assert.equal(phoneRead(phonePath,'utf8'),'Recovered older note');
+assert.ok(phoneStat(phonePath).mtimeMs>before,'phone cache change must be visible to index');
+await flush();
+assert.equal(applies,0);
+assert.equal(syncState().unsent,0);
+assert.equal(readFileSync(diskPath,'utf8'),'Recovered older note');
+console.log('PASS: clean phone takes older-mtime restore, marks index dirty, uploads nothing');
+// A phone edit that really is unsent: specified by D222 to win, not a false unsent classification.
+phoneWrite(phonePath,'Unsent phone edit');
+await setNotes(lib,item.meta.id,'Mac change to replace');
+git(lib,'restore','--source',old,'--',path);
+assert.equal(readFileSync(diskPath,'utf8'),'Recovered older note');
+await rescan();
+assert.equal(readFileSync(diskPath,'utf8'),'Unsent phone edit');
+console.log('POLICY D222: genuinely unsent phone write replaces Mac restore on rescan');
+assert.equal(syncState().unsent,0);
