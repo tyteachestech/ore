@@ -1,0 +1,39 @@
+{
+ "key": "4954959e9ab365e2",
+ "add": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0115069&type=printable",
+ "note": "PLOS ONE (CC BY)",
+ "fp": {
+  "type": "pdf",
+  "title": "An Efficiency Comparison of Document Preparation Systems Used in Academic Research and Development",
+  "author": "Markus Knauff, Jelica Nejasmic",
+  "words": 4841,
+  "headings": [
+   "## An Efficiency Comparison of Document Preparation Systems Used in Academic Research and Development",
+   "## Abstract",
+   "### Introduction",
+   "### Participants, Materials, and Methods",
+   "### Results",
+   "### Continuous text",
+   "### Table text",
+   "### Equation text",
+   "### Usability questionnaire",
+   "### Discussion",
+   "### Supporting Information",
+   "### Acknowledgments",
+   "### Author Contributions"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 6,
+  "first": "page 1 research article an efficiency comparison of document preparation systems used",
+  "last": "2013 1 en calculated using full time equivalents accessed 20 nov 2014"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.075,
+  "added": 0.012,
+  "found": 0.806,
+  "inOrder": 0.948
+ }
+}

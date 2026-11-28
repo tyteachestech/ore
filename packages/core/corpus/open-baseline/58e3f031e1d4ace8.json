@@ -1,0 +1,36 @@
+{
+ "key": "58e3f031e1d4ace8",
+ "add": "https://arxiv.org/pdf/q-bio/0311039v1",
+ "note": "arXiv, biology",
+ "fp": {
+  "type": "pdf",
+  "title": "arXiv:q-bio/0311039v1 [q-bio.QM] 28 Nov 2003 Hierarchical Clustering Based on Mutual Information",
+  "words": 6448,
+  "headings": [
+   "### Abstract",
+   "## 1 Introduction",
+   "## 2 Mutual Information",
+   "### 2.1 Shannon Theory",
+   "### 2.2 Algorithmic Information Theory",
+   "### 2.3 MI-Based Distance Measures",
+   "## 3 A Phylogenetic Tree for Mammals",
+   "## Clustering of Minimally Dependent Components in an Electrocardiogram",
+   "### 4 Clustering of Minimally De- pendent Components in an Electrocardiogram",
+   "## 5 Conclusions",
+   "### References"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "page 1 arxiv q bio 0311039v1 q bio qm 28 nov 2003",
+  "last": "37 th annual allerton conference on communication control and computing page 368"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.075,
+  "added": 0.042,
+  "found": 0.697,
+  "inOrder": 1
+ }
+}

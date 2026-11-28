@@ -53,6 +53,24 @@ export function refusal(title: string, markdown: string, host: string): string |
 export const fileAuthor = (a: string | undefined): string | undefined =>
   a?.trim() && !/^(python-(docx|pptx)|openpyxl|microsoft office user|windows user|user|owner|author|unknown|anonymous|administrator|admin)$/i.test(a.trim()) ? a.trim() : undefined;
 
+/** Authors as a reader names them, from a book's creators or a file's author field. A creator a tool left as its default ("Unknown") is no one, and a
+ *  library manager's sort form, several in one ("Lovett, Marsha C.;Bridges, Michael W."), is turned back
+ *  to the names on the cover (corpus run 2026-11-28). */
+export function authorList(creators: string[], { field = false } = {}): string | undefined {
+  // An EPUB creator is one person, so "Last, First" is its sort form. A PDF's Author field is free text: "Strunk,
+  // White" there is two people, so it is turned only when it is surely one name in sort form (an initial, as in
+  // "Brewer, William F.", or names a library manager joined with ";").
+  const sorted = (c: string, given: string) => !field || c.includes(";") || /(?:^|\s)\p{Lu}\.(?:\s|$)/u.test(given);
+  const names = creators
+    .flatMap((c) => c.split(/\s*;\s*/).map((n) => [c, n] as const))
+    .map(([c, n]) => {
+      const m = /^([\p{Lu}][\p{L}'’-]+),\s*([\p{Lu}][\p{L}.'’ -]*?)$/u.exec(n.trim());
+      return m && m[2]!.split(" ").length <= 3 && sorted(c, m[2]!) && !/^(?:jr|sr|ii|iii|iv|md|phd|inc|ltd|llc)\.?$/i.test(m[2]!) ? `${m[2]} ${m[1]}` : n.trim();
+    })
+    .filter((n) => fileAuthor(n));
+  return names.length ? [...new Set(names)].join(", ") : undefined;
+}
+
 /** An author as a page names one, or undefined when it isn't a name: a sentence fragment, a list of initials, a long blurb. */
 export function cleanAuthor(a: string | undefined): string | undefined {
   const s = fileAuthor(a?.replace(/\s+/g, " "));
@@ -70,7 +88,11 @@ export function cleanTitle(t: string | undefined, { numbers = false } = {}): str
   const s = t?.replace(/\s+/g, " ").trim();
   if (!s) return undefined;
   if (numbers && /^\d+$/.test(s)) return s;
-  const junk = /^(?:\d+|[\w.-]+\.(?:docx?|pptx?|pdf|dvi|e?ps|tex|indd|md|txt|pages|key|xlsx?|csv|numbers|png|jpe?g|tiff?|svg)|arxiv:\S+.*|book\s*\d+|sheet\s*\d+|microsoft (?:word|powerpoint) - .*|powerpoint presentation|untitled(?:[ -]+(?:document|presentation|deck|\d+))*|(?:new )?(?:document|presentation|slide)\s*\d*)$/i;
+  // An export link's id or a file name with no spaces ("1diPCNuI9me_eH…?format=pdf&dat=…", a Google Docs PDF's,
+  // 1,004 letters long: corpus run 2026-11-28) names no one's work.
+  // ASCII only: a long Chinese or Japanese title has no spaces either, and may hold a number.
+  if (/^[\x21-\x7e]{25,}$/.test(s) && /[\d?&=_]/.test(s)) return undefined;
+  const junk = /^(?:\d+|[\w.-]+\.(?:docx?|pptx?|pdf|dvi|e?ps|tex|indd|qxd|qxp|p65|md|txt|pages|key|xlsx?|csv|numbers|png|jpe?g|tiff?|svg)|arxiv:\S+.*|book\s*\d+|sheet\s*\d+|microsoft (?:word|powerpoint) - .*|powerpoint presentation|untitled(?:[ -]+(?:document|presentation|deck|\d+))*|(?:new )?(?:document|presentation|slide)\s*\d*)$/i;
   return junk.test(s) ? undefined : s;
 }
 

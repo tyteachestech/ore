@@ -1,0 +1,24 @@
+{
+ "key": "2290c31c987c488f",
+ "add": "https://raw.githubusercontent.com/jakevdp/PythonDataScienceHandbook/master/notebooks/04.01-Simple-Line-Plots.ipynb",
+ "note": "notebook with plots",
+ "fp": {
+  "type": "article",
+  "title": "Simple Line Plots",
+  "words": 1047,
+  "headings": [
+   "# Simple Line Plots",
+   "## Adjusting the Plot: Line Colors and Styles",
+   "## Adjusting the Plot: Axes Limits",
+   "## Labeling Plots",
+   "## Matplotlib Gotchas"
+  ],
+  "code": 15,
+  "tables": 0,
+  "math": 1,
+  "images": 14,
+  "first": "simple line plots perhaps the simplest of all plots is the visualization",
+  "last": "method to set all these properties at once see the following figure"
+ },
+ "flags": []
+}

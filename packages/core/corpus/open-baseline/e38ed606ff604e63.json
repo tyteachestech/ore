@@ -1,0 +1,33 @@
+{
+ "key": "e38ed606ff604e63",
+ "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/cole-voyage-of-life.epub",
+ "note": "EPUB 3 fixed layout, paintings (IDPF)",
+ "fp": {
+  "type": "epub",
+  "title": "Thomas Cole - The Voyage of Life",
+  "author": "Jesse Dylan",
+  "words": 1437,
+  "headings": [
+   "# The Voyage of Life",
+   "## Background",
+   "## Childhood",
+   "## Youth",
+   "## Manhood",
+   "## Old Age",
+   "## Cultural significance"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 9,
+  "first": "chapter 1 the voyage of life the voyage of life series painted",
+  "last": "awakening giving the series the prestige and popular acclaim it retains today"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0,
+  "added": 0.008,
+  "found": 0.972,
+  "inOrder": 1
+ }
+}

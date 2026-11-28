@@ -6,7 +6,7 @@ import type { TextItem } from "pdfjs-dist/types/src/display/api";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
 import { pdfData } from "./pdf-data.ts";
-import { cleanTitle, fileAuthor, lineBreakSpace } from "./check.ts";
+import { authorList, cleanTitle, lineBreakSpace } from "./check.ts";
 import { recognizedPages } from "./ocr.ts";
 import type { Box, Region } from "./paddle.ts";
 import { pageFigures, png } from "./pdf-figures.ts";
@@ -240,7 +240,26 @@ function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
   const number = /^(?:page\s*)?\d{1,4}(?:\s*(?:of|\/)\s*\d+)?$/i;
   // A page number, or a front-matter one ("viii"), at either end of the line.
   const folio = /^(?:\d{1,4}|[ivxlc]{1,6})\s|\s(?:\d{1,4}|[ivxlc]{1,6})$/;
-  return pages.map((lines) => {
+  // A line set the same on most pages is the printer's, not the text: a typesetting service's stamp in a page's
+  // corner ("XSL• FO" over "RenderX" on each of JMIR's pages, read as a heading on all 21), a publisher's notice
+  // turned up a margin ("This document is copyrighted by the American Psychological Association", "NIH-PA
+  // Author Manuscript"), or a download line at a page's head or foot ("Version of Record at: …") (corpus run
+  // 2026-11-28). The same to the letter, numbers too: "Figure 12 shows…" on every page is a figure's caption. A line
+  // is one only when turned or among a page's first or last three: in the body, a label ("Worked example") or a
+  // table's header row comes back on every page and is the text's.
+  const same = (l: Line) => plain(l.text).replace(/\s+/g, " ").trim().toLowerCase();
+  const edge = (p: Line[]) => {
+    const byY = [...p].sort((a, b) => b.y - a.y);
+    return new Set([...byY.slice(0, 3), ...byY.slice(-3)]);
+  };
+  const candidates = pages.map((p) => {
+    const ends = edge(p);
+    return new Set(p.filter((l) => !isBlock(l.text) && same(l).length >= 3 && (l.size === 0 || ends.has(l))));
+  });
+  const onPages = count(candidates.flatMap((c) => [...new Set([...c].map(same))]));
+  const stamp = (l: Line, n: number) => pages.length >= 4 && candidates[n]!.has(l) && (onPages.get(same(l)) ?? 0) >= Math.max(4, pages.length * 0.6);
+  return pages.map((page, n) => {
+    const lines = page.filter((l) => !stamp(l, n));
     // Highest and lowest on the page, whatever order the file writes them in (Chromium and many
     // print-to-PDF tools write the head and the page number after the body).
     const byY = [...lines].sort((a, b) => b.y - a.y);
@@ -252,7 +271,8 @@ function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
     const rest = byY.filter((l) => !drop.has(l));
     const foot = rest.at(-1);
     const prev = rest.at(-2);
-    if (foot && prev && !isBlock(foot.text) && t(foot).length <= 80 && (foot.size <= body * 1.1 || feet.get(key(foot))! >= 3) && prev.y - foot.y > typical * 1.5 && (number.test(t(foot)) || feet.get(key(foot))! > 1)) drop.add(foot);
+    // A long foot that comes back on three pages or more is one too: a journal's citation line with its page number.
+    if (foot && prev && !isBlock(foot.text) && (t(foot).length <= 80 || (t(foot).length <= 200 && feet.get(key(foot))! >= 3)) && (foot.size <= body * 1.1 || feet.get(key(foot))! >= 3) && prev.y - foot.y > typical * 1.5 && (number.test(t(foot)) || feet.get(key(foot))! > 1)) drop.add(foot);
     return lines.filter((l) => !drop.has(l));
   });
 }
@@ -519,7 +539,7 @@ async function pdfMeta(doc: PdfDocument): Promise<{ title?: string; author?: str
   // The Info dictionary's Author, else the XMP creator list many publishers fill instead.
   const xmp = meta?.metadata?.get("dc:creator") as string | string[] | undefined;
   const author = info.Author?.trim() || [xmp ?? []].flat().map((a) => String(a).trim()).filter(Boolean).join(", ");
-  return { title: info.Title?.trim() || undefined, author: fileAuthor(author) };
+  return { title: info.Title?.trim() || undefined, author: authorList([author], { field: true }) };
 }
 
 /** Opens a PDF quietly (pdf.js warns on stdout about any damage it works around), refusing one it

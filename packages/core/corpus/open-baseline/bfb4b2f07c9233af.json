@@ -1,0 +1,22 @@
+{
+ "key": "bfb4b2f07c9233af",
+ "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/slideshow/SampleShow.pptx",
+ "note": "Apache POI slides",
+ "fp": {
+  "type": "article",
+  "title": "SlideShow Sample",
+  "author": "Nick Burch",
+  "words": 72,
+  "headings": [
+   "## Title of the first slide",
+   "## This is the second slide"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "slide 1 title of the first slide subtitle of the first slide",
+  "last": "these are the notes of the 2nd slide this line is bold"
+ },
+ "flags": []
+}

@@ -4,7 +4,7 @@ import { DOMParser, parseHTML } from "linkedom";
 import { posix } from "node:path";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
-import { cleanDate, cleanTitle } from "./check.ts";
+import { authorList, cleanDate, cleanTitle } from "./check.ts";
 import { BACK_START, FRONT_END, backPages, frontPages, type PageFacts } from "./front-matter.ts";
 import { td } from "./markdown.ts";
 
@@ -24,13 +24,16 @@ const VOID = "area|base|br|col|embed|hr|img|input|link|meta|param|source|track|w
 /** A chapter file parsed as HTML. */
 function parse(xhtml: string): Document {
   // XHTML self-closing non-void tags (<a id="x"/>) would swallow content under an HTML parser.
-  const html = xhtml.replace(new RegExp(`<(?!(?:${VOID})\\b)([a-zA-Z][\\w:-]*)([^<>]*?)\\s*/>`, "g"), "<$1$2></$1>");
+  // A tab the typesetting tool escaped twice (`&amp;#9;`) at a line's start, around its list number, shows as
+  // "&#9;" in every reader: it is a space (corpus run 2026-11-28). In the text ("write &amp;#9; for a tab") it stays.
+  const html = xhtml.replace(/(>[ \t]*)&amp;#x?9;((?:[\da-z]{1,3}[.)]|[•·–-])?)(?:&amp;#x?9;)?/gi, "$1$2 ").replace(new RegExp(`<(?!(?:${VOID})\\b)([a-zA-Z][\\w:-]*)([^<>]*?)\\s*/>`, "g"), "<$1$2></$1>");
   return parseHTML(html).document as unknown as Document;
 }
 
 const kind = (e: Element) => `${e.getAttribute("epub:type") ?? ""} ${e.getAttribute("role") ?? ""}`;
 const NOTE = /\b(?:doc-)?(?:foot|end|rear)?note\b/;
 const BACKLINK = /\b(?:doc-)?backlink\b/;
+const BACK_TEXT = /^(?:go to note reference in text|back to (?:the )?(?:text|note reference)|return to (?:the )?text|↩\uFE0E?|⮌)$/i;
 
 /** A chapter as Markdown, its images pointed at saved copies; `image` saves one by its path in the book
  *  (undefined: not one to keep, null: the book names it but doesn't hold it).
@@ -58,6 +61,21 @@ function chapterMarkdown(document: Document, image: (src: string) => string | nu
       p.textContent = `OREGAP${gaps.push(alt ? `[missing figure: ${alt}]` : "[missing figure]") - 1}OREGAP`;
       img.replaceWith(p);
     } else img.remove();
+  }
+  // A link back from a note to the words it explains is the book's way around, not text: Penguin Random House's
+  // "GO TO NOTE REFERENCE IN TEXT" under each of a book's 391 notes (corpus run 2026-11-28).
+  for (const a of Array.from(document.querySelectorAll("a[href*='#']"))) {
+    if (!BACK_TEXT.test(a.textContent?.trim() ?? "") && !BACKLINK.test(kind(a))) continue;
+    const block = a.parentElement;
+    a.remove();
+    if (block && block !== document.body && !block.textContent?.trim() && !block.querySelector("img")) block.remove();
+  }
+  // A heading inside a figure is its caption (O'Reilly sets "Figure 1-5. …" as an <h6>: 56 in one book filled its
+  // outline, corpus run 2026-11-28): it stays under the picture as a line of text.
+  for (const h of Array.from(document.querySelectorAll("figure h1, figure h2, figure h3, figure h4, figure h5, figure h6, div.figure h1, div.figure h2, div.figure h3, div.figure h4, div.figure h5, div.figure h6"))) {
+    const p = document.createElement("p");
+    p.append(...Array.from(h.childNodes));
+    h.replaceWith(p);
   }
   const notes: string[] = [];
   for (const a of Array.from(document.querySelectorAll("a[href]"))) {
@@ -95,6 +113,41 @@ function classSizes(sheets: string[]): Map<string, { size: number; plain: boolea
     }
   }
   return sizes;
+}
+
+const squash = (s: string | null | undefined) => (s ?? "").normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+const BLOCK = "p, div, h1, h2, h3, h4, h5, h6, li, blockquote, section, header";
+
+/** A book that sets its chapter titles as styled paragraphs (`<p class="ct">Book 10</p>`), not headings,
+ *  came in with no outline at all: 29 of 184 books in Tyler's library (corpus run 2026-11-28). The book's own
+ *  table of contents names each title and where it is, so the line there that says that title becomes a
+ *  heading, as deep as the entry sits in the contents. Only a line that says the entry's words (or most of
+ *  them: "1" and "Turning" under "1 Turning") is changed, and only where no heading already says it. */
+function outlineFromToc(docs: Map<string, Document>, toc: { file: string; id?: string; label: string; depth: number }[]): void {
+  for (const e of toc) {
+    const page = docs.get(e.file);
+    const body = page?.body;
+    if (!page || !body) continue;
+    const want = squash(e.label);
+    if (want.length < 1 || want.length > 200) continue;
+    if (Array.from(body.querySelectorAll("h1, h2, h3, h4, h5, h6")).some((h) => squash(h.textContent) === want || (squash(h.textContent).length > 2 && want.includes(squash(h.textContent))))) continue;
+    // Where the entry points: its anchor, or the page's start; then the next few lines from there, each a
+    // block with text and no block inside it.
+    const anchor = e.id ? page.getElementById(e.id) : null;
+    if (e.id && !anchor) continue;
+    const lines = Array.from(body.querySelectorAll(BLOCK)).filter((b) => !b.querySelector(BLOCK) && b.textContent?.trim());
+    const from = anchor ? lines.findIndex((b) => b === anchor || b.contains(anchor) || !!(anchor.compareDocumentPosition(b) & 4)) : 0;
+    if (from < 0) continue;
+    const leaves = lines.slice(from, from + 4);
+    const hit = leaves.find((b) => squash(b.textContent) === want) ?? leaves.find((b) => {
+      const t = squash(b.textContent);
+      return t.length >= 3 && want.includes(t) && t.length >= want.length * 0.5;
+    });
+    if (!hit || hit.closest("nav, table, li")) continue;
+    const h = page.createElement(`h${Math.min(6, e.depth)}`);
+    h.append(...Array.from(hit.childNodes));
+    hit.replaceWith(h);
+  }
 }
 
 export function epubToDoc(data: Uint8Array): EpubDoc {
@@ -183,6 +236,16 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
     }
     map.set(file, [...(map.get(file) ?? []), word]);
   };
+  // The table of contents in order, each entry with the page and the place on it it points at.
+  const toc: { file: string; id?: string; label: string; depth: number }[] = [];
+  const entry = (from: string, href: string | null, what: string | null | undefined, depth: number) => {
+    const label = what?.replace(/\s+/g, " ").trim();
+    if (!href || !label || /^[a-z]+:/i.test(href)) return;
+    try {
+      const [path, id] = href.split("#");
+      toc.push({ file: path ? posix.normalize(posix.join(posix.dirname(from), decodeURIComponent(path))) : from, id: id ? decodeURIComponent(id) : undefined, label, depth: Math.max(1, depth) });
+    } catch {}
+  };
   for (const r of Array.from(tags("reference"))) say(kinds, opfPath, r.getAttribute("href"), r.getAttribute("type"));
   for (const e of Array.from(tags("item"))) {
     const file = posix.join(dir, decodeURIComponent(e.getAttribute("href") ?? ""));
@@ -192,14 +255,45 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
         const type = nav.getAttribute("epub:type") ?? "";
         for (const a of Array.from(nav.querySelectorAll("a[href]"))) {
           if (/\blandmarks\b/.test(type)) for (const t of (a.getAttribute("epub:type") ?? "").split(/\s+/)) say(kinds, file, a.getAttribute("href"), t);
-          else if (/\btoc\b/.test(type)) say(labels, file, a.getAttribute("href"), a.textContent);
+          else if (/\btoc\b/.test(type)) {
+            say(labels, file, a.getAttribute("href"), a.textContent);
+            let depth = 0;
+            for (let up: Element | null = a; up && up !== nav; up = up.parentElement) if (up.tagName === "OL" || up.tagName === "UL") depth++;
+            entry(file, a.getAttribute("href"), a.textContent, depth);
+          }
         }
       }
     } else if (e.getAttribute("media-type") === "application/x-dtbncx+xml") {
       const ncx = new DOMParser().parseFromString(read(file), "text/xml");
-      for (const point of Array.from(ncx.getElementsByTagName("navPoint"))) say(labels, file, point.getElementsByTagName("content")[0]?.getAttribute("src") ?? null, point.getElementsByTagName("text")[0]?.textContent);
+      for (const point of Array.from(ncx.getElementsByTagName("navPoint"))) {
+        const src = point.getElementsByTagName("content")[0]?.getAttribute("src") ?? null;
+        const label = point.getElementsByTagName("text")[0]?.textContent;
+        say(labels, file, src, label);
+        let depth = 0;
+        for (let up: Element | null = point; up; up = up.parentElement) if (up.nodeName.replace(/^.*:/, "") === "navPoint") depth++;
+        entry(file, src, label, depth);
+      }
     }
   }
+  // A book whose own table of contents is missing or a stub (calibre's one "Start" entry) still has its
+  // contents page: the page that links to the most other chapters stands in for it.
+  if (toc.length < 3) {
+    let best: { from: string; links: Element[] } | undefined;
+    for (const [from, page] of docs) {
+      const links = Array.from(page.querySelectorAll("a[href]")).filter((a) => {
+        const href = a.getAttribute("href") ?? "";
+        if (/^[a-z]+:/i.test(href) || !href.split("#")[0]) return false;
+        try {
+          return docs.has(posix.normalize(posix.join(posix.dirname(from), decodeURIComponent(href.split("#")[0]!))));
+        } catch {
+          return false;
+        }
+      });
+      if (links.length >= 5 && links.length > (best?.links.length ?? 0)) best = { from, links };
+    }
+    for (const a of best?.links ?? []) entry(best!.from, a.getAttribute("href"), a.textContent, 1);
+  }
+  outlineFromToc(docs, toc);
   const facts: PageFacts[] = [];
   let notes = 0;
   // Picture pages before the first page of words: a title plate or two is not the book, but a run of them
@@ -276,5 +370,5 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
   const back = backPages(facts, names, front);
   if (back < chapters.length) chapters[back] = `${BACK_START}\n\n${chapters[back]}`;
   if (front) chapters[front] = `${FRONT_END}\n\n${chapters[front]}`;
-  return { title: cleanTitle(text("dc:title")[0], { numbers: true }), author: creators.length ? creators.join(", ") : undefined, published: cleanDate(text("dc:date")[0]), body: chapters.join("\n\n") + "\n", assets: [...assets.values()] };
+  return { title: cleanTitle(text("dc:title")[0], { numbers: true }), author: authorList(creators), published: cleanDate(text("dc:date")[0]), body: chapters.join("\n\n") + "\n", assets: [...assets.values()] };
 }
