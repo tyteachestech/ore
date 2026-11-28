@@ -798,6 +798,9 @@ export function App() {
     const left = lastOpen.current;
     lastOpen.current = openId;
     if (!left || left === openId || !previews.current.has(left)) return;
+    // Review started over it: leaving Review opens it again (`beforeReview`), so it is put aside, not closed. Closed,
+    // it was gone when Review gave it back: `show` failed and focus fell to <body> (CI, #580).
+    if (openId === null && beforeReview.current === left) return void (lastOpen.current = left);
     const title = previews.current.get(left)!;
     previews.current.delete(left);
     settleNote(left).then((saved) => saved ? ore<{ result: string }>("feed", "close", left) : null).then(
@@ -852,6 +855,8 @@ export function App() {
       // Keep going after Review this source stays on that source.
       setReviewing((r) => (again ? { pick: null, source: r?.source, run: (r?.run ?? 0) + 1 } : null));
       if (!again && beforeReview.current) setOpenId(beforeReview.current);
+      // Given back: a Feed post it held aside closes as usual from here on.
+      if (!again) beforeReview.current = null;
       setHomeTick((n) => n + 1);
       void refresh();
     },

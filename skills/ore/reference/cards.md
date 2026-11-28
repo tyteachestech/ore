@@ -15,7 +15,7 @@ topics: [slug]
 content_type: definition | concept | procedure | fact
 state: draft | live | retired   # never change by hand; `ore card retire` and `ore card restore` own it (a finished draft stays `draft` here: the review log makes it live)
 created: ...          # never change
-ai: {vendor, model, prompt_version}   # leave as is
+ai: {vendor, model, prompt_version}   # author of the current wording; update through --ai
 ---
 <question>
 ---
@@ -35,5 +35,6 @@ ai: {vendor, model, prompt_version}   # leave as is
 - **Rubric asks only what the question asks.** Every bullet must be something a good answer to that exact question would contain. If a bullet needs content the question doesn't request, change the question or drop the bullet.
 - **2–4 rubric bullets** for prompts. Merge or cut to fit.
 - Keep Tyler's wording when he gives it; tighten, don't embellish.
-- Write the fix with `ore card set <id> [--question …] [--answer …] [--point …]…`, never by editing the file: `ore` keeps the frontmatter, the lock and the review history right.
+- Write the fix with `ore card set <id> [--question …] [--answer …] [--point …]… --ai <stamp JSON or null>`, never by editing the file: `ore` keeps the frontmatter, the lock and the review history right.
+- **Attribute replacement wording.** For AI-written text, `--ai` takes its actual `{vendor, model, prompt_version}` as JSON, shell-quoted by the rule in SKILL.md. `ore ask` returns `proposal` and `ai`: use them together. If your own model and prompt version are unknown, obtain the rewrite through `ore ask`. Never reuse the old stamp for a new author. For Tyler's own wording, pass `--ai null`.
 - After it, `ore card show <id> --json` shows the fix. If `card set` exits non-zero, report the error and stop.

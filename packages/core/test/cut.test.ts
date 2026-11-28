@@ -174,3 +174,37 @@ describe("cuts while the source changes", () => {
     expect(findItem(lib, item.meta.id).body).toBe("# Source\n\nGamma paragraph that is long enough to remain beyond the old cut position.\n");
   });
 });
+
+for (const move of [false, true]) test(`Undo restores a cut question's passage through Redo (moved: ${move})`, async () => {
+  const lib = await tempLibrary();
+  const item = await addText(lib, "# Recall\n\nAlpha practice strengthens recall.\n\nBeta spacing helps learning.\n\nGamma sleep consolidates memory.\n");
+  const asked = addHighlight(item, { exact: "Beta spacing helps learning.", intent: "question", note: "Why?" });
+  const after = addHighlight(item, { exact: "Gamma sleep consolidates memory.", intent: "question" });
+  const cut = await cutText(lib, item.meta.id, asked.start, asked.start + 1);
+  if (move) {
+    const body = findItem(lib, item.meta.id).body;
+    await cutText(lib, item.meta.id, body.indexOf("Alpha"), body.indexOf("Alpha") + 1);
+  }
+  for (let n = 0; n < 2; n++) {
+    const back = await restoreCut(lib, item.meta.id, cut.id);
+    for (const was of [asked, after]) {
+      const now = readAnnotations(back).find((a) => a.id === was.id)!;
+      expect(now.exact).toBe(was.exact);
+      expect(now.start).toBe(back.body.indexOf(was.exact));
+      expect(back.body.slice(now.start, now.end)).toBe(was.exact);
+      expect(now.note).toBe(was.note);
+    }
+    if (!n) await redoCut(lib, item.meta.id, cut.id);
+  }
+});
+
+test("an older cut receipt without retained questions restores their quote", async () => {
+  const lib = await tempLibrary();
+  const item = await addText(lib, "# Recall\n\nBeta spacing helps learning.\n\nGamma sleep consolidates memory.\n");
+  const a = addHighlight(item, { exact: "Beta spacing helps learning.", intent: "question" });
+  const cut = await cutText(lib, item.meta.id, a.start, a.start + 1);
+  const { retained: _, ...old } = cut;
+  writeFileSync(join(lib.root, ".ore", "cuts", item.meta.id, `${cut.id}.json`), JSON.stringify(old));
+  const back = await restoreCut(lib, item.meta.id, cut.id);
+  expect(readAnnotations(back)[0]).toMatchObject({ exact: a.exact, start: a.start, end: a.end });
+});

@@ -484,7 +484,15 @@ export class ReviewSession<S> {
       const b = this.before;
       goalClosed = !!b && b.counts && !b.met && b.active_ms + this.activeMs >= b.goal_ms;
     } catch (e) {
-      this.screen.notify(errorText(e), "error");
+      // Retired or deleted elsewhere while it was on screen (an agent's `ore card retire`, the iPhone): no rating
+      // can ever save, so it leaves the session as a retire here would, instead of an exercise that can't be rated.
+      const out = await this.outOfReview(card.id);
+      if (out) {
+        this.retired.add(card.id);
+        this.dropAhead();
+        this.screen.notify(`This exercise was ${out} elsewhere, so it left this review.`, "info");
+        if (this.queue?.[0]?.id === card.id) this.setQueue(afterAnswer(this.queue, false));
+      } else this.screen.notify(errorText(e), "error");
     } finally {
       this.setBusy(false);
     }
@@ -510,6 +518,15 @@ export class ReviewSession<S> {
     this.changed();
     // After the rating's own sound, so the two are heard apart.
     sfx("goal", { after: 0.5 });
+  }
+
+  /** Whether the exercise is out of review in the library now: retired, or no longer there. A read that fails for
+   *  another reason (a lock, a slow disk) is not taken for gone. */
+  private outOfReview(id: string): Promise<"retired" | "deleted" | null> {
+    return this.run<{ state: string }>("card", "show", id).then(
+      (c) => (c.state === "retired" ? "retired" : null),
+      (e) => (/^no card matches/.test(errorText(e)) ? "deleted" : null),
+    );
   }
 
   /** Writes a rating and moves on. The first time (`again` absent) it goes on the app history, so

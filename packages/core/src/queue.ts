@@ -88,3 +88,44 @@ export function winFirst(ordered: QueueEntry[]): QueueEntry[] {
   if (best <= 0 || ordered[best]!.retrievability <= ordered[0]!.retrievability) return ordered;
   return [ordered[best]!, ...ordered.slice(0, best), ...ordered.slice(best + 1)];
 }
+
+/** Below this chance of recall an exercise is a likely miss. For now: a coin flip. */
+const LIKELY_MISS = 0.5;
+/** How many likely misses may come back to back before a likely recall is brought forward. */
+const MISS_RUN = 2;
+
+// D360: never more than two likely misses in a row. Most forgotten first serves a backlog as one run of
+// probable misses, and hard items in a run are what make people stop (Kang, Daniels & Schweitzer 2022;
+// guidebook L246: difficulty has to be surmountable). So once two misses have come, the next exercise he
+// will likely recall is brought forward to sit before the third. Order only: nothing is dropped or held
+// back, no schedule changes (D22). A block (confusables, one source's definitions, D24) is never split,
+// moved or interrupted, so a block of misses can run longer than two; when no likely recall is left the
+// misses run on. `already`: the misses he has just made in a row (today's last ratings), so a fetch
+// mid-session, the quick quiz's or `/ore`'s next batch, carries the run on instead of starting it at none.
+export function pace(ordered: QueueEntry[], already = 0): QueueEntry[] {
+  const size = new Map<string, number>();
+  for (const e of ordered) size.set(unitKey(e), (size.get(unitKey(e)) ?? 0) + 1);
+  const single = ordered.map((e) => size.get(unitKey(e)) === 1);
+  const miss = (e: QueueEntry) => e.retrievability < LIKELY_MISS;
+  // The likely recalls that may move, in queue order: `win` walks them once, so the whole pass is linear.
+  const wins = ordered.flatMap((e, i) => (single[i] && !miss(e) ? [i] : []));
+  const taken = new Set<number>();
+  const out: QueueEntry[] = [];
+  let run = already, win = 0;
+  for (let i = 0; i < ordered.length; i++) {
+    if (taken.has(i)) continue;
+    const next = ordered[i]!;
+    if (run >= MISS_RUN && single[i] && miss(next)) {
+      while (win < wins.length && wins[win]! < i) win++;
+      if (win < wins.length) {
+        const at = wins[win++]!;
+        taken.add(at);
+        out.push(ordered[at]!);
+        run = 0;
+      }
+    }
+    out.push(next);
+    run = miss(next) ? run + 1 : 0;
+  }
+  return taken.size ? out : ordered;
+}

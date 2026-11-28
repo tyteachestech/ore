@@ -488,6 +488,36 @@ describe("two sessions open at once (D76)", () => {
   });
 });
 
+describe("the due queue never serves more than two likely misses in a row (D360)", () => {
+  test("a backlog of faded exercises with a few fresher ones: a likely recall comes after every two misses, with and without --start, and after misses just made", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Retrieval practice strengthens memory more than restudy." });
+    const mk = (n: number) => writeNewCard(lib, { kind: "card", item: item.meta.id, skills: ["learning"], topics: [`t${n}`], content_type: "fact", question: `Q${n}?`, answer: "A", rubric: [] });
+    const t0 = Date.now() + 864e5;
+    const day = (d: number) => new Date(t0 + d * 864e5);
+    // Five rated Hard once and left for a year have faded; three rated Easy again and again are still likely recalls.
+    const faded = await Promise.all([0, 1, 2, 3, 4].map(mk));
+    const fresh = await Promise.all([5, 6, 7].map(mk));
+    for (const c of faded) await recordReview(lib, c.meta.id, { rating: 2, confidence: 2, now: day(0) });
+    let last = "";
+    for (const c of fresh) for (const d of [0, 30, 120]) last = (await recordReview(lib, c.meta.id, { rating: 4, confidence: 2, now: day(d) })).due_next;
+    // The day after the fresher ones fall due: they are just past their target, the faded ones long past theirs.
+    const now = new Date(Date.parse(last) + 864e5);
+    const miss = (q: ReturnType<typeof dueQueue>) => q.map((e) => (e.retrievability < 0.5 ? "m" : "w")).join("");
+    const plain = dueQueue(lib, now);
+    expect(plain.map((e) => e.id).sort()).toEqual([...faded, ...fresh].map((c) => c.meta.id).sort());
+    expect(miss(plain)).toBe("mmwmmwmw");
+    // --start opens on the likeliest recall (D176), which counts toward the pacing.
+    expect(miss(dueQueue(lib, now, { start: true }))).toBe("wmmwmmwm");
+    // Two misses just made: the next fetch (the quick quiz, an `/ore` batch) opens on a likely recall.
+    const [m0, m1] = plain;
+    await recordReview(lib, m0!.id, { rating: 1, confidence: 2, now });
+    await recordReview(lib, m1!.id, { rating: 1, confidence: 2, now: new Date(now.getTime() + 1000) });
+    const after = dueQueue(lib, new Date(now.getTime() + 2000)).filter((e) => !e.relearn);
+    expect(miss(after)).toBe("wmmwmw");
+  });
+});
+
 // History recovery pass (restore-03): a whole day rolled back from the library's history takes the session's start
 // receipt with it, but `.ore/session` (gitignored) still named it, so the next rating went to a session that no
 // longer existed and its end failed with "no session".

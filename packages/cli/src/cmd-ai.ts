@@ -4,6 +4,20 @@ import {
 import type { Command } from "./types.ts";
 import { fromBase64, int, need, readStdin, str, strs } from "./util.ts";
 
+const object = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
+const chatFile = (v: unknown): v is { name: string; path: string } => object(v) && typeof v.name === "string" && typeof v.path === "string";
+const askTurn = (v: unknown): v is AskTurn => object(v) && typeof v.question === "string" && typeof v.answer === "string";
+// Tutor already normalizes missing/null message and reply, and ignores unrecognized older exercises.
+// Keep those turns intact; only check the containers it needs to walk.
+const tutorTurn = (v: unknown): v is TutorTurn => object(v) && (v.files === undefined || (Array.isArray(v.files) && v.files.every(chatFile)));
+
+function jsonArray<T>(text: string, flag: string, example: string, entry: (v: unknown) => v is T): T[] {
+  let value: unknown;
+  try { value = JSON.parse(text); } catch { /* The same next step fixes syntax and shape. */ }
+  if (!Array.isArray(value) || !value.every(entry)) throw new Error(`--${flag} must be a JSON array of objects; use ${example} (or [] for none)`);
+  return value;
+}
+
 function enrichText(r: EnrichResult): string {
   if (r.skipped) return `${r.title}: skipped (${r.skipped})`;
   const lines = [`${r.title} (${r.item})`, `  skills: ${r.skills.join(", ")}`, `  topics: ${r.topics.join(", ")}${r.topics_created.length ? ` (new: ${r.topics_created.join(", ")})` : ""}`, "  prequestions:", ...r.prequestions.map((q, i) => `    ${i + 1}. ${q}`)];
@@ -112,7 +126,7 @@ export const aiCommands: Record<string, Command> = {
       const lib = openLibrary();
       let earlier: AskTurn[] = [];
       if (str(f.earlier)) {
-        try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{question, answer}]"); }
+        earlier = jsonArray(str(f.earlier)!, "earlier", '[{"question":"...","answer":"..."}]', askTurn);
       }
       const r = await askLibrary(lib, need(words.join(" ") || undefined, '"<question>"'), earlier);
       const text = [r.answer, ...r.citations.map((c) => `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`)].join("\n");
@@ -127,7 +141,7 @@ export const aiCommands: Record<string, Command> = {
       const lib = openLibrary();
       let earlier: TutorTurn[] = [];
       if (str(f.earlier)) {
-        try { earlier = JSON.parse(str(f.earlier)!); } catch { throw new Error("--earlier must be JSON: [{message, reply, exercise?}]"); }
+        earlier = jsonArray(str(f.earlier)!, "earlier", '[{"message":"...","reply":"...","files":[{"name":"...","path":"..."}]}]', tutorTurn);
       }
       // --stream <id>: the reply as it is written, and a web search starting, as `{"progress": {stream, …}}`
       // lines on stderr, which the app shows on the turn with that id (Codex: the search alone).
@@ -135,7 +149,7 @@ export const aiCommands: Record<string, Command> = {
       const onProgress = stream ? (p: TutorProgress) => void process.stderr.write(JSON.stringify({ progress: { stream, ...p } }) + "\n") : undefined;
       let files: { name: string; path: string }[] = [];
       if (str(f.files)) {
-        try { files = JSON.parse(str(f.files)!); } catch { throw new Error("--files must be JSON: [{name, path}]"); }
+        files = jsonArray(str(f.files)!, "files", '[{"name":"...","path":"..."}]', chatFile);
       }
       const r = await tutor(lib, need(words.join(" ") || undefined, '"<message>"'), { earlier, files, chat: str(f.chat), item: str(f.item), at: str(f.at), sources: strs(f.source), skills: strs(f.skill), onProgress });
       const text = [withSteps(r), ...(r.exercise?.cases ?? []).map((c, i) => `  ${"AB"[i]}: ${c}`), ...r.marks.map((m) => `  ${m.covered ? "got" : "missed"}: ${m.point}${m.quote ? ` (“${m.quote}”)` : ""}`), ...(r.general ? ["  (general knowledge, not from your sources)"] : []), ...r.citations.map((c) => ("url" in c ? `  [${c.n}] ${c.title || c.site}: "${c.text}" ${c.url}` : `  [${c.n}] ${c.title}${c.heading ? ` › ${c.heading}` : ""}: "${c.text}" (${c.item} ${c.start}-${c.end})`))].join("\n");

@@ -23,14 +23,12 @@ Library: `$ORE_LIBRARY` or `~/Ore`. Cards live in `cards/<id>.md`, items in `ite
 - **"no idea" is an attempt.** Proposed rating 1, logged like any other (no AI graded it, so no `--ai-rating`).
 - **`ore` is the only writer.** Never edit a library file by hand: card wording goes through `ore card set`, a source's title, author and skills through `ore edit`. If no command does what you need, say so and stop.
 - **If `ore` is missing or any command exits non-zero: show the error line verbatim and stop.** Do not work around it, guess, or write library files instead.
-- **Shell safety.** Never paste Tyler's text inside double quotes on a command line. Pass it through a quoted heredoc:
+- **Shell safety.** Treat all supplied text (his or AI-written) as data. Before inserting it into a shell command, replace every single quote (`'`) in the text with `'\''`; that is the shell-escaped text, and the recipe's own pair of single quotes encloses it. Keep all other characters and newlines unchanged. For example, `it's` goes in as `ANS='it'\''s'`. Never paste raw text into shell syntax or a fixed-delimiter heredoc: a line in the text can end the heredoc.
   ```bash
-  IFS= read -r -d '' ANS <<'ORE_EOF'
-  <Tyler's answer, verbatim>
-  ORE_EOF
+  ANS='<shell-escaped text>'
   ore grade <card> --answer "$ANS" --json
   ```
-  `read` exits 1 at end of input, so start the next command on a new line, not after `&&`.
+  `<shell-escaped text>` means the result of that replacement, not the raw answer, and never with quotes of its own added. Pass the variable as `"$ANS"`; never use `eval`. Use the same quoting rule for every text argument below.
 - **Tone: calm coach.** Terse, specific, about the work. No praise inflation ("Great job!"), no streaks, quotas, XP, trend arrows, or guilt about backlog.
 - Always pass `--json` and read fields from the output; don't parse human text.
 
@@ -58,24 +56,22 @@ When he names a skill ("quiz me on Learning"), add `--skill <id>` (from `ore ski
 
 One item per turn. Each turn after the first does three things in one message: log the previous item, show the next probe, record the time.
 
-**Probe turn.** Show only:
+**Probe turn.** Fetch `ore card show <card> --review --json` for the next queue ID. Keep this presentation until its rating is logged: its `question`, `answer`, `rubric`, and optional `variant` belong together. The queue supplies order, not the full exercise. Show only:
 ```
 [3/12] · <skill> · <topic>[ · draft]
 <question>
 
 Reply: confidence 1–3, then your answer.  (1 low, 2 medium, 3 sure)  e.g. "2 it's because…" or "no idea"
 ```
-Show the `Reply:` line on the first item only. The question is the `question` field of that `ore due` entry. Never more. Remember the `date +%s` printed by the command that ran just before this probe as `t0`.
+Show the `Reply:` line on the first item only. Use the presentation's `question`. Keep its answer and rubric hidden until his attempt. If it has a `figure`, display `figure_file` with an opaque box over `figure.box` ([x, y, width, height], fractions of the image size); reveal the uncovered image only after his attempt. If you cannot display the covered figure, say so and ask him to review it in Ore; do not grade or log a text-only substitute. Remember the `date +%s` printed by the command that ran just before this probe as `t0`.
 
 **Answer turn.** Parse the leading digit as confidence. If missing, ask "Confidence 1–3?" and reveal nothing until it comes. "no idea" alone = confidence 1, proposed rating 1, skip `ore grade`, and log it without `--ai-rating` and `--ai-by`. Otherwise:
 ```bash
 date +%s
-IFS= read -r -d '' ANS <<'ORE_EOF'
-…
-ORE_EOF
-ore grade <card> --answer "$ANS" --json
+ANS='<shell-escaped text>'
+ore grade <card> --answer "$ANS" [--variant V] --json
 ```
-elapsed_ms = (that `date` − t0) × 1000. The grade JSON gives `rating` (the proposal), `gaps` and `feedback`; the model answer is `answer` from `ore card show <card> --json`. Then reveal:
+elapsed_ms = (that `date` − t0) × 1000. The grade JSON gives `rating` (the proposal), `gaps` and `feedback`; the model answer is the same presentation's `answer`. In grade and review calls, `V` is that presentation's `variant`; omit `--variant` for the original. Never fetch a different presentation between the probe and its rating. Then reveal:
 ```
 Model answer: <answer section of the card>
 Source: "<highlight text>" — your note: <note>   (optional; only after his answer. Highlight from `ore show <item> --json` → `annotations[]` with the card's `annotation` id; for `from: notes` cards just "from your notes"; for `from: prequestion` cards "from a prequestion")
@@ -84,14 +80,12 @@ Proposed: 3 (good)        ok to accept · 1 again · 2 hard · 3 good · 4 easy
 ```
 - Confidence 3 and proposed 1: name the specific wrong belief in the gap line. One sentence; that's the most useful miss.
 - If a rubric point asks for something the question never asked, say so in one line ("card's rubric asks for X; the question doesn't"), grade the answer as it stands, and fix the card (mode 4) after logging.
-- **Draft cards** (`state: draft`) are finishing encounters: the model answer is the AI draft. Add one line: `Draft — reply "edit: …" to change it before it goes live.` Tyler may send `edit: …` with or without a rating; apply it with `ore card set <id> --question …/--answer …/--point …` (rules in `reference/cards.md`), confirm with `ore card show <id> --json`, then wait for the rating if he hasn't given one.
+- **Draft cards** (`state: draft`) are finishing encounters: the model answer is the AI draft. Add one line: `Draft — reply "edit: …" to change it before it goes live.` Tyler may send `edit: …` with or without a rating; apply it with `ore card set <id> --question …/--answer …/--point … --ai <stamp JSON or null>` (rules in `reference/cards.md`), confirm with `ore card show <id> --json`, then wait for the rating if he hasn't given one.
 
 **Rating reply.** `ok`/`y`/empty = accept the proposal; a digit 1–4 = override. Log, then show the next probe in the same message:
 ```bash
-IFS= read -r -d '' ANS <<'ORE_EOF'
-…
-ORE_EOF
-ore review <card> --rating R --confidence C --answer "$ANS" --ai-rating A --ai-by "VENDOR MODEL PROMPT" --elapsed-ms N --session S [--finishing] --json && date +%s
+ANS='<shell-escaped text>'
+ore review <card> --rating R --confidence C --answer "$ANS" --ai-rating A --ai-by "VENDOR MODEL PROMPT" --elapsed-ms N --session S [--variant V] [--finishing] --json && date +%s
 ```
 `--ai-by` is the grade's `ai` (`vendor model prompt_version`); `--ai-rating` is refused without it. `--finishing` only on a draft's first encounter. Relay the next due date (`due_next`) in passing ("back in 9 days"), at most once per item.
 
@@ -128,12 +122,15 @@ After Tyler says he's read it:
 - Re-ask the same questions (don't show his earlier answers first). This is the first retrieval.
 - Now give feedback: per question, 1–2 lines on what his answer got and what the document actually says, citing the passage briefly. Compare to his pre-read answer only if it shows a changed belief.
 - No `ore review`, no rating, no FSRS. Store his answers with `ore prequestion <id> <n> --before|--after "<text>"` (and a free recall with `ore recall <id> --text`, which also lands in his source note under "Recall"). If he answers "where would you use this, and what does it connect to?", store his line with `ore notes <id> --append "<text>" --heading "Use and connections"`.
-- If something he couldn't answer looks worth keeping, suggest a key point: `ore highlight <id> --exact "<text>" --intent card` (text via the heredoc pattern). Don't create it unasked.
+- Once his answers and any recall are saved, mark the source he finished with `ore status <id> done --json`. Verify `status: done` and `finished_at` with `ore show <id> --json`; finishing makes its prequestions eligible for exercise drafting. A partway reading or chapter recall does not mean the whole source is Done.
+- If something he couldn't answer looks worth keeping, suggest a key point: `ore highlight <id> --exact "<text>" --intent card` (text via the shell-quoting rule). Don't create it unasked.
 
 ## 4 · Fix a card
 
+For AI-written replacement wording, pass its actual author's `{vendor, model, prompt_version}` JSON to `--ai`; `ore ask` returns that stamp as `ai` with its proposal. If you cannot identify your own model and prompt version, obtain the rewrite through `ore ask` and use its proposal and stamp together. Never copy the previous exercise's stamp. For Tyler's own replacement wording, pass `--ai null` to clear the old stamp. This applies to finishing edits in Review too.
+
 1. `ore card show <id> --json` to get the current text.
-2. Write the fix with `ore card set <id> [--question …] [--answer …] [--point …]…` (each `--point` is one key point; give them all), per `reference/cards.md`: one retrieval target; prompt rubric 2–4 points. Pass his and your text through the heredoc pattern.
+2. Write the fix with `ore card set <id> [--question …] [--answer …] [--point …]… --ai <stamp JSON or null>` (each `--point` is one key point; give them all), per `reference/cards.md`: one retrieval target; prompt rubric 2–4 points. Pass his and your text through the shell-quoting rule.
 3. Verify: `ore card show <id> --json` shows the fix. If `card set` exits non-zero, show the error and stop.
 4. Reply with the edit in 1–3 lines: `Fixed <id>: narrowed to <target>; rubric 4→3 bullets.` If narrowing dropped a second target worth keeping, offer to capture it as a key point on the source item (`ore highlight … --intent card --note "…"`, then `ore enrich <item>` drafts it). Never invent a card ID.
 
@@ -162,3 +159,15 @@ Use `ore ls`, `ore search <query>` (also searches the source note), `ore stats [
 2. Find the snapshot: `git log --format='%h %ad %s' --date=local -- <path>`, then `git show <sha>:<path>` to check it is the version he means.
 3. Restore only the paths he named: `git checkout <sha> -- <path>` (a source is its `items/<yyyy>/<slug>-<id>/` folder; its exercises are the `cards/` files with its id as `item:`). Never `git reset`, `git stash` or a checkout of the whole folder unless he asks for the whole library as it was: the `*.jsonl` logs hold his reviews and highlights from every device, and going back drops the ones since.
 4. `ore doctor --json`; the index reads the restored files by itself, and the app shows them once he is back in its window. Tell him what came back and from when, and that the last ten minutes before a snapshot may not be in it.
+
+## Saving a Dig
+
+`ore dig <skill> --text` saves the Dig record; it does not append to the skill note. As in the app, save Tyler's words to both places. First read `ore dig <skill> --json` and confirm the skill has a goal. Once he gives his memory response, put those exact words in `ANS` by the shell-quoting rule (each `'` as `'\''`, inside the recipe's one pair of single quotes). Replace `<skill>` with its ID and `<YYYY-MM-DD>` with today's local date:
+
+```bash
+ANS='<shell-escaped text>'
+ore notes --skill <skill> --append "$ANS" --heading "Dig, <YYYY-MM-DD>" --json &&
+ore dig <skill> --text "$ANS" --json
+```
+
+Verify both with `ore notes --skill <skill> --json` and `ore dig <skill> --json`. Stop on an error; if the note was saved but the Dig failed, the words are already safe in the note, so do not append them again when resuming. Never put AI feedback in the note. `ore dig <skill> --drop <dig>` removes only the Dig record; it does not undo the note append.

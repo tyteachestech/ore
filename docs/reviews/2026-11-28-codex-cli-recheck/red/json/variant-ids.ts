@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { setup,call,hashes,diff } from './common.ts';
+import { writeNewCard } from '../../packages/core/src/cards.ts';
+import { appendJsonl } from '../../packages/core/src/fsutil.ts';
+import { paths } from '../../packages/core/src/library.ts';
+import { readVariants } from '../../packages/core/src/remix.ts';
+const {lib,item}=await setup('variant-ids');
+const card=writeNewCard(lib,{kind:'prompt',item:item.meta.id,skills:['learning'],topics:[],content_type:'concept',question:'Why recall?',answer:'Recall strengthens memory.',rubric:['Recall strengthens memory.']});
+const ids=['01J00000000000000000000001','01K00000000000000000000001'];
+if(process.argv.includes('--reverse'))ids.reverse();
+for(const id of ids)appendJsonl(paths.variants(lib,card.meta.id),{id,rev:1,card:card.meta.id,type:'new-case',setting:id,question:'How can Mira practice?',answer:'Recall the melody.',rubric:['Recall strengthens memory.'],maps:[0],status:'ready',created:'2026-11-27T00:00:00.000Z',ai:{vendor:'claude',model:'fixture',prompt_version:'variant@1'}});
+const full=await call('card',['show',card.meta.id],{variant:ids[1]});
+const prefix=await call('card',['show',card.meta.id],{variant:'01K'});
+const before=hashes(lib.root);
+const ambiguous=await call('variant',['reject',card.meta.id,'00001']);
+console.log('[DEEP]',JSON.stringify({full:full.code,prefix,ambiguous,changed:diff(before,hashes(lib.root)),variants:readVariants(lib,card.meta.id).map(v=>({id:v.id,status:v.status,rev:v.rev}))}));
+assert.equal(ambiguous.code,1,'ambiguous variant suffix must be refused, not reject the first matching version');
+assert.deepEqual(diff(before,hashes(lib.root)),[]);

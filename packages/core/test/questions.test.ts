@@ -5,8 +5,50 @@ import { addSnippet, addText } from "../src/ingest/index.ts";
 import { findItem } from "../src/items.ts";
 import { answerQuestion, listQuestions, matchQuestion } from "../src/questions.ts";
 import { tempLibrary } from "./helpers.ts";
+import { setSystemTime } from "bun:test";
+import { reviseAnnotation } from "../src/annotations.ts";
 
 const ARTICLE = "# Spacing\n\nThe best gap is about a tenth of the time until the test.\n";
+
+test("answers written in one millisecond can each be edited and removed by their timestamp", async () => {
+  const lib = await tempLibrary();
+  const { annotation: q } = await addSnippet(lib, { text: "Why space practice?", intent: "question" });
+  let answers;
+  try {
+    setSystemTime(new Date("2026-11-28T12:00:00Z"));
+    await answerQuestion(lib, q.id, { text: "First explanation" });
+    await answerQuestion(lib, q.id, { text: "Second explanation" });
+    ({ question: { answers } } = await answerQuestion(lib, q.id, { text: "Third explanation" }));
+  } finally {
+    setSystemTime();
+  }
+  const second = answers![1]!.ts;
+  const edited = await answerQuestion(lib, q.id, { edit: second, text: "Second corrected" });
+  expect(edited.question.answers!.map((a) => a.text)).toEqual(["First explanation", "Second corrected", "Third explanation"]);
+  expect(new Set(answers!.map((a) => a.ts)).size).toBe(3);
+  const removed = await answerQuestion(lib, q.id, { remove: second });
+  expect(removed.question.answers!.map((a) => a.text)).toEqual(["First explanation", "Third explanation"]);
+});
+
+test("new answer timestamps avoid occupied slots without rewriting legacy contributions", async () => {
+  const lib = await tempLibrary();
+  const { item, annotation: q } = await addSnippet(lib, { text: "Why space practice?", intent: "question" });
+  const old = [
+    { ts: "2026-11-28T12:00:00.000Z", text: "First" },
+    { ts: "2026-11-28T12:00:00.000Z", text: "Old duplicate" },
+    { ts: "2026-11-28T12:00:00.001Z", text: "Next slot" },
+    { ts: "hand-edited timestamp", text: "Older accepted data" },
+  ];
+  reviseAnnotation(item, q, { answers: old });
+  try {
+    setSystemTime(new Date("2026-11-28T12:00:00Z"));
+    const { question } = await answerQuestion(lib, q.id, { text: "New answer" });
+    expect(question.answers!.slice(0, 4)).toEqual(old);
+    expect(question.answers![4]!.ts).toBe("2026-11-28T12:00:00.002Z");
+  } finally {
+    setSystemTime();
+  }
+});
 
 describe("questions → answers and sources (D75)", () => {
   test("contributions build up from several sources; a contribution links its source", async () => {

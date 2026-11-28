@@ -66,10 +66,16 @@ export const savedModel = (lib: Library, vendor: Vendor): string => {
   }
 };
 
-/** Save the model for one vendor (`models:` in skills.yaml), keeping comments; "" goes back to the default. */
-export async function setAiModel(lib: Library, vendor: Vendor, model: string): Promise<string> {
+/** Check a newly supplied model before saving any part of an AI settings change. */
+export function checkAiModel(model: string): string {
   const id = model.trim();
   if (id && !/^[\w.:\-[\]/]+$/.test(id)) throw new Error(`"${model}" isn’t a model name`);
+  return id;
+}
+
+/** Save the model for one vendor (`models:` in skills.yaml), keeping comments; "" goes back to the default. */
+export async function setAiModel(lib: Library, vendor: Vendor, model: string): Promise<string> {
+  const id = checkAiModel(model);
   return withLock(paths.lock(lib), () => {
     const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
     if (id && id !== DEFAULT[vendor]) doc.setIn(["models", vendor], id);
@@ -85,8 +91,7 @@ export async function setAiModel(lib: Library, vendor: Vendor, model: string): P
 
 /** Give one job its own AI (`jobs:` in skills.yaml), keeping comments; null puts it back on the default AI. */
 export async function setJobAi(lib: Library, job: AiJob, own: { ai: Vendor; model?: string } | null): Promise<{ ai: Vendor; model: string } | null> {
-  const model = own?.model?.trim() ?? "";
-  if (model && !/^[\w.:\-[\]/]+$/.test(model)) throw new Error(`"${own!.model}" isn’t a model name`);
+  const model = checkAiModel(own?.model ?? "");
   await withLock(paths.lock(lib), () => {
     const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
     if (own) {
