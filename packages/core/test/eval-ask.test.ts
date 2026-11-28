@@ -88,11 +88,11 @@ describe("ask-your-library eval", () => {
     const r = await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?");
     expect(r).toMatchObject({ found: false, outside: true, answer: "Ebbinghaus was born in 1850.", citations: [] });
     expect(r.ai?.prompt_version).toMatch(/^tutor@/);
-    // A plain refusal counts too; an unlabelled answer with no citation doesn't.
-    fakeClaude({ reply: "Your sources don't say when he was born.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null });
+    // A plain refusal counts too; a second uncited answer is labeled by the tutor.
+    fakeClaude({ reply: "Your sources don't say when he was born.", citations: [], general: null, hint: false, steps: [], exercise: null, card: null });
     expect((await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).outside).toBe(true);
     fakeClaude({ reply: "He was born in 1850.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null });
-    expect((await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).outside).toBe(false);
+    expect((await ask(lib, "tutor", "In what year was Hermann Ebbinghaus born?")).outside).toBe(true);
     // A web page's link says so too: it is plainly not one of his sources.
     const page = { url: "https://www.britannica.com/biography/Hermann-Ebbinghaus", title: "Hermann Ebbinghaus" };
     fakeClaude({ reply: "He was born in 1850 [1].", citations: [{ passage: page.url, quote: "born on January 24, 1850" }], general: false, hint: false, steps: [], exercise: null, card: null }, [

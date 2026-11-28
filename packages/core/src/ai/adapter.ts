@@ -16,7 +16,7 @@ export interface AgentTask<T> {
   input: unknown;
   files?: string[]; // absolute paths the agent should read
   schema: z.ZodType<T>;
-  check?: (data: T, web?: WebSeen) => string | null; // semantic validation beyond the schema
+  check?: (data: T, web: WebSeen | undefined, attempt: number) => string | null; // semantic validation beyond the schema
   web?: boolean; // allow web search/fetch
   /** While it runs (claude web tasks): the answer's JSON so far ("" as a run starts over), and a web search starting or done. */
   onProgress?: (p: StreamProgress) => void;
@@ -487,7 +487,7 @@ export async function runAgent<T>(lib: Library, task: AgentTask<T>): Promise<Age
     try {
       const parsed = task.schema.safeParse(parseOutput(raw.output));
       if (!parsed.success) throw new Error(parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`).join("; "));
-      const problem = task.check?.(parsed.data, web);
+      const problem = task.check?.(parsed.data, web, attempt);
       if (problem) throw new Error(problem);
       logged(attempt, true);
       return { data: parsed.data, ai: { vendor, model: raw.model, prompt_version: prompt.version }, usage, runs: attempt, ...(web ? { web } : {}), ...(raw.session ? { session: raw.session } : {}) };

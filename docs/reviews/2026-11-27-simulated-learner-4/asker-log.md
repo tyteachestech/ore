@@ -1,0 +1,89 @@
+# Asker friction log
+
+Measured with Node performance.now around browser actions. Supplied bridge buffers AI answers. Days advance only forward.
+
+- Day 1 · Read / Ask · day1-q1 full backend reply; initial action timer invalid due to selector error; bridge performance.now measurement (90230.0 ms)
+- Day 1 · Read / citation · day1-q1 citation 1 opened (159.8 ms)
+- Day 1 · Read / citation · day1-q1 citation 1 opened; includes 450 ms settle (494.1 ms)
+- Day 1 · Read / citation · day1-q1 citation 2 opened; includes 450 ms settle (473.7 ms)
+- Day 1 · Read / citation · day1-q1 citation 3 opened; includes 450 ms settle (466.3 ms)
+- Day 1 · Read / Ask · day1-q2 Use only my saved A closer look at Description, Effective prompting techniques, and The Description-Discernment loop together. How would I specify a product-video script, assess the draft, and revise my request? Show what each of the three sources adds.; acknowledged 16.2 ms (41657.1 ms)
+- Day 1 · Read / Ask · day1-q3 In my archived MCP lesson, why does MCP reduce integration maintenance, and what remains my responsibility when selecting tools? Use the saved lesson, with quotes.; acknowledged 14.4 ms (23972.1 ms)
+- Day 1 · Read / citation · day1-q3 citation 1 opened; includes 450 ms settle (495.1 ms)
+- Day 1 · Read / citation · day1-q3 citation 2 opened; includes 450 ms settle (504.0 ms)
+- Day 1 · Read / citation · day1-q3 citation 3 opened; includes 450 ms settle (491.3 ms)
+- Day 1 · Read / Ask · day1-q4 According to my saved library only, what exact shutter speed and aperture did I use for my own latest sponsored chair shoot? If the library does not say, say that. Do not search the web or guess.; acknowledged 19.2 ms (11382.5 ms)
+- Day 1 · Read / Ask · day1-q5 I remember a saved video called Photographing Giant Furniture, part 1, by Sean Tucker. Is that the right title? Why does he use white walls if he plans to cut the product out later? Find and cite the saved source.; acknowledged 16.0 ms (16408.5 ms)
+- Day 1 · Read / citation · day1-q5 citation 1 opened; includes 450 ms settle (499.1 ms)
+- Day 1 · Read / citation · day1-q5 citation 2 opened; includes 450 ms settle (490.9 ms)
+- Day 1 · Read / citation · day1-q5 citation 3 opened; includes 450 ms settle (500.3 ms)
+- Day 1 · Read / Ask · day1-q6 In Values Guide, what is the difference between a terminal value and an instrumental value? Give one example from the guide and cite the passage.; acknowledged 16.0 ms (15403.9 ms)
+- Day 1 · Read / citation · day1-q6 citation 1 opened; includes 450 ms settle (495.8 ms)
+- Day 1 · Read / citation · day1-q6 citation 2 opened; includes 450 ms settle (489.2 ms)
+- Day 1 · Read / Ask · day1-q7 In my saved Choosing the right model lesson, how should I use representative examples to choose a model instead of always picking the biggest? Use only that saved lesson.; acknowledged 15.9 ms (48148.0 ms)
+- Day 1 · Read / Ask · day1-q8 In Melanie Mitchell’s AI book, why can an adversarial image fool a classifier without looking meaningfully different to us? Explain from the book and cite it.; acknowledged 21.1 ms (23978.4 ms)
+- Day 1 · Read / citation · day1-q8 citation 1 opened; includes 450 ms settle (533.9 ms)
+- Day 1 · Read / citation · day1-q8 citation 2 opened; includes 450 ms settle (689.1 ms)
+- Day 1 · Read / verify · Q1 sent two citations outside Ore although the named sources exist locally; web quote 2 verified online, web quote 3 matches the saved book but external PDF could not be fetched by the web tool (20 MB limit). Known retrieval weakness F729, not a new finding.
+- Day 1 · Read / verify · Q2 and Q7 name saved lessons and answer from them but provide zero citation buttons or Sources list. Had to inspect the saved text to verify the claims; no warning that evidence could not be linked. Reproduced in two separate new chats.
+- Day 1 · Read / verify · Archived MCP citations open and match the saved lesson (F808 held). Wrong-title photography question identifies the right video. Missing personal camera settings are explicitly declined.
+- Day 1 · Read / Ask · day1-q9 According to my saved How to Photograph Big Products video, why turn off the flash trigger for a test shot, and what should that shot look like? Cite the transcript.; acknowledged 15.0 ms (16437.6 ms)
+- Day 1 · Read / citation · day1-q9 citation 1 opened; includes 450 ms settle (494.8 ms)
+- Day 1 · Read / citation · day1-q9 citation 2 opened; includes 450 ms settle (503.6 ms)
+- Day 1 · Read / citation · day1-q9 citation 3 opened; includes 450 ms settle (503.6 ms)
+- Day 1 · Read / Ask · day1-q10 In Values Guide, how does frustration help identify a value, and why do I still need to rank values that conflict? Cite the guide and distinguish its advice from your example.; acknowledged 15.7 ms (17413.3 ms)
+- Day 1 · Read / citation · day1-q10 citation 1 opened; includes 450 ms settle (494.9 ms)
+- Day 1 · Read / citation · day1-q10 citation 2 opened; includes 450 ms settle (491.0 ms)
+- Day 2 · Review / interruption · Typed partial answer, advanced 20 s active thought, left before rating; checking F796
+- Day 2 · Review · Wrong retrieval answer revealed (65.2 ms)
+- Day 2 · Review / Ask · day2-ask1 I confused identical wording with consistent knowledge. Give me a safe rewording example and explain why recalling a different fact is different.; acknowledged 30.2 ms (10875.2 ms)
+- Day 2 · Review / Ask · day2-clearer Make this exercise clearer; acknowledged 17.8 ms (13897.5 ms)
+- Day 2 · Review / edit · Used suggested clearer exercise (209.3 ms)
+- Day 2 · Review · day2-rate1 chose Again; next question (153.0 ms)
+- Day 2 · Review / Ask · day2-ask2 I pictured the client connecting straight to the database. Can you explain why the interface is an endpoint, using a request to fetch one video record?; acknowledged 15.1 ms (10353.8 ms)
+- Day 2 · Review · day2-rate2 chose Again; next question (147.7 ms)
+- Day 2 · Review / Ask · day2-ask3 I got this backward. How do shared endpoints let the web app and mobile app survive a database change? Give a small before-and-after example.; acknowledged 15.3 ms (8849.6 ms)
+- Day 2 · Review · day2-rate3 chose Again; next question (182.3 ms)
+- Day 3 · Read / find · Find conceptual slippage deep in longest book; includes 500 ms settle (549.9 ms)
+- Day 3 · Read / Ask · day3-deep Here in Active Symbols and Analogy Making, why does abc to abd map ppqqrrss to ppqqrrtt rather than ppqqrrst? I do not understand conceptual slippage. Explain using this passage, not general advice.; acknowledged 31.9 ms (18205.3 ms)
+- Day 3 · Read / citation · day3-deep citation 1 opened; includes 450 ms settle (503.3 ms)
+- Day 3 · Read / citation · day3-deep citation 2 opened; includes 450 ms settle (497.1 ms)
+- Day 3 · Read / citation · day3-deep citation 3 opened; includes 450 ms settle (474.2 ms)
+- Day 3 · Read / Ask · day3-mention-answer @AI Snake Oil: What Artificial Intelligence Can Do, What It Can't, and How to Tell the Difference - Chapter 1  Compare this book passage with the cited source: why should I not equate success on a narrow task with understanding? Cite each source separately.; acknowledged 29.7 ms (24289.1 ms)
+- Day 3 · Read / citation · day3-mention-answer citation 1 opened; includes 450 ms settle (509.5 ms)
+- Day 3 · Read / citation · day3-mention-answer citation 2 opened; includes 450 ms settle (502.6 ms)
+- Day 3 · Read / Ask · day3-image In this screenshot, what does the paragraph immediately above Problem 3 say is slipping? Quote the short phrase from the image and explain why changing only the last character is too literal.; acknowledged 57.6 ms (16208.2 ms)
+- Day 3 · Read / reimport · Reimported longest book from its kept original (1063.9 ms)
+- Day 3 · Read / saved chat · All three turns and screenshot reopened after reimport. First citation probe recorded no CSS highlight; verification is pending (do not count F589 as passed yet).
+- Day 3 · Review / Ask · day3-continue-api-fact Yesterday you used GET /api/videos/42. Is the JSON response also part of the interface contract, and why?; acknowledged 20.2 ms (6842.0 ms)
+- Day 3 · Review · day3-rate-api-fact chose Good; next question (176.6 ms)
+- Day 3 · Review / Ask · day3-continue-api-explain Continue your name-to-display_name example from yesterday. What single thing must remain stable for both clients?; acknowledged 16.5 ms (7847.1 ms)
+- Day 3 · Review · day3-rate-api-explain chose Good; next question (161.9 ms)
+- Day 3 · Review / Ask · day3-continue-edited Yesterday we distinguished wording from the idea. Is “the Moon goes around Earth” a safe rewording of “the Moon orbits Earth”, and why?; acknowledged 21.2 ms (8854.6 ms)
+- Day 3 · Review / grade · Clearer exercise returned with its new question and answer, but grading still marks retrieval-induced forgetting as missed although that requirement disappeared from the suggested answer. Investigating whether the saved rubric stayed old.
+- Day 3 · Review / grade · Second check after reload: exact proposed model answer still marked missing the old key point. UI timer excluded because confidence selection was initially toggled off; backend grade took 8961.5 ms.
+- Day 3 · Review / persistence · All three exercise chats returned on Day 3 and continued their prior examples (F807 held). The clearer question also appears under its source > Review this source after reload.
+- Day 3 · Read / citation · Saved book citation after reimport reaches correct quote from Home; prior 450 ms probe was too early (688.0 ms)
+- Day 3 · Review / understand the change · Read Ask proposal schema and Review onApply code to explain the conflicting answer and grading criteria. The screen should have kept those consistent; “Exercise updated” did not say the criteria stayed unchanged. Diagnostic reading time was not metered.
+- Day 4 · Read / Ask · day4-plain In Values Guide, what is the difference between a terminal value and an instrumental value? Give the family-security example and cite the guide.; acknowledged 18.6 ms (13897.3 ms)
+- Day 4 · Read / citation · day4-plain citation 1 opened; includes 450 ms settle (496.4 ms)
+- Day 4 · Read / citation · day4-plain citation 2 opened; includes 450 ms settle (477.4 ms)
+- Day 4 · Read / Ask · day4-typo In Values Guide, what is the differnce between a termnal value and an instrumntal value? Give the family-securty example and cite the guide.; acknowledged 16.0 ms (12889.4 ms)
+- Day 4 · Read / citation · day4-typo citation 1 opened; includes 450 ms settle (510.9 ms)
+- Day 4 · Read / citation · day4-typo citation 2 opened; includes 450 ms settle (478.3 ms)
+- Day 4 · Read / Ask · day4-spanish En Values Guide, ¿cuál es la diferencia entre un valor terminal y un valor instrumental? Da el ejemplo de la seguridad familiar y cita la guía.; acknowledged 15.8 ms (15418.1 ms)
+- Day 4 · Read / citation · day4-spanish citation 1 opened; includes 450 ms settle (489.0 ms)
+- Day 4 · Read / citation · day4-spanish citation 2 opened; includes 450 ms settle (478.5 ms)
+- Day 4 · Read / citation · day4-spanish citation 3 opened; includes 450 ms settle (499.4 ms)
+- Day 4 · Read / citation · Repeated Day 1 book citation 1 with settled highlight; correct adversarial-image quote (700.6 ms)
+- Day 4 · Read / citation · Repeated mentioned-book citation 2; correct tail-event quote (39.2 ms)
+- Day 4 · Read / compare · Plain English, four typos, and Spanish agree: terminal=end goal, instrumental=means; all seven citations point to Values Guide 01M80RPYXPRXM11CNAWXA7K7JS. English and typo use identical two quotes; Spanish uses two definition quotes plus the same family-security quote.
+
+File-audit notes recorded at the end (not extra learner actions):
+
+- Day 2 · Review / check · Three Again ratings saved at the moved Nov 28 date, one first-seen; review credit 170210 ms and end ring 3 min. First interrupted draft retained 30659 ms.
+- Day 3 · Review / check · Two Good ratings saved at Nov 29; review credit 62465 ms. The edited exercise was not rated again. API Fact due Dec 3, API Explain due Dec 2; all match saved state.
+- Day 4 · Open · Home displayed 0 of 10 min; no ratings today. Stored due dates remain correct.
+- Day 2 · Review / waiting · Captured Explain grade backend request: 9356.8 ms; first retrieval grade did not have a clean capture.
+- Day 3 · Review / waiting · Captured backend grade requests: API Explain 11134.5 ms, edited-exercise paraphrase 9833.7 ms, exact proposed answer 8961.5 ms. These overlap some chat waits and are not additive.
+- Day 3 · Read / attach · Screenshot attachment backend save: 114.2 ms. UI completion timing invalidated by tester selector mismatch; attachment did save and reopen.

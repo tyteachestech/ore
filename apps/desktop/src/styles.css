@@ -2743,6 +2743,8 @@ button.home-plan:hover { color: var(--text); }
 .ask-card .quiz-kicker { margin: 0 0 6px; }
 .ask-card-q { margin: 0; font-weight: 600; color: var(--text); }
 .ask-card-a { margin: 4px 0 0; color: var(--muted); }
+.ask-card-points { margin-top: 10px; color: var(--muted); }
+.ask-card-points ul { margin-bottom: 0; }
 /* A suggested card as a change to his card (D161): dropped words struck, added words underlined. */
 .ask-card .diff-del { color: var(--muted); text-decoration: line-through 1px; font-weight: 400; }
 .ask-card .diff-add { color: var(--text); text-decoration: underline 2px var(--accent); text-underline-offset: 3px; }

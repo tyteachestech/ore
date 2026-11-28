@@ -69,7 +69,7 @@ async function library() {
   return { lib, a, b, c };
 }
 
-const OK = { reply: "Yes.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "A chat" };
+const OK = { reply: "Yes.", citations: [], general: null, hint: false, steps: [], exercise: null, card: null, title: "A chat" };
 
 describe("tutor: what it sees", () => {
   test("the open source's passages come first, then the library's; unrelated sources stay out", async () => {
@@ -86,7 +86,7 @@ describe("tutor: what it sees", () => {
     const { lib } = await library();
     const png = await attachToChat(lib, { name: "chart.png", data: new Uint8Array([137, 80, 78, 71]) });
     const txt = await attachToChat(lib, { name: "notes.txt", data: new TextEncoder().encode("spacing") });
-    const out = { reply: "It shows a forgetting curve.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "A chart" };
+    const out = { ...OK, reply: "Chart.png shows a forgetting curve.", title: "A chart" };
     fakeClaude([out]);
     await tutor(lib, "what does this show?", { files: [png], earlier: [{ message: "see my notes", reply: "Read them.", files: [txt] }] });
     const m = JSON.parse(readFileSync(join(binDir, "msgs.jsonl"), "utf8").trim()) as string;
@@ -143,9 +143,14 @@ describe("tutor: replies", () => {
       expect(ps.slice(0, 30)).toEqual(own); // his source first, the library's after
     }
     expect(tutorPassages(lib, "summarize this", { item: a.meta.id }).some((p) => p.title === "Elsewhere")).toBe(true); // other sources still reach it
-    fakeClaude([{ reply: "It covers thirty ideas.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "Thirty parts" }]);
-    await tutor(lib, "summarize this", { item: a.meta.id });
+    fakeClaude([
+      { ...OK, reply: "It covers thirty ideas.", general: false, title: "Thirty parts" },
+      { ...OK, reply: "Part 30 explains the last idea [1].", citations: [{ passage: "P30", quote: "Section 30 explains idea number 30" }], general: false, title: "Thirty parts" },
+    ]);
+    const summary = await tutor(lib, "summarize this", { item: a.meta.id });
     expect(sent()[0]!.reading).toEqual({ title: "Thirty parts", whole: true });
+    expect(summary).toMatchObject({ general: false, citations: [{ item: a.meta.id, heading: "Part 30" }] });
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("citations are missing");
   });
 
   test("a source too long to send whole says so: its headings as an outline, and passages from across it when his words match none", async () => {
@@ -157,7 +162,7 @@ describe("tutor: replies", () => {
     expect(ps[0]!.heading).toBe("Chapter 1");
     expect(ps.some((p) => +p.heading.slice(8) > 45)).toBe(true); // not only its opening
     expect(tutorPassages(lib, "topic37", { item: a.meta.id })[0]!.heading).toBe("Chapter 37"); // his words still pick the part
-    fakeClaude([{ reply: "From the parts I can see, it runs to sixty chapters.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "A long book" }]);
+    fakeClaude([{ ...OK, reply: "The opening covers the first topic [1].", citations: [{ passage: "P1", quote: "Chapter 1 sentence about topic1." }], general: false, title: "A long book" }]);
     await tutor(lib, "summarize this", { item: a.meta.id });
     const r = sent()[0]!.reading as { title: string; whole: boolean; outline: string[] };
     expect(r.whole).toBe(false);
@@ -169,7 +174,7 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     fakeClaude([{ reply: "It drops back to box one [1].", citations: [{ passage: "P2", quote: "A card you miss goes back to the first box." }], general: false, hint: false, steps: [], exercise: null, card: null }]);
     const r = await tutor(lib, "what happens to a card I miss?", { item: a.meta.id });
-    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@17" });
+    expect(r.ai).toEqual({ vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@18" });
     expect(r.general).toBe(false);
     const c = r.citations[0] as Citation;
     expect(c).toMatchObject({ n: 1, item: a.meta.id, heading: "The Leitner system" });
@@ -179,7 +184,7 @@ describe("tutor: replies", () => {
 
   test("the first reply names the chat (D172); later ones don't rename it", async () => {
     const { lib, a } = await library();
-    const out = (title: string) => ({ reply: "Box one.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title });
+    const out = (title: string) => ({ ...OK, title });
     fakeClaude([out(" Leitner boxes "), out("Something else")]);
     expect((await tutor(lib, "Explain this simply", { item: a.meta.id })).title).toBe("Leitner boxes");
     expect((await tutor(lib, "and then?", { item: a.meta.id, earlier: [{ message: "Explain this simply", reply: "Box one." }] })).title).toBe("");
@@ -187,7 +192,7 @@ describe("tutor: replies", () => {
 
   test("an over-long title is cut, never a reason to refuse the reply", async () => {
     const { lib, a } = await library();
-    fakeClaude([{ reply: "Box one.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, title: "x".repeat(120) }]);
+    fakeClaude([{ ...OK, title: "x".repeat(120) }]);
     expect((await tutor(lib, "boxes?", { item: a.meta.id })).title).toBe("x".repeat(80));
   });
 
@@ -270,6 +275,35 @@ describe("tutor: replies", () => {
     expect(r.citations[0]!.quote).toBe("goes back to the first box");
   });
 
+  test("a source answer with no citations goes back once and can return with a citation", async () => {
+    const { lib, a } = await library();
+    fakeClaude([
+      { ...OK, reply: "A miss sends it back to the first box.", general: false },
+      { ...OK, reply: "A miss sends it back to the first box [1].", citations: [{ passage: "P2", quote: "goes back to the first box" }], general: false },
+    ]);
+    const r = await tutor(lib, "Where does a missed card go?", { item: a.meta.id });
+    expect(r).toMatchObject({ general: false, citations: [{ quote: "goes back to the first box" }] });
+    expect(readFileSync(join(binDir, "count"), "utf8")).toBe("2");
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("citations are missing");
+  });
+
+  test("a source answer still without citations after the retry is marked not from his sources", async () => {
+    const { lib, a } = await library();
+    const reply = "After a miss, review the card from the first box.";
+    fakeClaude([{ ...OK, reply: "A miss sends it back to the first box.", general: false }, { ...OK, reply: reply.replace(".", " [1]."), general: false }]);
+    const r = await tutor(lib, "Where does a missed card go?", { item: a.meta.id });
+    expect(r).toMatchObject({ reply, general: true, citations: [] });
+    expect(readFileSync(join(binDir, "count"), "utf8")).toBe("2");
+  });
+
+  test("small talk needs no citations even with a source open", async () => {
+    const { lib, a } = await library();
+    fakeClaude([{ ...OK, reply: "Hi!" }]);
+    const r = await tutor(lib, "Hi", { item: a.meta.id });
+    expect(r).toMatchObject({ reply: "Hi!", general: false, citations: [] });
+    expect(readFileSync(join(binDir, "count"), "utf8")).toBe("1");
+  });
+
   // F318: `xs[1]` in code was taken for a citation marker, so a plain reply went back to fix.
   test("an index in code or after a name is no citation marker: the reply is taken as it came", async () => {
     const { lib, a } = await library();
@@ -283,7 +317,7 @@ describe("tutor: replies", () => {
   // F264: only the last six turns reached the tutor, so a long chat lost what he had said he was after.
   test("a chat handed over whole keeps every turn, his words and the replies; only past 30,000 words do the oldest shrink to what he asked, a line each (D338)", async () => {
     const { lib } = await library();
-    const out = { reply: "On it.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null };
+    const out = { ...OK, reply: "On it." };
     const long = Array.from({ length: 20 }, (_, i) => ({ message: i ? `question ${i + 1}` : `I'm learning this for my exam on Friday. ${"So ".repeat(80)}`, reply: `answer ${i + 1} ${"word ".repeat(600)}` }));
     fakeClaude([out, out]);
     await tutor(lib, "and now?", { earlier: long });
@@ -317,7 +351,7 @@ describe("tutor: replies", () => {
     await Bun.sleep(3); // two reviews of one card in the same millisecond read as one
     await recordReview(lib, mended.meta.id, { rating: 3, confidence: 2 }); // missed, then got: no longer a miss
     await recordReview(lib, other.meta.id, { rating: 1, confidence: 2 });
-    fakeClaude([{ reply: "Here.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null }]);
+    fakeClaude([{ ...OK, reply: "Here." }]);
     await tutor(lib, "Practice", { item: a.meta.id, at: "The Leitner system" });
     const input = sent()[0] as unknown as { reading: unknown; missed: unknown };
     expect(input.reading).toEqual({
@@ -335,7 +369,7 @@ describe("tutor: replies", () => {
     await expect(tutor(lib, "and then?", { item: a.meta.id })).rejects.toThrow("invalid tutor output twice");
     const lines = readFileSync(join(lib.root, ".ore/logs/tutor.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
     expect(lines).toHaveLength(2);
-    expect(lines[0]).toMatchObject({ runs: 2, searched: false, moved: 1, dropped: 0, model: "claude-fake-1", prompt: "tutor@17" });
+    expect(lines[0]).toMatchObject({ runs: 2, searched: false, moved: 1, dropped: 0, model: "claude-fake-1", prompt: "tutor@18" });
     expect(lines[0].ms).toBeGreaterThanOrEqual(0);
     expect(Date.parse(lines[0].ts)).not.toBeNaN();
     expect(lines[1].error).toContain("invalid tutor output twice");
@@ -352,7 +386,7 @@ describe("tutor: replies", () => {
 
   test("a follow-up sends the conversation so far", async () => {
     const { lib } = await library();
-    fakeClaude([{ reply: "Less often.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null }]);
+    fakeClaude([{ ...OK, reply: "Less often [1].", citations: [{ passage: "P2", quote: "you review less often" }], general: false }]);
     await tutor(lib, "and the right ones?", { earlier: [{ message: "What happens to a missed card?", reply: "First box." }] });
     expect(sent()[0]!.earlier).toEqual([{ message: "What happens to a missed card?", reply: "First box." }]);
   });
@@ -482,7 +516,7 @@ describe("tutor: the web", () => {
 
   test("the tutor may search: its tools are web search and fetch, no file tools", async () => {
     const { lib } = await library();
-    fakeClaude([{ reply: "Hi!", citations: [], general: false, hint: false, steps: [], exercise: null, card: null }]);
+    fakeClaude([{ ...OK, reply: "Hi!" }]);
     await tutor(lib, "hello");
     const args = JSON.parse(readFileSync(join(binDir, "argv.json"), "utf8")) as string[];
     // Only the web tools: it is given its passages, so file tools would be input it never uses.
@@ -724,7 +758,7 @@ describe("tutor: @ sources and skills", () => {
 
   test("the AI is told what he pointed it at; an unknown skill is refused", async () => {
     const { lib, b } = await library();
-    fakeClaude([{ reply: "Easier each time.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null }]);
+    fakeClaude([{ ...OK, reply: "Easier each time [1].", citations: [{ passage: "P1", quote: "gets easier to recall" }], general: false }]);
     await tutor(lib, "what does this say?", { sources: [b.meta.id], skills: ["learning"] });
     expect((sent()[0] as unknown as { about: string[] }).about).toEqual(["Memory", "the skill Learning"]);
     await expect(tutor(lib, "hi", { skills: ["nope"] })).rejects.toThrow('no skill "nope"');
@@ -787,7 +821,7 @@ describe("tutor: hints and cards", () => {
 describe("tutor: practice", () => {
   const key: TutorCard = { kind: "prompt", content_type: "concept", question: "In the Leitner system, why does a missed card go back to box one?", answer: "A miss means the memory is weak, so the card is seen again soonest.", rubric: ["A miss shows the memory is weak", "Box one is reviewed most often"] };
   const exercise = { heading: "Why does a missed card go back to box one?", prompts: ["What happens to it next", "Why that helps"], card: key };
-  const out = (over: object) => ({ reply: "Explain why a missed card goes back to box one.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null, ...over });
+  const out = (over: object) => ({ ...OK, reply: "Explain why a missed card goes back to box one.", ...over });
 
   test("Practice sets an open exercise with a heading for his note and the card committed with it; an exercise with a card, a heading that isn't a question, or a thin key goes back to fix", async () => {
     const { lib, a } = await library();
@@ -810,8 +844,8 @@ describe("tutor: practice", () => {
     const earlier = [{ message: "Practice", reply: "Explain why a missed card goes back to box one.", exercise }, { message: "wait, what's box one?", reply: "The box reviewed most often." }];
     const late: TutorCard = { kind: "card", content_type: "fact", question: "Where does a missed card go?", answer: "Box one.", rubric: [] };
     fakeClaude([
-      out({ reply: "Right that it comes back sooner [1]. Missing: why box one. What does a miss say about the memory?", citations: [{ passage: "P2", quote: "goes back to the first box" }], covered: [false, true], evidence: ["", "you see it again soon"], card: late }),
-      out({ reply: "Both points, nicely put. What about a card you get right?", covered: [true, true], evidence: ["memory is weak", "comes round most often"] }),
+      out({ reply: "Right that it comes back sooner [1]. Missing: why box one. What does a miss say about the memory?", citations: [{ passage: "P2", quote: "goes back to the first box" }], general: false, covered: [false, true], evidence: ["", "you see it again soon"], card: late }),
+      out({ reply: "Both points, nicely put. What about a card you get right?", general: false, covered: [true, true], evidence: ["memory is weak", "comes round most often"] }),
       out({ reply: "Both points.", covered: [true], evidence: ["Both"] }),
       out({ reply: "Both points.", covered: [true, true], evidence: ["", ""] }),
     ]);
@@ -820,7 +854,9 @@ describe("tutor: practice", () => {
     const seen = sent()[0]!;
     expect(seen).toMatchObject({ exercise: { heading: exercise.heading, card: key } });
     expect(seen.earlier).toEqual([{ message: "Practice", reply: "Explain why a missed card goes back to box one." }, { message: "wait, what's box one?", reply: "The box reviewed most often." }]);
-    expect((await tutor(lib, "A miss shows the memory is weak, and box one comes round most often", { item: a.meta.id, earlier })).card).toBeNull();
+    const feedback = await tutor(lib, "A miss shows the memory is weak, and box one comes round most often", { item: a.meta.id, earlier });
+    expect(feedback).toMatchObject({ reply: "Both points, nicely put. What about a card you get right?", general: false, citations: [], card: null });
+    expect(readFileSync(join(binDir, "count"), "utf8")).toBe("2");
     expect((await tutor(lib, "Both", { item: a.meta.id, earlier })).card).toBeNull();
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("covered: one boolean per rubric point (2)");
   });
@@ -877,7 +913,7 @@ describe("tutor: practice", () => {
     ] };
     expect(sceneOutline(scene)).toBe("- Missed card\n- Box one\n- Missed card → Box one (goes back)");
     await setDiagram(lib, a.meta.id, "boxes", JSON.stringify(scene));
-    fakeClaude([{ reply: "Right: a miss sends it back.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null }]);
+    fakeClaude([{ ...OK, reply: "Right: a miss sends it back [1].", citations: [{ passage: "P2", quote: "goes back to the first box" }], general: false }]);
     await tutor(lib, "My answer:\n\n![Diagram](diagrams/boxes.excalidraw)\n\n![Diagram](diagrams/nothing.excalidraw)", { item: a.meta.id });
     const m = sent()[0]!.message;
     expect(m).toContain("[Diagram he drew:\n- Missed card\n- Box one\n- Missed card → Box one (goes back)\n]");

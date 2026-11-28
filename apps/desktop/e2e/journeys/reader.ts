@@ -2387,6 +2387,8 @@ journey("original: a JPEG 2000 scan's page shows ink, in WebKit, which runs pdf.
     await page.evaluate(([tab, notes]) => {
       for (const [k, v] of [["ore.sidetab", tab], ["ore.mynotes", notes]] as const) v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v);
     }, before);
+    // What the source view still reads answers before the page reloads: cut off, WebKit calls it a page error (CI on #587).
+    await settled(page);
     await ore("archive", made.id);
     await page.reload();
   }

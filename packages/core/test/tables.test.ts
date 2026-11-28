@@ -176,6 +176,16 @@ describe("PDF tables and formulas (D125)", () => {
     expect(body).not.toContain("$$\n412");
   });
 
+  test.each([
+    ["does not parse", "\\begin{aligned} R(t)&=e^{-t/S} \\\\ S_{n+1}&=S_n"],
+    ["drops an equals sign", "R(t)=e^{-t/S},\\quad S_{n+1} S_n\\cdot(1+\\alpha)"],
+  ])("PDF: keeps the original formula text when the page reader's LaTeX %s", async (_why, latex) => {
+    const formula = (await regionsOf("tables")).find((r) => r.kind === "formula")!;
+    const body = (await pdfToDoc(pdf("tables.pdf"), [{ ...formula, latex }])).body;
+    expect(body).toContain("\n\n*R(t) = e*⁻*t/S*, *Sn+1 = Sn · (1 +* α)\n\n");
+    expect(body).not.toContain("$$");
+  });
+
   test("a cell, which has no box, takes pdf.js's own text for it where the two agree, so powers and bold stay", async () => {
     const t = (await regionsOf("tables")).find((r) => r.kind === "table")!;
     if (t.kind !== "table") throw new Error("no table");

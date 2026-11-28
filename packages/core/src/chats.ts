@@ -11,7 +11,7 @@ import { withLock } from "./lock.ts";
 // by their first turn; Review uses the exercise id so the same exercise can reopen its chat.
 
 const Turn = z.looseObject({ id: z.string().min(1), message: z.string() });
-const ExerciseText = z.object({ question: z.string(), answer: z.string() });
+const ExerciseText = z.object({ question: z.string(), answer: z.string(), rubric: z.array(z.string()).optional() });
 const ExerciseTurn = Turn.extend({
   reply: z.string().optional(),
   session: z.string().optional(),

@@ -86,7 +86,8 @@ function AskThread({ card, answer, chat, setChat, save, onApply, onClose }: Chat
   const error = busy ? undefined : last?.error;
   /** Read off the card itself, never remembered: an undo or a later edit makes a suggestion usable again. */
   const same = (a: string, b: string) => a.replace(/\s+/g, " ").trim() === b.replace(/\s+/g, " ").trim();
-  const applied = (p: NonNullable<Turn["proposal"]>) => same(p.question, card.question) && same(p.answer, card.answer);
+  const applied = (p: NonNullable<Turn["proposal"]>) => same(p.question, card.question) && same(p.answer, card.answer)
+    && (!p.rubric || p.rubric.length === card.rubric.length && p.rubric.every((point, i) => same(point, card.rubric[i]!)));
   const field = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
   // The reply so far typed out at a steady pace, as the tutor's is (D321).
@@ -134,7 +135,7 @@ function AskThread({ card, answer, chat, setChat, save, onApply, onClose }: Chat
       const r = await oreJob<AskReply>(id, null, "ask", card.id, opt("message", message), opt("stream", id), ...(session ? [opt("session", session)] : []), opt("answer", answer || "(no idea)"), ...(card.variant ? [opt("variant", card.variant)] : []));
       // Checked here, outside the updater: a throw inside one escapes this catch and takes Review down with it.
       if (typeof r?.reply !== "string" || !r.reply.trim()) throw new TypeError("ask gave no reply");
-      if (!job.stopped) settle(job, next, { reply: r.reply, proposal: r.proposal, ai: r.ai, session: r.session, was: { question: card.question, answer: card.answer } });
+      if (!job.stopped) settle(job, next, { reply: r.reply, proposal: r.proposal, ai: r.ai, session: r.session, was: { question: card.question, answer: card.answer, rubric: card.rubric } });
     } catch (e) {
       if (!job.stopped) settle(job, next, { error: errorText(e, "answer that") });
     } finally {
@@ -188,9 +189,12 @@ function AskThread({ card, answer, chat, setChat, save, onApply, onClose }: Chat
                     <div className="quiz-kicker">Suggested exercise</div>
                     <p className="ask-card-q"><Changes was={t.was?.question} now={t.proposal.question} /></p>
                     <p className="ask-card-a"><Changes was={t.was?.answer} now={t.proposal.answer} /></p>
-                    <button className="ask-use" disabled={applied(t.proposal)} onClick={() => void onApply({ ...t.proposal!, ai: t.ai }).catch(() => {})}>
-                      {applied(t.proposal) ? "Exercise updated" : "Use this exercise"}
-                    </button>
+                    {!!t.proposal.rubric?.length && <KeyPointChanges was={t.was?.rubric} now={t.proposal.rubric} />}
+                    {card.kind === "prompt" && !t.proposal.rubric?.length && !applied(t.proposal)
+                      ? <p className="ask-card-a">Ask for a new suggestion with key points.</p>
+                      : <button className="ask-use" disabled={applied(t.proposal)} onClick={() => void onApply({ ...t.proposal!, ai: t.ai }).catch(() => {})}>
+                          {applied(t.proposal) ? "Exercise updated" : "Use this exercise"}
+                        </button>}
                   </div>
                 )}
               </div>
@@ -263,6 +267,19 @@ function AskThread({ card, answer, chat, setChat, save, onApply, onClose }: Chat
         )}
       </div>
     </section>
+  );
+}
+
+function KeyPointChanges({ was, now }: { was?: string[]; now: string[] }) {
+  return (
+    <div className="ask-card-points">
+      <div className="quiz-kicker">Key points</div>
+      <ul>
+        {Array.from({ length: Math.max(was?.length ?? 0, now.length) }, (_, i) => (
+          <li key={i}><Changes was={was && (was[i] ?? "")} now={now[i] ?? ""} /></li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
