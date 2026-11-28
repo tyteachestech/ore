@@ -1384,6 +1384,32 @@ describe("import coverage: EPUB", () => {
     expect(text).toMatch(/<!-- back matter -->\n\n<!-- chapter 6 -->\n\nCopyright © 2019 by Ada Learner\. All rights reserved\.\n$/);
   });
 
+  test("EPUB: lines the book marks as headings but styles smaller than its text and not bold (a program's lines set apart) stay lines, not headings", async () => {
+    const lib = await tempLibrary();
+    const xhtml = (body: string) => `<?xml version="1.0" encoding="utf-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title><link href="../styles/book.css" rel="stylesheet" type="text/css"/></head><body>${body}</body></html>`;
+    const epub = zipSync({
+      mimetype: strToU8("application/epub+zip"),
+      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
+      "OEBPS/content.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Ferry Logic</dc:title><dc:creator>Ada Learner</dc:creator></metadata>
+<manifest><item id="css" href="styles/book.css" media-type="text/css"/><item id="one" href="xhtml/one.xhtml" media-type="application/xhtml+xml"/><item id="two" href="xhtml/two.xhtml" media-type="application/xhtml+xml"/></manifest>
+<spine><itemref idref="one"/><itemref idref="two"/></spine></package>`),
+      "OEBPS/styles/book.css": strToU8(`h1 { font-size: 1.6em; }\nh1.small-line {\n\tfont-size:0.708em;\n\tfont-weight:normal;\n}\nh2.subhead { font-size: 0.9em; font-weight: bold; }`),
+      "OEBPS/xhtml/one.xhtml": strToU8(xhtml(`<h1>The Ferry Puzzle</h1><p>A planner writes the puzzle down like this:</p><h1 class="small-line">START:</h1><h1 class="small-line">NEAR-SHORE = [2 GOATS, 1 RAFT]</h1><p>Each line names what a shore holds.</p><h2 class="subhead">Moving the raft</h2><p>The raft carries one goat at a time.</p>`)),
+      "OEBPS/xhtml/two.xhtml": strToU8(xhtml(`<h1 class="small-line">After the Crossing</h1><p>Both goats wait on the far shore.</p>`)),
+    });
+    const path = join(lib.root, "ferry.epub");
+    writeFileSync(path, epub);
+    const body = (await addSource(lib, path)).body;
+    expect(body).toMatch(/^# The Ferry Puzzle$/m);
+    expect(body).toMatch(/^START:$/m);
+    expect(body).toMatch(/^NEAR-SHORE = \\\[2 GOATS, 1 RAFT\\\]$/m);
+    expect(body).not.toMatch(/^#+ (?:START|NEAR-SHORE)/m);
+    // A small heading the book sets in bold is still a heading.
+    expect(body).toMatch(/^## Moving the raft$/m);
+    // A page's opening heading names the page, however small the book sets it (a book's endnote heads).
+    expect(body).toMatch(/^# After the Crossing$/m);
+  });
+
   test("EPUB: an introduction between the title page and the copyright page shows, read by its heading over a paragraph, though its heading is marked \"title\" and the book's start-reading mark points at the title page", async () => {
     const lib = await tempLibrary();
     const xhtml = (body: string) => `<?xml version="1.0" encoding="utf-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>t</title></head><body>${body}</body></html>`;
