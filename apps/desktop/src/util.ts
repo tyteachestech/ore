@@ -247,20 +247,23 @@ export const usable = (el: Element | null | undefined): el is HTMLElement =>
   el instanceof HTMLElement && el.isConnected && el.getClientRects().length > 0 && !el.matches(":disabled") && !el.closest("[hidden], [inert]");
 
 /** Puts focus on what `pick` names, and again if that goes within `ms` with focus left on <body> (Home's Start
- *  review leaves when the review just done cleared what was due), each time on what `pick` names then. Ends at
- *  the first press, key or focus elsewhere, or after `ms`. */
+ *  review leaves when the review just done cleared what was due), each time on what `pick` names then. When nothing
+ *  it names can take focus yet (the screen behind is still being read again, or shows a page that can't take it),
+ *  the first one that can and comes within `ms` does. Ends at the first press, key or focus elsewhere, or after `ms`. */
 export function settleFocus(pick: () => HTMLElement | null | undefined, ms = 2000): void {
   let placed: HTMLElement | null = null;
   const place = () => {
     const to = pick();
     if (!usable(to)) return;
-    placed = to;
     focusQuietly(to);
+    // A page still loading can name what can't take focus yet (the reader's opening page has no tabindex): only
+    // where focus landed counts, so the one that can, when it comes, gets it.
+    placed = document.activeElement === to ? to : null;
   };
   place();
   if (typeof MutationObserver === "undefined") return;
   const seen = new MutationObserver(() => {
-    if (placed && !placed.isConnected && (!document.activeElement || document.activeElement === document.body)) place();
+    if ((!placed || !placed.isConnected) && (!document.activeElement || document.activeElement === document.body)) place();
   });
   const stop = () => {
     seen.disconnect();

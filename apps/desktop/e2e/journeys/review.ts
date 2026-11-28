@@ -2844,6 +2844,26 @@ journey("the mole and the ambience radio never cover the last of a screen: every
   await page.keyboard.press("Escape");
 });
 
+journey("Review left over a source still opening: focus is in the source at once, before its text, and stays there after (F873)", async (page) => {
+  // The source opens again under a closing Review, first as a page with its title only. That page couldn't take
+  // focus, so focus stayed on <body> until the text came, and keys pressed meanwhile went nowhere.
+  await openSource(page, TESTING);
+  await startReview(page, null, true);
+  await hold(page, "show", 2);
+  try {
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+    await until("the source is being read again", () => isHeld(page, "show"));
+    const inReader = () => page.evaluate(() => !!document.activeElement?.closest(".reader"));
+    await until("focus is in the source while its text is on its way", inReader);
+  } finally {
+    await release(page, "show");
+    await release(page, "show").catch(() => {});
+  }
+  await page.locator(".reader .doc").waitFor();
+  await until("focus is on the source's text once it is there", () => page.evaluate(() => document.activeElement?.matches(".reader-scroll") ?? false));
+});
+
 journey("review: under a long answer in a short window the four ratings stay in view, clear of the radio (D314)", async (page) => {
   const size = page.viewportSize()!;
   await page.setViewportSize({ width: 720, height: 480 });
