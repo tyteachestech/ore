@@ -1537,6 +1537,9 @@ journey("all sources: a search that matches nothing offers Clear the search, and
   await page.getByRole("button", { name: /^All sources/ }).click();
   const row = page.locator("main .list .row").first();
   await row.waitFor();
+  // The list's reads (ls, ls --archived) land after the first rows show and draw them anew: measured in between,
+  // the row was gone (null box, CI on #562).
+  await settled(page);
   const box = (await row.boundingBox())!;
   if (box.width > 1144) throw new Error(`a row is ${box.width}px wide on a 1920px window`);
   const bar = (await page.locator("main .list-bar").boundingBox())!;

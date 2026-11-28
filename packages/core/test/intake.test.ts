@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } fr
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { cleanAuthor, cleanDate, cleanTitle, refusal, wordCount } from "../src/ingest/check.ts";
 import { addPageText, addSource, addTab, addText, arxivListing, audioOf, fillOwed, hasPageText, redoPageText, reimportSource, undoPageText, undoReimport } from "../src/ingest/index.ts";
 import { addCourse, planCourse } from "../src/ingest/course.ts";
@@ -13,6 +14,7 @@ import { findItem, listItems } from "../src/items.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
+import { openPdf } from "../src/ingest/pdf.ts";
 import { rtfToDoc } from "../src/ingest/rtf.ts";
 import { xlsxToDoc } from "../src/ingest/sheets.ts";
 import { episode, pageAudio, transcribe, transcribeFile } from "../src/ingest/audio.ts";
@@ -367,6 +369,22 @@ describe("import coverage: web pages", () => {
     expect(b).toContain("\n$$\nR = e^{-\\frac{t}{S}},\n$$\n");
     expect(b).toContain("Here, $$b$$ represents 'Savings'");
     expect(b).not.toContain("\\left(\\right.");
+  });
+
+  test("MathML formulas are imported once and keep the author's TeX when provided", async () => {
+    const url = "https://example.org/tile-fractions";
+    serve({ [url]: { body: web("mathml-annotations.html"), type: HTML } });
+    const { meta, body } = await addSource(await tempLibrary(), url);
+    expect(meta.title).toBe("Fractions from a bag of tiles");
+    expect(meta.author).toBe("Maya Reed");
+    expect(meta.published).toBe("2026-11-27");
+    expect(body).toContain("A bag holds four tiles of the same size.");
+    expect(body).toContain("## Drawing one tile");
+    expect(body).toContain("the chances stay the same for the next draw.");
+    expect([...body.matchAll(/\$\$(.*?)\$\$/g)].map((match) => match[1])).toEqual([
+      "\\frac{2}{4}",
+      "\\tfrac{1}{4}",
+    ]);
   });
 
   test("a Pandoc or Quarto page's formulas: inline and on their own line, not raw TeX", async () => {
@@ -1639,6 +1657,32 @@ describe("import coverage: text recognition", () => {
     expect(item.body).toStartWith("<!-- page 1 -->\n\n## The testing effect\n\nRetrieving a memory");
   });
 
+  test("a scanned PDF decodes its JPEG 2000 images and JBIG2 masks", async () => {
+    // Public-domain Laplace excerpt from an Internet Archive scan. Each page has two JPEG 2000
+    // images, with the foreground using a JBIG2 mask to show the ink over the paper.
+    const task = openPdf(readFileSync(file("laplace-scan-pages19-20.pdf")));
+    try {
+      const pdf = await task.promise;
+      expect(pdf.numPages).toBe(2);
+      for (let n = 1; n <= pdf.numPages; n++) {
+        const page = await pdf.getPage(n);
+        const ops = await page.getOperatorList();
+        const images = await Promise.all(ops.fnArray.flatMap((op, i) => {
+          if (op !== OPS.paintImageXObject) return [];
+          const [id] = ops.argsArray[i];
+          const objs = id.startsWith("g_") ? page.commonObjs : page.objs;
+          return new Promise<{ data: Uint8Array | Uint8ClampedArray } | null>((resolve) => objs.get(id, resolve));
+        }));
+        expect(images.map((image) => image?.data.length ?? 0)).toEqual([628 * 1015 * 3, 1882 * 3043 * 4]);
+        const foreground = images[1]!.data;
+        expect(foreground.some((alpha, i) => i % 4 === 3 && alpha === 0)).toBe(true);
+        expect(foreground.some((alpha, i) => i % 4 === 3 && alpha === 255)).toBe(true);
+      }
+    } finally {
+      await task.destroy();
+    }
+  });
+
   test("an image with no text is refused", async () => {
     const empty = join(mkdtempSync(join(tmpdir(), "ore-ocr-")), "empty.json");
     writeFileSync(empty, JSON.stringify({ pages: [{ lines: [] }] }));
@@ -1967,6 +2011,24 @@ describe("import coverage: audio and podcasts", () => {
     asEpisode(await addSource(await tempLibrary(), EPISODE));
   });
 
+  // F754: the episode has a root-level slug and links to both audio and video.
+  test("a podcast host's episode with audio and video downloads keeps its audio and timed transcript", async () => {
+    const url = "https://podcasts.ox.ac.uk/probability-puzzle";
+    const audio = "https://media.podcasts.ox.ac.uk/conted/2014-MT-emergent-multiverse/2014-11-22_wallace_probability_puzzle.mp3";
+    const html = readFileSync(join(FIX, "audio", "oxford-episode-page.html"), "utf8");
+    const recording = readFileSync(join(FIX, "audio", "chaptered.mp3"));
+    serve({ [url]: { body: html, type: HTML }, [audio]: { body: recording, type: "audio/mpeg" } });
+    const item = await addSource(await tempLibrary(), url);
+    expect(item.meta).toMatchObject({ title: "The Probability Puzzle", url });
+    expect(audioOf(item)).toMatchObject({ file: join(item.dir, "source.mp3") });
+    expect(item.body).toContain("[00:00] Welcome back to the show.");
+    expect(item.body.trimEnd()).toEndWith("[01:00] Thanks for listening.");
+    expect(readFileSync(join(item.dir, "source.mp3"))).toEqual(recording);
+    expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toBe(VTT);
+    expect(readFileSync(join(item.dir, "page.html"), "utf8")).toBe(html);
+    expect(hasPageText(item)).toBe(true);
+  });
+
   test("an episode page added from the browser tab comes in as its episode too", async () => {
     serve({ [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
     asEpisode(await addTab(await tempLibrary(), { tab: { browser: "Safari", url: EPISODE, title: "x", html: episodePage } }));
@@ -2115,7 +2177,10 @@ describe("import coverage: audio and podcasts", () => {
       "https://news.test/2026/11/read-aloud": page(`<meta property="og:type" content="article"><meta property="og:audio" content="https://news.test/read-aloud.mp3">`),
       "https://news.test/2026/11/graph": page(ld({ "@graph": [{ "@type": "NewsArticle", headline: "Storm season" }, { "@type": "AudioObject", contentUrl: "https://news.test/graph.mp3" }] })),
       "https://news.test/2026/11/storm-season": page(ld({ "@type": "NewsArticle", audio: { "@type": "AudioObject", contentUrl: "https://news.test/nested.mp3" } }), `<audio controls src="/clips/mayor.mp3"></audio>`),
+      "https://news.test/storm-download": page("", `<a href="/clips/mayor.mp3">Download the clip</a>`),
       "https://show.test/podcasts/": page("", `<audio src="https://cdn.show.test/latest.mp3"></audio>`),
+      "https://podcasts.show.test/": page("", `<a href="/latest.mp3">Download the latest episode</a>`),
+      "https://podcast.show.test/series/workshop": page("", `<a href="/first.mp3">First episode</a><a href="/second.mp3">Second episode</a>`),
       "https://show.test/podcast/playlist": page("", `<iframe src="https://player.megaphone.fm/playlist/ABC1234567"></iframe>`),
       "https://show.test/episodes/video-19": page(ld({ "@type": "PodcastEpisode", associatedMedia: { "@type": "MediaObject", contentUrl: "https://cdn.show.test/19.mp4" } })),
     };
@@ -2137,6 +2202,14 @@ describe("import coverage: audio and podcasts", () => {
       expect([u, audioOf(item), existsSync(join(item.dir, "source.html"))]).toEqual([u, null, true]);
     }
     expect(fetched.filter((u) => /\.(mp3|m4a|mp4)(?:\?|$)/.test(u) && !/cdn\.(radio|show)\.test\/(17|sleep|18)/.test(u))).toEqual([]);
+  });
+
+  test("a download link is an episode's recording only beside its video twin: a series page's lone MP3 link, or a story's clip under /podcasts/, stays the page", () => {
+    const twin = `<a href="https://media.pod.test/talk.mp4">Video</a><a href="https://media.pod.test/talk.mp3">Audio</a>`;
+    expect(pageAudio(twin, "https://podcasts.pod.test/talk")).toBe("https://media.pod.test/talk.mp3");
+    const lone = `<p>Lectures.</p><a href="https://media.pod.test/latest.mp3">Download latest (MP3)</a>`;
+    expect(pageAudio(lone, "https://podcasts.pod.test/series/lectures")).toBeUndefined();
+    expect(pageAudio(lone, "https://news.test/podcasts/a-story")).toBeUndefined();
   });
 
   test("one episode under two addresses is one audio; a show's og:type is not an episode's; player pages hear any audio type and a Megaphone player", async () => {

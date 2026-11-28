@@ -25,7 +25,7 @@ import { HOLD_MS, MoleSays } from "./MoleSays";
 import { DotNumber, minutes, minutesText, Ring, ringDots } from "./Ring";
 import { endPlan, type EndProg, LapCentre, lapPlan, lapTickUp, levelAt, SkillRows, SkillStage, overDots, Sparkles, useLap } from "./Lap";
 import { SkillChip } from "./Skills";
-import { errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useDay, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
+import { beforeFlushKept, errorText, focusPicked, missedOf, kept, LIBRARY_BACK, useDay, useFocusWhileMounted, useLibraryChanges, type Notify } from "./util";
 import { Working } from "./Working";
 import { Timeline } from "./Timeline";
 import { ExerciseText } from "./ExerciseText";
@@ -65,9 +65,9 @@ type Shown = {
   remark: boolean; gradeError: string | null; passage: Passage | null; quoteAt: number; passageGone: string | null; asking: boolean;
 };
 type Rating = 1 | 2 | 3 | 4;
-/** Answers typed but not checked, and how sure he said he was, by card: putting the quick quiz away
+/** Unfinished answers, confidence and active time, by card: putting the quick quiz away
  *  (D76), Esc, Open in source or quitting the app keep them for when the card comes up again (for a day, `kept`). */
-const drafts = kept<{ text: string; conf?: number; asked: string }>("ore.review-drafts");
+const drafts = kept<{ text: string; conf?: number; asked: string; elapsedMs?: number }>("ore.review-drafts");
 /** What a draft was typed for: the question, or the remixed version shown (D66). One for another is dropped. */
 const askedOf = (c: CardFull) => `${c.variant ?? ""}\n${c.question}`;
 const draftFor = (c: CardFull) => {
@@ -75,7 +75,8 @@ const draftFor = (c: CardFull) => {
   if (d && d.asked !== askedOf(c)) return void drafts.delete(c.id);
   return d;
 };
-const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id, { text, conf, asked: askedOf(c) });
+// The time he spent on it before (kept as he left) stays with the words as he types more.
+const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id, { text, conf, asked: askedOf(c), elapsedMs: draftFor(c)?.elapsedMs });
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
  *  Explain cards (AI marks the rubric and suggests a rating; he decides), self-rated Fact cards. Every
@@ -187,6 +188,12 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     onClose,
     onLogged,
     shown: () => shownNowRef.current(),
+    keepDraftTime: (elapsedMs) => {
+      if (!card || !answer.trim()) return;
+      const draft = draftFor(card);
+      // The clock moving does not renew the draft's day.
+      if (draft?.text === answer) drafts.set(card.id, { ...draft, elapsedMs }, drafts.at(card.id));
+    },
     unrated: () => setMoment(null),
     press: (key) => document.body.dispatchEvent(typeof key === "string" ? keydownFor(keymap[key]) : new KeyboardEvent("keydown", { ...key, bubbles: true, cancelable: true })),
   };
@@ -196,6 +203,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   // Try again keeps the session it started.
   useEffect(() => () => s.leave(), [pick, source]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => s.gone(), [s]);
+  useEffect(() => beforeFlushKept(s.keepDraftTime), [s]);
 
   // The quick quiz (D76) rated cards while this window waited: the ones no longer due drop out, so none
   // comes up twice. Past the day's new-card limits, so a draft it didn't rate stays; the card on screen
@@ -292,7 +300,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
         const draft = c.kind === "prompt" ? draftFor(c) : undefined;
         setAnswer(draft?.text ?? "");
         setConf(draft?.conf);
-        s.clock();
+        s.clock(draft?.elapsedMs);
       },
       (e) => live && setError(errorText(e)),
     );

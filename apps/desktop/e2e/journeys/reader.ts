@@ -2329,6 +2329,42 @@ journey("original: a Korean PDF's page is drawn with its words, not blank (F379)
   }
 });
 
+journey("original: a JPEG 2000 scan's page shows ink, in WebKit, which runs pdf.js's JavaScript decoder", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "laplace-scan-pages19-20.pdf"), "--no-enrich")) as { id: string; title: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+    await page.reload();
+    await openSource(page, made.title);
+    const show = page.getByRole("button", { name: "Show side panel" });
+    if (await show.count()) await show.click();
+    await page.getByRole("tab", { name: "Original" }).click();
+    // One page: pdf.js's JavaScript decoder took over 30 s for the second on CI's WebKit (about 2 s on the Mac);
+    // the core test decodes both pages' images.
+    for (const n of [1]) {
+      const sheet = page.locator(`.original canvas[data-page="${n}"]`);
+      // A page that failed says so in place of the canvas instead.
+      const failed = page.getByText("This page can’t be shown here");
+      await sheet.or(failed).first().waitFor({ timeout: 30_000 });
+      if (await failed.isVisible()) throw new Error(`page ${n} failed to draw`);
+      const ink = await sheet.evaluate((c: HTMLCanvasElement) => {
+        const pixels = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+        let inked = 0;
+        for (let i = 0; i < pixels.length; i += 4) {
+          if (pixels[i + 3]! > 0 && pixels[i]! + pixels[i + 1]! + pixels[i + 2]! < 600) inked++;
+        }
+        return inked;
+      });
+      if (ink < 300) throw new Error(`page ${n} has ${ink} dark pixels`);
+    }
+  } finally {
+    await page.evaluate(([tab, notes]) => {
+      for (const [k, v] of [["ore.sidetab", tab], ["ore.mynotes", notes]] as const) v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v);
+    }, before);
+    await ore("archive", made.id);
+    await page.reload();
+  }
+}, "webkit");
+
 journey("reader: a source with pictures above his place reopens on the passage he left, though the pictures have not loaded again (F444)", async (page) => {
   // Six tall pictures, then a long text: far below them a picture is not loaded until he scrolls back near it.
   const picture = (n: number) => `![Figure ${n}](https://pictures.test/figure-${n}.svg)`;
