@@ -5,6 +5,7 @@ import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
 import { pdfData } from "./pdf-data.ts";
 import { cleanTitle, fileAuthor, lineBreakSpace } from "./check.ts";
+import { recognizedPages } from "./ocr.ts";
 import type { Box, Region } from "./paddle.ts";
 import { pageFigures, png } from "./pdf-figures.ts";
 
@@ -26,6 +27,8 @@ export type Structure = "tables" | "formulas";
 (globalThis as { pdfjsWorker?: unknown }).pdfjsWorker = pdfWorker;
 
 const MAX_FIGURES = 80;
+/** Stands where a scanned page's words couldn't be read. */
+export const SCAN_UNREAD = "*This page is a scan, and its words couldn’t be read here. Open the original to see it.*";
 const MAX_FIGURE = 5 * 1024 * 1024;
 /** Where a figure past the first MAX_FIGURES was: marked, as a missing one is (D351), not left out unsaid (deep import pass, pdfs-06). */
 const PAST_FIGURES = `[missing figure: Ore keeps a PDF's first ${MAX_FIGURES} figures; this one is in the original]`;
@@ -559,9 +562,7 @@ const inside = (i: Item, b: Box) => {
  *  the Markdown each block stands for: a table built cell by cell from pdf.js's own reading of the
  *  text in each cell's box (its powers and bold kept), the reader's where pdf.js finds none; a formula as
  *  the reader's LaTeX. */
-const worded = (i: Item) => /[\p{L}\p{N}]{2}/u.test(i.str);
-
-function swapRegions(items: Item[], regions: Region[], blocks: string[], scanned = false): Item[] {
+function swapRegions(items: Item[], regions: Region[], blocks: string[], scan: boolean): Item[] {
   let out = items;
   const read = regions.some((r) => r.kind === "page");
   const parts = regions.filter((r) => r.kind !== "page");
@@ -605,13 +606,11 @@ function swapRegions(items: Item[], regions: Region[], blocks: string[], scanned
   const tables = regions.filter((r) => r.kind === "table");
   /** Where the block before this one ended, so a block the PDF has no text for lands after it. */
   let after = 0;
-  // A page of a scanned PDF with no text of its own (a stamp in its margin is not text).
-  const scan = scanned && items.filter(worded).length < 5;
   for (const r of parts) {
     if (r.kind === "formula" && tables.some((t) => within(r.box, t.box))) continue;
     const ins = (i: Item) => !!i.str.trim() && !isBlock(i.str) && inside(i, r.box);
     const at = out.findIndex(ins);
-    if (r.kind === "text" && at >= 0) {
+    if (r.kind === "text" && at >= 0 && !scan) {
       after = out.findLastIndex(ins) + 1;
       continue;
     }
@@ -802,6 +801,7 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   const outline = await outlineOf(doc).catch(() => ({ chapters: [], sections: [] }));
   const items: Item[][] = [];
   const figures: Asset[][] = [];
+  const pageImages: boolean[] = [];
   const fields: string[][] = [];
   const seen = new Map<string, number>();
   for (let n = 1; n <= doc.numPages; n++) {
@@ -809,7 +809,9 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
     const tc = await page.getTextContent();
     // A figure that won't decode never costs the text. Reading the figures loads the page's fonts,
     // whose names say which text is bold or italic.
-    const figs = (await pageFigures(page).catch(() => [])).map((f) => png(f.width, f.height, f.rgba)).filter((d) => d.length <= MAX_FIGURE).map((d) => ({ name: assetName(d, "png"), data: d }));
+    const read = await pageFigures(page).catch(() => ({ figures: [], pageImage: false }));
+    const figs = read.figures.map((f) => png(f.width, f.height, f.rgba)).filter((d) => d.length <= MAX_FIGURE).map((d) => ({ name: assetName(d, "png"), data: d }));
+    pageImages.push(read.pageImage);
     const font = (id: string) => {
       try {
         return String((page.commonObjs.has(id) && (page.commonObjs.get(id) as { name?: string })?.name) || "");
@@ -831,10 +833,23 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   const structure = structureOf(items);
   const blocks: string[] = [];
   const split = items.map((p) => splitMargins(p, body));
-  // A scanned PDF: most of its pages have no text of their own. Only there is a page's prose the
-  // reader's; in a PDF with text, a page that is one picture and its caption keeps the picture's words in it.
+  // A scanned PDF: most of its pages have no text of their own.
+  const worded = (i: Item) => /[\p{L}\p{N}]{2}/u.test(i.str);
   const scanned = items.filter((p) => p.filter(worded).length < 5).length * 2 > items.length;
-  const raw = split.map((p, i) => pageLines(swapRegions(p.items, regions.filter((r) => r.page === i + 1), blocks, scanned)));
+  const needsRecognition: number[] = [];
+  const raw = split.map((p, i) => {
+    // A scan can have a page number or a small stamp in its text layer.
+    // A page the size of its picture with no words of its own: a page number or a stamp may be there, letters of a
+    // caption may not (a full-page figure and its caption keep the picture's words in the picture). A file that is
+    // mostly such pages (a scan stored some other way) counts every page with no text of its own.
+    const own = items[i]!.map((item) => item.str).join("");
+    const scan = (pageImages[i] === true || scanned) && bare(own).length < 20 && bare(own).replace(/\p{N}/gu, "").length < 3;
+    const before = blocks.length;
+    const page = i + 1;
+    const lines = pageLines(swapRegions(p.items, regions.filter((r) => r.page === page), blocks, scan));
+    if (scan && blocks.length === before) needsRecognition.push(page);
+    return lines;
+  });
   const typical = lineGap(raw);
   const lines = dropRunning(raw, body, typical);
   const words = wordsOf(lines);
@@ -862,13 +877,24 @@ export async function pdfToDoc(data: Uint8Array, regions: Region[] = []): Promis
   });
   const shown = new Set(assets.map((a) => a.name));
   const notes = footnotes(paras);
-  const pages = paras.map((p, i) => `<!-- page ${i + 1} -->\n\n${[...p.map((x) => (isBlock(x.text) ? blocks[Number(x.text.slice(1, -1))]! : notes(x.text, i))), ...kept[i]!.map((a) => (shown.has(a.name) ? `![](assets/${a.name})` : PAST_FIGURES)), ...fields[i]!].join("\n\n")}`);
-  const text = pages.join("\n\n") + "\n";
+  const pages = paras.map((p, i) => [...p.map((x) => (isBlock(x.text) ? blocks[Number(x.text.slice(1, -1))]! : notes(x.text, i))), ...kept[i]!.map((a) => (shown.has(a.name) ? `![](assets/${a.name})` : PAST_FIGURES)), ...fields[i]!].join("\n\n"));
+  const text = pages.join("\n\n");
   // Letters and numbers only: a font pdf.js can't map leaves its punctuation, which is no text to read.
   // The form's answers aren't the page's own text: a scanned form is still a scan (code review).
-  if (fields.flat().reduce((t, f) => t.replace(f, ""), text.replaceAll(PAST_FIGURES, "")).replace(/<!-- page \d+ -->|!\[\]\(assets\/[^)]+\)/g, "").replace(/[^\p{L}\p{N}]/gu, "").length < 20) {
+  if (fields.flat().reduce((t, f) => t.replace(f, ""), text.replaceAll(PAST_FIGURES, "")).replace(/!\[\]\(assets\/[^)]+\)/g, "").replace(/[^\p{L}\p{N}]/gu, "").length < 20) {
     throw new ScannedPdf();
   }
+  if (needsRecognition.length) {
+    // Where its words can't be read (the iPhone, which has no recognizer here; a recognizer that fails), the page
+    // says so, never left empty unsaid (D96).
+    const recognized = await recognizedPages(data, "pdf", needsRecognition).catch(() => null);
+    needsRecognition.forEach((page, i) => {
+      // A page it read and found no words on says so too, never left empty unsaid.
+      const words = (recognized && recognized[i]?.trim()) || SCAN_UNREAD;
+      if (words) pages[page - 1] = [words, pages[page - 1]].filter(Boolean).join("\n\n");
+    });
+  }
   // A metadata title that is only a file or tool name ("1706", "Microsoft Word - draft.docx") loses to page 1's.
-  return { title: cleanTitle(meta.title) ?? titleFrom(lines[0] ?? [], body), author: meta.author, body: text, assets, structure };
+  const markdown = pages.map((p, i) => `<!-- page ${i + 1} -->\n\n${p}`).join("\n\n") + "\n";
+  return { title: cleanTitle(meta.title) ?? titleFrom(lines[0] ?? [], body), author: meta.author, body: markdown, assets, structure };
 }

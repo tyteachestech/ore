@@ -69,7 +69,7 @@ describe("Ask about this (D61)", () => {
     const { item } = await addSnippet(lib, { text: "Retrieval practice changes what is stored." });
     const card = writeNewCard(lib, { kind: "card", item: item.meta.id, skills: [], topics: [], content_type: "fact", question: "What does retrieval change?", answer: "What is stored.", rubric: [] });
     const events = [
-      { type: "stream_event", event: { type: "message_start" } },
+      { type: "stream_event", event: { type: "message_start", message: { model: "claude-streaming" } } },
       { type: "stream_event", event: { type: "content_block_start", index: 0, content_block: { type: "tool_use", name: "StructuredOutput" } } },
       { type: "stream_event", event: { type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"reply": "Because effort' } } },
     ];
@@ -77,8 +77,8 @@ describe("Ask about this (D61)", () => {
     fakeClaude([{ reply: "Because effort strengthens it.", card: null }, { reply: "Yes.", card: null }]);
     const seen: unknown[] = [];
     const r = await askAboutCard(lib, card.meta.id, { message: "Why?", answer: "x", onProgress: (p) => seen.push(p) });
-    // Each carries the session, so a reply he stops part way can still be followed up in it.
-    expect(seen).toEqual([{ reply: "Because effort", session: r.session }]);
+    // A stopped reply can be saved with its AI stamp and followed up in its session.
+    expect(seen).toEqual([{ reply: "Because effort", session: r.session, ai: { ...r.ai, model: "claude-streaming" } }]);
     expect(r.reply).toBe("Because effort strengthens it.");
     rmSync(join(binDir, "while.js"));
     await askAboutCard(lib, card.meta.id, { message: "Sure?", session: r.session }); // nobody listening: one JSON answer, as before

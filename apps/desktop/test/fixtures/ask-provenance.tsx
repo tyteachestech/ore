@@ -1,10 +1,11 @@
 import { mock } from "bun:test";
 import { Window } from "happy-dom";
-import { act, useState } from "react";
+import { act } from "react";
 import { strict as assert } from "node:assert";
 import { rmSync } from "node:fs";
 import { addText } from "../../../../packages/core/src/ingest/index.ts";
 import { writeNewCard, findCard } from "../../../../packages/core/src/cards.ts";
+import { readExerciseChat, saveChat } from "../../../../packages/core/src/chats.ts";
 import { tempLibrary } from "../../../../packages/core/test/helpers.ts";
 import { studyCommands } from "../../../../packages/cli/src/cmd-study.ts";
 import type { CardFull } from "../../src/ore";
@@ -29,17 +30,23 @@ g.IS_REACT_ACT_ENVIRONMENT = true;
 g.matchMedia = () => ({ matches: true, addEventListener() {}, removeEventListener() {} });
 g.requestAnimationFrame = (f: (time: number) => void) => setTimeout(() => f(performance.now()), 1);
 g.cancelAnimationFrame = clearTimeout;
-mock.module("../../src/ore.ts", () => ({ oreJob: async () => result, cancelOre: async () => {}, opt: (k: string, v: string) => `--${k}=${v}` }));
+mock.module("../../src/ore.ts", () => ({
+  ore: async () => readExerciseChat(lib, card.meta.id),
+  oreWith: (body: string) => saveChat(lib, body, { merge: true }),
+  oreJob: async () => result,
+  cancelOre: async () => {},
+  opt: (k: string, v: string) => `--${k}=${v}`,
+}));
 mock.module("@tauri-apps/api/event", () => ({ listen: async () => () => {} }));
-const { Ask, NO_ASK } = await import("../../src/Ask.tsx");
+const { Ask, useAskChats } = await import("../../src/Ask.tsx");
 const { createRoot } = await import("react-dom/client");
 const { TooltipProvider } = await import("@radix-ui/react-tooltip");
 let apply: Promise<unknown> | undefined;
 function Host() {
-  const [chat, setChat] = useState(NO_ASK);
+  const asks = useAskChats((message) => { throw new Error(message); });
   return <TooltipProvider><Ask
     card={{ ...card.meta, question: card.question, answer: card.answer, rubric: [] } as CardFull}
-    answer="Recall" chat={chat} setChat={setChat} onClose={() => {}}
+    answer="Recall" store={asks} onClose={() => {}}
     onApply={async p => {
       apply = studyCommands.card!.run(["set", card.meta.id], { question: p.question, answer: p.answer, ai: JSON.stringify(p.ai) });
       await apply;
@@ -53,6 +60,7 @@ try {
   await act(async () => root.render(<Host />));
   const button = [...document.querySelectorAll("button")].find(b => b.textContent === "Make this exercise clearer")!;
   await act(async () => { button.click(); });
+  await act(async () => root.render(<Host key="reopened" />));
   const use = [...document.querySelectorAll("button")].find(b => b.textContent === "Use this exercise")!;
   assert.ok(use, "Ask offers the proposed wording");
   await act(async () => { use.click(); await apply; });
