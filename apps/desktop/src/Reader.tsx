@@ -4307,7 +4307,7 @@ function Prequestions({ doc, waiting, onRetry, notify, ask, onKept }: {
             {doc.enrich_skipped ? "Write them" : "Try again"}
           </button>
         </div>
-        {doc.enrich_error && <p className="preq-why">{doc.enrich_error}</p>}
+        {doc.enrich_error && <p className="preq-why">{errorText(doc.enrich_error)}</p>}
       </section>
     );
 

@@ -1,7 +1,6 @@
 import { useEffect, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { ownsUndo } from "./history";
 import { BINDINGS, comboOf, IN_REVIEW, useKeymap, type Combo, type CommandEvent, type KeyId } from "./keys";
 
@@ -166,8 +165,11 @@ export function runMenu(id: KeyId, keymap: Record<KeyId, Combo>, now = performan
   ((here && document.activeElement) || document.body).dispatchEvent(e);
 }
 
-export function listenMenu(keymap: () => Record<KeyId, Combo>, quick = false) {
-  return listen<string>("menu", (e) => {
+/** This window's own `listen`: the plain one hears a click sent to any window, so the hidden quick quiz heard
+ *  the main window's, sent it back to the main window as "not mine", heard that one too, and so on without end
+ *  (F801: a review started from the menu started again each time he left it). */
+export function listenMenu(keymap: () => Record<KeyId, Combo>, quick = false, win: Pick<ReturnType<typeof getCurrentWindow>, "listen"> = getCurrentWindow()) {
+  return win.listen<string>("menu", (e) => {
     const id = e.payload.replace(/^ore:/, "") as KeyId;
     if (!BINDINGS.some((b) => b.id === id)) return;
     // App navigation still opens main; Review commands and history belong to this quiz.

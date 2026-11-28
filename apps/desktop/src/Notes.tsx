@@ -9,7 +9,7 @@ import { Hint } from "./Hint";
 import { usePeek } from "./Peek";
 import { change } from "./change";
 import { ore, opt, oreWith, type Backlink, type Notes } from "./ore";
-import { errorText, LIBRARY_BACK, load, save, useLibraryChanges, type Notify } from "./util";
+import { errorText, LIBRARY_BACK, load, onLeave, save, useLibraryChanges, type Notify } from "./util";
 
 /** Which note: a source note (D31) or a skill note (D41). */
 type NoteRef = { item: string } | { skill: string };
@@ -271,13 +271,12 @@ export function useNotes(ref: NoteRef, notify: Notify, onKept?: () => void): MyN
       void queue(() => ore<Notes>("notes", ...key.split(" "))).then((r) => live && draft.current === saved.current && r.text !== saved.current && apply(r.text), () => {});
     window.addEventListener(LIBRARY_BACK, outside);
     // Leaving (or quitting) writes what is pending; the CLI call outlives this view.
-    const leave = () => void flush();
-    window.addEventListener("beforeunload", leave);
+    const left = onLeave(flush);
     return () => {
       live = false;
       window.removeEventListener("ore:note-written", written);
       window.removeEventListener(LIBRARY_BACK, outside);
-      window.removeEventListener("beforeunload", leave);
+      left();
     };
   }, [key, tries, apply, flush, notify, queue]);
 
