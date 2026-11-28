@@ -498,8 +498,10 @@ export async function highlightMenu(page: Page, phrase: string, item: string) {
       const i = n.data.indexOf(phrase);
       if (i < 0) continue;
       const r = document.createRange();
-      r.setStart(n, i);
-      r.setEnd(n, i + 1);
+      // Its middle letter: the first has the selection's drag handle over it while the popup is open.
+      const m = i + Math.floor(Math.min(phrase.length, n.data.length - i) / 2);
+      r.setStart(n, m);
+      r.setEnd(n, m + 1);
       const b = r.getBoundingClientRect();
       return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
     }

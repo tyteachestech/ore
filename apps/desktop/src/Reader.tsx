@@ -2345,9 +2345,18 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
    *  so the popup keeps only what he does to every highlight (its kind and note). */
   const menuHl = useRef<string | null>(null);
   const menuNative = (e: ReactPointerEvent) => {
-    const sel = getSelection();
-    menuHl.current = !PHONE && (!sel || sel.isCollapsed) ? hitTest(ranges.current, e.clientX, e.clientY) : null;
+    // A highlight under the pointer gets its own menu, also while its words are still selected (just made);
+    // a selection reaching past it keeps the Mac's menu, so plain text is copied, looked up, spoken as anywhere.
+    const hit = PHONE ? null : hitTest(ranges.current, e.clientX, e.clientY);
+    menuHl.current = hit && withinHighlight(hit) ? hit : null;
     return !menuHl.current;
+  };
+  const withinHighlight = (id: string) => {
+    const sel = getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount) return true;
+    // Its words alone, give or take the space a drag picks up at an end.
+    const r = rangeOf(id), s = sel.getRangeAt(0);
+    return !!r && r.compareBoundaryPoints(Range.END_TO_START, s) < 0 && r.compareBoundaryPoints(Range.START_TO_END, s) > 0 && r.toString().includes(s.toString().trim());
   };
   const textMenu = (): MenuAction[] => {
     const id = menuHl.current;
@@ -2359,7 +2368,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     return [
       ...(pdf ? [{ id: "page", label: "Show on the page", run: () => showOnPage(range) }] : []),
       ...(video && words ? [{ id: "play-here", label: "Play from here", run: () => startHere(id) }] : []),
-      ...(lookable(range.toString()) ? [{ id: "look-up", label: "Explain", hint: label(keys["look-up"]), run: () => lookUp(range, popup?.id === id ? popup : null) }] : []),
+      ...(lookable(range.toString()) ? [{ id: "look-up", label: "Explain", hint: label(keys["look-up"]), run: () => lookUp(range, { id }) }] : []),
       { id: "copy-highlight", label: "Copy with source", hint: label(keys.copy), run: () => copyHighlight(id, annOf(id)?.note) },
       ...(cut ? [{ id: "cut-text", label: heading ? "Remove this section from the text" : "Remove this from the text", hint: label(keys["cut-text"]), divider: true, run: () => void cutOut(id) }] : []),
       { id: "remove", label: "Remove highlight", hint: label(keys.remove), danger: true, divider: !cut, run: () => void removeSaved(id) },
@@ -2416,7 +2425,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   /** Explain (D97) on a word: a term he had to look up is one he didn't know, so it stays highlighted,
    *  marked looked up, and the plan weighs it at the finish (D318). With no highlight there
    *  (the key on the word under the pointer), it becomes a plain one. */
-  function lookUp(range: Range, from: Popup | null) {
+  function lookUp(range: Range, from: { id: string } | null) {
     let ann: string | null = null;
     if (from) {
       ann = from.id;
@@ -2818,7 +2827,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   useEffect(() => () => disarm.current(), []);
   const onMouseDown = (e: MouseEvent) => {
     // A right-click on a highlight opens its menu: WebKit would first select the word under it, as for Look Up.
-    if (!PHONE && (e.button === 2 || e.ctrlKey) && getSelection()?.isCollapsed !== false && hitTest(ranges.current, e.clientX, e.clientY)) e.preventDefault();
+    if (!PHONE && (e.button === 2 || e.ctrlKey)) {
+      const hit = hitTest(ranges.current, e.clientX, e.clientY);
+      if (hit && withinHighlight(hit)) e.preventDefault();
+    }
     // A click that is not the third of a triple: the double click's sentence is kept now, quietly (no popup,
     // and the selection this click starts is left alone).
     const word = wordWait.current;
