@@ -82,5 +82,6 @@ describe("app reinstall hooks", () => {
     await installs();
     git(clone, "pull", "-q", "--ff-only");
     expect(await installs()).toBe("master");
-  });
+    // A clone, a commit, a pull and two waits of up to 1.6 s each for the hook: more than bun's 5 s on a busy runner (F-new-hooks-test-budget).
+  }, 20_000);
 });
