@@ -787,7 +787,7 @@ journey("Ask about this exercise in WebKit: a sent question is not in the next d
     const field = page.getByRole("textbox", { name: "Ask about this exercise" });
     await field.pressSequentially("First question");
     await page.keyboard.press("Enter");
-    await page.locator(".ask").getByText("Because recalling it is the practice.").waitFor();
+    await page.locator(".review-chat").getByText("Because recalling it is the practice.").waitFor();
     await until("the field is empty and has focus", async () => (await field.inputValue()) === "" && (await field.evaluate((el) => el === document.activeElement)));
     await undoRedo(page, field);
   } finally {
@@ -1407,7 +1407,7 @@ journey("math in a reply: the tutor and Review's Ask draw an AI's formulas, on t
     await page.getByRole("button", { name: "Ask about this" }).click();
     await page.getByRole("textbox", { name: "Ask about this exercise" }).fill("Show me the formula");
     await page.keyboard.press("Enter");
-    await drawn("Review's Ask", page.locator(".ask"));
+    await drawn("Review's Ask", page.locator(".review-chat"));
   } finally {
     await page.unroute(/\/ore$/);
   }
