@@ -432,7 +432,7 @@ export async function select(page: Page, phrase: string) {
     }
     return null;
   }, phrase);
-  // Found where it rests (F887): read while a picture above it was still loading, the press
+  // Found where it rests (F888): read while a picture above it was still loading, the press
   // landed on the picture that took the words' place and opened it instead of selecting.
   let box = await find();
   for (let last = ""; box; box = await find()) {
