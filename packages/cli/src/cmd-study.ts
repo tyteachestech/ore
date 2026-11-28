@@ -244,7 +244,7 @@ export const studyCommands: Record<string, Command> = {
       const text = [
         `Goal ${t.goal_minutes} min${t.weekdays_only ? " (weekdays)" : ""}: ${min(t.active_ms)} done${t.met ? " · met" : t.counts ? "" : " · day off"}`,
         `${t.due} to review (~${min(t.estimate_ms)})${t.caught_up ? " · all caught up" : ""}${t.new_waiting ? ` · ${t.new_waiting} new waiting (${t.new_per_day ? `up to ${t.new_per_day} a day` : "new cards are off"})` : ""}`,
-        `This week: ${t.week.map((d) => (d.status === "met" ? "●" : d.status === "off" ? "–" : "○")).join(" ")} · ${t.days_met} days met`,
+        `This week: ${t.week.map((d) => (d.status === "met" ? "●" : d.status === "short" ? "◐" : d.status === "off" ? "–" : "○")).join(" ")} · ${t.days_met} days met`,
       ].join("\n");
       return { data: t, text };
     },

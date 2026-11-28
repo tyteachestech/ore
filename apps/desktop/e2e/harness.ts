@@ -618,19 +618,39 @@ export async function armGood(page: Page, noIdea: boolean) {
   await page.waitForTimeout(550); // a second press inside a double click doesn't count
 }
 
+/** Waits until the passage is under the answer. It lands a moment after the answer and pushes the ratings
+ *  down, so a click on a rating sent in that instant misses it (F865). */
+export const passageIn = (page: Page) => page.locator(".review-passage").first().waitFor();
+
 /** Every `ore` call a page makes, in order, and the ratings it logged (to take back after the journey). */
 export function oreCalls(page: Page) {
   const calls: string[][] = [];
   const rated: { card: string; ts: string }[] = [];
+  const argsOf = (r: { postData(): string | null }) => (JSON.parse(r.postData() ?? "{}") as { args: string[] }).args;
+  const isRating = (r: { method(): string; url(): string; postData(): string | null }) =>
+    r.method() === "POST" && r.url().endsWith("/ore") && argsOf(r)[0] === "review" && !argsOf(r).some((a) => a.startsWith("--undo"));
+  // Ratings sent whose answer isn't read yet. A rating is known here only then, so `undoAll` waits for them:
+  // run in a journey's `finally` right after the press, it found none and left a real review in the library (F866).
+  let out = 0;
   page.on("request", (r) => {
-    if (r.method() === "POST" && r.url().endsWith("/ore")) calls.push((JSON.parse(r.postData() ?? "{}") as { args: string[] }).args);
+    if (r.method() !== "POST" || !r.url().endsWith("/ore")) return;
+    calls.push(argsOf(r));
+    if (isRating(r)) out++;
   });
+  page.on("requestfailed", (r) => void (isRating(r) && out--));
   page.on("response", async (r) => {
-    if (r.request().method() !== "POST" || !r.url().endsWith("/ore") || !r.ok()) return;
-    const args = (JSON.parse(r.request().postData() ?? "{}") as { args: string[] }).args;
-    if (args[0] === "review" && !args.some((a) => a.startsWith("--undo"))) rated.push(await r.json());
+    if (!isRating(r.request())) return;
+    try {
+      if (r.ok()) rated.push(await r.json());
+    } finally {
+      out--;
+    }
   });
-  return { calls, rated, undoAll: async () => { for (const r of rated.splice(0).reverse()) await ore("review", r.card, `--undo=${r.ts}`).catch(() => {}); } };
+  const undoAll = async () => {
+    for (const end = Date.now() + 5000; out > 0 && Date.now() < end; ) await Bun.sleep(50);
+    for (const r of rated.splice(0).reverse()) await ore("review", r.card, `--undo=${r.ts}`).catch(() => {});
+  };
+  return { calls, rated, undoAll };
 }
 
 /** Leaves the window for over 10 s and comes back, as he does after using the CLI, `/ore` or the phone. */
