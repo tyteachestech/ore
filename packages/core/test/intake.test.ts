@@ -2657,6 +2657,21 @@ describe("import coverage: figures and slide pictures", () => {
     for (const i of images(item.body)) expect(existsSync(join(item.dir, i.path))).toBe(true);
   });
 
+  test("notebook: a picture its Markdown shows from beside it, as <img> or ![](), is saved", async () => {
+    // Import corpus 2026-11-28: fastbook's chapters show their figures as <img src="images/…"> in Markdown
+    // cells; the reader shows no raw HTML, so every figure was dropped without a word.
+    const dir = mkdtempSync(join(tmpdir(), "ore-nb-"));
+    mkdirSync(join(dir, "images"));
+    writeFileSync(join(dir, "images", "neuron.png"), readFileSync(join(FIX, "files", "screenshot.png")));
+    const cells = ["# Neurons", '<img alt="Natural and artificial neurons" width="500" src="images/neuron.png" id="neuron"/>', "A neuron sums its inputs.\n\n![A second view](images/neuron.png)"];
+    writeFileSync(join(dir, "intro.ipynb"), JSON.stringify({ nbformat: 4, nbformat_minor: 5, metadata: {}, cells: cells.map((s) => ({ cell_type: "markdown", metadata: {}, source: s })) }));
+    const item = await addSource(await tempLibrary(), join(dir, "intro.ipynb"));
+    expect(item.body).not.toContain("<img");
+    const shown = images(item.body);
+    expect(shown.map((i) => i.alt)).toEqual(["Natural and artificial neurons", "A second view"]);
+    for (const i of shown) expect(existsSync(join(item.dir, i.path))).toBe(true);
+  });
+
   test("notebook: a plot is saved as an image, its <Figure …> text dropped", async () => {
     const item = await addSource(await tempLibrary(), file("plot.ipynb"));
     const [plot] = images(item.body);

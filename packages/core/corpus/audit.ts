@@ -110,15 +110,18 @@ function order(orig: string[], doc: string[]): { found: number; inOrder: number 
   const at = new Map<string, number>();
   for (let i = 0; i + N <= doc.length; i++) {
     const k = doc.slice(i, i + N).join(" ");
-    if (!at.has(k)) at.set(k, i);
+    // A run the doc has twice (a paragraph a document repeats) can't say where it sits: -1.
+    at.set(k, at.has(k) ? -1 : i);
   }
   const step = Math.max(N, Math.floor(orig.length / 300));
   const seen: number[] = [];
   let tried = 0;
+  let found = 0;
   for (let i = 0; i + N <= orig.length; i += step) {
     tried++;
     const p = at.get(orig.slice(i, i + N).join(" "));
-    if (p !== undefined) seen.push(p);
+    if (p !== undefined) found++;
+    if (p !== undefined && p >= 0) seen.push(p);
   }
   // Longest increasing run of positions (patience sort).
   const tails: number[] = [];
@@ -132,7 +135,7 @@ function order(orig: string[], doc: string[]): { found: number; inOrder: number 
     }
     tails[lo] = p;
   }
-  return { found: tried ? seen.length / tried : 1, inOrder: seen.length ? tails.length / seen.length : 1 };
+  return { found: tried ? found / tried : 1, inOrder: seen.length ? tails.length / seen.length : 1 };
 }
 
 /** How much of the original's text the doc kept (`lost`: share of its words missing), what it added that the
@@ -140,7 +143,8 @@ function order(orig: string[], doc: string[]): { found: number; inOrder: number 
 export function coverage(orig: Original, body: string): { lost: number; added: number; found: number; inOrder: number } | undefined {
   if (orig.words.length <= 200) return undefined;
   // The whole body in its order, code included, without links' and pictures' addresses.
-  const docWords = words(body.replace(/^\s*(?:`{3,}|~{3,}).*$/gm, "").replace(/!\[[^\]]*\]\([^)]*\)/g, " ").replace(/\]\([^)]*\)/g, "]"));
+  // TeX the doc draws a formula with (\frac, \lambda) is not words of the original: MathML holds λ.
+  const docWords = words(body.replace(/\\[a-zA-Z]+/g, " ").replace(/^\s*(?:`{3,}|~{3,}).*$/gm, "").replace(/!\[[^\]]*\]\([^)]*\)/g, " ").replace(/\]\([^)]*\)/g, "]"));
   const k = kept(orig.words, docWords);
   const o = order(orig.words, docWords);
   const r = (x: number) => Math.round(x * 1000) / 1000;

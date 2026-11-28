@@ -24,6 +24,8 @@ interface Entry {
   sha256?: string;
   /** What it is, for the report: a publisher, a kind of PDF. */
   note?: string;
+  /** Its kind, for a link whose path has no extension (arXiv's /pdf/1706.03762v7). */
+  kind?: string;
 }
 
 interface Result {
@@ -115,7 +117,7 @@ for (const input of inputs) {
     entries.push(...found.map((add) => ({ add })));
   } else entries.push({ add: input });
 }
-const extOf = (e: Entry) => (/^https?:/.test(e.add) && !e.sha256 ? "link" : extname(e.add.split("?")[0]).slice(1).toLowerCase() || "link");
+const extOf = (e: Entry) => e.kind ?? (/^https?:/.test(e.add) && !e.sha256 ? "link" : extname(e.add.split("?")[0]).slice(1).toLowerCase() || "link");
 if (only) entries = entries.filter((e) => only.includes(extOf(e)));
 
 // A file with a hash is fetched once into the cache and imported from there; its key is its hash.
@@ -125,7 +127,7 @@ async function local(e: Entry): Promise<{ add: string; key: string }> {
     return { add: e.add, key: sha(readFileSync(e.add)).slice(0, 16) };
   }
   if (!e.sha256) return { add: e.add, key: sha(e.add).slice(0, 16) };
-  const ext = extname(new URL(e.add).pathname) || ".bin";
+  const ext = `.${extOf(e)}`;
   const file = join(out, "cache", e.sha256.slice(0, 16) + ext);
   if (!existsSync(file)) {
     const res = await fetch(e.add, { headers: { "user-agent": "Ore corpus" } });
