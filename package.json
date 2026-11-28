@@ -34,5 +34,8 @@
     "axe-core": "4.11.1",
     "playwright": "1.63.0",
     "typescript": "^7.0.2"
+  },
+  "patchedDependencies": {
+    "defuddle@0.19.4": "patches/defuddle@0.19.4.patch"
   }
 }

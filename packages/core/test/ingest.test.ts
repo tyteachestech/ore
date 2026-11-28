@@ -74,6 +74,9 @@ describe("ingest", () => {
     expect(youtubeId("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=10")).toBe("dQw4w9WgXcQ");
     expect(youtubeId("https://youtu.be/dQw4w9WgXcQ?si=x")).toBe("dQw4w9WgXcQ");
     expect(youtubeId("https://youtube.com/shorts/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    // A saved link without its scheme still names its video (code review of #600).
+    expect(youtubeId("www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
+    expect(youtubeId("youtu.be/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
     expect(youtubeId("https://www.youtube.com/live/dQw4w9WgXcQ")).toBe("dQw4w9WgXcQ");
     expect(youtubeId("https://example.com/watch")).toBeNull();
   });

@@ -34,6 +34,7 @@ const MATHML = "MathML formulas are imported once";
 const MATRIX = "adjacent MathML tables in one matrix keep their rows and columns";
 const RELATED_WORK = "a paper keeps its numbered Related Work section and paragraph";
 const VIDEO_FILE = "article video files become safe links with their poster and caption";
+const NEWSLETTER_PROSE = "a newsletter keeps the linked paragraphs that introduce its subject";
 
 const GRID: Record<string, Row> = {
   // Web pages
@@ -41,7 +42,7 @@ const GRID: Record<string, Row> = {
   "Blog with images and code": { title: "blog with diagrams and code", author: "a blog whose byline is only in its head", date: "blog with diagrams and code", text: "blog with two kinds of footnotes", headings: "blog with diagrams and code", images: "a page's images are saved beside it", code: "blog with diagrams and code", tables: TABLES, math: "inline math becomes", language: LANG, junk: WEB_JUNK },
   "Docs site": { title: "docs with code (MDN)", author: na, date: "docs with code (MDN)", text: "docs with code (Python)", headings: "docs with code (Python)", images: na, code: "docs with code (Python)", tables: "a <table> shown as code stays code", math: na, language: LANG, junk: WEB_JUNK },
   Wikipedia: { title: "Wikipedia", author: "Wikipedia", date: "Wikipedia", text: "Wikipedia", headings: "Wikipedia", images: "Wikipedia", code: na, tables: "a table nested in a cell", math: "Wikipedia's formulas", language: LANG, junk: WEB_JUNK },
-  Newsletter: { title: "newsletter (Substack)", author: "newsletter (Substack)", date: "newsletter (Substack)", text: "newsletter (Substack)", headings: "newsletter (Substack)", images: "newsletter (Substack)", code: na, tables: na, math: na, language: LANG, junk: WEB_JUNK },
+  Newsletter: { title: "newsletter (Substack)", author: "newsletter (Substack)", date: "newsletter (Substack)", text: NEWSLETTER_PROSE, headings: "newsletter (Substack)", images: "newsletter (Substack)", code: na, tables: na, math: na, language: LANG, junk: WEB_JUNK },
   Tutorial: { title: "tutorial", author: "tutorial", date: "tutorial", text: "tutorial", headings: "tutorial", images: "tutorial", code: "tutorial", tables: na, math: "a Pandoc or Quarto page's formulas", language: LANG, junk: WEB_JUNK },
   "Page with MathML annotations": { title: MATHML, author: MATHML, date: MATHML, text: MATHML, headings: MATHML, images: na, code: na, tables: na, math: MATHML, language: na, junk: WEB_JUNK },
   "Page with split MathML matrices": { title: MATRIX, author: MATRIX, date: MATRIX, text: MATRIX, headings: MATRIX, images: na, code: na, tables: na, math: MATRIX, language: na, junk: WEB_JUNK },

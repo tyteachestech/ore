@@ -28,10 +28,20 @@ export function stamp(sec: number): string {
 const decode = (s: string) =>
   s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&nbsp;/g, " ");
 
-/** The video ID in a YouTube URL (watch?v=, youtu.be/, shorts/, live/), or null. */
-export function youtubeId(url: string): string | null {
-  const m = url.match(/(?:[?&]v=|youtu\.be\/|\/(?:shorts|live|embed)\/)([\w-]{11})/);
-  return m ? m[1]! : null;
+/** The video ID in a YouTube URL (watch, youtu.be, shorts, embed, live), or null. */
+export function youtubeId(url: string | URL): string | null {
+  // A saved link may lack its scheme (www.youtube.com/watch?v=…, youtu.be/…): read it as https.
+  const bare = typeof url === "string" && !/^[a-z][a-z0-9+.-]*:/i.test(url) ? `https://${url.replace(/^\/\//, "")}` : url;
+  const link = typeof bare === "string" ? URL.parse(bare) : bare;
+  if (!link || (link.protocol !== "http:" && link.protocol !== "https:")) return null;
+  const { hostname, pathname, searchParams } = link;
+  const host = hostname.replace(/^(www|m|music)\./, "");
+  let id: string | null | undefined;
+  if (host === "youtube.com" && (pathname === "/watch" || pathname === "/watch/")) id = searchParams.get("v");
+  else if (host === "youtube.com") id = pathname.match(/^\/(?:shorts|live|embed)\/([\w-]{11})\/?$/)?.[1];
+  else if (host === "youtube-nocookie.com") id = pathname.match(/^\/embed\/([\w-]{11})\/?$/)?.[1];
+  else if (host === "youtu.be") id = pathname.match(/^\/([\w-]{11})\/?$/)?.[1];
+  return id && /^[\w-]{11}$/.test(id) ? id : null;
 }
 
 type Cue = { start: number; end: number; lines: string[] };

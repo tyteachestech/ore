@@ -419,6 +419,26 @@ describe("today (D60)", () => {
     expect(today(lib).unreadable).toEqual([]);
   });
 
+  test("away: two or more days with no review, something due, and none yet today (D365)", async () => {
+    const { lib, cards } = await library(2);
+    const at = T();
+    const day = (n: number) => new Date(at.getTime() + n * 86_400_000);
+    // Never reviewed is a first day, not a gap.
+    expect(today(lib, at).away).toBe(false);
+    await recordReview(lib, cards[0]!.meta.id, { rating: 3, confidence: 2, elapsed_ms: 30_000, now: at });
+    expect(today(lib, at).away).toBe(false);
+    expect(today(lib, day(1)).away).toBe(false);
+    // One day missed is not a gap yet.
+    expect(today(lib, day(2)).away).toBe(false);
+    expect(today(lib, day(3)).away).toBe(true);
+    expect(today(lib, day(9)).away).toBe(true);
+    // One review that day and the offer is gone: it is made once per gap.
+    await recordReview(lib, cards[1]!.meta.id, { rating: 3, confidence: 2, elapsed_ms: 30_000, now: day(9) });
+    expect(today(lib, day(9)).away).toBe(false);
+    // A review dated ahead of today (a clock set wrong, then right) is not one he just made.
+    expect(today(lib, day(5)).away).toBe(true);
+  });
+
   test("a day he reviewed but fell short of the goal is short, not open (D362)", async () => {
     const { lib, cards } = await library(2);
     const at = T();

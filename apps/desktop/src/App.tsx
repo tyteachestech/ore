@@ -237,7 +237,7 @@ export function App() {
   /** Review mode (D59) over the window, for these skills (null: all). */
   /** `run` counts sessions, so "Keep going" mounts a fresh Review. */
   /** `paused`: the source he opened from a card (Open in source); Review waits, hidden, on the same card. */
-  const [reviewing, setReviewing] = useState<{ pick: string[] | null; source?: string; run: number; paused?: string } | null>(null);
+  const [reviewing, setReviewing] = useState<{ pick: string[] | null; source?: string; short?: boolean; run: number; paused?: string } | null>(null);
   /** What to review (D80), asked by ⌘R and the palette; Home asks from its own button. */
   const [asking, setAsking] = useState<Today | null>(null);
   const [homeTick, setHomeTick] = useState(0);
@@ -825,13 +825,13 @@ export function App() {
   /** The source open when review started: leaving review puts him back in it, where he was. */
   const beforeReview = useRef<string | null>(null);
   /** `source`: Review this source, only its exercises. */
-  const startReview = useCallback((pick: string[] | null, source?: string) => {
+  const startReview = useCallback((pick: string[] | null, source?: string, short?: boolean) => {
     setOpenId((id) => {
       beforeReview.current = id;
       return null;
     });
     setFinishing(false);
-    setReviewing((r) => ({ pick, source, run: (r?.run ?? 0) + 1 }));
+    setReviewing((r) => ({ pick, source, short, run: (r?.run ?? 0) + 1 }));
   }, []);
 
   /** ⌘R: ask what to review when more than one skill has cards due, else start. Home's last numbers
@@ -2348,7 +2348,7 @@ export function App() {
             recent={recent}
             reload={homeTick}
             blocked={overlay}
-            onReview={startReview}
+            onReview={(pick, short) => startReview(pick, undefined, short)}
             onOpenSource={openSource}
             onOpenSkill={openSkill}
             onRefile={(i, next, before, k) => void refile(i, next, before, k)}
@@ -2402,6 +2402,7 @@ export function App() {
           asks={asks}
           pick={reviewing.pick}
           source={reviewing.source}
+          short={reviewing.short}
           skills={skills}
           paused={!!reviewing.paused}
           under={palette || help}

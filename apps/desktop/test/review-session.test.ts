@@ -356,6 +356,49 @@ test("a goal that closes on a miss gets one likely recall first (D177); the quic
   expect(q.s.end).not.toBeNull();
 });
 
+test("a two-minute session ends itself at the rating that passes two minutes, after one likely recall if that was a miss (D365)", async () => {
+  const t = await open({ queue: [due("a"), due("b"), due("c"), due("d")] });
+  t.s.short = 120_000;
+  t.s.clock(50_000);
+  await t.rate("a");
+  await tick();
+  expect(t.s.end).toBeNull();
+  t.s.clock(80_000);
+  await t.rate("b");
+  await tick();
+  expect(t.wrote("session end")).toEqual(["session end S1"]);
+  expect(t.s.end).not.toBeNull();
+
+  // Past two minutes on a miss: one he will likely recall first, so the session doesn't end on a failure (D177).
+  const m = await open({ queue: [due("a"), due("b", { retrievability: 0.5 }), due("c", { retrievability: 0.9 })] });
+  m.s.short = 120_000;
+  m.s.clock(130_000);
+  await m.rate("a", 1);
+  await tick();
+  expect(m.s.end).toBeNull();
+  expect(m.ids()![0]).toBe("c");
+  m.s.clock(5000);
+  await m.rate("c");
+  await tick();
+  expect(m.s.end).not.toBeNull();
+
+  // Given again with ⇧⌘Z after ⌘Z took it back from the end screen, the rating ends the session again.
+  await t.steps.at(-1)!.undo!();
+  await tick();
+  expect(t.s.end).toBeNull();
+  t.on("b");
+  await t.steps.at(-1)!.redo!();
+  await tick();
+  expect(t.s.end).not.toBeNull();
+
+  // A session without it flows on.
+  const f = await open();
+  f.s.clock(130_000);
+  await f.rate("a");
+  await tick();
+  expect(f.s.end).toBeNull();
+});
+
 test("one write at a time on the exercise on screen: an edit holds a rating off until it has saved", async () => {
   const t = await open();
   let done!: () => void;

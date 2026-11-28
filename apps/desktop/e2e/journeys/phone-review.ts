@@ -831,3 +831,24 @@ journey("phone: after a rating scrolled down a long answer, the next exercise op
     if (top > 1) throw new Error(`the next exercise opened ${top}px down its screen, below the start of its question`);
   }
 }, "phone");
+
+journey("phone: back after days away the mole offers two minutes on Today, a 44 pt tap that starts a review with no pick (D365)", async (page) => {
+  const short = page.getByRole("button", { name: "2 minutes", exact: true });
+  // With something he is trying, which a full session asks about first (D324).
+  await page.evaluate(() => localStorage.setItem("e2e.check-in", "1"));
+  // Four days on, for Date only (F468): the seed's last review is days behind.
+  await page.clock.setFixedTime(new Date(Date.now() + 4 * 24 * 3600e3));
+  await page.reload();
+  await page.locator(".phone-app").waitFor();
+  await short.waitFor();
+  if (process.env.ORE_SHOT) await page.screenshot({ path: process.env.ORE_SHOT });
+  if ((await page.locator(".home-away").innerText()).trim() !== "Two minutes is plenty today.") throw new Error(`the mole says: ${await page.locator(".home-away").innerText()}`);
+  const box = (await short.boundingBox())!;
+  if (box.height < 44) throw new Error(`the 2 minutes button is ${box.height} pt tall`);
+  const start = (await page.getByRole("button", { name: "Start review" }).first().boundingBox())!;
+  if (box.y < start.y) throw new Error("2 minutes stands above Start review, which is the main way in");
+  await tap(page, short);
+  await page.getByRole("radio", { name: "Think so" }).or(page.locator(".review-q")).first().waitFor();
+  if (await page.locator(".review-pick").count()) throw new Error("two minutes asked what to review first");
+  if (await page.locator(".checkin").count()) throw new Error("two minutes opened on the check-in, not an exercise");
+}, "phone");

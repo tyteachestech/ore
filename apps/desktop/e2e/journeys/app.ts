@@ -512,7 +512,7 @@ journey("toast: a long title is clipped to two lines, not a wall of text over th
 
 journey("resize drags: Esc mid-drag puts the size back and stays on the page; nothing is left stuck after", async (page) => {
   const { createItem } = (await import(join(import.meta.dir, "../../../../packages/core/src/index.ts"))) as { createItem: (lib: { root: string }, d: object) => Promise<{ meta: { id: string } }> };
-  const made = await createItem({ root: LIB }, { type: "youtube", title: "A talk on spacing", url: "https://www.youtube.com/watch?v=spacingTalk1", body: "[00:00] Spacing works.\n\n[00:30] Test yourself after a pause.", source: { ext: "vtt", data: "WEBVTT\n\n00:00:00.000 --> 00:00:30.000\nSpacing works.\n\n00:00:30.000 --> 00:01:00.000\nTest yourself after a pause.\n" } });
+  const made = await createItem({ root: LIB }, { type: "youtube", title: "A talk on spacing", url: "https://www.youtube.com/watch?v=spacingTalk", body: "[00:00] Spacing works.\n\n[00:30] Test yourself after a pause.", source: { ext: "vtt", data: "WEBVTT\n\n00:00:00.000 --> 00:00:30.000\nSpacing works.\n\n00:00:30.000 --> 00:01:00.000\nTest yourself after a pause.\n" } });
   try {
     await page.reload();
     await openSource(page, "A talk on spacing");

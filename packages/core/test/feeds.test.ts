@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { addHighlight } from "../src/annotations.ts";
 import { arrangeFeeds, clearPreviews, closePost, feedView, findFeed, followFeed, listFeeds, markRead, openPost, parseFeed, refreshFeeds, restoreFeed, unfollowFeed } from "../src/feeds.ts";
-import { addSource } from "../src/ingest/index.ts";
-import { allItems, findItem, listItems, updateItemMeta } from "../src/items.ts";
-import { setNotes } from "../src/notes.ts";
+import { addSource, linkKey } from "../src/ingest/index.ts";
+import { allItems, createItem, findItem, listItems, updateItemMeta } from "../src/items.ts";
+import { readNotes, setNotes } from "../src/notes.ts";
 import { paths } from "../src/library.ts";
 import { withLock } from "../src/lock.ts";
 import { tempLibrary } from "./helpers.ts";
@@ -290,6 +290,42 @@ describe("the Feed and what he saved meanwhile", () => {
     await refreshFeeds(lib);
     await addSource(lib, "http://www.howiai.example.com/p/agents");
     expect(feedView(lib).posts.map((p) => p.url)).toEqual(["https://howiai.example.com/p/newest"]);
+  });
+
+  test("a kept YouTube Short leaves the Feed and reopens with its saved note (F610)", async () => {
+    const id = "0IZcjWtWmDA";
+    const watch = `https://www.youtube.com/watch?v=${id}`;
+    const short = `https://www.youtube.com/shorts/${id}`;
+    const feed = "https://www.youtube.com/feeds/videos.xml?channel_id=UC123";
+    serve(new Set(), { [feed]: [YOUTUBE.replace("https://www.youtube.com/watch?v=abc123", short), "application/atom+xml"] });
+    const lib = await tempLibrary();
+    await followFeed(lib, feed);
+    await refreshFeeds(lib);
+    expect(feedView(lib).posts.map((p) => p.url)).toEqual([short]);
+
+    // The video importer stores the watch URL, regardless of the link the Feed presented.
+    const saved = await createItem(lib, { type: "youtube", url: watch, title: "A short lesson", body: "[00:00] A short lesson." });
+    await setNotes(lib, saved.meta.id, "My saved thought.");
+    expect(feedView(lib).posts).toEqual([]);
+    const reopened = await openPost(lib, short);
+    expect(reopened.meta.id).toBe(saved.meta.id);
+    expect(reopened.meta.preview).toBeUndefined();
+    expect(readNotes(reopened)).toBe("My saved thought.");
+    expect(allItems(lib, { preview: true }).map((i) => i.meta.id)).toEqual([saved.meta.id]);
+
+    for (const alias of [
+      `https://m.youtube.com/watch?list=PL123&v=${id}&t=42#clip`,
+      `https://youtu.be/${id}?si=share`,
+      `https://www.youtube.com/embed/${id}`,
+      `https://www.youtube-nocookie.com/embed/${id}`,
+      `https://www.youtube.com/live/${id}`,
+    ]) expect(linkKey(alias)).toBe(linkKey(watch));
+    for (const other of [
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+      `https://www.youtube.com/watch?v=${id}0`,
+      `https://example.org/watch?v=${id}`,
+      `https://www.youtube.com/redirect?v=${id}`,
+    ]) expect(linkKey(other)).not.toBe(linkKey(watch));
   });
 
   test("one post listed by two feeds under links written two ways shows once, read in both (F610)", async () => {

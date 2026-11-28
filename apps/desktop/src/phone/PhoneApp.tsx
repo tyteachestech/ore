@@ -230,7 +230,7 @@ function usePullToSearch(mainRef: RefObject<HTMLElement | null>, cueRef: RefObje
 type TabId = "today" | "sources" | "loose" | "archive";
 
 /** Where he was, so a relaunch comes back to it, as Apple's apps do. */
-type Place = { tab: TabId; skill: string | null; skillNote?: boolean; course?: string | null; settings?: boolean; openId: string | null; noting?: boolean; side?: SideTab; finishing?: boolean; review: { pick: string[] | null; source?: string } | null };
+type Place = { tab: TabId; skill: string | null; skillNote?: boolean; course?: string | null; settings?: boolean; openId: string | null; noting?: boolean; side?: SideTab; finishing?: boolean; review: { pick: string[] | null; source?: string; short?: boolean } | null };
 export const PLACE = "ore-phone-place";
 function loadPlace(): Place {
   try {
@@ -581,7 +581,7 @@ export function PhoneApp() {
   const [recorded, setRecorded] = useState(false);
   useEffect(() => void (finishing || setRecorded(false)), [finishing]);
   /** `source`: Review this source, only its exercises. */
-  const [reviewing, setReviewing] = useState<{ pick: string[] | null; source?: string; run: number } | null>(start.review && { pick: start.review.pick, source: start.review.source, run: 0 });
+  const [reviewing, setReviewing] = useState<{ pick: string[] | null; source?: string; short?: boolean; run: number } | null>(start.review && { pick: start.review.pick, source: start.review.source, short: start.review.short, run: 0 });
   /** The skill whose editor (name, icon, colour, collection) is open. */
   const [editingSkill, setEditingSkill] = useState<string | null>(null);
   /** The course whose lessons are open, pushed over the list it was tapped in. */
@@ -637,7 +637,7 @@ export function PhoneApp() {
 
   useEffect(() => {
     try {
-      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, course, settings, openId, noting, side, finishing: finishing && !recorded, review: reviewing && { pick: reviewing.pick, source: reviewing.source } } satisfies Place));
+      localStorage.setItem(PLACE, JSON.stringify({ tab, skill, skillNote, course, settings, openId, noting, side, finishing: finishing && !recorded, review: reviewing && { pick: reviewing.pick, source: reviewing.source, short: reviewing.short } } satisfies Place));
     } catch {}
   }, [tab, skill, skillNote, course, settings, openId, noting, side, finishing, recorded, reviewing]);
   const tabNow = useRef(tab);
@@ -1059,12 +1059,14 @@ export function PhoneApp() {
             key={reviewing.run}
             pick={reviewing.pick}
             source={reviewing.source}
+            short={reviewing.short}
             skills={skills}
             onOpenSource={(item, at) => {
               endReview();
               open(item, at);
             }}
-            onClose={(again) => (again ? setReviewing({ ...reviewing, run: reviewing.run + 1 }) : endReview())}
+            // Keep going after the mole's two minutes is a full session, as on the Mac.
+            onClose={(again) => (again ? setReviewing({ ...reviewing, short: false, run: reviewing.run + 1 }) : endReview())}
             // A rating undone after Review closed: Today, mounted under it all along, reads its numbers again (F159).
             onLogged={() => setTick((t) => t + 1)}
             notify={notify}
@@ -1190,7 +1192,7 @@ export function PhoneApp() {
                 skills={skills}
                 recent={[]}
                 reload={tick}
-                onReview={(pick) => setReviewing({ pick, run: 0 })}
+                onReview={(pick, short) => setReviewing({ pick, short, run: 0 })}
                 onOpenSource={(id) => open(id)}
                 onOpenSkill={setSkill}
                 sourceMenu={row.menu}

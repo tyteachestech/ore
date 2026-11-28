@@ -18,10 +18,10 @@ export const CheckOutput = z.strictObject({ covered: z.array(z.boolean()) });
 
 /** Each quote located in the body and stored as a selector; quotes that do not anchor are dropped
  *  (D56), as are repeats. */
-export function anchorEvidence(body: string, quotes: string[]): Evidence[] {
+export function anchorEvidence(body: string, quotes: (string | { quote: string; start: number })[]): Evidence[] {
   const out: Evidence[] = [];
   for (const q of quotes) {
-    const at = locate(body, q);
+    const at = typeof q === "string" ? locate(body, q) : locate(body, q.quote, q.start);
     if (at && !out.some((e) => e.start === at.start)) out.push(quoteSelector(body, at.start, at.end));
   }
   return out;
