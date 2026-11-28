@@ -2924,7 +2924,36 @@ describe("import coverage: the grid's small holes", () => {
       if (view.getUint32(i, true) === 0x02014b50 && view.getUint16(i + 28, true) === name.length && docx.subarray(i + 46, i + 46 + name.length).every((b, k) => b === name[k])) view.setUint32(i + 24, 200, true);
     const dir = mkdtempSync(join(tmpdir(), "ore-lie-"));
     writeFileSync(join(dir, "notes.docx"), docx);
+    // DIAGNOSTIC (not for merge)
+    const t0 = performance.now();
+    const say = (...a: unknown[]) => console.log(`DIAG +${(performance.now() - t0).toFixed(1)}ms`, ...a);
+    const G = globalThis as Record<string, unknown>;
+    say("globals", Object.fromEntries(["window", "document", "MutationObserver", "CustomEvent", "navigator", "happyDOM", "IS_REACT_ACT_ENVIRONMENT"].map((k) => [k, typeof G[k]])));
+    say("timers", String(setTimeout).slice(0, 80), "|", String(setImmediate).slice(0, 80), "|", String(queueMicrotask).slice(0, 60), "| Promise native:", String(Promise).includes("[native code]"), "| fetch:", String(fetch).slice(0, 80));
+    for (const ev of ["unhandledRejection", "uncaughtException", "rejectionHandled"]) say("listeners", ev, process.listeners(ev as "exit").map((f) => String(f).slice(0, 400)));
+    const onUR = (reason: unknown, promise: unknown) => say("process unhandledRejection", String(reason), (reason as Error)?.stack?.slice(0, 600), "bluebird:", !!promise && typeof promise === "object" && "_bitField" in promise, "native:", promise instanceof Promise);
+    const onDom = (e: Event) => say("dom event", e.type, Object.keys(e), String((e as unknown as { reason?: unknown }).reason), JSON.stringify((e as CustomEvent).detail ?? null)?.slice(0, 300));
+    process.on("unhandledRejection", onUR);
+    for (const t of ["unhandledrejection", "rejectionhandled", "error"]) addEventListener(t, onDom);
+    const realReject = Promise.reject.bind(Promise);
+    Promise.reject = ((r?: unknown) => (r === undefined && say("Promise.reject(undefined)", new Error("here").stack), realReject(r))) as typeof Promise.reject;
+    try {
+      for (let i = 0; i < 6; i++) {
+        const lib = await tempLibrary();
+        say("run", i, "start");
+        const out = await addSource(lib, join(dir, "notes.docx")).then(() => "read", (e: Error) => `refused: ${e.message.slice(0, 40)}`);
+        say("run", i, out);
+        await new Promise((r) => setTimeout(r, i === 0 ? 300 : 20));
+        say("run", i, "after wait");
+      }
+    } finally {
+      process.off("unhandledRejection", onUR);
+      for (const t of ["unhandledrejection", "rejectionhandled", "error"]) removeEventListener(t, onDom);
+      Promise.reject = realReject;
+    }
+    say("expect");
     await expect(addSource(await tempLibrary(), join(dir, "notes.docx"))).rejects.toThrow(/That Word file is damaged/);
+    say("done");
   });
 
   test("a damaged Word file is refused once, with no second failure left unhandled, also where a page's globals are present (F883)", async () => {
