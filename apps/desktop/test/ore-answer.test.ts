@@ -20,3 +20,10 @@ test("F330: an AI reply, grade or check that comes back empty is a failure the s
   expect(answered(["recall", "s1", "--text=hi"], null)).toBeNull();
   expect(answered(["ask", "c1"], { reply: "Sure" })).toEqual({ reply: "Sure" });
 });
+
+test("an AI answer that failed Ore's check twice is said in plain words, never the library's own", () => {
+  const raw = "claude returned invalid enrich output twice: no skills and no suggested_skill: suggest the skill this document belongs to";
+  expect(errorText(raw)).toBe("Got an unexpected reply. Try again, or carry on without it.");
+  expect(errorText(new Error(raw), "write prequestions")).toBe("Couldn’t write prequestions: got an unexpected reply. Try again, or carry on without it.");
+  expect(errorText("disk full")).toBe("disk full");
+});

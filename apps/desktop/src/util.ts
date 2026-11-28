@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type RefObject } from "react";
 import { localDay } from "../../../packages/core/src/ids";
@@ -23,7 +24,9 @@ export type Forget = (() => void) & { undo: () => void; hold: (write: Promise<un
 /** What went wrong, in words he can act on. A JS fault (usually an empty or malformed AI reply) never
  *  reaches the UI as "Cannot read properties of null". */
 export const errorText = (e: unknown, action?: string) =>
-  e instanceof TypeError || e instanceof SyntaxError
+  // The AI's answer failed Ore's check twice: the library says so in its own words ("claude returned invalid enrich
+  // output twice: no skills and no suggested_skill…"), which tell him nothing he can act on (F804).
+  e instanceof TypeError || e instanceof SyntaxError || /returned invalid [\w-]+ output twice/.test(String(e))
     ? `${action ? `Couldn’t ${action}: g` : "G"}ot an unexpected reply. Try again, or carry on without it.`
     : e instanceof Error
       ? e.message
@@ -57,24 +60,29 @@ export const DRAFT_MS = 24 * 3600_000;
 export type Kept<V> = { get(id: string): V | undefined; at(id: string): number | undefined; set(id: string, v: V, at?: number): void; delete(id: string): void };
 type Stamped<V> = { v: V; at: number };
 const beforeKeptFlush = new Set<() => void>();
-const flushers = new Set<() => void>();
+const flushers = new Set<() => unknown>();
 /** Lets a screen capture live draft state before the app puts its drafts away. */
 export function beforeFlushKept(capture: () => void) {
   beforeKeptFlush.add(capture);
   return () => void beforeKeptFlush.delete(capture);
 }
-/** Writes every kept draft now. */
+/** Writes every kept draft now; settled once the writes that take a moment (a note's) have landed or failed. */
 /** `leaving`: the page goes or the app quits, so a screen's live state (Review's time on a draft) is taken too. A page
  *  only hidden (⌘Tab away) keeps running: taking its time then would let another window (the quick quiz) count it again. */
 export const flushKept = (leaving = true) => {
   if (leaving) beforeKeptFlush.forEach((capture) => capture());
-  flushers.forEach((flush) => flush());
+  return Promise.allSettled([...flushers].map(async (flush) => flush()));
 };
+/** Runs `f` whenever the page may be going (hidden, unloading, the app quitting), until the returned call: for a
+ *  write that waits on a pause in his typing, as a note's does. ⌘Q sends no `beforeunload`, so a listener of its
+ *  own for that missed the quit, and the words he typed in the note's last 800 ms were never saved (F803). */
+export const onLeave = (f: () => unknown) => (flushers.add(f), () => void flushers.delete(f));
 if (typeof window !== "undefined") {
-  addEventListener("pagehide", () => flushKept());
-  addEventListener("beforeunload", () => flushKept());
-  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flushKept(false));
-  if ("__TAURI_INTERNALS__" in window) void listen("quitting", () => flushKept()).catch(() => {});
+  addEventListener("pagehide", () => void flushKept());
+  addEventListener("beforeunload", () => void flushKept());
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && void flushKept(false));
+  // The shell quits once every page has answered (`quit_ready`, main.rs), so a write is never cut off mid-way.
+  if ("__TAURI_INTERNALS__" in window) void listen("quitting", () => void flushKept().then(() => invoke("quit_ready"))).catch(() => {});
 }
 export function kept<V>(key: string): Kept<V> {
   const fresh = (e: Stamped<V>) => Date.now() - e.at <= DRAFT_MS;

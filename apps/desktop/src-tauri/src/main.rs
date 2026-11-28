@@ -11,7 +11,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::collections::HashMap;
 use std::os::unix::process::CommandExt;
 use std::sync::{Mutex, OnceLock};
@@ -337,6 +337,23 @@ const PLAYER_HTML: &str = include_str!("player.html");
 static PLAYER_PORT: OnceLock<Option<u16>> = OnceLock::new();
 /// Set once the app has told its pages it is quitting, so the exit that follows goes through.
 static QUITTING: AtomicBool = AtomicBool::new(false);
+/// How many pages have said they wrote what he typed, since "quitting".
+static QUIT_READY: AtomicUsize = AtomicUsize::new(0);
+/// How long a quit waits for its pages at most: a page that never answers (hung, mid-reload) must not keep Ore open.
+const QUIT_WAIT: Duration = Duration::from_millis(2000);
+
+/// A page has written what he typed and hadn't sent (util.ts, on "quitting"). Once every page has, the app quits,
+/// a moment later so WebKit puts the kept drafts on disk. A fixed 150 ms in place of this answer lost the race in
+/// the real window: a note typed just before ⌘Q was not yet handed to `ore` when the app went (F15).
+#[tauri::command]
+fn quit_ready(app: AppHandle) {
+    if QUITTING.load(Ordering::SeqCst) && QUIT_READY.fetch_add(1, Ordering::SeqCst) + 1 >= app.webview_windows().len() {
+        thread::spawn(move || {
+            thread::sleep(Duration::from_millis(150));
+            app.exit(0);
+        });
+    }
+}
 
 fn serve_player() -> Option<u16> {
     let listener = TcpListener::bind("127.0.0.1:0").ok()?;
@@ -665,6 +682,16 @@ fn set_app_menu(app: AppHandle, window: tauri::WebviewWindow, menus: Vec<Value>)
                 sub.append(&item).map_err(e)?;
                 continue;
             }
+            // Quit is Ore's own item, never the standard one: that one sends `terminate:`, which never becomes
+            // ExitRequested here (tao has no applicationShouldTerminate), so the pages were not told "quitting"
+            // and the words he typed just before ⌘Q were lost (F15). This one exits through
+            // `app.exit`, which does. The Dock's Quit and a logout still send `terminate:`.
+            if it["predef"].as_str() == Some("quit") {
+                let name = app.config().product_name.clone().unwrap_or_else(|| "Ore".into());
+                let item = MenuItem::with_id(&app, "ore:quit", format!("Quit {name}"), true, Some("Cmd+Q")).map_err(e)?;
+                sub.append(&item).map_err(e)?;
+                continue;
+            }
             let p = match it["predef"].as_str().unwrap_or("") {
                 "separator" => PredefinedMenuItem::separator(&app),
                 "about" => PredefinedMenuItem::about(&app, None, None),
@@ -672,7 +699,6 @@ fn set_app_menu(app: AppHandle, window: tauri::WebviewWindow, menus: Vec<Value>)
                 "hide" => PredefinedMenuItem::hide(&app, None),
                 "hide_others" => PredefinedMenuItem::hide_others(&app, None),
                 "show_all" => PredefinedMenuItem::show_all(&app, None),
-                "quit" => PredefinedMenuItem::quit(&app, None),
                 "close_window" => PredefinedMenuItem::close_window(&app, None),
                 "undo" => PredefinedMenuItem::undo(&app, None),
                 "redo" => PredefinedMenuItem::redo(&app, None),
@@ -733,13 +759,15 @@ fn main() {
                 .with_state_flags(StateFlags::all() & !StateFlags::VISIBLE)
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![ore, ore_cancel, player_port, define, clipboard_count, clipboard_text, clipboard_files, set_reminder, login_item, quiz_hide, quiz_open_source, set_quiz_shortcut, set_tray, set_app_menu, menu_main])
+        .invoke_handler(tauri::generate_handler![ore, ore_cancel, player_port, define, clipboard_count, clipboard_text, clipboard_files, set_reminder, login_item, quiz_hide, quiz_open_source, set_quiz_shortcut, set_tray, set_app_menu, menu_main, quit_ready])
         .on_menu_event(|app, e| {
             let id = e.id().as_ref();
             if !id.starts_with("ore:") {
                 return; // the menu bar item's own menu
             }
-            if id == "ore:quick-quiz" {
+            if id == "ore:quit" {
+                app.exit(0);
+            } else if id == "ore:quick-quiz" {
                 toggle_quiz(app);
             } else if let Some(w) = app.webview_windows().values().find(|w| w.is_focused().unwrap_or(false)) {
                 let _ = app.emit_to(w.label(), "menu", id);
@@ -772,15 +800,15 @@ fn main() {
         .build(tauri::generate_context!())
         .expect("error while running Ore")
         .run(|app, e| {
-            // ⌘Q sends the pages neither pagehide nor visibilitychange: they are told "quitting" and given a moment
-            // to write what he typed and hasn't sent (kept drafts, util.ts), then the app quits.
+            // ⌘Q sends the pages neither pagehide nor visibilitychange: they are told "quitting", write what he typed
+            // and hasn't sent (kept drafts and notes, util.ts) and answer `quit_ready`, which quits; this wait is the most it takes.
             if let tauri::RunEvent::ExitRequested { api, .. } = &e {
                 if !QUITTING.swap(true, Ordering::SeqCst) {
                     api.prevent_exit();
                     let _ = app.emit("quitting", ());
                     let app = app.clone();
                     thread::spawn(move || {
-                        thread::sleep(Duration::from_millis(150));
+                        thread::sleep(QUIT_WAIT);
                         app.exit(0);
                     });
                     return;

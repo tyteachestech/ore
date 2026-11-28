@@ -161,11 +161,11 @@ export const studyCommands: Record<string, Command> = {
   },
 
   review: {
-    usage: "<card> --rating 1-4 --confidence 1-3 [--answer a] [--ai-rating r --ai-by 'vendor model prompt@n'] [--elapsed-ms n] [--finishing] [--session id] [--variant v] [--in-head] | <card> --undo <ts>   --variant: the remixed version shown (D66); --in-head: answered in his head, self-marked (D68); --undo: takes back the card's latest review (its ts from the review's output)",
+    usage: "<card> --rating 1-4 --confidence 1-3 [--answer a] [--ai-rating r --ai-by 'vendor model prompt@n'] [--elapsed-ms n] [--finishing] [--session id] [--variant v] [--in-head] [--cued 1-2] | <card> --undo <ts>   --variant: the remixed version shown (D66); --in-head: answered in his head, self-marked (D68); --cued: how many hints he took first; --undo: takes back the card's latest review (its ts from the review's output)",
     options: {
       undo: { type: "string" },
       rating: { type: "string" }, confidence: { type: "string" }, answer: { type: "string" }, "ai-rating": { type: "string" }, "ai-by": { type: "string" },
-      "elapsed-ms": { type: "string" }, finishing: { type: "boolean" }, session: { type: "string" }, variant: { type: "string" }, "in-head": { type: "boolean" },
+      "elapsed-ms": { type: "string" }, finishing: { type: "boolean" }, session: { type: "string" }, variant: { type: "string" }, "in-head": { type: "boolean" }, cued: { type: "string" },
     },
     async run([ref], f) {
       const lib = openLibrary();
@@ -188,7 +188,7 @@ export const studyCommands: Record<string, Command> = {
       if (by && by.length < 2) throw new Error('--ai-by takes "vendor model prompt@n", as `ore grade` prints them');
       const r = await recordReview(lib, need(ref, "<card>"), {
         rating: rating as 1 | 2 | 3 | 4, confidence, answer: str(f.answer), ai_rating: aiRating, ai: by && { vendor: by[0]!, model: by.slice(1, -1).join(" "), prompt_version: by.at(-1)! },
-        elapsed_ms: int(f["elapsed-ms"], "elapsed-ms"), finishing: Boolean(f.finishing), session: str(f.session), variant: str(f.variant), in_head: Boolean(f["in-head"]),
+        elapsed_ms: int(f["elapsed-ms"], "elapsed-ms"), finishing: Boolean(f.finishing), session: str(f.session), variant: str(f.variant), in_head: Boolean(f["in-head"]), cued: int(f.cued, "cued"),
       });
       // A card that just became remixable, or used up its variants, gets new ones written ahead.
       startRemix(lib, cardsToRemix(lib, [findCard(lib, r.card)]));
