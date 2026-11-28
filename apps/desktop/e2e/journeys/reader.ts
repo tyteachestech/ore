@@ -1778,8 +1778,6 @@ journey("highlight: its colour arrives as dots that join (the vein), its ore fli
 async function explain(page: Page, phrase: string) {
   await select(page, phrase);
   const popup = page.getByRole("dialog", { name: "Highlight" });
-  // A drag under CI load now and then lands before the page has settled from the last journey: one more drag.
-  if (!(await popup.waitFor({ timeout: 2500 }).then(() => true, () => false))) await select(page, phrase);
   await popup.waitFor();
   await popup.getByRole("button", { name: "Explain", exact: true }).click();
   await page.getByRole("dialog", { name: `Explain ${phrase}` }).waitFor();

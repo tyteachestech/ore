@@ -412,7 +412,7 @@ export async function openSource(page: Page, title: string) {
 
 /** Drags across a phrase in the reader, as he selects with the mouse. */
 export async function select(page: Page, phrase: string) {
-  const box = await page.evaluate((phrase) => {
+  const find = () => page.evaluate((phrase) => {
     const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
     for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
       const i = n.data.indexOf(phrase);
@@ -423,10 +423,24 @@ export async function select(page: Page, phrase: string) {
       r.setEnd(n, i + phrase.length);
       const rects = r.getClientRects();
       const a = rects[0]!, z = rects[rects.length - 1]!;
-      return { x1: a.left + 1, y1: a.top + a.height / 2, x2: z.right - 1, y2: z.top + z.height / 2 };
+      // A picture on screen still loading has no height yet: it lands a moment later and pushes the words down.
+      const loading = [...document.querySelectorAll<HTMLImageElement>(".doc img")].some((img) => {
+        const b = img.getBoundingClientRect();
+        return !img.complete && b.bottom > -innerHeight && b.top < 2 * innerHeight;
+      });
+      return { x1: a.left + 1, y1: a.top + a.height / 2, x2: z.right - 1, y2: z.top + z.height / 2, loading };
     }
     return null;
   }, phrase);
+  // Found where it rests (F884): read while a picture above it was still loading, the press
+  // landed on the picture that took the words' place and opened it instead of selecting.
+  let box = await find();
+  for (let last = ""; box; box = await find()) {
+    const now = `${Math.round(box.y1)},${Math.round(box.x1)}`;
+    if (!box.loading && now === last) break;
+    last = box.loading ? "" : now;
+    await page.waitForTimeout(50);
+  }
   if (!box) throw new Error(`“${phrase}” is not in the reader`);
   await page.mouse.move(box.x1, box.y1);
   await page.mouse.down();
