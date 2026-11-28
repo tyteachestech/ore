@@ -25,7 +25,7 @@ export type Forget = (() => void) & { undo: () => void; hold: (write: Promise<un
  *  reaches the UI as "Cannot read properties of null". */
 export const errorText = (e: unknown, action?: string) =>
   // The AI's answer failed Ore's check twice: the library says so in its own words ("claude returned invalid enrich
-  // output twice: no skills and no suggested_skill…"), which tell him nothing he can act on (F-new-ai-raw-words).
+  // output twice: no skills and no suggested_skill…"), which tell him nothing he can act on (F804).
   e instanceof TypeError || e instanceof SyntaxError || /returned invalid [\w-]+ output twice/.test(String(e))
     ? `${action ? `Couldn’t ${action}: g` : "G"}ot an unexpected reply. Try again, or carry on without it.`
     : e instanceof Error
@@ -57,19 +57,30 @@ export const DRAFT_MS = 24 * 3600_000;
  *  lasts DRAFT_MS from its last change (`at`). Written a moment after the last change, and at once (flushKept) as
  *  the page is hidden or goes, or the app quits (the shell's "quitting" event: ⌘Q sends the page neither). Each write
  *  puts only its own changes over what is stored, so another window (the quick quiz) keeps its own. */
-export type Kept<V> = { get(id: string): V | undefined; at(id: string): number | undefined; set(id: string, v: V): void; delete(id: string): void };
+export type Kept<V> = { get(id: string): V | undefined; at(id: string): number | undefined; set(id: string, v: V, at?: number): void; delete(id: string): void };
 type Stamped<V> = { v: V; at: number };
+const beforeKeptFlush = new Set<() => void>();
 const flushers = new Set<() => unknown>();
+/** Lets a screen capture live draft state before the app puts its drafts away. */
+export function beforeFlushKept(capture: () => void) {
+  beforeKeptFlush.add(capture);
+  return () => void beforeKeptFlush.delete(capture);
+}
 /** Writes every kept draft now; settled once the writes that take a moment (a note's) have landed or failed. */
-export const flushKept = () => Promise.allSettled([...flushers].map(async (f) => f()));
+/** `leaving`: the page goes or the app quits, so a screen's live state (Review's time on a draft) is taken too. A page
+ *  only hidden (⌘Tab away) keeps running: taking its time then would let another window (the quick quiz) count it again. */
+export const flushKept = (leaving = true) => {
+  if (leaving) beforeKeptFlush.forEach((capture) => capture());
+  return Promise.allSettled([...flushers].map(async (flush) => flush()));
+};
 /** Runs `f` whenever the page may be going (hidden, unloading, the app quitting), until the returned call: for a
  *  write that waits on a pause in his typing, as a note's does. ⌘Q sends no `beforeunload`, so a listener of its
- *  own for that missed the quit, and the words he typed in the note's last 800 ms were never saved (F-new-note-quit). */
+ *  own for that missed the quit, and the words he typed in the note's last 800 ms were never saved (F803). */
 export const onLeave = (f: () => unknown) => (flushers.add(f), () => void flushers.delete(f));
 if (typeof window !== "undefined") {
-  addEventListener("pagehide", flushKept);
-  addEventListener("beforeunload", flushKept);
-  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flushKept());
+  addEventListener("pagehide", () => void flushKept());
+  addEventListener("beforeunload", () => void flushKept());
+  document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && void flushKept(false));
   // The shell quits once every page has answered (`quit_ready`, main.rs), so a write is never cut off mid-way.
   if ("__TAURI_INTERNALS__" in window) void listen("quitting", () => void flushKept().then(() => invoke("quit_ready"))).catch(() => {});
 }
@@ -134,7 +145,7 @@ export function kept<V>(key: string): Kept<V> {
   return {
     get: (id) => live(id)?.v,
     at: (id) => live(id)?.at,
-    set: (id, v) => (m.set(id, { v, at: Date.now() }), changed(id)),
+    set: (id, v, at = Date.now()) => (m.set(id, { v, at }), changed(id)),
     delete: (id) => void (m.delete(id) && changed(id)),
   };
 }

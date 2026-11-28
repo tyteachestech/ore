@@ -210,7 +210,7 @@ test("a note that failed to load says so where the editor goes, and Try again lo
 });
 
 test("quitting the app saves the words typed in a note's last moment", async () => {
-  // F-new-note-quit: ⌘Q tells the page "quitting" (util.ts runs flushKept), never `beforeunload`, which was all the note listened for.
+  // F803: ⌘Q tells the page "quitting" (util.ts runs flushKept), never `beforeunload`, which was all the note listened for.
   const { flushKept } = await import("../src/util");
   let notes!: Notes;
   const quiet = () => {}; // one function across renders, as the app's is: a new one each render closes the note, which saves it

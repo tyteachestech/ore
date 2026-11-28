@@ -344,7 +344,7 @@ const QUIT_WAIT: Duration = Duration::from_millis(2000);
 
 /// A page has written what he typed and hadn't sent (util.ts, on "quitting"). Once every page has, the app quits,
 /// a moment later so WebKit puts the kept drafts on disk. A fixed 150 ms in place of this answer lost the race in
-/// the real window: a note typed just before ⌘Q was not yet handed to `ore` when the app went (F-new-quit-skips-flush).
+/// the real window: a note typed just before ⌘Q was not yet handed to `ore` when the app went (F15).
 #[tauri::command]
 fn quit_ready(app: AppHandle) {
     if QUITTING.load(Ordering::SeqCst) && QUIT_READY.fetch_add(1, Ordering::SeqCst) + 1 >= app.webview_windows().len() {
@@ -684,7 +684,7 @@ fn set_app_menu(app: AppHandle, window: tauri::WebviewWindow, menus: Vec<Value>)
             }
             // Quit is Ore's own item, never the standard one: that one sends `terminate:`, which never becomes
             // ExitRequested here (tao has no applicationShouldTerminate), so the pages were not told "quitting"
-            // and the words he typed just before ⌘Q were lost (F-new-quit-skips-flush). This one exits through
+            // and the words he typed just before ⌘Q were lost (F15). This one exits through
             // `app.exit`, which does. The Dock's Quit and a logout still send `terminate:`.
             if it["predef"].as_str() == Some("quit") {
                 let name = app.config().product_name.clone().unwrap_or_else(|| "Ore".into());

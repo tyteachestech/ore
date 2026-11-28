@@ -19,7 +19,7 @@ test("native menu commands reach the focused webview without raising main first"
   expect(setter).toContain('None => window.label() == "main"');
 });
 
-// F-new-quit-skips-flush, seen in the real window: the standard Quit item sends `terminate:`, which this Tauri
+// F15, seen in the real window: the standard Quit item sends `terminate:`, which this Tauri
 // never turns into ExitRequested, so the pages were never told "quitting" and what he typed in his last moment
 // was lost. Only a Mac can press ⌘Q; here the contract is kept: Quit is Ore's own item and exits through the shell.
 test("Quit is Ore's own menu item, so the pages hear that the app is quitting and save what he just typed", () => {
@@ -71,7 +71,7 @@ test("quiz menu Undo stays in its history and app navigation is handed to main",
   const unlisten = await listenMenu(() => keys, true);
   try {
     const listener = calls.find((c) => c.cmd === "plugin:event|listen" && c.args.event === "menu")!;
-    // Its own clicks only: the plain `listen` (target "Any") heard the main window's too, and handed each back (F794).
+    // Its own clicks only: the plain `listen` (target "Any") heard the main window's too, and handed each back (F801).
     expect(listener.args.target).toEqual({ kind: "Window", label: "quiz" });
     callbacks.get(listener.args.handler)!({ payload: "ore:undo" });
     await Promise.resolve();

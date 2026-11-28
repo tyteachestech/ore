@@ -203,14 +203,15 @@ const AUDIO_ANYWHERE = new RegExp(`\\.(?:${AUDIO_TYPES.join("|")})(?:[/?#]|$)`, 
 /** An address with a part after `/podcast/`, `/podcasts/`, `/episode/` or `/episodes/`: one episode's
  *  page, not the show's index (`/podcasts/`). */
 const EPISODE_PATH = /\/(?:podcasts?|episodes?)\/[^/]+/i;
+const PODCAST_HOST = /^podcasts?\./i;
 /** A Megaphone episode id (SAM9228418236): letters, then digits. A playlist or show path is not one. */
 const MEGAPHONE_ID = /^[A-Z]{2,}\d{6,}$/;
 
 /** The audio a web page is the episode of, or undefined when the page is only an article (D92,
  *  D122, D167). The page is an episode when its JSON-LD's page-level node (or one in its @graph) is a
  *  PodcastEpisode or RadioEpisode whose media is audio, or its `og:type` says episode and `og:audio`
- *  names the file; otherwise only when it plays exactly one audio (its `og:audio`, an `<audio>` file,
- *  or a Megaphone episode player, whose enclosure is its id's MP3) and its address names one episode.
+ *  names the file; otherwise only when an episode path or a page on a podcast host offers one audio.
+ *  Look for `og:audio`, an `<audio>` file or a Megaphone player first, then for audio download links.
  *  So a news story that plays a clip, or offers a read-aloud of itself (a bare `og:audio`, an
  *  AudioObject beside its Article), stays the article, as does a show's index with a featured player.
  *  One file counts once (see `add`). `player` is an episode link's own page (Overcast, Pocket Casts):
@@ -229,14 +230,17 @@ export function pageAudio(html: string, url: string, player = false): string | u
   if (declared) return abs(declared);
   // A player's own og:audio is its episode, whatever its address looks like (as before D215).
   if (player && og) return og;
-  if (!player && !EPISODE_PATH.test(new URL(url).pathname)) return undefined;
+  if (!player) {
+    const { hostname, pathname } = new URL(url);
+    if (!EPISODE_PATH.test(pathname) && !(PODCAST_HOST.test(hostname) && pathname !== "/")) return undefined;
+  }
   const isAudio = (u: string) => (player ? AUDIO_ANYWHERE : AUDIO_FILE).test(new URL(u).pathname);
   // One episode under two addresses counts once: the same file in another format or under another
   // query string, or behind a redirector (`…/redirect.mp3/traffic.megaphone.fm/ID.mp3`), is known by
   // its own name, the last part of its address without the type.
   const found = new Map<string, string>();
   const add = (u: string | undefined) => {
-    if (!u || !isAudio(u)) return;
+    if (!u || !/^https?:/.test(u) || !isAudio(u)) return;
     const key = (new URL(u).pathname.split("/").filter(Boolean).pop() ?? u).replace(/\.\w+$/, "").toLowerCase();
     if (!found.has(key)) found.set(key, u);
   };
@@ -256,6 +260,15 @@ export function pageAudio(html: string, url: string, player = false): string | u
     if (MEGAPHONE_ID.test(id)) add(`https://traffic.megaphone.fm/${id}.mp3`);
   }
   if (player) return [...found.values()][0];
+  // A page can offer the recording as a download beside a video of the same episode, both under one name
+  // (Oxford's `…/talk.mp3` and `…/talk.mp4`). A lone audio link (a series page's latest, a story's clip) is not
+  // enough: only one with its video twin is the episode.
+  if (found.size === 0) {
+    const links = [...html.matchAll(/<a(?=\s)[^>]*?\shref\s*=\s*(?:"([^"]+)"|'([^']+)')/gi)].map((m) => abs(m[1] ?? m[2])).filter((u): u is string => !!u && /^https?:/.test(u));
+    const stem = (u: string) => new URL(u).pathname.replace(/\.\w+$/, "").toLowerCase();
+    const videos = new Set(links.filter((u) => /\.(?:mp4|m4v|mov|webm)$/i.test(new URL(u).pathname)).map(stem));
+    for (const u of links) if (videos.has(stem(u))) add(u);
+  }
   return found.size === 1 ? [...found.values()][0] : undefined;
 }
 
