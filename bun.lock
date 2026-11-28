@@ -121,6 +121,9 @@
       },
     },
   },
+  "patchedDependencies": {
+    "defuddle@0.19.4": "patches/defuddle@0.19.4.patch",
+  },
   "packages": {
     "@anthropic-ai/sdk": ["@anthropic-ai/sdk@1.14.0", "", { "dependencies": { "@opentelemetry/api": "^1.4.1", "json-schema-to-ts": "^3.1.1", "standardwebhooks": "^1.0.0" }, "peerDependencies": { "zod": "^3.25.0 || ^4.0.0" }, "optionalPeers": ["zod"], "bin": { "anthropic-ai-sdk": "bin/cli" } }, "sha512-nADYXUd5fn9Zgw2nHi1iKyt/kb1UUt1cN3RbdxEI6XjTDTxbx4LLG4GnMrxWyS9GgXQllFOyAKSiFM3joDNK9A=="],
 

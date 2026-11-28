@@ -206,6 +206,25 @@ function noteFeed() {
   return { title, server, url: `http://localhost:${server.port}/feed.xml` };
 }
 
+journey("Feed: ⇧⌘U marks a single ⌘-clicked post read before any arrow key", async (page) => {
+  const feed = noteFeed();
+  try {
+    await ore("feed", "follow", feed.url);
+    await page.evaluate(() => localStorage.setItem("ore.feed.show", "unread"));
+    await page.getByRole("button", { name: /^Feed/ }).click();
+    const post = page.locator(".row.post", { hasText: feed.title });
+    await post.click({ modifiers: ["Meta"] });
+    await post.and(page.locator(".sel")).waitFor();
+    await page.keyboard.press("Shift+Meta+KeyU");
+    await until("⇧⌘U removes the single picked post from Unread", async () => (await post.count()) === 0);
+    await page.keyboard.press("Meta+KeyZ");
+    await post.waitFor();
+  } finally {
+    await ore("feed", "unfollow", feed.url).catch(() => {});
+    feed.server.stop(true);
+  }
+});
+
 journey("feed: leaving and reopening waits for the pending note (F143)", async (page) => {
   const feed = noteFeed();
   try {

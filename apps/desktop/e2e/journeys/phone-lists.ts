@@ -1,6 +1,7 @@
 import { type Locator, type Page, type Route } from "playwright";
 import { join } from "node:path";
 import { readdirSync, readFileSync } from "node:fs";
+import { addHighlight, createItem, openLibrary, setNotes } from "../../../../packages/core/src/index";
 import { AGENTS, fits44, itemFile, journey, keyboardUp, macChanges, pasteInto, PHONE_LIB, phoneReaderReady, phoneSource, phoneWith, press, swipe, tap, TESTING, until, tapFact } from "../harness";
 
 journey("phone: Today's list titles are 17 pt and the bar's buttons are 44 pt rounds (iPhone sizing A)", async (page) => {
@@ -944,6 +945,38 @@ journey("phone: Search's ⓧ clears what he typed and keeps Search open with the
   if (xs !== 1) throw new Error(`${xs} ✕ beside the field with text typed`);
   await tap(page, page.getByRole("button", { name: "Cancel", exact: true }));
   await field.waitFor({ state: "detached" });
+}, "phone");
+
+journey("phone: Search shows Key point and Source note on long titles at the largest text size", async (page) => {
+  const title = "A field guide to recognizing and describing the patterns that repeat across different scales in nature";
+  const body = "River branches resemble the veins in a leaf.";
+  await phoneWith(page, async () => {
+    const lib = openLibrary(PHONE_LIB);
+    const source = await createItem(lib, { type: "article", title, body });
+    addHighlight(source, { intent: "card", exact: body, note: "Nested patterns appear at many scales." });
+    await setNotes(lib, source.meta.id, "Nested patterns are easier to spot in a diagram.");
+    return source.dir;
+  }, async () => {
+    await page.evaluate(() => document.documentElement.style.setProperty("--type", String(28 / 17)));
+    await tap(page, page.getByRole("button", { name: "Search" }));
+    await page.locator("[cmdk-input]").fill("Nested patterns");
+    for (const [kind, label] of [["annotation", "Key point"], ["notes", "Source note"]] as const) {
+      const row = page.locator(`[cmdk-item][data-value^="text ${kind} "]`).filter({ hasText: title });
+      await row.waitFor();
+      const kindLabel = row.getByText(label, { exact: true });
+      if (!(await kindLabel.isVisible())) throw new Error(`${label} has no visible label apart from the long title`);
+      await kindLabel.scrollIntoViewIfNeeded();
+      const fits = await kindLabel.evaluate((el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const text = range.getBoundingClientRect();
+        const box = el.getBoundingClientRect();
+        return text.left >= box.left && text.right <= Math.min(box.right, window.innerWidth);
+      });
+      if (!fits) throw new Error(`${label} is clipped at the largest text size`);
+    }
+    await tap(page, page.getByRole("button", { name: "Cancel", exact: true }));
+  });
 }, "phone");
 
 journey("phone: a switch's knob slid off its track flips it, and a slide that ends on it doesn't flip it back (Codex native scout)", async (page) => {

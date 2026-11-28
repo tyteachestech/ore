@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { type Locator, type Page } from "playwright";
-import { AGENTS, BRIDGE, FIXTURES, journey, LIB, openSource, ore, reveal, startReview, TESTING, unchip, until } from "../harness";
+import { AGENTS, BRIDGE, FIXTURES, journey, LIB, openSource, ore, reveal, settled, startReview, TESTING, unchip, until } from "../harness";
 
 journey("tutor mole: it sits at the bottom right on every screen, pages keep room to scroll clear of it, and a quiz panel hides it (D160, D168)", async (page) => {
   const button = page.getByRole("button", { name: "Open the tutor" });
@@ -834,11 +834,18 @@ journey("tutor chats: deleting a chat while its reply is being written keeps it 
   await page.keyboard.press("Meta+j");
 });
 
-journey("tutor hints and cards: a hint offers Show me, which asks for the answer; + Exercise keeps the reply's exercise, ⌘Z takes it back", async (page) => {
+// F892
+journey("tutor hints and cards: Show me answers the hint, + Exercise keeps the cited passage, and ⌘Z takes it back", async (page) => {
   await openSource(page, TESTING);
+  const source = (await ore("ls") as { id: string; title: string }[]).find((i) => i.title === TESTING)!;
+  const { body } = await ore("show", source.id) as { body: string };
+  const quote = "Each successful retrieval changes the memory itself.";
+  const start = body.indexOf(quote);
+  if (start < 0) throw new Error("the seeded source no longer holds the quote");
+  const cite = { n: 1, item: source.id, title: TESTING, heading: "", quote, text: quote, start, end: start + quote.length };
   const replies = [
     { reply: "Think about what the tested group did that the rereaders didn't.", citations: [], general: false, hint: true, card: null },
-    { reply: "They pulled it out of memory, and that effort is what made it last.", citations: [], general: false, hint: false, card: { kind: "card", content_type: "fact", question: "In Roediger and Karpicke (2006), which group remembered more after a week?", answer: "The group that took a recall test.", rubric: [] } },
+    { reply: "They pulled it out of memory, and that effort is what made it last [1].", citations: [cite], general: false, hint: false, card: { kind: "card", content_type: "fact", question: "In Roediger and Karpicke (2006), which group remembered more after a week?", answer: "The group that took a recall test.", rubric: [] } },
   ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@3" } }));
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
@@ -854,7 +861,9 @@ journey("tutor hints and cards: a hint offers Show me, which asks for the answer
   const kept = page.waitForResponse((r) => (r.request().postData() ?? "").includes('"tutor-card"'));
   await tutor.getByRole("button", { name: /^Add exercise:/ }).click();
   await tutor.getByRole("button", { name: "Exercise added" }).waitFor();
-  await kept;
+  const { id } = await (await kept).json() as { id: string };
+  const saved = await ore("card", "show", id, "--review") as { evidence?: { exact: string; start: number; end: number }[] };
+  if (!saved.evidence?.some((e) => e.exact === quote && e.start === start && e.end === cite.end)) throw new Error("+ Exercise saved no anchor for the cited passage");
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // out of the field, so ⌘Z is the app's
   await page.keyboard.press("Meta+z");
   await tutor.getByRole("button", { name: /^Add exercise:/ }).waitFor();
@@ -862,11 +871,12 @@ journey("tutor hints and cards: a hint offers Show me, which asks for the answer
   await page.keyboard.press("Meta+j");
 });
 
-journey("tutor steps: Show me's worked answer shows one step at a time, Next step adds the next, the last hands the field the focus, and the steps stay and go with the next message (D142)", async (page) => {
+// F894
+journey("tutor steps: a reopened worked answer keeps its revealed steps and sends only those with a follow-up", async (page) => {
   await openSource(page, TESTING);
   const steps = ["The tested group pulled the facts out of memory.", "Pulling them out made the memory stronger.", "So a week later they **remembered more**."];
   const replies = [
-    { reply: "Think about what the tested group did.", citations: [], general: false, hint: true, steps: [], exercise: null, card: null },
+    { reply: "Think about what the tested group did.", title: "Working through the testing effect", citations: [], general: false, hint: true, steps: [], exercise: null, card: null },
     { reply: "Here's the working.", citations: [], general: false, hint: false, steps, exercise: null, card: null },
     { reply: "Step 2 is the testing effect.", citations: [], general: false, hint: false, steps: [], exercise: null, card: null },
   ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@8" } }));
@@ -902,6 +912,15 @@ journey("tutor steps: Show me's worked answer shows one step at a time, Next ste
     await page.keyboard.press("Escape");
     await page.keyboard.press("Meta+j");
     await until("the steps came back as he left them", async () => (await shown.count()) === 2);
+    await settled(page);
+    await page.reload();
+    await openSource(page, TESTING);
+    await page.keyboard.press("Meta+j");
+    await tutor.getByRole("button", { name: "Chats", exact: true }).click();
+    await page.locator(".tutor-chats [cmdk-item]", { hasText: "Working through the testing effect" }).click();
+    await shown.first().waitFor();
+    const reopened = await shown.count();
+    if (reopened !== 2) throw new Error(`reopening the saved chat showed ${reopened} step(s) instead of 2`);
     // The next message carries the steps he has seen as what the tutor said, not the one still hidden.
     await field.fill("Why step 2?");
     await page.keyboard.press("Enter");
@@ -1003,14 +1022,18 @@ journey("tutor Practice: an exercise is written in the source note with the sour
   await page.keyboard.press("Meta+j");
 });
 
-journey("tutor Practice: a tell apart's two cases sit side by side with a line each; Enter in A goes to B, Enter in B sends both (D163); the feedback marks each point and underlines his words (D162)", async (page) => {
+// F893
+journey("tutor Practice: a tell apart can send both cases by clicking Send or pressing Enter in B", async (page) => {
   await openSource(page, AGENTS);
   const card = { kind: "prompt", content_type: "concept", question: "Which fits each: a support bot that follows fixed steps, or one that picks its own tools?", answer: "The first is a workflow, the second an agent.", rubric: ["Fixed steps make a workflow", "Choosing its own tools makes an agent"] };
   const cases = ["A support bot answers refunds by running the same four steps every time.", "A research bot decides which tools to call and when it is done."];
   const exercise = { heading: "Which idea fits each case, and what decides it?", prompts: ["Case A", "Case B"], card, cases };
+  const askCases = { reply: "Tell these two apart.", citations: [], general: false, hint: false, exercise, card: null, marks: [] };
   const replies = [
-    { reply: "Tell these two apart.", citations: [], general: false, hint: false, exercise, card: null, marks: [] },
+    askCases,
     { reply: "A is right. B: who decides the steps?", citations: [], general: false, hint: false, exercise: null, card, marks: [{ point: card.rubric[0], covered: true, quote: "same steps each time" }, { point: card.rubric[1], covered: false, quote: "" }] },
+    askCases,
+    { reply: "Both answers received.", citations: [], general: false, hint: false, exercise: null, card: null, marks: [] },
   ].map((r) => ({ ...r, ai: { vendor: "claude", model: "mock", prompt_version: "tutor@12" } }));
   const asked: string[] = [];
   await page.route(/\/ore$/, async (route) => {
@@ -1025,6 +1048,7 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   if (await fresh.isEnabled()) await fresh.click();
   await tutor.getByRole("button", { name: "Practice", exact: true }).click();
   const a = tutor.getByRole("region", { name: "Case A" }), b = tutor.getByRole("region", { name: "Case B" });
+  const send = tutor.getByRole("button", { name: "Send", exact: true });
   await a.getByText(cases[0]!).waitFor();
   await b.getByText(cases[1]!).waitFor();
   const [boxA, boxB] = [await a.boundingBox(), await b.boundingBox()];
@@ -1033,14 +1057,14 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   await page.keyboard.type("A workflow: same steps each time");
   await page.keyboard.press("Enter");
   await until("Enter in A goes to B", async () => await b.getByRole("textbox").evaluate((el) => el === document.activeElement));
+  if (await send.isEnabled()) throw new Error("Send enabled with only Case A filled");
   await page.keyboard.type("An agent");
   // Closing the tutor mid-answer keeps both lines, as it keeps the chat box's draft.
   await tutor.getByRole("button", { name: "Close the tutor" }).click();
   await page.keyboard.press("Meta+j");
   if ((await a.getByRole("textbox").inputValue()) !== "A workflow: same steps each time" || (await b.getByRole("textbox").inputValue()) !== "An agent") throw new Error("closing the tutor lost the answers he was writing");
-  await b.getByRole("textbox").click();
-  await page.keyboard.press("End");
-  await page.keyboard.press("Enter");
+  if (!(await send.isEnabled())) throw new Error("Send stayed disabled with both cases filled");
+  await send.click();
   await tutor.getByText("A is right. B: who decides the steps?").waitFor();
   if (asked[1] !== "A: A workflow: same steps each time\nB: An agent") throw new Error(`sent: ${JSON.stringify(asked[1])}`);
   if (await a.getByRole("textbox").count()) throw new Error("the answer lines stay once he has answered");
@@ -1050,6 +1074,14 @@ journey("tutor Practice: a tell apart's two cases sit side by side with a line e
   await tutor.getByRole("listitem", { name: "Missed: Choosing its own tools makes an agent" }).focus();
   await until("a missed point marks nothing", async () => (await tutor.locator(".ask-me .quiz-evidence").count()) === 0);
   await tutor.getByRole("button", { name: /^Add exercise/ }).waitFor(); // the committed card, offered after the miss (D158)
+
+  await fresh.click();
+  await tutor.getByRole("button", { name: "Practice", exact: true }).click();
+  await a.getByRole("textbox").fill("Workflow");
+  await b.getByRole("textbox").fill("Agent");
+  await b.getByRole("textbox").press("Enter");
+  await tutor.getByText("Both answers received.").waitFor();
+  if (asked.at(-1) !== "A: Workflow\nB: Agent") throw new Error(`Enter in B sent: ${JSON.stringify(asked.at(-1))}`);
   await page.unroute(/\/ore$/);
   await page.keyboard.press("Meta+j");
 });

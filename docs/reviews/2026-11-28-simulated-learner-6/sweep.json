@@ -1,0 +1,5 @@
+{ "testers": [
+  { "name": "follower", "seed": "seed", "from": "/tmp/ore-learner/library" },
+  { "name": "practicer", "seed": "seed", "from": "/tmp/ore-learner/library" },
+  { "name": "phone", "seed": "seed", "from": "/tmp/ore-learner/library" }
+] }

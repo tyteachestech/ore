@@ -862,6 +862,23 @@ describe("tutor: hints and cards", () => {
     await expect(addTutorCard(lib, a.meta.id, { kind: "card", content_type: "fact", question: "Where does a known card go?", answer: "Up a box.", rubric: [] }, { vendor: "claude", model: "m", prompt: "tutor@3" } as never)).rejects.toThrow("prompt_version");
     expect(readdirSync(join(lib.root, "cards")).filter((f) => f.endsWith(".md")).length).toBe(before);
   });
+
+  // F892
+  test("a kept tutor exercise anchors its cited passages on its source", async () => {
+    const { lib, a, b } = await library();
+    const body = findItem(lib, a.meta.id).body;
+    const first = "A card you miss goes back to the first box.";
+    const second = "Cards you answer correctly move to the next box";
+    const citation = (quote: string, start = body.indexOf(quote), item = a.meta.id): Citation =>
+      ({ n: 1, item, title: a.meta.title, heading: "", quote, text: quote, start, end: start + quote.length });
+    const c = await addTutorCard(lib, a.meta.id,
+      { kind: "card", content_type: "fact", question: "Where does a missed card go?", answer: "Back to the first box.", rubric: [] },
+      { vendor: "claude", model: "mock", prompt_version: "tutor@3" },
+      [citation(first), citation(second, 0), citation(first), citation("A missing quote.", 0), citation("Spaced repetition", 0, b.meta.id)]);
+    expect(findCard(lib, c.meta.id).meta.evidence).toMatchObject([first, second].map((exact) => ({
+      exact, start: body.indexOf(exact), end: body.indexOf(exact) + exact.length,
+    })));
+  });
 });
 
 describe("tutor: practice", () => {

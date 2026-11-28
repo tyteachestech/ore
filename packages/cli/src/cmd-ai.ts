@@ -192,14 +192,15 @@ export const aiCommands: Record<string, Command> = {
   },
 
   "tutor-card": {
-    usage: '<source> --card <json> --ai <json>   Keep the card a tutor reply proposed (D128): {kind, content_type, question, answer, rubric} as `ore tutor` returned it, with that reply\'s ai stamp; it goes into review as a draft',
-    options: { card: { type: "string" }, ai: { type: "string" } },
+    usage: '<source> --card <json> --ai <json> [--citations <json>]   Keep the card a tutor reply proposed (D128): {kind, content_type, question, answer, rubric} as `ore tutor` returned it, with that reply\'s ai stamp and local passages; it goes into review as a draft',
+    options: { card: { type: "string" }, ai: { type: "string" }, citations: { type: "string" } },
     async run([ref], f) {
       const lib = openLibrary();
       const json = (v: string | undefined, name: string) => {
         try { return JSON.parse(need(v, `--${name}`)); } catch (e) { throw (e as Error).message.startsWith("missing") ? e : new Error(`--${name} must be JSON`); }
       };
-      const c = await addTutorCard(lib, need(ref, "<source>"), json(str(f.card), "card"), json(str(f.ai), "ai"));
+      const citations = f.citations === undefined ? [] : json(str(f.citations), "citations");
+      const c = await addTutorCard(lib, need(ref, "<source>"), json(str(f.card), "card"), json(str(f.ai), "ai"), citations);
       return { data: { id: c.meta.id, item: c.meta.item, kind: c.meta.kind, question: c.question }, text: `Added card ${c.meta.id}` };
     },
   },

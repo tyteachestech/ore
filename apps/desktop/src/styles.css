@@ -3121,6 +3121,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .palette-close { display: grid; place-items: center; flex: none; height: 44px; padding: 0 4px 0 8px; background: none; border: 0; color: var(--text); font: 400 17px var(--font); }
 .phone .overlay .panel [cmdk-list] { flex: 1; min-height: 0; max-height: none; }
 .phone .overlay .panel [cmdk-item] { min-height: 44px; height: auto; font-size: 16px; }
+.phone .palette-kind { font-size: calc(12px * var(--type, 1)); color: var(--muted); }
 .phone .overlay .panel .panel-foot:not(:has(.err)) { display: none; }
 .phone .overlay .panel .panel-foot .right { display: none; }
 .phone-page { overflow-y: auto; padding-top: env(safe-area-inset-top, 0px); }
