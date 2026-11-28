@@ -60,23 +60,33 @@ export type EndReceipt = SessionReceipt & { type: "end"; reviews: number; kept: 
 
 export const rescuedAt = (target: number) => Math.min(RESCUE_BELOW, target - 0.05);
 
-export function readSessions(lib: Library): SessionReceipt[] {
+type SessionEvent = SessionReceipt | { type: "reopen"; id: string; ts: string };
+
+function sessionEvents(lib: Library): SessionEvent[] {
   const dir = paths.sessions(lib);
   if (!existsSync(dir)) return [];
   // Every device's month logs (`2026-10.<device>.jsonl`); a receipt read twice (a conflicted copy) counts once.
-  const all = visible(dir)
+  return visible(dir)
     .filter((f) => f.endsWith(".jsonl"))
-    .flatMap((f) => readJsonl<SessionReceipt>(join(dir, f)))
+    .flatMap((f) => readJsonl<SessionEvent>(join(dir, f)))
     .filter((s) => typeof s.ts === "string" && typeof s.id === "string");
-  // A receipt read twice (a conflicted copy, same time) counts once, the first copy read; a session
-  // reopened by an undo on its end screen ends again, and its later end receipt counts.
-  const latest = new Map<string, SessionReceipt>();
-  for (const r of all) {
-    const k = `${r.type} ${r.id}`;
+}
+
+export function readSessions(lib: Library): SessionReceipt[] {
+  // End and reopen are successive states of one ending. The start still counts once.
+  const latest = new Map<string, SessionEvent>();
+  for (const r of sessionEvents(lib)) {
+    const k = `${r.type === "reopen" ? "end" : r.type} ${r.id}`;
     const had = latest.get(k);
     if (!had || r.ts > had.ts) latest.set(k, r);
   }
-  return [...latest.values()].sort((a, b) => a.ts.localeCompare(b.ts));
+  return [...latest.values()].filter((r): r is SessionReceipt => r.type !== "reopen").sort((a, b) => a.ts.localeCompare(b.ts));
+}
+
+/** Keep successive end/reopen writes ordered even within one clock tick (or after a clock correction). */
+function nextEndingTime(lib: Library, id: string, now: Date): string {
+  const last = sessionEvents(lib).filter((r) => r.id === id && r.type !== "start").reduce((at, r) => Math.max(at, Date.parse(r.ts) || 0), 0);
+  return nowIso(new Date(Math.max(now.getTime(), last + 1)));
 }
 
 /** Opens an ended session again, so a rating taken back on the end screen (⌘Z) returns him to that
@@ -84,6 +94,8 @@ export function readSessions(lib: Library): SessionReceipt[] {
 export function reopenSession(lib: Library, id: string): Promise<void> {
   return withLock(paths.lock(lib), () => {
     if (!readSessions(lib).some((r) => r.type === "start" && r.id === id)) throw new Error(`no session ${id}`);
+    const ts = nextEndingTime(lib, id, new Date());
+    appendJsonl(deviceLog(paths.sessionLog(lib, new Date(ts))), { type: "reopen", id, ts });
     // Another window's session open meanwhile (the quick quiz) stays the default; the app names its own.
     const ids = openSessionIds(lib);
     if (!ids.includes(id)) writeAtomic(paths.openSession(lib), [id, ...ids].join("\n"));
@@ -228,8 +240,8 @@ function receipt(lib: Library, now: Date, caughtUp: boolean, id: string | null):
     bySkill.set(skill, (bySkill.get(skill) ?? 0) + 1);
   }
   const keptSkills = [...bySkill].map(([skill, n]) => ({ skill, n })).sort((x, y) => y.n - x.n);
-  const r: EndReceipt = { type: "end", id, ts: nowIso(now), ...(thenNow ? { then_now: thenNow } : {}), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(keptSkills.length ? { kept_skills: keptSkills } : {}), ...(caughtUp ? { caught_up: true } : {}) };
-  appendJsonl(deviceLog(paths.sessionLog(lib, now)), r);
+  const r: EndReceipt = { type: "end", id, ts: nextEndingTime(lib, id, now), ...(thenNow ? { then_now: thenNow } : {}), reviews: own.length, kept: kept.length, rescued: rescued.length, cut, ...(grades.some((g) => g !== "cut") ? { grades } : {}), ...(polished.length ? { polished } : {}), ...(depth > 0 ? { depth_days: depth } : {}), ...(extra > 0 ? { depth_extra_days: extra } : {}), ...(longest > 0 ? { longest_days: longest } : {}), ...(keptSkills.length ? { kept_skills: keptSkills } : {}), ...(caughtUp ? { caught_up: true } : {}) };
+  appendJsonl(deviceLog(paths.sessionLog(lib, new Date(r.ts))), r);
   const ids = openSessionIds(lib);
   if (ids.includes(id)) {
     const rest = ids.filter((x) => x !== id);

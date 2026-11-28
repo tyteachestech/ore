@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { z } from "zod";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.ts";
 import { visible, writeAtomic } from "./fsutil.ts";
@@ -118,10 +118,10 @@ export function cardFiles(lib: Library): string[] {
  *  by the id; `ore doctor` names the copy. */
 export function listCards(lib: Library): Card[] {
   const cards = readable(cardFiles(lib), readCardFile);
-  const own = new Set(cards.filter((c) => c.path.endsWith(`${c.meta.id}.md`)).map((c) => c.meta.id));
+  const own = new Set(cards.filter((c) => basename(c.path) === `${c.meta.id}.md`).map((c) => c.meta.id));
   const seen = new Set<string>();
   return cards.filter((c) => {
-    if (seen.has(c.meta.id) || (own.has(c.meta.id) && !c.path.endsWith(`${c.meta.id}.md`))) return false;
+    if (seen.has(c.meta.id) || (own.has(c.meta.id) && basename(c.path) !== `${c.meta.id}.md`)) return false;
     seen.add(c.meta.id);
     return true;
   });
