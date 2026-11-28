@@ -34,7 +34,7 @@ journey("phone: in Review the buttons he taps on every exercise sit at the foot 
     const sure = page.getByRole("radio", { name: "Think so" });
     await sure.or(page.locator(".phone-full .review-end")).first().waitFor();
     if (!(await sure.count())) break;
-    // A Fact exercise (D-new-typed-facts): its short box, how sure he is and its buttons, at the foot.
+    // A Fact exercise (D359): its short box, how sure he is and its buttons, at the foot.
     const fact = (await page.locator(".phone-full .review-card").first().getAttribute("data-kind")) === "card";
     if (fact) {
       const gap = await foot(".phone-full .review-foot");

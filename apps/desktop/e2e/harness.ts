@@ -578,7 +578,7 @@ export async function startReview(page: Page, only: RegExp | null, keys = false,
 /** Whether the exercise on screen is a Fact one (`kind: card`). */
 export const isFact = async (page: Page) => (await page.locator(".review-card").first().getAttribute("data-kind")) === "card";
 
-/** Answers the Fact exercise on screen as he does (D-new-typed-facts): types `text` (its own answer by default, so
+/** Answers the Fact exercise on screen as he does (D359): types `text` (its own answer by default, so
  *  ↵ suggests Good), says how sure, and checks it. */
 export async function typeFact(page: Page, text?: string, sure = "Think so") {
   const id = await page.locator(".review-card").first().getAttribute("data-id");
@@ -682,7 +682,7 @@ export async function tap(page: Page, target: Locator) {
   await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
 }
 
-/** On the phone: answers the Fact exercise on screen with touches (D-new-typed-facts). The phone's library lives in
+/** On the phone: answers the Fact exercise on screen with touches (D359). The phone's library lives in
  *  the page, out of the bridge's reach, so it types `text`, not the answer: Good is tapped, not suggested. */
 export async function tapFact(page: Page, text = "An answer from memory", sure = "Think so") {
   const said = text;

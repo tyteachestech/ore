@@ -33,7 +33,7 @@ journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel,
   await page.keyboard.press("Escape");
 });
 
-// D-new-typed-facts: a Fact exercise asked only how sure he was, then showed the answer, so recognising it could
+// D359: a Fact exercise asked only how sure he was, then showed the answer, so recognising it could
 // pass for recalling it (the Learning Science guidebook, ch. 5: "Every review prompt should require generation").
 journey("review: a Fact exercise is typed: keys go in the box, ↵ asks how sure, and ↵ suggests Good only when it is the answer", async (page) => {
   await page.getByRole("button", { name: "Start review" }).click();

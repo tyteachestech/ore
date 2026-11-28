@@ -82,7 +82,7 @@ const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id,
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
  *  Explain cards (AI marks the rubric and suggests a rating; he decides), and Fact cards typed on one line,
- *  checked by code (D-new-typed-facts), rated by him. Every
+ *  checked by code (D359), rated by him. Every
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
@@ -433,7 +433,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   /** The rating to highlight: the AI's, or (once he flips a mark) one that follows his marks. Never logged by itself (D21). */
   const uncapped = ((): number | undefined => {
     if (!card || phase !== "checked") return undefined;
-    // D-new-typed-facts: a typed Fact suggests Good only when code finds it is the answer; otherwise he rates it.
+    // D359: a typed Fact suggests Good only when code finds it is the answer; otherwise he rates it.
     if (card.kind === "card") return !answer.trim() ? 1 : factMatches(answer, card.answer) ? 3 : undefined;
     if (inHead || gradeError) {
       // His own marks decide; nothing is suggested until he marks one.
@@ -905,7 +905,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
 
             {phase === "answer" && card.kind === "card" && (
               <>
-                {/* D-new-typed-facts: a Fact is typed too, so recognising the answer can't pass for recalling it.
+                {/* D359: a Fact is typed too, so recognising the answer can't pass for recalling it.
                     One line, as a short answer is; ↵ checks, and ↵ on an empty box is No idea. */}
                 <input
                   ref={line}
@@ -1160,7 +1160,7 @@ function KeyFoot({ phase, kind, hint, suggested, variant, inHead, draft }: { pha
         ? kind === "prompt"
           ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
             [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), ...(hint ? [[k("hint"), "Hint"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
-          : // A Fact's one line (D-new-typed-facts): ↵ checks, and on an empty box is No idea.
+          : // A Fact's one line (D359): ↵ checks, and on an empty box is No idea.
             [["↵", "Check"], [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
         : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], [k("retire-card"), draft ? "Delete" : "Retire"], ["Esc", "Leave"]];
   return (

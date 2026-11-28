@@ -1,4 +1,4 @@
-/** Whether what he typed for a Fact exercise is its answer (D-new-typed-facts), so ↵ suggests Good only then.
+/** Whether what he typed for a Fact exercise is its answer (D359), so ↵ suggests Good only then.
  *  Strict on purpose: a right answer worded differently says no and he rates it himself, but a wrong one never
  *  says yes. Case, spacing, punctuation, accents and a leading article don't count; what the answer puts in
  *  brackets is optional; one slip of the keys is forgiven in a word of 5 letters or more, two from 10, never in

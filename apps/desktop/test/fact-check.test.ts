@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { factMatches } from "../src/fact-check";
 
-// D-new-typed-facts: a Fact exercise is typed, and code says whether what he typed is the answer, so ↵ suggests
+// D359: a Fact exercise is typed, and code says whether what he typed is the answer, so ↵ suggests
 // Good only when it is. It may say "no" to a right answer worded differently (he rates it himself then), but
 // never "yes" to a wrong one: a wrong number, a different word, an empty box.
 

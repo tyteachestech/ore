@@ -3056,7 +3056,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .quick .review-body { padding: 4px 22px 20px; }
 .quick .review-q { font-size: 20px; }
 .quick .review-card .quiz-answer { min-height: 96px; }
-/* A Fact's answer is one line (D-new-typed-facts): a short answer's box, not an essay's. */
+/* A Fact's answer is one line (D359): a short answer's box, not an essay's. */
 .review-card .quiz-answer.quiz-answer-line, .quick .review-card .quiz-answer.quiz-answer-line { min-height: 0; height: 40px; }
 .quick .review-end { margin-top: 0; }
 .settings-hotkey .settings-btn kbd { background: none; border: 0; box-shadow: none; padding: 0; font-size: 13px; }
