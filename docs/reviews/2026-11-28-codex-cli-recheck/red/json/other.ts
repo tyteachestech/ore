@@ -1,0 +1,51 @@
+import assert from 'node:assert/strict';
+import { writeFileSync,mkdirSync,unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { setup,call,addText,addHighlight,findItem,hashes,diff } from './common.ts';
+import { appendJsonl } from '../../packages/core/src/fsutil.ts';
+import { writeNewCard } from '../../packages/core/src/cards.ts';
+import { paths } from '../../packages/core/src/library.ts';
+const {lib,item}=await setup('other');
+const results:any[]=[];
+async function run(name:string,args:string[]=[],flags:Record<string,unknown>={},expected=0) {
+ const before=hashes(lib.root),r=await call(name,args,flags);
+ const row={name,args,flags,...r,changed:diff(before,hashes(lib.root))};results.push(row);
+ writeFileSync(join(import.meta.dir,'other.json'),JSON.stringify(results,null,2));
+ console.log('[DEEP]',JSON.stringify(row));assert.equal(r.code,expected,`${name} exit`);return r.data;
+}
+const feed='https://scout.invalid/feed.xml', post='https://scout.invalid/article';
+const xml=`<rss version="2.0"><channel><title>Scout feed</title><link>https://scout.invalid</link><description>Learning</description><item><title>Recall article</title><link>${post}</link><guid>${post}</guid><pubDate>${new Date().toUTCString()}</pubDate><description>Recall and practice</description></item></channel></rss>`;
+const html='<html><head><title>Recall article</title></head><body><article><h1>Recall article</h1><p>'+'Recalling ideas without looking supports later memory. '.repeat(25)+'</p></article></body></html>';
+globalThis.fetch=(async (input:any)=>{
+ const url=String(input instanceof Request?input.url:input);
+ if(![feed,post].includes(url))throw Error('Scout refuses unconfigured network URL '+url);
+ const r=new Response(url===feed?xml:html,{headers:{'content-type':url===feed?'application/rss+xml':'text/html'}});
+ Object.defineProperty(r,'url',{value:url});return r;
+}) as typeof fetch;
+await run('init',[lib.root]);
+await run('backfill',[item.meta.id]);
+await run('feed',['find',feed]);await run('feed',['follow',feed],{skill:['learning']});await run('feed',[],{refresh:true});
+await run('feed',['set',feed],{name:'Scout renamed',skill:['learning']});await run('feed',['arrange',JSON.stringify([feed])]);
+await run('feed',['read',post]);await run('feed',['unread',post]);const opened=await run('feed',['open',post]);await run('feed',['close',opened.id]);
+const removed=await run('feed',['unfollow',feed]);await run('feed',['restore',JSON.stringify(removed.feed)],{at:'0'});
+const sample=join(import.meta.dir,'local-original.html');writeFileSync(sample,html);
+const added=await run('add',[sample],{'no-enrich':true});await run('reimport',[added.id]);
+const queued=await run('inbox',[],{'add-file':sample,name:'another.html'});await run('inbox',[],{import:true});
+const illustrated=await addText(lib,'# Figure\n\n![Rectangle](assets/figure.svg)\n\nAn illustration.');
+mkdirSync(join(illustrated.dir,'assets'),{recursive:true});writeFileSync(join(illustrated.dir,'assets/figure.svg'),'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"></svg>');
+await run('card',['figure',illustrated.meta.id],{src:'assets/figure.svg',box:'0,0,0.5,0.5',answer:'Rectangle'});
+const card=writeNewCard(lib,{kind:'prompt',item:item.meta.id,skills:['learning'],topics:[],content_type:'concept',question:'Why recall?',answer:'Recall supports learning.',rubric:['Recall strengthens memory.','Spacing supports retention.']});
+await run('remix',[card.meta.id]); // not yet eligible; no AI requested
+const v={id:'01J00000000000000000000001',rev:1,card:card.meta.id,type:'new-case',setting:'Piano',question:'How can Mira practice?',answer:'Recall the melody.',rubric:['Recall strengthens memory.','Spacing supports retention.'],maps:[0,1],status:'ready',created:new Date().toISOString(),ai:{vendor:'claude',model:'fixture',prompt_version:'variant@1'}};
+appendJsonl(paths.variants(lib,card.meta.id),v);
+await run('card',['show',card.meta.id],{variant:v.id});await run('card',['set',card.meta.id],{variant:v.id,question:'How should Mira practice?'});
+await run('variant',['reject',card.meta.id,v.id],{reason:'Bad scenario'});await run('variant',['restore',card.meta.id,v.id]);
+addHighlight(findItem(lib,item.meta.id),{exact:'Recall improves memory.',intent:'card'});
+addHighlight(findItem(lib,item.meta.id),{exact:'Spacing practice helps retention.',intent:'card'});
+await run('skills',['set','learning'],{goal:'Explain learning methods'});
+await run('dig',['learning'],{text:'Recall helps.'});
+writeFileSync(join(import.meta.dir,'bin','reply.json'),JSON.stringify({came:[1],asks:[{n:2,q:'How could the practice sessions be arranged?'}]}));
+await run('dig',['learning'],{ask:true});
+writeFileSync(join(import.meta.dir,'bin','reply.json'),JSON.stringify({came:[2],asks:[]}));
+await run('dig',['learning'],{answer:['Space them.']});
+unlinkSync(join(import.meta.dir,'bin','reply.json'));

@@ -1,0 +1,24 @@
+import assert from 'node:assert/strict';
+import {core,fresh,artifact} from './common.ts';
+import {commands} from '../../packages/cli/src/commands.ts';
+const mode=process.argv[2]??'archived';
+const lib=await fresh('suggested-'+mode);
+await core.addSkill(lib,'Gardening');
+const old=await core.addText(lib,'# Garden\n\nSoil supports the plant.',{skills:['gardening']});
+const card=core.writeNewCard(lib,{kind:'card',item:old.meta.id,skills:['gardening'],topics:[],content_type:'fact',question:'What supports the plant?',answer:'Soil.',rubric:[]});
+// A due exercise already owned by the archived skill, independent of the new suggestion.
+await core.recordReview(lib,card.meta.id,{rating:1,confidence:2,now:new Date('2026-11-20T18:00:00.000Z')});
+if(mode!=='active')await core.archiveSkill(lib,'gardening',true);
+const item=await core.addText(lib,'# New garden notes\n\nPlants need suitable soil.');
+await core.updateItemMeta(lib,item.meta.id,m=>({...m,suggested_skill:{name:'Gardening',hook:'Grow plants'}}));
+const before={archived:!!core.loadSkills(lib).skills.find(s=>s.id==='gardening')!.archived,due:core.dueQueue(lib).map(c=>c.id)};
+const accepted=(await commands['suggested-skill']!.run([item.meta.id,'accept'],{})).data as any;
+if(mode==='rename')await core.renameItem(lib,item.meta.id,'Independent rename');
+if(mode==='reindex')core.rebuildIndex(lib);
+await commands['suggested-skill']!.run([item.meta.id,'undo',JSON.stringify(accepted.undo)],{});
+const after={archived:!!core.loadSkills(lib).skills.find(s=>s.id==='gardening')!.archived,due:core.dueQueue(lib).map(c=>c.id)};
+core.rebuildIndex(lib);
+const freshQueue=core.dueQueue(lib).map(c=>c.id);
+console.log('[DEEP]',JSON.stringify({mode,before,undo:accepted.undo,after,freshQueue,sourceSkills:core.findItem(lib,item.meta.id).meta.skills}));
+artifact('suggested-'+mode+'.json',{before,accepted,after,freshQueue});
+assert.deepEqual(after,before,'Undo must restore the archived skill and leave its old exercises out of review (D173.4)');

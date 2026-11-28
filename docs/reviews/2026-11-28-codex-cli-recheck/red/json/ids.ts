@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import { setup, call, addText } from './common.ts';
+import { writeNewCard } from '../../packages/core/src/cards.ts';
+const { lib,item } = await setup('ids');
+const second = await addText(lib, '# Second\n\nAttention supports recall.');
+const c = writeNewCard(lib,{kind:'card',item:item.meta.id,skills:['learning'],topics:[],content_type:'fact',question:'What helps memory?',answer:'Recall',rubric:[]});
+let n = 1; while (item.meta.id.slice(0,n) === second.meta.id.slice(0,n)) n++;
+const unique = item.meta.id.slice(0,n);
+const full = await call('cards',[],{item:item.meta.id});
+const prefix = await call('cards',[],{item:unique});
+const opened = await call('show',[unique]);
+const suffix = await call('cards',[],{item:item.meta.id.slice(-8)});
+const ambiguous = await call('cards',[],{item:item.meta.id.slice(0,4)});
+const missing = await call('cards',[],{item:'missing'});
+console.log('[DEEP]',JSON.stringify({id:item.meta.id,unique,full:full.data.map((x:any)=>x.id),prefix,show:opened.data.id,suffix:suffix.data.map((x:any)=>x.id),ambiguous,missing}));
+assert.equal(full.data.length,1);
+assert.equal(opened.data.id,item.meta.id);
+assert.deepEqual(prefix.data,full.data,'cards --item drops a source matched by a unique ID prefix');
