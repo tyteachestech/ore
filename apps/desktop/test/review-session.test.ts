@@ -21,7 +21,7 @@ const tick = () => new Promise<void>((r) => setTimeout(r, 0));
 
 type Call = { args: string[]; land: (v?: unknown) => void; fail: (why: string) => void };
 /** A session on a fake library and a fake history. Commands in `slow` wait until the test lands or fails them. */
-async function open(o: { queue?: DueEntry[]; quick?: boolean; slow?: string[]; today?: Today; begin?: boolean; failReopen?: boolean } = {}) {
+async function open(o: { queue?: DueEntry[]; quick?: boolean; slow?: string[]; today?: Today; begin?: boolean; failReopen?: boolean; retired?: string[]; deleted?: string[] } = {}) {
   const calls: string[] = [];
   const waiting: Call[] = [];
   const slow = new Set(o.slow ?? []);
@@ -33,12 +33,13 @@ async function open(o: { queue?: DueEntry[]; quick?: boolean; slow?: string[]; t
     if (a === "today") return o.today ?? today();
     if (a === "due") return o.queue ?? [due("a"), due("b"), due("c")];
     if (a === "review" && !args.some((x) => x.startsWith("--undo"))) return { ts: `t${++n}` };
-    if (a === "card" && b === "show") return card(args[2]!);
+    if (a === "card" && b === "show") return o.retired?.includes(args[2]!) ? { ...card(args[2]!), state: "retired" } : card(args[2]!);
     return null;
   };
   const run = ((...args: string[]) => {
     calls.push(args.join(" "));
     if (o.failReopen && args[0] === "session" && args[1] === "reopen") return Promise.reject(new Error("reopen refused"));
+    if (args[0] === "card" && args[1] === "show" && o.deleted?.includes(args[2]!)) return Promise.reject(new Error(`no card matches "${args[2]}"`));
     if (!slow.has(args[0]!)) return Promise.resolve(answer(args));
     return new Promise((ok, no) => waiting.push({ args, land: (v) => ok(v ?? answer(args)), fail: (why) => no(new Error(why)) }));
   }) as never;
@@ -130,6 +131,20 @@ test("a rating that fails to save says why and leaves the exercise, the count an
   t.waiting[1]!.land();
   await tick();
   expect(t.ids()).toEqual(["b", "c"]);
+});
+
+test("an exercise retired or deleted elsewhere while it was on screen (an agent, the iPhone) leaves the session when rated: no raw error, no exercise that can't be rated", async () => {
+  for (const [how, o] of [["retired", { retired: ["a"] }], ["deleted", { deleted: ["a"] }]] as const) {
+    const t = await open({ slow: ["review"], ...o });
+    const rating = t.rate("a");
+    await tick();
+    t.waiting[0]!.fail("card a is retired: `ore card restore a` puts it back in review");
+    await rating;
+    expect(t.said).toEqual(["This exercise was retired elsewhere, so it left this review."]);
+    expect([how, t.ids()]).toEqual([how, ["b", "c"]]);
+    expect([t.s.done, t.s.reviewed, t.s.canUndo, t.s.busy]).toEqual([0, 0, false, false]);
+    expect(t.steps).toEqual([]);
+  }
 });
 
 test("a miss comes back a few exercises on, and its second answer is one more step", async () => {
