@@ -1,0 +1,58 @@
+{
+ "key": "6eae057a9faf4f67",
+ "add": "https://www.nature.com/articles/s41586-021-03819-2.pdf",
+ "note": "Nature, open access (CC BY)",
+ "fp": {
+  "type": "pdf",
+  "title": "Highly accurate protein structure prediction with AlphaFold",
+  "author": "John Jumper",
+  "words": 12325,
+  "headings": [
+   "## Highly accurate protein structure prediction with AlphaFold",
+   "### The AlphaFold network",
+   "### Evoformer",
+   "### End-to-end structure prediction",
+   "### Training with labelled and unlabelled data",
+   "### Interpreting the neural network",
+   "### MSA depth and cross-chain contacts",
+   "### Related work",
+   "### Discussion",
+   "### Online content",
+   "## ArticleMethods",
+   "### Data availability",
+   "### Code availability",
+   "## ArticleHMMER v.3.3 (http://eddylab.org/software/hmmer/). For constrained",
+   "## Reporting Summary",
+   "## Statistics",
+   "## Software and code",
+   "## Data",
+   "## Field-specific reporting",
+   "## Life sciences study design",
+   "## Reporting for specific materials, systems and methods",
+   "### Materials & experimental systems",
+   "### Methods"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 15,
+  "first": "page 1 nature vol 596 26 august 2021 583article highly accurate protein",
+  "last": "a involved in the study chip seq flow cytometry mri based neuroimaging"
+ },
+ "flags": [
+  {
+   "rule": "line-repeated",
+   "detail": "1, most “Pair representation (*r*,*r*,*c*)” ×5"
+  },
+  {
+   "rule": "order-changed",
+   "detail": "86.9% of found passages in the original's order"
+  }
+ ],
+ "coverage": {
+  "lost": 0.039,
+  "added": 0.013,
+  "found": 0.851,
+  "inOrder": 0.869
+ }
+}

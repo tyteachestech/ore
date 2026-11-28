@@ -1,0 +1,36 @@
+{
+ "key": "5d10bf6a73f461b7",
+ "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/regime-anticancer-arabic.epub",
+ "note": "EPUB 3 Arabic, right to left (IDPF)",
+ "fp": {
+  "type": "epub",
+  "title": "Le Vrai Régime anti-cancer",
+  "author": "Pr David Khayat, Nathalie Hutter-Lardeau, Marina Khalil Fayad",
+  "published": "2012",
+  "words": 5653,
+  "headings": [
+   "## الفصل الثاني",
+   "# ما هو السرطان؟",
+   "# من أين تأتي الحياة؟",
+   "# أهمّية جيناتنا",
+   "# السرطان: مرض جينيّ",
+   "## جينات متضرّرة",
+   "## السرطان ليس محتّمًا",
+   "# الرابط بين التغذية والسرطان أو علم المورثات الغذائيّة",
+   "# تأثيرات المكوِّنات الحيويّة الغذائيّة"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "chapter 1 الفصل الثاني ما هو السرطان من أين تأتي الحياة حسن",
+  "last": "les chemins de l espoir دروب الأمل باريس منشورات أوديل جاكوب 2003"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0,
+  "added": 0,
+  "found": 1,
+  "inOrder": 1
+ }
+}

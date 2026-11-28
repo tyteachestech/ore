@@ -1,0 +1,29 @@
+{
+ "key": "dac67500b9078110",
+ "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/document/heading123.docx",
+ "note": "Apache POI, heading levels",
+ "fp": {
+  "type": "article",
+  "title": "First paragraph",
+  "author": "Paolo Mottadelli",
+  "words": 259,
+  "headings": [
+   "# First paragraph",
+   "## Second paragraph",
+   "### Third paragraph"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "first paragraph ffflorem ipsum dolor sit amet consectetur adipiscing elit curabitur bibendum",
+  "last": "mauris felis vitae laoreet eros quisque et ipsum eu massa tristique elementum"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0,
+  "added": 0,
+  "found": 1,
+  "inOrder": 1
+ }
+}

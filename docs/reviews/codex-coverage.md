@@ -37,6 +37,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 13. **done (#580)** **CLI and `/ore` skill recheck** ([11-28](2026-11-28-codex-cli-recheck/), three Codex reading scouts on the Mac, Codex drafted the fixes, Claude reviewed): 24 found, 24 fixed test first. Worst: the /ore skill's heredoc let a line of his answer run as a command; failed commands that still wrote (a highlight moved, a course renamed, the AI switched); undo of a cut, a reimport and an accepted skill that put back the wrong thing; `ore doctor` blind to broken chats, inbox entries, variants and images. Through the screens: Review stuck on an exercise an agent retired mid-review (fixed). Left open: a reimport's Undo doesn't re-anchor highlights made on the newer text. Not covered: the CLI with real AI (every run stubbed it), and two agents at once on one library.
 14. *Claude lane:* **Hostile content** in sources and feeds (scripts, paths, commands, huge files), which Codex refused.
 15. **done (#572)** *Claude lane:* **Ore Cloud security.** Sign-in, sessions, account deletion and the private-address guard held; four bugs fixed (a zip bomb, an import that could take the server down, no import limits, yt-dlp past the guard), one wording row open. Still open, each needing the server online or Tyler: Apple tokens revoked on delete (his .p8 key, #551), IPv6 egress if the host gets it (the firewall in #571 covers IPv4), and a pass on the live server once #550 deploys it.
+16. **done (#591)** **An import corpus per type** (Tyler, 2026-11-28: "we need a way bigger test suite of different sources per source type"): `bun run corpus` (`packages/core/corpus/README.md`) imports every file in a list or folder, audits each doc.md against its original read from its own bytes, and reports what changed since the accepted run. Run on his Mac over copies of ~/Calibre Library, his iCloud library and Downloads (184 EPUBs, his PDFs and Office files, read only, results kept in `.corpus/`), and in the cloud over 47 openly licensed files (`open.json`, baseline in the repo). 7 bugs fixed test first (no outline in 29 of 184 books, note backlinks kept as text, figure captions as headings, sort-form and "Unknown" authors, publishers' stamps on every PDF page and id titles, Excel character codes, notebook pictures dropped). Not yet in the corpus: web pages, YouTube, podcasts and audio, feeds, chats (live, so `intake:live` covers them), scans with the page reader. Leads left: calibre's PDF-made EPUBs with a paragraph per line, a PDF's U+FFFD letters, "Downloaded by" lines a few publishers vary, no outline in ten papers, a PLOS running head joined to a heading, a figure's word labels read as text (the Transformer paper), an author block taken as a heading (NIST).
 
 ## Angles
 
@@ -60,13 +61,14 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | Podcasts and audio, recordings | done | sweep 5 media, deep scan 2 media (recording in the learner pass) |
 | PDF papers | done | deep scan 2 media, newcomer 11-26 (BERT) |
 | Long textbooks, scans, the page reader | partly | deep import 11-27 PDFs (26 files, 5,131 pages; 7 fixed); with the page reader downloaded: not yet run; a scanned page among text pages: F790 |
-| EPUB books | done | deep import 11-27 books (38 books, his Calibre library; 7 fixed); left: real DRM, layout by sight |
+| EPUB books | done | deep import 11-27 books (38 books, his Calibre library; 7 fixed); import corpus 11-28 (184 of his books, 16 open ones; 4 fixed); left: real DRM, layout by sight |
 | Word, RTF, PowerPoint, Excel, notebooks, Markdown, screenshots | done | deep scan 5 office (reading only); deep import 11-27 (357 real Office files, 12 notebooks; 3 fixed) |
 | Shared AI chats | done | deep scan 2 chat |
 | Feeds and newsletters | done | sweep 11, deep scan 5 feeds |
 | Courses and playlists | partly | deep scan 5 courses (reading only), ux 8 |
 | Other scripts (CJK, RTL, Thai) | done | sweep 4 languages (F285 open) |
 | Reimport and anchoring | done | sweep 8, deep scan 1 intake, deep scan 5 original |
+| Many files per type, each against its original (`bun run corpus`) | done | import corpus 11-28 (queue 16): books, PDFs, Office, notebooks; web, media, feeds and chats not yet in it |
 | Ore Cloud's server import against the Mac's | open | queue 8 |
 
 ### Screens and journeys

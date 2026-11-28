@@ -1,0 +1,21 @@
+{
+ "key": "b9c3eb4b198ef3e5",
+ "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/slideshow/table_test.pptx",
+ "note": "Apache POI, a slide table",
+ "fp": {
+  "type": "article",
+  "title": "b9c3eb4b198ef3e5",
+  "author": "Andreas Beeker",
+  "words": 4,
+  "headings": [
+   "## Slide 1"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "slide 1 slide 1",
+  "last": "slide 1 slide 1"
+ },
+ "flags": []
+}

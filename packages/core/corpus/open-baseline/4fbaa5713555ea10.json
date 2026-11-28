@@ -1,0 +1,27 @@
+{
+ "key": "4fbaa5713555ea10",
+ "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/trees.epub",
+ "note": "EPUB 3 small, SVG (IDPF)",
+ "fp": {
+  "type": "epub",
+  "title": "Trees",
+  "words": 877,
+  "headings": [
+   "## Classification",
+   "## Morphology"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "chapter 1 classification your reading system does not support canvas a tree",
+  "last": "not fit the definition of a tree but all spruces are trees"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.011,
+  "added": 0.005,
+  "found": 0.973,
+  "inOrder": 1
+ }
+}

@@ -1,0 +1,55 @@
+{
+ "key": "bdfaa68d8984f0dc",
+ "add": "https://arxiv.org/pdf/1706.03762v7",
+ "note": "arXiv, NeurIPS paper with tables and formulas",
+ "fp": {
+  "type": "pdf",
+  "title": "Attention Is All You Need",
+  "words": 6495,
+  "headings": [
+   "## Attention Is All You Need",
+   "### Abstract",
+   "## 1 Introduction",
+   "## 2 Background",
+   "## 3 Model Architecture",
+   "### 3.1 Encoder and Decoder Stacks",
+   "### 3.2 Attention",
+   "#### 3.2.1 Scaled Dot-Product Attention",
+   "#### 3.2.2 Multi-Head Attention",
+   "#### 3.2.3 Applications of Attention in our Model",
+   "### 3.3 Position-wise Feed-Forward Networks",
+   "### 3.4 Embeddings and Softmax",
+   "### 3.5 Positional Encoding",
+   "## 4 Why Self-Attention",
+   "## 5 Training",
+   "### 5.1 Training Data and Batching",
+   "### 5.2 Hardware and Schedule",
+   "### 5.3 Optimizer",
+   "### 5.4 Regularization",
+   "## 6 Results",
+   "### 6.1 Machine Translation",
+   "### 6.2 Model Variations",
+   "### 6.3 English Constituency Parsing",
+   "## 7 Conclusion",
+   "### References"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 3,
+  "first": "page 1 provided proper attribution is provided google hereby grants permission to",
+  "last": "layer 5 of 6 the heads clearly learned to perform different tasks"
+ },
+ "flags": [
+  {
+   "rule": "paragraphs-cut",
+   "detail": "96 of 310 paragraphs end mid-sentence and the next goes on"
+  }
+ ],
+ "coverage": {
+  "lost": 0.036,
+  "added": 0.022,
+  "found": 0.869,
+  "inOrder": 1
+ }
+}

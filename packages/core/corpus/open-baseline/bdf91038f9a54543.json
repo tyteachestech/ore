@@ -1,0 +1,6 @@
+{
+ "key": "bdf91038f9a54543",
+ "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/document/Headers.docx",
+ "note": "Apache POI, only headers and footers: refused, its body is empty",
+ "error": "This Word file has no text to read."
+}

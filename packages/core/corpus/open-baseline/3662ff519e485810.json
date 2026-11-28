@@ -1,0 +1,38 @@
+{
+ "key": "3662ff519e485810",
+ "add": "https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/tracemonkey.pdf",
+ "note": "pdf.js test corpus, two columns (Apache-2.0)",
+ "fp": {
+  "type": "pdf",
+  "title": "Trace-based Just-in-Time Type Specialization for Dynamic Languages",
+  "words": 13613,
+  "headings": [
+   "### Jesse Ruderman∗, Edwin Smith#, Rick Reitmaier#, Michael Bebenita⁺, Mason Chang+#, Michael Franz⁺",
+   "### Abstract",
+   "### 1. Introduction",
+   "### 2. Overview: Example Tracing Run",
+   "### 3. Trace Trees",
+   "### 4. Nested Trace Tree Formation",
+   "### 5. Trace Tree Optimization",
+   "### 6. Implementation",
+   "### 7. Evaluation",
+   "### 8. Related Work",
+   "### 9. Conclusions",
+   "### 10. Future Work",
+   "### Acknowledgments"
+  ],
+  "code": 3,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "page 1 trace based just in time type specialization for dynamic languages",
+  "last": "international conference on virtual execution environments pages 83 93 acm press 2007"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.03,
+  "added": 0.017,
+  "found": 0.89,
+  "inOrder": 1
+ }
+}

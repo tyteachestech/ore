@@ -1,0 +1,69 @@
+{
+ "key": "e9a0d3128767db61",
+ "add": "https://arxiv.org/pdf/2106.09685v2",
+ "note": "arXiv, long with appendix tables",
+ "fp": {
+  "type": "pdf",
+  "title": "LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+  "words": 15124,
+  "headings": [
+   "## LORA: LOW-RANK ADAPTATION OF LARGE LAN- GUAGE MODELS",
+   "### ABSTRACT",
+   "## 1 Introduction",
+   "## 2 Problem Statement",
+   "## 3 Aren't Existing Solutions Good Enough?",
+   "### 3 AREN’T EXISTING SOLUTIONS GOOD ENOUGH?",
+   "## 4 Our Method",
+   "### 4.1 Low-Rank-Parametrized Update Matrices",
+   "### 4.2 Applying LoRA to Transformer",
+   "## 5 Empirical Experiments",
+   "### 5.1 Baselines",
+   "### 5.2 RoBERTa base/large",
+   "### 5.3 DeBERTa XXL",
+   "### 5.4 GPT-2 medium/large",
+   "### 5.5 Scaling up to GPT-3 175B",
+   "## 6 Related Works",
+   "## 7 Understanding the Low-Rank Updates",
+   "### 7.1 Which Weight Matrices in Transformer Should We Apply LoRA to?",
+   "### 7.2 What is the Optimal Rank r for LoRA?",
+   "## 8 Conclusion and Future Work",
+   "### REFERENCES",
+   "## A Large Language Models Still Need Parameter Updates",
+   "## B Inference Latency Introduced by Adapter Layers",
+   "## C Dataset Details",
+   "## D Hyperparameters Used in Experiments",
+   "### D.1 RoBERTa",
+   "### D.2 DeBERTa",
+   "### D.3 GPT-2",
+   "### D.4 GPT-3",
+   "## E Combining LoRA with Prefix Tuning",
+   "## F Additional Empirical Experiments",
+   "### F.1 Additional Experiments on GPT-2",
+   "### F.2 Additional Experiments on GPT-3",
+   "### F.3 Low-Data Regime",
+   "## G Measuring Similarity Between Subspaces",
+   "## H Additional Experiments on Low-Rank Matrices",
+   "### H.1 Correlation between LoRA Modules",
+   "### H.2 Effect of r on GPT-2",
+   "### H.4 Amplification Factor"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "page 1 lora low rank adaptation of large lan guage models edward",
+  "last": "tends to pick up more directions that are already emphasized in w"
+ },
+ "flags": [
+  {
+   "rule": "line-repeated",
+   "detail": "2, most “1 6 12 18 23 29 35 40 46 52 58 *j*” ×4"
+  }
+ ],
+ "coverage": {
+  "lost": 0.077,
+  "added": 0.041,
+  "found": 0.739,
+  "inOrder": 1
+ }
+}

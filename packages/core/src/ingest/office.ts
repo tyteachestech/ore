@@ -23,7 +23,15 @@ export interface OfficeDoc {
 }
 
 export const xmlText = (s: string) =>
-  s.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+  s
+    .replace(/<[^>]+>/g, "")
+    // Numeric references, which some tools write for every letter past ASCII (&#8212; in his source registry's
+    // sheets: corpus run 2026-11-28), before &amp; so a reference written as text (&amp;#9;) stays text.
+    .replace(/&#(\d+);|&#x([\da-f]+);/gi, (m, d: string | undefined, h: string | undefined) => {
+      const n = d ? Number(d) : parseInt(h!, 16);
+      return n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : m;
+    })
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
 
 /** Title and author from docProps/core.xml, which Word, PowerPoint and Excel files all carry. */
 export function coreProps(files: Record<string, Uint8Array>): { title?: string; author?: string } {

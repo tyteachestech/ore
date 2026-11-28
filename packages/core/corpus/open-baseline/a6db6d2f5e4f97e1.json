@@ -1,0 +1,27 @@
+{
+ "key": "a6db6d2f5e4f97e1",
+ "add": "https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/TAMReview.pdf",
+ "note": "pdf.js test corpus, a review (Apache-2.0)",
+ "fp": {
+  "type": "pdf",
+  "title": "Overview of the Technology Acceptance Model: Origins, Developments and Future Directions",
+  "author": "ARRAY(0x2c7cf020)",
+  "words": 2167,
+  "headings": [
+   "### Overview of the Technology Acceptance Model: Origins, Developments and Future Directions"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 14,
+  "images": 4,
+  "first": "page 1 working papers on information systems issn 1535 6078 overview of",
+  "last": "e 2 74 1018 wb amsterdam netherlands email admin sprouts aisnet org"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.001,
+  "added": 0.022,
+  "found": 0.928,
+  "inOrder": 1
+ }
+}
