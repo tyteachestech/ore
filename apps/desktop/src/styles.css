@@ -1948,12 +1948,24 @@ button.try-stone:hover .stone { opacity: 1; }
 /* Quiz panel (D52 to D56): the finish step and chapter recalls float at the right of the reader;
    the source is blurred past reading until an answer is checked, then passages show like find. */
 .reader.quizzing .reader-scroll { padding-right: 420px; }
-/* D208: hidden, the words fade and HideDots draws each line as a row of dots; the page keeps its shape. */
-.reader-scroll > * { transition: opacity var(--t-4) var(--ease-out); }
+/* D358: hidden, one veil over the source blurs it past reading. The blur spreads from the eye
+   (--veil-x/y, HideVeil.tsx) to the farthest corner and draws back into it; the stops are shares of that
+   distance, so a resized window stays covered. */
+@property --veil { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
 .reader-pane.hidden-src .reader-scroll { pointer-events: none; user-select: none; -webkit-user-select: none; }
-.reader-pane.hidden-src .reader-scroll > * { opacity: 0; }
-.hide-dots { position: absolute; z-index: 1; pointer-events: none; }
-@media (prefers-reduced-motion: reduce) { .reader-scroll > * { transition: none; } }
+.hide-veil {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: color-mix(in srgb, var(--bg) 30%, transparent);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  -webkit-mask-image: radial-gradient(circle farthest-corner at var(--veil-x, 100%) var(--veil-y, 0px), #000 calc(var(--veil) - 18%), transparent var(--veil));
+  mask-image: radial-gradient(circle farthest-corner at var(--veil-x, 100%) var(--veil-y, 0px), #000 calc(var(--veil) - 18%), transparent var(--veil));
+  transition: --veil var(--t-4) var(--ease-out);
+}
+.hide-veil.on { --veil: 118%; transition-duration: var(--t-moment); }
+/* A picture's or a diagram's big shapes would show through the blur, so they dim and blur further under it (not the app's own
+   icons, which are aria-hidden). */
+.reader-pane.hidden-src .reader-scroll :is(img, video, canvas, iframe, svg:not([aria-hidden])) { opacity: 0.3; filter: blur(14px); transition: opacity var(--t-4) var(--ease-out), filter var(--t-4) var(--ease-out); }
+@media (prefers-reduced-motion: reduce) { .hide-veil, .reader-pane.hidden-src .reader-scroll :is(img, video, canvas, iframe, svg) { transition: none; } }
 .hidden-chip {
   position: absolute; top: 38%; left: calc((100% - 420px) / 2); transform: translateX(-50%); z-index: 7;
   display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px;
