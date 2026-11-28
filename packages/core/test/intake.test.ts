@@ -2928,6 +2928,34 @@ describe("import coverage: the grid's small holes", () => {
     await expect(addSource(await tempLibrary(), join(dir, "notes.docx"))).rejects.toThrow(/That Word file is damaged/);
   });
 
+  test("a damaged Word file is refused once, with no second failure left unhandled, also where a page's globals are present (F883)", async () => {
+    // Mammoth's promise library (bluebird) picks how it waits when it is first loaded: with a page's
+    // MutationObserver present (the iPhone, or a test that left one behind) it announced the broken part
+    // as an unhandled rejection beside the refusal. So this runs in a process of its own, loaded that way.
+    const docx = new Uint8Array(readFileSync(file("notes.docx")));
+    const view = new DataView(docx.buffer, docx.byteOffset, docx.byteLength);
+    const name = new TextEncoder().encode("word/document.xml");
+    for (let i = 0; i < docx.length - 46; i++)
+      if (view.getUint32(i, true) === 0x02014b50 && view.getUint16(i + 28, true) === name.length && docx.subarray(i + 46, i + 46 + name.length).every((b, k) => b === name[k])) view.setUint32(i + 24, 200, true);
+    const dir = mkdtempSync(join(tmpdir(), "ore-lie-"));
+    writeFileSync(join(dir, "notes.docx"), docx);
+    const script = `
+      globalThis.MutationObserver = class {};
+      let unhandled = 0;
+      process.on("unhandledRejection", () => unhandled++);
+      const { docxToDoc } = await import(${JSON.stringify(join(import.meta.dir, "../src/ingest/office.ts"))});
+      const bytes = new Uint8Array(await Bun.file(${JSON.stringify(join(dir, "notes.docx"))}).arrayBuffer());
+      const said = await docxToDoc(bytes).then(() => "read", (e) => e.message);
+      await new Promise((r) => setTimeout(r, 50));
+      console.log(JSON.stringify({ said, unhandled }));
+    `;
+    const run = Bun.spawnSync([process.execPath, "-e", script], { stdout: "pipe", stderr: "pipe" });
+    const out = JSON.parse(run.stdout.toString().trim().split("\n").pop()!) as { said: string; unhandled: number };
+    expect(out.said).toMatch(/That Word file is damaged/);
+    expect(out.unhandled).toBe(0);
+    expect(run.stderr.toString()).not.toContain("Unhandled rejection");
+  });
+
   test("a private Google Doc's sign-in page is refused with how to share it", async () => {
     const lib = await tempLibrary();
     serve({ "https://docs.google.com/document/d/abc_123/export?format=docx": { body: "<html><head><title>Sign in</title></head><body>Sign in to continue to Docs</body></html>", type: HTML } });
