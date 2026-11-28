@@ -600,9 +600,10 @@ img.thumb { filter: brightness(0.86); }
 .pick-bar .pick-x { padding: 0; width: 28px; justify-content: center; }
 .pick-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
 body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
-/* Review's ratings are its bottom bar (D-new-ratings-bar): a toast stands above them, never over Hard and Good. */
-body:has(.review-bar) :is(.toasts, .toast) { bottom: 78px; }
-body:has(.review-bar .review-guard) :is(.toasts, .toast) { bottom: 118px; }
+/* Review's ratings are its bottom bar (D-new-ratings-bar): the toasts stand above it, never over Hard and Good;
+   higher while the bar also holds the warning over an unexpected rating. Not while Review waits behind a source. */
+body:has(.review:not([hidden]) .review-bar) .toasts { bottom: 78px; }
+body:has(.review:not([hidden]) .review-bar .review-guard) .toasts { bottom: 108px; }
 /* The tutor's field sits at the window's foot, where a toast and the pick bar land: with the tutor open they stand
    in the room left of it, never over what he is typing (F447). A floating tutor is 400px wide, 16px
    in from the right; a docked one is --tutor-w. The window is never under 720px, which leaves them 256px. */
@@ -2480,9 +2481,10 @@ button.home-plan:hover { color: var(--text); }
    row): it stays in view under a long answer and nothing loading above it can move it (F865). The bar keeps the
    page's side padding so the four sit under the exercise's column. In a window too narrow for the card to clear
    the radio (D254), the card and the bar start to the radio's right, so the radio never sits on Again. */
-.review-bar { flex: none; position: relative; padding: 10px 24px 13px; border-top: 1px solid var(--border); background: var(--bg-side); }
-.review-bar .review-rate { max-width: 640px; margin: 0 auto; }
-.review-bar .review-guard { position: absolute; left: 0; right: 0; bottom: calc(100% + 10px); margin: 0 auto; width: fit-content; max-width: calc(100% - 48px); padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-side); }
+.review-bar { flex: none; display: flex; flex-direction: column-reverse; gap: 8px; padding: 10px 24px 13px; border-top: 1px solid var(--border); background: var(--bg-side); }
+.review-bar .review-rate { width: 100%; max-width: 640px; margin: 0 auto; }
+/* The warning over an unexpected rating (D237) is the bar's top line: the bar grows up, the four stay where they are. */
+.review-bar .review-guard { width: 100%; max-width: 640px; margin: 0 auto; }
 .quick .review-bar { padding: 8px 22px 11px; }
 :where(:root:not(.phone)) .review-bar:not(.quick *) { padding-left: clamp(24px, calc(816px - 100vw), 76px); }
 :where(:root:not(.phone)) .review-body:not(.quick *) { padding-left: clamp(24px, calc(816px - 100vw), 76px); }

@@ -562,9 +562,13 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   const was = await q.innerText();
   await page.waitForTimeout(400); // a rating key right after the answer shows is ignored
   // Good, two steps over the marks: it waits, says why, and nothing is recorded.
+  const goodAt = () => page.locator(".review-rate .rate-3").evaluate((b) => Math.round(b.getBoundingClientRect().top));
+  const goodWas = await goodAt();
   await page.keyboard.press("3");
   const guard = page.locator(".review-guard");
   await guard.waitFor();
+  // The warning is the bar's top line (F865): the bar grows up and the buttons stay under his pointer.
+  if ((await goodAt()) !== goodWas) throw new Error(`the warning moved Good from y ${goodWas} to ${await goodAt()}`);
   if (!(await guard.innerText()).includes("2 of 2 key points are marked missed. Press Good again to keep it.")) throw new Error(`the guard says: ${await guard.innerText()}`);
   if ((await q.innerText()) !== was) throw new Error("one press of Good over a miss moved on");
   if (await page.locator(".review-moment").count()) throw new Error("a rating that only waits showed a moment");
@@ -1270,16 +1274,18 @@ journey("review: ⌘Z from the end screen after a Later doesn't count the time s
     await page.keyboard.press("Meta+z");
     await until("back on it", async () => !(await doneButton.isVisible()) && (await good.isVisible()));
     // The toast that says what ⌘Z took back stands above the ratings bar, not over it: a press on Good right away lands.
-    const over = await page.evaluate(() => {
+    const gap = await page.evaluate(() => {
       const bar = document.querySelector(".review-bar")!.getBoundingClientRect();
-      return [...document.querySelectorAll(".toast")].some((t) => t.getBoundingClientRect().bottom > bar.top);
+      const toast = document.querySelector(".toast")?.getBoundingClientRect();
+      return toast ? Math.round(bar.top - toast.bottom) : null;
     });
-    if (over) throw new Error("a toast sits over the ratings bar");
+    if (gap === null) throw new Error("no toast said what ⌘Z took back");
+    if (gap < 4 || gap > 40) throw new Error(`the toast is ${gap}px above the ratings bar, not just over it`);
     await good.click();
     await doneButton.waitFor();
     const last = calls.calls.filter((a) => a[0] === "review" && !a.some((x) => x.startsWith("--undo"))).at(-1)!;
     const ms = Number(last.find((x) => x.startsWith("--elapsed-ms="))!.split("=")[1]);
-    if (ms >= 2500) throw new Error(`the rating counted ${ms} ms: the time on the end screen went in; ${calls.calls.filter((a) => a[0] === "review" || a[0] === "session").map((a) => a.filter((x) => /elapsed|undo|reopen|end|start/.test(x)).join(" ")).join(" / ")}`);
+    if (ms >= 2500) throw new Error(`the rating counted ${ms} ms: the time on the end screen went in`);
     await page.keyboard.press("Enter");
     await page.locator(".review").waitFor({ state: "detached" });
   } finally {
@@ -3084,17 +3090,17 @@ journey("Home: a day he reviewed but is under the goal has a half-filled dot, no
 });
 
 journey("review: the four ratings sit in the bottom bar and do not move when the passage loads (F865)", async (page) => {
-  await startReview(page, null);
+  await startReview(page, /Learning/);
   // The passage's read held back, as a slow library is: the ratings are there before it.
-  await hold(page, "show", 2);
+  await hold(page, "show");
   try {
     await reveal(page);
     const rate = page.locator(".review-rate");
     await rate.waitFor();
     const boxes = () => rate.locator("button").evaluateAll((bs) => bs.map((b) => { const r = b.getBoundingClientRect(); return `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)}`; }).join(" "));
     const before = await boxes();
+    await until("the passage is being read", () => isHeld(page, "show"));
     await release(page, "show");
-    await release(page, "show").catch(() => {});
     await passageIn(page);
     const after = await boxes();
     if (after !== before) throw new Error(`the ratings moved when the passage loaded: ${before} then ${after}`);
@@ -3107,6 +3113,8 @@ journey("review: the four ratings sit in the bottom bar and do not move when the
     });
     if (!at.below || at.left || at.right) throw new Error(`the ratings are not in the bar under the exercise's column: ${JSON.stringify(at)}`);
   } finally {
+    // No hold left armed for the next journey, whichever way this one went.
+    await page.evaluate(() => delete (window as unknown as { __ORE_HOLD?: Record<string, unknown> }).__ORE_HOLD?.show);
     await release(page, "show").catch(() => {});
   }
   await page.keyboard.press("Escape");
