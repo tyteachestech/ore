@@ -457,8 +457,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   const missed = phase === "checked" && suggested === 1;
   useEffect(() => {
     if (!missed || waved.current || quick || PHONE) return;
-    waved.current = true;
-    const on = window.setTimeout(() => setWave(true), 600);
+    // Counted once he has seen it: a rating inside the wait leaves the wave for the next miss.
+    const on = window.setTimeout(() => (waved.current = true, setWave(true)), 600);
     const off = window.setTimeout(() => setWave(false), 600 + 1500);
     return () => (clearTimeout(on), clearTimeout(off), setWave(false));
   }, [missed, card?.id]); // eslint-disable-line react-hooks/exhaustive-deps

@@ -65,7 +65,7 @@ function Shell({ mole, onClose, children }: { mole?: boolean; onClose: () => voi
   return (
     <aside className="tutor float review-chat" role="region" aria-label="Ask about this">
       <div className="tutor-head">
-        <Hint text={<>Close <kbd>esc</kbd></>}>
+        <Hint text={<>Close <kbd>Esc</kbd></>}>
           <button className="icon-btn" aria-label="Close the chat" onClick={onClose}>
             <X size={14} aria-hidden="true" />
           </button>
@@ -108,6 +108,8 @@ function AskThread({ card, answer, mole, missed, chat, setChat, save, onApply, o
 }) {
   const { turns, input, run } = chat;
   const busy = !!run;
+  // The starters he opened it to stay: a grade landing or a mark flipped never swaps a row under his pointer.
+  const [afterMiss] = useState(!!missed);
   const last = turns.at(-1);
   const error = busy ? undefined : last?.error;
   /** Read off the card itself, never remembered: an undo or a later edit makes a suggestion usable again. */
@@ -192,7 +194,7 @@ function AskThread({ card, answer, mole, missed, chat, setChat, save, onApply, o
 
   const starters = turns.length === 0 && (mole ? (
     <div className="tutor-starters">
-      {(missed ? STARTERS_MISS : STARTERS_MOLE).map(([s, Glyph]) => (
+      {(afterMiss ? STARTERS_MISS : STARTERS_MOLE).map(([s, Glyph]) => (
         <button key={s} className="menu-item" onClick={() => void send(s)}><Glyph size={14} aria-hidden="true" />{s}</button>
       ))}
     </div>
