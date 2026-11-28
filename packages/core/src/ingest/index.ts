@@ -1,5 +1,4 @@
 import { constants, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, utimesSync, writeFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
 import type { Region } from "./paddle.ts";
 import { paddlePath } from "./paddle-path.ts";
 import { homedir } from "node:os";
@@ -230,7 +229,7 @@ async function fromBytes(bytes: Uint8Array, kind: string, name: string, url?: st
     return { type: "article", title: fileStem(name), url, body: s.body, source: { ext: kind, data: bytes } };
   }
   if (kind === "ipynb") {
-    const n = (await import("./notebook.ts")).notebookToDoc(text, base && /^https?:/.test(base) ? base : existsSync(name) ? pathToFileURL(name).href : undefined);
+    const n = (await import("./notebook.ts")).notebookToDoc(text, base && /^https?:/.test(base) ? base : existsSync(name) ? `file://${resolve(name).split("/").map(encodeURIComponent).join("/")}` : undefined);
     return { type: "article", title: n.title ?? fileStem(name), url, body: n.body, source: { ext: "ipynb", data: bytes }, assets: n.assets };
   }
   if (kind === "srt" || kind === "vtt") {

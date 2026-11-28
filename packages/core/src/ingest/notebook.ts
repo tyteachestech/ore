@@ -2,7 +2,6 @@
 // text, code cells as code blocks in the notebook's language, and their output after each: its text,
 // and the plots it drew, saved as images (D122).
 import { existsSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
 // `fenced`: a fence longer than any run of backticks inside, so a cell that prints Markdown (or holds a ``` string) stays one block.
@@ -67,7 +66,7 @@ export function notebookToDoc(json: string, base?: string): NotebookDoc {
           try {
             const href = new URL(url, base).href;
             // A picture that isn't beside the file stays as written: never a link to this Mac's folder in a doc.md.
-            return !href.startsWith("file:") || existsSync(fileURLToPath(href)) ? href : undefined;
+            return !href.startsWith("file:") || existsSync(decodeURIComponent(new URL(href).pathname)) ? href : undefined;
           } catch { return; }
         }
         const name = url.slice("attachment:".length);
