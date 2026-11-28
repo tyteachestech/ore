@@ -14,7 +14,8 @@ import { findItem, listItems } from "../src/items.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
 import { ocrMarkdown } from "../src/ingest/ocr.ts";
-import { openPdf } from "../src/ingest/pdf.ts";
+import { openPdf, pageViews } from "../src/ingest/pdf.ts";
+import { regionsFrom, type PaddlePage } from "../src/ingest/paddle.ts";
 import { rtfToDoc } from "../src/ingest/rtf.ts";
 import { xlsxToDoc } from "../src/ingest/sheets.ts";
 import { episode, pageAudio, transcribe, transcribeFile } from "../src/ingest/audio.ts";
@@ -105,6 +106,9 @@ interface Case {
 }
 
 const PAGES: Case[] = [
+  { name: "numbered course sections survive ids made from their heading words", url: "https://example.org/elimination", fixture: "numbered-course-sections.html", title: "Solving systems by elimination", author: "Maya Reed", published: "2026-11-27", minWords: 65, has: ["Elimination replaces an equation", "### 2.4.2. More rows than columns", "An extra equation can rule out a solution", "### 2.4.3. More columns than rows", "A variable with no pivot can remain free", "substitute your answer into the original equations."], headings: 3 },
+  { name: "a paper keeps its numbered Related Work section and paragraph", url: "https://example.org/river-gauges", fixture: "paper-related-work.html", title: "Comparing river gauges", author: "Maya Reed", published: "2026-11-27", minWords: 70, has: ["A river gauge records the water level at a fixed point.", "### 1.1 Related Work", "Earlier surveys compared gauges by following the same storms.", "### 1.2 Daily readings", "The final plot shows the change at each station over the season."], headings: 3 },
+  { name: "adjacent MathML tables in one matrix keep their rows and columns", url: "https://example.org/equipment", fixture: "mathml-split-matrix.html", title: "Equipment by team", author: "Maya Reed", published: "2026-11-27", minWords: 70, has: ["Two teams share a storage room.", "## Reading the equipment matrix", "Read down a column to find what one team needs to bring to practice.", "\\begin{bmatrix} 6 & 10 \\\\ 30 & 24 \\\\ 14 & 20 \\end{bmatrix}"], headings: 1 },
   { name: "essay", url: "https://paulgraham.com/greatwork.html", fixture: "essay.html", title: "How to Do Great Work", minWords: 11000, has: ["If you research drill of elaboration", "But the note reading gap of forgetting concept", "for elaboration and for example writing"], paragraphs: 100, links: 20 },
   { name: "blog with diagrams and code", url: "https://lilianweng.github.io/posts/2023-06-23-agent/", fixture: "blog-images.html", title: "LLM Powered Autonomous Agents", author: "Lilian Weng", published: "2023-06-23T00:00:00Z", minWords: 6000, has: ["In a LLM-powered autonomous index reading", "In the FACT-Check interval", "Test model answer idea review and plan"], headings: 12, images: 13, code: 6 },
   { name: "docs with code (Python)", url: "https://docs.python.org/3/tutorial/classes.html", fixture: "docs-python.html", title: "9. Classes", minWords: 5000, has: ["Compared with other programming languages", "If the same attribute name occurs in", "Some simple generators can be coded succinctly", "As discussed in [A Word About Names and Objects](#tut-object), shared data", "(except see below [Private Variables](#tut-private))"], headings: 15, code: 30 },
@@ -1194,6 +1198,26 @@ describe("import coverage: what the reader shows", () => {
     expect(readFileSync(join(item.dir, saved!))).toEqual(PNG);
     expect(item.body).toContain("![gone](https://cdn.example.com/gone.png)");
     expect(item.body).toContain("![pixel](https://example.com/pixel.gif)"); // a tracking pixel isn't saved
+  });
+
+  test("article video files become safe links with their poster and caption", async () => {
+    const url = "https://example.org/tank/ripples";
+    serve({
+      [url]: { body: web("article-videos.html"), type: HTML },
+      "https://example.org/tank/media/first-frame.png": { body: PNG, type: "image/png" },
+    });
+    const { meta, body } = await addSource(await tempLibrary(), url);
+    expect(meta.title).toBe("Tracking ripples in a tank");
+    expect(meta.author).toBe("Maya Reed");
+    expect(meta.published).toBe("2026-11-27");
+    expect(body).toContain("Watch the surface of a shallow tank");
+    expect(body).toContain("## What the camera records");
+    expect(body).toContain("[Video: Ripples after one stroke](https://example.org/tank/media/one-stroke.mp4)");
+    expect(body).toMatch(/!\[[^\]]*\]\(assets\/[0-9a-f]{16}\.png\)/);
+    expect(body).toContain("The first crest reaches the blue mark before any other crest.");
+    expect(body).toContain("[Video](https://example.org/films/two-strokes.webm)");
+    expect(body).toContain("Keep the camera fixed while comparing the experiments");
+    expect(body).not.toMatch(/<(?:video|source)\b|does not support the video tag|javascript:|file:/i);
   });
 
   test("embedded videos become a link where they stood; tables become Markdown tables", async () => {
@@ -2431,6 +2455,22 @@ describe("import coverage: videos heard from their sound", () => {
 // D122: figures and slide pictures come in with the text they illustrate.
 // make-deep-pdfs.py: the PDFs the deep import pass found broken (2026-11-27).
 describe("import coverage: PDF, deep import pass", () => {
+  test("PDF: reimport keeps the original formula text when a saved reading drops an operator", async () => {
+    const lib = await tempLibrary();
+    const item = await addSource(lib, file("tables.pdf"));
+    const data = readFileSync(file("tables.pdf"));
+    const pages = JSON.parse(readFileSync(file("tables.paddle.json"), "utf8")) as PaddlePage[];
+    const regions = regionsFrom(pages, await pageViews(data)).map((r) =>
+      r.kind === "formula" ? { ...r, latex: r.latex.replace("1+", "1") } : r);
+    writeFileSync(join(item.dir, "layout.json"), JSON.stringify(regions));
+
+    const { item: reread } = await reimportSource(lib, item.meta.id);
+    expect(reread.meta).toMatchObject({ title: "Spacing and recall", author: "A. Reader" });
+    expect(reread.body).toContain("## Spacing and recall\n\nLearners who spread");
+    expect(reread.body).toContain("| Schedule | Learners | Day 1 | Day 30 |");
+    expect(reread.body).toContain("*R(t) = e*⁻*t/S*, *Sn+1 = Sn · (1 +* α)\n\nEach successful review");
+  });
+
   test("PDF: a scan's text layer set at a slight tilt is the page's text, not margin to drop", async () => {
     const item = await addSource(await tempLibrary(), file("skewed.pdf"));
     const tilted = item.body.split("<!-- page 2 -->")[0]!;

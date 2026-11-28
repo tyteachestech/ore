@@ -58,7 +58,7 @@ export const TutorOutput = z.strictObject({
   reply: z.string().min(1),
   // `passage` is a passage id, or the URL of a page the web search returned.
   citations: z.array(z.strictObject({ passage: z.string(), quote: z.string().min(1) })),
-  general: z.boolean(),
+  general: z.boolean().nullable(),
   // The reply holds back an answer he is meant to find (a hint rung): the app offers "Show me".
   hint: z.boolean(),
   // One idea from this reply worth keeping, as a card he can add with one click; null when none.
@@ -307,7 +307,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
       }),
       schema: TutorOutput,
       input: { message: m, ...(attached.length ? { attached } : {}), ...(before.length ? { before } : {}), ...(st ? {} : { earlier: recent }), ...(open ? { exercise: { heading: open.heading, card: open.card } } : {}), ...(reading !== undefined ? { reading } : {}), ...(missedBefore ? { missed: missedBefore } : {}), ...(pointed.length ? { about: pointed } : {}), passages: passages.map(({ id, title, heading, text }) => ({ id, source: title, heading, text })) },
-      check: (d, seen) => {
+      check: (d, seen, attempt) => {
         repaired = { moved: 0, dropped: 0 };
         // A citation that fails is mended here, never a reason to write the reply again (D291): a quote a
         // few words off moves to the sentence that says it; one with no such sentence, or naming a passage that
@@ -350,11 +350,8 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
           d.citations = d.citations.filter((_, i) => keep[i]);
           d.general = true;
         }
-        // A glued [n] counts only when citation n exists, so it never fails this (markers.ts).
-        const top = Math.max(0, ...[d.reply, ...d.steps].flatMap((t) => markerNumbers(t, (n) => n >= 1 && n <= d.citations.length)));
         if (d.steps.length === 1 || d.steps.length > 6) return "steps: give 2 to 6 steps, or [] when the reply isn't a worked answer";
         if (d.steps.length && (d.hint || d.exercise)) return "steps are a worked answer: not with a hint or an exercise";
-        if (top > d.citations.length) return `marker [${top}] has no citation`;
         if (d.card && d.card.kind === "prompt" && !d.card.rubric.length) return "a prompt card needs 2 to 4 rubric points";
         if (d.exercise && d.card) return "an exercise is for him to answer: propose no card with it";
         if (d.exercise) {
@@ -369,9 +366,23 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
           if (d.covered.length !== open.card.rubric.length) return `covered: one boolean per rubric point (${open.card.rubric.length})`;
           if (d.evidence.length !== d.covered.length) return `evidence: one per rubric point (${d.covered.length}), "" where not covered`;
         }
-        if (!d.card) return null;
-        d.card.question = hideBlanks(d.card.question); // what the + Exercise chip shows, before it is kept
-        return cardTextProblem(d.card) ?? blankProblem(d.card);
+        if (d.card) {
+          d.card.question = hideBlanks(d.card.question); // what the + Exercise chip shows, before it is kept
+          const problem = cardTextProblem(d.card) ?? blankProblem(d.card);
+          if (problem) return problem;
+        }
+        const uncited = d.general === false && !d.citations.length && !d.hint && !d.exercise;
+        if (uncited && attempt === 2) {
+          const unmark = (text: string) => eachMarker(text, () => false, (marker, n) => n > 0 ? "" : marker);
+          d.reply = unmark(d.reply);
+          d.steps = d.steps.map(unmark);
+          d.general = true;
+        }
+        // A glued [n] counts only when citation n exists, so it never fails this (markers.ts).
+        const top = Math.max(0, ...[d.reply, ...d.steps].flatMap((t) => markerNumbers(t, (n) => n >= 1 && n <= d.citations.length)));
+        if (top > d.citations.length) return `marker [${top}] has no citation`;
+        if (uncited && attempt === 1) return "citations are missing: cite the passages or web results that support the answer, or set general to true for outside knowledge, or null if it only responds to his message or attachments without factual claims from other sources";
+        return null;
       },
     }).catch((e: unknown) => {
       // A session that is gone is no failure of this turn: it runs again in a new one, and that run leaves the line.
@@ -404,7 +415,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
     // Each point of the committed card with its mark and the words of his that earned it (D162), as Review's
     // check shows them (D141): a quote is kept only for a covered point and only when it is in what he wrote.
     const marks = open && data.covered.length ? open.card.rubric.map((point, i) => ({ point, covered: data.covered[i]!, quote: data.covered[i] ? quoteIn(message.trim(), data.evidence[i] ?? "") : "" })) : [];
-    return { message: m, title: earlier.length ? "" : data.title.trim().slice(0, 80), reply: data.reply, citations, general: data.general, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card, marks, repaired, ai, usage: usage as Usage };
+    return { message: m, title: earlier.length ? "" : data.title.trim().slice(0, 80), reply: data.reply, citations, general: data.general ?? false, searched: web?.searched ?? false, hint: data.hint, exercise: data.exercise, steps: data.steps, card, marks, repaired, ai, usage: usage as Usage };
   };
   if (!live) return once(null);
   try {

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { findAnnotation } from "../annotations.ts";
-import { findCard } from "../cards.ts";
+import { findCard, rubricProblem } from "../cards.ts";
 import type { Library } from "../library.ts";
 import type { AiStamp } from "../items.ts";
 import { findVariant } from "../remix.ts";
@@ -9,7 +9,7 @@ import { loadPrompt } from "./prompts.ts";
 
 export const ChatOutput = z.strictObject({
   reply: z.string().min(1),
-  card: z.strictObject({ question: z.string().min(1), answer: z.string().min(1) }).nullable(),
+  card: z.strictObject({ question: z.string().trim().min(1), answer: z.string().trim().min(1), rubric: z.array(z.string().trim().min(1)) }).nullable(),
 });
 
 /** A session as "Ask about this" hands it out: `<vendor>:<id>`, so a follow-up after he switched AI (Settings › AI,
@@ -35,6 +35,8 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
   let message = a.message.trim();
   const vendor = chooseVendor(lib, "tutor");
   const session = sessionOf(a.session, vendor);
+  const v = a.variant ? findVariant(lib, card.meta.id, a.variant) : null;
+  const kind = v ? "prompt" : card.meta.kind;
   if (!session) {
     let passage: { source: string; text: string } | undefined;
     if (card.meta.annotation) {
@@ -45,10 +47,9 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
         // the highlight is gone; the chat still has the card
       }
     }
-    const v = a.variant ? findVariant(lib, card.meta.id, a.variant) : null;
     const shown = v ? { question: v.question, model_answer: v.answer, rubric: v.rubric } : { question: card.question, model_answer: card.answer, rubric: card.rubric };
     const original = v ? { original: { question: card.question, model_answer: card.answer, rubric: card.rubric, note: "He answered a new version of this exercise that tests the same idea in a new case." } } : {};
-    const context = { ...shown, his_answer: a.answer?.trim() || "(no idea)", passage, ...original };
+    const context = { ...shown, kind: kind === "prompt" ? "Explain" : "Fact", his_answer: a.answer?.trim() || "(no idea)", passage, ...original };
     message = `Exercise (JSON):\n${JSON.stringify(context, null, 2)}\n\nHis message:\n${message}`;
   }
   const onProgress = a.onProgress && ((p: { reply: string; session: string; model: string }) => a.onProgress!({
@@ -58,5 +59,12 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
   }));
   const r = await runChatTurn(lib, { prompt: "chat", system: prompt.text, message, schema: vendorSchema(ChatOutput), session, cwd: lib.root, onProgress });
   const out = ChatOutput.parse(parseOutput(r.output));
+  if (out.card) {
+    const problem = rubricProblem(kind, out.card.rubric);
+    if (problem) throw new Error(problem);
+    if (v && out.card.rubric.length !== v.rubric.length) {
+      throw new Error(`This version keeps its ${v.rubric.length} key points. Ask to reword them in the same order.`);
+    }
+  }
   return { card: card.meta.id, reply: out.reply, proposal: out.card, session: `${r.vendor}:${r.session}`, ai: { vendor: r.vendor, model: r.model, prompt_version: prompt.version } };
 }

@@ -1,3 +1,5 @@
+import katex from "katex";
+import { parseHTML } from "linkedom";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import * as pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
@@ -558,10 +560,36 @@ const inside = (i: Item, b: Box) => {
   return x >= b.l - 2 && x <= b.r + 2 && y >= b.b - 2 && y <= b.t + 2;
 };
 
+/** Compare visible operators, so a command such as \cdot counts and TeX syntax doesn't. */
+const operators = (text: string) => text.normalize("NFC").replace(/-/g, "−").replace(/·/g, "⋅").match(/[=≠<>≤≥+−×÷⋅]/g) ?? [];
+
+function formulaKeepsText(latex: string, items: Item[]): boolean {
+  let mathml: string;
+  try {
+    mathml = katex.renderToString(latex, { displayMode: true, output: "mathml", throwOnError: true, strict: "ignore" });
+  } catch {
+    return false;
+  }
+  const { document } = parseHTML(mathml);
+  const counts = new Map<string, number>();
+  for (const node of document.querySelectorAll("mo")) {
+    for (const op of operators(node.textContent)) counts.set(op, (counts.get(op) ?? 0) + 1);
+  }
+  // A derivation may use the same operator several times, so compare occurrences.
+  for (const item of items) {
+    for (const op of operators(item.str)) {
+      const count = counts.get(op) ?? 0;
+      if (count === 0) return false;
+      counts.set(op, count - 1);
+    }
+  }
+  return true;
+}
+
 /** A page's items with each region's text taken out and one BLOCK item put where it started, and
  *  the Markdown each block stands for: a table built cell by cell from pdf.js's own reading of the
- *  text in each cell's box (its powers and bold kept), the reader's where pdf.js finds none; a formula as
- *  the reader's LaTeX. */
+ *  text in each cell's box (its powers and bold kept), the reader's where pdf.js finds none; a formula
+ *  as the reader's LaTeX if it renders and keeps the operators found by pdf.js. */
 function swapRegions(items: Item[], regions: Region[], blocks: string[], scan: boolean): Item[] {
   let out = items;
   const read = regions.some((r) => r.kind === "page");
@@ -610,6 +638,10 @@ function swapRegions(items: Item[], regions: Region[], blocks: string[], scan: b
     if (r.kind === "formula" && tables.some((t) => within(r.box, t.box))) continue;
     const ins = (i: Item) => !!i.str.trim() && !isBlock(i.str) && inside(i, r.box);
     const at = out.findIndex(ins);
+    if (r.kind === "formula" && !formulaKeepsText(r.latex, out.filter(ins))) {
+      if (at >= 0) after = out.findLastIndex(ins) + 1;
+      continue;
+    }
     if (r.kind === "text" && at >= 0 && !scan) {
       after = out.findLastIndex(ins) + 1;
       continue;

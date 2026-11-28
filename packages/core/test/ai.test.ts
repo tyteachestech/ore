@@ -92,11 +92,12 @@ describe("Ask about this (D61)", () => {
     const lib = await tempLibrary();
     const { item, annotation } = await addSnippet(lib, { text: "Retrieval practice changes what is stored." });
     const card = writeNewCard(lib, { kind: "prompt", item: item.meta.id, annotation: annotation.id, skills: [], topics: ["t"], content_type: "concept", question: "Why test yourself?", answer: "Recall changes memory.", rubric: ["Recall is learning"] });
-    fakeClaude([{ reply: "Because recall rewrites.", card: null }, { reply: "Try this.", card: { question: "What does recall do?", answer: "Strengthens it." } }]);
+    const proposal = { question: "What does recall do?", answer: "Strengthens it.", rubric: ["Explains that recall strengthens memory"] };
+    fakeClaude([{ reply: "Because recall rewrites.", card: null }, { reply: "Try this.", card: proposal }]);
     const first = await askAboutCard(lib, card.meta.id, { message: "Why?", answer: "effort" });
-    expect(first).toMatchObject({ reply: "Because recall rewrites.", proposal: null, ai: { vendor: "claude", prompt_version: "chat@2" } });
+    expect(first).toMatchObject({ reply: "Because recall rewrites.", proposal: null, ai: { vendor: "claude", prompt_version: "chat@3" } });
     const next = await askAboutCard(lib, card.meta.id, { message: "Clearer card?", session: first.session });
-    expect(next.proposal).toEqual({ question: "What does recall do?", answer: "Strengthens it." });
+    expect(next.proposal).toEqual(proposal);
     const [a, b] = readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
     expect(a![1]).toContain("Retrieval practice changes what is stored.");
     expect(a![1]).toContain("effort");
@@ -104,6 +105,21 @@ describe("Ask about this (D61)", () => {
     expect(`claude:${a![a!.indexOf("--session-id") + 1]}`).toBe(first.session);
     expect(b![1]).toBe("Clearer card?");
     expect(`claude:${b![b!.indexOf("--resume") + 1]}`).toBe(first.session);
+  });
+
+  test("an Explain rewrite returns key points that match the proposed answer", async () => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Retrieval strengthens the idea you recall. The wording can vary." });
+    const card = writeNewCard(lib, { kind: "prompt", item: item.meta.id, skills: [], topics: [], content_type: "concept", question: "Why keep a fixed retrieval target?", answer: "Related ideas can be inhibited.", rubric: ["Names inhibition"] });
+    const proposal = {
+      question: "Why recall the same idea on each review?",
+      answer: "Recall strengthens that idea. You can use different words each time.",
+      rubric: ["Recall strengthens the retrieved idea", "The wording can vary"],
+    };
+    fakeClaude([{ reply: "Try this wording.", card: proposal }]);
+    const r = await askAboutCard(lib, card.meta.id, { message: "Make this exercise clearer" });
+    expect(r.proposal).toEqual(proposal);
+    expect(r.ai.prompt_version).toBe("chat@3");
   });
 
   // F755: every run's spend goes in usage.jsonl (#547), but Review's Ask about this ran outside runAgent and logged none.

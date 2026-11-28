@@ -2638,21 +2638,21 @@ journey("review Ask: a failed question offers Try again, which asks it again and
   await clearChat();
 });
 
-journey("review Ask: a suggested card shows only what it changes, struck and underlined, and keeps showing it once used (D161)", async (page) => {
+journey("review Ask: an Explain rewrite shows, saves and undoes its key point changes (D161)", async (page) => {
   const { clearChat } = reviewAskCalls(page);
-  let id = "";
-  let was = { question: "", answer: "" };
+  await startReview(page, /Teaching/);
+  const id = (await page.locator(".review-card").first().getAttribute("data-id"))!;
+  const was = await ore("card", "show", id) as { question: string; answer: string; rubric: string[]; ai?: unknown };
+  const rubric = ["Explains how repeated exposure makes text feel familiar", "Explains why familiarity can overstate recall"];
+  const ai = { vendor: "claude", model: "mock", prompt_version: "chat@3" };
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
     if (route.request().method() !== "POST" || !body.includes('"ask",')) return route.fallback();
-    id = (JSON.parse(body) as { args: string[] }).args[1]!;
     const question = was.question.replace(/\?$/, "") + ", in one line?";
-    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Tighter, and it asks for one line.", proposal: { question, answer: "Short answer." }, session: "s1" }) });
+    const answer = "Rereading makes the text feel familiar, so you can overestimate what you can recall unaided.";
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify({ reply: "Tighter, and it asks for one line.", proposal: { question, answer, rubric }, session: "s1", ai }) });
   });
-  await startReview(page, null);
-  was = { question: (await page.locator(".review-q").innerText()).trim(), answer: "" };
   await reveal(page);
-  was.answer = (await page.locator(".review-answer").first().innerText()).trim();
   await page.getByRole("button", { name: "Ask about this" }).click();
   await page.locator(".ask-starters").getByRole("button", { name: "Make this exercise clearer" }).click();
   const card = page.locator(".ask-card");
@@ -2660,10 +2660,18 @@ journey("review Ask: a suggested card shows only what it changes, struck and und
   const q = card.locator(".ask-card-q");
   if ((await q.locator(".diff-del").count()) !== 0) throw new Error("the question's kept words were struck");
   if (!(await q.locator(".diff-add").innerText()).includes("in one line")) throw new Error("the added words aren't marked");
-  if (!(await card.locator(".ask-card-a .diff-add").allInnerTexts()).join("").includes("Short")) throw new Error("the new answer isn't marked as added");
+  if (!(await card.locator(".ask-card-a .diff-add").allTextContents()).join("").includes("unaided")) throw new Error("the new answer isn't marked as added");
+  const points = card.locator(".ask-card-points");
+  if (!(await points.locator(".diff-del").allTextContents()).join("").includes("fluency")) throw new Error("the old key point isn't marked as removed");
+  if (!(await points.locator(".diff-add").allTextContents()).join("").includes("exposure")) throw new Error("the new key point isn't marked as added");
   await page.unroute(/\/ore$/);
   await card.getByRole("button", { name: "Use this exercise" }).click();
   await card.getByRole("button", { name: "Exercise updated" }).waitFor();
+  const saved = await ore("card", "show", id) as typeof was;
+  if (JSON.stringify(saved.rubric) !== JSON.stringify(rubric)) throw new Error("the rewrite didn't save the new key points");
+  for (const [key, value] of Object.entries(ai)) {
+    if ((saved.ai as Record<string, unknown> | undefined)?.[key] !== value) throw new Error("the rewrite didn't save its AI stamp");
+  }
   if (!(await q.locator(".diff-add").innerText()).includes("in one line")) throw new Error("using the card dropped the change it shows");
   // ⌘Z puts the old card back, so the suggestion can be used again.
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
@@ -2671,7 +2679,8 @@ journey("review Ask: a suggested card shows only what it changes, struck and und
   await card.getByRole("button", { name: "Use this exercise" }).waitFor({ timeout: 3000 }).catch(() => {
     throw new Error("after ⌘Z the suggestion still says Exercise updated");
   });
-  await ore("card", "set", id, `--question=${was.question}`, `--answer=${was.answer}`);
+  const undone = await ore("card", "show", id) as typeof was;
+  if (JSON.stringify(undone.rubric) !== JSON.stringify(was.rubric)) throw new Error("Undo didn't restore the old key points");
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });

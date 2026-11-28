@@ -18,6 +18,27 @@ const ACCENT: Record<string, string> = { "^": "\\hat", "ˆ": "\\hat", "~": "\\ti
 const name = (e: Element) => (e.localName || e.nodeName).toLowerCase().replace(/^.*:/, "");
 const kids = (e: Element) => Array.from(e.children);
 
+/** Equal-height tables laid side by side inside one pair of brackets form a single matrix. */
+export function joinMatrixTables(math: Element): void {
+  const withoutSpace = (e: Element) => kids(e).filter((child) => name(child) !== "mspace");
+  for (const row of math.querySelectorAll("mrow")) {
+    const [open, ...inner] = withoutSpace(row);
+    const close = inner.pop();
+    if (!open || !close || name(open) !== "mo" || name(close) !== "mo") continue;
+    if (!["[]", "()", "{}"].includes(open.textContent!.trim() + close.textContent!.trim())) continue;
+    const tables = inner.length === 1 && name(inner[0]!) === "mrow" ? withoutSpace(inner[0]!) : inner;
+    if (tables.length < 2 || tables.some((table) => name(table) !== "mtable")) continue;
+    const [first, ...rest] = tables.map(kids);
+    if (!first?.length || [first, ...rest].some((rows) =>
+      rows.length !== first.length || rows.some((tr) => name(tr) !== "mtr"))) continue;
+    for (const rows of rest) {
+      rows.forEach((tr, i) => first[i]!.append(...kids(tr)));
+      rows[0]!.parentElement!.remove();
+    }
+    tables[0]!.parentElement!.querySelectorAll(":scope > mspace").forEach((space) => space.remove());
+  }
+}
+
 /** One token's text as TeX: a symbol by name, a letter as itself, TeX's own specials escaped. */
 function token(text: string): string {
   return [...text.trim()]

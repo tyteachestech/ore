@@ -1090,7 +1090,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                     store={asks}
                     onApply={async (p) => {
                       try {
-                        await setText(card, p.question, p.answer, undefined, true, card, p.ai);
+                        await setText(card, p.question, p.answer, p.rubric, true, card, p.ai);
                       } catch (e) {
                         notify(errorText(e), "error");
                         throw e;

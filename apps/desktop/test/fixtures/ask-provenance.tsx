@@ -14,10 +14,10 @@ const lib = await tempLibrary();
 process.env.ORE_LIBRARY = lib.root;
 const item = await addText(lib, "# Learning\n\nRecall helps memory.");
 const original = { vendor: "claude", model: "first-author", prompt_version: "enrich@25" };
-const card = writeNewCard(lib, { item: item.meta.id, kind: "card", skills: [], topics: [], content_type: "fact", question: "What helps?", answer: "Recall.", rubric: [], ai: original });
+const card = writeNewCard(lib, { item: item.meta.id, kind: "prompt", skills: [], topics: [], content_type: "concept", question: "Why review?", answer: "Recall helps.", rubric: ["Cites rereading", "Explains effort"], ai: original });
 const result = {
-  reply: "Try this wording.", proposal: { question: "What strengthens memory?", answer: "Retrieval practice." },
-  session: "codex:rewrite", ai: { vendor: "codex", model: "rewrite-author", prompt_version: "chat@2" },
+  reply: "Try this wording.", proposal: { question: "Why does retrieval practice strengthen memory?", answer: "Recall takes effort, which strengthens memory.", rubric: ["Links recall to memory", "Explains effort"] },
+  session: "codex:rewrite", ai: { vendor: "codex", model: "rewrite-author", prompt_version: "chat@3" },
 };
 const w = new Window();
 w.document.write("<!doctype html><html><body></body></html>");
@@ -45,10 +45,10 @@ let apply: Promise<unknown> | undefined;
 function Host() {
   const asks = useAskChats((message) => { throw new Error(message); });
   return <TooltipProvider><Ask
-    card={{ ...card.meta, question: card.question, answer: card.answer, rubric: [] } as CardFull}
+    card={{ ...card.meta, question: card.question, answer: card.answer, rubric: card.rubric } as CardFull}
     answer="Recall" store={asks} onClose={() => {}}
     onApply={async p => {
-      apply = studyCommands.card!.run(["set", card.meta.id], { question: p.question, answer: p.answer, ai: JSON.stringify(p.ai) });
+      apply = studyCommands.card!.run(["set", card.meta.id], { question: p.question, answer: p.answer, point: p.rubric, ai: JSON.stringify(p.ai) });
       await apply;
     }}
   /></TooltipProvider>;
@@ -63,9 +63,13 @@ try {
   await act(async () => root.render(<Host key="reopened" />));
   const use = [...document.querySelectorAll("button")].find(b => b.textContent === "Use this exercise")!;
   assert.ok(use, "Ask offers the proposed wording");
+  const suggestion = use.closest(".ask-card")!;
+  assert.ok([...suggestion.querySelectorAll("del")].some(el => el.textContent?.includes("rereading")), "Ask marks the old key point as removed after reopening");
+  assert.ok([...suggestion.querySelectorAll("ins")].some(el => el.textContent?.includes("recall to memory")), "Ask marks the new key point as added after reopening");
   await act(async () => { use.click(); await apply; });
   const saved = findCard(lib, card.meta.id);
   assert.equal(saved.question, result.proposal.question);
+  assert.deepEqual(saved.rubric, result.proposal.rubric);
   assert.deepEqual(saved.meta.ai, result.ai, "applying an AI rewrite must retain who wrote the new text");
 } finally {
   await act(async () => root.unmount());

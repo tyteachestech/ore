@@ -5,6 +5,7 @@ import type { Asset } from "../items.ts";
 import { chartLinks, drawCharts } from "./charts.ts";
 import { cleanAuthor, cleanDate, escapeMarkdown, flattenRuby, FROM_TAB } from "./check.ts";
 import { td } from "./markdown.ts";
+import { joinMatrixTables } from "./mathml.ts";
 import { chatMarkdown, notionMarkdown } from "./rendered.ts";
 import { youtubeId } from "./youtube.ts";
 
@@ -29,9 +30,8 @@ function videoPage(src: string): string | null {
   return loom ? `https://www.loom.com/share/${loom}` : null;
 }
 
-/** Embedded videos as a "Video: …" link where they stand, so the text says a video is there and
- *  one click opens it; an extractor drops the iframe itself. */
-function videoLinks(document: Document) {
+/** Embedded videos become links where they stood, with any poster and surrounding caption. */
+function videoLinks(document: Document, url: string) {
   for (const f of Array.from(document.querySelectorAll("iframe"))) {
     const page = videoPage(f.getAttribute("src") ?? f.getAttribute("data-src") ?? "");
     if (!page) continue;
@@ -42,6 +42,41 @@ function videoLinks(document: Document) {
     a.textContent = title ? `Video: ${title}` : `Video on ${/youtube/.test(page) ? "YouTube" : /vimeo/.test(page) ? "Vimeo" : "Loom"}`;
     p.appendChild(a);
     f.replaceWith(p);
+  }
+  const webUrl = (value: string | null, base: string) => {
+    if (!value?.trim()) return undefined;
+    const parsed = URL.parse(value, base);
+    return parsed && (parsed.protocol === "https:" || parsed.protocol === "http:") ? parsed.href : undefined;
+  };
+  const base = webUrl(document.querySelector("base[href]")?.getAttribute("href") ?? null, url) ?? url;
+  // The image-figure rule keeps only an image and caption, discarding the video link beside a poster.
+  for (const figure of document.querySelectorAll("figure:has(video)")) {
+    const group = document.createElement("div");
+    for (const attr of figure.attributes) group.setAttribute(attr.name, attr.value);
+    group.append(...figure.childNodes);
+    figure.replaceWith(group);
+  }
+  for (const video of document.querySelectorAll("video")) {
+    const sources = [video, ...video.querySelectorAll("source[src]")];
+    const src = sources.map((node) => webUrl(node.getAttribute("src"), base)).find(Boolean);
+    const poster = webUrl(video.getAttribute("poster"), base);
+    const title = video.getAttribute("title")?.trim();
+    const block = document.createElement(video.closest("p") ? "span" : "p");
+    if (poster) {
+      const img = document.createElement("img");
+      img.setAttribute("src", poster);
+      img.setAttribute("alt", title || "Video preview");
+      block.append(img, document.createElement("br"));
+    }
+    if (src) {
+      const link = document.createElement("a");
+      link.href = src;
+      link.textContent = title ? `Video: ${title}` : "Video";
+      block.append(link);
+    } else {
+      block.append("Video unavailable. Open the original page to watch.");
+    }
+    video.replaceWith(block);
   }
 }
 
@@ -89,6 +124,8 @@ function inlineCustom(document: Document) {
   }
 }
 
+const SECTION_NUMBER = /^\s*\d+(?:\.\d+)*\.?\s+/;
+
 /** A section's heading in a `<header>` of its own (Brilliant's wiki: `<header class="section-header"><h2>…`): the
  *  extractor drops every header as the site's, with the heading. One that holds a section heading and nothing
  *  else is that heading. And a box in the running text classed as a modal (Brilliant's worked problems,
@@ -100,6 +137,13 @@ function sectionHeaders(document: Document) {
     if (!heads.length || h.querySelector("h1, nav") || heads.map(text).join("") !== text(h)) continue;
     h.replaceWith(...Array.from(h.childNodes));
   }
+  // Defuddle's navigation score penalizes words like "related" even in a formal section heading.
+  // A numbered section with prose in the article is content. Mark it for the scorer that reads it.
+  for (const section of document.querySelectorAll("article section, main section")) {
+    const heading = section.firstElementChild;
+    if (heading?.matches("h2, h3, h4, h5, h6") && SECTION_NUMBER.test(heading.textContent ?? "") &&
+        section.querySelector("p") && !section.closest("aside, nav")) section.classList.add("section-content");
+  }
   // A section whose id is its heading's words with a word the extractor reads as a box of links ("more-examples":
   // "more-") is dropped whole. Such an id is cleared when the heading says what the section teaches, not what a box
   // of links says ("More stories", "Related posts" keep theirs). Markdown keeps no ids, so nothing else is lost.
@@ -107,7 +151,7 @@ function sectionHeaders(document: Document) {
   const LINKS = new Set([...BOX, "posts", "articles", "stories", "reading", "from", "you", "also", "like", "may", "our", "the", "this", "on", "in", "next", "read"]);
   const slug = (t: string) => t.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
   const slugs = Array.from(document.querySelectorAll("h2, h3, h4, h5, h6"))
-    .map((h) => slug(h.textContent ?? ""))
+    .map((h) => slug((h.textContent ?? "").replace(SECTION_NUMBER, "")))
     .filter((t) => t.split("-").some((w) => BOX.has(w)) && t.split("-").some((w) => !LINKS.has(w)));
   for (const el of Array.from(document.querySelectorAll("[id]")))
     if (slugs.some((t) => el.id.toLowerCase().endsWith(t))) el.removeAttribute("id");
@@ -466,7 +510,7 @@ async function readHtml(html: string, url: string, min: number): Promise<WebDoc>
   // A byline only in the head's `<link rel="author" content="…">` (jaykmody.com), which the readers don't read (F162).
   const linked = document.querySelector('link[rel~="author"][content]')?.getAttribute("content") ?? undefined;
   try {
-    videoLinks(document as unknown as Document);
+    videoLinks(document as unknown as Document, url);
     videoCards(document as unknown as Document);
     flatTables(document as unknown as Document);
     footnoteLists(document as unknown as Document);
@@ -477,6 +521,7 @@ async function readHtml(html: string, url: string, min: number): Promise<WebDoc>
     pandocMath(document as unknown as Document);
     // MathML's XML annotations are alternate representations. Defuddle can turn both into one formula.
     for (const annotation of document.querySelectorAll("math semantics > annotation-xml")) annotation.remove();
+    for (const math of document.querySelectorAll("math")) joinMatrixTables(math as unknown as Element);
     const charts = await drawCharts(document as unknown as Document, html);
     const h1 = document.querySelector("h1")?.textContent ?? undefined;
     const paper = paperAuthors(document as unknown as Document);
