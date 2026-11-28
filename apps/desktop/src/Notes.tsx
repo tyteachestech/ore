@@ -271,7 +271,7 @@ export function useNotes(ref: NoteRef, notify: Notify, onKept?: () => void): MyN
       void queue(() => ore<Notes>("notes", ...key.split(" "))).then((r) => live && draft.current === saved.current && r.text !== saved.current && apply(r.text), () => {});
     window.addEventListener(LIBRARY_BACK, outside);
     // Leaving (or quitting) writes what is pending; the CLI call outlives this view.
-    const left = onLeave(() => void flush());
+    const left = onLeave(flush);
     return () => {
       live = false;
       window.removeEventListener("ore:note-written", written);

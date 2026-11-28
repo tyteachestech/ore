@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type RefObject } from "react";
 import { localDay } from "../../../packages/core/src/ids";
@@ -58,18 +59,19 @@ export const DRAFT_MS = 24 * 3600_000;
  *  puts only its own changes over what is stored, so another window (the quick quiz) keeps its own. */
 export type Kept<V> = { get(id: string): V | undefined; at(id: string): number | undefined; set(id: string, v: V): void; delete(id: string): void };
 type Stamped<V> = { v: V; at: number };
-const flushers = new Set<() => void>();
-/** Writes every kept draft now. */
-export const flushKept = () => flushers.forEach((f) => f());
+const flushers = new Set<() => unknown>();
+/** Writes every kept draft now; settled once the writes that take a moment (a note's) have landed or failed. */
+export const flushKept = () => Promise.allSettled([...flushers].map(async (f) => f()));
 /** Runs `f` whenever the page may be going (hidden, unloading, the app quitting), until the returned call: for a
  *  write that waits on a pause in his typing, as a note's does. ⌘Q sends no `beforeunload`, so a listener of its
  *  own for that missed the quit, and the words he typed in the note's last 800 ms were never saved (F-new-note-quit). */
-export const onLeave = (f: () => void) => (flushers.add(f), () => void flushers.delete(f));
+export const onLeave = (f: () => unknown) => (flushers.add(f), () => void flushers.delete(f));
 if (typeof window !== "undefined") {
   addEventListener("pagehide", flushKept);
   addEventListener("beforeunload", flushKept);
   document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && flushKept());
-  if ("__TAURI_INTERNALS__" in window) void listen("quitting", flushKept).catch(() => {});
+  // The shell quits once every page has answered (`quit_ready`, main.rs), so a write is never cut off mid-way.
+  if ("__TAURI_INTERNALS__" in window) void listen("quitting", () => void flushKept().then(() => invoke("quit_ready"))).catch(() => {});
 }
 export function kept<V>(key: string): Kept<V> {
   const fresh = (e: Stamped<V>) => Date.now() - e.at <= DRAFT_MS;

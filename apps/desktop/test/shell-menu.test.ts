@@ -31,6 +31,10 @@ test("Quit is Ore's own menu item, so the pages hear that the app is quitting an
   const route = rust.slice(rust.indexOf(".on_menu_event(|app, e|"), rust.indexOf("// Images in notes"));
   expect(route).toMatch(/"ore:quit"[^;]*app\.exit\(0\)/);
   expect(rust.slice(rust.indexOf("RunEvent::ExitRequested"))).toContain('app.emit("quitting", ())');
+  // The quit waits for each page's answer, not a fixed moment: 150 ms went by before a note reached `ore`.
+  expect(rust).toContain("fn quit_ready(");
+  expect(rust).toMatch(/generate_handler!\[[^\]]*quit_ready/);
+  expect(source("../src/util.ts")).toContain('flushKept().then(() => invoke("quit_ready"))');
 });
 
 test("both webviews install the shared menu lifecycle, including focus refresh", () => {
