@@ -184,9 +184,13 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
     return cov ? [...idx.filter((i) => !cov[i]), ...idx.filter((i) => cov[i])] : idx;
   }, [q?.points, q?.check?.covered]);
   const passages = useMemo(() => {
-    const out: { e: Evidence; point: number }[] = [];
-    for (const i of order) for (const e of q!.points![i]!.evidence) if (!out.some((o) => o.e.start === e.start)) out.push({ e, point: i });
-    return out;
+    const byStart = new Map<number, { e: Evidence; points: Set<number> }>();
+    for (const i of order) for (const e of q!.points![i]!.evidence) {
+      const passage = byStart.get(e.start);
+      if (passage) passage.points.add(i);
+      else byStart.set(e.start, { e, points: new Set([i]) });
+    }
+    return [...byStart.values()];
   }, [order]);
   useEffect(() => {
     if (!moved.current) setAt(0);
@@ -610,8 +614,8 @@ export function Finish({ doc, reached, blocked, setReveal, keyPoint, onCancel, o
                 {order.map((i) => {
                   const p = q.points![i]!;
                   const mark = cov?.[i];
-                  const first = passages.findIndex((x) => x.point === i);
-                  const current = passages[at]?.point === i;
+                  const first = passages.findIndex((x) => x.points.has(i));
+                  const current = passages[at]?.points.has(i);
                   return (
                     <li key={i} className={`${mark === false ? "missed" : mark ? "got" : ""}${current ? " on" : ""}`}>
                       {cov ? (

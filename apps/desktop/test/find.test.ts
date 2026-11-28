@@ -29,6 +29,16 @@ describe("find in source", () => {
     expect(search([p as unknown as HTMLElement], "άλφα").map((r) => r.toString())).toEqual(["α\u0301λφα"]);
   });
 
+  test("Find matches without accents and highlights the original letters (F-new-find-accents)", () => {
+    const p = document.createElement("p");
+    p.textContent = "corazón, corazo\u0301n, corazon, cafe\u0301";
+    document.body.append(p as unknown as Node);
+    const matches = (query: string) => search([p as unknown as HTMLElement], query).map((r) => r.toString());
+    expect(matches("corazon")).toEqual(["corazón", "corazo\u0301n", "corazon"]);
+    expect(matches("corazón")).toEqual(["corazón", "corazo\u0301n", "corazon"]);
+    expect(matches("cafe")).toEqual(["cafe\u0301"]);
+  });
+
   test("a match runs across inline marks, never across paragraphs, left pane before right", () => {
     const left = document.createElement("div");
     left.innerHTML = "<p>desirable <strong>diff</strong>iculties</p><p>end</p><p>start</p><button>end start</button>";

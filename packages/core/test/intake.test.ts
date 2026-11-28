@@ -2277,6 +2277,29 @@ describe("import coverage: audio and podcasts", () => {
     expect(hasPageText(item)).toBe(true);
   });
 
+  test("episode pages under a compound podcast path keep their own titles, audio and transcripts (F-new-podcast-episode-path)", async () => {
+    const lib = await tempLibrary();
+    const host = "https://www.spanishpodcast.org";
+    const recording = Buffer.alloc(4096);
+    for (const [id, file, title] of [
+      [216, "216paella.mp3", "La paella es deliciosa o está deliciosa"],
+      [215, "215soyfeliz.mp3", "Soy feliz y estoy feliz"],
+    ] as const) {
+      const url = `${host}/podcasts_con_transcripcion/${id}t.html`;
+      const audio = `${host}/archivos/episodios/EP${id}/${file}`;
+      const html = readFileSync(join(FIX, "audio", `spanishpodcast-${id}.html`), "utf8");
+      serve({ [url]: { body: html, type: HTML }, [audio]: { body: recording, type: "audio/mpeg" } });
+      const item = await addSource(lib, url);
+      expect(audioOf(item)).toMatchObject({ file: join(item.dir, "source.mp3") });
+      expect(item.meta).toMatchObject({ title, url });
+      expect(item.body).toBe(heard);
+      expect(readFileSync(join(item.dir, "source.mp3"))).toEqual(recording);
+      expect(readFileSync(join(item.dir, "transcript.vtt"), "utf8")).toBe(VTT);
+      expect(readFileSync(join(item.dir, "page.html"), "utf8")).toBe(html);
+      expect(hasPageText(item)).toBe(true);
+    }
+  });
+
   test("an episode page added from the browser tab comes in as its episode too", async () => {
     serve({ [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
     asEpisode(await addTab(await tempLibrary(), { tab: { browser: "Safari", url: EPISODE, title: "x", html: episodePage } }));

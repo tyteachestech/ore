@@ -364,16 +364,27 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   useKeptScroll(root, "home");
   // Read once as Home opens (kept through StrictMode's second run): where Back should put focus, if it was Back.
   const backTo = useRef<string | null>(null);
+  const placingFocus = useRef(true);
   useLayoutEffect(() => {
     const to = backHome ? openedByKeys : null;
     (backHome = false), (openedByKeys = null);
     if (to) backTo.current = to;
   }, []);
   useLayoutEffect(() => {
-    const el = backTo.current && root.current?.querySelector<HTMLElement>(`${backTo.current} .home-open`);
-    if (!el) return;
-    backTo.current = null;
-    if (!document.activeElement || document.activeElement === document.body) focusQuietly(el);
+    if (PHONE || !placingFocus.current || blocked) return;
+    if (document.activeElement && document.activeElement !== document.body) {
+      placingFocus.current = false;
+      return;
+    }
+    if (!today && !error) return;
+    const row = backTo.current && root.current?.querySelector<HTMLElement>(`${backTo.current} .home-open`);
+    // Wait for the skills before deciding where to land when Today already knows review is due.
+    if (!row && today?.due && !canStart && !error) return;
+    const el = row || root.current?.querySelector<HTMLElement>(".home-go") || root.current?.querySelector<HTMLElement>("button:not([disabled]), a[href]");
+    if (el) {
+      placingFocus.current = false;
+      focusQuietly(el);
+    }
   });
 
   const split = useSplit("ore.home-split", 1 / 3);

@@ -2294,10 +2294,8 @@ export function App() {
             targets={targets}
             onOpenLink={openLink}
             onBack={() => {
-              // Back on Home, focus goes to the source's Continue reading row, as the list's row keeps it.
-              const id = openId;
-              flushSync(() => setOpenId(null));
-              if (!onSkillPage && place === "home") document.querySelector<HTMLElement>(`.home-read[data-id="${id}"] .home-open`)?.focus();
+              if (place === "home" && !skill) comingBackHome();
+              setOpenId(null);
             }}
             onChanged={() => void refresh()}
             onSkillsChanged={reloadSkills}
@@ -2478,6 +2476,7 @@ export function App() {
           following={following}
           onPickFiles={chooseFiles}
           onClose={() => setAdding(false)}
+          giveBack={place === "feed" ? () => document.querySelector<HTMLElement>(".feed-list") : undefined}
           notify={notify}
         />
       )}

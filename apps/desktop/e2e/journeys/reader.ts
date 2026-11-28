@@ -2541,3 +2541,29 @@ journey("reader: a book opens on its text, its publisher's pages under one shut 
     await ore("archive", made.id).catch(() => {});
   }
 });
+
+// F-new-reader-passage-announcement
+journey("Reader: keyboard passage selection exposes the named reader and the selected text (run 7)", async (page) => {
+  const title = "Passage selection";
+  const first = "Retrieval strengthens memory.";
+  const last = "Space out retrieval over several days.";
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# ${title}\n\n${first}\n\n${last}`);
+  await page.keyboard.press("Enter");
+  const reader = page.locator(".reader-scroll");
+  await reader.locator(".doc").getByText(last).waitFor();
+  await until("the reader has the keys", () => reader.evaluate((el) => el === document.activeElement));
+  const before = await reader.ariaSnapshot();
+  for (let n = 0; n < 4; n++) await page.keyboard.press("ArrowDown");
+  await reader.locator(".focus-box").waitFor();
+  const single = await reader.ariaSnapshot();
+  await page.keyboard.press("Shift+ArrowUp");
+  const extended = await reader.ariaSnapshot();
+  if (before === single || single === extended) throw new Error("The accessibility snapshot did not change with the keyboard selection");
+  if (!single.includes(`region "${title}"`)) throw new Error("The reader has no accessible name");
+  if (!single.includes(`status: ${last}`) || !extended.includes(`status: ${first} ${last}`)) {
+    throw new Error(`The accessibility snapshot has the wrong selection:\n${single}\n${extended}`);
+  }
+  await page.keyboard.press("Escape");
+  if ((await reader.ariaSnapshot()).includes(`status: ${first}`)) throw new Error("Escape left the old passage announced");
+}, "webkit");

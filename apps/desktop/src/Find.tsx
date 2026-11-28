@@ -22,29 +22,32 @@ export function fold(s: string): string {
   });
 }
 
-/** Where `needle` starts in `hay`, without overlaps, ignoring case. */
+/** Where `needle` starts in `hay`, without overlaps, ignoring case and accents. */
 export const findAll = (hay: string, needle: string): number[] => findRanges(hay, needle).map(([a]) => a);
 
-/** Where `needle` is in `hay` (start, end), without overlaps, ignoring case and how an accent is typed:
- *  é as one letter or as e and its mark look the same, so each finds both (Codex sweep 4). */
+const withoutAccents = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "");
+
+/** Where `needle` is in `hay` (start, end), without overlaps, ignoring case and accents. */
 export function findRanges(hay: string, needle: string): [number, number][] {
-  const n = fold(needle).normalize("NFC");
+  const n = fold(withoutAccents(needle));
   if (!n.trim()) return [];
-  let h = fold(hay);
+  let h = withoutAccents(hay);
   let start = (i: number) => i;
   let end = (i: number) => i;
-  // Text with an accent typed as its own mark (rare): searched in one form, each letter mapped back to where it sits.
-  if (h.normalize("NFC") !== h) {
+  // A separate mark belongs to its original letter. Map offsets when removing one or when
+  // decomposition expands a letter: equal total lengths can hide both changes in the same text.
+  if (h.length !== hay.length || /\p{M}/u.test(hay)) {
     const from: number[] = [];
     const to: number[] = [];
     let c = "";
-    for (const m of h.matchAll(/\P{M}\p{M}*|\p{M}+/gu)) {
-      const piece = m[0].normalize("NFC");
+    for (const m of hay.matchAll(/\P{M}\p{M}*|\p{M}+/gu)) {
+      const piece = withoutAccents(m[0]);
       for (let k = 0; k < piece.length; k++) (from.push(m.index), to.push(m.index + m[0].length));
       c += piece;
     }
     [h, start, end] = [c, (i) => from[i]!, (i) => to[i - 1]!];
   }
+  h = fold(h);
   const at: [number, number][] = [];
   for (let i = h.indexOf(n); i >= 0; i = h.indexOf(n, i + n.length)) at.push([start(i), end(i + n.length)]);
   return at;

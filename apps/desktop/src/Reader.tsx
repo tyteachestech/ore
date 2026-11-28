@@ -3487,7 +3487,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
             Its own class: `.doc-head` means the source is read and its title can be worked.
             It takes focus as the text's scroller does, so focus given to the reader while it opens lands (F873). */}
         <div className="reader-pane">
-        <div className="reader-scroll" tabIndex={-1}>
+        <div className="reader-scroll" tabIndex={-1} role={PHONE ? undefined : "region"} aria-label={PHONE ? undefined : p.known?.title ?? "Source"}>
           <div className="page">
             {p.known && (
               <header className="doc-opening">
@@ -3504,6 +3504,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       </div>
     );
 
+  const keyboardPassage = focus && !closedBook && focusSpan(focus);
   // A file on the Mac can't open on the phone; a web page opens in Safari.
   const source = PHONE && !doc.url ? null : originalLabel(doc);
   const published = pubDate(doc.published);
@@ -3729,7 +3730,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       )}
       <HideVeil hidden={hidden} eye={eyeRef} />
       {/* Only the words hide (F118): the toolbar above them, with Show the source, stays in reach of VoiceOver. */}
-      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} aria-hidden={hidden || undefined} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
+      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} role={PHONE ? undefined : "region"} aria-label={PHONE ? undefined : doc.title} aria-hidden={hidden || undefined} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
+        {/* The live region is in place before the first key moves the passage box. */}
+        {!PHONE && <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {keyboardPassage ? textRange(...keyboardPassage)?.toString().replace(/\s+/g, " ").trim() : ""}
+        </div>}
         <WithMenu actions={textMenu} native={menuNative}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} {...(PHONE ? { onTouchStart, onTouchMove, onTouchEnd } : {})} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
@@ -3903,7 +3908,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
               />
             );
           })()}
-          {focus && !closedBook && <FocusBox from={focusSpan(focus)[0]} to={focusSpan(focus)[1]} />}
+          {keyboardPassage && <FocusBox from={keyboardPassage[0]} to={keyboardPassage[1]} />}
           {spots && !closedBook && (
             <Margin
               chapters={spots}

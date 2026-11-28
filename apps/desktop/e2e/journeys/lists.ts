@@ -5,6 +5,38 @@ import { AGENTS, answered, BRIDGE, foundOnScreen, hasCaret, hold, inLibrary, isH
 
 // —— journeys ——
 
+// F-new-home-entry-focus
+journey("Home: focus starts at Start review, returns there from a palette-opened source, and has a fallback (run 7)", async (page) => {
+  const home = page.locator(".home");
+  const start = home.getByRole("button", { name: "Start review" });
+  const focused = () => page.evaluate(() => {
+    const el = document.activeElement;
+    return el?.matches("button") ? el.textContent?.trim() : el?.tagName;
+  });
+  await start.waitFor();
+  const launch = await focused();
+  await page.keyboard.press("Meta+k");
+  await page.getByPlaceholder("Search sources or run a command…").fill(TESTING);
+  await page.getByRole("option", { name: new RegExp(TESTING) }).first().press("Enter");
+  await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+  await until("the reader has the keys", () => page.locator(".reader-scroll").evaluate((el) => el === document.activeElement));
+  await page.keyboard.press("Escape");
+  await start.waitFor();
+  const returned = await focused();
+
+  await page.route(/\/ore$/, async (route) => {
+    if (route.request().postDataJSON().args[0] !== "today") return route.fallback();
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), due: 0 } });
+  });
+  await page.reload();
+  await home.getByRole("button", { name: /Plan when you review|^After .* I review\.$/ }).waitFor();
+  const fallback = await focused();
+  if (launch !== "Start review" || returned !== "Start review" || !/^(Plan when you review|After .* I review\.)$/.test(fallback ?? "")) {
+    throw new Error(`Home focus at launch, after the reader, and without review: ${launch}, ${returned}, ${fallback}`);
+  }
+}, "webkit");
+
 journey("Home: today's minutes are the big number, and the goal ring stands unframed", async (page) => {
   await page.locator(".home-goal h1 .roll").waitFor();
   const look = await page.evaluate(() => {

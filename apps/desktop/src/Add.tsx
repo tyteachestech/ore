@@ -88,7 +88,7 @@ function Detected({ list }: { list: Entry[] }) {
 type Left = { value: string; pasted: Pasted | null; picked: string[]; files: string[] };
 const left: { add?: Left; follow?: Left } = {};
 
-export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, following, onPickFiles, onClose, notify }: {
+export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, following, onPickFiles, onClose, giveBack, notify }: {
   skill: Skill | null;
   skills: Skill[];
   /** Links already in the library, never offered from the clipboard. */
@@ -99,6 +99,8 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
   onFollow: (url: string, skills: string[]) => Promise<string | null>;
   /** Opened by Feed's Follow: it takes one link and follows it, and never saves what is typed as a source. */
   following?: boolean;
+  /** Where the keys go if the control that opened the box is gone. */
+  giveBack?: () => HTMLElement | null;
   /** Opens the system's file panel: the files picked, none on Cancel. */
   onPickFiles: () => Promise<string[]>;
   onClose: () => void;
@@ -115,7 +117,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
   const [error, setError] = useState<string | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const skillsRef = useRef<HTMLSpanElement>(null);
-  useFocusWhileMounted(ref);
+  useFocusWhileMounted(ref, giveBack);
   const open = useRef(true);
   /** What to keep if the box closes now: nothing while an add runs or once it went in. */
   /** It went in (or was followed): the box closes with nothing to keep. */
@@ -198,7 +200,7 @@ export function AddBox({ skill, skills, have, onCreate, onAdd, onFollow, followi
   return (
     <div className="overlay" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <Trap>
-      <div className="panel add-box" role="dialog" aria-modal="true" aria-label={following ? "Follow a feed" : "Add a source"}>
+      <div className="panel add-box" role="dialog" aria-modal="true" aria-label={following ? "Follow a feed" : "Add a source"} data-gives-back={giveBack ? "" : undefined}>
         <Grow
           ref={ref}
           className="panel-input add-input"

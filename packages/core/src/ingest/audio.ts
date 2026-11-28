@@ -200,9 +200,9 @@ function metaOf(html: string): (p: string) => string | undefined {
  *  page (Overcast, Pocket Casts) may name the type mid-path (`/ep13.mp3/stream`). */
 const AUDIO_FILE = new RegExp(`\\.(?:${AUDIO_TYPES.join("|")})(?:[?#]|$)`, "i");
 const AUDIO_ANYWHERE = new RegExp(`\\.(?:${AUDIO_TYPES.join("|")})(?:[/?#]|$)`, "i");
-/** An address with a part after `/podcast/`, `/podcasts/`, `/episode/` or `/episodes/`: one episode's
- *  page, not the show's index (`/podcasts/`). */
-const EPISODE_PATH = /\/(?:podcasts?|episodes?)\/[^/]+/i;
+/** An address with a part after a section named for podcasts or episodes, including compound names
+ *  such as `/podcasts_con_transcripcion/`. A section on its own can be the show's index. */
+const EPISODE_PATH = /\/[^/]*(?:podcast|episode)[^/]*\/[^/]+/i;
 const PODCAST_HOST = /^podcasts?\./i;
 /** A Megaphone episode id (SAM9228418236): letters, then digits. A playlist or show path is not one. */
 const MEGAPHONE_ID = /^[A-Z]{2,}\d{6,}$/;

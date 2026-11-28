@@ -1,0 +1,5 @@
+{ "testers": [
+  { "name": "keyboard", "seed": "seed", "from": "/tmp/ore-learner/library" },
+  { "name": "language", "seed": "init" },
+  { "name": "researcher", "seed": "seed", "from": "/tmp/ore-learner/library" }
+] }
