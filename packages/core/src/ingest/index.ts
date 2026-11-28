@@ -3,7 +3,7 @@ import type { Region } from "./paddle.ts";
 import { paddlePath } from "./paddle-path.ts";
 import { homedir } from "node:os";
 import { basename, extname, join, resolve, sep } from "node:path";
-import { addHighlight, annotationRevs, readAnnotations, reanchorItem, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
+import { addHighlight, annotationRevs, readAnnotations, reanchorAnnotations, reviseAnnotation, type Annotation, type Intent } from "../annotations.ts";
 import { parseFrontmatter, stringifyFrontmatter } from "../frontmatter.ts";
 import { deviceName, latestRevs, realNow, sha256, subdirs, writeAtomic } from "../fsutil.ts";
 import { isUlid, nowIso, ulid } from "../ids.ts";
@@ -898,6 +898,10 @@ function swapFiles(item: Item, from: string) {
   writeAtomic(join(tmp, "highlights.json"), JSON.stringify(latestRevs(annotationRevs(item.dir))));
   const old = parseFrontmatter(readFileSync(join(from, "doc.md"), "utf8"));
   const was = ItemMetaSchema.parse(old.data);
+  // New receipts keep the state this operation wrote. Only reverse fields still at that state;
+  // an independent edit wins. Older receipts remain readable with their original swap behavior.
+  const afterPath = join(from, "after.json");
+  const after = existsSync(afterPath) ? JSON.parse(readFileSync(afterPath, "utf8")) as { meta: ItemMeta } : undefined;
   // Written over in place, never removed first, so a stop at any point leaves every file the source needs
   // (deep scan 4, EDGES-01); only a file the other version doesn't have goes, after.
   const theirs = readdirSync(from).filter((f) => REPLACED(f) && f !== "doc.md");
@@ -907,7 +911,12 @@ function swapFiles(item: Item, from: string) {
   const lost = (was.chapter_recalls ?? []).filter((r) => !back.some((b) => b.n === r.n || (b.at === r.at && b.text === r.text)));
   const recalls = [...back, ...lost].sort((a, b) => a.n - b.n);
   const meta = { ...item.meta, type: was.type, url: was.url, video: was.video, page_added: was.page_added, author: was.author, published: was.published, structure: was.structure, text_sha256: was.text_sha256, chapter_recalls: recalls.length ? recalls : undefined };
+  if (after) for (const key of ["type", "url", "video", "page_added", "author", "published", "structure"] as const) {
+    if (JSON.stringify(was[key]) === JSON.stringify(after.meta[key]) || JSON.stringify(item.meta[key]) !== JSON.stringify(after.meta[key]))
+      Object.assign(meta, { [key]: item.meta[key] });
+  }
   writeAtomic(item.docPath, stringifyFrontmatter(meta, old.body));
+  writeAtomic(join(tmp, "after.json"), JSON.stringify({ meta }));
   for (const f of readdirSync(item.dir).filter((f) => REPLACED(f) && f !== "doc.md" && !theirs.includes(f))) unlinkSync(join(item.dir, f));
   rmSync(from, { recursive: true, force: true });
   return tmp;
@@ -1087,7 +1096,7 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     return { item, changed: false, moved: 0, removed: [], unplaced: [] };
   }
   const step = stash ? ulid() : undefined;
-  await withLock(paths.lock(lib), () => {
+  return withLock(paths.lock(lib), () => {
     pruneStashes(lib);
     if (step) {
       const dir = join(stashes(lib, item.meta.id), step);
@@ -1113,13 +1122,19 @@ async function rewrite(lib: Library, was: Item, draft: NewItem, regions: Region[
     const added = tail ? recordEnd(lib, item.meta.id, draft.body.length - tail.length, tail) : undefined;
     const meta = { ...now, text_sha256: sha256(current.body), type: draft.type, url: course ? (draft.url ?? url) : url, video: draft.video, page_added: added, author: now.author || draft.author?.trim() || undefined, published: draft.published?.trim() || now.published, structure: draft.structure, owed: undefined, owed_error: undefined, chapter_recalls: followChapters(now.chapter_recalls, item.body, draft.body, draft.type) };
     writeAtomic(item.docPath, stringifyFrontmatter(meta, draft.body));
+    // The inverse records only what this rewrite wrote, before another command can edit it.
+    const next = readItemDir(item.dir);
+    const report = reanchorAnnotations(next);
+    const orphans = readAnnotations(next).filter((a) => report.orphaned.includes(a.id));
+    const gone = orphans.filter((a) => a.intent !== "question");
+    for (const a of gone) reviseAnnotation(next, a, { status: "deleted" });
+    const finalMeta = { ...meta, text_sha256: sha256(next.body) };
+    writeAtomic(item.docPath, stringifyFrontmatter(finalMeta, next.body));
+    if (step) writeAtomic(join(stashes(lib, item.meta.id), step, "after.json"), JSON.stringify({
+      meta: finalMeta, highlights: latestRevs(annotationRevs(item.dir)),
+    }));
+    return { item: readItemDir(item.dir), changed: true, moved: report.moved.length, removed: gone, unplaced: orphans.filter((a) => a.intent === "question"), step };
   });
-  const next = readItemDir(item.dir);
-  const report = await reanchorItem(lib, next);
-  const orphans = readAnnotations(next).filter((a) => report.orphaned.includes(a.id));
-  const gone = orphans.filter((a) => a.intent !== "question");
-  for (const a of gone) reviseAnnotation(next, a, { status: "deleted" });
-  return { item: readItemDir(item.dir), changed: true, moved: report.moved.length, removed: gone, unplaced: orphans.filter((a) => a.intent === "question"), step };
 }
 
 /** Where a source with a part owed is noted, beside the links waiting in inbox/: a pass that finds none
@@ -1258,27 +1273,42 @@ export async function undoReimport(lib: Library, ref: string, step?: string): Pr
   const name = step ?? steps(lib, item.meta.id).filter((s) => !existsSync(join(stashes(lib, item.meta.id), s, UNDONE))).at(-1);
   const dir = join(stashes(lib, item.meta.id), name && isUlid(name) ? name : "-");
   if (!existsSync(join(dir, "doc.md"))) throw new Error("There is no reimport of this source to undo.");
-  const saved = JSON.parse(readFileSync(join(dir, "highlights.json"), "utf8")) as Annotation[];
-  const undone = existsSync(join(dir, UNDONE));
-  await withLock(paths.lock(lib), () => {
+  return withLock(paths.lock(lib), () => {
+    const saved = JSON.parse(readFileSync(join(dir, "highlights.json"), "utf8")) as Annotation[];
+    const afterPath = join(dir, "after.json");
+    const after = existsSync(afterPath) ? JSON.parse(readFileSync(afterPath, "utf8")) as { highlights?: Annotation[] } : undefined;
+    const expected = new Map(after?.highlights?.map((a) => [a.id, a]));
+    const undone = existsSync(join(dir, UNDONE));
     const tmp = swapFiles(readItemDir(item.dir), dir);
     // The swap's other side becomes the stash, so the next call with its step redoes.
     mkdirSync(dir, { recursive: true });
     for (const f of readdirSync(tmp)) keepFile(join(tmp, f), join(dir, f));
     rmSync(tmp, { recursive: true, force: true });
     if (!undone) writeFileSync(join(dir, UNDONE), "");
+    const now = readItemDir(item.dir);
+    const current = new Map(latestRevs(annotationRevs(now.dir)).map((a) => [a.id, a]));
+    const keep = new Set(saved.map((a) => a.id));
+    for (const s of saved) {
+      const c = current.get(s.id);
+      if (!c) continue;
+      const e = expected.get(s.id);
+      const selector = (a: Annotation) => ({ exact: a.exact, prefix: a.prefix, suffix: a.suffix, start: a.start, end: a.end });
+      const patch: Partial<Annotation> = {};
+      // Status and passage are independent: a later deletion stays deleted even when its passage moves back.
+      if ((!after?.highlights || (e && c.status === e.status && s.status !== e.status)) && c.status !== s.status) patch.status = s.status;
+      if ((!after?.highlights || (e && JSON.stringify(selector(c)) === JSON.stringify(selector(e))))
+        && JSON.stringify(selector(c)) !== JSON.stringify(selector(s))) Object.assign(patch, selector(s));
+      if (Object.keys(patch).length) reviseAnnotation(now, c, patch);
+    }
+    // A highlight made on the other version, not on this one, re-anchors here or stays orphaned (kept).
+    if ([...current.values()].some((a) => !keep.has(a.id) && a.status !== "deleted")) {
+      const currentItem = readItemDir(now.dir);
+      const report = reanchorAnnotations(currentItem);
+      if (report.hashChanged) writeAtomic(currentItem.docPath, stringifyFrontmatter({ ...currentItem.meta, text_sha256: sha256(currentItem.body) }, currentItem.body));
+    }
+    writeAtomic(afterPath, JSON.stringify({ meta: readItemDir(now.dir).meta, highlights: latestRevs(annotationRevs(now.dir)) }));
+    return readItemDir(now.dir);
   });
-  const now = readItemDir(item.dir);
-  const current = new Map(latestRevs(annotationRevs(now.dir)).map((a) => [a.id, a]));
-  const keep = new Set(saved.map((a) => a.id));
-  for (const s of saved) {
-    const c = current.get(s.id);
-    if (c && (c.status !== s.status || c.start !== s.start || c.end !== s.end || c.exact !== s.exact))
-      reviseAnnotation(now, c, { status: s.status, exact: s.exact, prefix: s.prefix, suffix: s.suffix, start: s.start, end: s.end });
-  }
-  // A highlight made on the other version, not on this one, re-anchors here or stays orphaned (kept).
-  if ([...current.values()].some((a) => !keep.has(a.id) && a.status !== "deleted")) await reanchorItem(lib, readItemDir(now.dir));
-  return readItemDir(now.dir);
 }
 
 export { academyLessons, addCourse, isCourseUrl, planCourse, type CourseAdded, type CourseLesson, type CoursePlan } from "./course.ts";

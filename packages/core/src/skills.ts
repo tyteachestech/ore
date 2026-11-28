@@ -422,10 +422,11 @@ export async function acceptSuggestedSkill(lib: Library, ref: string): Promise<{
       writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
     }
     const id = skill.id;
+    const archived = !!skill.archived;
     if (skill.archived) skill = { ...skill, archived: undefined };
     unarchiveFiled(lib, [id]);
     const cards: string[] = [], topics: string[] = [];
-    const undo = { suggestion: s, skill: id, created, filed: !item.meta.skills.includes(id), cards, topics };
+    const undo = { suggestion: s, skill: id, created, archived, filed: !item.meta.skills.includes(id), cards, topics };
     const meta = parseItemMeta({ ...item.meta, skills: [...new Set([...item.meta.skills, id])], suggested_skill: undefined });
     writeAtomic(item.docPath, stringifyFrontmatter(meta, item.body));
     for (const c of listCards(lib).filter((c) => c.meta.item === meta.id && !c.meta.skills.includes(id))) {
@@ -446,6 +447,7 @@ export const SuggestionUndoSchema = z.object({
   suggestion: SuggestedSkill,
   skill: z.string().optional(),
   created: z.boolean().default(false),
+  archived: z.boolean().default(false),
   filed: z.boolean().default(false),
   cards: z.array(z.string()).default([]),
   topics: z.array(z.string()).default([]),
@@ -469,6 +471,10 @@ export async function undoSuggestedSkill(lib: Library, ref: string, input: Sugge
     for (const c of listCards(lib).filter((c) => cards.has(c.meta.id) && c.meta.skills.includes(id))) writeCardMeta(c, { ...c.meta, skills: off(c.meta.skills) });
     for (const t of r.topics.map((slug) => readTopic(lib, slug)))
       if (t?.meta.skills.includes(id)) writeTopic({ ...t, meta: { ...t.meta, skills: off(t.meta.skills) } });
+    if (r.archived) {
+      const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
+      if (setArchived(doc, id, true)) writeAtomic(paths.skills(lib), doc.toString({ lineWidth: 0 }));
+    }
     const used = allItems(lib).some((i) => i.meta.skills.includes(id)) || listCards(lib).some((c) => c.meta.skills.includes(id)) || listTopics(lib).some((t) => t.meta.skills.includes(id));
     if (r.created && !used) {
       const doc = loadYaml().parseDocument(readFileSync(paths.skills(lib), "utf8"));
