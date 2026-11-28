@@ -886,7 +886,7 @@ journey("review Ask: closing and reopening it keeps the reply so far and a half-
   const ask = page.getByRole("region", { name: "Ask about this" });
   await ask.getByText("Because recalling it is the practice.").waitFor();
   await field.fill("And after a week?");
-  await toggle.click();
+  await ask.getByRole("button", { name: "Close the chat" }).click();
   await until("Ask closes", async () => (await ask.count()) === 0);
   await toggle.click();
   await ask.getByText("Because recalling it is the practice.").waitFor();
@@ -898,6 +898,34 @@ journey("review Ask: closing and reopening it keeps the reply so far and a half-
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
   await clearChat();
+});
+
+journey("review: after an answer the mole is in his corner, waves at the session's first miss only, and opens his chat beside the exercise (D363)", async (page) => {
+  await startReview(page, null);
+  const q = page.locator(".review-q");
+  const mole = page.locator(".review").getByRole("button", { name: "Ask about this" });
+  const ask = page.getByRole("region", { name: "Ask about this" });
+  if (await mole.count()) throw new Error("the mole is out before the answer");
+  const first = await q.innerText();
+  await page.getByRole("button", { name: "No idea" }).click();
+  await mole.locator('svg[data-mood="wave"]').waitFor();
+  if (await page.locator(".review-tools").getByRole("button", { name: "Ask about this" }).count()) throw new Error("the chat icon is still under the ratings");
+  await mole.click();
+  for (const s of ["Why did I miss it?", "Explain it another way", "Try a similar one"]) await ask.getByRole("button", { name: s }).waitFor();
+  await until("the exercise is clear of the chat", async () => {
+    const [card, chat] = await Promise.all([page.locator(".review-card").first(), ask].map((l) => l.evaluate((el) => el.getBoundingClientRect())));
+    return card!.right <= chat!.left || (await page.evaluate(() => innerWidth)) < 880;
+  });
+  // Moving on closes his chat; the next miss gets the mole, quiet.
+  await page.keyboard.press("Meta+l");
+  await until("Later moves on", async () => (await q.innerText()) !== first);
+  await ask.waitFor({ state: "detached" });
+  await page.getByRole("button", { name: "No idea" }).click();
+  await mole.waitFor();
+  await page.waitForTimeout(1200);
+  if (await mole.locator('svg[data-mood="wave"]').count()) throw new Error("he waved at a second miss");
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
 });
 
 // F807
@@ -928,7 +956,7 @@ journey("review Ask: reopening the same exercise restores its chat and resumes i
     await toggle.click();
   };
   const leave = async () => {
-    await toggle.click();
+    await ask.getByRole("button", { name: "Close the chat" }).click();
     await ask.waitFor({ state: "detached" });
     await page.keyboard.press("Escape");
     await page.locator(".review").waitFor({ state: "detached" });
@@ -1059,7 +1087,7 @@ journey("review: Later puts the exercise off to the end of the session with noth
     if ((await step()) !== `0 of ${total}`) throw new Error(`Later moved the session bar: ${await step()}`);
     await page.keyboard.press("Meta+z");
     await until("⌘Z brings it back, its answer still shown", async () => (await q.innerText()) === first && (await good.isVisible()));
-    await until("and Ask open as he left it", async () => (await askToggle.getAttribute("aria-pressed")) === "true");
+    await until("and Ask open as he left it", async () => await page.getByRole("region", { name: "Ask about this" }).isVisible());
     await page.keyboard.press("Escape"); // closes Ask
     await page.keyboard.press("Shift+Meta+z");
     await until("⇧⌘Z puts it off again", async () => (await q.innerText()) !== first);
@@ -2657,10 +2685,10 @@ journey("review Ask: a failed question offers Try again, which asks it again and
   const box = page.getByRole("textbox", { name: "Ask about this exercise" });
   await box.fill("Why does this work?");
   await page.keyboard.press("Enter");
-  await page.locator(".ask").getByText("The AI is offline.", { exact: false }).waitFor();
+  await page.locator(".review-chat").getByText("The AI is offline.", { exact: false }).waitFor();
   await box.fill("And for kids?");
-  await page.locator(".ask").getByRole("button", { name: "Try again" }).dblclick();
-  await page.locator(".ask").getByText("Because recalling it is the practice.").waitFor();
+  await page.locator(".review-chat").getByRole("button", { name: "Try again" }).dblclick();
+  await page.locator(".review-chat").getByText("Because recalling it is the practice.").waitFor();
   await page.unroute(/\/ore$/);
   if (asked.join(" | ") !== "--message=Why does this work? | --message=Why does this work?") throw new Error(`asked: ${asked.join(" | ")}`);
   if ((await box.inputValue()) !== "And for kids?") throw new Error("Try again cleared the follow-up");
@@ -2689,7 +2717,9 @@ journey("review Ask: an Explain rewrite shows, saves and undoes its key point ch
   });
   await reveal(page);
   await page.getByRole("button", { name: "Ask about this" }).click();
-  await page.locator(".ask-starters").getByRole("button", { name: "Make this exercise clearer" }).click();
+  // After a miss the starters are the ways on from it (D363); a rewrite is asked for in words.
+  await page.getByRole("textbox", { name: "Ask about this exercise" }).fill("Make this exercise clearer");
+  await page.keyboard.press("Enter");
   const card = page.locator(".ask-card");
   await card.waitFor();
   const q = card.locator(".ask-card-q");
