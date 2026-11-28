@@ -20,6 +20,8 @@ export type Answer = {
   answer: string;
   grade: Grade | null;
   inHead: boolean;
+  /** Hints he took before answering (D-new-hint-before-no-idea); 0 for none. */
+  cued?: number;
   /** No moment was over the goal's note as he rated, so he has seen it: this rating takes it down. */
   noteSeen: boolean;
   /** Once the rating is in the log, before anything else: its moment, its draft dropped. */
@@ -453,6 +455,7 @@ export class ReviewSession<S> {
         opt("elapsed-ms", String(elapsed)),
         ...variantOpt(card),
         ...(a.inHead ? ["--in-head"] : []),
+        ...(a.cued ? [opt("cued", String(a.cued))] : []),
         ...(this.session ? [opt("session", this.session.id)] : []),
       ];
       await this.submit(args, rating, elapsed);

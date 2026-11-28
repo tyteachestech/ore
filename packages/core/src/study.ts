@@ -30,6 +30,8 @@ export interface ReviewInput {
   variant?: string;
   /** Answered in his head and self-marked (D68). */
   in_head?: boolean;
+  /** How many hints he took before answering, 1 or 2 (D-new-hint-before-no-idea). */
+  cued?: number;
   now?: Date;
 }
 
@@ -63,6 +65,7 @@ export async function recordReview(lib: Library, cardRef: string, input: ReviewI
   return withLock(paths.lock(lib), () => {
     const card = findCard(lib, cardRef);
     if (card.meta.state === "retired") throw new Error(`card ${card.meta.id} is retired`);
+    if (input.cued !== undefined && input.cued !== 1 && input.cued !== 2) throw new Error("--cued is 1 or 2");
     // A time this card already has a review at (taken back or not, here or synced) moves on a millisecond:
     // an undo names its review by card and time, so two reviews sharing one would stand or fall together.
     let now = input.now ?? new Date();
@@ -90,6 +93,7 @@ export async function recordReview(lib: Library, cardRef: string, input: ReviewI
       finishing: finishing || undefined,
       variant,
       in_head: input.in_head || undefined,
+      cued: input.cued || undefined,
     };
     // A review dated after now (a clock that ran ahead) comes after this one when the log is replayed, as the
     // index does: the state saved is that replay, so the two never disagree (Codex sweep 4). Doctor names that review.

@@ -21,7 +21,7 @@ const MENUS: Spec[] = [
   { title: "View", items: ["palette", "sidebar", "side-panel", "notes", "collected", "questions", "-", "@fullscreen"] },
   { title: "Go", items: ["home", "go-feed", "go-toread", "go-done", "-", "nav-back", "nav-forward", "-", "lesson-prev", "lesson-next"] },
   { title: "Source", when: "reader", items: ["finish-source", "section", "look-up", "listen", "rename", "pin", "archive"] },
-  { title: "Review", items: ["review", "quick-quiz", "-", "no-idea", "in-head", "later", "edit-card", "retire-card", "ask", "bad-version"] },
+  { title: "Review", items: ["review", "quick-quiz", "-", "hint", "no-idea", "in-head", "later", "edit-card", "retire-card", "ask", "bad-version"] },
   { title: "Window", role: "window", items: ["@minimize", "@maximize"] },
   { title: "Help", role: "help", items: ["shortcuts"] },
 ];
@@ -63,6 +63,7 @@ const LABEL: Partial<Record<KeyId, string>> = {
   review: "Start Review",
   "quick-quiz": "Quick Quiz",
   "no-idea": "No Idea",
+  hint: "Hint",
   "in-head": "Answered in My Head",
   later: "Later",
   "edit-card": "Edit Exercise…",
