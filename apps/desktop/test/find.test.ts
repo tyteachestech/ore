@@ -29,7 +29,7 @@ describe("find in source", () => {
     expect(search([p as unknown as HTMLElement], "άλφα").map((r) => r.toString())).toEqual(["α\u0301λφα"]);
   });
 
-  test("Find matches without accents and highlights the original letters (F-new-find-accents)", () => {
+  test("Find matches without accents and highlights the original letters (F903)", () => {
     const p = document.createElement("p");
     p.textContent = "corazón, corazo\u0301n, corazon, cafe\u0301";
     document.body.append(p as unknown as Node);

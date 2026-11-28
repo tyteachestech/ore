@@ -2277,7 +2277,7 @@ describe("import coverage: audio and podcasts", () => {
     expect(hasPageText(item)).toBe(true);
   });
 
-  test("episode pages under a compound podcast path keep their own titles, audio and transcripts (F-new-podcast-episode-path)", async () => {
+  test("episode pages under a compound podcast path keep their own titles, audio and transcripts (F904)", async () => {
     const lib = await tempLibrary();
     const host = "https://www.spanishpodcast.org";
     const recording = Buffer.alloc(4096);

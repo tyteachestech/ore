@@ -68,7 +68,7 @@ describe("questions → answers and sources (D75)", () => {
     expect(findAnnotation(lib, q.id).annotation.answers).toHaveLength(1);
   });
 
-  test("an answer contribution resolves its archived source (F-new-archived-answer-source)", async () => {
+  test("an answer contribution resolves its archived source (F906)", async () => {
     const lib = await tempLibrary();
     const { annotation: q } = await addSnippet(lib, { text: "How long should the gap be?", intent: "question", skills: ["learning"] });
     const source = await addText(lib, ARTICLE, { skills: ["learning"] });

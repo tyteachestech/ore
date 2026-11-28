@@ -1576,7 +1576,7 @@ journey("Ask about this: an answer that comes back empty says so with Try again,
   }
 });
 
-// F-new-tutor-keep-focus
+// F900
 journey("Tutor: keeping an exercise by keyboard moves focus to the composer (run 7)", async (page) => {
   await openSource(page, TESTING);
   const path = /\/ore$/;

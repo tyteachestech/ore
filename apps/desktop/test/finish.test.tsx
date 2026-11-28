@@ -4,7 +4,7 @@ import { act } from "react";
 import type { Reveal } from "../src/Finish";
 import type { Doc } from "../src/ore";
 
-test("Finish links both key points to one shared passage (F-new-finish-shared-passage)", async () => {
+test("Finish links both key points to one shared passage (F905)", async () => {
   const w = new Window();
   w.document.write("<!doctype html><html><body></body></html>");
   const globals = [

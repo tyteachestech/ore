@@ -2543,7 +2543,7 @@ journey("reader: a book opens on its text, its publisher's pages under one shut 
   }
 });
 
-// F-new-reader-passage-announcement
+// F902
 journey("Reader: keyboard passage selection exposes the named reader and the selected text (run 7)", async (page) => {
   const title = "Passage selection";
   const first = "Retrieval strengthens memory.";

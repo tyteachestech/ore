@@ -402,7 +402,7 @@ journey("Feed: Follow opens a box that takes a link only, and never saves what i
   await page.keyboard.press("Escape");
 });
 
-// F-new-feed-follow-focus
+// F899
 journey("Feed: following the first feed by keyboard gives the post list focus (run 7)", async (page) => {
   const title = "First post after following";
   const server = Bun.serve({ port: 0, fetch: (r: Request): Response => new URL(r.url).pathname === "/feed.xml"

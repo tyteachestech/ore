@@ -396,7 +396,7 @@ journey("questions on a source: Collected lists only this source's questions, no
   }
 });
 
-journey("skill page: an answer still names and opens its archived source (F-new-archived-answer-source)", async (page) => {
+journey("skill page: an answer still names and opens its archived source (F906)", async (page) => {
   const question = "How should I space practice?";
   const title = "A guide to practice gaps";
   const passage = "Leave a short gap before the next practice session.";

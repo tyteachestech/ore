@@ -5,7 +5,7 @@ import { AGENTS, answered, BRIDGE, foundOnScreen, hasCaret, hold, inLibrary, isH
 
 // —— journeys ——
 
-// F-new-home-entry-focus
+// F901
 journey("Home: focus starts at Start review, returns there from a palette-opened source, and has a fallback (run 7)", async (page) => {
   const home = page.locator(".home");
   const start = home.getByRole("button", { name: "Start review" });
