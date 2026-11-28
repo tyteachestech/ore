@@ -3018,6 +3018,21 @@ journey("review: a Fact exercise has the same Hint: its answer as first letters,
   }
 });
 
+journey("e2e harness: undoAll right after a rating is pressed still takes it back (F866)", async (page) => {
+  const calls = oreCalls(page);
+  const due = async () => ((await ore("due")) as { id: string }[]).map((c) => c.id);
+  await startReview(page, null);
+  const id = (await page.locator(".review-card").getAttribute("data-id"))!;
+  await reveal(page);
+  await passageIn(page);
+  await page.getByRole("button", { name: "Good", exact: true }).click();
+  await until("the rating is sent", async () => calls.calls.some((a) => a[0] === "review"));
+  // At once, as a journey's `finally` does: the rating's answer may not be read yet.
+  await calls.undoAll();
+  await page.keyboard.press("Escape");
+  if (!(await due()).includes(id)) throw new Error("undoAll left the rating in the library");
+});
+
 journey("Home: a day he reviewed but is under the goal has a half-filled dot, not an empty one (D362)", async (page) => {
   // The seed has one review today, well under the goal.
   await page.locator(".home-day.today.short").waitFor();
