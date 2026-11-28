@@ -114,7 +114,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | Review replay, frontmatter round-trips, the index rebuilt | done | deep scan 1 data, deep scan 3 engine |
 | Library changed outside the app | done | sweep 2 outside |
 | iCloud conflict copies | done | deep scan 4 edges, deep scan 5 phone |
-| Recovery from the library's git history | done | history recovery 11-27 (#578): a note, a source, a whole day; open Review after a roll-back (F-new-review-open-restore) left |
+| Recovery from the library's git history | done | history recovery 11-27 (#578): a note, a source, a whole day; open Review after a roll-back (F815) left |
 
 ### AI
 | Angle | Status | Runs |
