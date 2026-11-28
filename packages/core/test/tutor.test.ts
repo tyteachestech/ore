@@ -9,7 +9,7 @@ import { sceneOutline, setDiagram } from "../src/diagrams.ts";
 import { findCard, listCards, writeCardMeta, writeNewCard } from "../src/cards.ts";
 import { addHighlight } from "../src/annotations.ts";
 import { recordReview } from "../src/study.ts";
-import { createItem, findItem, setItemArchived } from "../src/items.ts";
+import { createItem, findItem, renameItem, setItemArchived } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
 // A fake `claude` that replays canned outputs in order and keeps what it was sent.
@@ -122,12 +122,28 @@ describe("tutor: replies", () => {
     const { lib, a } = await library();
     await setItemArchived(lib, a.meta.id, true);
     const quote = "A card you miss goes back to the first box.";
-    fakeClaude([{ ...OK, reply: "Back to the first box [1].", citations: [{ passage: "P1", quote }] }]);
+    fakeClaude([{ ...OK, reply: "Back to the first box [1].", citations: [{ passage: "P2", quote }] }]);
 
     const r = await tutor(lib, "In Flashcard boxes, where does a missed card go?");
 
-    expect(sent()[0]!.passages[0]).toMatchObject({ id: "P1", source: "Flashcard boxes", heading: "The Leitner system" });
+    expect(sent()[0]!.passages[1]).toMatchObject({ id: "P2", source: "Flashcard boxes", heading: "The Leitner system" });
     expect(r.citations).toMatchObject([{ item: a.meta.id, title: "Flashcard boxes", quote }]);
+  });
+
+  test("the tutor cites an archived source by its current title even without matching words in the passage", async () => {
+    const lib = await tempLibrary();
+    const quote = "Longer gaps strengthen recall.";
+    const sections = Array.from({ length: 9 }, (_, i) => `## Section ${i + 1}\n\nReviews should happen every morning.`);
+    const a = await createItem(lib, { type: "article", title: "Memory primer", body: [...sections, `## Study\n\n${quote}`].join("\n\n") });
+    await createItem(lib, { type: "article", title: "Other advice", body: "Reviews should happen every morning." });
+    const title = "Study habits — review timing";
+    await renameItem(lib, a.meta.id, title);
+    await setItemArchived(lib, a.meta.id, true);
+    fakeClaude([{ ...OK, reply: "Longer gaps strengthen recall [1].", citations: [{ passage: "P10", quote }] }]);
+
+    const r = await tutor(lib, `In my saved source ${title}, when should reviews happen?`);
+
+    expect(r.citations).toMatchObject([{ item: a.meta.id, title, quote }]);
   });
 
   // F261: "Summarize this", "What's this about?" and Practice got the open source's first 8 passages (16% of a 4,000-word article).
@@ -285,6 +301,36 @@ describe("tutor: replies", () => {
     expect(r).toMatchObject({ general: false, citations: [{ quote: "goes back to the first box" }] });
     expect(readFileSync(join(binDir, "count"), "utf8")).toBe("2");
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("citations are missing");
+  });
+
+  test("a local file link goes back for a passage citation even with another valid citation", async () => {
+    const { lib, a } = await library();
+    const secondary = { passage: "P1", quote: "Spaced repetition is a way to remember" };
+    fakeClaude([
+      { ...OK, general: false, reply: `A miss sends it back [Boxes](${a.docPath}:70). Spacing helps you remember [1].`, citations: [secondary] },
+      { ...OK, general: false, reply: "A miss sends it back [1]. Spacing helps you remember [2].", citations: [{ passage: "P2", quote: "goes back to the first box" }, secondary] },
+    ]);
+
+    const r = await tutor(lib, "Where does a missed card go?", { item: a.meta.id });
+
+    expect(r.citations.map((c) => c.quote)).toEqual(["goes back to the first box", secondary.quote]);
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("cite the passage in citations instead");
+  });
+
+  test("a local link still present after the retry keeps its text and drops its destination", async () => {
+    const { lib, a } = await library();
+    const webAndCitation = "[Web](https://example.com/reading) and [Boxes](#cite-1)";
+    const example = "`[example](doc.md)`";
+    const out = { ...OK, general: false, citations: [{ passage: "P2", quote: "goes back to the first box" }] };
+    fakeClaude([
+      { ...out, reply: "See [Boxes](items/boxes/doc.md:70) [1]." },
+      { ...out, reply: `See [**Boxes**](<file:///My Library/(boxes)/doc.md:70>), ${webAndCitation}, and ${example}.`, steps: ["Open [the source](../doc.md#box).", "Recall it [1]."] },
+    ]);
+
+    const r = await tutor(lib, "Where does a missed card go?", { item: a.meta.id });
+
+    expect(r).toMatchObject({ reply: `See **Boxes**, ${webAndCitation}, and ${example}.`, steps: ["Open the source.", "Recall it [1]."], citations: [{ quote: "goes back to the first box" }] });
+    expect(readFileSync(join(binDir, "count"), "utf8")).toBe("2");
   });
 
   test("a source answer still without citations after the retry is marked not from his sources", async () => {

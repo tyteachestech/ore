@@ -38,9 +38,14 @@ export async function pageFigures(page: PDFPageProxy) {
   let covered = 0;
   let ctm: M = [1, 0, 0, 1, 0, 0];
   const stack: M[] = [];
+  let maskDepth = 0;
   for (let i = 0; i < ops.fnArray.length; i++) {
     const fn = ops.fnArray[i];
     const args = ops.argsArray[i];
+    // PDF.js draws a soft-mask group into a separate buffer to define transparency, not onto the page.
+    if (fn === OPS.beginGroup && args[0]?.smask) maskDepth++;
+    if (fn === OPS.endGroup && args[0]?.smask) maskDepth--;
+    if (maskDepth > 0) continue;
     if (fn === OPS.save) stack.push(ctm);
     else if (fn === OPS.restore) ctm = stack.pop() ?? ctm;
     else if (fn === OPS.transform) ctm = mul(ctm, args as M);

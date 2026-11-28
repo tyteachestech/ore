@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Cutting, Gem } from "../src/Gem";
-import { DotBar, DotRing, lit, ThumbLine } from "../src/Ring";
+import { DotBar, DotRing, lit, minutes, minutesText, ThumbLine } from "../src/Ring";
 
 // D183: one way of drawing. Gems, rings and icons are round dots; no square pixel is left beside them.
 
@@ -11,6 +11,17 @@ test("any progress lights one dot, and only a whole share lights them all", () =
   expect(lit(0.5, 14)).toBe(7);
   expect(lit(0.99, 14)).toBe(13);
   expect(lit(1, 14)).toBe(14);
+});
+
+test("goal minutes stay below the target until enough time has elapsed (F877)", () => {
+  const goal = 600_000;
+  expect(minutes(573_084, goal)).toBe(9);
+  expect(minutesText(599_999, goal)).toBe("9");
+  expect(minutesText(45_000, goal)).toBe("<1");
+  expect(minutesText(0, goal)).toBe("0");
+  expect(minutesText(goal, goal)).toBe("10");
+  expect(minutesText(635_000, goal)).toBe("11");
+  expect(minutesText(573_084)).toBe("10");
 });
 
 test("a ring shows its lit dots, then today's dimmer ones, then the track", () => {

@@ -3562,15 +3562,20 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .feed-head:hover .feed-skill, .feed-tools:focus-within .feed-skill { opacity: 1; }
 
 /* The iPhone's bar over the keyboard while he writes a note (Notion, Bear): one row of 44 pt taps. */
+.phone {
+  --kb-row-height: 44px;
+  --kb-bar-inset: calc(max(var(--keyboard, 0px), env(safe-area-inset-bottom, 0px)) + var(--kb-row-height) + 1px);
+}
 .kb-bar { position: fixed; left: 0; right: 0; bottom: var(--keyboard, 0px); z-index: 40; display: flex; justify-content: space-between; padding: 0 0 max(0px, calc(env(safe-area-inset-bottom, 0px) - var(--keyboard, 0px))); background: var(--bg-raised); border-top: 1px solid var(--border); }
-.kb-btn { flex: 1; min-width: 0; height: 44px; display: grid; place-items: center; color: var(--muted); border-radius: 8px; -webkit-tap-highlight-color: transparent; }
+.kb-btn { flex: 1; min-width: 0; height: var(--kb-row-height); display: grid; place-items: center; color: var(--muted); border-radius: 8px; -webkit-tap-highlight-color: transparent; }
 .kb-btn:active, .kb-btn.on { color: var(--text); background: var(--bg-hover); }
 .kb-btn:disabled { color: var(--faint); opacity: 0.5; }
-body:has(.kb-bar) .phone-reader { padding-bottom: calc(var(--keyboard, 0px) + 44px); }
+body:has(.kb-bar) .phone-reader { padding-bottom: var(--kb-bar-inset); }
 /* On the phone the / [[ @ and emoji menus are a sheet docked above the keyboard bar (Notion's iOS app), never under a finger or off screen. */
-/* Fixed inside the note page, which slides in by a transform and ends at the bar: its bottom is the bar's top. */
-/* Never taller than the room under the source's 44pt header (iOS's keyboard can leave less than 40vh). */
-.phone .note-menu { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; max-width: none; max-height: min(40vh, calc(100% - 60px)); overflow-y: auto; z-index: 41; }
+/* A source's sliding note pane ends at the bar. A skill note's fixed menu is positioned against the full
+ * screen, so it needs the bar's inset when docking and when measuring the room under the header. */
+.phone body:has(.kb-bar) .phone-note .note-menu { --note-menu-lift: var(--kb-bar-inset); }
+.phone .note-menu { left: 8px !important; right: 8px; top: auto !important; bottom: calc(8px + var(--note-menu-lift, 0px)); max-width: none; max-height: min(40vh, calc(100% - 60px - var(--note-menu-lift, 0px))); overflow-y: auto; z-index: 41; }
 .phone .note-menu-row { height: 44px; font-size: 17px; }
 .phone .mynotes-text { scroll-padding-bottom: 52px; }
 /* The skill's note on the phone: a row at the top of its page (Apple Notes' folder rows), and the note's own screen. */
