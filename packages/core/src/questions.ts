@@ -77,7 +77,7 @@ export async function answerQuestion(lib: Library, ref: string, input: AnswerInp
     if (annotation.intent !== "question") throw new Error(`${annotation.id} is a ${annotation.intent} highlight, not a question`);
     let answers = annotation.answers ?? [];
     if (input.remove) {
-      // One contribution: two written in the same millisecond share a ts.
+      // Older contributions can share a ts; keep their first-match removal behavior.
       const at = answers.findIndex((c) => c.ts === input.remove);
       if (at === -1) throw new Error(`no contribution at ${input.remove}`);
       answers = answers.filter((_, i) => i !== at);
@@ -86,7 +86,14 @@ export async function answerQuestion(lib: Library, ref: string, input: AnswerInp
       const at = answers.findIndex((c) => c.ts === input.edit);
       if (at === -1) throw new Error(`no contribution at ${input.edit}`);
       answers = answers.map((c, i) => (i === at ? { ...c, text: text! } : c));
-    } else if (text) answers = [...answers, { ts: nowIso(), text, item: input.item ? findItem(lib, input.item).meta.id : undefined, quote: input.quote?.trim() || undefined }];
+    } else if (text) {
+      // The timestamp is the edit/remove handle. Allocate it under the write lock,
+      // against disk, so even simultaneous writers cannot reuse a current handle.
+      const occupied = new Set(answers.map((a) => a.ts));
+      let ts = nowIso();
+      while (occupied.has(ts)) ts = nowIso(new Date(Date.parse(ts) + 1));
+      answers = [...answers, { ts, text, item: input.item ? findItem(lib, input.item).meta.id : undefined, quote: input.quote?.trim() || undefined }];
+    }
     if (input.card && !answers.length) throw new Error("a card is drafted from his answer: write one first");
     const question = reviseAnnotation(item, annotation, {
       answers: answers.length ? answers : undefined,

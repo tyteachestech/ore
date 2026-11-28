@@ -1,0 +1,18 @@
+import assert from 'node:assert/strict';
+import {existsSync} from 'node:fs';
+import {ore,out} from './common.ts';
+import {findItem,listItems} from '../../packages/core/src/items.ts';
+import {pendingPrequestions} from '../../packages/core/src/ai/enrich.ts';
+import {listCards} from '../../packages/core/src/cards.ts';
+let lib={root:out+'/libs/guide-finish'}; process.env.ORE_LIBRARY=lib.root;
+const item=listItems(lib)[0]!;
+assert.equal(pendingPrequestions(item,listCards(lib)).length,0);
+await ore('status',item.meta.id,'done');
+assert.equal(pendingPrequestions(findItem(lib,item.meta.id),listCards(lib)).length,2);
+console.log('[DEEP] Only status done changed: pending prequestions 0 -> 2. Answers were already stored.');
+lib={root:out+'/libs/guide-figure'}; process.env.ORE_LIBRARY=lib.root;
+const c=listCards(lib).find(c=>c.meta.figure)!;
+const shown=await ore('card','show',c.meta.id,'--review');
+console.log('[DEEP] review figure file:',shown.figure_file, 'exists:',existsSync(shown.figure_file));
+assert(existsSync(shown.figure_file));
+console.log('PASS finish eligibility and stored figure controls');

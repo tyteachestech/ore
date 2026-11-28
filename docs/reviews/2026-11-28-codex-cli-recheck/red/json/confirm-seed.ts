@@ -1,0 +1,11 @@
+import {setup,updateItemMeta,addHighlight} from './common.ts';
+import {writeNewCard} from '../../packages/core/src/cards.ts';
+import {appendJsonl} from '../../packages/core/src/fsutil.ts';
+import {paths} from '../../packages/core/src/library.ts';
+const {lib,item}=await setup('confirm-'+(process.argv[2]??'default'));
+await updateItemMeta(lib,item.meta.id,m=>({...m,course:{id:'scout-course',title:'Original course',part:1}}));
+const a=addHighlight(item,{exact:'Recall improves memory.',intent:'card'});
+const make=()=>writeNewCard(lib,{kind:'prompt',item:item.meta.id,skills:['learning'],topics:[],content_type:'concept',question:'Why recall?',answer:'Recall strengthens memory.',rubric:['Recall strengthens memory.']});
+const c1=make(),c2=make();
+for(const id of ['01J00000000000000000000001','01K00000000000000000000001'])appendJsonl(paths.variants(lib,c1.meta.id),{id,rev:1,card:c1.meta.id,type:'new-case',setting:id,question:'How can Mira practice?',answer:'Recall the melody.',rubric:['Recall strengthens memory.'],maps:[0],status:'ready',created:'2026-11-27T00:00:00.000Z',ai:{vendor:'claude',model:'fixture',prompt_version:'variant@1'}});
+console.log(JSON.stringify({root:lib.root,item:item.meta.id,annotation:a.id,c1:c1.meta.id,c2:c2.meta.id}));

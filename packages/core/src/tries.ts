@@ -38,6 +38,11 @@ function sectionAt(body: string, at: number): string | undefined {
 /** Times he has used a try's idea: the rounds he closed, and the last one once it is his. */
 export const useCount = (a: Annotation): number => (a.uses?.length ?? 0) + (a.status === "done" ? 1 : 0);
 
+/** The same source context for a listed try and a just-saved one. */
+export function tryView(item: Item, annotation: Annotation): TryView {
+  return { ...annotation, item_title: item.meta.title, ...(annotation.point ? {} : { section: sectionAt(item.body, annotation.start) }) };
+}
+
 /** Tries filed under `skill` (the skills of the source they were highlighted in): to try first, then
  *  tried; newest first in each. With a skill, one open try is `active`. */
 export function listTries(lib: Library, opts: { skill?: string } = {}): TryView[] {
@@ -49,7 +54,7 @@ function collectTries(items: Item[]): { tried: TryView; skills: string[] }[] {
     .flatMap((i) =>
       readAnnotations(i)
         .filter((a) => a.intent === "apply")
-        .map((a) => ({ skills: i.meta.skills, tried: { ...a, item_title: i.meta.title, ...(a.point ? {} : { section: sectionAt(i.body, a.start) }) } })),
+        .map((a) => ({ skills: i.meta.skills, tried: tryView(i, a) })),
     )
     .sort(({ tried: a }, { tried: b }) => (a.status === b.status ? b.id.localeCompare(a.id) : a.status === "open" ? -1 : 1));
 }
