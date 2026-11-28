@@ -2473,12 +2473,15 @@ button.home-plan:hover { color: var(--text); }
   .review-passage { position: absolute; top: 32px; left: calc(100% + 32px); width: 300px; margin: 0; animation: card-in var(--t-3) ease-out both; }
 }
 .review-rate { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 22px; }
-/* The rating stays in view under a long answer (D314): it sticks 10px above the keys
-   while the answer scrolls behind it, as a dialog's footer does. In a window too narrow for the card to clear
-   the radio (D254), the card starts to the radio's right, so the radio never sits on Again. */
-:root:not(.phone) .review-rate { position: sticky; bottom: -22px; z-index: 1; }
-:root:not(.phone) .quick .review-rate { bottom: -10px; }
-:root:not(.phone) .review-rate::before { content: ""; position: absolute; inset: -14px 0 -10px; z-index: -1; background: linear-gradient(to bottom, transparent, var(--bg) 12px); pointer-events: none; }
+/* On the Mac the rating is the bottom bar once the answer is shown (D-new-ratings-bar, in place of D314's sticky
+   row): it stays in view under a long answer and nothing loading above it can move it (F865). The bar keeps the
+   page's side padding so the four sit under the exercise's column. In a window too narrow for the card to clear
+   the radio (D254), the card and the bar start to the radio's right, so the radio never sits on Again. */
+.review-bar { flex: none; position: relative; padding: 10px 24px 13px; border-top: 1px solid var(--border); background: var(--bg-side); }
+.review-bar .review-rate { max-width: 640px; margin: 0 auto; }
+.review-bar .review-guard { position: absolute; left: 0; right: 0; bottom: calc(100% + 10px); margin: 0 auto; width: fit-content; max-width: calc(100% - 48px); padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-side); }
+.quick .review-bar { padding: 8px 22px 11px; }
+:where(:root:not(.phone)) .review-bar:not(.quick *) { padding-left: clamp(24px, calc(816px - 100vw), 76px); }
 :where(:root:not(.phone)) .review-body:not(.quick *) { padding-left: clamp(24px, calc(816px - 100vw), 76px); }
 .review-rate button {
   height: 44px; border-radius: 12px; font: 700 14px var(--round); color: var(--text); background: var(--bg-raised);

@@ -618,8 +618,8 @@ export async function armGood(page: Page, noIdea: boolean) {
   await page.waitForTimeout(550); // a second press inside a double click doesn't count
 }
 
-/** Waits until the passage is under the answer. It lands a moment after the answer and pushes the ratings
- *  down, so a click on a rating sent in that instant misses it (F865). */
+/** Waits until the passage is under the answer. It lands a moment after the answer and moves what is under it
+ *  in the page; the Mac's ratings are in the bottom bar and stay put (F865). */
 export const passageIn = (page: Page) => page.locator(".review-passage").first().waitFor();
 
 /** Every `ore` call a page makes, in order, and the ratings it logged (to take back after the journey). */

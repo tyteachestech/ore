@@ -732,6 +732,26 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   const gemNow = card?.kind === "card" ? undefined : card?.history?.gem?.kind;
   const gemShown = gemNow === "ready" ? "rough" : gemNow;
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
+  // The four ratings and the warning an unexpected one gets (D237). On the Mac they are the bottom bar once the
+  // answer is shown (D-new-ratings-bar): nothing that loads above them, the passage first, can move them.
+  const rateRow = phase === "checked" && card && entry && !end && (
+    <>
+      <div className="review-rate" role="group" aria-label="How well did you remember it?" onMouseLeave={() => setPreview(undefined)} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setPreview(undefined)}>
+        {RATINGS.map((r, i) => (
+          <Hint key={r} text={<>{i + 1 === suggested ? `${r}, suggested` : r} <kbd>{i + 1}</kbd>{i + 1 === suggested && <kbd>↵</kbd>}</>} side="top">
+            <button className={`rate-${i + 1}${i + 1 === suggested ? " suggested" : ""}`} data-armed={guard === i + 1 || undefined} disabled={busy} onClick={() => void rate(i + 1)} onMouseEnter={() => setPreview(i + 1)} onFocus={() => setPreview(i + 1)}>
+              {r}
+            </button>
+          </Hint>
+        ))}
+      </div>
+      {guard !== undefined && (
+        <p className="review-guard" role="status">
+          {marks?.some((m) => m === false) ? missedOf(marks) : "This one is down as a miss."} Press {RATINGS[guard - 1]} again to keep it.
+        </p>
+      )}
+    </>
+  );
   const quickGoalLabel = start ? `${minutes(start.active_ms + s.activeMs, start.goal_ms)} of ${start.goal_minutes} minutes today` : "";
 
   return (
@@ -1071,20 +1091,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                     <Timeline history={card.history} rating={(preview ?? suggested ?? 3) as Rating} />
                   </div>
                 )}
-                <div className="review-rate" role="group" aria-label="How well did you remember it?" onMouseLeave={() => setPreview(undefined)} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setPreview(undefined)}>
-                  {RATINGS.map((r, i) => (
-                    <Hint key={r} text={<>{i + 1 === suggested ? `${r}, suggested` : r} <kbd>{i + 1}</kbd>{i + 1 === suggested && <kbd>↵</kbd>}</>} side="top">
-                      <button className={`rate-${i + 1}${i + 1 === suggested ? " suggested" : ""}`} data-armed={guard === i + 1 || undefined} disabled={busy} onClick={() => void rate(i + 1)} onMouseEnter={() => setPreview(i + 1)} onFocus={() => setPreview(i + 1)}>
-                        {r}
-                      </button>
-                    </Hint>
-                  ))}
-                </div>
-                {guard !== undefined && (
-                  <p className="review-guard" role="status">
-                    {marks?.some((m) => m === false) ? missedOf(marks) : "This one is down as a miss."} Press {RATINGS[guard - 1]} again to keep it.
-                  </p>
-                )}
+                {PHONE && rateRow}
                 {!PHONE && <div className="review-tools">
                   <Hint text="Ask about this" keys="ask" side="top">
                     <button aria-label="Ask about this" aria-pressed={asking} onClick={() => setAsking((v) => !v)}>
@@ -1147,27 +1154,25 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
           </div>
         )}
       </div>
-      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} hint={cued < hints} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} draft={entry.state === "draft"} />}
+      {!end && card && entry && (rateRow ? !PHONE && <div className="review-bar">{rateRow}</div> : <KeyFoot phase={phase} kind={card.kind} hint={cued < hints} inHead={!!card.in_head_ok} />)}
     </div>
     </Trap>
   );
 }
 
-/** The review footer: the keys for this step, Raycast's action bar (DESIGN.md). `suggested`: the rating ↵ gives,
- *  named in the bar as its button is (Again, Hard, Good or Easy); none, no ↵. */
-function KeyFoot({ phase, kind, hint, suggested, variant, inHead, draft }: { phase: Phase; kind: CardFull["kind"]; hint: boolean; suggested?: number; variant: boolean; inHead: boolean; draft: boolean }) {
+/** The review footer while he answers or edits: the keys for this step, Raycast's action bar (DESIGN.md). Once the
+ *  answer is shown the Mac's bar is the four ratings instead (D-new-ratings-bar); the iPhone shows no key bar. */
+function KeyFoot({ phase, kind, hint, inHead }: { phase: Phase; kind: CardFull["kind"]; hint: boolean; inHead: boolean }) {
   const map = useKeymap();
   const k = (id: KeyId) => label(map[id]);
   const rows: [string, string][] =
     phase === "edit"
       ? [[k("finish"), "Save"], ["Esc", "Cancel"]]
-      : phase === "answer"
-        ? kind === "prompt"
-          ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
-            [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), ...(hint ? [[k("hint"), "Hint"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
-          : // A Fact's one line (D359): ↵ checks, and on an empty box is No idea.
-            [["↵", "Check"], ...(hint ? [[k("hint"), "Hint"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
-        : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], [k("retire-card"), draft ? "Delete" : "Retire"], ["Esc", "Leave"]];
+      : kind === "prompt"
+        ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
+          [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), ...(hint ? [[k("hint"), "Hint"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
+        : // A Fact's one line (D359): ↵ checks, and on an empty box is No idea.
+          [["↵", "Check"], ...(hint ? [[k("hint"), "Hint"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]];
   return (
     <div className="review-keys" aria-hidden="true">
       {rows.map(([key, what]) => (
