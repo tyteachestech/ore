@@ -3401,7 +3401,13 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 .phone .review-end .review-foot { flex-direction: column-reverse; align-self: stretch; gap: 4px; margin-top: auto; padding-top: 32px; }
 .phone .review-end .review-foot .pill-btn.quiz-go { width: 100%; height: 52px; justify-content: center; border-radius: 999px; font: 600 17px var(--font); letter-spacing: 0; }
 .phone .review-end .review-foot .quiz-ghost { height: 44px; font-size: 15px; }
-.phone .review-card:not(:has(textarea)) > #review-sure, .phone .review-card > .review-memory, .phone .review-card > :not(.review-memory) + .review-rate { margin-top: auto; }
+.phone .review-card:not(:has(textarea)) > #review-sure, .phone .review-card > .review-memory { margin-top: auto; }
+/* The ratings bar on the iPhone (F887): it ends at the clear space over the home indicator, which the page then
+   no longer keeps for itself, and a toast stands above it as on the Mac. */
+.phone .review-bar { padding: 10px 24px var(--foot); }
+.phone .review:has(.review-bar) .review-body { padding-bottom: 16px; }
+:root.phone body:has(.review:not([hidden]) .review-bar) .toasts { bottom: calc(max(32px, env(safe-area-inset-bottom, 0px) + 16px) + 62px); }
+:root.phone body:has(.review:not([hidden]) .review-bar .review-guard) .toasts { bottom: calc(max(32px, env(safe-area-inset-bottom, 0px) + 16px) + 92px); }
 .phone .review-card > .review-passage, .phone .review-card > .review-answer { margin-bottom: 24px; }
 /* What the last answer won shows over the next exercise, so it stands clear above the buttons at the foot (F137). */
 /* Menu rows at iOS's 44pt; the highlight popup's types and icons, and "What do you already know?", too. */
@@ -4033,13 +4039,11 @@ body:has(.kb-bar) .phone-reader { padding-bottom: var(--kb-bar-inset); }
 .timeline .rate-2 { --rate: var(--c-orange); }
 .timeline .rate-3 { --rate: var(--c-green); }
 .timeline .rate-4 { --rate: var(--c-blue); }
-.timeline + .review-rate { margin-top: 14px; }
 /* The exercise's gem beside its reviews (D237): one line, the gem on the timeline's midline. */
 .review-memory { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
 .review-memory .timeline { flex: 1; margin-top: 0; }
 /* Its width holds while the pointer crosses the ratings, so the line never changes length under the dots. */
 .timeline-next { flex: none; min-width: 17ch; text-align: right; color: var(--faint); font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.review-memory + .review-rate { margin-top: 14px; }
 .review-gem { flex: none; display: inline-grid; border-radius: 4px; }
 .review-gem:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* A rating waiting for its second press. */
