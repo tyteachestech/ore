@@ -20,7 +20,7 @@ export type Answer = {
   answer: string;
   grade: Grade | null;
   inHead: boolean;
-  /** Hints he took before answering (D-new-hint-before-no-idea); 0 for none. */
+  /** Hints he took before answering (D358); 0 for none. */
   cued?: number;
   /** No moment was over the goal's note as he rated, so he has seen it: this rating takes it down. */
   noteSeen: boolean;

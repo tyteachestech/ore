@@ -36,7 +36,7 @@ export const ReviewSchema = z.object({
   finishing: z.boolean().optional(),
   variant: z.string().optional(), // the remixed version shown (D66); absent for the original
   in_head: z.boolean().optional(), // an Explain card answered in his head, self-marked (D68)
-  cued: z.number().int().min(1).max(2).optional(), // how many hints he took before answering (D-new-hint-before-no-idea)
+  cued: z.number().int().min(1).max(2).optional(), // how many hints he took before answering (D358)
 });
 export type Review = z.infer<typeof ReviewSchema>;
 

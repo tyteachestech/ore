@@ -128,7 +128,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   const [remark, setRemark] = useState(false);
   /** Answered in his head (D68): no typing, no AI; he marks the key points himself. */
   const [inHead, setInHead] = useState(false);
-  /** Hints he took before answering (D-new-hint-before-no-idea), 0 to CUE_LEVELS. */
+  /** Hints he took before answering (D358), 0 to CUE_LEVELS. */
   const [cued, setCued] = useState(0);
   /** What answers the card in its source, shown after the answer: the passage it came from, or for a line
    *  he typed (D99) the quotes the AI found, one at a time. `at` opens the source there. A card with no

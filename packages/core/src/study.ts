@@ -30,7 +30,7 @@ export interface ReviewInput {
   variant?: string;
   /** Answered in his head and self-marked (D68). */
   in_head?: boolean;
-  /** How many hints he took before answering, 1 or 2 (D-new-hint-before-no-idea). */
+  /** How many hints he took before answering, 1 or 2 (D358). */
   cued?: number;
   now?: Date;
 }
