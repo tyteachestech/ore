@@ -9,7 +9,7 @@ import { sceneOutline, setDiagram } from "../src/diagrams.ts";
 import { findCard, writeCardMeta, writeNewCard } from "../src/cards.ts";
 import { addHighlight } from "../src/annotations.ts";
 import { recordReview } from "../src/study.ts";
-import { createItem, findItem } from "../src/items.ts";
+import { createItem, findItem, setItemArchived } from "../src/items.ts";
 import { tempLibrary } from "./helpers.ts";
 
 // A fake `claude` that replays canned outputs in order and keeps what it was sent.
@@ -117,6 +117,19 @@ describe("tutor: what it sees", () => {
 });
 
 describe("tutor: replies", () => {
+  // F808
+  test("the tutor retrieves and cites an archived source named in the question", async () => {
+    const { lib, a } = await library();
+    await setItemArchived(lib, a.meta.id, true);
+    const quote = "A card you miss goes back to the first box.";
+    fakeClaude([{ ...OK, reply: "Back to the first box [1].", citations: [{ passage: "P1", quote }] }]);
+
+    const r = await tutor(lib, "In Flashcard boxes, where does a missed card go?");
+
+    expect(sent()[0]!.passages[0]).toMatchObject({ id: "P1", source: "Flashcard boxes", heading: "The Leitner system" });
+    expect(r.citations).toMatchObject([{ item: a.meta.id, title: "Flashcard boxes", quote }]);
+  });
+
   // F261: "Summarize this", "What's this about?" and Practice got the open source's first 8 passages (16% of a 4,000-word article).
   test("the source he has open goes whole, in order, whatever his words: a summary or an exercise can draw on its end (D290)", async () => {
     const lib = await tempLibrary();

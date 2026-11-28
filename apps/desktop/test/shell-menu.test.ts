@@ -19,6 +19,24 @@ test("native menu commands reach the focused webview without raising main first"
   expect(setter).toContain('None => window.label() == "main"');
 });
 
+// F15, seen in the real window: the standard Quit item sends `terminate:`, which this Tauri
+// never turns into ExitRequested, so the pages were never told "quitting" and what he typed in his last moment
+// was lost. Only a Mac can press ⌘Q; here the contract is kept: Quit is Ore's own item and exits through the shell.
+test("Quit is Ore's own menu item, so the pages hear that the app is quitting and save what he just typed", () => {
+  const rust = source("../src-tauri/src/main.rs");
+  expect(rust).not.toContain("PredefinedMenuItem::quit");
+  const setter = rust.slice(rust.indexOf("fn set_app_menu("), rust.indexOf("/// Red underlines"));
+  expect(setter).toContain('MenuItem::with_id(&app, "ore:quit"');
+  expect(setter).toContain('Some("Cmd+Q")');
+  const route = rust.slice(rust.indexOf(".on_menu_event(|app, e|"), rust.indexOf("// Images in notes"));
+  expect(route).toMatch(/"ore:quit"[^;]*app\.exit\(0\)/);
+  expect(rust.slice(rust.indexOf("RunEvent::ExitRequested"))).toContain('app.emit("quitting", ())');
+  // The quit waits for each page's answer, not a fixed moment: 150 ms went by before a note reached `ore`.
+  expect(rust).toContain("fn quit_ready(");
+  expect(rust).toMatch(/generate_handler!\[[^\]]*quit_ready/);
+  expect(source("../src/util.ts")).toContain('flushKept().then(() => invoke("quit_ready"))');
+});
+
 test("both webviews install the shared menu lifecycle, including focus refresh", () => {
   expect(source("../src/App.tsx")).toContain("useMenu(");
   expect(source("../src/QuickQuiz.tsx")).toContain("useMenu(");
@@ -35,6 +53,7 @@ test("quiz menu Undo stays in its history and app navigation is handed to main",
   const calls: { cmd: string; args: any }[] = [];
   let sequence = 0;
   (w as any).__TAURI_INTERNALS__ = {
+    metadata: { currentWindow: { label: "quiz" }, currentWebview: { label: "quiz", windowLabel: "quiz" } },
     transformCallback(fn: (event: { payload: string }) => void) { callbacks.set(++sequence, fn); return sequence; },
     async invoke(cmd: string, args: any) { calls.push({ cmd, args }); return args?.handler; },
   };
@@ -52,6 +71,8 @@ test("quiz menu Undo stays in its history and app navigation is handed to main",
   const unlisten = await listenMenu(() => keys, true);
   try {
     const listener = calls.find((c) => c.cmd === "plugin:event|listen" && c.args.event === "menu")!;
+    // Its own clicks only: the plain `listen` (target "Any") heard the main window's too, and handed each back (F801).
+    expect(listener.args.target).toEqual({ kind: "Window", label: "quiz" });
     callbacks.get(listener.args.handler)!({ payload: "ore:undo" });
     await Promise.resolve();
     expect(disk).toEqual({ mainArchived: true, quizRated: false });

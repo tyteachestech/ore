@@ -2013,6 +2013,8 @@ button.try-stone:hover .stone { opacity: 1; }
 .quiz-foot { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
 .quiz .pill-btn.quiz-go { height: 42px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; }
 .quiz .pill-btn.quiz-go.wide { flex: 1; justify-content: center; }
+/* The hint before No idea: the answer's shape in mono, letters spaced so each blank reads as one letter. */
+.review-cue { margin: 8px 0 14px; font-family: var(--mono); font-size: 15px; letter-spacing: 0.06em; color: var(--muted); overflow-wrap: anywhere; }
 .quiz-ghost { height: 42px; padding: 0 14px; white-space: nowrap; border-radius: 999px; color: var(--muted); font-weight: 600; }
 .quiz-ghost:hover:not(:disabled, [aria-disabled="true"]), .quiz-ghost:focus-visible { background: var(--bg-hover); color: var(--text); }
 .quiz-ghost:disabled, .quiz-ghost[aria-disabled="true"] { opacity: 0.45; }
