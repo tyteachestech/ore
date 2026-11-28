@@ -1,6 +1,6 @@
 import { type Locator } from "playwright";
 import { join } from "node:path";
-import { AGENTS, BRIDGE, failNext, foundOnScreen, hasCaret, inLibrary, isHeld, journey, LIB, openSource, ore, pickWithKeys, release, searchPick, select, settled, startReview, TESTING, textFile, until, typeFact } from "../harness";
+import { AGENTS, BRIDGE, failNext, foundOnScreen, hasCaret, highlightMenu, inLibrary, isHeld, journey, LIB, openSource, ore, pickWithKeys, release, searchPick, select, settled, startReview, TESTING, textFile, until, typeFact } from "../harness";
 
 journey("a sheet opened in the same moment as All sources keeps the keys: the list behind never takes them (F64)", async (page) => {
   // F64: the list takes the keys a frame after All sources is chosen. ⌘R inside that frame opened What to review, then
@@ -405,8 +405,7 @@ journey("settle: closing a typed highlight lifts the popup away, pops its mark a
   await page.keyboard.press("Escape");
   if (await left()) throw new Error("settle ran under reduced motion");
   await page.emulateMedia({ reducedMotion: null });
-  await page.locator(".mark-icon.question").first().click();
-  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, "Multiple-choice works too", "Remove highlight");
   await page.waitForTimeout(500); // the write lands before the next journey reads the library
 });
 

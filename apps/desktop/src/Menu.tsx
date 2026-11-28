@@ -119,7 +119,7 @@ function useHold(on: boolean | undefined) {
 
 /** An object's actions, the same list on right-click and on its ⋯ button, as in Linear and Finder
  *  (AGENTS.md interaction checklist). Radix menus: arrows, type-ahead, Enter, Esc. */
-export function WithMenu({ actions, children, keepFocus, hold, plain }: { actions: Actions; children: ReactNode; /** No icons: a long command list (the diagram canvas). */ plain?: boolean; /** Focus stays where the action put it (the note's text), not back on the trigger. */ keepFocus?: boolean; /** On the iPhone, a still half-second press opens it (Photos, Files): a row that has no swipes of its own. */ hold?: boolean }) {
+export function WithMenu({ actions, children, keepFocus, hold, plain, native: nativeAt }: { actions: Actions; children: ReactNode; /** Whether a right-click there gets the Mac's own menu, in place of `nativeMenu` (the reader's text, whose highlights have a menu of their own). */ native?: (e: PointerEvent) => boolean; /** No icons: a long command list (the diagram canvas). */ plain?: boolean; /** Focus stays where the action put it (the note's text), not back on the trigger. */ keepFocus?: boolean; /** On the iPhone, a still half-second press opens it (Photos, Files): a row that has no swipes of its own. */ hold?: boolean }) {
   // macOS opens the menu on mouse down, under the pointer, so the same click's mouse up lands on the
   // first item and Radix would pick it. A release right after opening is that click, not a choice;
   // pressing, moving to an item and releasing still picks it, as in a native menu.
@@ -135,7 +135,7 @@ export function WithMenu({ actions, children, keepFocus, hold, plain }: { action
   if (useLite() || (Array.isArray(actions) && !actions.length)) return children; // or no menu to open (the phone's title)
   return (
     <ContextMenu.Root onOpenChange={(open) => open && (opened.current = performance.now())}>
-      <ContextMenu.Trigger asChild ref={held} disabled={native} data-menu-row="" onPointerDownCapture={(e) => ((row.current = e.currentTarget as HTMLElement), setNative(nativeMenu(e.target, getSelection())))}>
+      <ContextMenu.Trigger asChild ref={held} disabled={native} data-menu-row="" onPointerDownCapture={(e) => ((row.current = e.currentTarget as HTMLElement), setNative(nativeAt ? nativeAt(e) : nativeMenu(e.target, getSelection())))}>
         {children}
       </ContextMenu.Trigger>
       <ContextMenu.Portal>

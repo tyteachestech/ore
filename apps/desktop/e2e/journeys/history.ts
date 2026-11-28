@@ -1,7 +1,7 @@
 // Recovering from the library's history (D5, coverage queue 9): an agent restores files with git while the app is
 // open, and the screens must show what the files now hold and never write the screen's older view back over it.
 import { $ } from "bun";
-import { AGENTS, awayAndBack, journey, LIB, loaded, openSource, ore, oreCalls, reveal, select, startReview, TESTING, until } from "../harness";
+import { AGENTS, awayAndBack, highlightMenu, journey, LIB, loaded, openSource, ore, oreCalls, reveal, select, startReview, TESTING, until } from "../harness";
 
 const git = (...args: string[]) => $`git -C ${LIB} -c user.name=Test -c user.email=t@t ${args}`.quiet().text();
 const commit = async () => (await git("add", "-A"), await git("commit", "-qm", "test", "--allow-empty"), (await git("rev-parse", "HEAD")).trim());
@@ -47,8 +47,7 @@ journey("a highlight removed, then its source's highlights restored from the his
   await until("the highlight is saved", async () => (await live()) === 1);
   await loaded(page);
   const good = await commit();
-  await select(page, phrase);
-  await page.getByRole("dialog", { name: "Highlight" }).getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, phrase, "Remove highlight");
   await until("it is removed", async () => (await live()) === 0);
   await loaded(page);
   const dir = (await git("ls-files", "items")).split("\n").find((f) => f.includes(id) && f.includes("annotations"))!;

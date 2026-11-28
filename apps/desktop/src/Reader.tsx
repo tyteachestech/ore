@@ -1,17 +1,17 @@
 import { readGuard } from "./reads";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { citedRange } from "./cite-pills";
-import { ArrowLeft, BookOpenText, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Copy, Eraser, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, Trash, X } from "./icons";
+import { Copy, Eraser, Trash, ArrowLeft, CaretDown, CaretLeft, CaretRight, CaretUp, Check, Eye, EyeSlash, MagnifyingGlass, Pause, Play, SidebarRight, Subtitles, X } from "./icons";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as HoverCard from "@radix-ui/react-hover-card";
-import { Children, createContext, Fragment, isValidElement, lazy, memo, Suspense, useContext, type CSSProperties, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type TouchEvent, type ReactNode, type RefObject } from "react";
+import { Children, createContext, Fragment, isValidElement, lazy, memo, Suspense, useContext, type CSSProperties, startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type PointerEvent as ReactPointerEvent, type TouchEvent, type ReactNode, type RefObject } from "react";
 import { createPortal, flushSync } from "react-dom";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { rehypeMath, remarkPlugins } from "./math-md";
 import { withImages } from "./md-images";
 import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
-import { PixelPage, PixelQuestion } from "./PixelIcon";
+import { PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
 import { backStart, frontEnd, unfold, unfoldFor } from "./front";
 import { SearchButton, SearchField } from "./HeadSearch";
@@ -1583,7 +1583,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   /** The passage to light once the Original tab opens: Show on the page from a highlight's popup. */
   const litNext = useRef<{ page: number; text: string } | null>(null);
   /** The page of the original a node of the text sits on: the last page mark before it (none before page 1's words). */
-  const pageOf = (node: Node) => {
+  const markPageOf = (node: Node) => {
     let on = 1;
     for (const m of docEl.current?.querySelectorAll<HTMLElement>("[data-page]") ?? []) {
       if (!(m.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
@@ -1606,7 +1606,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       for (const m of words.querySelectorAll(".katex, .katex-error")) m.replaceWith(" ");
       const text = words.textContent?.trim();
       if (!text) return;
-      setLit({ page: pageOf(block), text });
+      setLit({ page: markPageOf(block), text });
     };
     el.addEventListener("click", onClick);
     return () => el.removeEventListener("click", onClick);
@@ -1614,7 +1614,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   /** Show on the page: the Original tab opens beside the text with the highlight lit on its PDF page (D315). */
   const showOnPage = (range: Range) => {
-    const at = { page: pageOf(range.startContainer), text: range.toString().replace(/\s+/g, " ").trim() };
+    const at = { page: markPageOf(range.startContainer), text: range.toString().replace(/\s+/g, " ").trim() };
     keepNote();
     setPopup(null);
     if (originalShown) setLit(at);
@@ -2341,17 +2341,41 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     { id: "remove", label: "Remove highlight", danger: true, divider: true, run: () => void removeSaved(a.id) },
   ];
 
+  /** The highlight under a right-click in the text (D-new-highlight-menu): its tools, as Apple Books puts them,
+   *  so the popup keeps only what he does to every highlight (its kind and note). */
+  const menuHl = useRef<string | null>(null);
+  const menuNative = (e: ReactPointerEvent) => {
+    const sel = getSelection();
+    menuHl.current = !PHONE && (!sel || sel.isCollapsed) ? hitTest(ranges.current, e.clientX, e.clientY) : null;
+    return !menuHl.current;
+  };
+  const textMenu = (): MenuAction[] => {
+    const id = menuHl.current;
+    const range = id ? rangeOf(id) : null;
+    if (!id || !range) return [];
+    const el = range.startContainer.nodeType === 1 ? (range.startContainer as Element) : range.startContainer.parentElement;
+    const heading = !!el?.closest("h1, h2, h3, h4, h5, h6");
+    const cut = !!el && (!video || cardMode) && !el.closest(".video-card") && !annOf(id)?.point;
+    return [
+      ...(pdf ? [{ id: "page", label: "Show on the page", run: () => showOnPage(range) }] : []),
+      ...(video && words ? [{ id: "play-here", label: "Play from here", run: () => startHere(id) }] : []),
+      ...(lookable(range.toString()) ? [{ id: "look-up", label: "Explain", hint: label(keys["look-up"]), run: () => lookUp(range, popup?.id === id ? popup : null) }] : []),
+      { id: "copy-highlight", label: "Copy with source", hint: label(keys.copy), run: () => copyHighlight(id, annOf(id)?.note) },
+      ...(cut ? [{ id: "cut-text", label: heading ? "Remove this section from the text" : "Remove this from the text", hint: label(keys["cut-text"]), divider: true, run: () => void cutOut(id) }] : []),
+      { id: "remove", label: "Remove highlight", hint: label(keys.remove), danger: true, divider: !cut, run: () => void removeSaved(id) },
+    ];
+  };
+
   /** Removes junk from the text (D111): every block the highlight touches, or from a heading, its whole
    *  section. A fresh, untouched Keep was only a way to point, so it goes quietly first; a highlight he had
    *  goes with the text (its cards stay). Undo puts the text and its highlights back. */
-  async function cutOut() {
-    if (!popup || !doc) return;
-    const range = rangeOf(popup.id);
+  async function cutOut(id = popup?.id) {
+    if (!id || !doc) return;
+    const range = rangeOf(id);
     const section = !!(range && (range.startContainer.nodeType === 1 ? (range.startContainer as Element) : range.startContainer.parentElement)?.closest("h1, h2, h3, h4, h5, h6"));
-    const id = popup.id;
     const ann = annOf(id);
-    const untouched = sameId(fresh.current, id) && ann?.intent === "keep" && !ann.note && !popup.note.trim();
-    closePopup(false);
+    const untouched = sameId(fresh.current, id) && ann?.intent === "keep" && !ann.note && !(popup?.id === id && popup.note.trim());
+    if (popup) closePopup(false);
     const d = doc;
     try {
       const rid = await realId(id);
@@ -2376,15 +2400,15 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   /** "Start from here" (D49): plays from the highlight's first word. A fresh, untouched selection
    *  was only a way to point, so its Keep highlight goes; an existing highlight stays. */
-  function startHere() {
-    const range = popup && rangeOf(popup.id);
-    if (!popup || !range || !words || !idx.current) return;
+  function startHere(id = popup?.id) {
+    const range = id && rangeOf(id);
+    if (!id || !range || !words || !idx.current) return;
     const i = wordAtOffset(words, skeletonOffset(idx.current, range.startContainer, range.startOffset));
-    const ann = annOf(popup.id);
-    const drop = sameId(fresh.current, popup.id) && ann?.intent === "keep" && !ann.note && !popup.note.trim();
+    const ann = annOf(id);
+    const drop = popup?.id === id && sameId(fresh.current, id) && ann?.intent === "keep" && !ann.note && !popup.note.trim();
     if (i >= 0) seekTo(words.time[i]!, true);
     if (drop) void remove(false);
-    else closePopup();
+    else if (popup) closePopup();
   }
 
   const markLookedUp = hl.lookedUp;
@@ -2793,6 +2817,8 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const disarm = useRef(() => {});
   useEffect(() => () => disarm.current(), []);
   const onMouseDown = (e: MouseEvent) => {
+    // A right-click on a highlight opens its menu: WebKit would first select the word under it, as for Look Up.
+    if (!PHONE && (e.button === 2 || e.ctrlKey) && getSelection()?.isCollapsed !== false && hitTest(ranges.current, e.clientX, e.clientY)) e.preventDefault();
     // A click that is not the third of a triple: the double click's sentence is kept now, quietly (no popup,
     // and the selection this click starts is left alone).
     const word = wordWait.current;
@@ -3334,7 +3360,6 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
 
   const intent = (popup && anns.find((a) => sameId(a.id, popup.id))?.intent) || "keep";
   const popupRange = popup && rangeOf(popup.id);
-  const canLookUp = !PHONE && !!popupRange && lookable(popupRange.toString());
   // Junk can be cut from the text, but not from a transcript: its words are timed to the video (D111).
   const popupEl = popupRange && (popupRange.startContainer.nodeType === 1 ? (popupRange.startContainer as Element) : popupRange.startContainer.parentElement);
   const canCut = !!popupEl && (!video || cardMode) && !popupEl.closest(".video-card") && !annOf(popup?.id)?.point;
@@ -3693,6 +3718,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       <HideVeil hidden={hidden} eye={eyeRef} />
       {/* Only the words hide (F118): the toolbar above them, with Show the source, stays in reach of VoiceOver. */}
       <div className="reader-scroll" ref={scrollRef} tabIndex={-1} aria-hidden={hidden || undefined} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
+        <WithMenu actions={textMenu} native={menuNative}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} {...(PHONE ? { onTouchStart, onTouchMove, onTouchEnd } : {})} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
             {/* A book's cover or a PDF's first page at the top (D77): the picture is the source. A page's
@@ -3922,46 +3948,35 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                 }}
                 placeholder={PLACEHOLDER[intent]}
               />
-              <div className="popup-tools">
-                <Hint text="Copy with source" keys="copy" side="right">
-                  <button tabIndex={-1} className="intent icon" aria-label="Copy with source" onClick={() => copyHighlight(popup.id, popup.note)}>
-                    <Copy size={14} aria-hidden="true" />
-                  </button>
-                </Hint>
-                {canCut && (
-                  <Hint text={inHeading ? "Remove this section from the text" : "Remove this from the text"} keys="cut-text" side="right">
-                    <button tabIndex={-1} className="intent icon" aria-label={inHeading ? "Remove section" : "Remove text"} onClick={() => void cutOut()}>
-                      <Eraser size={14} aria-hidden="true" />
+              {/* The iPhone has no right-click: its tools stay in the popup, under the note. */}
+              {PHONE && (
+                <div className="popup-tools">
+                  <Hint text="Copy with source" keys="copy" side="right">
+                    <button tabIndex={-1} className="intent icon" aria-label="Copy with source" onClick={() => copyHighlight(popup.id, popup.note)}>
+                      <Copy size={14} aria-hidden="true" />
                     </button>
                   </Hint>
-                )}
-                <Hint text="Remove highlight" keys="remove" side="right">
-                  <button tabIndex={-1} className="intent remove" aria-label="Remove highlight" onClick={() => void remove()}>
-                    <Trash size={13} aria-hidden="true" />
-                  </button>
-                </Hint>
-                {video && words && (
-                  <Hint text="Play from here" side="right">
-                    <button tabIndex={-1} className="intent icon extra" aria-label="Play from here" onClick={startHere}>
-                      <Play size={14} aria-hidden="true" />
+                  {canCut && (
+                    <Hint text={inHeading ? "Remove this section from the text" : "Remove this from the text"} keys="cut-text" side="right">
+                      <button tabIndex={-1} className="intent icon" aria-label={inHeading ? "Remove section" : "Remove text"} onClick={() => void cutOut()}>
+                        <Eraser size={14} aria-hidden="true" />
+                      </button>
+                    </Hint>
+                  )}
+                  <Hint text="Remove highlight" keys="remove" side="right">
+                    <button tabIndex={-1} className="intent remove" aria-label="Remove highlight" onClick={() => void remove()}>
+                      <Trash size={13} aria-hidden="true" />
                     </button>
                   </Hint>
-                )}
-                {pdf && !PHONE && popupRange && (
-                  <Hint text="Show on the page" side="right">
-                    <button tabIndex={-1} className="intent icon extra" aria-label="Show on the page" onClick={() => showOnPage(popupRange)}>
-                      <PixelPage size={14} aria-hidden="true" />
-                    </button>
-                  </Hint>
-                )}
-                {canLookUp && (
-                  <Hint text="Explain" keys="look-up" side="right">
-                    <button tabIndex={-1} className="intent icon extra" aria-label="Explain" onClick={() => lookUp(popupRange!, popup)}>
-                      <BookOpenText size={14} aria-hidden="true" />
-                    </button>
-                  </Hint>
-                )}
-              </div>
+                  {video && words && (
+                    <Hint text="Play from here" side="right">
+                      <button tabIndex={-1} className="intent icon extra" aria-label="Play from here" onClick={() => startHere()}>
+                        <Play size={14} aria-hidden="true" />
+                      </button>
+                    </Hint>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {lookup && doc && (
@@ -3991,6 +4006,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
             />
           )}
         </div>
+        </WithMenu>
       </div>
       {/* After the text, so Tab reaches the outline once the source's own head is behind him. */}
       {!closedBook && !video && !PHONE && <Position scroll={scrollRef} doc={docEl.current} ready={ready} onJump={markPlace} />}

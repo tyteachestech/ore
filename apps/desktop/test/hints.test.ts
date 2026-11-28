@@ -15,11 +15,7 @@ const NO_CONTROL: Record<string, string> = {
   keep: "Hint keys={i} on the highlight popup's intent buttons",
   question: "Hint keys={i} on the highlight popup's intent buttons",
   apply: "Hint keys={i} on the highlight popup's intent buttons",
-  "mark-read": "label(keys[\"mark-read\"]) on the Feed row menu's Mark read / unread item",
   note: "no control; Tab moves into the popup's note field",
-  "block-up": "label(keymap[\"block-up\"]) beside Move up in the note's ⋮⋮ block menu (editor/BlockHandle.tsx)",
-  "block-down": "label(keymap[\"block-down\"]) beside Move down in the note's ⋮⋮ block menu (editor/BlockHandle.tsx)",
-  "block-duplicate": "label(keymap[\"block-duplicate\"]) beside Duplicate in the note's ⋮⋮ block menu (editor/BlockHandle.tsx)",
   "note-last-color": "puts the colour last picked in the format bar's colour menu on the selection again; nothing on screen to press",
   "quick-quiz": "system-wide (D76): registered with macOS, works in any app; shown and set in Settings › Review › Quick quiz",
 };
@@ -37,6 +33,7 @@ for (const m of code.matchAll(/keys=(?:"([\w-]+)"|\{\[([^\]]*)\]\})/g)) {
   for (const id of m[2]?.match(/[\w-]+/g) ?? []) shown.add(id);
 }
 for (const m of code.matchAll(/label\(keys\.([\w]+)\)/g)) shown.add(m[1]!);
+for (const m of code.matchAll(/label\(keys\["([\w-]+)"\]\)/g)) shown.add(m[1]!); // a menu item's hint, as on a highlight's right-click menu
 // The diagram editor's tools and commands carry their binding as `key: "d-…"`: the toolbar hints it, and
 // the / command list and the right-click menu show it beside each command (draw/Editor.tsx).
 for (const m of sources(join(import.meta.dir, "../src/draw")).join("\n").matchAll(/\bkey: "(d-[\w-]+)"/g)) shown.add(m[1]!);
