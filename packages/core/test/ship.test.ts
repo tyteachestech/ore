@@ -82,7 +82,7 @@ test("failed checks stop it, and master moving during the checks starts it again
   expect(f.calls.filter((c) => c.startsWith("gh pr checks")).length).toBe(2);
 });
 
-test("after pushing the numbers it waits for GitHub to say the PR can merge again, rather than failing on \"not mergeable\" (#562)", async () => {
+test("after pushing the numbers it waits for GitHub to say the PR can merge again, rather than failing on not mergeable (#562)", async () => {
   let numbered = false;
   let asked = 0;
   const f = fake((c) => {
