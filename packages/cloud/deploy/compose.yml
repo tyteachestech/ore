@@ -10,6 +10,12 @@ services:
     restart: unless-stopped
     environment:
       ORE_SESSION_SECRET: ${ORE_SESSION_SECRET:?set ORE_SESSION_SECRET in /etc/ore-cloud.env}
+      # Ore's own AI (#554): off until a key is in /etc/ore-cloud.env. Dollars a month per person and for
+      # the whole server; ORE_BILLING=on keeps it to Pro.
+      ORE_ANTHROPIC_KEY: ${ORE_ANTHROPIC_KEY:-}
+      ORE_AI_ALLOWANCE: ${ORE_AI_ALLOWANCE:-4}
+      ORE_AI_TOTAL: ${ORE_AI_TOTAL:-20}
+      ORE_BILLING: ${ORE_BILLING:-}
     volumes:
       - accounts:/data
     # A job's library lives in memory and is gone with it: the server keeps nothing (#545). It counts

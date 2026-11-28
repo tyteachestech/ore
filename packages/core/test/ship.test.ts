@@ -23,20 +23,32 @@ function fake(over: (cmd: string) => { code?: number; out?: string } | undefined
 }
 const go = (sh: Run, reviewed = true) => ship({ sh, log: () => {}, reviewed, wait: async () => {}, live: import.meta.dir });
 
-test("merges after numbering, the placeholder check, the push and green checks, then pulls the live checkout", async () => {
-  const f = fake();
+test("merges after green checks, then numbering, the placeholder check and its push, then pulls the live checkout", async () => {
+  let numbered = false;
+  const f = fake((c) => (c === "bun run ids" ? ((numbered = true), {}) : c === "git status --porcelain" && numbered ? { out: " M docs/reviews/findings.md" } : undefined));
   expect(await go(f.sh)).toBe(431);
   const at = (s: string) => f.calls.findIndex((c) => c.startsWith(s));
+  expect(at("gh pr checks 431")).toBeLessThan(at("bun run ids"));
   expect(at("bun run ids")).toBeLessThan(at("bun packages/core/scripts/ids.ts --check"));
-  expect(at("bun packages/core/scripts/ids.ts --check")).toBeLessThan(at("git push"));
-  expect(at("gh pr checks 431")).toBeLessThan(at("gh pr merge 431 --squash --match-head-commit h1"));
+  expect(at("bun packages/core/scripts/ids.ts --check")).toBeLessThan(f.calls.findLastIndex((c) => c.startsWith("git push")));
+  expect(f.calls.findLastIndex((c) => c.startsWith("git push"))).toBeLessThan(at("gh pr merge 431 --squash --match-head-commit h1"));
   expect(f.calls.some((c) => c.includes("pull -q --ff-only"))).toBe(true);
 });
 
-test("a placeholder left after numbering stops it before the push", async () => {
+test("rows are numbered only once master holds still, so master moving during the checks never leaves two rows one number (#562)", async () => {
+  const f = fake();
+  f.setMasters(["m1", "m2", "m2", "m2"]);
+  expect(await go(f.sh)).toBe(431);
+  const lastChecks = f.calls.findLastIndex((c) => c.startsWith("gh pr checks"));
+  expect(f.calls.filter((c) => c === "bun run ids").length).toBe(1);
+  expect(f.calls.findIndex((c) => c === "bun run ids")).toBeGreaterThan(lastChecks);
+});
+
+test("a placeholder left after numbering stops it before the numbers are pushed and merged", async () => {
   const f = fake((c) => (c.endsWith("ids.ts --check") ? { code: 1, out: "findings.md: an unnumbered finding" } : undefined));
   await expect(go(f.sh)).rejects.toThrow("placeholder");
-  expect(f.calls.some((c) => c.startsWith("git push") || c.startsWith("gh pr merge"))).toBe(false);
+  expect(f.calls.findLastIndex((c) => c.startsWith("git push"))).toBeLessThan(f.calls.findIndex((c) => c.endsWith("ids.ts --check")));
+  expect(f.calls.some((c) => c.startsWith("gh pr merge"))).toBe(false);
 });
 
 test("refuses without a review, from master, with uncommitted work, or while master is red", async () => {

@@ -3,7 +3,7 @@ import * as pdfWorker from "pdfjs-dist/legacy/build/pdf.worker.mjs";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
 import type { Asset } from "../items.ts";
 import { assetName } from "./assets.ts";
-import { CarriedData } from "./pdf-data.ts";
+import { pdfData } from "./pdf-data.ts";
 import { cleanTitle, fileAuthor, lineBreakSpace } from "./check.ts";
 import type { Box, Region } from "./paddle.ts";
 import { pageFigures, png } from "./pdf-figures.ts";
@@ -520,7 +520,7 @@ async function pdfMeta(doc: PdfDocument): Promise<{ title?: string; author?: str
 /** Opens a PDF quietly (pdf.js warns on stdout about any damage it works around), refusing one it
  *  can't open with the next step. */
 export function openPdf(data: Uint8Array) {
-  const task = getDocument({ data: new Uint8Array(data), BinaryDataFactory: CarriedData, useSystemFonts: true, fontExtraProperties: true, verbosity: 0, isOffscreenCanvasSupported: false, isImageDecoderSupported: false });
+  const task = getDocument({ data: new Uint8Array(data), ...pdfData, useSystemFonts: true, fontExtraProperties: true, verbosity: 0, isOffscreenCanvasSupported: false, isImageDecoderSupported: false });
   const promise = task.promise.catch((e: Error) => {
     if (e.name === "PasswordException") throw new Error("That PDF is locked with a password. Open it in Preview, enter the password, choose File › Export as PDF, and add the copy.");
     throw new Error("That file isn’t a readable PDF: it may be damaged or only partly downloaded. Download it again, or open it in Preview and choose File › Export as PDF.");

@@ -1,3 +1,4 @@
+import { AI, aiRoute, anthropic, ledger, type Ai } from "./ai.ts";
 import { accounts, appleKeys, KeysUnavailable, limiter, nonces, openSession, session, verifyApple, type Auth } from "./auth.ts";
 import { guarded } from "./guard.ts";
 import { encode, importJob, type ImportJob } from "./import.ts";
@@ -7,7 +8,8 @@ import { isolated } from "./isolate.ts";
  *  `{ identityToken, nonce }` from Sign in with Apple and answers `{ session, account }`; every other route needs that session as `Authorization: Bearer …` (#551).
  *  DELETE /account deletes the account, all the server keeps about a person. POST /import: a link comes as JSON `{ "url": … }`; a file as the request body with
  *  its name in `?name=`, or, with the files it links to, as JSON `{ name, bytes, beside: { name: bytes } }`
- *  in base64. The reply is JSON: `{ id, files: { path: base64 } }`, or `{ refused }` with the next step. */
+ *  in base64. The reply is JSON: `{ id, files: { path: base64 } }`, or `{ refused }` with the next step.
+ *  POST /ai runs one AI task on Ore's own AI (ai.ts, #554). */
 
 /** A source bigger than this is refused before it is read: the Mac's own import has no such limit, but a
  *  server must not let one upload fill its disk. Revisit with the phone's real largest PDFs. */
@@ -66,14 +68,16 @@ async function signIn(req: Request, auth: Auth, once: ReturnType<typeof nonces>)
   }
 }
 
-const ROUTES: Record<string, string> = { "/health": "GET", "/auth/nonce": "POST", "/auth/apple": "POST", "/account": "DELETE", "/import": "POST" };
+const ROUTES: Record<string, string> = { "/health": "GET", "/auth/nonce": "POST", "/auth/apple": "POST", "/account": "DELETE", "/import": "POST", "/ai": "POST" };
 
 /** `who` is the caller's address, for the sign-in limit. */
-export const makeHandler = (auth: Auth, allowed = limiter(), run: Run = isolated) => {
+export const makeHandler = (auth: Auth, allowed = limiter(), run: Run = isolated, ai?: Ai) => {
   const once = nonces(auth);
   const running = new Map<string, number>();
   const hourly = limiter(IMPORTS.perHour, 3600);
   let total = 0;
+  const now = auth.now ?? (() => Math.floor(Date.now() / 1000));
+  const askAi = ai && aiRoute(ai, now, limiter(AI.perMinute, 60, now));
   return async function handle(req: Request, who = "unknown"): Promise<Response> {
   const url = new URL(req.url);
   const method = ROUTES[url.pathname];
@@ -93,6 +97,7 @@ export const makeHandler = (auth: Auth, allowed = limiter(), run: Run = isolated
     auth.accounts.remove(sub);
     return json({ deleted: true });
   }
+  if (url.pathname === "/ai") return askAi ? askAi(account, (max) => capped(req, max), req.signal) : json({ error: "Ore's own AI isn't set up on this server." }, 503);
   const mine = running.get(sub) ?? 0;
   if (mine >= IMPORTS.perAccount) return json({ refused: "Ore's server is still reading the last ones you sent. Wait for one to finish, then send this again." }, 429);
   if (total >= IMPORTS.total) return json({ refused: "Ore's server is busy just now. Try again in a minute." }, 503);
@@ -149,6 +154,20 @@ export const unsafeTools = () => ["yt-dlp"].filter((t) => Bun.which(t, { PATH: p
 export const caller = (req: Request, socket: string | undefined, behindProxy: boolean) =>
   (behindProxy ? req.headers.get("x-forwarded-for")?.split(",").pop()?.trim() : undefined) || socket || "unknown";
 
+/** Ore's own AI, when the server has a key for it (ORE_ANTHROPIC_KEY, only ever in its environment): a
+ *  month's dollars per person (ORE_AI_ALLOWANCE) and for the whole server (ORE_AI_TOTAL), which also
+ *  wants a spend limit set on the key's own workspace at Anthropic. ORE_BILLING=on keeps it to Pro. */
+function aiFromEnv(auth: Auth, db: string): Ai | undefined {
+  const key = process.env.ORE_ANTHROPIC_KEY;
+  if (!key) return undefined;
+  const dollars = (name: string, usual: number) => {
+    const n = Number(process.env[name]?.trim() || usual);
+    if (!Number.isFinite(n) || n < 0) throw new Error(`${name} is a number of dollars a month.`);
+    return n;
+  };
+  return { ask: anthropic(key), ledger: ledger(db, auth.secret), allowance: dollars("ORE_AI_ALLOWANCE", 4), total: dollars("ORE_AI_TOTAL", 20), everyone: process.env.ORE_BILLING !== "on" };
+}
+
 /** The server's settings from its environment; it won't start without a session secret of its own. */
 function authFromEnv(): Auth {
   const secret = process.env.ORE_SESSION_SECRET ?? "";
@@ -167,7 +186,8 @@ function authFromEnv(): Auth {
 if (import.meta.main) {
   const tools = unsafeTools();
   if (tools.length) throw new Error(`Remove ${tools.join(", ")} from the server: it opens links itself, past Ore's guard on private addresses.`);
-  const handle = makeHandler(authFromEnv());
+  const auth = authFromEnv();
+  const handle = makeHandler(auth, undefined, undefined, aiFromEnv(auth, process.env.ORE_CLOUD_DB!));
   // Nothing the server opens may reach its own network; each import's process sets the same guard.
   globalThis.fetch = guarded(globalThis.fetch);
   const server = Bun.serve({ port: Number(process.env.PORT ?? 8787), hostname: process.env.HOST ?? "127.0.0.1", fetch: (req, server) => handle(req, caller(req, server.requestIP(req)?.address, !!process.env.ORE_BEHIND_PROXY)), maxRequestBodySize: MAX_UPLOAD + 1 });

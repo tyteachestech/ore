@@ -122,6 +122,31 @@ try {
   );
   for (const f of fonts) if (f) problems.push(`font failed to load: ${f}`);
   await page.waitForTimeout(300);
+
+  // A scanned book's pages are JPEG 2000: pdf.js decodes them with a decoder it loads (Wasm, or its JavaScript
+  // stand-in), which the CSP must let in, or the Original tab draws white pages (the simulated learner, 2026-11-27).
+  at = "a scan's Original";
+  const scan = join(import.meta.dir, "../../../packages/core/test/fixtures/intake/files/laplace-scan-pages19-20.pdf");
+  const added = (await (await fetch(`${bridgeOrigin}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", scan, "--no-enrich"] }) })).json()) as { title: string };
+  // Nothing in flight as the page reloads, or the cut-off call reads as a failed load.
+  await page.waitForFunction(() => !(window as unknown as { __ORE_PENDING?: number }).__ORE_PENDING);
+  await page.goto(`${origin}/`);
+  await page.locator(".side-item").first().waitFor();
+  await page.getByRole("button", { name: /^All sources/ }).click();
+  await page.locator(".row", { hasText: added.title.slice(0, 30) }).first().click();
+  await page.locator(".doc-head").waitFor();
+  const panel = page.getByRole("button", { name: "Show side panel" });
+  if (await panel.count()) await panel.click();
+  await page.getByRole("tab", { name: "Original" }).click();
+  const sheet = page.locator('.original canvas[data-page="1"]');
+  await sheet.waitFor();
+  const ink = await sheet.evaluate((c: HTMLCanvasElement) => {
+    const px = c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < px.length; i += 4) if (px[i + 3]! > 0 && px[i]! + px[i + 1]! + px[i + 2]! < 600) n++;
+    return n;
+  });
+  if (ink < 300) problems.push(`a scan's Original page drew ${ink} dark pixels: its JPEG 2000 images didn't decode`);
 } catch (e) {
   problems.push(`the walk broke at ${at}: ${(e as Error).message.split("\n")[0]} (${await shown?.().catch(() => "the page is gone")})`);
 } finally {
@@ -135,4 +160,4 @@ if (problems.length) {
   console.error(`release check (${engine}, release CSP): ${problems.length} problem(s)\n` + problems.map((p) => `  - ${p}`).join("\n"));
   process.exit(1);
 }
-console.log(`release check (${engine}, release CSP): Home, a source, a skill, All sources and a review load clean`);
+console.log(`release check (${engine}, release CSP): Home, a source, a skill, All sources, a review and a scan's Original load clean`);
