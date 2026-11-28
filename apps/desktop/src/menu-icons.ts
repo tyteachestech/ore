@@ -1,5 +1,5 @@
-import { Archive, ArrowClockwise, Circle, ArrowCounterClockwise, ArrowDown, ArrowLeft, ArrowRight, ArrowSquareOut, ArrowUp, ChatCircleDots, Check, Copy, Eraser, Eye, EyeSlash, Folder, Globe, Headphones, Keyboard, LinkSimple, MagnifyingGlass, NotePencil, Path, PencilSimple, Pin, Play, Plus, Quotes, Rss, Scissors, Signpost, Stack, Target, TextAlignLeft, Trash, User, X, type Icon } from "./icons";
-import { PixelBook, PixelGem, PixelQuestion, PixelTry } from "./PixelIcon";
+import { Archive, ArrowClockwise, BookOpenText, Circle, ArrowCounterClockwise, ArrowDown, ArrowLeft, ArrowRight, ArrowSquareOut, ArrowUp, ChatCircleDots, Check, Copy, Eraser, Eye, EyeSlash, Folder, Globe, Headphones, Keyboard, LinkSimple, MagnifyingGlass, NotePencil, Path, PencilSimple, Pin, Play, Plus, Quotes, Rss, Scissors, Signpost, Stack, Target, TextAlignLeft, Trash, User, X, type Icon } from "./icons";
+import { PixelBook, PixelGem, PixelPage, PixelQuestion, PixelTry } from "./PixelIcon";
 import type { MenuAction } from "./Menu";
 
 /* The icon at the left of each ⋯ and right-click menu item (ChatGPT's menus, Tyler 2026-11-12): one table, so
@@ -50,6 +50,10 @@ const BY_ID: Record<string, Icon> = {
   find: MagnifyingGlass,
   search: MagnifyingGlass,
   "cut-text": Scissors,
+  // A highlight's right-click menu in the reader.
+  page: PixelPage,
+  "play-here": Play,
+  "look-up": BookOpenText,
   "remove-highlight": Eraser,
   remove: Trash,
   type: Quotes,

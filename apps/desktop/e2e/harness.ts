@@ -503,6 +503,28 @@ export async function pointAt(page: Page, phrase: string, root = ".doc") {
   }, { phrase, root }))!;
 }
 
+/** A highlight's right-click menu in the reader (its tools left the popup, Tyler 2026-11-28): right-clicks the
+ *  phrase's first word and picks the item. */
+export async function highlightMenu(page: Page, phrase: string, item: string) {
+  const at = (await page.evaluate((phrase) => {
+    const walk = document.createTreeWalker(document.querySelector(".doc")!, NodeFilter.SHOW_TEXT);
+    for (let n = walk.nextNode() as Text | null; n; n = walk.nextNode() as Text | null) {
+      const i = n.data.indexOf(phrase);
+      if (i < 0) continue;
+      const r = document.createRange();
+      // Its middle letter: the first has the selection's drag handle over it while the popup is open.
+      const m = i + Math.floor(Math.min(phrase.length, n.data.length - i) / 2);
+      r.setStart(n, m);
+      r.setEnd(n, m + 1);
+      const b = r.getBoundingClientRect();
+      return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+    }
+  }, phrase))!;
+  await page.mouse.click(at.x, at.y, { button: "right" });
+  // Its name ends with its keys (⌫), as the menu shows them.
+  await page.getByRole("menuitem", { name: new RegExp(`^${item.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`) }).click();
+}
+
 /** A long source of numbered passages, for the journeys that select past the screen's edge. */
 export const longPassages = (title: string) =>
   `# ${title}\n\n${Array.from({ length: 40 }, (_, i) => `Passage ${i + 1} goes on about recall and spacing, long enough to wrap across a couple of lines of the reading column.`).join("\n\n")}\n`;

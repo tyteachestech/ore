@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { type Page } from "playwright";
-import { AGENTS, answered, askFieldIsPlain, BRIDGE, failNext, FIXTURES, hold, isHeld, journey, loaded, longPassages, openSource, ore, pointAt, release, select, settled, TESTING, until } from "../harness";
+import { AGENTS, answered, askFieldIsPlain, BRIDGE, failNext, FIXTURES, highlightMenu, hold, isHeld, journey, loaded, longPassages, openSource, ore, pointAt, release, select, settled, TESTING, until } from "../harness";
 
 journey("reader width: a recording's transcript keeps about the column an article gets in a narrow pane (D207)", async (page) => {
   await page.setViewportSize({ width: 1180, height: 800 });
@@ -16,12 +16,12 @@ journey("reader width: a recording's transcript keeps about the column an articl
 });
 
 // F129
-journey("highlight popup: on a recording, where Play takes a second column of tools, each type's name stays on one line", async (page) => {
+journey("highlight popup: on a recording, each type's name stays on one line, and Play from here is on the highlight's right-click menu", async (page) => {
   await openSource(page, "Lecture 4");
   await page.locator(".page.video").waitFor();
   await select(page, "testing yourself");
   // F130: a recording has no video, so its Play says only "Play from here".
-  await page.locator(".popup .popup-tools").getByRole("button", { name: "Play from here", exact: true }).waitFor();
+  await highlightMenu(page, "testing yourself", "Play from here");
   const tall = await page.locator(".popup .intents .intent").evaluateAll((els) =>
     els
       .filter((el) => {
@@ -33,7 +33,7 @@ journey("highlight popup: on a recording, where Play takes a second column of to
       .map((el) => el.textContent),
   );
   // Leaves the recording with the highlights it came with: a later journey counts its ticks.
-  await page.locator(".popup").getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, "testing yourself", "Remove highlight");
   await page.locator(".popup").waitFor({ state: "detached" });
   if (tall.length) throw new Error(`wrapped or cut: ${tall.join(", ")}`);
 });
@@ -256,15 +256,12 @@ journey("highlight popup open: typing writes the note, and no letter runs a shor
   if (after !== words + "2") throw new Error(`a 2 typed after the note became “${after}”`);
 });
 
-journey("highlight note: ⇧↵ carries a list on, an empty item ends it, a long note widens the popup, and its tools stay at the top", async (page) => {
+journey("highlight note: ⇧↵ carries a list on, an empty item ends it, and a long note widens the popup", async (page) => {
   await openSource(page, TESTING);
   await select(page, "Each successful retrieval changes the memory itself");
   const popup = page.getByRole("dialog", { name: "Highlight" });
   await popup.waitFor();
   const note = popup.getByLabel("Note");
-  const tools = popup.locator(".popup-tools");
-  const offset = async () => (await tools.boundingBox())!.y - (await popup.boundingBox())!.y;
-  const top = await offset();
   const width = (await popup.boundingBox())!.width;
   await page.keyboard.type("1. cue");
   await page.keyboard.press("Shift+Enter");
@@ -281,7 +278,6 @@ journey("highlight note: ⇧↵ carries a list on, an empty item ends it, a long
   await until("a note past four lines widens the popup", async () => (await popup.boundingBox())!.width > width + 40);
   const box = (await popup.boundingBox())!;
   if (box.x < 0 || box.x + box.width > page.viewportSize()!.width) throw new Error("the wide popup runs off the window");
-  if (Math.abs((await offset()) - top) > 1) throw new Error("the tools moved down the popup as the note grew");
   await page.keyboard.press("Enter");
   await popup.waitFor({ state: "hidden" });
   // Saved as Markdown: the bullets are "- " in the file, and come back as bullets.
@@ -1003,7 +999,7 @@ journey("highlight: a drag that starts right after a double click keeps both, th
   await until("the drag's passage is highlighted, its popup open", async () => (await active()).startsWith("Free recall, short-answer questions"));
   await until("the double click's sentence is kept too", async () => (await kept()).some((t) => t.startsWith("Decades of laboratory") && t.endsWith("no feedback is given.")));
   // The drag's highlight goes again: the vein journey below highlights these words as new.
-  await page.getByRole("dialog", { name: "Highlight" }).getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, "Free recall, short-answer questions", "Remove highlight");
   await until("the drag's highlight is gone", async () => !(await kept()).some((t) => t.startsWith("Free recall, short-answer questions")));
 });
 
@@ -1328,7 +1324,7 @@ journey("highlight note: a note whose save fails is kept, and saves when the hig
   await open();
   await until("the retried save landed", async () => (await note.inputValue()) === "first thought and two");
   // Its highlight goes again: the explain journeys below select words inside this passage as new.
-  await page.getByRole("dialog", { name: "Highlight" }).getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, "subtasks at once", "Remove highlight");
   await note.waitFor({ state: "detached" });
 });
 
@@ -1365,7 +1361,7 @@ journey("highlight: ⌘Z while its removal is being written brings it back with 
   await open();
   const slow = (ms: number | null) => page.evaluate((ms) => ((window as unknown as { __ORE_SLOW?: object }).__ORE_SLOW = ms ? { annotate: ms } : undefined), ms);
   await slow(1500);
-  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, "essential passage", "Remove highlight");
   await page.waitForTimeout(100);
   await page.keyboard.press("Meta+z");
   await settled(page);
@@ -1374,7 +1370,7 @@ journey("highlight: ⌘Z while its removal is being written brings it back with 
   // Brought back whole: a note changed while it was gone (here by another device) comes back as it went.
   const aid = (await saved())[0]!.id;
   await open();
-  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, "essential passage", "Remove highlight");
   await settled(page);
   await until("it is removed", async () => (await saved()).length === 0);
   await ore("annotate", aid, "--note=");
@@ -1418,7 +1414,7 @@ journey("highlight: ⌘Z then ⇧⌘Z while its removal is being written leaves 
   await open();
   await popup.waitFor();
   await slow(1200);
-  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, "essential passage", "Remove highlight");
   await page.waitForTimeout(100);
   await page.keyboard.press("Meta+z");
   await page.keyboard.press("Meta+Shift+z");
@@ -1445,7 +1441,7 @@ journey("highlight: two quick ⌘Z while its removal is being written bring it b
   await open();
   await popup.waitFor();
   await slow(1200);
-  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, "essential passage", "Remove highlight");
   await page.waitForTimeout(100);
   await page.keyboard.press("Meta+z");
   await page.keyboard.press("Meta+z");
@@ -1762,7 +1758,7 @@ journey("highlight: its colour arrives as dots that join (the vein), its ore fli
   // Reduced motion: the highlight is simply there.
   const card = page.locator(".mark-icon.card").first();
   if (!(await popup.isVisible())) await card.click();
-  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, "Free recall, short-answer questions", "Remove highlight");
   await page.waitForTimeout(500);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await select(page, "Free recall, short-answer questions");
@@ -1770,16 +1766,16 @@ journey("highlight: its colour arrives as dots that join (the vein), its ore fli
   await popup.waitFor();
   if ((await tinted("hl-keep")) !== before + 1) throw new Error("no tint under reduced motion");
   await page.emulateMedia({ reducedMotion: null });
-  await popup.getByRole("button", { name: "Remove highlight" }).click();
+  await highlightMenu(page, "Free recall, short-answer questions", "Remove highlight");
   await page.waitForTimeout(500); // the write lands before the next journey reads the library
 });
 
-/** Explain on a phrase, from the highlight popup's Explain button. */
+/** Explain on a phrase, from its highlight's right-click menu. */
 async function explain(page: Page, phrase: string) {
   await select(page, phrase);
   const popup = page.getByRole("dialog", { name: "Highlight" });
   await popup.waitFor();
-  await popup.getByRole("button", { name: "Explain", exact: true }).click();
+  await highlightMenu(page, phrase, "Explain");
   await page.getByRole("dialog", { name: `Explain ${phrase}` }).waitFor();
 }
 
@@ -2318,6 +2314,46 @@ journey("original: a click on a passage of the text lights where it sits on the 
     await until("page 1 shows, with no mark", async () => (await sheet.getAttribute("data-page")) === "1", 15000);
     await page.waitForTimeout(400);
     if (await lit.count()) throw new Error("words the page lacks lit something");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.evaluate(([tab, open]) => {
+      tab ? localStorage.setItem("ore.sidetab", tab) : localStorage.removeItem("ore.sidetab");
+      open ? localStorage.setItem("ore.mynotes", open) : localStorage.removeItem("ore.mynotes");
+    }, before);
+    await page.reload();
+  }
+});
+
+journey("highlight menu: a right-click on a highlight has its tools (the popup keeps only its kinds and note), and Show on the page opens the Original tab with it lit on its PDF page", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "textbook.pdf"), "--no-enrich")) as { id: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+    // The side panel on the source note: the Original tab is out of sight, as Tyler had it.
+    await page.evaluate(() => (localStorage.setItem("ore.sidetab", "note"), localStorage.removeItem("ore.mynotes")));
+    await page.reload();
+    await openSource(page, "Chapter 1: Learning");
+    await select(page, "Practice spread over days");
+    const popup = page.getByRole("dialog", { name: "Highlight" });
+    await popup.waitFor();
+    if (await popup.locator("button.icon, .popup-tools").count()) throw new Error("the popup still holds tools");
+    await page.keyboard.press("Enter");
+    await popup.waitFor({ state: "detached" });
+    // A right-click on plain text is the Mac's own (Look Up): no menu of ours.
+    const plain = await pointAt(page, "crammed into one night");
+    await page.mouse.click(plain.x, plain.y, { button: "right" });
+    await page.waitForTimeout(300);
+    if (await page.getByRole("menu").count()) throw new Error("plain text opened our menu");
+    // On the highlight: its tools, in the order he reaches for them.
+    const at = await pointAt(page, "Practice spread");
+    await page.mouse.click(at.x, at.y, { button: "right" });
+    const items = await page.getByRole("menuitem").allInnerTexts();
+    const names = items.map((t) => t.replace(/\s+\S*[⌘⌫⇧⌃]\S*$/, "").trim());
+    for (const want of ["Show on the page", "Copy with source", "Remove this from the text", "Remove highlight"]) if (!names.some((n) => n.startsWith(want))) throw new Error(`the menu lacks ${want}: ${names.join(" | ")}`);
+    await page.getByRole("menuitem", { name: "Show on the page" }).click();
+    const sheet = page.locator(".original canvas");
+    await until("the Original tab is open", async () => (await page.getByRole("tab", { name: "Original" }).getAttribute("aria-selected")) === "true", 5000);
+    await until("the highlight is lit on page 3", async () => (await sheet.getAttribute("data-page")) === "3" && (await page.locator(".original-lit").count()) > 0, 15000);
+    await highlightMenu(page, "Practice spread over days", "Remove highlight");
   } finally {
     await ore("archive", made.id).catch(() => {});
     await page.evaluate(([tab, open]) => {
