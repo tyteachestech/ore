@@ -2944,13 +2944,14 @@ journey("review: Hint before No idea shows first letters, then half the words; t
   try {
     await startReview(page, null);
     const hint = page.getByRole("button", { name: "Hint", exact: true });
-    // Pass Fact exercises until an Explain one, which has the hint.
-    for (let n = 0; n < 8 && !(await hint.isVisible()); n++) {
-      await q.waitFor();
-      if (await hint.isVisible()) break;
-      await page.keyboard.press("Meta+l");
-      await page.waitForTimeout(250);
+    // Pass Fact exercises until an Explain one: its hint is its first key point.
+    await q.waitFor();
+    for (let n = 0; n < 8 && (await isFact(page)); n++) {
+      const was = await page.locator(".review-card").getAttribute("data-id");
+      await page.keyboard.press("Meta+KeyL");
+      await until("the next exercise", async () => (await page.locator(".review-card").getAttribute("data-id")) !== was);
     }
+    if (await isFact(page)) throw new Error("no Explain exercise came up");
     await hint.click();
     const shown = page.getByLabel("Hint", { exact: true });
     const first = await shown.innerText();
@@ -2968,6 +2969,44 @@ journey("review: Hint before No idea shows first letters, then half the words; t
     // Marking every key point got would suggest Good; with hints taken the suggestion stops at Hard.
     for (const box of await page.locator(".quiz-points .quiz-mark").all()) if ((await box.getAttribute("aria-pressed")) !== "true") await box.click();
     await until("Hard is suggested", async () => (await page.locator(".rate-2.suggested").count()) === 1);
+    await page.getByRole("button", { name: "Hard", exact: true }).click();
+    await until("the rating is sent with its hints", async () => calls.calls.some((a) => a[0] === "review" && a.includes("--cued=2") && a.includes("--rating=2")));
+  } finally {
+    await calls.undoAll();
+    if (await page.locator(".review").count()) await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
+  }
+});
+
+// D358 on a Fact exercise: the hint is drawn from its answer, and a hinted answer that matches suggests Hard, not Good.
+journey("review: a Fact exercise has the same Hint: its answer as first letters, then more; a right answer after a hint suggests Hard", async (page) => {
+  const calls = oreCalls(page);
+  const q = page.locator(".review-q");
+  try {
+    await startReview(page, null);
+    await q.waitFor();
+    for (let n = 0; n < 8 && !(await isFact(page)); n++) {
+      const was = await page.locator(".review-card").getAttribute("data-id");
+      await page.keyboard.press("Meta+KeyL");
+      await until("the next exercise", async () => (await page.locator(".review-card").getAttribute("data-id")) !== was);
+    }
+    if (!(await isFact(page))) throw new Error("no Fact exercise came up");
+    const id = (await page.locator(".review-card").getAttribute("data-id"))!;
+    const { answer } = (await ore("card", "show", id)) as { answer: string };
+    // ⌘' from the answer box, as on an Explain one.
+    await page.getByLabel("Your answer").focus();
+    await page.keyboard.press("Meta+Quote");
+    const shown = page.getByLabel("Hint", { exact: true });
+    const first = await shown.innerText();
+    if (!first.includes("_") || first === answer) throw new Error(`the first hint should hide most of the answer: ${first}`);
+    if (await page.locator(".review-answer").count()) throw new Error("the hint showed the answer");
+    await page.getByRole("button", { name: "More", exact: true }).click();
+    await until("the second hint shows more", async () => (await shown.innerText()) !== first);
+    if (await page.getByRole("button", { name: /^(Hint|More)$/ }).count()) throw new Error("a third hint was offered");
+    await page.getByLabel("Your answer").fill(answer);
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await page.getByRole("button", { name: "Check", exact: true }).click();
+    await until("Hard is suggested, not Good", async () => (await page.locator(".rate-2.suggested").count()) === 1);
     await page.getByRole("button", { name: "Hard", exact: true }).click();
     await until("the rating is sent with its hints", async () => calls.calls.some((a) => a[0] === "review" && a.includes("--cued=2") && a.includes("--rating=2")));
   } finally {

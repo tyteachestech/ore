@@ -37,7 +37,7 @@ import { stampBefore } from "./transcript";
 import { passageText } from "./text";
 import { Evidence } from "./Evidence";
 import { Occluded } from "./Occluded";
-import { cue, cueSource, CUE_LEVELS } from "./cue";
+import { cue, cueLevels, cueSource } from "./cue";
 
 const SURE = ["Guess", "Think so", "Sure"] as const;
 const KEY_POINTS_CHANGED = "The key points changed.";
@@ -449,8 +449,21 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   })();
   // Recalled with a hint is a weaker recall: the suggestion goes no higher than Hard; his pick stands (D21).
   const suggested = cued && uncapped ? Math.min(uncapped, 2) : uncapped;
-  /** An Explain exercise with a key point to hint from (D358). */
-  const hintable = !!card && card.kind === "prompt" && !!cueSource(card);
+  /** An exercise with something to hint from (D358): an Explain's first key point, a Fact's answer. */
+  const hints = card ? cueLevels(cueSource(card)) : 0;
+  const cueLine = card && cued > 0 && (
+    <p className="review-cue" aria-label="Hint" aria-live="polite">
+      {cue(cueSource(card), cued)}
+    </p>
+  );
+  // No ⌘Z for a hint: what it showed can't be unseen, so taking it back would only hide that he saw it.
+  const hintButton = cued < hints && (
+    <Hint text={cued ? "Another hint" : "A hint: the first letters"} keys="hint" side="top">
+      <button className="quiz-ghost" onClick={() => setCued(cued + 1)}>
+        {cued ? "More" : "Hint"}
+      </button>
+    </Hint>
+  );
 
   // A rating waits only for what the marks say now: when they change, it stops waiting.
   useEffect(() => setGuard(undefined), [suggested]);
@@ -663,10 +676,10 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     }
     const digit = reviewDigit(e);
     if (phase === "answer") {
-      if (is(e, "hint") && hintable) {
+      if (is(e, "hint") && hints > 0) {
         e.preventDefault();
         // A held ⌘' gives one hint, never both at once.
-        if (!e.repeat && cued < CUE_LEVELS) setCued(cued + 1);
+        if (!e.repeat && cued < hints) setCued(cued + 1);
       } else if (is(e, "no-idea")) {
         e.preventDefault();
         void check(true);
@@ -851,11 +864,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
 
             {phase === "answer" && card.kind === "prompt" && (
               <>
-                {cued > 0 && (
-                  <p className="review-cue" aria-label="Hint" aria-live="polite">
-                    {cue(cueSource(card), cued)}
-                  </p>
-                )}
+                {cueLine}
                 <Grow
                   ref={field}
                   // In the empty answer field there is no text to undo, so ⌘Z walks the app history.
@@ -881,14 +890,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                       </button>
                     </Hint>
                   )}
-                  {/* No ⌘Z for a hint: what it showed can't be unseen, so taking it back would only hide that he saw it. */}
-                  {hintable && cued < CUE_LEVELS && (
-                    <Hint text={cued ? "Another hint" : "A hint: the first letters"} keys="hint" side="top">
-                      <button className="quiz-ghost" onClick={() => setCued(cued + 1)}>
-                        {cued ? "More" : "Hint"}
-                      </button>
-                    </Hint>
-                  )}
+                  {hintButton}
                   <Hint text="No idea" keys="no-idea" side="top">
                     <button className="quiz-ghost" onClick={() => void check(true)}>
                       No idea
@@ -907,6 +909,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
               <>
                 {/* D359: a Fact is typed too, so recognising the answer can't pass for recalling it.
                     One line, as a short answer is; ↵ checks, and ↵ on an empty box is No idea. */}
+                {cueLine}
                 <input
                   ref={line}
                   data-app-undo={answer ? undefined : ""}
@@ -934,6 +937,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                 </div>
                 <Sure refEl={sureRef} conf={conf} onPick={(n) => (conf === n ? (setConf(undefined), keepDraft(card, answer)) : pickSure(n))} />
                 <div className="review-foot">
+                  {hintButton}
                   <Hint text="No idea" keys="no-idea" side="top">
                     <button className="quiz-ghost" onClick={() => void check(true)}>
                       No idea
@@ -1142,7 +1146,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
           </div>
         )}
       </div>
-      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} hint={hintable && cued < CUE_LEVELS} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} draft={entry.state === "draft"} />}
+      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} hint={cued < hints} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} draft={entry.state === "draft"} />}
     </div>
     </Trap>
   );
@@ -1161,7 +1165,7 @@ function KeyFoot({ phase, kind, hint, suggested, variant, inHead, draft }: { pha
           ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
             [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), ...(hint ? [[k("hint"), "Hint"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
           : // A Fact's one line (D359): ↵ checks, and on an empty box is No idea.
-            [["↵", "Check"], [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
+            [["↵", "Check"], ...(hint ? [[k("hint"), "Hint"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
         : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], [k("retire-card"), draft ? "Delete" : "Retire"], ["Esc", "Leave"]];
   return (
     <div className="review-keys" aria-hidden="true">
