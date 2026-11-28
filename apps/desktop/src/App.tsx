@@ -271,13 +271,13 @@ export function App() {
     const from = tutorFrom.current;
     // Focus moves only if the tutor had it (or nothing did): put away with ⌘J while he types in his note, it stays there.
     const now = document.activeElement;
-    const had = !now || now === document.body || !!now.closest("aside.tutor");
+    const had = !now || now === document.body || !!now.closest("aside.tutor:not(.review-chat)");
     // The ✦ that opened it is hidden while the tutor is open: focus goes to the one that comes back.
     flushSync(() => setTutorOpen(false));
     if (!had) return;
     // So is the bubble it said a reply from (D159): focus goes to the mole beside it. Opened with nothing focused
     // (its shortcut, ⌘K) or from something gone since, focus goes to the mole too: the tutor's own button.
-    const back = from && from !== document.body && from.isConnected ? from : document.querySelector<HTMLElement>(".tutor-bubble");
+    const back = from && from !== document.body && from.isConnected ? from : document.querySelector<HTMLElement>(".tutor-bubble:not(.review *)");
     if (back) focusQuietly(back);
   };
   const [adding, setAdding] = useState(false);

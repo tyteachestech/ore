@@ -95,7 +95,7 @@ describe("Ask about this (D61)", () => {
     const proposal = { question: "What does recall do?", answer: "Strengthens it.", rubric: ["Explains that recall strengthens memory"] };
     fakeClaude([{ reply: "Because recall rewrites.", card: null }, { reply: "Try this.", card: proposal }]);
     const first = await askAboutCard(lib, card.meta.id, { message: "Why?", answer: "effort" });
-    expect(first).toMatchObject({ reply: "Because recall rewrites.", proposal: null, ai: { vendor: "claude", prompt_version: "chat@3" } });
+    expect(first).toMatchObject({ reply: "Because recall rewrites.", proposal: null, ai: { vendor: "claude", prompt_version: "chat@4" } });
     const next = await askAboutCard(lib, card.meta.id, { message: "Clearer card?", session: first.session });
     expect(next.proposal).toEqual(proposal);
     const [a, b] = readFileSync(join(binDir, "args.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l) as string[]);
@@ -119,7 +119,7 @@ describe("Ask about this (D61)", () => {
     fakeClaude([{ reply: "Try this wording.", card: proposal }]);
     const r = await askAboutCard(lib, card.meta.id, { message: "Make this exercise clearer" });
     expect(r.proposal).toEqual(proposal);
-    expect(r.ai.prompt_version).toBe("chat@3");
+    expect(r.ai.prompt_version).toBe("chat@4");
   });
 
   test.each([
