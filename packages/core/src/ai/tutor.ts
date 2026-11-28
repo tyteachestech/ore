@@ -21,6 +21,7 @@ import { aiStampFor, chooseVendor, isWebUrl, partialReply, runAgent, samePage, t
 export { partialReply };
 import { nearestSentence, PASSAGES, passageCitation, plainText, retrieve, splitPassages, type Citation, type Passage, type WebCitation } from "./ask.ts";
 import { quoteIn } from "./grade.ts";
+import { anchorEvidence } from "./check.ts";
 
 // The tutor (D128): the chat docked at the window's right, grown out of Ask your library. It answers
 // his own questions from his sources with citations; when they don't hold the answer it says so, then
@@ -478,10 +479,12 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
   }
 }
 
+const CitedPassage = z.object({ item: z.string(), quote: z.string().min(1), start: z.number().int().nonnegative() });
+
 /** Keeps a card the tutor proposed (D128, D9: it goes into review like any draft). It belongs to the
  *  source it came from (the first one cited, else the one he was reading) and takes that source's
  *  skills and first topic; the AI that wrote it is recorded. */
-export async function addTutorCard(lib: Library, item: string, card: TutorCard, ai: AiStamp): Promise<Card> {
+export async function addTutorCard(lib: Library, item: string, card: TutorCard, ai: AiStamp, citations: z.input<typeof CitedPassage>[] = []): Promise<Card> {
   const c = TutorCard.parse(card);
   const problem = cardTextProblem(c);
   if (problem) throw new Error(problem);
@@ -489,11 +492,13 @@ export async function addTutorCard(lib: Library, item: string, card: TutorCard, 
   // Checked as a card's read checks it: a stamp missing a field made a card no list could read (F811).
   const stamp = AiStamp.safeParse(ai);
   if (!stamp.success) throw new Error(`--ai: ${stamp.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
+  const passages = CitedPassage.array().parse(citations);
   return withLock(paths.lock(lib), () => {
     const it = findItem(lib, item);
     return writeNewCard(lib, {
       kind: c.kind, item: it.meta.id, from: "tutor", skills: it.meta.skills, topics: it.meta.topics.slice(0, 1), content_type: c.content_type,
       question: c.question, answer: c.answer, rubric: c.kind === "prompt" ? c.rubric : [], ai: stamp.data,
+      evidence: anchorEvidence(it.body, passages.filter((p) => p.item === it.meta.id)),
     });
   });
 }

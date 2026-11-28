@@ -105,7 +105,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
           const out: Hit[] = [];
           for (const r of rows) {
             if (r.kind === "skill-notes") {
-              out.push({ key: `skill notes ${r.ref}`, skill: r.ref, title: skills.find((s) => s.id === r.ref)?.name ?? r.title, what: "skill note", snippet: r.snippet });
+              out.push({ key: `skill notes ${r.ref}`, skill: r.ref, title: skills.find((s) => s.id === r.ref)?.name ?? r.title, what: "Skill note", snippet: r.snippet });
               continue;
             }
             const item = r.item ?? (r.kind === "item" ? r.ref : undefined);
@@ -115,7 +115,7 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
               key: `text ${r.kind} ${r.ref}`,
               item,
               title: items.find((i) => i.id === item)?.title ?? r.title,
-              what: intent ? (LABEL[intent] ?? "highlight").toLowerCase() : r.kind === "notes" ? "source note" : r.kind === "card" ? "exercise" : undefined,
+              what: intent ? (LABEL[intent] ?? "Highlight") : r.kind === "notes" ? "Source note" : r.kind === "card" ? "Exercise" : undefined,
               at: landing(r, query),
               snippet: r.snippet,
             });
@@ -273,7 +273,8 @@ export function Palette({ actions, recent, items, skills, skill, onSkill, onSkil
               <>
                 {h.item && <Thumb item={items.find((i) => i.id === h.item) ?? { type: "article", thumbnail: undefined }} />}
                 <span className="palette-hit">
-                  <span className="title">{h.what ? `${h.title} · ${h.what}` : h.title}</span>
+                  {PHONE && h.what && <small className="palette-kind">{h.what}</small>}
+                  <span className="title">{!PHONE && h.what ? `${h.title} · ${h.what.toLowerCase()}` : h.title}</span>
                   {h.snippet && <span className="sub">{snippet(h.snippet, query)}</span>}
                 </span>
               </>

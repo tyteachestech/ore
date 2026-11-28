@@ -1,0 +1,27 @@
+diff --git a/dist/removals/scoring.js b/dist/removals/scoring.js
+index 6ad685ecd818276423946edf3c0037d67abdb46a..e7def11d512ffa4c30455c73d8e89d916f2a7c40 100644
+--- a/dist/removals/scoring.js
++++ b/dist/removals/scoring.js
+@@ -58,8 +58,8 @@ const navigationIndicators = [
+     'terms',
+     'trending'
+ ];
+-// Social media profile URL pattern — used to detect author bios
+-const socialProfilePattern = /\b(linkedin\.com\/(in|company)\/|twitter\.com\/(?!intent\b)\w|x\.com\/(?!intent\b)\w|facebook\.com\/(?!share\b)\w|instagram\.com\/\w|threads\.net\/\w|mastodon\.\w)/i;
++// A profile link can mark an author bio. A link to a specific post can be a citation in prose.
++const socialProfilePattern = /\b(linkedin\.com\/(in|company)\/|(?:twitter|x)\.com\/(?!intent\b)\w+\/?(?:[?#]|$)|facebook\.com\/(?!share\b)\w|instagram\.com\/\w|threads\.net\/\w|mastodon\.\w)/i;
+ // Date pattern for detecting standalone bylines — no leading \b because
+ // textContent can concatenate adjacent elements without whitespace
+ const datePattern = /(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}|\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*)/i;
+@@ -425,9 +425,8 @@ class ContentScorer {
+             score -= 15;
+         }
+         // Check for high link text ratio (e.g. card groups, nav sections)
+-        // Requires multiple links to avoid penalizing content paragraphs
+-        // that happen to be wrapped in a single link
+-        if (links > 1 && words < 80) {
++        // Count destinations: a linked poster and caption can point at the same media.
++        if (links > 1 && words < 80 && new Set(Array.from(linkElements, (link) => link.getAttribute('href'))).size > 1) {
+             let linkTextLength = 0;
+             for (let i = 0; i < linkElements.length; i++) {
+                 linkTextLength += (linkElements[i].textContent || '').length;

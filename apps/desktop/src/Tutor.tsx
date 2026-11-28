@@ -66,6 +66,7 @@ export type TutorTurn = {
   reply?: string; citations?: AnyCitation[]; general?: boolean; hint?: boolean; exercise?: Exercise | null; card?: TutorCard | null; ai?: Ai; error?: string;
   /** A worked answer's steps, shown one at a time (D142); empty for any other reply. */
   steps?: string[];
+  stepsShown?: number;
   /** Feedback on his answer to an exercise: its card's points, marked (D162); empty for any other reply. */
   marks?: Mark[];
   /** Files he attached to this message (D189), as `ore chat --attach` returned them. */
@@ -207,7 +208,7 @@ export function useTutorChat(notify: Notify) {
     const mine = () => jobs.current.get(t.id) === job;
     // The steps of a worked answer he has shown are part of what the tutor said, so a follow-up ("why step
     // 2?") can lean on them; the ones still hidden aren't, so his own try at the next step is his (D142).
-    const said = (x: TutorTurn) => [x.reply, ...(x.steps ?? []).slice(0, stepsShown.get(x.id) ?? 1).map((s, i) => `${i + 1}. ${s}`)].join("\n\n");
+    const said = (x: TutorTurn) => [x.reply, ...(x.steps ?? []).slice(0, x.stepsShown ?? 1).map((s, i) => `${i + 1}. ${s}`)].join("\n\n");
     // A turn that set an exercise carries it, so the feedback judges against the card committed then (D158).
     const earlier = before.flatMap((x) => (x.reply ? [{ message: x.message, reply: said(x), ...(x.exercise ? { exercise: x.exercise } : {}), ...(x.files?.length ? { files: x.files } : {}) }] : []));
     // The reply as it is written lands on this turn (ChatGPT's streaming), so the first words show in a
@@ -280,7 +281,6 @@ export function useTutorChat(notify: Notify) {
   const retry = (id: string, edited?: string) => {
     const i = now.current.findIndex((t) => t.id === id);
     if (i < 0) return;
-    stepsShown.delete(id); // a new reply starts its steps from the first
     const t = askAgain(now.current[i]!, edited);
     update((ts) => ts.map((x) => (x.id === id ? t : x)));
     save();
@@ -288,9 +288,12 @@ export function useTutorChat(notify: Notify) {
   };
   /** Shows another version of a turn (D201). */
   const version = (id: string, i: number) => {
-    stepsShown.delete(id);
     update((ts) => ts.map((x) => (x.id === id ? flip(x, i) : x)));
     save();
+  };
+  const showSteps = (id: string, stepsShown: number) => {
+    const chat = metaNow.current;
+    if (chat) patch(chat.id, id, { stepsShown });
   };
   /** Keeps the reply's card on the source it cites first (else the one he asked about); ⌘Z retires it. */
   const keep = async (id: string) => {
@@ -301,7 +304,8 @@ export function useTutorChat(notify: Notify) {
     const mark = (kept: string | undefined) => patch(chat, id, { kept });
     mark("adding");
     try {
-      const c = await ore<{ id: string }>("tutor-card", item, opt("card", JSON.stringify(t.card)), opt("ai", JSON.stringify(t.ai)));
+      const citations = t.citations?.filter((c) => "item" in c) ?? [];
+      const c = await ore<{ id: string }>("tutor-card", item, opt("card", JSON.stringify(t.card)), opt("ai", JSON.stringify(t.ai)), opt("citations", JSON.stringify(citations)));
       mark(c.id);
       notify(
         "Exercise added",
@@ -406,7 +410,7 @@ export function useTutorChat(notify: Notify) {
   };
   /** A web page a reply cites, in his browser. */
   const openLink = (url: string) => void openUrl(url).catch((e) => notify(`Couldn’t open the link: ${errorText(e)}`, "error"));
-  return { turns, draft, setDraft, carry, drop, ask, queue: hold, unqueue, stop, retry, version, attach, attaching: attaching > 0, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
+  return { turns, draft, setDraft, carry, drop, ask, queue: hold, unqueue, stop, retry, version, showSteps, attach, attaching: attaching > 0, say: notify, keep, quote, fresh, open, remove, current: meta, openLink };
 }
 
 /** Starters for an empty chat, so he sees what it does (NotebookLM's suggested questions). */
@@ -439,7 +443,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
   onOpen: (item: string, at: string) => void;
   onClose: () => void;
 }) {
-  const { turns, draft: { input, mentions, files = [] }, setDraft, carry } = chat;
+  const { turns, draft: { input, mentions, files = [], cases: caseDraft }, setDraft, carry } = chat;
   const setInput = (text: string) => setDraft((d) => ({ ...d, input: text }));
   // The page on screen is the context (Notion AI): the open source, else the skill whose page it is. He can
   // take it out (the chip's ×): it stays out for that page while the tutor is open, and another page has its own.
@@ -485,6 +489,10 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
   /** His last message while he edits it (D201): the text in its field. */
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const lastTurn = turns[turns.length - 1];
+  const caseAnswers = lastTurn?.exercise?.cases?.length === 2 && caseDraft?.turn === lastTurn.id
+    ? caseDraft.said.map((answer) => answer.trim()) : [];
+  const [caseA, caseB] = caseAnswers;
+  const caseAnswer = caseA && caseB ? `A: ${caseA}\nB: ${caseB}` : "";
   // The newest reply typed out at a steady pace (D321): the model sends words in clumps, and a
   // Codex reply comes whole, so the words on screen run on their own clock, never more than LAG behind.
   // Its [n] markers wait for the citations, which come with the whole reply; Stop shows what was sent.
@@ -548,6 +556,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
     setAt(null);
     field.current?.focus();
   };
+  const sendCases = () => send(caseAnswer);
 
   /** The @word the caret is in, if any. */
   const track = (text: string, caret: number) => {
@@ -806,11 +815,18 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
                       </Hint>
                     )}
                     <div data-reply={t.id}>
-                      <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} steps={t.steps} id={t.id} onSteps={() => field.current?.focus()} />
+                      <Answer text={t.reply} citations={t.citations ?? []} onOpen={onOpen} onLink={chat.openLink} general={t.general} worked={t.steps?.length ? {
+                        steps: t.steps,
+                        count: t.stepsShown ?? 1,
+                        onReveal: (count) => {
+                          chat.showSteps(t.id, count);
+                          if (count === t.steps!.length) field.current?.focus();
+                        },
+                      } : undefined} />
                     </div>
                     {t.stopped && <p className="tutor-general">Stopped</p>}
                     {t.exercise?.cases?.length === 2 && (
-                      <Cases cases={t.exercise.cases} open={last} said={chat.draft.cases?.turn === t.id ? chat.draft.cases.said : NO_CASES} onSaid={(said) => setDraft((d) => ({ ...d, cases: { turn: t.id, said } }))} onSend={(text) => send(text)} />
+                      <Cases cases={t.exercise.cases} open={last} said={caseDraft?.turn === t.id ? caseDraft.said : NO_CASES} onSaid={(said) => setDraft((d) => ({ ...d, cases: { turn: t.id, said } }))} onSend={sendCases} />
                     )}
                     {!!t.marks?.length && (
                       <ul className="quiz-points tutor-points" aria-label="Key points">
@@ -1009,8 +1025,8 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
               </button>
             </Hint>
           ) : (
-            <Hint text={<>Send <kbd>↵</kbd></>} side="top">
-              <button className="ask-send" aria-label="Send" disabled={!input.trim() || chat.attaching} onClick={() => send(input, true)}>
+            <Hint text={input.trim() || !caseAnswer ? <>Send <kbd>↵</kbd></> : <>Send case answers <kbd>↵</kbd> in Case B</>} side="top">
+              <button className="ask-send" aria-label="Send" disabled={!(input.trim() || caseAnswer) || chat.attaching} onClick={() => input.trim() ? send(input, true) : sendCases()}>
                 <ArrowUp size={14} aria-hidden="true" />
               </button>
             </Hint>
@@ -1061,7 +1077,9 @@ function Pill({ run, open }: { run: AnyCitation[]; open: (c: AnyCitation) => voi
  *  named for its source ("britannica", "How spaced repetition works", "+1" for a second), its passage or
  *  page on hover, opened on click (his source at the quote, a page in the browser). The full list waits
  *  behind "Sources" under the reply. A reply from general knowledge says so. */
-function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }: { text: string; citations: AnyCitation[]; general?: boolean; onOpen: (item: string, at: string) => void; onLink: (url: string) => void; steps?: string[]; id?: string; onSteps?: () => void }) {
+type WorkedAnswer = { steps: string[]; count: number; onReveal: (count: number) => void };
+
+function Answer({ text, citations, general, onOpen, onLink, worked }: { text: string; citations: AnyCitation[]; general?: boolean; onOpen: (item: string, at: string) => void; onLink: (url: string) => void; worked?: WorkedAnswer }) {
   const [listed, setListed] = useState(false);
   const opener = useRef({ onOpen, onLink });
   opener.current = { onOpen, onLink };
@@ -1084,8 +1102,8 @@ function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }
       <ReactMarkdown {...math} components={components}>
         {citeRuns(aiMath(text), cited)}
       </ReactMarkdown>
-      {!!steps?.length && id && (
-        <Steps id={id} steps={steps} onDone={onSteps}>
+      {worked && (
+        <Steps {...worked}>
           {(s) => (
             <ReactMarkdown {...math} components={components}>
               {citeRuns(aiMath(s), cited)}
@@ -1122,23 +1140,16 @@ function Answer({ text, citations, general, onOpen, onLink, steps, id, onSteps }
   );
 }
 
-/** How many steps of each worked answer he has shown, so closing the tutor or moving around keeps his place. */
-const stepsShown = new Map<string, number>();
-
 /** A worked answer one step at a time (D142, after assistant-ui's math block): the first shows, Next step
  *  shows the one after, and the hover asks him to work it out first, so he explains each move to himself
  *  before he reads it (faded worked examples; self-explanation). */
-function Steps({ id, steps, onDone, children }: { id: string; steps: string[]; onDone?: () => void; children: (step: string) => ReactNode }) {
-  const [n, setN] = useState(() => Math.min(stepsShown.get(id) ?? 1, steps.length));
+function Steps({ steps, count, onReveal, children }: WorkedAnswer & { children: (step: string) => ReactNode }) {
+  const n = Math.min(count, steps.length);
   const list = useRef<HTMLOListElement>(null);
   const shown = useRef(false);
   const next = () => {
-    const k = n + 1;
-    stepsShown.set(id, k);
     shown.current = true;
-    setN(k);
-    // The button goes with the last step: the field takes the focus, for what he wants to ask next.
-    if (k === steps.length) onDone?.();
+    onReveal(n + 1);
   };
   // The step he just showed scrolls into view inside the log only, never the page under a floating tutor,
   // and only when he asked for it (not when the tutor reopens on a worked answer).
@@ -1299,14 +1310,13 @@ export function useUnheard(turns: TutorTurn[], open: boolean) {
 
 /** A tell apart's two cases side by side (D163, after assistant-ui's comparison card): comparing two cases
  *  teaches the difference when they are seen together, so each sits in its own column, A and B, with a line
- *  under it for which idea fits and what decides it. Enter in A goes to B; Enter in B sends both as one
- *  answer ("A: … B: …"); ⇧Enter is a new line. The chat field still takes an answer written any other way.
+ *  under it for which idea fits and what decides it. Enter in A goes to B; Enter in B or Send submits
+ *  both filled lines as one answer ("A: … B: …"); ⇧Enter is a new line.
  *  Once he has answered (`open` false) the cases stay, without their lines. */
 const NO_CASES = ["", ""];
 /** `said` lives with the chat's draft, so closing the tutor mid-answer keeps it. */
-function Cases({ cases, open, said, onSaid, onSend }: { cases: string[]; open: boolean; said: string[]; onSaid: (said: string[]) => void; onSend: (text: string) => void }) {
+function Cases({ cases, open, said, onSaid, onSend }: { cases: string[]; open: boolean; said: string[]; onSaid: (said: string[]) => void; onSend: () => void }) {
   const second = useRef<HTMLTextAreaElement>(null);
-  const answer = said.map((x, i) => (x.trim() ? `${"AB"[i]}: ${x.trim()}` : "")).filter(Boolean).join("\n");
   return (
     <div className="tutor-cases">
       {cases.map((c, i) => (
@@ -1323,10 +1333,10 @@ function Cases({ cases, open, said, onSaid, onSend }: { cases: string[]; open: b
               value={said[i]}
               onChange={(e) => onSaid(said.map((x, j) => (j === i ? e.target.value : x)))}
               onKeyDown={(e) => {
-                if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+                if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
                 e.preventDefault();
                 if (!i) return second.current?.focus();
-                if (answer) onSend(answer);
+                onSend();
               }}
             />
           )}

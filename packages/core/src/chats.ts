@@ -10,7 +10,7 @@ import { withLock } from "./lock.ts";
 // D172 and D61: each chat is saved in the library as chats/<id>.json. Tutor names its own chats
 // by their first turn; Review uses the exercise id so the same exercise can reopen its chat.
 
-const Turn = z.looseObject({ id: z.string().min(1), message: z.string() });
+const Turn = z.looseObject({ id: z.string().min(1), message: z.string(), stepsShown: z.number().int().positive().optional() });
 const ExerciseText = z.object({ question: z.string(), answer: z.string(), rubric: z.array(z.string()).optional() });
 const ExerciseTurn = Turn.extend({
   reply: z.string().optional(),
@@ -109,26 +109,39 @@ const hasReply = (v: Version) => typeof v.reply === "string";
  *  are another version, so neither's stamp is lost in a merge (Codex deep scan 2). */
 const key = (v: Version) => {
   const ai = (v.ai ?? {}) as Record<string, unknown>;
-  return JSON.stringify([v.message, v.reply, ai.vendor, ai.model, ai.prompt_version]);
+  return JSON.stringify([v.message, v.reply, ai.vendor, ai.model, ai.prompt_version, v.steps ?? []]);
 };
 const shown = ({ id: _i, alts: _a, alt: _n, ...v }: Turn): Version => v;
 const versionsOf = (t: Turn): Version[] => [...((t.alts as Version[] | undefined) ?? []), ...(hasReply(t) ? [shown(t)] : [])];
 const keptOf = (v: Version) => (typeof v.kept === "string" && v.kept !== "adding" ? v.kept : undefined);
+const stepsShownOf = (v: Version) => (typeof v.stepsShown === "number" && Number.isSafeInteger(v.stepsShown) ? v.stepsShown : 1);
 
 /** One turn as both copies have it. The new copy's, unless the file's has a reply the new one never saw (a
  *  window that said "No reply came" while another's reply landed); either way every reply either holds stays a
- *  version, and a card kept from one in either stays kept. */
+ *  version, and its kept card and revealed steps stay with it. */
 function mergeTurn(saved: Turn, next: Turn): Turn {
   const nextVersions = versionsOf(next);
   const useNext = hasReply(next) || !hasReply(saved) || nextVersions.some((v) => key(v) === key(saved));
   const [base, other] = useNext ? [next, saved] : [saved, next];
   const known = new Set(versionsOf(base).map(key));
-  const extra = versionsOf(other).filter((v) => !known.has(key(v)) && (known.add(key(v)), true));
-  const keptIn = new Map(versionsOf(other).flatMap((v) => (keptOf(v) ? [[key(v), keptOf(v)!] as const] : [])));
-  const withKept = <V extends Version>(v: V): V => (keptOf(v) || !hasReply(v) || !keptIn.has(key(v)) ? v : { ...v, kept: keptIn.get(key(v)) });
-  const alts = [...((base.alts as Version[] | undefined) ?? []), ...extra].map(withKept);
-  if (!alts.length) return withKept(base);
-  return { ...withKept(base), alts, alt: typeof base.alt === "number" ? base.alt : ((base.alts as Version[] | undefined)?.length ?? 0) };
+  const otherVersions = versionsOf(other);
+  const extra = otherVersions.filter((v) => !known.has(key(v)) && (known.add(key(v)), true));
+  const keptIn = new Map(otherVersions.flatMap((v) => (keptOf(v) ? [[key(v), keptOf(v)!] as const] : [])));
+  const revealedIn = new Map<string, number>();
+  for (const v of otherVersions) {
+    const id = key(v);
+    revealedIn.set(id, Math.max(revealedIn.get(id) ?? 1, stepsShownOf(v)));
+  }
+  const withProgress = <V extends Version>(v: V): V => {
+    if (!hasReply(v)) return v;
+    const id = key(v);
+    const kept = keptOf(v) ?? keptIn.get(id);
+    const stepsShown = revealedIn.get(id) ?? 1;
+    return { ...v, ...(kept ? { kept } : {}), ...(stepsShown > stepsShownOf(v) ? { stepsShown } : {}) };
+  };
+  const alts = [...((base.alts as Version[] | undefined) ?? []), ...extra].map(withProgress);
+  if (!alts.length) return withProgress(base);
+  return { ...withProgress(base), alts, alt: typeof base.alt === "number" ? base.alt : ((base.alts as Version[] | undefined)?.length ?? 0) };
 }
 
 /** The saved turns with the new copy's. A turn only the file has (another window's, sent after this copy was

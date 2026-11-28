@@ -580,10 +580,12 @@ function untracked(url: string): string {
   return `${head}${kept.length ? `?${kept.join("&")}` : ""}${hash ?? ""}`;
 }
 /** The same page's link, however it was written: with or without tags, the host in any case, a default port,
- *  http or https, with or without `www.` (an old http link and the browser's https one are one page). */
+ *  http or https, with or without `www.`. For YouTube, the video ID is the link's identity. */
 export const linkKey = (url: string) => {
   if (!URL.canParse(url)) return url;
   const u = new URL(untracked(url));
+  const video = youtubeId(u);
+  if (video) return `youtube.com/watch?v=${video}`;
   return `${u.host.replace(/^www\./, "")}${u.pathname}${u.search}${u.hash}`;
 };
 /** The source already here from this link (a course's lessons aside); `preview` counts Feed posts being read. */

@@ -97,6 +97,18 @@ describe("tutor chats", () => {
     expect((turn("c-2") as unknown as { alts?: object[] }).alts).toHaveLength(1);
   });
 
+  // F-new-tutor-worked-steps
+  test("a stale chat save keeps the most revealed steps for each version of a worked reply", async () => {
+    const { save, turn } = await twoWindows();
+    const first = { message: "How?", reply: "Here's how.", steps: ["Start here.", "Then this.", "Finally this."] };
+    const next = { ...first, steps: ["Try this first.", "Then try this."] };
+    await save([shared, { id: "c-2", ...first, stepsShown: 3 }]);
+    await save([shared, { id: "c-2", ...next, stepsShown: 2, alts: [first], alt: 1 }]);
+    expect(turn("c-2")).toMatchObject({ steps: next.steps, stepsShown: 2, alts: [{ steps: first.steps, stepsShown: 3 }] });
+    await save([shared, { id: "c-2", ...first, stepsShown: 2 }]);
+    expect(turn("c-2")).toMatchObject({ steps: first.steps, stepsShown: 3, alts: [{ steps: next.steps, stepsShown: 2 }] });
+  });
+
   test("a retry still being written is the saving window's: the reply it set aside stays a version, not back on top", async () => {
     const { save, turn } = await twoWindows();
     await save([shared, { id: "c-2", message: "why?", reply: "Because." }]);

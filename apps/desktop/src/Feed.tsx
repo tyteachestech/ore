@@ -339,7 +339,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     } else if (current && is(e.nativeEvent, "copy") && !getSelection()?.toString()) {
       e.preventDefault();
       copyPost(current);
-    } else if (pick.length > 1 && is(e.nativeEvent, "mark-read")) {
+    } else if (pick.length && is(e.nativeEvent, "mark-read")) {
       // The key acts on the pick, as its menu's Mark N read does (D234).
       e.preventDefault();
       manyActions(pick).find((a) => a.id === "read")!.run();
