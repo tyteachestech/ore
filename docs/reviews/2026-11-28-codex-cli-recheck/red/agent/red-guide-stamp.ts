@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {seed,ore,fixtureReply} from './common.ts';
+const {card}=await seed('guide-stamp');
+const guide=readFileSync('skills/ore/reference/cards.md','utf8');
+assert(guide.includes('ai: {vendor, model, prompt_version}   # leave as is'));
+fixtureReply({reply:'Narrow the wording to recall after a delay.',card:{question:'How does spacing retrieval help later recall?',answer:'Retrieving after a delay strengthens access to the memory.'}});
+const rewrite=await ore('ask',card.meta.id,'--message','Fix the wording after my answer.','--answer','Retrieval helps access.');
+const fixed=await ore('card','set',card.meta.id,'--question',rewrite.proposal.question,'--answer',rewrite.proposal.answer);
+const expected=rewrite.ai;
+console.log('[DEEP] guide fix stamp:',JSON.stringify(fixed.ai));
+console.log('[DEEP] actual author of the replacement wording:',JSON.stringify(expected));
+assert.deepEqual(fixed.ai,expected,'following the guide must attribute AI replacement wording to its author');
