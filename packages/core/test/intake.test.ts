@@ -1336,19 +1336,26 @@ describe("import coverage: EPUB", () => {
     // Two names in one creator, or a name with a suffix, are left as they are.
     expect(bookAuthor(["Peter Brown, Henry Roediger"])).toBe("Peter Brown, Henry Roediger");
     expect(bookAuthor(["Martin Luther King, Jr."])).toBe("Martin Luther King, Jr.");
+    // A PDF's Author field is free text: two surnames stay two people; an initial or a ";" says it is a sort form.
+    expect(bookAuthor(["Strunk, White"], { field: true })).toBe("Strunk, White");
+    expect(bookAuthor(["Brewer, William F."], { field: true })).toBe("William F. Brewer");
+    // A long Chinese or Japanese title with a number in it is a title, not an export link's id.
+    const { cleanTitle } = await import("../src/ingest/check.ts");
+    expect(cleanTitle("機械学習のための数学入門第2版ベクトルと行列から始める確率統計")).toBe("機械学習のための数学入門第2版ベクトルと行列から始める確率統計");
+    expect(cleanTitle("1diPCNuI9me_eHeGoEPVRpWwr41NDF4ts?format=pdf")).toBeUndefined();
     const lib = await tempLibrary();
     const epub = zipSync({
       mimetype: strToU8("application/epub+zip"),
       "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
       "content.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="2.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Four Habits</dc:title><dc:creator>Unknown</dc:creator></metadata><manifest><item id="a" href="a.html" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="a"/></spine></package>`),
-      "a.html": strToU8(`<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>Habits</h1><p class="x07-List-Numbered-First">&amp;#9;1.&amp;#9;Accept only what is true.</p></body></html>`),
+      "a.html": strToU8(`<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>Habits</h1><p class="x07-List-Numbered-First">&amp;#9;1.&amp;#9;Accept only what is true.</p><p>Write &amp;#9; in HTML for a tab.</p></body></html>`),
     });
     const path = join(lib.root, "habits.epub");
     writeFileSync(path, epub);
     const item = await addSource(lib, path);
     expect(item.meta.author).toBeUndefined();
-    expect(item.body).not.toContain("&#9;");
-    expect(item.body).toContain("Accept only what is true.");
+    expect(item.body).toContain("1\\. Accept only what is true.");
+    expect(item.body).toContain("Write &#9; in HTML for a tab.");
   });
 
   test("EPUB: a figure's caption set as a heading (O'Reilly's <h6>Figure 1-5. …</h6>) stays a line under its picture, out of the outline", async () => {
@@ -2586,6 +2593,8 @@ describe("import coverage: PDF, deep import pass", () => {
     expect(item.body).not.toContain("J Tide Stud 2021");
     expect(item.body).not.toMatch(/copyrighted by the Tide Studies|Version of Record/);
     expect(item.body).toContain("On day 1 of the survey the snails in pool one grazed the algae.");
+    // A short label on every page, mid-page, is the text's own: only a page's edge or margin holds stamps.
+    expect(item.body.match(/Worked example/g)?.length).toBe(5);
     expect(item.body).toMatch(/On day 135 of the survey the gobies in pool\n$/);
   });
 
@@ -2665,11 +2674,20 @@ describe("import coverage: figures and slide pictures", () => {
     writeFileSync(join(dir, "images", "neuron.png"), readFileSync(join(FIX, "files", "screenshot.png")));
     const cells = ["# Neurons", '<img alt="Natural and artificial neurons" width="500" src="images/neuron.png" id="neuron"/>', "A neuron sums its inputs.\n\n![A second view](images/neuron.png)"];
     writeFileSync(join(dir, "intro.ipynb"), JSON.stringify({ nbformat: 4, nbformat_minor: 5, metadata: {}, cells: cells.map((s) => ({ cell_type: "markdown", metadata: {}, source: s })) }));
-    const item = await addSource(await tempLibrary(), join(dir, "intro.ipynb"));
+    const lib = await tempLibrary();
+    const item = await addSource(lib, join(dir, "intro.ipynb"));
     expect(item.body).not.toContain("<img");
     const shown = images(item.body);
     expect(shown.map((i) => i.alt)).toEqual(["Natural and artificial neurons", "A second view"]);
     for (const i of shown) expect(existsSync(join(item.dir, i.path))).toBe(true);
+    // Read again from its kept copy, where images/ is not beside it, it keeps the pictures it saved.
+    const r = await reimportSource(lib, item.meta.id, { local: true });
+    expect(r.changed).toBe(false);
+    expect(readFileSync(findItem(lib, item.meta.id).docPath, "utf8")).toBe(readFileSync(item.docPath, "utf8"));
+    // A picture that isn't beside it stays as the notebook wrote it, never a link to this Mac's folder.
+    writeFileSync(join(dir, "alone.ipynb"), JSON.stringify({ nbformat: 4, nbformat_minor: 5, metadata: {}, cells: [{ cell_type: "markdown", metadata: {}, source: '# Alone\n\n<img alt="Gone" src="images/gone.png">' }] }));
+    const alone = await addSource(lib, join(dir, "alone.ipynb"));
+    expect(alone.body).not.toContain("file:");
   });
 
   test("notebook: a plot is saved as an image, its <Figure …> text dropped", async () => {

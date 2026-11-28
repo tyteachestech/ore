@@ -24,8 +24,9 @@ const VOID = "area|base|br|col|embed|hr|img|input|link|meta|param|source|track|w
 /** A chapter file parsed as HTML. */
 function parse(xhtml: string): Document {
   // XHTML self-closing non-void tags (<a id="x"/>) would swallow content under an HTML parser.
-  // A tab the typesetting tool escaped twice (`&amp;#9;`) shows as "&#9;" in every reader: it is a space (corpus run 2026-11-28).
-  const html = xhtml.replace(/&amp;#(?:9|x9);/gi, " ").replace(new RegExp(`<(?!(?:${VOID})\\b)([a-zA-Z][\\w:-]*)([^<>]*?)\\s*/>`, "g"), "<$1$2></$1>");
+  // A tab the typesetting tool escaped twice (`&amp;#9;`) at a line's start, around its list number, shows as
+  // "&#9;" in every reader: it is a space (corpus run 2026-11-28). In the text ("write &amp;#9; for a tab") it stays.
+  const html = xhtml.replace(/(>[ \t]*)&amp;#x?9;((?:[\da-z]{1,3}[.)]|[•·–-])?)(?:&amp;#x?9;)?/gi, "$1$2 ").replace(new RegExp(`<(?!(?:${VOID})\\b)([a-zA-Z][\\w:-]*)([^<>]*?)\\s*/>`, "g"), "<$1$2></$1>");
   return parseHTML(html).document as unknown as Document;
 }
 

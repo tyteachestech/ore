@@ -78,9 +78,11 @@ function docx(data: Uint8Array): Original {
   const core = decode(files["docProps/core.xml"] ?? new Uint8Array());
   const text = xml
     .replace(/<w:tab\/>/g, " ")
+    .replace(/<w:(?:br|cr)\b[^>]*\/>/g, "\n")
     .replace(/<\/w:p>/g, "\n")
     .replace(/<w:instrText[^>]*>[\s\S]*?<\/w:instrText>/g, "")
     .replace(/<[^>]+>/g, "")
+    .replace(/&#(\d+);|&#x([\da-f]+);/gi, (_, d, h) => String.fromCodePoint(d ? Number(d) : parseInt(h, 16)))
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
   return {
     words: words(text),
@@ -96,9 +98,14 @@ function docx(data: Uint8Array): Original {
 /** A deck's slides in order, each slide's words. */
 function pptx(data: Uint8Array): Original {
   const files = unzip(data);
-  const slides = Object.keys(files)
-    .filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f))
-    .sort((a, b) => Number(a.match(/\d+/)![0]) - Number(b.match(/\d+/)![0]));
+  // In the deck's order: presentation.xml lists its slides' ids, each a relationship to a slide file.
+  const rels = new Map([...decode(files["ppt/_rels/presentation.xml.rels"] ?? new Uint8Array()).matchAll(/<Relationship\b[^>]*>/g)].map((m) => [m[0].match(/Id="([^"]+)"/)?.[1], m[0].match(/Target="([^"]+)"/)?.[1]]));
+  const ordered = [...decode(files["ppt/presentation.xml"] ?? new Uint8Array()).matchAll(/<p:sldId\b[^>]*r:id="([^"]+)"/g)].map((m) => `ppt/${rels.get(m[1])?.replace(/^\/?ppt\//, "")}`).filter((f) => files[f]);
+  const slides = ordered.length
+    ? ordered
+    : Object.keys(files)
+        .filter((f) => /^ppt\/slides\/slide\d+\.xml$/.test(f))
+        .sort((a, b) => Number(a.match(/\d+/)![0]) - Number(b.match(/\d+/)![0]));
   const text = slides.map((s) => decode(files[s]).replace(/<\/a:p>/g, "\n").replace(/<[^>]+>/g, "")).join("\n");
   return { words: words(text.replace(/&amp;/g, "&")), headings: slides.length };
 }

@@ -45,5 +45,10 @@
   "first": "your deep learning journey hello and thank you for letting us join",
   "last": "see if you can find documented examples of that happening in practice"
  },
- "flags": []
+ "flags": [
+  {
+   "rule": "picture-missing",
+   "detail": "19: images/chapter7_neuron.png"
+  }
+ ]
 }

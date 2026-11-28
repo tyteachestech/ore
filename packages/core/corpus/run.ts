@@ -151,6 +151,8 @@ for (const list of byKind.values()) {
 function one(add: string, key: string): Promise<Omit<Result, "key" | "add">> {
   const proc = Bun.spawn(["bun", import.meta.path, "--one", add, join(out, "docs", `${key}.md`)], { stdout: "pipe", stderr: "pipe" });
   const timer = setTimeout(() => proc.kill(), timeout);
+  // Read at once, beside stdout: a child that fills the stderr pipe would block until the timeout.
+  const errText = new Response(proc.stderr).text();
   return new Response(proc.stdout).text().then(async (text) => {
     clearTimeout(timer);
     await proc.exited;
@@ -158,7 +160,7 @@ function one(add: string, key: string): Promise<Omit<Result, "key" | "add">> {
     try {
       return JSON.parse(last);
     } catch {
-      return { ms: timeout, error: proc.signalCode ? `took over ${timeout / 1000} s` : `crashed: ${(await new Response(proc.stderr).text()).trim().split("\n").slice(-1)[0]?.slice(0, 200)}` };
+      return { ms: timeout, error: proc.signalCode ? `took over ${timeout / 1000} s` : `crashed: ${(await errText).trim().split("\n").slice(-1)[0]?.slice(0, 200)}` };
     }
   });
 }
@@ -175,7 +177,8 @@ async function worker() {
     try {
       ({ add, key } = await local(e));
     } catch (err) {
-      results.push({ key: sha(e.add).slice(0, 16), add: e.add, note: e.note, ms: 0, error: (err as Error).message });
+      // Keyed as `local` keys it, so a pinned link that stops downloading is a regression against its accepted run.
+      results.push({ key: e.sha256?.slice(0, 16) ?? sha(e.add).slice(0, 16), add: e.add, note: e.note, ms: 0, error: (err as Error).message });
       continue;
     }
     if (seenKeys.has(key)) continue;

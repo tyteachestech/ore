@@ -242,8 +242,9 @@ function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
   // corner ("XSL• FO" over "RenderX" on each of JMIR's pages, read as a heading on all 21), a publisher's notice
   // turned up a margin ("This document is copyrighted by the American Psychological Association", "NIH-PA
   // Author Manuscript"), or a download line at a page's head or foot ("Version of Record at: …") (corpus run
-  // 2026-11-28). The same to the letter, numbers too: "Figure 12 shows…" on every page is a figure's caption. A long
-  // line is one only when turned or among a page's first or last three: in the body, text can come back.
+  // 2026-11-28). The same to the letter, numbers too: "Figure 12 shows…" on every page is a figure's caption. A line
+  // is one only when turned or among a page's first or last three: in the body, a label ("Worked example") or a
+  // table's header row comes back on every page and is the text's.
   const same = (l: Line) => plain(l.text).replace(/\s+/g, " ").trim().toLowerCase();
   const edge = (p: Line[]) => {
     const byY = [...p].sort((a, b) => b.y - a.y);
@@ -251,7 +252,7 @@ function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
   };
   const candidates = pages.map((p) => {
     const ends = edge(p);
-    return new Set(p.filter((l) => !isBlock(l.text) && same(l).length >= 3 && (plain(l.text).length <= 40 || l.size === 0 || ends.has(l))));
+    return new Set(p.filter((l) => !isBlock(l.text) && same(l).length >= 3 && (l.size === 0 || ends.has(l))));
   });
   const onPages = count(candidates.flatMap((c) => [...new Set([...c].map(same))]));
   const stamp = (l: Line, n: number) => pages.length >= 4 && candidates[n]!.has(l) && (onPages.get(same(l)) ?? 0) >= Math.max(4, pages.length * 0.6);
@@ -536,7 +537,7 @@ async function pdfMeta(doc: PdfDocument): Promise<{ title?: string; author?: str
   // The Info dictionary's Author, else the XMP creator list many publishers fill instead.
   const xmp = meta?.metadata?.get("dc:creator") as string | string[] | undefined;
   const author = info.Author?.trim() || [xmp ?? []].flat().map((a) => String(a).trim()).filter(Boolean).join(", ");
-  return { title: info.Title?.trim() || undefined, author: authorList([author]) };
+  return { title: info.Title?.trim() || undefined, author: authorList([author], { field: true }) };
 }
 
 /** Opens a PDF quietly (pdf.js warns on stdout about any damage it works around), refusing one it

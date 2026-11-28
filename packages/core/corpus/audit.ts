@@ -154,6 +154,14 @@ export function coverage(orig: Original, body: string): { lost: number; added: n
 const pct = (x: number) => `${Math.round(x * 1000) / 10}%`;
 
 /** What in a doc.md looks broken. `dir` is the source's folder (for its pictures), `orig` what its original holds. */
+const decoded = (p: string) => {
+  try {
+    return decodeURIComponent(p);
+  } catch {
+    return p;
+  }
+};
+
 export function audit(meta: Record<string, unknown>, body: string, dir?: string, orig?: Original): Flag[] {
   const flags: Flag[] = [];
   const flag = (rule: string, detail: string) => flags.push({ rule, detail });
@@ -209,7 +217,7 @@ export function audit(meta: Record<string, unknown>, body: string, dir?: string,
   if ((text.match(/\$\$/g) ?? []).length % 2) flag("math-unclosed", "an odd number of $$");
   // Pictures the doc shows that aren't in the source's folder.
   if (dir) {
-    const missing = [...text.matchAll(/!\[[^\]]*\]\(([^)\s]+)/g)].map((m) => m[1]).filter((p) => !/^[a-z]+:/i.test(p) && !existsSync(join(dir, decodeURIComponent(p))));
+    const missing = [...text.matchAll(/!\[[^\]]*\]\(([^)\s]+)/g)].map((m) => m[1]).filter((p) => !/^[a-z]+:/i.test(p) && !existsSync(join(dir, decoded(p))));
     if (missing.length) flag("picture-missing", `${missing.length}: ${missing[0]}`);
   }
   // Code blocks that are prose, or empty.

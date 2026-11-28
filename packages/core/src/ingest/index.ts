@@ -1055,7 +1055,8 @@ function savedPictures(body: string, item: Item): string {
   const IMG = /!\[([^\]\n]*)\]\(([^)\s]+)\)/g;
   const saved = [...item.body.matchAll(IMG)].filter((m) => m[2]!.startsWith("assets/") && existsSync(join(item.dir, m[2]!))).map((m) => ({ alt: m[1]!, path: m[2]! }));
   return body.replace(IMG, (all, alt: string, src: string) => {
-    if (!src.startsWith("file:")) return all;
+    // A `file://` link, or a path as the file wrote it ("images/neuron.png" in a notebook): neither is beside the kept copy.
+    if (!src.startsWith("file:") && (/^[a-z][\w+.-]*:|^\/\/|^#/i.test(src) || src.startsWith("assets/"))) return all;
     const i = saved.findIndex((p) => p.alt === alt);
     return i < 0 ? all : `![${alt}](${saved.splice(i, 1)[0]!.path})`;
   });
