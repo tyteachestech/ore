@@ -13,15 +13,27 @@ test("Bold Text turned on in the Settings app shows in Ore once it is back, not 
   (globalThis as any).document = doc;
   const { followAppearance } = await import("../src/phone/appearance");
   // Only Bold Text answers here; the light/dark question is left unanswered.
-  followAppearance((async (cmd: string) => (cmd === "bold_text" ? bold : Promise.reject())) as never, true);
+  // What it leaves running is counted: its once-a-minute question outlived this test and fired inside a later
+  // one's wait, 60 seconds on, failing that one with "error: undefined" (F886).
+  const running = new Set<unknown>();
+  const { setInterval: set, clearInterval: clear } = globalThis;
+  globalThis.setInterval = ((...a: Parameters<typeof set>) => { const id = set(...a); running.add(id); return id; }) as typeof set;
+  globalThis.clearInterval = ((id: Parameters<typeof clear>[0]) => { running.delete(id); clear(id); }) as typeof clear;
+  let asked = 0;
+  const stop = followAppearance((async (cmd: string) => (asked++, cmd === "bold_text" ? bold : Promise.reject())) as never, true);
   await Bun.sleep(10);
   expect(root.style.get("--bold")).toBe("0");
   doc.dispatchEvent(new Event("visibilitychange")); // asked at once: still the old answer
   await Bun.sleep(10);
   bold = true; // iOS's new setting arrives
   await Bun.sleep(2000);
-  (globalThis as any).document = was;
   expect(root.style.get("--bold")).toBe("1");
+  stop(); // stop leaves no timer or listener behind
+  Object.assign(globalThis, { setInterval: set, clearInterval: clear });
+  const before = asked;
+  doc.dispatchEvent(new Event("visibilitychange"));
+  (globalThis as any).document = was;
+  expect({ timers: running.size, askedAfterStop: asked - before }).toEqual({ timers: 0, askedAfterStop: 0 });
 });
 
 test("every Geist weight has a heavier face to step up to, so a bold title gets bolder too", () => {
