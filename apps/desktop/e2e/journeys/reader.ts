@@ -619,7 +619,7 @@ journey("hidden source keeps Show the source in the accessibility tree (F118)", 
   await page.getByRole("button", { name: "Hide the source", exact: true }).waitFor();
 });
 
-journey("hidden source: one blur spreads from the eye over the whole page, his highlights stay under it, and it draws back (D360)", async (page) => {
+journey("hidden source: one blur spreads from the eye over the whole page, his highlights stay under it, and it draws back (D361)", async (page) => {
   await openSource(page, TESTING);
   const veil = () =>
     page.evaluate(() => {
