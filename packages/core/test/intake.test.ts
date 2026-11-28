@@ -2925,7 +2925,10 @@ describe("import coverage: the grid's small holes", () => {
       if (view.getUint32(i, true) === 0x02014b50 && view.getUint16(i + 28, true) === name.length && docx.subarray(i + 46, i + 46 + name.length).every((b, k) => b === name[k])) view.setUint32(i + 24, 200, true);
     const dir = mkdtempSync(join(tmpdir(), "ore-lie-"));
     writeFileSync(join(dir, "notes.docx"), docx);
-    await expect(addSource(await tempLibrary(), join(dir, "notes.docx"))).rejects.toThrow(/That Word file is damaged/);
+    // Awaited plainly: Bun's expect(…).rejects waits over a second on this refusal (it settles through setImmediate
+    // steps), and any timer another test left running fires inside that wait and fails this test (F886).
+    const refused = await addSource(await tempLibrary(), join(dir, "notes.docx")).then(() => null, (e: Error) => e);
+    expect(refused?.message).toMatch(/That Word file is damaged/);
   });
 
   test("a damaged Word file is refused once, with no second failure left unhandled, also where a page's globals are present (F883)", async () => {
