@@ -96,7 +96,7 @@ describe("review loop", () => {
     await undoReview(lib, b.meta.id, rb.ts, at(5));
     expect(readReviews(lib)).toEqual([]);
     // A rating the log no longer has (taken back, or the log restored from the library's history) says so in words,
-    // not as a timestamp and an id: the app shows this after "Couldn't undo" (history recovery pass, F802).
+    // not as a timestamp and an id: the app shows this after "Couldn't undo" (history recovery pass, F808).
     await expect(undoReview(lib, b.meta.id, rb.ts, at(5))).rejects.toThrow("that rating is no longer in the library");
     expect(dueQueue(lib, at(5)).map((e) => e.id).sort()).toEqual([a.meta.id, b.meta.id].sort());
     const redo = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: at(6) });
