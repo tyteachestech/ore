@@ -373,7 +373,8 @@ export function Home({ items, empty, skills, skillsLoading = false, recent, relo
   }, []);
   useLayoutEffect(() => {
     // The control Home put focus on went (Start review, once Today learns nothing is due): place it again.
-    if (!placingFocus.current && placed.current && !placed.current.isConnected && document.activeElement === document.body) placingFocus.current = true;
+    const gone = !placingFocus.current && !!placed.current && !placed.current.isConnected && document.activeElement === document.body;
+    if (gone) placingFocus.current = true;
     if (PHONE || !placingFocus.current || blocked) return;
     if (document.activeElement && document.activeElement !== document.body) {
       placingFocus.current = false;
@@ -383,8 +384,9 @@ export function Home({ items, empty, skills, skillsLoading = false, recent, relo
     const row = backTo.current && root.current?.querySelector<HTMLElement>(`${backTo.current} .home-open`);
     // Wait for the skills before deciding where to land when Today already knows review is due.
     if (!row && today?.due && !canStart && skillsLoading && !error) return;
-    // With nothing to review, the first row he can move through with the arrows (F401), before any other button.
-    const el = row || root.current?.querySelector<HTMLElement>(".home-go") || root.current?.querySelector<HTMLElement>(".home-open") || root.current?.querySelector<HTMLElement>("button:not([disabled]), a[href]");
+    // Start review, else the first control (the review plan). When the one he was on went under him (the session just
+    // cleared what was due), the first row he can move through with the arrows instead (F401).
+    const el = row || root.current?.querySelector<HTMLElement>(".home-go") || (gone ? root.current?.querySelector<HTMLElement>(".home-open") : null) || root.current?.querySelector<HTMLElement>("button:not([disabled]), a[href]");
     if (el) {
       placingFocus.current = false;
       placed.current = el;
