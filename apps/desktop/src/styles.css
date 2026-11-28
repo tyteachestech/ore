@@ -2262,6 +2262,13 @@ button.home-plan:hover { color: var(--text); }
 .review-pick-foot { display: flex; justify-content: flex-end; padding: 14px 12px 0; }
 .review-pick .pill-btn.home-go { height: 40px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; }
 .home .pill-btn.home-go { height: 40px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; }
+/* Back after days away (D-new-two-minutes): the mole's line, and the short way in beside Start review, quieter
+   than it (one primary per view). */
+.home-goal p.home-away { display: flex; align-items: center; gap: 6px; color: var(--text); }
+.home-short { height: 40px; padding: 0 16px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font: 500 13px var(--mono); letter-spacing: 0.04em; white-space: nowrap; }
+.home-short:hover { background: var(--bg-hover); }
+.home-short:active { transform: translateY(1px); }
+.home-short:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .home-h { margin: 26px 0 10px; color: var(--faint); font-size: 12px; font-weight: 500; }
 .home-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
 .home-skill { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border); text-align: left; color: var(--text); min-width: 0;; box-shadow: var(--lift); }
@@ -3187,6 +3194,7 @@ html:has(.quick), html:has(.quick) body { background: transparent; }
 /* Start review sits beside the ring on the Mac; a phone is too narrow, so it takes its own full-width row under it. */
 .phone .home-goal { flex-wrap: wrap; row-gap: 16px; }
 .phone .home-goal > .home-go { flex: 1 0 100%; height: 48px; justify-content: center; }
+.phone .home-goal > .home-short { order: 1; flex: 1 0 100%; height: 48px; border-radius: 999px; font: 600 16px var(--font); letter-spacing: 0; }
 .phone .home-cont { border: 0; padding: 0; margin-top: 0; }
 .phone .home-cols { display: block; }
 .phone .home-cols .col-divider { display: none; }

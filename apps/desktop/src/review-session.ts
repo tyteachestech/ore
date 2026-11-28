@@ -156,6 +156,9 @@ export class ReviewSession<S> {
   private watchers = new Set<() => void>();
   private settling = false;
 
+  /** The length, in ms of active review, at which this session ends itself; 0 for one that flows on. The mole's
+   *  two minutes after days away (D-new-two-minutes). */
+  short = 0;
   constructor(private quick = false, private run: typeof ore = ore) {}
 
   /** `draw` runs whenever what the screen draws has changed. */
@@ -502,6 +505,16 @@ export class ReviewSession<S> {
     if (this.goalTold && a.noteSeen) {
       this.goalSaid = false;
       this.changed();
+    }
+    // A two-minute session (D-new-two-minutes) ends itself at the rating that passes its time; after a miss, one
+    // he will likely recall comes first, as before the goal's moment (D177), so it never ends on a failure.
+    if (this.short && this.activeMs >= this.short) {
+      const win = rating === 1 && !this.wonLast ? lastWin(this.queue ?? []) : null;
+      if (win) {
+        this.wonLast = true;
+        return this.setQueue(win);
+      }
+      return void this.finish();
     }
     if (!goalClosed || this.goalTold) return;
     // D177: a goal that closes on a miss gets one more card first, a likely recall, so its moment doesn't

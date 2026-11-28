@@ -3163,3 +3163,33 @@ journey("review: the four ratings sit in the bottom bar and do not move when the
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
 });
+
+journey("Home: back after days away the mole offers two minutes; one tap starts a review with no questions asked (D-new-two-minutes)", async (page) => {
+  const short = page.getByRole("button", { name: "2 minutes", exact: true });
+  await page.getByRole("button", { name: "Start review" }).waitFor();
+  // The seed was reviewed today: no gap, no offer.
+  if (await short.count()) throw new Error("two minutes is offered on a day he already reviewed");
+  await page.route(/\/ore$/, async (route) => {
+    const args = (JSON.parse(route.request().postData() ?? "{}") as { args?: string[] }).args ?? [];
+    if (args[0] !== "today") return route.fallback();
+    const r = await route.fetch().catch(() => null);
+    if (r) await route.fulfill({ response: r, json: { ...(await r.json()), away: true } }).catch(() => {});
+  });
+  try {
+    await page.reload();
+    await short.waitFor();
+    const line = page.locator(".home-away");
+    if ((await line.innerText()).trim() !== "Two minutes is plenty today.") throw new Error(`the mole says: ${await line.innerText()}`);
+    // Never how long it has been (D62).
+    if (/\d+ days|missed|streak/i.test(await page.locator(".home-today").innerText())) throw new Error("Home counts the days he was away");
+    await short.click();
+    // Straight into the first exercise: no pick of skills in between.
+    await page.locator(".review .review-q").waitFor();
+    if (await page.locator(".review-pick").count()) throw new Error("two minutes asked what to review first");
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  } finally {
+    await page.unroute(/\/ore$/);
+    await page.reload();
+  }
+});

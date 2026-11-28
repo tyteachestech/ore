@@ -158,6 +158,9 @@ export interface Today {
   /** Monday to Sunday of this week. */
   week: { date: string; status: DayStatus; active_ms: number }[];
   days_met: number;
+  /** Back after a gap (D-new-two-minutes): he has reviewed before, not today, and not on the two days before
+   *  today that count (weekends are skipped under weekdays only), and something is due. */
+  away: boolean;
   skills: ({ skill: string; due: number } & Omit<Strength, "explain">)[];
   /** Sources whose doc.md can't be read (files-10): they drop out of every list, so Home names them. */
   unreadable: { dir: string; error: string }[];
@@ -199,6 +202,16 @@ export function today(lib: Library, now = new Date()): Today {
     const daysMet = new Set([...byDay.keys()].filter((d) => d !== day && metOn(d)));
     if (met) daysMet.add(day);
 
+    // The two days before today that count toward the goal, newest first.
+    const before: string[] = [];
+    for (const d = new Date(now); before.length < 2; ) {
+      d.setDate(d.getDate() - 1);
+      if (counts(localDay(d))) before.push(localDay(d));
+    }
+    // No review since the day before the older of the two: one on a day off in between still ends the gap.
+    const last = [...byDay.keys()].sort().at(-1);
+    const away = !!last && last < before[1]! && queue.length > 0;
+
     const cards = index.cards();
     const med = medians(reviews, new Map(cards.map((c) => [c.id, c.kind])));
     const estimate = queue.reduce((t, e) => t + med[e.kind], 0);
@@ -225,6 +238,7 @@ export function today(lib: Library, now = new Date()): Today {
       slice_ms: Math.max(0, Math.min(estimate, goal - active(done))),
       week,
       days_met: daysMet.size,
+      away,
       skills,
       unreadable: unreadable(index),
     };

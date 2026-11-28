@@ -55,6 +55,8 @@ const GEM_SAYS: Record<CardGem["kind"], string> = {
 };
 /** Cut gems drawn on the end screen; the rest show as "+N". */
 const CUT_SHOWN = 8;
+/** The mole's short session after days away (D-new-two-minutes). */
+const TWO_MINUTES_MS = 120_000;
 /** The end screen's ring, in px (the quick quiz's is smaller and has no cart). */
 // D242: wide enough to hold the session's gems, which land inside it.
 const END_RING = 236;
@@ -87,9 +89,11 @@ const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id,
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged, notify, asks, quick = false, paused = false, under = false, leave, giveBack }: {
+function Session({ pick, source, short = false, skills, onOpenSource, onDig, onClose, onLogged, notify, asks, quick = false, paused = false, under = false, leave, giveBack }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
+  /** The mole's two minutes after days away (D-new-two-minutes): the session ends itself once two minutes are in. */
+  short?: boolean;
   /** Review this source: only its exercises, its new ones included. */
   source?: string;
   /** Hidden while he reads the source a card opened; it waits on that card, its keys off. */
@@ -112,7 +116,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   giveBack?: () => HTMLElement | null | undefined;
 }) {
   /** The session: what is next, the time and the goal, every step he can take back. This screen draws it. */
-  const [s] = useState(() => new ReviewSession<Shown>(quick));
+  const [s] = useState(() => Object.assign(new ReviewSession<Shown>(quick), { short: short ? TWO_MINUTES_MS : 0 }));
   const [, draw] = useReducer((n: number) => n + 1, 0);
   useEffect(() => s.watch(draw), [s]);
   const { queue, done, busy, end, start } = s;
