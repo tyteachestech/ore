@@ -127,7 +127,8 @@ export function strength(cards: CardRow[], reviews: Review[], skill: string, w?:
   };
 }
 
-export type DayStatus = "met" | "open" | "off";
+/** short: he reviewed that day but fell short of the goal, so showing up still shows (D361). */
+export type DayStatus = "met" | "short" | "open" | "off";
 
 export interface Today {
   goal_minutes: number;
@@ -192,7 +193,7 @@ export function today(lib: Library, now = new Date()): Today {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
       const date = localDay(d);
-      const status: DayStatus = !counts(date) ? "off" : (date === day ? met : metOn(date)) ? "met" : "open";
+      const status: DayStatus = !counts(date) ? "off" : (date === day ? met : metOn(date)) ? "met" : (byDay.get(date)?.length ?? 0) > 0 ? "short" : "open";
       return { date, status, active_ms: active(byDay.get(date) ?? []) };
     });
     const daysMet = new Set([...byDay.keys()].filter((d) => d !== day && metOn(d)));

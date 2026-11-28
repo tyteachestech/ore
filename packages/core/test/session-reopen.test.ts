@@ -33,7 +33,7 @@ test("reopening a caught-up session removes its historical goal credit even with
   const later = today(lib, new Date(at.getTime() + 864e5));
   expect(later.days_met).toBe(0);
   const day = later.week.find((d) => d.date === localDay(at));
-  if (day) expect(day.status).toBe("open");
+  if (day) expect(day.status).toBe("short"); // reviewed, no longer met (D361)
   expect((await doctor(lib)).issues).toEqual([]);
   // A fast end/reopen/end under one clock tick still leaves only the newest ending effective.
   await endSession(lib, at, true, session.id);

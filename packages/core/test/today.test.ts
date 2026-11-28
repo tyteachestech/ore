@@ -5,6 +5,7 @@ import { findCard, writeCardContent, writeCardMeta, writeNewCard } from "../src/
 import { addSnippet } from "../src/ingest/index.ts";
 import { setItemStatus } from "../src/items.ts";
 import { appendJsonl } from "../src/fsutil.ts";
+import { localDay } from "../src/ids.ts";
 import { paths } from "../src/library.ts";
 import { DEPTH_CAP_DAYS, endSession, firstEndThisWeek, startSession } from "../src/sessions.ts";
 import { readReviews, reviewLogFiles, type Review } from "../src/reviews.ts";
@@ -403,6 +404,20 @@ describe("today (D60)", () => {
     }
     writeFileSync(item.docPath, good);
     expect(today(lib).unreadable).toEqual([]);
+  });
+
+  test("a day he reviewed but fell short of the goal is short, not open (D361)", async () => {
+    const { lib, cards } = await library(2);
+    const at = T();
+    const of = (t: ReturnType<typeof today>) => t.week.find((d) => d.date === localDay(at))!.status;
+    expect(of(today(lib, at))).toBe("open");
+    await recordReview(lib, cards[0]!.meta.id, { rating: 3, confidence: 2, elapsed_ms: 30_000, now: at });
+    expect(of(today(lib, at))).toBe("short");
+    expect(today(lib, at)).toMatchObject({ met: false, days_met: 0 });
+    // The day after, yesterday still reads short.
+    const next = new Date(at.getTime() + 86_400_000);
+    const y = today(lib, next).week.find((d) => d.date === localDay(at));
+    if (y) expect(y.status).toBe("short");
   });
 
   test("weekdays only: a weekend day is off", async () => {
