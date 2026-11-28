@@ -356,7 +356,7 @@ test("a goal that closes on a miss gets one likely recall first (D177); the quic
   expect(q.s.end).not.toBeNull();
 });
 
-test("a two-minute session ends itself at the rating that passes two minutes, after one likely recall if that was a miss (D-new-two-minutes)", async () => {
+test("a two-minute session ends itself at the rating that passes two minutes, after one likely recall if that was a miss (D365)", async () => {
   const t = await open({ queue: [due("a"), due("b"), due("c"), due("d")] });
   t.s.short = 120_000;
   t.s.clock(50_000);

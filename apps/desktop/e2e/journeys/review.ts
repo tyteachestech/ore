@@ -3164,7 +3164,7 @@ journey("review: the four ratings sit in the bottom bar and do not move when the
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-journey("Home: back after days away the mole offers two minutes; one tap starts a review with no questions asked (D-new-two-minutes)", async (page) => {
+journey("Home: back after days away the mole offers two minutes; one tap starts a review with no questions asked (D365)", async (page) => {
   const short = page.getByRole("button", { name: "2 minutes", exact: true });
   await page.getByRole("button", { name: "Start review" }).waitFor();
   // The seed was reviewed today: no gap, no offer.

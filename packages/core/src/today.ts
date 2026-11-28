@@ -158,7 +158,7 @@ export interface Today {
   /** Monday to Sunday of this week. */
   week: { date: string; status: DayStatus; active_ms: number }[];
   days_met: number;
-  /** Back after a gap (D-new-two-minutes): he has reviewed before, not today, and not on the two days before
+  /** Back after a gap (D365): he has reviewed before, not today, and not on the two days before
    *  today that count (weekends are skipped under weekdays only), and something is due. */
   away: boolean;
   skills: ({ skill: string; due: number } & Omit<Strength, "explain">)[];

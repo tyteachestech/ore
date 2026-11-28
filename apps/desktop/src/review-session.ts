@@ -157,7 +157,7 @@ export class ReviewSession<S> {
   private settling = false;
 
   /** The length, in ms of active review, at which this session ends itself; 0 for one that flows on. The mole's
-   *  two minutes after days away (D-new-two-minutes). */
+   *  two minutes after days away (D365). */
   short = 0;
   /** Active time rated in this session, whatever day it fell on: `activeMs` starts again at midnight. */
   private ratedMs = 0;
@@ -650,7 +650,7 @@ export class ReviewSession<S> {
     return this.submit(args, rating, elapsed, again).finally(() => this.setBusy(false)).then(() => void this.shortOver(rating));
   }
 
-  /** A two-minute session (D-new-two-minutes) ends itself at the rating, given or given again, that brings its time
+  /** A two-minute session (D365) ends itself at the rating, given or given again, that brings its time
    *  to two minutes. After a miss, one he will likely recall comes first, as before the goal's moment and sharing
    *  its once a session (D177), so it does not end on a failure. True if it ended or served that one. */
   private shortOver(rating: number): boolean {

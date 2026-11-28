@@ -2262,7 +2262,7 @@ button.home-plan:hover { color: var(--text); }
 .review-pick-foot { display: flex; justify-content: flex-end; padding: 14px 12px 0; }
 .review-pick .pill-btn.home-go { height: 40px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; }
 .home .pill-btn.home-go { height: 40px; padding: 0 22px; font-size: 14px; font-weight: 700; color: #0f2a19; }
-/* Back after days away (D-new-two-minutes): the mole's line, and the short way in beside Start review, quieter
+/* Back after days away (D365): the mole's line, and the short way in beside Start review, quieter
    than it (one primary per view). */
 .home-goal p.home-away { display: flex; align-items: center; gap: 6px; color: var(--text); }
 .home-short { height: 40px; padding: 0 16px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); font: 500 13px var(--mono); letter-spacing: 0.04em; white-space: nowrap; }

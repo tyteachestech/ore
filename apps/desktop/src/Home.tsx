@@ -107,7 +107,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   reload: number;
   /** Review or a sheet is open over Home: its keys are theirs, even while focus is still on the page. */
   blocked?: boolean;
-  /** `short`: the mole's two minutes after days away (D-new-two-minutes). */
+  /** `short`: the mole's two minutes after days away (D365). */
   onReview: (pick: string[] | null, short?: boolean) => void;
   onOpenSource: (id: string) => void;
   onOpenSkill: (id: string) => void;
@@ -406,7 +406,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 </h1>
                 {/* Mid-goal with cards due, "N of 10 min" and Start review say it all (D65.4 as amended): no line. */}
                 {subline(today, empty) && <p>{subline(today, empty)}</p>}
-                {/* Back after two or more days away (D-new-two-minutes): the mole asks for two minutes, no more, and
+                {/* Back after two or more days away (D365): the mole asks for two minutes, no more, and
                     never says how long it has been (D62). Gone with the day's first rating. */}
                 {today.away && canStart && (
                   <p className="home-away">

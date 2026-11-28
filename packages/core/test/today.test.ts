@@ -419,7 +419,7 @@ describe("today (D60)", () => {
     expect(today(lib).unreadable).toEqual([]);
   });
 
-  test("away: two or more days with no review, something due, and none yet today (D-new-two-minutes)", async () => {
+  test("away: two or more days with no review, something due, and none yet today (D365)", async () => {
     const { lib, cards } = await library(2);
     const at = T();
     const day = (n: number) => new Date(at.getTime() + n * 86_400_000);

@@ -832,7 +832,7 @@ journey("phone: after a rating scrolled down a long answer, the next exercise op
   }
 }, "phone");
 
-journey("phone: back after days away the mole offers two minutes on Today, a 44 pt tap that starts a review with no pick (D-new-two-minutes)", async (page) => {
+journey("phone: back after days away the mole offers two minutes on Today, a 44 pt tap that starts a review with no pick (D365)", async (page) => {
   const short = page.getByRole("button", { name: "2 minutes", exact: true });
   // With something he is trying, which a full session asks about first (D324).
   await page.evaluate(() => localStorage.setItem("e2e.check-in", "1"));
