@@ -3,7 +3,8 @@ import { listen } from "@tauri-apps/api/event";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 import { Children, useEffect, useReducer, useRef, useState, type MutableRefObject } from "react";
 import { Grow } from "./Grow";
-import { Ask, NO_ASK, type AskChat } from "./Ask";
+import { factMatches } from "./fact-check";
+import { Ask, type useAskChats } from "./Ask";
 import { Cutting, Gem } from "./Gem";
 import { EndMark } from "./EndMark";
 import { Mole, Mound } from "./Mole";
@@ -80,11 +81,12 @@ const draftFor = (c: CardFull) => {
 const keepDraft = (c: CardFull, text: string, conf?: number) => drafts.set(c.id, { text, conf, asked: askedOf(c), elapsedMs: draftFor(c)?.elapsedMs });
 
 /** Review mode (D59), full window like Raycast's command view: one card at a time, typed answers for
- *  Explain cards (AI marks the rubric and suggests a rating; he decides), self-rated Fact cards. Every
+ *  Explain cards (AI marks the rubric and suggests a rating; he decides), and Fact cards typed on one line,
+ *  checked by code (D359), rated by him. Every
  *  rating is logged at once, so leaving with Esc loses nothing. `quick` is the quick quiz window (D76):
  *  today's ring instead of the session bar, and leaving closes it with no end screen unless the goal
  *  just closed or nothing is left. */
-function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged, notify, quick = false, paused = false, under = false, leave, giveBack }: {
+function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged, notify, asks, quick = false, paused = false, under = false, leave, giveBack }: {
   /** Skills to review, or null for all. */
   pick: string[] | null;
   /** Review this source: only its exercises, its new ones included. */
@@ -103,6 +105,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   /** A rating taken back (⌘Z) or given again after Review closed: today's numbers changed. */
   onLogged?: () => void;
   notify: Notify;
+  asks?: ReturnType<typeof useAskChats>;
   quick?: boolean;
   /** Where focus goes as it closes when what started it is gone (the What to review sheet): the screen's own place. */
   giveBack?: () => HTMLElement | null | undefined;
@@ -152,8 +155,6 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     const t = setTimeout(() => setMoment(null), moment.tone === "miss" ? 6000 : 4000);
     return () => clearTimeout(t);
   }, [moment]);
-  /** Each card's Ask chat, kept while he closes and reopens it. */
-  const [asks, setAsks] = useState<Record<string, AskChat>>({});
   /** Why the exercise could not load; why the session could not start is the session's. */
   const [cardError, setError] = useState<string | null>(null);
   const error = cardError ?? s.error;
@@ -165,6 +166,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   /** When the answer showed: a rating key right after it is the confidence key pressed twice. */
   const shownAnswerAt = useRef(0);
   const field = useRef<HTMLTextAreaElement>(null);
+  const line = useRef<HTMLInputElement>(null);
   const sureRef = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
   // Closed (Esc, Done, Later on the last one), focus goes back to what started it, else to `giveBack`.
@@ -302,7 +304,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
       (c) => {
         if (!live) return;
         setCard(c);
-        const draft = c.kind === "prompt" ? draftFor(c) : undefined;
+        const draft = draftFor(c);
         setAnswer(draft?.text ?? "");
         setConf(draft?.conf);
         s.clock(draft?.elapsedMs);
@@ -322,7 +324,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
 
   useEffect(() => {
     if (paused) return;
-    if (card && phase === "answer") (card.kind === "prompt" && !PHONE ? field.current : root.current)?.focus({ preventScroll: true });
+    if (card && phase === "answer") (PHONE ? root.current : card.kind === "prompt" ? field.current : line.current)?.focus({ preventScroll: true });
     if (phase === "checked") root.current?.focus({ preventScroll: true });
   }, [card, phase, paused]);
 
@@ -369,8 +371,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   const check = async (noIdea = false) => {
     if (!card || phase !== "answer") return;
     // ⌘↵ with nothing typed does what the disabled Check button does: nothing (⌘⌫ is No idea).
-    if (card.kind === "prompt" && !noIdea && !answer.trim()) return;
-    if (card.kind === "prompt" && !noIdea && conf === undefined) {
+    if (!noIdea && !answer.trim()) return;
+    if (!noIdea && conf === undefined) {
       // ⌘↵ before saying how sure: ask, and 1–3 then checks.
       pending.current = "check";
       setAskSure(true);
@@ -431,7 +433,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   /** The rating to highlight: the AI's, or (once he flips a mark) one that follows his marks. Never logged by itself (D21). */
   const uncapped = ((): number | undefined => {
     if (!card || phase !== "checked") return undefined;
-    if (card.kind === "card") return 3; // D59: ↵ is Good on a Fact card
+    // D359: a typed Fact suggests Good only when code finds it is the answer; otherwise he rates it.
+    if (card.kind === "card") return !answer.trim() ? 1 : factMatches(answer, card.answer) ? 3 : undefined;
     if (inHead || gradeError) {
       // His own marks decide; nothing is suggested until he marks one.
       if (remark || !marks || marks.every((m) => m === undefined)) return undefined;
@@ -583,13 +586,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
 
   const pickSure = (n: number) => {
     setConf(n);
-    if (card?.kind === "prompt") keepDraft(card, answer, n);
-    if (card?.kind === "card") {
-      setPhase("checked");
-      sfx("tap");
-      shownAnswerAt.current = Date.now();
-      loadPassage(card);
-    } else if (askSure) {
+    if (card) keepDraft(card, answer, n);
+    if (askSure) {
       setAskSure(false);
       // Check (or reveal for an in-head answer) with the confidence just picked.
       setTimeout(() => document.getElementById(pending.current === "head" ? "review-head" : "review-check")?.click());
@@ -669,13 +667,13 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
         e.preventDefault();
         // A held ⌘' gives one hint, never both at once.
         if (!e.repeat && cued < CUE_LEVELS) setCued(cued + 1);
-      } else if (is(e, "no-idea") && card.kind === "prompt") {
+      } else if (is(e, "no-idea")) {
         e.preventDefault();
         void check(true);
       } else if (is(e, "in-head") && card.in_head_ok) {
         e.preventDefault();
         answerInHead();
-      } else if (is(e, "finish") && card.kind === "prompt") {
+      } else if (is(e, "finish")) {
         e.preventDefault();
         void check();
       } else if (!inTextField(e) && digit !== null && digit <= 3) {
@@ -827,7 +825,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
         {end && <EndScreen end={end} skills={skills} quick={quick} onDone={() => onClose()} onAgain={() => onClose(true)} onDig={onDig} />}
 
         {!end && card && entry && (
-          <div className="review-card" key={`${card.id}-${done}-${left}`}>
+          <div className="review-card" data-kind={card.kind} data-id={card.id} key={`${card.id}-${done}-${left}`}>
             <div className="review-meta">
               {entry.skills.map((s) => (
                 <SkillChip key={s} skill={skillOf(s)} />
@@ -907,16 +905,52 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
 
             {phase === "answer" && card.kind === "card" && (
               <>
-                <div className="quiz-label" id="review-sure">
+                {/* D359: a Fact is typed too, so recognising the answer can't pass for recalling it.
+                    One line, as a short answer is; ↵ checks, and ↵ on an empty box is No idea. */}
+                <input
+                  ref={line}
+                  data-app-undo={answer ? undefined : ""}
+                  className="field quiz-answer quiz-answer-line"
+                  aria-label="Your answer"
+                  placeholder="Your answer…"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  enterKeyHint="done"
+                  value={answer}
+                  onChange={(e) => {
+                    setAnswer(e.target.value);
+                    keepDraft(card, e.target.value, conf);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter" || e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.nativeEvent.isComposing || e.keyCode === 229) return;
+                    e.preventDefault();
+                    void check(!answer.trim());
+                  }}
+                />
+                <div className={`quiz-label${askSure ? " ask" : ""}`} id="review-sure">
                   How sure are you?
                 </div>
-                <Sure refEl={sureRef} conf={conf} onPick={pickSure} />
+                <Sure refEl={sureRef} conf={conf} onPick={(n) => (conf === n ? (setConf(undefined), keepDraft(card, answer)) : pickSure(n))} />
+                <div className="review-foot">
+                  <Hint text="No idea" keys="no-idea" side="top">
+                    <button className="quiz-ghost" onClick={() => void check(true)}>
+                      No idea
+                    </button>
+                  </Hint>
+                  <Hint text="Check your answer" keys="finish" side="top">
+                    <button id="review-check" className="pill-btn quiz-go" disabled={!answer.trim()} onClick={() => void check()}>
+                      Check
+                    </button>
+                  </Hint>
+                </div>
               </>
             )}
 
             {phase === "checked" && (
               <>
-                {card.kind === "prompt" && !inHead && (
+                {!inHead && (
                   <>
                     <div className="quiz-kicker">Your answer</div>
                     <p className="quiz-yours">{answer.trim() ? <Evidence answer={answer.trim()} quote={shownQuote} /> : <span className="quiz-faint">No idea</span>}</p>
@@ -1083,12 +1117,12 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                     </Hint>
                   )}
                 </div>}
-                {asking && (
+                {asking && asks && (
                   <Ask
+                    key={card.id}
                     card={card}
                     answer={answer}
-                    chat={asks[card.id] ?? NO_ASK}
-                    setChat={(f) => setAsks((a) => ({ ...a, [card.id]: f(a[card.id] ?? NO_ASK) }))}
+                    store={asks}
                     onApply={async (p) => {
                       try {
                         await setText(card, p.question, p.answer, undefined, true, card, p.ai);
@@ -1126,7 +1160,8 @@ function KeyFoot({ phase, kind, hint, suggested, variant, inHead, draft }: { pha
         ? kind === "prompt"
           ? // No "1 2 3" here: digits type into the answer; ⌘↵ asks how sure, and then 1–3 work.
             [[k("finish"), "Check"], ...(inHead ? [[k("in-head"), "In my head"] as [string, string]] : []), ...(hint ? [[k("hint"), "Hint"] as [string, string]] : []), [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
-          : [["1 2 3", "How sure, then show"], [k("later"), "Later"], ["Esc", "Leave"]]
+          : // A Fact's one line (D359): ↵ checks, and on an empty box is No idea.
+            [["↵", "Check"], [k("no-idea"), "No idea"], [k("later"), "Later"], ["Esc", "Leave"]]
         : [["1–4", "Rate"], ...(suggested ? [["↵", RATINGS[suggested - 1]!] as [string, string]] : []), [k("ask"), "Ask"], [k("edit-card"), "Edit"], ...(variant ? [[k("bad-version"), "Bad version"] as [string, string]] : []), [k("later"), "Later"], [k("retire-card"), draft ? "Delete" : "Retire"], ["Esc", "Leave"]];
   return (
     <div className="review-keys" aria-hidden="true">

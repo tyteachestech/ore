@@ -80,14 +80,14 @@ export function retrieve(lib: Library, question: string, max = PASSAGES, only?: 
   // Link targets and footnote marks aren't words he reads; a word in the title or heading counts as half a match.
   const tokens = (s: string) => s.replace(/\]\([^)]*\)|\[\^\d+\]/g, " ").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
   const words = (s: string) => new Set(tokens(s));
-  const cands: (Passage & { tf: Map<string, number>; len: number; around: Set<string>; note: boolean })[] = [];
+  const cands: (Passage & { tf: Map<string, number>; len: number; around: Set<string>; note: boolean; archived: boolean })[] = [];
   for (const id of ids) {
     let item;
     try { item = findItem(lib, id); } catch { continue; } // gone since the index was built
     for (const p of splitPassages(item.body)) {
       const ts = tokens(p.text);
       const tf = new Map(terms.map((t) => [t, ts.filter((w) => w.startsWith(t)).length]));
-      cands.push({ ...p, id: "", item: item.meta.id, title: item.meta.title, tf, len: ts.length, around: words(`${item.meta.title} ${p.heading}`), note: p.text.startsWith("[^") });
+      cands.push({ ...p, id: "", item: item.meta.id, title: item.meta.title, tf, len: ts.length, around: words(`${item.meta.title} ${p.heading}`), note: p.text.startsWith("[^"), archived: !!item.meta.archived_at });
     }
   }
   const has = (ws: Set<string>, t: string) => [...ws].some((w) => w.startsWith(t));
@@ -103,17 +103,21 @@ export function retrieve(lib: Library, question: string, max = PASSAGES, only?: 
     return Math.max(f ? (f * (k1 + 1)) / (f + k1 * (1 - b + (b * c.len) / avg)) : 0, has(c.around, t) ? 0.5 : 0);
   };
   const scored = cands
-    // A footnote (often a reference list entry) counts half.
-    .map((c) => ({ c, score: (c.note ? 0.5 : 1) * terms.reduce((s, t) => s + idf.get(t)! * bm25(c, t), 0) }))
+    .map((c) => {
+      const relevance = terms.reduce((s, t) => s + idf.get(t)! * bm25(c, t), 0);
+      // Footnotes count half. Archived passages count half too: at scale, a new archived match
+      // filled five of the fourteen places and displaced the answer from an active source.
+      return { c, score: relevance * (c.note ? 0.5 : 1) * (c.archived ? 0.5 : 1) };
+    })
     .filter((x) => x.score > 0 && terms.some((t) => x.c.tf.get(t)))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score || Number(a.c.archived) - Number(b.c.archived));
   const per = new Map<string, number>();
   const out: Passage[] = [];
   for (const { c } of scored) {
     if (out.length >= max) break;
     if (typeof only !== "string" && (per.get(c.item) ?? 0) >= 5) continue;
     per.set(c.item, (per.get(c.item) ?? 0) + 1);
-    const { tf: _, len: __, around: ___, note: ____, ...p } = c;
+    const { tf: _, len: __, around: ___, note: ____, archived: _archived, ...p } = c;
     out.push({ ...p, id: `P${out.length + 1}` });
   }
   return out;

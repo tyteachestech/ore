@@ -3,7 +3,7 @@
 // Types only. The app (apps/desktop/src/ore.ts) imports these and nothing else from here; before this file it
 // kept its own copies, and one had drifted (a search hit's `item` and `snippet`).
 import type {
-  AnchoredAnnotation, askAboutCard, chapterRecallFeedback, cardHistory, DiagramResult, gradeAnswer, itemCardSkills, NotesResult, QuestionView, recallFeedback, research, transcriptOf, TryView,
+  AnchoredAnnotation, askAboutCard, chapterRecallFeedback, cardHistory, DiagramResult, gradeAnswer, itemCardSkills, NotesResult, QuestionView, readExerciseChat, recallFeedback, research, transcriptOf, TryView,
 } from "@ore/core";
 import type { Highlighted, ListedSource, ShownSource } from "./cmd-items.ts";
 import type { DueRow, ShownCard, SkillStatsRow } from "./cmd-study.ts";
@@ -51,5 +51,6 @@ export type CardHistory = ReturnType<typeof cardHistory>;
 export type CardSkills = ReturnType<typeof itemCardSkills>;
 /** `ore ask`, including the author of any proposed wording. */
 export type AskReply = Awaited<ReturnType<typeof askAboutCard>>;
+export type SavedExerciseChat = ReturnType<typeof readExerciseChat>;
 /** `ore grade`. */
 export type Grade = Awaited<ReturnType<typeof gradeAnswer>>;

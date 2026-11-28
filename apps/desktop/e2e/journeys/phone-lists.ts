@@ -1,7 +1,7 @@
 import { type Locator, type Page, type Route } from "playwright";
 import { join } from "node:path";
 import { readdirSync, readFileSync } from "node:fs";
-import { AGENTS, fits44, itemFile, journey, keyboardUp, macChanges, pasteInto, PHONE_LIB, phoneSource, phoneWith, press, swipe, tap, TESTING, until } from "../harness";
+import { AGENTS, fits44, itemFile, journey, keyboardUp, macChanges, pasteInto, PHONE_LIB, phoneSource, phoneWith, press, swipe, tap, TESTING, until, tapFact } from "../harness";
 
 journey("phone: Today's list titles are 17 pt and the bar's buttons are 44 pt rounds (iPhone sizing A)", async (page) => {
   await page.locator(".home-read").first().waitFor();
@@ -427,7 +427,7 @@ journey("phone: Today starts the new day at midnight without a reload (F172)", a
   const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
   await sure.waitFor();
   await page.clock.fastForward("03:00");
-  const field = page.locator(".phone-full textarea:visible");
+  const field = page.locator(".phone-full .quiz-answer:visible");
   if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
   await tap(page, sure);
   const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
@@ -456,7 +456,7 @@ journey("phone: VoiceOver hears Explain's answer and that marking is his, its ma
     await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).waitFor();
     if (await field.count()) break;
     if (i > 10) throw new Error("no Explain exercise came up");
-    await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+    await tapFact(page);
     await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
     await Bun.sleep(300);
   }
@@ -485,7 +485,7 @@ journey("phone: a half-typed Explain answer and a Finish recall survive a relaun
       await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).waitFor();
       if (await field.count()) return;
       if (i > 10) throw new Error("no Explain exercise came up");
-      await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+      await tapFact(page);
       await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
       await Bun.sleep(300);
     }
@@ -584,7 +584,7 @@ journey("phone: a kept draft goes when the Mac changes what it answered, and not
       await page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }).waitFor();
       if (await field.count()) return;
       if (i > 10) throw new Error("no Explain exercise came up");
-      await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ }));
+      await tapFact(page);
       await tap(page, page.locator(".phone-full button:visible").filter({ hasText: /^Good/ }));
       await Bun.sleep(300);
     }
@@ -888,7 +888,7 @@ journey("phone: every field on every screen stays in sight when the keyboard com
   await tap(page, page.getByRole("button", { name: "Start review" }).first());
   await tap(page, page.getByRole("button", { name: /^Start review/ }).last());
   await page.locator(".review-q").waitFor();
-  await tap(page, page.getByRole("radio", { name: "Think so" }));
+  await tapFact(page);
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await tap(page, page.getByRole("button", { name: "Exercise actions" }));
   await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
@@ -906,7 +906,7 @@ journey("phone: every field on every screen stays in sight when the keyboard com
   for (let i = 0; i < 12; i++) {
     await answer.or(good).or(sure).first().waitFor();
     if (await answer.count()) break;
-    if (!(await good.count())) await tap(page, sure);
+    if (!(await good.count())) await tapFact(page);
     await good.waitFor();
     const was = await asked.innerText();
     await tap(page, good);
@@ -1029,7 +1029,7 @@ journey("phone: on a small phone the end screen opens at its top, its first line
     const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
     await sure.or(page.locator(".phone-full .review-end")).first().waitFor();
     if (!(await sure.count())) break;
-    const field = page.locator(".phone-full textarea:visible");
+    const field = page.locator(".phone-full .quiz-answer:visible");
     if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
     await tap(page, sure);
     const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });

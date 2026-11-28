@@ -2,6 +2,7 @@ import { z } from "zod";
 import { findAnnotation } from "../annotations.ts";
 import { findCard } from "../cards.ts";
 import type { Library } from "../library.ts";
+import type { AiStamp } from "../items.ts";
 import { findVariant } from "../remix.ts";
 import { chooseVendor, parseOutput, runChatTurn, vendorSchema } from "./adapter.ts";
 import { loadPrompt } from "./prompts.ts";
@@ -25,7 +26,9 @@ const sessionOf = (s: string | undefined, vendor: string) => {
  *  rating is suggested (D21). */
 // On a variant (D66) the chat sees the variant he answered and the original, so "why is this the
 // same idea?" has an answer.
-export async function askAboutCard(lib: Library, cardRef: string, a: { message: string; answer?: string; session?: string; variant?: string; onProgress?: (p: { reply: string; session: string }) => void }) {
+export type AskProgress = { reply: string; session: string; ai: AiStamp };
+
+export async function askAboutCard(lib: Library, cardRef: string, a: { message: string; answer?: string; session?: string; variant?: string; onProgress?: (p: AskProgress) => void }) {
   if (!a.message.trim()) throw new Error("message is empty");
   const card = findCard(lib, cardRef);
   const prompt = loadPrompt("chat");
@@ -48,7 +51,11 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
     const context = { ...shown, his_answer: a.answer?.trim() || "(no idea)", passage, ...original };
     message = `Exercise (JSON):\n${JSON.stringify(context, null, 2)}\n\nHis message:\n${message}`;
   }
-  const onProgress = a.onProgress && ((p: { reply: string; session: string }) => a.onProgress!({ ...p, session: `${vendor}:${p.session}` }));
+  const onProgress = a.onProgress && ((p: { reply: string; session: string; model: string }) => a.onProgress!({
+    reply: p.reply,
+    session: `${vendor}:${p.session}`,
+    ai: { vendor, model: p.model, prompt_version: prompt.version },
+  }));
   const r = await runChatTurn(lib, { prompt: "chat", system: prompt.text, message, schema: vendorSchema(ChatOutput), session, cwd: lib.root, onProgress });
   const out = ChatOutput.parse(parseOutput(r.output));
   return { card: card.meta.id, reply: out.reply, proposal: out.card, session: `${r.vendor}:${r.session}`, ai: { vendor: r.vendor, model: r.model, prompt_version: prompt.version } };

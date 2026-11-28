@@ -27,11 +27,15 @@ const MAX_WIDTH = 1400;
 type M = [number, number, number, number, number, number];
 const mul = (m: M, n: M): M => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
 
-/** The page's figures as RGBA, each with its size in pixels. */
-export async function pageFigures(page: PDFPageProxy): Promise<{ width: number; height: number; rgba: Uint8Array }[]> {
+/** The page's figures as RGBA, and whether an image covers most of the page. */
+export async function pageFigures(page: PDFPageProxy) {
   const ops = await page.getOperatorList();
-  const [, , pw = 0, ph = 0] = page.view;
+  const [left = 0, bottom = 0, right = 0, top = 0] = page.view;
+  const scanArea = (right - left) * (top - bottom) * 0.8;
   const placed: Placed[] = [];
+  let pageImage = false;
+  /** How much of the page its pictures cover together: a scanner may store a page as strips or tiles. */
+  let covered = 0;
   let ctm: M = [1, 0, 0, 1, 0, 0];
   const stack: M[] = [];
   for (let i = 0; i < ops.fnArray.length; i++) {
@@ -52,11 +56,17 @@ export async function pageFigures(page: PDFPageProxy): Promise<{ width: number; 
       const ys = [ctm[5], ctm[5] + ctm[1], ctm[5] + ctm[3], ctm[5] + ctm[1] + ctm[3]];
       const box: Placed["box"] = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
       if (box[2] - box[0] < MIN_SIDE || box[3] - box[1] < MIN_SIDE) continue;
-      if ((box[2] - box[0]) * (box[3] - box[1]) > pw * ph * 0.8) continue; // the page's scan
+      const w = Math.max(0, Math.min(right, box[2]) - Math.max(left, box[0]));
+      const h = Math.max(0, Math.min(top, box[3]) - Math.max(bottom, box[1]));
+      covered += w * h;
+      if ((box[2] - box[0]) * (box[3] - box[1]) > scanArea) {
+        if (w * h > scanArea) pageImage = true;
+        continue; // the page's scan is not a figure
+      }
       placed.push({ box, pic });
     }
   }
-  return groups(placed).map(draw);
+  return { figures: groups(placed).map(draw), pageImage: pageImage || covered > scanArea };
 }
 
 function resolve(page: PDFPageProxy, name: unknown): Promise<Picture | null> {

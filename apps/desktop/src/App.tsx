@@ -41,6 +41,7 @@ import { comingBackHome, Home } from "./Home";
 import { Feed, feedProof, type FeedPost, type FoundFeed } from "./Feed";
 import { dueSkills, lastToday, rememberToday, ReviewPick } from "./ReviewPick";
 import { Review } from "./Review";
+import { useAskChats } from "./Ask";
 import { useToast } from "./Toast";
 import { courseGroups, lineAfter, lineKey, type Line } from "./lines";
 import { TYPE_GAP, typeJump, typesTitle } from "./typeahead";
@@ -328,6 +329,7 @@ export function App() {
   const rowSensors = useSensors(useSensor(RowSensor, { activationConstraint: { distance: 6 } }));
   const { notify, progress, clear: clearToast, view: toast } = useToast();
   const tutor = useTutorChat(notify);
+  const asks = useAskChats(notify);
   const unheard = useUnheard(tutor.turns, tutorOpen);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -2392,6 +2394,7 @@ export function App() {
       {reviewing && (
         <Boundary key={reviewing.run} onBack={() => endReview()}>
         <Review
+          asks={asks}
           pick={reviewing.pick}
           source={reviewing.source}
           skills={skills}

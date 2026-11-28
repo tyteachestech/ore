@@ -164,14 +164,17 @@ export type StreamProgress = { partial: string } | { searching: boolean };
 /** A stream-json line's news for `onProgress`: a web search starting or its results back, or more of
  *  the structured answer's JSON (claude writes it as the StructuredOutput tool's input, streamed with
  *  --include-partial-messages). `state` keeps the answer's block index in this message and its JSON so far. */
-export function streamProgress(line: string, state: { block?: number; json: string; searching?: boolean }): StreamProgress | null {
-  let e: { type?: string; event?: { type?: string; index?: number; content_block?: { type?: string; name?: string }; delta?: { type?: string; partial_json?: string } } };
+export function streamProgress(line: string, state: { block?: number; json: string; searching?: boolean; model?: string }): StreamProgress | null {
+  let e: { type?: string; event?: { type?: string; index?: number; message?: { model?: string }; content_block?: { type?: string; name?: string }; delta?: { type?: string; partial_json?: string } } };
   try { e = JSON.parse(line); } catch { return null; }
   // A tool's results came back: the search is over, and the model is thinking again.
   if (e.type === "user" && state.searching) return (state.searching = false), { searching: false };
   const ev = e.type === "stream_event" ? e.event : undefined;
   // Block indexes start over in every message.
-  if (ev?.type === "message_start") state.block = undefined;
+  if (ev?.type === "message_start") {
+    state.block = undefined;
+    state.model = ev.message?.model ?? state.model;
+  }
   if (ev?.type === "content_block_start") {
     state.block = undefined;
     if (ev.content_block?.type !== "tool_use") return null;
@@ -510,7 +513,7 @@ export interface ChatRun {
 // up again with `exec resume`. No tools: everything the chat needs is in the first message.
 /** `onProgress` (claude only): the reply so far as it is written, a few times a second, with the session it is
  *  written in, which a run stopped part way never returns (D296). */
-export async function runChatTurn(lib: Library, a: { prompt: PromptName; system: string; message: string; schema: object; session?: string; cwd: string; onProgress?: (p: { reply: string; session: string }) => void }): Promise<ChatRun & { vendor: Vendor }> {
+export async function runChatTurn(lib: Library, a: { prompt: PromptName; system: string; message: string; schema: object; session?: string; cwd: string; onProgress?: (p: { reply: string; session: string; model: string }) => void }): Promise<ChatRun & { vendor: Vendor }> {
   const job = JOB_OF[a.prompt];
   const vendor = chooseVendor(lib, job);
   const model = aiModel(lib, vendor, job);
@@ -532,13 +535,13 @@ export async function runChatTurn(lib: Library, a: { prompt: PromptName; system:
       ...(a.session ? ["--resume", session] : ["--session-id", session]),
       ...(model ? ["--model", model] : []),
     ];
-    const state = { json: "" };
+    const state: { json: string; model?: string } = { json: "" };
     let last = 0;
     const r = await exec(cmd, a.cwd, a.onProgress && ((line) => {
       const p = streamProgress(line, state);
       if (!p || !("partial" in p) || Date.now() - last < 50) return;
       const reply = partialReply(p.partial);
-      if (reply) (last = Date.now()), a.onProgress!({ reply, session });
+      if (reply) (last = Date.now()), a.onProgress!({ reply, session, model: state.model ?? model ?? "claude-default" });
     }));
     const out = claudeResult(r, a.onProgress ? streamEvents(r.stdout) : undefined);
     const usage = Object.entries(out.modelUsage ?? {}).sort((x, y) => (y[1].outputTokens ?? 0) - (x[1].outputTokens ?? 0));

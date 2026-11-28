@@ -64,6 +64,15 @@ export async function ship({ sh, log, reviewed, wait = Bun.sleep, tries = 3, liv
       must(["git", "commit", "-qam", "Number new decisions and findings"], "Couldn't commit the numbers.");
       must(["git", "push", "-q", "-u", "origin", branch], "git push failed.");
       log("numbered new decisions and findings");
+      // Just after a push GitHub has not yet worked out whether the PR merges, and a merge then is refused as
+      // "not mergeable" (#562): wait until it says.
+      for (let t = 0; ; t++) {
+        const m = sh(["gh", "pr", "view", String(pr), "--json", "mergeable", "-q", ".mergeable"]).out;
+        if (m === "MERGEABLE") break;
+        if (m === "CONFLICTING") throw new Error(`PR #${pr} conflicts with master after numbering: merge master in and ship again.`);
+        if (t >= 30) throw new Error(`GitHub hadn't said whether PR #${pr} merges after 5 minutes.`);
+        await wait(10_000);
+      }
     }
     const head = must(["git", "rev-parse", "HEAD"], "No HEAD.");
     must(["gh", "pr", "merge", String(pr), "--squash", "--match-head-commit", head], "gh pr merge failed.");

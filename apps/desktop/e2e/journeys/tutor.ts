@@ -1532,7 +1532,10 @@ journey("Ask about this: an answer that comes back empty says so with Try again,
     const question = await page.locator(".review-q").textContent();
     await page.getByRole("button", { name: "Ask about this" }).click();
     const ask = page.getByRole("region", { name: "Ask about this" });
-    await ask.getByRole("button", { name: "Make this exercise clearer" }).click();
+    // The exercise may hold an earlier chat (it comes back with the exercise), so the question is typed, not a starter.
+    const field = ask.getByRole("textbox");
+    await field.fill("Make this exercise clearer");
+    await field.press("Enter");
     await ask.getByRole("button", { name: "Try again" }).waitFor();
     if (await page.getByText("This view hit a snag").count()) throw new Error("the view crashed");
     if ((await page.locator(".review-q").textContent()) !== question) throw new Error("the exercise left the screen");
