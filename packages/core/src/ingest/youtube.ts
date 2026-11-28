@@ -30,7 +30,9 @@ const decode = (s: string) =>
 
 /** The video ID in a YouTube URL (watch, youtu.be, shorts, embed, live), or null. */
 export function youtubeId(url: string | URL): string | null {
-  const link = typeof url === "string" ? URL.parse(url.startsWith("//") ? `https:${url}` : url) : url;
+  // A saved link may lack its scheme (www.youtube.com/watch?v=…, youtu.be/…): read it as https.
+  const bare = typeof url === "string" && !/^[a-z][a-z0-9+.-]*:/i.test(url) ? `https://${url.replace(/^\/\//, "")}` : url;
+  const link = typeof bare === "string" ? URL.parse(bare) : bare;
   if (!link || (link.protocol !== "http:" && link.protocol !== "https:")) return null;
   const { hostname, pathname, searchParams } = link;
   const host = hostname.replace(/^(www|m|music)\./, "");

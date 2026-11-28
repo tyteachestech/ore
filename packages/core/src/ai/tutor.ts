@@ -492,7 +492,8 @@ export async function addTutorCard(lib: Library, item: string, card: TutorCard, 
   // Checked as a card's read checks it: a stamp missing a field made a card no list could read (F811).
   const stamp = AiStamp.safeParse(ai);
   if (!stamp.success) throw new Error(`--ai: ${stamp.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
-  const passages = CitedPassage.array().parse(citations);
+  // A citation that doesn't read as a passage (an empty quote, an old chat's) is left out; the rest still anchor.
+  const passages = citations.flatMap((c) => { const r = CitedPassage.safeParse(c); return r.success ? [r.data] : []; });
   return withLock(paths.lock(lib), () => {
     const it = findItem(lib, item);
     return writeNewCard(lib, {

@@ -492,7 +492,8 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
   const caseAnswers = lastTurn?.exercise?.cases?.length === 2 && caseDraft?.turn === lastTurn.id
     ? caseDraft.said.map((answer) => answer.trim()) : [];
   const [caseA, caseB] = caseAnswers;
-  const caseAnswer = caseA && caseB ? `A: ${caseA}\nB: ${caseB}` : "";
+  // What he has written of the two cases goes, as it did before Send knew about them; an empty case is left out.
+  const caseAnswer = [caseA && `A: ${caseA}`, caseB && `B: ${caseB}`].filter(Boolean).join("\n");
   // The newest reply typed out at a steady pace (D321): the model sends words in clumps, and a
   // Codex reply comes whole, so the words on screen run on their own clock, never more than LAG behind.
   // Its [n] markers wait for the citations, which come with the whole reply; Stop shows what was sent.

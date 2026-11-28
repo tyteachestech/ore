@@ -21,7 +21,7 @@ index 6ad685ecd818276423946edf3c0037d67abdb46a..e7def11d512ffa4c30455c73d8e89d91
 -        // that happen to be wrapped in a single link
 -        if (links > 1 && words < 80) {
 +        // Count destinations: a linked poster and caption can point at the same media.
-+        if (links > 1 && words < 80 && new Set(Array.from(linkElements, (link) => link.getAttribute('href'))).size > 1) {
++        if (links > 1 && words < 80 && new Set(Array.from(linkElements, (link) => { const h = link.getAttribute('href') || ''; return h === '' || h.startsWith('#') || h.startsWith('javascript:') ? link : h; })).size > 1) {
              let linkTextLength = 0;
              for (let i = 0; i < linkElements.length; i++) {
                  linkTextLength += (linkElements[i].textContent || '').length;

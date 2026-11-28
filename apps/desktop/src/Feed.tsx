@@ -333,7 +333,7 @@ export function Feed({ skills, tick, blocked, onOpen, onFollow, onCreateSkill, n
     } else if (e.key === "Enter" && current) {
       e.preventDefault();
       open(current);
-    } else if (pick.length > 1 && is(e.nativeEvent, "copy") && !getSelection()?.toString()) {
+    } else if (pick.length && is(e.nativeEvent, "copy") && !getSelection()?.toString()) {
       e.preventDefault();
       manyActions(pick).find((a) => a.id === "copy")!.run();
     } else if (current && is(e.nativeEvent, "copy") && !getSelection()?.toString()) {
