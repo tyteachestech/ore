@@ -5,9 +5,10 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { setSystemDark } from "../reading";
 
-/** `call`: the app's commands (a test passes its own). */
-export function followAppearance(call: typeof invoke = invoke, inApp = isTauri()): void {
-  if (!inApp) return;
+/** `call`: the app's commands (a test passes its own). Returns how to stop following: the app never does, a test
+ * must, or the once-a-minute question fires inside whichever test is running a minute later (F886). */
+export function followAppearance(call: typeof invoke = invoke, inApp = isTauri()): () => void {
+  if (!inApp) return () => {};
   const ask = () => {
     void call<boolean>("system_dark").then(setSystemDark, () => {});
     // Bold Text (F409): the CSS weighs every weight one step heavier under --bold (dynamic-type.ts). It is set in
@@ -16,12 +17,20 @@ export function followAppearance(call: typeof invoke = invoke, inApp = isTauri()
   };
   ask();
   // Back from the Settings app, iOS's first answer is still the old Bold Text (Codex verify 2026-11-20): ask again a moment later.
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState !== "visible") return;
+  const page = document;
+  let again: ReturnType<typeof setTimeout> | undefined;
+  const back = () => {
+    if (page.visibilityState !== "visible") return;
     ask();
-    setTimeout(ask, 1000);
-  });
-  setInterval(ask, 60_000);
+    again = setTimeout(ask, 1000);
+  };
+  page.addEventListener("visibilitychange", back);
+  const every = setInterval(ask, 60_000);
+  return () => {
+    page.removeEventListener("visibilitychange", back);
+    clearTimeout(again);
+    clearInterval(every);
+  };
 }
 
 /** The status bar's text for what is under it: dark over a light page. */
