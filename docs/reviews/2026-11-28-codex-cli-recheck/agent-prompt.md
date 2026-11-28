@@ -1,0 +1,8 @@
+
+---
+
+# Your focus (`agent`): an agent following the guides
+Ore is AI-first: Claude Code and Codex work on the library through `ore`, guided by `skills/ore/SKILL.md` and the `AGENTS.md` that `ore init` writes (`packages/core/src/templates/library-agents.md`).
+1. **Docs match.** Every command, flag and example in `SKILL.md`, `library-agents.md`, `ore --help`, each command's `--help` and `docs/SPEC.md`'s CLI part: does it exist and do what it says? Run each example as written on a scratch library. List each that is wrong, missing or stale (a command or flag that exists but no guide names, when an agent needs it for a job the guide describes, counts too).
+2. **An agent's day.** Play an agent following `SKILL.md` on a seeded scratch library, with a stub AI: quiz him on a skill and record ratings (D21: the AI never sets the recorded rating; AI output carries vendor, model, prompt version), add a source by URL and by `--stdin`, write exercises from his highlights, fix a bad exercise, answer one of his questions, file a source under a skill, archive and restore. Where does a guide lead the agent wrong, let it break a rule in `CLAUDE.md` (writing the library other than through `ore`, inventing a rating) or leave it stuck with no next step?
+3. **Two writers at once.** Two CLI writes on the same thing at once (`&`): two reviews of one card, a review and a `card set`, two `notes --append`, `edit --title` and `skills set --name` on its skill, `chat <id> --set --merge` from two copies, two `inbox --add`, `answer` twice on one question. Anything lost, duplicated or left broken? Read the findings rows from 2026-11-14 on about outside edits and locks first, and report only what they don't cover.
