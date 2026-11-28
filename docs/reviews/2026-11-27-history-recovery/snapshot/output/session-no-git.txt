@@ -1,0 +1,4 @@
+ore: Executable not found in $PATH: "git"
+{"error":"Executable not found in $PATH: \"git\""}
+end receipt saved: True
+FAIL: session end exited 1 although its end receipt was saved; history must never fail a command (D5)

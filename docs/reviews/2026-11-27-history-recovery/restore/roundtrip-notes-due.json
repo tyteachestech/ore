@@ -1,0 +1,18 @@
+[
+  {
+    "id": "01M8FPM1XKVSRKF2RGYP27A7G9",
+    "kind": "card",
+    "state": "live",
+    "content_type": "fact",
+    "item": "01M8FPM1XG7CNQPKPV3SBS243C",
+    "skills": [
+      "learning"
+    ],
+    "topics": [],
+    "priority": "P1",
+    "question": "What did this source say?",
+    "due": "2026-11-22T12:00:00.000Z",
+    "retrievability": 0.8083,
+    "relearn": false
+  }
+]

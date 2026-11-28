@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { type Page } from "playwright";
-import { AGENTS, answered, armGood, awayAndBack, BRIDGE, browser, errors, hold, isHeld, journey, LIB, MOCK, openSource, ore, oreCalls, release, reveal, running, settled, startReview, TESTING, type TryRec, until, url } from "../harness";
+import { AGENTS, answered, armGood, isFact, showAnswer, typeFact, awayAndBack, BRIDGE, browser, errors, hold, isHeld, journey, LIB, MOCK, openSource, ore, oreCalls, release, reveal, running, settled, startReview, TESTING, type TryRec, until, url } from "../harness";
 
 journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel, as a Mac sheet's do", async (page) => {
   const inside = (sel: string) => page.evaluate((sel) => !!document.activeElement?.closest(sel), sel);
@@ -30,6 +30,47 @@ journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel,
     await page.keyboard.press("Shift+Tab");
     if (!(await inside(".review-pick"))) throw new Error(`Tab left What to review`);
   }
+  await page.keyboard.press("Escape");
+});
+
+// D359: a Fact exercise asked only how sure he was, then showed the answer, so recognising it could
+// pass for recalling it (the Learning Science guidebook, ch. 5: "Every review prompt should require generation").
+journey("review: a Fact exercise is typed: keys go in the box, ↵ asks how sure, and ↵ suggests Good only when it is the answer", async (page) => {
+  await page.getByRole("button", { name: "Start review" }).click();
+  const pick = page.getByRole("dialog", { name: "What to review" });
+  const q = page.locator(".review-q");
+  await pick.or(q).first().waitFor();
+  if (await pick.isVisible()) await page.keyboard.press("Enter");
+  await q.waitFor();
+  // Later until a Fact one is on screen; nothing is rated.
+  for (let n = 0; n < 12 && !(await isFact(page)); n++) {
+    const was = await page.locator(".review-card").getAttribute("data-id");
+    await page.keyboard.press("Meta+KeyL");
+    await until("the next exercise", async () => (await page.locator(".review-card").getAttribute("data-id")) !== was);
+  }
+  if (!(await isFact(page))) throw new Error("no Fact exercise came up");
+  const box = page.getByLabel("Your answer");
+  await until("the answer box has focus", () => box.evaluate((b) => b === document.activeElement));
+  // A digit is part of the answer, never a confidence that shows it.
+  await page.keyboard.type("2 wrong guess");
+  if ((await box.inputValue()) !== "2 wrong guess") throw new Error(`typed: ${await box.inputValue()}`);
+  if (await page.locator(".review-answer").count()) throw new Error("a key showed the answer before he checked");
+  await page.keyboard.press("Enter");
+  await until("↵ asks how sure first", async () => (await page.locator("#review-sure.ask").count()) > 0);
+  await page.keyboard.press("2");
+  await page.locator(".review-answer").waitFor();
+  if (!(await page.locator(".quiz-yours").innerText()).includes("2 wrong guess")) throw new Error("his answer isn't shown beside the answer");
+  if (await page.locator(".review-rate .suggested").count()) throw new Error("a wrong answer suggested a rating");
+  // The next Fact one, with its own answer typed: ↵ suggests Good.
+  const first = await page.locator(".review-card").getAttribute("data-id");
+  for (let n = 0; n < 12; n++) {
+    const was = await page.locator(".review-card").getAttribute("data-id");
+    await page.keyboard.press("Meta+KeyL");
+    await until("the next exercise", async () => (await page.locator(".review-card").getAttribute("data-id")) !== was);
+    if ((await isFact(page)) && (await page.locator(".review-card").getAttribute("data-id")) !== first && (await page.getByLabel("Your answer").count())) break;
+  }
+  await typeFact(page);
+  await until("Good is suggested", async () => ((await page.getByRole("button", { name: "Good", exact: true }).getAttribute("class")) ?? "").includes("suggested"));
   await page.keyboard.press("Escape");
 });
 
@@ -640,8 +681,7 @@ journey("review: Open in source pauses on the card; Back to Review picks it up w
   // Show answers until a card offers its passage (a card he typed has none).
   for (let n = 0; n < 6 && !(await open.isVisible()); n++) {
     await q.waitFor();
-    const noIdea = page.getByRole("button", { name: "No idea" });
-    await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+    await showAnswer(page);
     await page.getByRole("button", { name: "Good", exact: true }).waitFor();
     await page.waitForTimeout(300); // the passage loads after the answer
     if (await open.isVisible()) break;
@@ -693,8 +733,7 @@ journey("review: Enter activates the focused button (Again, Edit exercise, Open 
   // A card with its passage (a Fact card, where ↵ suggests Good).
   for (let n = 0; n < 6; n++) {
     await q.waitFor();
-    const noIdea = page.getByRole("button", { name: "No idea" });
-    await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+    await showAnswer(page);
     await good.waitFor();
     await page.waitForTimeout(300);
     if (await open.isVisible() && (await good.getAttribute("class"))?.includes("suggested")) break;
@@ -731,7 +770,7 @@ journey("review: Enter activates the focused button (Again, Edit exercise, Open 
   const undo = page.getByRole("button", { name: "Undo last rating" });
   await undo.click();
   await until("the card is back", async () => (await q.isVisible()) && (await q.innerText()) === card);
-  await page.getByRole("radio", { name: "Think so" }).click();
+  await typeFact(page);
   await good.waitFor();
   await page.waitForTimeout(350);
   await page.locator(".review").focus();
@@ -779,8 +818,7 @@ journey("review Ask: the reply shows as it is written, Stop keeps the words so f
   await pick.or(q).first().waitFor();
   if (await pick.isVisible()) await page.keyboard.press("Enter");
   await q.waitFor();
-  const noIdea = page.getByRole("button", { name: "No idea" });
-  await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+  await showAnswer(page);
   await page.getByRole("button", { name: "Ask about this" }).click();
   const ask = page.getByRole("region", { name: "Ask about this" });
   const field = page.getByRole("textbox", { name: "Ask about this exercise" });
@@ -839,8 +877,7 @@ journey("review Ask: closing and reopening it keeps the reply so far and a half-
   await pick.or(q).first().waitFor();
   if (await pick.isVisible()) await page.keyboard.press("Enter");
   await q.waitFor();
-  const noIdea = page.getByRole("button", { name: "No idea" });
-  await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+  await showAnswer(page);
   const toggle = page.getByRole("button", { name: "Ask about this" });
   await toggle.click();
   const field = page.getByRole("textbox", { name: "Ask about this exercise" });
@@ -1184,8 +1221,7 @@ journey("review: ⌘Z after a quick Later brings the exercise back with its pass
   await startReview(page, /Learning/);
   const q = page.locator(".review-q");
   const first = await q.innerText();
-  const noIdea = page.getByRole("button", { name: "No idea" });
-  await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+  await showAnswer(page);
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await page.keyboard.press("Meta+l"); // before its passage lands
   await until("Later moves on", async () => (await q.innerText()) !== first);
@@ -1403,8 +1439,7 @@ journey("review: at a session's end the cart tips its ore into the ring and leav
     for (let n = 0; n < 12 && !(await doneButton.isVisible()); n++) {
       await q.or(doneButton).first().waitFor();
       if (await doneButton.isVisible()) break;
-      const noIdea = page.getByRole("button", { name: "No idea" });
-      await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click().catch(() => {});
+      await showAnswer(page).catch(() => {});
       await page.getByRole("button", { name: "Good", exact: true }).click({ timeout: 2000 }).catch(() => {});
       // Good over No idea waits for a second press (D237).
       if (await page.locator(".review-guard").isVisible()) {
@@ -1888,7 +1923,7 @@ journey("review: ⌘Z pressed twice while a rating saves takes back both newest 
 journey("review: a held ↵ rates the last card once and the end screen stays", async (page) => {
   const app = oreCalls(page);
   await startReview(page, /^\s*AI\b/);
-  await page.keyboard.press("2");
+  await typeFact(page);
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await page.waitForTimeout(350);
   const from = app.calls.length;
@@ -2697,7 +2732,7 @@ journey("review end: calibration shows a bar for each tap with enough answers, t
   const app = oreCalls(page);
   try {
     await startReview(page, /^\s*AI\b/);
-    await page.keyboard.press("2");
+    await typeFact(page);
     await page.getByRole("button", { name: "Good", exact: true }).click();
     const cal = page.getByRole("group", { name: "When you say" });
     await cal.waitFor();

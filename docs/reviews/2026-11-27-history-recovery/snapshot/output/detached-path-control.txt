@@ -1,0 +1,9 @@
+{
+  "result": {
+    "committed": true
+  },
+  "namedBranchContainsSnapshot": true,
+  "visibleAfterReturning": "Work done after recovery.",
+  "reflogContainsSnapshot": true
+}
+PASS: new snapshot remains reachable from the normal history branch

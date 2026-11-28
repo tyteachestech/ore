@@ -1,0 +1,37 @@
+{
+  "id": "01M8FPM5Y3J7P24NAKCZYTETWQ",
+  "type": "article",
+  "title": "Notes on retrieval practice",
+  "captured_at": "2026-11-27T23:49:36.323Z",
+  "text_sha256": "338863910194e7abc862505575d5d020814fff1fe3e5fec6e6813bfbc44be931",
+  "status": "inbox",
+  "skills": [],
+  "topics": [],
+  "prequestions": [],
+  "path": "items/2026/notes-on-retrieval-practice-01M8FPM5Y3J7P24NAKCZYTETWQ/doc.md",
+  "dir": "/Users/tylerpoelking/Developer/ore-wt/history-recovery/codex-out/restore/libs/roundtrip-archive/items/2026/notes-on-retrieval-practice-01M8FPM5Y3J7P24NAKCZYTETWQ",
+  "source_file": "/Users/tylerpoelking/Developer/ore-wt/history-recovery/codex-out/restore/libs/roundtrip-archive/items/2026/notes-on-retrieval-practice-01M8FPM5Y3J7P24NAKCZYTETWQ/source.rtf",
+  "body": "### Notes on retrieval practice\n\nTesting yourself beats rereading. A café study group that quizzes each other learns more than one that rereads its notes together — even when the rereading feels better.\n\nThree habits help, and the **first** matters most:\n\n- Space reviews out over days\n- Mix topics in one session\n- Explain each answer in your own words\n\n*Write the question before you read the answer.* Then check it the next day: that’s the retrieval that sticks.\n",
+  "annotations": [
+    {
+      "id": "01M8FPM5Y52RQAXBRJ172XKYHC",
+      "rev": 1,
+      "item": "01M8FPM5Y3J7P24NAKCZYTETWQ",
+      "ts": "2026-11-27T23:49:36.325Z",
+      "intent": "card",
+      "exact": "Testing yourself beats rereading. A café study group that quizzes each other learns more than one that rereads its notes together — even when the rereading feels better.",
+      "prefix": "## Notes on retrieval practice\n\n",
+      "suffix": "\n\nThree habits help, and the **f",
+      "start": 33,
+      "end": 202,
+      "note": "Restorable highlight",
+      "status": "open",
+      "anchor": {
+        "start": 33,
+        "end": 202,
+        "method": "position"
+      }
+    }
+  ],
+  "reimport": true
+}

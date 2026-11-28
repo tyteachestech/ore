@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { addHighlight, anchorAnnotations, readAnnotations } from "../src/annotations.ts";
 import { blocks, cutSpan, cutText, redoCut, restoreCut } from "../src/cut.ts";
@@ -136,6 +136,27 @@ describe("cuts while the source changes", () => {
     await cutText(lib, item.meta.id, mid.indexOf("Alpha"), mid.indexOf("Alpha") + 1);
     await restoreCut(lib, item.meta.id, beta.id);
     expect(findItem(lib, item.meta.id).body).toBe("# Source\n\nBeta paragraph.\n\nGamma paragraph that is long enough to remain beyond the old cut position.\n");
+  });
+
+  test("Undo of a cut whose text a restore from the library's history already brought back adds no second copy (history recovery pass, restore-02)", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, TEXT);
+    const original = readFileSync(item.docPath, "utf8");
+    await cutText(lib, item.meta.id, item.body.indexOf("Alpha"), item.body.indexOf("Alpha") + 1);
+    const mid = findItem(lib, item.meta.id).body;
+    const beta = await cutText(lib, item.meta.id, mid.indexOf("Beta"), mid.indexOf("Beta") + 1);
+    writeFileSync(item.docPath, original); // git checkout <sha> -- doc.md; the cut records in .ore stay
+    await expect(restoreCut(lib, item.meta.id, beta.id)).rejects.toThrow("already back");
+    expect(findItem(lib, item.meta.id).body).toBe(item.body);
+  });
+
+  test("Undo of a cut of a paragraph that repeats the one before it puts it back where it was (code review of the restore-02 fix)", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, "# Twice\n\nSame words.\n\nSame words.\n\nThe end.\n");
+    const second = item.body.lastIndexOf("Same words.");
+    const c = await cutText(lib, item.meta.id, second, second + 1);
+    await restoreCut(lib, item.meta.id, c.id);
+    expect(findItem(lib, item.meta.id).body).toBe(item.body);
   });
 
   test("Redo after an Undo that found the text a new place takes it out again from there (F606)", async () => {

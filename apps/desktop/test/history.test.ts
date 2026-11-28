@@ -237,3 +237,21 @@ test("a held step whose write fails is taken off, and an undo already asked for 
   expect(h.canRedo).toBe(false);
   expect(h.undoName).toBe("a");
 });
+
+// History recovery pass (app-02): after a restore from the library's history, a step whose change the restore took
+// back (a rating no longer in the log, a note or importance changed since) failed the same way on every ⌘Z and hid
+// every step before it. One that can never apply leaves the history; the next ⌘Z goes on to the step before.
+test("an undo that can never apply says why and leaves the history: the next ⌘Z takes the step before", async () => {
+  const { Stale } = await import("../src/history");
+  const failed: string[] = [];
+  const h = new History((s, e, what) => failed.push(`${what} ${s.message}: ${(e as Error).message}`));
+  const ok = step("a");
+  h.push(ok);
+  const gone = { message: "b", undo: () => Promise.reject(new Stale("that rating is no longer in the library")), redo: async () => {} };
+  h.push(gone);
+  expect(h.undo()).toBe(gone);
+  await Bun.sleep(0);
+  expect(failed).toEqual(["undo b: that rating is no longer in the library"]);
+  expect(h.canRedo).toBe(false);
+  expect(h.undo()).toBe(ok);
+});

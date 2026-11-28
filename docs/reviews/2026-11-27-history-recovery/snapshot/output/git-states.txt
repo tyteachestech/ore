@@ -1,0 +1,14 @@
+PASS: unborn repo gets its first commit
+PASS: checkout path is snapshotted on current branch
+PASS: restore source is snapshotted on current branch
+PASS: whole-tree checkout is snapshotted on current branch
+PASS: clean git revert needs no extra snapshot
+PASS: stash survives clean snapshot
+PASS: clean stash pop snapshots restored work
+PASS: busy library does not commit
+PASS: next NON-forced command retries after busy library
+PASS: git index.lock returns false without throwing
+doctor git-lock: [{"level":"warn","path":".git/index.lock","message":"library history has stopped saving: a git run was cut off and left this lock — run ore doctor --fix"}]
+PASS: doctor --fix repairs old index.lock
+PASS: .git file worktree snapshots its branch
+PASS: missing .git skips without adopting parent repository

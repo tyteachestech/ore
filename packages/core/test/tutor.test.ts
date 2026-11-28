@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { chmodSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Citation } from "../src/ai/ask.ts";
 import { addTutorCard, partialReply, tutor, tutorPassages, type TutorCard } from "../src/ai/tutor.ts";
 import { attachToChat } from "../src/chats.ts";
 import { sceneOutline, setDiagram } from "../src/diagrams.ts";
-import { findCard, writeCardMeta, writeNewCard } from "../src/cards.ts";
+import { findCard, listCards, writeCardMeta, writeNewCard } from "../src/cards.ts";
 import { addHighlight } from "../src/annotations.ts";
 import { recordReview } from "../src/study.ts";
 import { createItem, findItem, setItemArchived } from "../src/items.ts";
@@ -805,6 +805,11 @@ describe("tutor: hints and cards", () => {
     expect(c.meta).toMatchObject({ item: a.meta.id, from: "tutor", state: "draft", skills: ["learning"], ai: { prompt_version: "tutor@3" } });
     expect(findCard(lib, c.meta.id).answer).toBe("Back to the first box.");
     await expect(addTutorCard(lib, a.meta.id, { kind: "prompt", content_type: "concept", question: "Why?", answer: "Because.", rubric: [] }, { vendor: "claude", model: "m", prompt_version: "tutor@3" })).rejects.toThrow("rubric");
+    // A stamp missing its prompt version is refused before a file is written: a card written with it could never be read
+    // again, and every list skipped it with no word (history recovery pass, F811).
+    const before = listCards(lib).length;
+    await expect(addTutorCard(lib, a.meta.id, { kind: "card", content_type: "fact", question: "Where does a known card go?", answer: "Up a box.", rubric: [] }, { vendor: "claude", model: "m", prompt: "tutor@3" } as never)).rejects.toThrow("prompt_version");
+    expect(readdirSync(join(lib.root, "cards")).filter((f) => f.endsWith(".md")).length).toBe(before);
   });
 });
 
