@@ -619,6 +619,32 @@ journey("hidden source keeps Show the source in the accessibility tree (F118)", 
   await page.getByRole("button", { name: "Hide the source", exact: true }).waitFor();
 });
 
+journey("hidden source: one blur spreads from the eye over the whole page, his highlights stay under it, and it draws back (D361)", async (page) => {
+  await openSource(page, TESTING);
+  const veil = () =>
+    page.evaluate(() => {
+      const v = document.querySelector<HTMLElement>(".hide-veil")!, cs = getComputedStyle(v);
+      const eye = document.querySelector('button[aria-label="Hide the source"], button[aria-label="Show the source"]')!.getBoundingClientRect(), box = v.getBoundingClientRect();
+      const scroll = document.querySelector(".reader-scroll")!.getBoundingClientRect();
+      return {
+        at: cs.getPropertyValue("--veil").trim(),
+        blur: cs.backdropFilter || cs.getPropertyValue("-webkit-backdrop-filter"),
+        fromEye: Math.abs(parseFloat(v.style.getPropertyValue("--veil-x")) - (eye.left + eye.width / 2 - box.left)) < 1,
+        covers: box.left <= scroll.left && box.top <= scroll.top && box.right >= scroll.right && box.bottom >= scroll.bottom,
+        marks: [...CSS.highlights.keys()].filter((k) => /^hl-(keep|card|question|apply)$/.test(k)).length,
+      };
+    });
+  const before = await veil();
+  if (before.at !== "0%" || !before.marks) throw new Error(`before hiding: ${JSON.stringify(before)}`);
+  await page.getByRole("button", { name: "Hide the source", exact: true }).click();
+  await until("the blur covers the page", async () => (await veil()).at === "118%");
+  const hidden = await veil();
+  if (!/blur\(/.test(hidden.blur) || !hidden.fromEye || !hidden.covers) throw new Error(`hidden: ${JSON.stringify(hidden)}`);
+  if (hidden.marks !== before.marks) throw new Error(`his highlights should stay under the blur: ${hidden.marks} of ${before.marks}`);
+  await page.getByRole("button", { name: "Show the source", exact: true }).click();
+  await until("the blur draws back", async () => (await veil()).at === "0%");
+});
+
 journey("tables: a heading's button covers its column, a click or Enter shows a cell, right-click on a covered one makes an exercise of it and Undo takes it back (D200)", async (page) => {
   const made = (await (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--json"], stdin: "# Sampling settings\n\nHow the draw is made.\n\n| Setting | What it changes | Range |\n|---|---|---|\n| Temperature | How flat the odds are | 0 to 1.5 |\n| Top-p | How much of the tail stays | 0.8 to 1 |\n| Top-k | How many words stay | 20 to 100 |\n\nChange one at a time." }) })).json()) as { id: string };
   try {

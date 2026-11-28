@@ -2,7 +2,7 @@ import { dirname, join } from "node:path";
 import { type Page } from "playwright";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { $ } from "bun";
-import { AGENTS, askFieldIsPlain, fits44, itemFile, journey, keyboardUp, longPassages, macChanges, pasteInto, PHONE_LIB, phoneSource, phoneWith, pointAt, press, slid, tap, TESTING, until } from "../harness";
+import { AGENTS, doubleTap, askFieldIsPlain, fits44, itemFile, journey, keyboardUp, longPassages, macChanges, pasteInto, PHONE_LIB, phoneSource, phoneWith, pointAt, press, slid, tap, TESTING, until } from "../harness";
 
 // iPhone sizes, not the Mac's (Tyler 2026-11-13, option A): list titles 17 pt, every tap 44 pt, the bar's buttons round.
 journey("phone: Finish comes straight after a source's text, with the room for the bars under it (F88)", async (page) => {
@@ -372,10 +372,7 @@ journey("phone: a double tap highlights the paragraph and opens it, a heading an
   await page.waitForTimeout(400);
   const kept = () => page.evaluate(() => ["hl-keep", "hl-active"].flatMap((k) => [...(CSS.highlights.get(k) ?? [])].map((r) => r.toString())));
   const at = (phrase: string) => pointAt(page, phrase, ".phone-reader .doc");
-  const twice = async (p: { x: number; y: number }) => {
-    await page.touchscreen.tap(p.x, p.y);
-    await page.touchscreen.tap(p.x, p.y);
-  };
+  const twice = (p: { x: number; y: number }) => doubleTap(page, p.x, p.y);
   const before = (await kept()).length;
   const heading = await at("Why it works");
   await page.waitForTimeout(300); // the scroll settles: a tap that stops one is no tap
