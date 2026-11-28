@@ -562,9 +562,13 @@ journey("review: Good over a miss takes a second press, and a cut gem he misses 
   const was = await q.innerText();
   await page.waitForTimeout(400); // a rating key right after the answer shows is ignored
   // Good, two steps over the marks: it waits, says why, and nothing is recorded.
+  const goodAt = () => page.locator(".review-rate .rate-3").evaluate((b) => Math.round(b.getBoundingClientRect().top));
+  const goodWas = await goodAt();
   await page.keyboard.press("3");
   const guard = page.locator(".review-guard");
   await guard.waitFor();
+  // The warning is the bar's top line (F865): the bar grows up and the buttons stay under his pointer.
+  if ((await goodAt()) !== goodWas) throw new Error(`the warning moved Good from y ${goodWas} to ${await goodAt()}`);
   if (!(await guard.innerText()).includes("2 of 2 key points are marked missed. Press Good again to keep it.")) throw new Error(`the guard says: ${await guard.innerText()}`);
   if ((await q.innerText()) !== was) throw new Error("one press of Good over a miss moved on");
   if (await page.locator(".review-moment").count()) throw new Error("a rating that only waits showed a moment");
@@ -1297,6 +1301,14 @@ journey("review: ⌘Z from the end screen after a Later doesn't count the time s
     await page.waitForTimeout(3000); // on the end screen
     await page.keyboard.press("Meta+z");
     await until("back on it", async () => !(await doneButton.isVisible()) && (await good.isVisible()));
+    // The toast that says what ⌘Z took back stands above the ratings bar, not over it: a press on Good right away lands.
+    const gap = await page.evaluate(() => {
+      const bar = document.querySelector(".review-bar")!.getBoundingClientRect();
+      const toast = document.querySelector(".toast")?.getBoundingClientRect();
+      return toast ? Math.round(bar.top - toast.bottom) : null;
+    });
+    if (gap === null) throw new Error("no toast said what ⌘Z took back");
+    if (gap < 4 || gap > 40) throw new Error(`the toast is ${gap}px above the ratings bar, not just over it`);
     await good.click();
     await doneButton.waitFor();
     const last = calls.calls.filter((a) => a[0] === "review" && !a.some((x) => x.startsWith("--undo"))).at(-1)!;
@@ -2508,14 +2520,13 @@ journey("review: a card that fails to load offers Try again, focused, which load
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
-journey("review: once an Explain exercise is checked, the key bar names the suggested rating (↵ Hard), as its button does", async (page) => {
+journey("review: once an Explain exercise is checked, the bottom bar is the four ratings; the suggested one (Hard) and Retire name their keys on hover", async (page) => {
   await page.route(/\/ore$/, async (route) => {
     if (!(route.request().postData() ?? "").includes('"grade",')) return route.fallback();
     await route.fulfill({ contentType: "application/json", body: JSON.stringify({ rating: 2, gaps: [], feedback: "", covered: [true, false] }) });
   });
   try {
     await startReview(page, /Teaching/);
-    const keys = page.locator(".review-keys");
     await page.getByRole("textbox", { name: "Your answer" }).fill("Fluency feels like knowing");
     await page.getByRole("radio", { name: "Think so" }).click();
     await page.getByRole("button", { name: "Check", exact: true }).click();
@@ -2523,11 +2534,21 @@ journey("review: once an Explain exercise is checked, the key bar names the sugg
     await suggested.waitFor();
     const name = (await suggested.innerText()).trim();
     if (name !== "Hard") throw new Error(`the suggested button reads ${name}, not Hard`);
-    await until("the key bar says ↵ Hard", async () => /↵\s*Hard/.test(await keys.innerText())).catch(async () => {
-      throw new Error(`the key bar reads: ${await keys.innerText()}`);
+    // The ratings took the key bar's place (F865), so each key is said where its button is, on hover.
+    if (await page.locator(".review-keys").count()) throw new Error("the key bar is still there beside the ratings");
+    if (!(await suggested.evaluate((b) => !!b.closest(".review-bar")))) throw new Error("the ratings are not the bottom bar");
+    const tip = page.getByRole("tooltip");
+    await suggested.hover();
+    await until("Hard's hint names ↵", async () => /↵/.test((await tip.allInnerTexts()).join(" "))).catch(async () => {
+      throw new Error(`Hard's hint reads: ${(await tip.allInnerTexts()).join(" | ") || "nothing"}`);
     });
-    // F134: Retire is a tool under the ratings like Ask, Edit and Later, so the bar names its key too.
-    if (!/⇧⌘⌫\s*Retire/.test(await keys.innerText())) throw new Error(`the key bar doesn't name Retire: ${await keys.innerText()}`);
+    // F134: Retire is a tool under the answer like Ask, Edit and Later, and names its key too.
+    // In steps, as a hand moves: a hint lets its neighbour open on the second move, not a jump's one.
+    const retire = (await page.getByRole("button", { name: "Retire exercise" }).boundingBox())!;
+    await page.mouse.move(retire.x + retire.width / 2, retire.y + retire.height / 2, { steps: 6 });
+    await until("Retire's hint names ⇧⌘⌫", async () => /⇧⌘⌫/.test((await tip.allInnerTexts()).join(" "))).catch(async () => {
+      throw new Error(`Retire's hint reads: ${(await tip.allInnerTexts()).join(" | ") || "nothing"}`);
+    });
   } finally {
     await page.unroute(/\/ore$/);
     await page.keyboard.press("Escape");
@@ -2894,7 +2915,7 @@ journey("Review left over a source still opening: focus is in the source at once
   await until("focus is on the source's text once it is there", () => page.evaluate(() => document.activeElement?.matches(".reader-scroll") ?? false));
 });
 
-journey("review: under a long answer in a short window the four ratings stay in view, clear of the radio (D314)", async (page) => {
+journey("review: under a long answer in a short window the four ratings stay in view in the bottom bar, clear of the radio (D254)", async (page) => {
   const size = page.viewportSize()!;
   await page.setViewportSize({ width: 720, height: 480 });
   try {
@@ -2909,12 +2930,12 @@ journey("review: under a long answer in a short window the four ratings stay in 
     const body = page.locator(".review-body");
     if (!(await body.evaluate((b) => b.scrollHeight > b.clientHeight + 100))) throw new Error("the answer is not long enough to scroll");
     const seen = () => page.evaluate(() => {
-      const keys = document.querySelector(".review-keys")!.getBoundingClientRect();
+      const view = document.querySelector(".review")!.getBoundingClientRect();
       const orb = document.querySelector(".radio-orb")!.getBoundingClientRect();
       return [...document.querySelectorAll(".review-rate button")].map((b) => {
         const r = b.getBoundingClientRect();
         const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-        return { name: b.textContent, shown: r.top >= 0 && r.bottom <= keys.top && b.contains(top), underOrb: r.left < orb.right && r.bottom > orb.top };
+        return { name: b.textContent, shown: r.top >= 0 && r.bottom <= view.bottom && b.contains(top), underOrb: r.left < orb.right && r.bottom > orb.top };
       });
     });
     for (const at of ["top", "end"] as const) {
@@ -2922,6 +2943,19 @@ journey("review: under a long answer in a short window the four ratings stay in 
       const bad = (await seen()).filter((b) => !b.shown || b.underOrb);
       if (bad.length) throw new Error(`scrolled to the ${at}, a rating is out of view or under the radio: ${JSON.stringify(bad)}`);
     }
+    // Every width on the way to one where the centred column clears the radio by itself, and with the mole's
+    // chat open, which leaves the column only the left of the window.
+    for (const width of [760, 800, 840, 880]) {
+      await page.setViewportSize({ width, height: 480 });
+      const bad = (await seen()).filter((b) => b.underOrb);
+      if (bad.length) throw new Error(`at ${width}px wide a rating is under the radio: ${JSON.stringify(bad)}`);
+    }
+    await page.setViewportSize({ width: 1100, height: 720 });
+    await page.locator(".tutor-bubble").click();
+    await page.locator(".review-chat").waitFor();
+    const bad = (await seen()).filter((b) => b.underOrb);
+    if (bad.length) throw new Error(`with the mole's chat open a rating is under the radio: ${JSON.stringify(bad)}`);
+    await page.keyboard.press("Escape");
     await page.keyboard.press("Escape");
     await page.locator(".review").waitFor({ state: "detached" });
   } finally {
@@ -3096,4 +3130,36 @@ journey("Home: a day he reviewed but is under the goal has a half-filled dot, no
   // The seed has one review today, well under the goal.
   await page.locator(".home-day.today.short").waitFor();
   if (await page.locator(".home-day.met").count()) throw new Error("a day under the goal reads as met");
+});
+
+journey("review: the four ratings sit in the bottom bar and do not move when the passage loads (F865)", async (page) => {
+  await startReview(page, /Learning/);
+  // The passage's read held back, as a slow library is: the ratings are there before it.
+  await hold(page, "show");
+  try {
+    await reveal(page);
+    const rate = page.locator(".review-rate");
+    await rate.waitFor();
+    const boxes = () => rate.locator("button").evaluateAll((bs) => bs.map((b) => { const r = b.getBoundingClientRect(); return `${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.width)}`; }).join(" "));
+    const before = await boxes();
+    await until("the passage is being read", () => isHeld(page, "show"));
+    await release(page, "show");
+    await passageIn(page);
+    const after = await boxes();
+    if (after !== before) throw new Error(`the ratings moved when the passage loaded: ${before} then ${after}`);
+    // In the bar: under the scrolling page, in line with the exercise's column.
+    const at = await page.evaluate(() => {
+      const r = document.querySelector(".review-rate")!.getBoundingClientRect();
+      const body = document.querySelector(".review-body")!.getBoundingClientRect();
+      const card = document.querySelector(".review-card")!.getBoundingClientRect();
+      return { below: r.top >= body.bottom, left: Math.round(r.left - card.left), right: Math.round(r.right - card.right) };
+    });
+    if (!at.below || at.left || at.right) throw new Error(`the ratings are not in the bar under the exercise's column: ${JSON.stringify(at)}`);
+  } finally {
+    // No hold left armed for the next journey, whichever way this one went.
+    await page.evaluate(() => delete (window as unknown as { __ORE_HOLD?: Record<string, unknown> }).__ORE_HOLD?.show);
+    await release(page, "show").catch(() => {});
+  }
+  await page.keyboard.press("Escape");
+  await page.locator(".review").waitFor({ state: "detached" });
 });
