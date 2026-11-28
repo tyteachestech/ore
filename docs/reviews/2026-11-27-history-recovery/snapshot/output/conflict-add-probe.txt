@@ -1,0 +1,8 @@
+{
+  "unmergedBefore": true,
+  "unmergedAfter": false,
+  "committed": false,
+  "headChanged": false,
+  "stored": "Today note."
+}
+FAIL: snapshot leaves unresolved recovery conflicts unmerged and uncommitted

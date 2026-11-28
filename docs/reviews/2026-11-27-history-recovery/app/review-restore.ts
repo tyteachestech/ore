@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import {setup, snap, git, history, pinClock, advance, run} from './support';
+import {writeNewCard} from '../../packages/core/src/cards';
+import {readReviews} from '../../packages/core/src/reviews';
+pinClock();
+const {ReviewSession} = await import('../../apps/desktop/src/review-session');
+const {setPlayer} = await import('../../apps/desktop/src/sfx');
+setPlayer(()=>{});
+const {lib,item} = await setup('review-restore');
+advance(-7*86400000);
+for(let i=0;i<2;i++) writeNewCard(lib,{item:item.meta.id,kind:'card',question:`Question ${i}?`,answer:`Answer ${i}`,rubric:[],skills:[],topics:[],content_type:'fact'});
+for (const c of await run<any[]>('cards')) await run('review',c.id,'--rating=3','--confidence=2');
+advance(7*86400000);
+const sessionStart=Date.now();
+const h=history();
+const s=new ReviewSession(false,run);
+s.source=item.meta.id;
+s.screen={notify:h.notify,onClose(){},shown:()=>null,unrated(){},press(){}};
+const stop=s.begin();
+await h.settle();
+assert.equal(s.queue?.length,2);
+const id=s.queue![0]!.id;
+// Snapshot the tracked review month before this session rates anything.
+const old=snap(lib);
+advance(20000);
+s.clock();advance(20000);
+await s.rate({card:await s.load(id),rating:3,answer:'answer',grade:null,inHead:false,noteSeen:true});
+await h.settle();
+snap(lib);
+assert.equal(s.reviewed,1);
+git(lib,'restore','--source',old,'--','reviews');
+// Exactly the LIBRARY_BACK path: fresh due IDs, then settingsChanged from wakeOpenScreens.
+const due=await run<any[]>('due','--all','--source',item.meta.id);
+if(process.argv[2]==='reverse') {s.settingsChanged();await h.settle();}
+s.stillDue(new Set(due.map(e=>e.id)),true,false);
+s.settingsChanged();
+await h.settle();
+console.log('restored core due contains rated exercise:',due.some(e=>e.id===id));
+console.log('open Review queue contains rated exercise:',s.queue?.some(e=>e.id===id));
+console.log('restored reviews since session started:',readReviews(lib).filter(r=>Date.parse(r.ts)>=sessionStart).length);
+console.log('open Review reviewed:',s.reviewed,'activeMs:',s.activeMs,'canUndo:',s.canUndo);
+h.h.undo();await h.settle();
+console.log('Undo rejected:',h.errors.some(e=>e.includes('latest')),'history remains:',h.h.canUndo);
+console.log('Undo error:',h.errors.at(-1));
+h.h.undo();await h.settle();
+console.log('same Undo rejects again:',h.errors.length===2 && h.h.canUndo);
+// A newly opened session sees the restored exercise: distinguishes session state from index state.
+const fresh=new ReviewSession(false,run);fresh.source=item.meta.id;fresh.screen=s.screen;
+const endFresh=fresh.begin();await h.settle();
+console.log('fresh session contains restored exercise:',fresh.queue?.some(e=>e.id===id));
+assert.ok(fresh.queue?.some(e=>e.id===id));
+endFresh();fresh.gone();stop();s.gone();await h.settle();
+assert.ok(s.queue?.some(e=>e.id===id),'app-02: a restored due exercise must reenter the open review queue');

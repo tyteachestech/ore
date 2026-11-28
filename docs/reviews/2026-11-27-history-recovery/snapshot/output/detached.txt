@@ -1,0 +1,9 @@
+{
+  "result": {
+    "committed": true
+  },
+  "namedBranchContainsSnapshot": false,
+  "visibleAfterReturning": "Today's note.",
+  "reflogContainsSnapshot": true
+}
+FAIL: new snapshot remains reachable from the normal history branch

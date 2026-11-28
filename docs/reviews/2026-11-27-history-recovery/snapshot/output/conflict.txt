@@ -1,0 +1,9 @@
+{
+  "unmergedBefore": true,
+  "unmergedAfter": false,
+  "committed": true,
+  "headChanged": true,
+  "stored": "<<<<<<< HEAD\nToday note.\n=======\nRecovered branch note.\n>>>>>>> 92c2944 (Snapshot 2026-11-27T12:00:00.001Z)"
+}
+rebaseContinue: success
+FAIL: snapshot leaves unresolved recovery conflicts unmerged and uncommitted

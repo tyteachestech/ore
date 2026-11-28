@@ -1,0 +1,13 @@
+{
+  "type": "end",
+  "id": "01M8EE0VG0TBHCGECMDXA0XMT6",
+  "ts": "2026-11-27T23:55:02.576Z",
+  "reviews": 0,
+  "kept": 0,
+  "rescued": 0,
+  "cut": [],
+  "caught_up": true,
+  "calibration": null
+}
+end receipt saved: True
+PASS: session end survives missing git
