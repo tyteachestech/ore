@@ -570,7 +570,8 @@ journey("figure cards: a drag over a zoomed figure draws a box, what's under it 
   await fig.click();
   const big = page.locator(".figure-zoom.open img");
   await big.waitFor();
-  await page.waitForTimeout(400);
+  // Grown in: measured while it still grows, the drag lands off the figure's own points (F882).
+  await until("the figure has grown in", () => big.evaluate((el) => !el.getAnimations().length && !el.parentElement!.getAnimations().length));
   const b = (await big.boundingBox())!;
   // A plain click still puts it back; a drag draws a box instead.
   await page.mouse.move(b.x + b.width * 0.2, b.y + b.height * 0.3);

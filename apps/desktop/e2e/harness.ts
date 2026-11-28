@@ -840,9 +840,29 @@ export async function textFile(name: string, text: string) {
   return path;
 }
 
-/** A double tap: both taps sent at once, so the second never waits for the first's answer to come back and the
- *  two stay inside the Reader's 350 ms however busy the runner is. */
+/** A double tap on the iPhone reader's text. The Reader takes no tap within 150 ms of a scroll (a tap that stops a
+ *  scroll is no tap), and a journey has just scrolled its paragraph into view, so this first waits, by the page's
+ *  own clock, until the page has drawn and no scroll has come for 250 ms: a fixed wait counted here said nothing
+ *  of when a busy page sent its scroll, and the first tap was thrown away (F856). Then both taps are sent at once,
+ *  so the second never waits for the first's answer and the two stay inside the Reader's 350 ms. */
 export async function doubleTap(page: Page, x: number, y: number) {
+  await page.evaluate(() => new Promise<void>((done) => {
+    // What the page saw of this double tap, for the failure's message: each scroll and touch, in ms from its start.
+    const w = window as unknown as { __TAPS: string[]; __tapsOff?: () => void };
+    w.__tapsOff?.();
+    const t0 = performance.now();
+    const seen: string[] = (w.__TAPS = []);
+    let last = t0;
+    const note = (e: Event) => {
+      if (e.type === "scroll") last = performance.now();
+      if (seen.length < 40) seen.push(`${e.type}@${Math.round(performance.now() - t0)}`);
+    };
+    const kinds = ["scroll", "touchstart", "touchend"];
+    kinds.forEach((k) => addEventListener(k, note, true));
+    w.__tapsOff = () => kinds.forEach((k) => removeEventListener(k, note, true));
+    const frame = () => (performance.now() - last > 250 ? (seen.push(`still@${Math.round(performance.now() - t0)}`), done()) : requestAnimationFrame(frame));
+    requestAnimationFrame(frame);
+  }));
   await Promise.all([page.touchscreen.tap(x, y), page.touchscreen.tap(x, y)]);
 }
 
@@ -941,8 +961,9 @@ export async function run() {
         // The `ore` calls still out and the last ones answered: a step that timed out behind a slow or failed call
         // says so, where a screenshot alone left the cause open (F142, F651).
         const calls = await page?.evaluate(() => {
-          const w = window as unknown as { __ORE_INFLIGHT?: string[]; __ORE_LOG?: string[] };
-          return `ore in flight: ${JSON.stringify(w.__ORE_INFLIGHT ?? [])}; last answered: ${JSON.stringify(w.__ORE_LOG ?? [])}`;
+          const w = window as unknown as { __ORE_INFLIGHT?: string[]; __ORE_LOG?: string[]; __TAPS?: string[] };
+          // A double tap's touches and the scrolls around them, in ms of the page's clock (`doubleTap`, F856).
+          return `ore in flight: ${JSON.stringify(w.__ORE_INFLIGHT ?? [])}; last answered: ${JSON.stringify(w.__ORE_LOG ?? [])}${w.__TAPS ? `; last double tap: ${w.__TAPS.join(" ")}` : ""}`;
         }).catch(() => "");
         // The error's first two lines, then the end of Playwright's call log: what was in the way of a click that timed out.
         const lines = (e as Error).message.split("\n").filter((l) => l.trim());
