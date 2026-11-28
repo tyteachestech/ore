@@ -47,6 +47,23 @@ describe("due queue ordering", () => {
     expect([pos("d1"), pos("d2"), pos("d3")].sort()).toEqual([0, 1, 2]);
   });
 
+  test("relearn passes last in the ordered group; placeRetries brings them forward", () => {
+    const due = e({ id: "due", retrievability: 0.5 });
+    const draft = e({ id: "draft", state: "draft", due: null, retrievability: 0 });
+    const relearn = e({ id: "relearn", retrievability: 0, relearn: true });
+    expect(ids(orderQueue([relearn, due, draft]))).toEqual(["draft", "due", "relearn"]);
+  });
+
+  test("a retry right after its miss waits three exercises, new ones filling the gap when no due are left; two in one slot keep their urgency order", () => {
+    const n = (id: string) => e({ id, state: "draft", due: null, retrievability: 0 });
+    const r = (id: string, retrievability: number) => e({ id, retrievability, relearn: true });
+    expect(ids(placeRetries([n("n1"), n("n2"), n("n3"), n("n4")], [r("miss", 0)], [{ card: "miss" }]))).toEqual(["n1", "n2", "n3", "miss", "n4"]);
+    // The miss is the last of its reviews, though the card was reviewed before it too.
+    expect(ids(placeRetries([n("n1"), n("n2"), n("n3")], [r("miss", 0)], [{ card: "miss" }, { card: "x" }, { card: "miss" }]))).toEqual(["n1", "n2", "n3", "miss"]);
+    const old = [{ card: "a" }, { card: "b" }, { card: "x" }, { card: "y" }, { card: "z" }];
+    expect(ids(placeRetries([n("n1")], [r("b", 0.5), r("a", 0.9)], old))).toEqual(ids(placeRetries([], [r("b", 0.5), r("a", 0.9)], old)).concat("n1"));
+  });
+
   test("a pending retry comes first when only new exercises remain", () => {
     const draft = e({ id: "draft", state: "draft", due: null, retrievability: 0 });
     const relearn = e({ id: "relearn", retrievability: 0, relearn: true });

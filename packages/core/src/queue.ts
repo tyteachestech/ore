@@ -70,26 +70,27 @@ export function orderQueue(entries: QueueEntry[]): QueueEntry[] {
   return [...orderGroup(entries.filter((e) => !e.relearn)), ...entries.filter((e) => e.relearn).sort(compare)];
 }
 
-/** How many other reviews come between a miss and its retry (D59): enough that the retry is a recall, not a read-back. */
-const RELEARN_GAP = 3;
+/** How many exercises come between a miss and its retry: enough that the retry is a recall, not a read-back. The
+ *  session's own retry uses the same gap (`AGAIN_GAP`, apps/desktop/src/ore.ts; a test holds them equal). */
+export const RELEARN_GAP = 3;
 
-/** Today's owed retries put back near the front, before new material (daily-session.md rule 4, "a card missed today
+/** Today's owed retries put back near the front, ahead of new material when there is enough due (daily-session.md rule 4, "a card missed today
  *  comes back today"; Tyler 2026-11-28, amends D144): a short session that ended on a miss left its retry behind every
  *  new exercise, so across a day of bursts on the phone it never came back. Each comes after up to three reviews in
  *  all since its miss, counting the ones he has done since in any session. `reviews` in time order. */
 export function placeRetries(queue: QueueEntry[], retries: QueueEntry[], reviews: readonly { card: string }[]): QueueEntry[] {
   const out = [...queue];
   const recent = reviews.slice(-RELEARN_GAP);
-  // Never behind new material: the gap is made of reviews, and new exercises don't count toward it.
-  const firstNew = out.findIndex((e) => e.state === "draft");
-  const room = firstNew < 0 ? out.length : firstNew;
+  // The gap counts whatever comes between; due reviews fill it first, and new ones (every fifth place, D144) come
+  // after it, so with enough due the retry is ahead of new material, and with too few the new fill the gap.
   const at = (e: QueueEntry) => {
-    const miss = recent.findIndex((r) => r.card === e.id);
+    const miss = recent.findLastIndex((r) => r.card === e.id);
     const between = miss < 0 ? RELEARN_GAP : recent.length - miss - 1;
-    return Math.min(RELEARN_GAP - between, room);
+    return Math.min(RELEARN_GAP - between, out.length);
   };
-  // Back to front, so an earlier slot isn't moved by a later insert.
-  for (const e of [...retries].sort(compare).map((e) => ({ e, i: at(e) })).sort((a, b) => b.i - a.i)) out.splice(e.i, 0, e.e);
+  // Back to front, so an earlier slot isn't moved by a later insert; within a slot, most urgent first (D22).
+  const placed = [...retries].sort(compare).map((e) => ({ e, i: at(e) }));
+  for (const i of [...new Set(placed.map((p) => p.i))].sort((a, b) => b - a)) out.splice(i, 0, ...placed.filter((p) => p.i === i).map((p) => p.e));
   return out;
 }
 

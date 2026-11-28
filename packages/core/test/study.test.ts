@@ -231,7 +231,10 @@ describe("review loop", () => {
     await endSession(lib, at(2));
     expect(dueQueue(lib, at(3)).find((e) => e.id === a.meta.id)?.relearn).toBe(true); // no session open
     await startSession(lib, at(4));
-    expect(dueQueue(lib, at(5))[0]).toMatchObject({ id: a.meta.id, relearn: true }); // the next session owes it
+    // The next session owes it, three exercises in: right after the miss it would be a read-back.
+    const owed = dueQueue(lib, at(5));
+    expect(owed.findIndex((e) => e.id === a.meta.id)).toBe(Math.min(3, owed.length - 1));
+    expect(owed.find((e) => e.id === a.meta.id)?.relearn).toBe(true);
     await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: at(6) });
     expect(dueQueue(lib, at(7)).some((e) => e.id === a.meta.id)).toBe(false); // once only
     // A miss on its relearn pass waits for its FSRS date, and yesterday's miss is not today's to relearn.
