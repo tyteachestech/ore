@@ -42,7 +42,7 @@
         "@tauri-apps/plugin-opener": "^2.7.2",
         "cmdk": "^1.1.1",
         "decode-named-character-reference": "1.3.0",
-        "katex": "0.16.47",
+        "katex": "0.16.22",
         "lowlight": "^3.3.0",
         "mdast-util-from-markdown": "2.1.0",
         "mingcute_icon": "2.9.72",
@@ -100,7 +100,7 @@
         "approx-string-match": "^2.0.1",
         "defuddle": "^0.19.4",
         "fflate": "^0.8.3",
-        "katex": "0.16.47",
+        "katex": "0.16.22",
         "linkedom": "^0.18.13",
         "mammoth": "1.11.0",
         "mdast-util-from-markdown": "2.1.0",
@@ -818,7 +818,7 @@
 
     "jszip": ["jszip@3.10.2", "", { "dependencies": { "lie": "~3.3.0", "pako": "~1.0.2", "readable-stream": "~2.3.6", "setimmediate": "^1.0.5" } }, "sha512-3l+rb15IOWtUhU0H5MFqES/T6Kh7abYwjosBey/vD6hDt8zoEffkSC5Ws5SGtgVw3gBx2NEbhTeSW1+kWkpyTQ=="],
 
-    "katex": ["katex@0.16.47", "", { "dependencies": { "commander": "^8.3.0" }, "bin": { "katex": "cli.js" } }, "sha512-Eeo8Ys1doU1z+x8AZsPpQu+p/QcZBI5PeOo7QGQdy2x2m0MU/hYagBbGOmXwr5KVbEfVuWv9LpnQWeehogurjg=="],
+    "katex": ["katex@0.16.22", "", { "dependencies": { "commander": "^8.3.0" }, "bin": { "katex": "cli.js" } }, "sha512-XCHRdUw4lf3SKBaJe4EvgqIuWwkPSo9XoeO8GjQW94Bp7TWv9hNhzZjZ+OH9yf1UmLygb7DIT5GSFQiyt16zYg=="],
 
     "lie": ["lie@3.3.0", "", { "dependencies": { "immediate": "~3.0.5" } }, "sha512-UaiMJzeWRlEujzAuw5LokY1L5ecNQYZKfmyZ9L7wDHb/p5etKaxXhohBcrw0EYby+G/NA52vRSN4N39dxHAIwQ=="],
 
