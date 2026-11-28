@@ -80,6 +80,23 @@ function chapterMarkdown(document: Document, image: (src: string) => string | nu
   return { md: notes.length ? `${md}\n\n${notes.join("\n\n")}` : md, pictures };
 }
 
+/** Each class rule's font size in the book's CSS (`h1.name` or `.name` → em), and whether it is set not bold. */
+function classSizes(sheets: string[]): Map<string, { size: number; plain: boolean }> {
+  const sizes = new Map<string, { size: number; plain: boolean }>();
+  for (const css of sheets) {
+    for (const [, sel, body] of css.replace(/\/\*[\s\S]*?\*\//g, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const size = /(?:^|;)\s*font-size\s*:\s*([\d.]+)(em|rem|%)/i.exec(body!);
+      if (!size) continue;
+      const plain = /(?:^|;)\s*font-weight\s*:\s*(?:normal|400|lighter)\b/i.test(body!);
+      for (const one of sel!.split(",")) {
+        const m = /^\s*([a-z][a-z0-9]*)?\.([\w-]+)\s*$/i.exec(one);
+        if (m) sizes.set(`${m[1]?.toLowerCase() ?? ""}.${m[2]}`, { size: Number(size[1]) / (size[2] === "%" ? 100 : 1), plain });
+      }
+    }
+  }
+  return sizes;
+}
+
 export function epubToDoc(data: Uint8Array): EpubDoc {
   const files = unzip(data);
   const read = (p: string) => {
@@ -116,6 +133,32 @@ export function epubToDoc(data: Uint8Array): EpubDoc {
     .filter((item) => (/html/.test(item.type) && !item.nav) || /^image\//.test(item.type))
     .map((item) => ({ path: posix.join(dir, decodeURIComponent(item.href.split("#")[0]!)), picture: /^image\//.test(item.type) }));
   const docs = new Map(spine.map(({ path, picture }) => [path, parse(picture ? `<html><body><img src="${encodeURIComponent(posix.basename(path))}"/></body></html>` : read(path))]));
+  // A heading the book's own styles set well under its text's size and not bold is a line set apart (a program's
+  // lines in Tyler's AI book), not a heading: it read as a run of big titles and filled the outline. A small heading
+  // near the text's size stays one (that book's section heads are 0.896em over 0.92em text).
+  const sizes = classSizes(Array.from(manifest.values()).filter((i) => i.type === "text/css").map((i) => files[posix.join(dir, decodeURIComponent(i.href))]).flatMap((f) => (f ? [strFromU8(f)] : [])));
+  if (sizes.size) {
+    const styleOf = (e: Element) => Array.from(e.classList).map((c) => sizes.get(`${e.tagName.toLowerCase()}.${c}`) ?? sizes.get(`.${c}`)).find(Boolean);
+    // The text's size: the size of the paragraph style the book uses most.
+    const used = new Map<number, number>();
+    for (const page of docs.values()) for (const para of Array.from(page.querySelectorAll("p"))) {
+      const size = styleOf(para)?.size ?? 1;
+      used.set(size, (used.get(size) ?? 0) + 1);
+    }
+    const text = [...used].sort((a, b) => b[1] - a[1])[0]?.[0] ?? 1;
+    for (const page of docs.values()) {
+      const paras = Array.from(page.querySelectorAll("p")).filter((x) => x.textContent?.trim());
+      for (const h of Array.from(page.querySelectorAll("h1, h2, h3, h4, h5, h6"))) {
+        const style = styleOf(h);
+        if (!style?.plain || style.size >= text * 0.85) continue;
+        // A page's opening heading names the page, however small the book sets it (its endnotes' heads).
+        if (!paras.some((x) => x.compareDocumentPosition(h) & 4 /* h follows x */)) continue;
+        const p = page.createElement("p");
+        p.append(...Array.from(h.childNodes));
+        h.replaceWith(p);
+      }
+    }
+  }
   // The cover picture as the book names it: EPUB 3's cover-image, EPUB 2's <meta name="cover">, or a picture
   // the book calls cover (cover.jpg, id="cover", coverImage), as many older books do: cover as a word of its
   // name, not inside one (discovery.png, recovery-curve.png). Known by path, held in the book or not.
