@@ -9,7 +9,7 @@ export function veilFrom(box: Box, eye: Box | null): { x: number; y: number } {
   return { x: eye.left + eye.width / 2 - box.left, y: eye.top + eye.height / 2 - box.top };
 }
 
-/** D-new-hide-blur: the hidden source is blurred past reading. The blur spreads from the eye over the page and
+/** D360: the hidden source is blurred past reading. The blur spreads from the eye over the page and
  *  draws back into it (`.hide-veil` in styles.css); the page under it keeps its shape. */
 export function HideVeil({ hidden, eye }: { hidden: boolean; eye: RefObject<HTMLElement | null> }) {
   const el = useRef<HTMLDivElement>(null);
