@@ -2341,7 +2341,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     { id: "remove", label: "Remove highlight", danger: true, divider: true, run: () => void removeSaved(a.id) },
   ];
 
-  /** The highlight under a right-click in the text (D365): its tools, as Apple Books puts them,
+  /** The highlight under a right-click in the text (D-new-highlight-menu): its tools, as Apple Books puts them,
    *  so the popup keeps only what he does to every highlight (its kind and note). */
   const menuHl = useRef<string | null>(null);
   const menuNative = (e: ReactPointerEvent) => {
