@@ -173,9 +173,9 @@ export async function importQueued<T extends { id: string; title: string }>(lib:
       got = await add(l.file ? join(paths.inbox(lib), l.file) : l.url, l.skills);
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
-      errors.push({ ...l, error });
-      // Removed on the phone while it was being imported: nothing to keep.
+      // Removed on the phone while it was being imported: nothing to keep, and not a failure.
       if (!existsSync(item(lib, l))) continue;
+      errors.push({ ...l, error });
       writeAtomic(item(lib, l), JSON.stringify({ ...l, error }, null, 2) + "\n");
       if (error !== l.error) failed.push({ ...l, error });
       continue;

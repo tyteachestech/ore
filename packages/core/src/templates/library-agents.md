@@ -46,9 +46,10 @@ Highlight intents: keep (a plain highlight), card (a ★ key point), question (o
 
 ## Saving a Dig
 
-`ore dig <skill> --text` saves the Dig record; it does not append to the skill note. As in the app, save Tyler's words to both places. First read `ore dig <skill> --json` and confirm the skill has a goal. Once he gives his memory response, put those exact words in `ANS` using the shell-quoting rule: replace every single quote (`'`) with `'\''`, then enclose the whole result in single quotes. Replace `<skill>` with its ID and `<YYYY-MM-DD>` with today's local date:
+`ore dig <skill> --text` saves the Dig record; it does not append to the skill note. As in the app, save Tyler's words to both places. First read `ore dig <skill> --json` and confirm the skill has a goal. Once he gives his memory response, put those exact words in `ANS` by the shell-quoting rule (each `'` as `'\''`, inside the recipe's one pair of single quotes). Replace `<skill>` with its ID and `<YYYY-MM-DD>` with today's local date:
 
 ```bash
+ANS='<shell-escaped text>'
 ore notes --skill <skill> --append "$ANS" --heading "Dig, <YYYY-MM-DD>" --json &&
 ore dig <skill> --text "$ANS" --json
 ```

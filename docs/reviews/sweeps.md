@@ -136,6 +136,7 @@ When a sweep's triage is done, add a row per tester here.
 | 11-27 | [deep import](2026-11-27-codex-deep-import/) PDFs | Codex | 26 public PDFs, 5,131 pages: OpenStax textbooks, arXiv papers, MIT slides, scans without the page reader, a filled form | Mac | 9 (7 fixed, 1 the same as the web lane's arXiv, 1 open: F790) | #567 |
 | 11-27 | [deep import](2026-11-27-codex-deep-import/) media | Codex | 31 links: 19 videos with 233,160 caption words compared word by word, TED, Apple episodes, chaptered MP3s | Mac | 5 (5 fixed) | #567 |
 | 11-27 | Ore Cloud security | Claude | `packages/cloud` read with `/security-and-hardening`, then hostile files and links sent to the server run locally: zip bombs, private addresses, oversized and endless input, many imports at once | server | 5 (4 fixed, 1 open) | #572 |
+| 11-28 | [CLI recheck](2026-11-28-codex-cli-recheck/) json, agent, undo | Codex reads, Codex drafts, Claude reviews; Claude in cloud WebKit | Every `--json` answer, exit code and refused write; an agent's day by SKILL.md and AGENTS.md; every CLI undo and `ore doctor` on a broken library; an agent's writes with Review open | CLI | 25 (24 fixed, 1 open found by code review) | #580 |
 
 Not counted here: the 2026-11-01 bug sweep and the 2026-11-08 stress test (Claude testers), the Impeccable design rounds, and rows found by Claude threads or Tyler.
 

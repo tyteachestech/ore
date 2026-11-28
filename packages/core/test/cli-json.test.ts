@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { addHighlight, findAnnotation } from "../src/annotations.ts";
 import { writeNewCard } from "../src/cards.ts";
@@ -111,6 +111,9 @@ test("cards --item resolves the same source references as show (JSON-08)", async
   const ambiguous = await ore(lib, ["cards", "--item", item.meta.id.slice(0, 2)]);
   expect(ambiguous.code).toBe(1);
   expect(ambiguous.data.error).toContain("use more of the id");
+  // A source whose folder is gone: doctor says to find its exercises and retire them, so its full id still lists them.
+  rmSync(item.dir, { recursive: true, force: true });
+  expect((await ore(lib, ["cards", "--item", item.meta.id])).data.map((c: { id: string }) => c.id)).toEqual([card.meta.id]);
 });
 
 test("try mutations return the same source title and section as tries (JSON-09)", async () => {
@@ -133,4 +136,13 @@ test("try mutations return the same source title and section as tries (JSON-09)"
   const a = addHighlight(item, { exact: "Recall strengthens memory.", intent: "apply" });
   await check(["try", a.id, "--plan", "Try recall"]);
   await check(["tried", a.id]);
+});
+
+test("edit --cards without --skills is refused, not saved as nothing", async () => {
+  const lib = await tempLibrary();
+  const item = await createItem(lib, { type: "markdown", title: "Learning", body: "Recall helps." });
+  const r = await ore(lib, ["edit", item.meta.id, "--title", "Renamed", "--cards", "{}"]);
+  expect(r.code).toBe(1);
+  expect(r.data.error).toContain("--cards goes with --skills");
+  expect(findItem(lib, item.meta.id).meta.title).toBe("Learning");
 });

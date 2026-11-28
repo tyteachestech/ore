@@ -72,8 +72,13 @@ export const studyCommands: Record<string, Command> = {
     async run(_, f) {
       const lib = openLibrary();
       const state = oneOf(f.state, CardState.options, "state");
-      const item = str(f.item) ? findItem(lib, str(f.item)!).meta.id : undefined;
       const stateOf = cardStates(lib);
+      const ref = str(f.item);
+      // A source whose folder is gone still has exercises to find and retire (doctor's advice): its full id lists them.
+      const item = ref === undefined ? undefined : (() => {
+        try { return findItem(lib, ref).meta.id; }
+        catch (e) { if (listCards(lib).some((c) => c.meta.item === ref.toUpperCase())) return ref.toUpperCase(); throw e; }
+      })();
       const cards = listCards(lib).filter(
         (c) => (!state || stateOf(c) === state) && (!item || c.meta.item === item) && (!f.skill || c.meta.skills.includes(f.skill as string)),
       );

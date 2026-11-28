@@ -140,7 +140,7 @@ test("an exercise retired or deleted elsewhere while it was on screen (an agent,
     await tick();
     t.waiting[0]!.fail("card a is retired: `ore card restore a` puts it back in review");
     await rating;
-    expect(t.said).toEqual(["This exercise was retired elsewhere, so it left this review."]);
+    expect(t.said).toEqual([`This exercise was ${how} elsewhere, so it left this review.`]);
     expect([how, t.ids()]).toEqual([how, ["b", "c"]]);
     expect([t.s.done, t.s.reviewed, t.s.canUndo, t.s.busy]).toEqual([0, 0, false, false]);
     expect(t.steps).toEqual([]);

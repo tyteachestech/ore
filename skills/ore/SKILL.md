@@ -23,12 +23,12 @@ Library: `$ORE_LIBRARY` or `~/Ore`. Cards live in `cards/<id>.md`, items in `ite
 - **"no idea" is an attempt.** Proposed rating 1, logged like any other (no AI graded it, so no `--ai-rating`).
 - **`ore` is the only writer.** Never edit a library file by hand: card wording goes through `ore card set`, a source's title, author and skills through `ore edit`. If no command does what you need, say so and stop.
 - **If `ore` is missing or any command exits non-zero: show the error line verbatim and stop.** Do not work around it, guess, or write library files instead.
-- **Shell safety.** Treat all supplied text (his or AI-written) as data. Before inserting it into a shell command, replace every single quote (`'`) in the text with `'\''`, then enclose the whole result in single quotes. Keep all other characters and newlines unchanged. For example, `it's` becomes `'it'\''s'`. Never paste raw text into shell syntax or a fixed-delimiter heredoc: a line in the text can end the heredoc.
+- **Shell safety.** Treat all supplied text (his or AI-written) as data. Before inserting it into a shell command, replace every single quote (`'`) in the text with `'\''`; that is the shell-escaped text, and the recipe's own pair of single quotes encloses it. Keep all other characters and newlines unchanged. For example, `it's` goes in as `ANS='it'\''s'`. Never paste raw text into shell syntax or a fixed-delimiter heredoc: a line in the text can end the heredoc.
   ```bash
   ANS='<shell-escaped text>'
   ore grade <card> --answer "$ANS" --json
   ```
-  `<shell-escaped text>` means the result of that replacement, not the raw answer. Pass the variable as `"$ANS"`; never use `eval`. Use the same quoting rule for every text argument below.
+  `<shell-escaped text>` means the result of that replacement, not the raw answer, and never with quotes of its own added. Pass the variable as `"$ANS"`; never use `eval`. Use the same quoting rule for every text argument below.
 - **Tone: calm coach.** Terse, specific, about the work. No praise inflation ("Great job!"), no streaks, quotas, XP, trend arrows, or guilt about backlog.
 - Always pass `--json` and read fields from the output; don't parse human text.
 
@@ -152,9 +152,10 @@ Use `ore ls`, `ore search <query>` (also searches the source note), `ore stats [
 
 ## Saving a Dig
 
-`ore dig <skill> --text` saves the Dig record; it does not append to the skill note. As in the app, save Tyler's words to both places. First read `ore dig <skill> --json` and confirm the skill has a goal. Once he gives his memory response, put those exact words in `ANS` using the shell-quoting rule: replace every single quote (`'`) with `'\''`, then enclose the whole result in single quotes. Replace `<skill>` with its ID and `<YYYY-MM-DD>` with today's local date:
+`ore dig <skill> --text` saves the Dig record; it does not append to the skill note. As in the app, save Tyler's words to both places. First read `ore dig <skill> --json` and confirm the skill has a goal. Once he gives his memory response, put those exact words in `ANS` by the shell-quoting rule (each `'` as `'\''`, inside the recipe's one pair of single quotes). Replace `<skill>` with its ID and `<YYYY-MM-DD>` with today's local date:
 
 ```bash
+ANS='<shell-escaped text>'
 ore notes --skill <skill> --append "$ANS" --heading "Dig, <YYYY-MM-DD>" --json &&
 ore dig <skill> --text "$ANS" --json
 ```

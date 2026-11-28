@@ -34,7 +34,7 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 10. **A day-long soak.** The Mac open eight hours with background enrichment, many adds, timers: memory growth, stale screens, the midnight turn.
 11. **A11y recheck.** VoiceOver and keyboard only over the whole loop. The last full pass was 11-15; most screens changed since.
 12. **New learners.** An exam crammer (deadline, a big new batch, Importance), a language learner (vocabulary, audio, another script), a researcher with fifty papers. Each a five-day run with real AI.
-13. **CLI and `/ore` skill recheck.** Sweep 3 found 10; many commands changed since. Every `--json` answer against `packages/cli/src/answers.ts`, exit codes, the library's AGENTS.md.
+13. **done (#580)** **CLI and `/ore` skill recheck** ([11-28](2026-11-28-codex-cli-recheck/), three Codex reading scouts on the Mac, Codex drafted the fixes, Claude reviewed): 24 found, 24 fixed test first. Worst: the /ore skill's heredoc let a line of his answer run as a command; failed commands that still wrote (a highlight moved, a course renamed, the AI switched); undo of a cut, a reimport and an accepted skill that put back the wrong thing; `ore doctor` blind to broken chats, inbox entries, variants and images. Through the screens: Review stuck on an exercise an agent retired mid-review (fixed). Left open: a reimport's Undo doesn't re-anchor highlights made on the newer text. Not covered: the CLI with real AI (every run stubbed it), and two agents at once on one library.
 14. *Claude lane:* **Hostile content** in sources and feeds (scripts, paths, commands, huge files), which Codex refused.
 15. **done (#572)** *Claude lane:* **Ore Cloud security.** Sign-in, sessions, account deletion and the private-address guard held; four bugs fixed (a zip bomb, an import that could take the server down, no import limits, yt-dlp past the guard), one wording row open. Still open, each needing the server online or Tyler: Apple tokens revoked on delete (his .p8 key, #551), IPv6 egress if the host gets it (the firewall in #571 covers IPv4), and a pass on the live server once #550 deploys it.
 
@@ -144,4 +144,4 @@ Ranked by what it does for the foundation: data that can't be lost, imports that
 | Tests missing for recent merges | partly | test-gap hunt 11-13 |
 | Flaky tests traced to their cause | partly | flaky pass 11-27 (#564): 6 of 11 traced; F349 and F748 need the Mac |
 | Open rows that need no call from Tyler | open | queue 2 |
-| The `ore` CLI and `/ore` skill as an agent uses them | partly | sweep 3 cli, deep scan 3 library: queue 13 |
+| The `ore` CLI and `/ore` skill as an agent uses them | done | sweep 3 cli, deep scan 3 library, [CLI recheck 11-28](2026-11-28-codex-cli-recheck/) (#580) |

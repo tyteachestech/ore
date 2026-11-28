@@ -178,8 +178,10 @@ export const itemCommands: Record<string, Command> = {
         // --owe (the iPhone): an episode is in at once, and the app fills it after, showing how far it is.
         const filled = f.owe ? [] : (await fillOwed(lib)).map((i) => ({ id: i.meta.id, title: i.meta.title }));
         for (const i of filled) startEnrich(lib, i.id);
-        // Every link failing is a failure (the links stay for a retry); some failing is reported, not fatal.
-        return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.errors.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n"), exitCode: r.errors.length && !r.added.length && !filled.length ? 1 : 0 };
+        // Every link failing for a new reason is a failure (the links stay for a retry); some failing is reported, not
+        // fatal. A retry failing for the same reason exits 0, or the Mac, which imports each time it comes to the front,
+        // would say the same failure again each time; `errors` lists every link that failed this time, for an agent.
+        return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.errors.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n"), exitCode: r.failed.length && !r.added.length && !filled.length ? 1 : 0 };
       }
       const all = queuedLinks(lib);
       return { data: all, text: all.length ? table(all.map((l) => [l.id, l.url, l.error ?? "waiting"])) : "Nothing waiting" };
@@ -591,6 +593,7 @@ export const itemCommands: Record<string, Command> = {
       if (f.title === undefined && f.author === undefined && f.priority === undefined && f.skills === undefined) throw new Error("nothing to change (--title, --author, --priority or --skills)");
       // Every field is checked before the first is written, so a refused edit changes nothing.
       let cards: Record<string, string[]> | undefined;
+      if (f.cards !== undefined && f.skills === undefined) throw new Error("--cards goes with --skills: it puts each exercise's skills back as a filing changes them");
       if (f.cards !== undefined) {
         try { cards = JSON.parse(str(f.cards)!); }
         catch { throw new Error('--cards must be JSON mapping exercise IDs to arrays of skill IDs (for example, {"exercise-id":["learning"]})'); }

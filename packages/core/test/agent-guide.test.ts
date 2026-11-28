@@ -68,10 +68,10 @@ test("both Dig guide recipes save his words once in the dated skill note and in 
       await setSkillLook(lib, "learning", { goal: "Explain how to space retrieval" });
       const words = "I'd retrieve over several days, then check what I missed.\nKeep $HOME and `examples` literal.";
       const result = spawnSync("/bin/sh", ["-c", 'ore() { "$BUN" "$CLI" "$@"; }\n' + recipe!
-        .replaceAll("<skill>", "learning").replaceAll("<YYYY-MM-DD>", "2026-11-28")], {
+        .replaceAll("<skill>", "learning").replaceAll("<YYYY-MM-DD>", "2026-11-28").replace("<shell-escaped text>", words.replaceAll("'", "'\\''"))], {
         encoding: "utf8", timeout: 10000,
         env: { ...process.env, BUN: process.execPath, CLI: join(root, "packages/cli/src/ore.ts"),
-          ORE_LIBRARY: lib.root, ORE_NO_ENRICH: "1", ANS: words },
+          ORE_LIBRARY: lib.root, ORE_NO_ENRICH: "1" },
       });
       expect(result.status).toBe(0);
       const note = readFileSync(skillNotesPath(lib, "learning"), "utf8");
