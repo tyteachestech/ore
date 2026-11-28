@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { type Page } from "playwright";
-import { AGENTS, answered, armGood, isFact, showAnswer, typeFact, awayAndBack, BRIDGE, browser, errors, hold, isHeld, journey, LIB, MOCK, openSource, ore, oreCalls, release, reveal, running, settled, startReview, TESTING, type TryRec, until, url } from "../harness";
+import { AGENTS, answered, armGood, isFact, showAnswer, typeFact, awayAndBack, BRIDGE, browser, errors, hold, isHeld, journey, LIB, MOCK, openSource, ore, oreCalls, passageIn, release, reveal, running, settled, startReview, TESTING, type TryRec, until, url } from "../harness";
 
 journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel, as a Mac sheet's do", async (page) => {
   const inside = (sel: string) => page.evaluate((sel) => !!document.activeElement?.closest(sel), sel);
@@ -2966,6 +2966,7 @@ journey("review: Hint before No idea shows first letters, then half the words; t
     await page.getByRole("radio", { name: "Think so" }).click();
     await page.getByRole("button", { name: "Check", exact: true }).click();
     await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+    await passageIn(page);
     // Marking every key point got would suggest Good; with hints taken the suggestion stops at Hard.
     for (const box of await page.locator(".quiz-points .quiz-mark").all()) if ((await box.getAttribute("aria-pressed")) !== "true") await box.click();
     await until("Hard is suggested", async () => (await page.locator(".rate-2.suggested").count()) === 1);
@@ -3007,6 +3008,7 @@ journey("review: a Fact exercise has the same Hint: its answer as first letters,
     await page.getByRole("radio", { name: "Think so" }).click();
     await page.getByRole("button", { name: "Check", exact: true }).click();
     await until("Hard is suggested, not Good", async () => (await page.locator(".rate-2.suggested").count()) === 1);
+    await passageIn(page);
     await page.getByRole("button", { name: "Hard", exact: true }).click();
     await until("the rating is sent with its hints", async () => calls.calls.some((a) => a[0] === "review" && a.includes("--cued=2") && a.includes("--rating=2")));
   } finally {
