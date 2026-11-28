@@ -375,12 +375,10 @@ journey("phone: a double tap highlights the paragraph and opens it, a heading an
   const twice = (p: { x: number; y: number }) => doubleTap(page, p.x, p.y);
   const before = (await kept()).length;
   const heading = await at("Why it works");
-  await page.waitForTimeout(300); // the scroll settles: a tap that stops one is no tap
   await twice(heading);
   await page.waitForTimeout(600);
   if ((await kept()).length !== before) throw new Error(`a double tap on a heading highlighted ${JSON.stringify(await kept())}`);
   const p = await at("familiarity is easily");
-  await page.waitForTimeout(300);
   await twice(p);
   await page.getByRole("dialog", { name: "Highlight" }).waitFor();
   await until("the paragraph is highlighted", async () => (await kept()).some((t) => t.startsWith("Rereading, by contrast") && t.endsWith("weaker results.")));
