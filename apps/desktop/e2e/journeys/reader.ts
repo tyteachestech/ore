@@ -2556,14 +2556,30 @@ journey("Reader: keyboard passage selection exposes the named reader and the sel
   const before = await reader.ariaSnapshot();
   for (let n = 0; n < 4; n++) await page.keyboard.press("ArrowDown");
   await reader.locator(".focus-box").waitFor();
+  const status = reader.locator('[role="status"][aria-live="polite"][aria-atomic="true"]');
+  await until("the single passage is announced", async () => (await status.textContent()) === last);
   const single = await reader.ariaSnapshot();
   await page.keyboard.press("Shift+ArrowUp");
+  await until("the extended passage is announced", async () => (await status.textContent()) === `${first} ${last}`);
   const extended = await reader.ariaSnapshot();
   if (before === single || single === extended) throw new Error("The accessibility snapshot did not change with the keyboard selection");
   if (!single.includes(`region "${title}"`)) throw new Error("The reader has no accessible name");
   if (!single.includes(`status: ${last}`) || !extended.includes(`status: ${first} ${last}`)) {
     throw new Error(`The accessibility snapshot has the wrong selection:\n${single}\n${extended}`);
   }
+  // A render for an unrelated control must not read the selected blocks again.
+  const paragraph = reader.locator(".doc p").filter({ hasText: /Space out retrieval over several days\.|Changed DOM text/ });
+  await paragraph.evaluate((el) => { el.firstChild!.textContent = "Changed DOM text"; });
+  try {
+    await page.keyboard.press("Meta+f");
+    await page.getByRole("textbox", { name: "Find in source" }).waitFor();
+    if (!(await reader.ariaSnapshot()).includes(`status: ${first} ${last}`)) {
+      throw new Error("Opening Find changed the passage announcement");
+    }
+    await page.keyboard.press("Escape");
+  } finally {
+    await paragraph.evaluate((el, text) => { el.firstChild!.textContent = text; }, last);
+  }
   await page.keyboard.press("Escape");
-  if ((await reader.ariaSnapshot()).includes(`status: ${first}`)) throw new Error("Escape left the old passage announced");
+  await until("Escape clears the announcement", async () => (await status.textContent()) === "");
 }, "webkit");

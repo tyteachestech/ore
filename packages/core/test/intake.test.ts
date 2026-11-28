@@ -20,7 +20,7 @@ import { rtfToDoc } from "../src/ingest/rtf.ts";
 import { xlsxToDoc } from "../src/ingest/sheets.ts";
 import { episode, pageAudio, transcribe, transcribeFile } from "../src/ingest/audio.ts";
 import { absolutize, rewrite } from "../src/ingest/links.ts";
-import { htmlToDoc, inlineMath } from "../src/ingest/web.ts";
+import { episodeHeading, htmlToDoc, inlineMath } from "../src/ingest/web.ts";
 import { mathmlToTex } from "../src/ingest/mathml.ts";
 import { ommlToTex } from "../src/ingest/omml.ts";
 import { pdfToDoc, SCAN_UNREAD } from "../src/ingest/pdf.ts";
@@ -2300,6 +2300,16 @@ describe("import coverage: audio and podcasts", () => {
     }
   });
 
+  test("an episode takes its nearest heading before the player", () => {
+    const html = readFileSync(join(FIX, "audio", "spanishpodcast-216.html"), "utf8")
+      .replace('<h2 class="title">', '<h2>Latest episodes</h2><h2 class="title">')
+      .replace("</audio>", "</audio><h2>Transcript</h2>");
+    const url = "https://www.spanishpodcast.org/podcasts_con_transcripcion/216t.html";
+    expect(episodeHeading(html, url, "Español Podcast / Spanishpodcast |")).toBe("La paella es deliciosa o está deliciosa");
+    const flat = `<html><body><h1><a href="/">Spanish Podcast</a></h1><h2>A good night's sleep</h2><audio></audio><h2>Show notes</h2></body></html>`;
+    expect(episodeHeading(flat, url, "Spanish Podcast")).toBe("A good night's sleep");
+  });
+
   test("an episode page added from the browser tab comes in as its episode too", async () => {
     serve({ [MEGAPHONE]: { body: new Uint8Array(4096), type: "audio/mpeg" } });
     asEpisode(await addTab(await tempLibrary(), { tab: { browser: "Safari", url: EPISODE, title: "x", html: episodePage } }));
@@ -2473,6 +2483,37 @@ describe("import coverage: audio and podcasts", () => {
       expect([u, audioOf(item), existsSync(join(item.dir, "source.html"))]).toEqual([u, null, true]);
     }
     expect(fetched.filter((u) => /\.(mp3|m4a|mp4)(?:\?|$)/.test(u) && !/cdn\.(radio|show)\.test\/(17|sleep|18)/.test(u))).toEqual([]);
+  });
+
+  test("a podcast industry news story with one embedded clip stays an article", async () => {
+    const url = "https://news.test/podcast-industry/ad-revenue-falls";
+    const html = web("podcast-industry.html");
+    serve({
+      [url]: { body: html, type: HTML },
+      "https://news.test/clips/interview.mp3": { body: Buffer.alloc(4096), type: "audio/mpeg" },
+    });
+    const item = await addSource(await tempLibrary(), url);
+    expect(audioOf(item)).toBeNull();
+    expect(item.meta).toMatchObject({ title: "Ad revenue falls", author: "Mara Reed", published: "2026-11-20", url });
+    expect(item.body).toContain("Independent producers reported a drop");
+    expect(item.body).toContain("## What changed this quarter");
+    expect(item.body).toContain("/clips/interview.mp3");
+    expect(item.body).toContain("`revenue / slots`");
+    expect(item.body).toContain("Producers expect bookings to recover in January.");
+    expect(readFileSync(join(item.dir, "source.html"), "utf8")).toBe(html);
+  });
+
+  test("a compound episode path needs a named episode and one audio player", () => {
+    const url = "https://show.test/episodes-with-transcripts/good-sleep";
+    const audio = `<audio src="/sleep.mp3"></audio>`;
+    const named = ld({ "@type": "PodcastEpisode", name: "A good night's sleep" });
+    const titled = `<title>Episode 12: A good night's sleep</title>`;
+    const file = "https://show.test/sleep.mp3";
+    expect(pageAudio(page(named, audio), url)).toBe(file);
+    expect(pageAudio(`<html><head>${titled}</head><body>${audio}</body></html>`, url)).toBe(file);
+    expect(pageAudio(page(named, `${audio}<video src="/sleep.mp4"></video>`), url)).toBeUndefined();
+    expect(pageAudio(page(named, audio), "https://show.test/episodes-with-transcripts/")).toBeUndefined();
+    expect(pageAudio(page(named, audio), "https://show.test/latest-podcasts/good-sleep")).toBeUndefined();
   });
 
   test("a download link is an episode's recording only beside its video twin: a series page's lone MP3 link, or a story's clip under /podcasts/, stays the page", () => {

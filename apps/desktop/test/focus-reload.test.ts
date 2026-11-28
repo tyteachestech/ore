@@ -14,6 +14,7 @@ async function app() {
   type Skill = { id: string; name: string };
   const disk = { skills: [{ id: "creativity", name: "Creativity" }] as Skill[], sources: [{ title: "Before" }] };
   let skills: Skill[] = [], items: unknown[] = [], selected: string | null = "creativity", now = 1000, wakes = 0;
+  let skillsLoading = true;
   const saved = new Map<string, string>();
   const commands: string[] = [];
   const events = new Map<string, () => void>();
@@ -39,6 +40,7 @@ async function app() {
     loadSkills: async () => { commands.push("skills"); return structuredClone(disk.skills); },
     setItems: (all: unknown[]) => { items = all; }, setArchived() {}, setListError() {},
     setSkills: (all: Skill[]) => { skills = all; },
+    setSkillsLoading: (loading: boolean) => { skillsLoading = loading; },
     setSkill: (fn: (k: string | null) => string | null) => { selected = fn(selected); },
     save: (key: string, value: string) => saved.set(key, value), LAST_SKILLS: "ore.skills",
     notify() {}, errorText: (e: Error) => e.message,
@@ -50,7 +52,7 @@ async function app() {
   commands.length = 0;
   return {
     disk, commands,
-    state: () => ({ skills, items, selected, cached: JSON.parse(saved.get("ore.skills")!), wakes }),
+    state: () => ({ skills, skillsLoading, items, selected, cached: JSON.parse(saved.get("ore.skills")!), wakes }),
     async back(after = 12_000, tagName = "BODY") {
       document.activeElement.tagName = tagName;
       events.get("blur")!();
@@ -68,6 +70,7 @@ async function app() {
 test("SOAK-02: returning after an outside rename refreshes sidebar skills, their cache and source lists", async () => {
   const a = await app();
   expect(a.state().skills[0]!.name).toBe("Creativity");
+  expect(a.state().skillsLoading).toBe(false);
   a.disk.skills[0]!.name = "Soak external skill";
   a.disk.sources[0]!.title = "Outside edit";
   await a.back();

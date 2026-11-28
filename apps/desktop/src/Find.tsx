@@ -25,7 +25,9 @@ export function fold(s: string): string {
 /** Where `needle` starts in `hay`, without overlaps, ignoring case and accents. */
 export const findAll = (hay: string, needle: string): number[] => findRanges(hay, needle).map(([a]) => a);
 
-const withoutAccents = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "");
+// Vowel signs and voicing marks in other scripts are part of the spelling.
+const withoutAccents = (s: string) =>
+  s.normalize("NFD").replace(/((?=\p{L})[\p{Script=Latin}\p{Script=Greek}\p{Script=Cyrillic}])\p{M}+/gu, "$1");
 
 /** Where `needle` is in `hay` (start, end), without overlaps, ignoring case and accents. */
 export function findRanges(hay: string, needle: string): [number, number][] {
@@ -49,7 +51,15 @@ export function findRanges(hay: string, needle: string): [number, number][] {
   }
   h = fold(h);
   const at: [number, number][] = [];
-  for (let i = h.indexOf(n); i >= 0; i = h.indexOf(n, i + n.length)) at.push([start(i), end(i + n.length)]);
+  const mark = /\p{M}/uy;
+  for (let i = h.indexOf(n); i >= 0;) {
+    const after = i + n.length;
+    // A plain kana must not match the start of a decomposed voiced kana.
+    mark.lastIndex = after;
+    const partial = mark.test(h);
+    if (!partial) at.push([start(i), end(after)]);
+    i = h.indexOf(n, partial ? i + 1 : after);
+  }
   return at;
 }
 

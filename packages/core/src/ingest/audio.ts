@@ -1,9 +1,11 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { release, tmpdir } from "node:os";
 import { join } from "node:path";
+import { parseHTML } from "linkedom";
 import { madeThisRun } from "../cancel.ts";
 import { cleanDate } from "./check.ts";
 import { run, swiftHelper } from "./swift.ts";
+import { episodeHeading } from "./web.ts";
 
 // Audio and podcast episodes (D96 phase 3): transcribed on the Mac with Apple's on-device speech
 // recognition, into the same timed transcript a video or subtitle file gives.
@@ -200,9 +202,9 @@ function metaOf(html: string): (p: string) => string | undefined {
  *  page (Overcast, Pocket Casts) may name the type mid-path (`/ep13.mp3/stream`). */
 const AUDIO_FILE = new RegExp(`\\.(?:${AUDIO_TYPES.join("|")})(?:[?#]|$)`, "i");
 const AUDIO_ANYWHERE = new RegExp(`\\.(?:${AUDIO_TYPES.join("|")})(?:[/?#]|$)`, "i");
-/** An address with a part after a section named for podcasts or episodes, including compound names
- *  such as `/podcasts_con_transcripcion/`. A section on its own can be the show's index. */
-const EPISODE_PATH = /\/[^/]*(?:podcast|episode)[^/]*\/[^/]+/i;
+/** A section on its own can be the show's index. Compound sections can also be news categories. */
+const EPISODE_PATH = /\/(?:podcasts?|episodes?)\/[^/]+/i;
+const COMPOUND_EPISODE_PATH = /\/(?:podcasts?|episodes?)[_-][\p{L}\p{N}][^/]*\/[^/]+/iu;
 const PODCAST_HOST = /^podcasts?\./i;
 /** A Megaphone episode id (SAM9228418236): letters, then digits. A playlist or show path is not one. */
 const MEGAPHONE_ID = /^[A-Z]{2,}\d{6,}$/;
@@ -211,6 +213,7 @@ const MEGAPHONE_ID = /^[A-Z]{2,}\d{6,}$/;
  *  D122, D167). The page is an episode when its JSON-LD's page-level node (or one in its @graph) is a
  *  PodcastEpisode or RadioEpisode whose media is audio, or its `og:type` says episode and `og:audio`
  *  names the file; otherwise only when an episode path or a page on a podcast host offers one audio.
+ *  Compound paths also need a named episode and a single native audio player as the page's only media.
  *  Look for `og:audio`, an `<audio>` file or a Megaphone player first, then for audio download links.
  *  So a news story that plays a clip, or offers a read-aloud of itself (a bare `og:audio`, an
  *  AudioObject beside its Article), stays the article, as does a show's index with a featured player.
@@ -226,13 +229,23 @@ export function pageAudio(html: string, url: string, player = false): string | u
   };
   const meta = metaOf(html);
   const og = abs(meta("og:audio") ?? meta("og:audio:url") ?? meta("og:audio:secure_url"));
-  const declared = ldEpisodeAudio(html)?.audio ?? (og && /episode/i.test(meta("og:type") ?? "") && AUDIO_FILE.test(og) ? og : undefined);
+  const episode = ldEpisode(html);
+  const declared = episode?.audio ?? (og && /episode/i.test(meta("og:type") ?? "") && AUDIO_FILE.test(og) ? og : undefined);
   if (declared) return abs(declared);
   // A player's own og:audio is its episode, whatever its address looks like (as before D215).
   if (player && og) return og;
   if (!player) {
     const { hostname, pathname } = new URL(url);
-    if (!EPISODE_PATH.test(pathname) && !(PODCAST_HOST.test(hostname) && pathname !== "/")) return undefined;
+    if (!EPISODE_PATH.test(pathname) && !(PODCAST_HOST.test(hostname) && pathname !== "/")) {
+      if (!COMPOUND_EPISODE_PATH.test(pathname)) return undefined;
+      const { document } = parseHTML(html);
+      const media = document.querySelectorAll("audio, video, iframe, embed, object");
+      if (media.length !== 1 || !media[0]?.matches("audio")) return undefined;
+      const title = document.title;
+      // Some shows put their name in the browser title and the episode's title above the player.
+      if (!episode?.title && !/\b(?:episode|episodio)(?:\s+\d|\s*[:#]\s*\S)/i.test(title) &&
+          !(/\bpodcasts?\b/i.test(title) && episodeHeading(html, url, title) !== title)) return undefined;
+    }
   }
   const isAudio = (u: string) => (player ? AUDIO_ANYWHERE : AUDIO_FILE).test(new URL(u).pathname);
   // One episode under two addresses counts once: the same file in another format or under another
@@ -275,19 +288,21 @@ export function pageAudio(html: string, url: string, player = false): string | u
 /** The spoken language of the episode whose audio pageAudio chooses. A site's UI language is not
  *  evidence of what its recording speaks; only the episode's own inLanguage is used. */
 export function pageAudioLanguage(html: string): string | undefined {
-  return ldEpisodeAudio(html)?.language;
+  return ldEpisode(html)?.language;
 }
 
 /** The audio a page's JSON-LD names as the page's own: a page-level (or @graph) PodcastEpisode's or
  *  RadioEpisode's `associatedMedia` or `audio`, when it is audio by its address or `encodingFormat`,
- *  and the spoken language declared on that same episode. */
-function ldEpisodeAudio(html: string): Pick<Episode, "audio" | "language"> | undefined {
+ *  and the spoken language declared on that same episode. An episode with no media metadata can
+ *  still name the recording in its own player. */
+function ldEpisode(html: string): Partial<Pick<Episode, "audio" | "language" | "title">> | undefined {
   const media = (v: unknown): string | undefined =>
     [v].flat().flatMap((m) => {
       const o = m && typeof m === "object" ? (m as Record<string, unknown>) : {};
       const u = typeof o.contentUrl === "string" ? o.contentUrl : undefined;
       return u && (AUDIO_FILE.test(u) || /^audio\//i.test(String(o.encodingFormat ?? ""))) ? [u] : [];
     })[0];
+  let title: string | undefined;
   for (const m of html.matchAll(/<script\b[^>]*application\/ld\+json[^>]*>([\s\S]*?)<\/script>/gi)) {
     let data: unknown;
     try {
@@ -300,9 +315,10 @@ function ldEpisodeAudio(html: string): Pick<Episode, "audio" | "language"> | und
       if (!n || typeof n !== "object" || ![n["@type"]].flat().some((t) => /^(?:PodcastEpisode|RadioEpisode)$/.test(String(t)))) continue;
       const u = media(n.associatedMedia) ?? media(n.audio);
       if (u) return { audio: u, language: languageTag(typeof n.inLanguage === "string" ? n.inLanguage : undefined) };
+      if (!n.associatedMedia && !n.audio && !n.video && typeof n.name === "string") title ??= n.name.trim() || undefined;
     }
   }
-  return undefined;
+  return title ? { title } : undefined;
 }
 
 /** Titles compared as words: case, punctuation and "&" vs "and" aside. */

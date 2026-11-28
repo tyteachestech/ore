@@ -39,6 +39,12 @@ describe("find in source", () => {
     expect(matches("cafe")).toEqual(["cafe\u0301"]);
   });
 
+  test("Find keeps Hindi vowel signs and Japanese voicing marks", () => {
+    expect(findAll("का कि", "का")).toEqual([0]);
+    expect(findAll("が か か\u3099", "か")).toEqual([2]);
+    expect(findAll("が か か\u3099", "が")).toEqual([0, 4]);
+  });
+
   test("a match runs across inline marks, never across paragraphs, left pane before right", () => {
     const left = document.createElement("div");
     left.innerHTML = "<p>desirable <strong>diff</strong>iculties</p><p>end</p><p>start</p><button>end start</button>";
