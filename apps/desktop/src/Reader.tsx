@@ -23,7 +23,7 @@ import { Marks, type Mark } from "./Marks";
 import { Finish, type Reveal } from "./Finish";
 import { Grow } from "./Grow";
 import { breakList, bulletOnSpace, fromBullets, showBullets } from "./list-keys";
-import { HideDots } from "./HideDots";
+import { HideVeil } from "./HideVeil";
 import { drafting } from "./drafting";
 import { ExerciseText } from "./ExerciseText";
 import { Hint } from "./Hint";
@@ -862,6 +862,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   const [reveal, setReveal] = useState<Reveal>(null);
   const hidden = (closedBook && !reveal) || hideSource;
   const scrollRef = useRef<HTMLDivElement>(null);
+  const eyeRef = useRef<HTMLButtonElement>(null);
   useFocusBack(authoring, authorRef, scrollRef);
   // The title isn't a control of its own (one click renames it): its field closed by Enter or Esc, focus goes to the text.
   useFocusBack(renaming, scrollRef);
@@ -1425,10 +1426,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     // The same list kept as is (a popup opening reruns this): the margin marks then don't redraw.
     const next = hidden ? [] : painted;
     setPainted((cur) => (cur.length === next.length && cur.every((x, i) => x.a === next[i]!.a && x.r === next[i]!.r) ? cur : next));
-    // Hidden behind the quiz, highlight colors would show where the answers are (D52).
+    // Hidden behind the quiz, highlight colors would show where the answers are (D52). Hidden by the eye they
+    // stay, as bands of colour under the blur: where he was.
     for (const i of INTENTS) {
       // Above hl-spoken, so a highlight in a playing transcript keeps its own text colour.
-      paint(`hl-${i}`, hidden || writing ? [] : by[i], MARKS);
+      paint(`hl-${i}`, (closedBook && !reveal) || writing ? [] : by[i], MARKS);
     }
     const active = popup && map.get(popup.id);
     paint("hl-active", active ? [active] : [], MARKS);
@@ -3607,7 +3609,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           {/* Not on the phone: its note is a page of its own, the source already out of sight. */}
           {!PHONE && (
             <Hint text={hideSource ? "Show the source" : "Hide the source while you write"} keys="hide-source">
-              <button className={`width-toggle${hideSource ? " on" : ""}`} aria-label={hideSource ? "Show the source" : "Hide the source"} aria-pressed={hideSource} onClick={toggleHide}>
+              <button className={`width-toggle${hideSource ? " on" : ""}`} aria-label={hideSource ? "Show the source" : "Hide the source"} aria-pressed={hideSource} onClick={toggleHide} ref={eyeRef}>
                 {hideSource ? <EyeSlash size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
               </button>
             </Hint>
@@ -3669,7 +3671,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
           })}
         </div>
       )}
-      <HideDots hidden={hidden} box={scrollRef} page={pageRef} />
+      <HideVeil hidden={hidden} eye={eyeRef} />
       {/* Only the words hide (F118): the toolbar above them, with Show the source, stays in reach of VoiceOver. */}
       <div className="reader-scroll" ref={scrollRef} tabIndex={-1} aria-hidden={hidden || undefined} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} {...(PHONE ? { onTouchStart, onTouchMove, onTouchEnd } : {})} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>

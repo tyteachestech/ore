@@ -812,6 +812,13 @@ export async function textFile(name: string, text: string) {
   return path;
 }
 
+/** A double tap: both taps sent at once, so the second never waits for the first's answer to come back. Sent one
+ *  after the other from here, a busy runner put them more than the Reader's 350 ms apart and they were two single
+ *  taps (F856). */
+export async function doubleTap(page: Page, x: number, y: number) {
+  await Promise.all([page.touchscreen.tap(x, y), page.touchscreen.tap(x, y)]);
+}
+
 /** A finger dragged from one point to another in `ms` and lifted (Playwright's touchscreen only taps): touch events
  *  built in the page, on what was under the finger when it came down, as a browser sends them. */
 export async function swipe(page: Page, from: [number, number], to: [number, number], ms = 200, scrolls = false) {
