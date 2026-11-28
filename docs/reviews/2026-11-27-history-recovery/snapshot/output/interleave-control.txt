@@ -1,0 +1,11 @@
+{
+  "nested": {
+    "skipped": true
+  },
+  "outer": {
+    "committed": true
+  },
+  "savedA": "complete",
+  "savedB": "complete"
+}
+PASS: snapshot contains one complete write, never half of the next write (F643)

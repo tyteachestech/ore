@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "AI_DISABLED_RESTORE_SCOUT" >&2
+exit 91

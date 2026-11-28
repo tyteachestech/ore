@@ -1,0 +1,16 @@
+{
+  "nested": {
+    "committed": false
+  },
+  "stageAfterRejected": {
+    "a": "next",
+    "b": "complete",
+    "lockHeld": true
+  },
+  "outer": {
+    "committed": true
+  },
+  "savedA": "next",
+  "savedB": "complete"
+}
+FAIL: snapshot contains one complete write, never half of the next write (F643)

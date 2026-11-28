@@ -1,0 +1,3 @@
+#!/bin/sh
+printf '%s\n' 'SCOUT: real AI is disabled' >&2
+exit 91

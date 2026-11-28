@@ -1,0 +1,16 @@
+[
+  {
+    "kind": "skill-notes",
+    "ref": "learning",
+    "item": null,
+    "title": "Notes: Learning",
+    "snippet": "[amberword] [Source](ore:item/01M8FPM1XG7CNQPKPV3SBS243C)\n"
+  },
+  {
+    "kind": "notes",
+    "ref": "01M8FPM1XG7CNQPKPV3SBS243C",
+    "item": "01M8FPM1XG7CNQPKPV3SBS243C",
+    "title": "My notes: Notes on retrieval practice",
+    "snippet": "[amberword] [Target](ore:item/01M8FPM1XN2T9Y6BRQB4C4VX7R)\n"
+  }
+]

@@ -1,0 +1,16 @@
+import {fresh,git,check,NOW} from "./harness.ts";
+import {snapshot} from "../../packages/core/src/history.ts";
+import {addText} from "../../packages/core/src/ingest/index.ts";
+import {setNotes,notesPath} from "../../packages/core/src/notes.ts";
+const lib=await fresh("detached"); const item=await addText(lib,"Source to read.");
+await setNotes(lib,item.meta.id,"Earlier note."); snapshot(lib,{force:true,now:NOW});
+const base=git(lib,"rev-parse","HEAD"),main=git(lib,"branch","--show-current");
+await setNotes(lib,item.meta.id,"Today's note."); snapshot(lib,{force:true,now:NOW+1});
+if(process.env.PROBE_PATH_RESTORE)git(lib,"restore","--source",base,"--",".");else git(lib,"checkout","-q","--detach",base);
+await setNotes(lib,item.meta.id,"Work done after recovery.");
+const result=snapshot(lib,{force:true,now:NOW+2}); const saved=git(lib,"rev-parse","HEAD");
+const branches=git(lib,"branch","--contains",saved);
+git(lib,"checkout","-q",main);
+const visible=git(lib,"show","HEAD:"+notesPath(item).slice(lib.root.length+1));
+console.log(JSON.stringify({result,namedBranchContainsSnapshot:!!branches.replace(/.*HEAD detached.*\n?/g,""),visibleAfterReturning:visible,reflogContainsSnapshot:git(lib,"reflog","--format=%H").includes(saved)},null,2));
+let reachable=true; try{git(lib,"merge-base","--is-ancestor",saved,main);}catch{reachable=false;} check(reachable,"new snapshot remains reachable from the normal history branch");

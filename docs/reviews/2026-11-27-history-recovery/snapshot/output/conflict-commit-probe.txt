@@ -1,0 +1,8 @@
+{
+  "unmergedBefore": true,
+  "unmergedAfter": true,
+  "committed": false,
+  "headChanged": false,
+  "stored": "Today note."
+}
+PASS: snapshot leaves unresolved recovery conflicts unmerged and uncommitted

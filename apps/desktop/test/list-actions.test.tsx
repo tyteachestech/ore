@@ -296,6 +296,7 @@ test("Undo of importance after an earlier failed save restores the last saved im
   const calls: string[] = [];
   const run = async <T,>(...args: string[]): Promise<T> => {
     calls.push(args.join(" "));
+    if (args[0] === "show") return { priority: saved } as T; // Undo reads it first (it may have been changed since)
     if (first) {
       first = false;
       await new Promise<void>((_, reject) => { fail = reject; });
@@ -388,4 +389,23 @@ test("list title Undo and Redo preserve a newer external title (PHONE-03)", asyn
   expect(disk).toBe("Mac");
   expect(d.state.items[0]!.title).toBe("Mac");
   expect(document.body.textContent).toContain("it was renamed since");
+});
+
+// History recovery pass (app-01): a source's importance restored from the library's history, then ⌘Z on the
+// change made before it wrote the older importance back over the restore. Undo and Redo check it on disk, as a
+// title's do (PHONE-03).
+test("importance Undo leaves an importance set outside since (a restore from the history), and says so", async () => {
+  let disk = "";
+  const d = await device({ items: [item("a")], answers: (args) => {
+    if (args[0] === "show") return { title: "A", priority: disk || undefined };
+    if (args[0] === "edit") disk = args.find((a) => a.startsWith("--priority="))!.split("=")[1]!;
+  } });
+  await act(async () => void await d.sources().setImportance(d.state.items[0]!, "P1"));
+  await tick();
+  expect(disk).toBe("P1");
+  disk = "P3"; // git checkout <sha> -- items/…/doc.md
+  await act(async () => d.t.undo());
+  await tick();
+  expect(disk).toBe("P3");
+  expect(document.body.textContent).toContain("changed since");
 });

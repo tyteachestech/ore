@@ -133,12 +133,14 @@ export function sourceActions(env: Lists) {
   const setImportance = (item: Item, p: Priority | "") => {
     const before = item.priority ?? "";
     const said = p ? LEVELS.find((l) => l.p === p)!.label : item.skills.length ? "same as its skills" : "Normal";
+    // Undo and Redo leave an importance set outside since (a restore from the library's history), as a title's do.
+    const level = keepNewer(async () => (await ore<Doc>("show", item.id)).priority ?? "", (to: Priority | "") => ore("edit", item.id, opt("priority", to)), () => "Left as it is: its importance was changed since");
     return env.change(valueChange<Priority | "">({
       message: `${item.title}: ${said}`,
       kind: "quiet", key: item.id,
       field: `source ${item.id} priority`, before, after: p,
-      show: (priority) => patch(item.id, (i) => ({ ...i, priority: priority || undefined })),
-      write: (priority) => ore("edit", item.id, opt("priority", priority)),
+      show: (priority) => patch(item.id, (i) => ({ ...i, priority: (level.newer() ?? priority) || undefined })),
+      write: level.write,
     }));
   };
 
