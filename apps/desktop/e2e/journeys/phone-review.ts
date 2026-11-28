@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { journey, keyboardUp, PHONE_LIB, phoneSource, phoneWith, pointAt, press, settled, slid, swipe, tap, TESTING, until } from "../harness";
+import { journey, keyboardUp, PHONE_LIB, phoneSource, phoneWith, pointAt, press, settled, slid, swipe, tap, TESTING, until, tapFact } from "../harness";
 
 journey("phone: the check-in before a session asks about what he is trying, its buttons are 44 pt taps, and Not yet goes on to the first exercise (D324)", async (page) => {
   // The seed's library has something he is trying, last touched before today.
@@ -34,29 +34,29 @@ journey("phone: in Review the buttons he taps on every exercise sit at the foot 
     const sure = page.getByRole("radio", { name: "Think so" });
     await sure.or(page.locator(".phone-full .review-end")).first().waitFor();
     if (!(await sure.count())) break;
-    const typed = (await page.locator(".phone-full textarea:visible").count()) > 0;
-    if (!typed) {
-      // An exercise answered in his head: nothing under the question but the three buttons, at the foot.
-      const gap = await foot(".quiz-sure");
-      if (gap > 60) throw new Error(`How sure are you? ends ${gap}px above the foot of the screen`);
+    // A Fact exercise (D-new-typed-facts): its short box, how sure he is and its buttons, at the foot.
+    const fact = (await page.locator(".phone-full .review-card").first().getAttribute("data-kind")) === "card";
+    if (fact) {
+      const gap = await foot(".phone-full .review-foot");
+      if (gap > 60) throw new Error(`a Fact's No idea and Check end ${gap}px above the foot of the screen`);
       const moment = page.locator(".review-moment");
       if (await moment.count()) {
         const over = await moment.evaluate((m) => Math.round(m.getBoundingClientRect().bottom - document.querySelector("#review-sure")!.getBoundingClientRect().top));
         if (over > 0) throw new Error(`what the last answer won covers the confidence buttons by ${over}px`);
       }
     }
-    if (typed) await tap(page, page.getByRole("button", { name: "No idea" }));
-    else await tap(page, sure);
+    await tap(page, page.getByRole("button", { name: "No idea" }));
     const good = page.getByRole("button", { name: "Good", exact: true });
     await good.waitFor();
     const gap = await foot(".review-rate");
     const tall = await page.locator(".review-body").evaluate((b) => b.scrollHeight > b.clientHeight + 1);
     // A long answer scrolls and the ratings follow it; a short one leaves them at the foot.
     if (!tall && gap > 60) throw new Error(`the ratings end ${gap}px above the foot of the screen`);
-    if (!typed) seen++;
-    await tap(page, good);
+    if (fact) seen++;
+    // After No idea, Good on an Explain one wants a second press (D237): Again moves on at one.
+    await tap(page, page.getByRole("button", { name: "Again", exact: true }));
   }
-  if (!seen) throw new Error("no exercise answered in his head came up");
+  if (!seen) throw new Error("no Fact exercise came up");
 }, "phone");
 
 journey("phone: a skill's header is one line of its rocks in the order they grow, ending in the level ring and the cut count (F141)", async (page) => {
@@ -112,7 +112,7 @@ journey("phone: Review's confidence labels stay in their buttons at the largest 
       return text.bottom > box.bottom + 1 || text.top < box.top - 1 ? [`${b.textContent}: text ${Math.round(text.top)}–${Math.round(text.bottom)}, button ${Math.round(box.top)}–${Math.round(box.bottom)}`] : [];
     }));
     if (spill.length) throw new Error(`a confidence label spills out of its button: ${spill.join("; ")}`);
-    const field = page.locator(".phone-full textarea:visible");
+    const field = page.locator(".phone-full .quiz-answer:visible");
     if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
     await tap(page, sure);
     const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
@@ -254,7 +254,7 @@ journey("phone: ⌘Z on a rating after leaving Review puts Today's minutes back 
   await sure.waitFor();
   // Three minutes on this exercise, so the rating shows in Today's minutes.
   await page.evaluate(() => { const real = Date.now; Date.now = () => real() + 180_000; });
-  const field = page.locator(".phone-full textarea:visible");
+  const field = page.locator(".phone-full .quiz-answer:visible");
   if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
   await tap(page, sure);
   const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
@@ -305,7 +305,7 @@ journey("phone: the mole's note that the goal is met never covers the buttons he
     } else {
       // Three minutes an exercise (the cap), so the day's five are met in two.
       await page.evaluate(() => { const real = Date.now; Date.now = () => real() + 181_000; });
-      await tap(page, (await page.locator(".phone-full textarea:visible").count()) ? page.getByRole("button", { name: "No idea" }) : sure);
+      await tap(page, (await page.locator(".phone-full .quiz-answer:visible").count()) ? page.getByRole("button", { name: "No idea" }) : sure);
     }
     await page.waitForTimeout(700);
   }
@@ -322,7 +322,7 @@ journey("phone: a rating still saves after the clock is set back (F183)", async 
   const rate = async () => {
     const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
     await sure.waitFor();
-    const field = page.locator(".phone-full textarea:visible");
+    const field = page.locator(".phone-full .quiz-answer:visible");
     if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
     await tap(page, sure);
     const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
@@ -351,7 +351,7 @@ journey("phone: a session across midnight counts only the new day's minutes towa
     const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
     await sure.waitFor();
     await page.clock.fastForward(wait);
-    const field = page.locator(".phone-full textarea:visible");
+    const field = page.locator(".phone-full .quiz-answer:visible");
     if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
     await tap(page, sure);
     const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
@@ -375,7 +375,7 @@ journey("phone: a review left after midnight with no rating since shows the new 
   const rate = async (wait: string) => {
     await sure.waitFor();
     await page.clock.fastForward(wait);
-    const field = page.locator(".phone-full textarea:visible");
+    const field = page.locator(".phone-full .quiz-answer:visible");
     if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
     await tap(page, sure);
     const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
@@ -422,7 +422,7 @@ journey("phone: a rating after midnight whose day could not be read still counts
   const rate = async (wait: string) => {
     await sure.waitFor();
     await page.clock.fastForward(wait);
-    const field = page.locator(".phone-full textarea:visible");
+    const field = page.locator(".phone-full .quiz-answer:visible");
     if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
     await tap(page, sure);
     const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
@@ -468,7 +468,7 @@ journey("phone: the last rating of a review shows the end screen, not Wrapping u
     const sure = page.locator(".phone-full button:visible").filter({ hasText: /^Think so/ });
     await sure.or(page.locator(".phone-full .review-end")).or(page.getByText("Wrapping up")).first().waitFor();
     if (!(await sure.count())) break;
-    const field = page.locator(".phone-full textarea:visible");
+    const field = page.locator(".phone-full .quiz-answer:visible");
     if (await field.count()) (await tap(page, field), await page.keyboard.type("Retrieval makes the memory stronger."));
     await tap(page, sure);
     const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
@@ -546,7 +546,7 @@ journey("phone: Review's ⋯ puts an exercise off with Later before its answer, 
   await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Later", exact: true }));
   await until("Later moves on", async () => (await q.innerText()) !== first);
   if (await page.getByRole("button", { name: "Ask about this" }).count()) throw new Error("Ask is on the phone, which can't run the AI");
-  await tap(page, page.getByRole("radio", { name: "Think so" }));
+  await tapFact(page);
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await tap(page, more);
   await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
@@ -567,7 +567,7 @@ journey("phone: Review's ⋯ is as strong as ×, and Edit exercise's question st
   const [dots, x] = [await ink("Exercise actions"), await ink("Leave review")];
   if (dots < x * 0.6) throw new Error(`⋯ has ${dots} dots of ink to ×'s ${x}`);
   // Edit exercise's question went up under the head when the keyboard came up (the answer's buttons were pulled into sight).
-  await tap(page, page.getByRole("radio", { name: "Think so" }));
+  await tapFact(page);
   await page.getByRole("button", { name: "Good", exact: true }).waitFor();
   await tap(page, page.getByRole("button", { name: "Exercise actions" }));
   await tap(page, page.locator(".action-sheet").getByRole("button", { name: "Edit exercise", exact: true }));
@@ -708,7 +708,7 @@ journey("phone: the phone ticks under his finger on four moments and no others: 
   const sure = page.getByRole("radio", { name: "Think so" });
   await sure.waitFor();
   await slid(page);
-  await tap(page, (await page.locator(".phone-full textarea:visible").count()) ? page.getByRole("button", { name: "No idea" }) : sure);
+  await tap(page, (await page.locator(".phone-full .quiz-answer:visible").count()) ? page.getByRole("button", { name: "No idea" }) : sure);
   const hard = page.getByRole("button", { name: "Hard", exact: true });
   await hard.waitFor();
   await tap(page, hard);
@@ -794,7 +794,7 @@ journey("phone: a tap on an exercise's history line lists each review's rating a
   await sure.or(page.locator(".phone-full .review-end")).first().waitFor();
   for (let i = 0; i < 8 && !(await page.locator(".timeline-tap").count()); i++) {
     if (!(await sure.count())) break;
-    const field = page.locator(".phone-full textarea:visible");
+    const field = page.locator(".phone-full .quiz-answer:visible");
     if (await field.count()) (await tap(page, field), await page.keyboard.type("Spacing beats cramming."));
     await tap(page, sure);
     const check = page.locator(".phone-full button:visible").filter({ hasText: /^Check/ });
@@ -823,7 +823,7 @@ journey("phone: after a rating scrolled down a long answer, the next exercise op
     await sure.waitFor();
     const was = await question();
     // No idea, then Again: Good after No idea asks him to confirm.
-    const typed = (await page.locator(".phone-full textarea:visible").count()) > 0;
+    const typed = (await page.locator(".phone-full .quiz-answer:visible").count()) > 0;
     await tap(page, typed ? page.getByRole("button", { name: "No idea" }) : sure);
     const rate = page.getByRole("button", { name: typed ? "Again" : "Good", exact: true });
     await rate.waitFor();

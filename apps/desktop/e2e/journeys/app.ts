@@ -1,6 +1,6 @@
 import { type Locator } from "playwright";
 import { join } from "node:path";
-import { AGENTS, BRIDGE, failNext, foundOnScreen, hasCaret, inLibrary, isHeld, journey, LIB, openSource, ore, pickWithKeys, release, searchPick, select, settled, startReview, TESTING, textFile, until } from "../harness";
+import { AGENTS, BRIDGE, failNext, foundOnScreen, hasCaret, inLibrary, isHeld, journey, LIB, openSource, ore, pickWithKeys, release, searchPick, select, settled, startReview, TESTING, textFile, until, typeFact } from "../harness";
 
 journey("a sheet opened in the same moment as All sources keeps the keys: the list behind never takes them (F64)", async (page) => {
   // F64: the list takes the keys a frame after All sources is chosen. ⌘R inside that frame opened What to review, then
@@ -655,7 +655,7 @@ journey("a11y: revealing a Fact announces its answer and rating phase (F113)", a
   await page.locator(".quiz-sure").waitFor();
   const live = page.locator(".review .sr-only[aria-live]");
   const before = await live.innerText();
-  await page.keyboard.press("3");
+  await typeFact(page, undefined, "Sure");
   const answer = page.locator(".review-answer");
   await answer.waitFor();
   const said = await live.innerText();
@@ -698,7 +698,7 @@ journey("a11y: gem counts say their meaning and reveal hints by keyboard (F114)"
 journey("a11y: the suggested rating has a keyboard focus ring (F115)", async (page) => {
   await startReview(page, /Learning/);
   await page.locator(".quiz-sure").waitFor();
-  await page.keyboard.press("3");
+  await typeFact(page, undefined, "Sure");
   const good = page.locator(".review-rate .suggested");
   await good.waitFor();
   const before = await good.evaluate((e) => getComputedStyle(e).boxShadow);

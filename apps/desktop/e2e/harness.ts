@@ -575,8 +575,32 @@ export async function startReview(page: Page, only: RegExp | null, keys = false,
   });
 }
 
-/** Shows the answer of the card on screen: No idea on a question, Think so on a card. */
+/** Whether the exercise on screen is a Fact one (`kind: card`). */
+export const isFact = async (page: Page) => (await page.locator(".review-card").first().getAttribute("data-kind")) === "card";
+
+/** Answers the Fact exercise on screen as he does (D-new-typed-facts): types `text` (its own answer by default, so
+ *  ↵ suggests Good), says how sure, and checks it. */
+export async function typeFact(page: Page, text?: string, sure = "Think so") {
+  const id = await page.locator(".review-card").first().getAttribute("data-id");
+  const said = text ?? ((await ore("card", "show", id!)) as { answer: string }).answer;
+  await page.getByLabel("Your answer").fill(said);
+  const pick = page.getByRole("radio", { name: sure, exact: true });
+  // A kept draft brings back how sure he was; a second press would clear it.
+  if ((await pick.getAttribute("aria-checked")) !== "true") await pick.click();
+  await page.locator("#review-check").click();
+}
+
+/** Checks the exercise on screen as fast as he can: No idea on an Explain one, its own answer typed on a Fact one. */
+export const showAnswer = async (page: Page) => ((await isFact(page)) ? typeFact(page) : page.getByRole("button", { name: "No idea" }).click());
+
+/** Shows the answer of the exercise on screen: No idea on an Explain one, its own answer typed on a Fact one. */
 export async function reveal(page: Page) {
+  if (await isFact(page)) {
+    await typeFact(page);
+    await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+    await page.waitForTimeout(300);
+    return;
+  }
   const noIdea = page.getByRole("button", { name: "No idea" });
   const none = await noIdea.isVisible();
   await (none ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
@@ -656,6 +680,18 @@ export async function tap(page: Page, target: Locator) {
   }
   if (!b) throw new Error(`nothing on screen to tap: ${target}`);
   await page.touchscreen.tap(b.x + b.width / 2, b.y + b.height / 2);
+}
+
+/** On the phone: answers the Fact exercise on screen with touches (D-new-typed-facts). The phone's library lives in
+ *  the page, out of the bridge's reach, so it types `text`, not the answer: Good is tapped, not suggested. */
+export async function tapFact(page: Page, text = "An answer from memory", sure = "Think so") {
+  const said = text;
+  const box = page.locator(".phone-full .quiz-answer-line");
+  await tap(page, box);
+  await box.fill(said);
+  const pick = page.getByRole("radio", { name: sure, exact: true });
+  if ((await pick.getAttribute("aria-checked")) !== "true") await tap(page, pick);
+  await tap(page, page.locator(".phone-full #review-check"));
 }
 
 /** Opens a source from the drawer's Sources, by its title. */
