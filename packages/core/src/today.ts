@@ -208,8 +208,9 @@ export function today(lib: Library, now = new Date()): Today {
       d.setDate(d.getDate() - 1);
       if (counts(localDay(d))) before.push(localDay(d));
     }
-    // No review since the day before the older of the two: one on a day off in between still ends the gap.
-    const last = [...byDay.keys()].sort().at(-1);
+    // No review since the day before the older of the two: one on a day off in between still ends the gap. A line
+    // dated ahead of today (a clock set wrong, then right) is not a review he just made.
+    const last = [...byDay.keys()].filter((d) => d <= day).sort().at(-1);
     const away = !!last && last < before[1]! && queue.length > 0;
 
     const cards = index.cards();

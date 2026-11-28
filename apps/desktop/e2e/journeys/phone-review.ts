@@ -834,6 +834,8 @@ journey("phone: after a rating scrolled down a long answer, the next exercise op
 
 journey("phone: back after days away the mole offers two minutes on Today, a 44 pt tap that starts a review with no pick (D-new-two-minutes)", async (page) => {
   const short = page.getByRole("button", { name: "2 minutes", exact: true });
+  // With something he is trying, which a full session asks about first (D324).
+  await page.evaluate(() => localStorage.setItem("e2e.check-in", "1"));
   // Four days on, for Date only (F468): the seed's last review is days behind.
   await page.clock.setFixedTime(new Date(Date.now() + 4 * 24 * 3600e3));
   await page.reload();
@@ -848,4 +850,5 @@ journey("phone: back after days away the mole offers two minutes on Today, a 44 
   await tap(page, short);
   await page.getByRole("radio", { name: "Think so" }).or(page.locator(".review-q")).first().waitFor();
   if (await page.locator(".review-pick").count()) throw new Error("two minutes asked what to review first");
+  if (await page.locator(".checkin").count()) throw new Error("two minutes opened on the check-in, not an exercise");
 }, "phone");

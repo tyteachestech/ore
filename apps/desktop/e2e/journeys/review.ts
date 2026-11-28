@@ -3173,7 +3173,8 @@ journey("Home: back after days away the mole offers two minutes; one tap starts 
     const args = (JSON.parse(route.request().postData() ?? "{}") as { args?: string[] }).args ?? [];
     if (args[0] !== "today") return route.fallback();
     const r = await route.fetch().catch(() => null);
-    if (r) await route.fulfill({ response: r, json: { ...(await r.json()), away: true } }).catch(() => {});
+    if (!r) return route.abort().catch(() => {});
+    await route.fulfill({ response: r, json: { ...(await r.json()), away: true } }).catch(() => {});
   });
   try {
     await page.reload();

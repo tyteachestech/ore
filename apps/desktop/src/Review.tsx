@@ -1814,7 +1814,8 @@ function useCheckIn(pick: string[] | null, source: string | undefined, quick: bo
 /** Review, with one question first on the days it applies: did he use the thing he is trying? It is asked where he
  *  reliably is, takes how it went, and one key ("Not yet", Esc) goes past it. */
 export function Review(props: Parameters<typeof Session>[0]) {
-  const [t, pass] = useCheckIn(props.pick, props.source, !!props.quick);
+  // Two minutes after days away start on an exercise, no question first: the check-in waits for his next full session.
+  const [t, pass] = useCheckIn(props.pick, props.source, !!props.quick || !!props.short);
   if (t === undefined) return <div className="review" aria-label="Review" />;
   if (!t) return <Session {...props} />;
   const save = async (text: string, mine: boolean) => {

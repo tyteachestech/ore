@@ -159,6 +159,8 @@ export class ReviewSession<S> {
   /** The length, in ms of active review, at which this session ends itself; 0 for one that flows on. The mole's
    *  two minutes after days away (D-new-two-minutes). */
   short = 0;
+  /** Active time rated in this session, whatever day it fell on: `activeMs` starts again at midnight. */
+  private ratedMs = 0;
   constructor(private quick = false, private run: typeof ore = ore) {}
 
   /** `draw` runs whenever what the screen draws has changed. */
@@ -506,16 +508,7 @@ export class ReviewSession<S> {
       this.goalSaid = false;
       this.changed();
     }
-    // A two-minute session (D-new-two-minutes) ends itself at the rating that passes its time; after a miss, one
-    // he will likely recall comes first, as before the goal's moment (D177), so it never ends on a failure.
-    if (this.short && this.activeMs >= this.short) {
-      const win = rating === 1 && !this.wonLast ? lastWin(this.queue ?? []) : null;
-      if (win) {
-        this.wonLast = true;
-        return this.setQueue(win);
-      }
-      return void this.finish();
-    }
+    if (this.shortOver(rating)) return;
     if (!goalClosed || this.goalTold) return;
     // D177: a goal that closes on a miss gets one more card first, a likely recall, so its moment doesn't
     // follow a failure. Once only: whatever he answers next, the goal is told.
@@ -584,6 +577,7 @@ export class ReviewSession<S> {
     this.done++;
     if (this.ahead) this.ahead.armed = true;
     this.activeMs += Math.min(elapsed, ACTIVE_CAP_MS);
+    this.ratedMs += Math.min(elapsed, ACTIVE_CAP_MS);
     this.setQueue(this.queue && afterAnswer(this.queue, rating === 1));
   }
 
@@ -622,6 +616,7 @@ export class ReviewSession<S> {
       this.reviewed--;
       // A rating from before midnight's rollover: the count is the new day's now, so only its own time comes off.
       this.activeMs = last.day === this.beforeDay ? last.activeMs : Math.max(0, this.activeMs - last.ms);
+      this.ratedMs = Math.max(0, this.ratedMs - last.ms);
       // One rated after midnight that no new day counted yet: it is no longer this session's either.
       if (this.turnedMs) this.turnedMs = Math.max(0, this.turnedMs - last.ms);
       this.off = new Set(last.off);
@@ -652,7 +647,20 @@ export class ReviewSession<S> {
   private redoRated(id: string, args: string[], rating: number, elapsed: number, again: Again) {
     if (this.end || this.busy || this.queue?.[0]?.id !== id) return null;
     this.setBusy(true);
-    return this.submit(args, rating, elapsed, again).finally(() => this.setBusy(false));
+    return this.submit(args, rating, elapsed, again).finally(() => this.setBusy(false)).then(() => void this.shortOver(rating));
+  }
+
+  /** A two-minute session (D-new-two-minutes) ends itself at the rating, given or given again, that brings its time
+   *  to two minutes. After a miss, one he will likely recall comes first, as before the goal's moment and sharing
+   *  its once a session (D177), so it does not end on a failure. True if it ended or served that one. */
+  private shortOver(rating: number): boolean {
+    if (!this.short || this.end || this.ratedMs < this.short) return false;
+    const win = rating === 1 && !this.wonLast ? lastWin(this.queue ?? []) : null;
+    if (win) {
+      this.wonLast = true;
+      this.setQueue(win);
+    } else void this.finish();
+    return true;
   }
 
   /** Later (D192, Anki's Bury for this session): the exercise goes to the end of the session, before or after

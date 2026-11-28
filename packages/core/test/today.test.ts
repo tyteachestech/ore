@@ -435,6 +435,8 @@ describe("today (D60)", () => {
     // One review that day and the offer is gone: it is made once per gap.
     await recordReview(lib, cards[1]!.meta.id, { rating: 3, confidence: 2, elapsed_ms: 30_000, now: day(9) });
     expect(today(lib, day(9)).away).toBe(false);
+    // A review dated ahead of today (a clock set wrong, then right) is not one he just made.
+    expect(today(lib, day(5)).away).toBe(true);
   });
 
   test("a day he reviewed but fell short of the goal is short, not open (D362)", async () => {

@@ -382,6 +382,15 @@ test("a two-minute session ends itself at the rating that passes two minutes, af
   await tick();
   expect(m.s.end).not.toBeNull();
 
+  // Given again with ⇧⌘Z after ⌘Z took it back from the end screen, the rating ends the session again.
+  await t.steps.at(-1)!.undo!();
+  await tick();
+  expect(t.s.end).toBeNull();
+  t.on("b");
+  await t.steps.at(-1)!.redo!();
+  await tick();
+  expect(t.s.end).not.toBeNull();
+
   // A session without it flows on.
   const f = await open();
   f.s.clock(130_000);
