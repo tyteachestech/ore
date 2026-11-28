@@ -30,7 +30,7 @@ export interface ReviewInput {
   variant?: string;
   /** Answered in his head and self-marked (D68). */
   in_head?: boolean;
-  /** How many hints he took before answering, 1 or 2 (D358). */
+  /** How many hints he took before answering, 1 or 2; 0 or none for no hint (D358). */
   cued?: number;
   now?: Date;
 }
@@ -65,7 +65,7 @@ export async function recordReview(lib: Library, cardRef: string, input: ReviewI
   return withLock(paths.lock(lib), () => {
     const card = findCard(lib, cardRef);
     if (card.meta.state === "retired") throw new Error(`card ${card.meta.id} is retired`);
-    if (input.cued !== undefined && input.cued !== 1 && input.cued !== 2) throw new Error("--cued is 1 or 2");
+    if (input.cued && input.cued !== 1 && input.cued !== 2) throw new Error("--cued is 1 or 2");
     // A time this card already has a review at (taken back or not, here or synced) moves on a millisecond:
     // an undo names its review by card and time, so two reviews sharing one would stand or fall together.
     let now = input.now ?? new Date();

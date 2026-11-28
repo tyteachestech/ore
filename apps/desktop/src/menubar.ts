@@ -104,7 +104,7 @@ export function setMenu(keymap: Record<KeyId, Combo>, where: Where) {
   void invoke("set_app_menu", { menus: menuSpec(keymap, where) }).catch(() => {});
 }
 
-const KEY: Record<string, string> = { BracketLeft: "[", BracketRight: "]", Comma: ",", Slash: "/", Backspace: "Backspace", Enter: "Enter", Space: " " };
+const KEY: Record<string, string> = { BracketLeft: "[", BracketRight: "]", Comma: ",", Slash: "/", Quote: "'", Backspace: "Backspace", Enter: "Enter", Space: " " };
 
 /** The keydown a combo stands for, as the page's handlers read it (they match on `code`). */
 export function keydownFor(combo: Combo): KeyboardEvent {

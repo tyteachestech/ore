@@ -446,6 +446,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   })();
   // Recalled with a hint is a weaker recall: the suggestion goes no higher than Hard; his pick stands (D21).
   const suggested = cued && uncapped ? Math.min(uncapped, 2) : uncapped;
+  /** An Explain exercise with a key point to hint from (D358). */
+  const hintable = !!card && card.kind === "prompt" && !!cueSource(card);
 
   // A rating waits only for what the marks say now: when they change, it stops waiting.
   useEffect(() => setGuard(undefined), [suggested]);
@@ -663,9 +665,10 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     }
     const digit = reviewDigit(e);
     if (phase === "answer") {
-      if (is(e, "hint") && card.kind === "prompt") {
+      if (is(e, "hint") && hintable) {
         e.preventDefault();
-        if (cued < CUE_LEVELS) setCued(cued + 1);
+        // A held ⌘' gives one hint, never both at once.
+        if (!e.repeat && cued < CUE_LEVELS) setCued(cued + 1);
       } else if (is(e, "no-idea") && card.kind === "prompt") {
         e.preventDefault();
         void check(true);
@@ -880,7 +883,8 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                       </button>
                     </Hint>
                   )}
-                  {cued < CUE_LEVELS && (
+                  {/* No ⌘Z for a hint: what it showed can't be unseen, so taking it back would only hide that he saw it. */}
+                  {hintable && cued < CUE_LEVELS && (
                     <Hint text={cued ? "Another hint" : "A hint: the first letters"} keys="hint" side="top">
                       <button className="quiz-ghost" onClick={() => setCued(cued + 1)}>
                         {cued ? "More" : "Hint"}
@@ -1104,7 +1108,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
           </div>
         )}
       </div>
-      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} hint={card.kind === "prompt" && cued < CUE_LEVELS} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} draft={entry.state === "draft"} />}
+      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} hint={hintable && cued < CUE_LEVELS} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} draft={entry.state === "draft"} />}
     </div>
     </Trap>
   );

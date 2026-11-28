@@ -295,6 +295,6 @@ describe("a hint before No idea", () => {
     expect(own(lib, c.meta.id).at(-1)).toMatchObject({ cued: 2, rating: 2 });
     await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, answer: "spacing", now: day() });
     expect(own(lib, c.meta.id).at(-1)!.cued).toBeUndefined();
-    expect(recordReview(lib, c.meta.id, { rating: 3, confidence: 2, cued: 3, now: day() })).rejects.toThrow("--cued is 1 or 2");
+    await expect(recordReview(lib, c.meta.id, { rating: 3, confidence: 2, cued: 3, now: day() })).rejects.toThrow("--cued is 1 or 2");
   });
 });

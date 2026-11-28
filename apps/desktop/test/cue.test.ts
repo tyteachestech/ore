@@ -21,8 +21,17 @@ describe("a fading hint before No idea", () => {
 
   test("an Explain exercise hints its first key point, a Fact its answer", () => {
     expect(cueSource({ kind: "prompt", answer: "Long model answer.", rubric: ["Retrieval strengthens memory", "Spacing"] })).toBe("Retrieval strengthens memory");
-    expect(cueSource({ kind: "prompt", answer: "Only an answer.", rubric: [] })).toBe("Only an answer.");
+    expect(cueSource({ kind: "prompt", answer: "Only an answer.", rubric: [] })).toBe(""); // no key point: no hint
     expect(cueSource({ kind: "card", answer: "Hippocampus", rubric: [] })).toBe("Hippocampus");
+  });
+
+  test("a number is masked like a word, so a point that turns on one doesn't give it away", () => {
+    expect(cue("1945", 1)).toBe("1___");
+    expect(cue("Ended in 1945", 1)).toBe("E____ i_ 1___");
+  });
+
+  test("an underscore inside a word stays part of it, so snake_case keeps its length", () => {
+    expect(cue("use snake_case names", 1)).toBe("u__ s_________ n____");
   });
 
   test("there are two hints, then No idea", () => expect(CUE_LEVELS).toBe(2));
