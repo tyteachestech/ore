@@ -724,7 +724,6 @@ journey("phone: the phone ticks under his finger on four moments and no others: 
   await phoneReaderReady(page);
   await slid(page);
   const para = await pointAt(page, "familiarity is easily", ".phone-reader .doc");
-  await page.waitForTimeout(300);
   await doubleTap(page, para.x, para.y);
   await page.getByRole("dialog", { name: "Highlight" }).waitFor();
   await expectTicks("a highlight", "impact_feedback:medium selection_feedback impact_feedback:light");

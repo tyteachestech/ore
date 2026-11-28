@@ -6,7 +6,7 @@ import { itemDirs, type AiStamp } from "./items.ts";
 import { localDay, nowIso } from "./ids.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
-import { orderQueue, pace, winFirst, type QueueEntry } from "./queue.ts";
+import { orderQueue, pace, placeRetries, winFirst, type QueueEntry } from "./queue.ts";
 import { findVariant } from "./remix.ts";
 import { appendReview, appendUndo, lineId, readReviews, reviewTimes, type FsrsState, type Review } from "./reviews.ts";
 import { emptyState, loadParams, merged, nextState, replay, retrievability } from "./scheduler.ts";
@@ -169,7 +169,7 @@ const RECENT_MS = 7 * 864e5;
 
 // Due queue (SPEC §3): live cards due now in queue order, opening on a likely recall (D176) and never more than two
 // likely misses in a row (D360), with unseen
-// drafts (his own work first, D176, then the freshest source, D60) taking every fifth place, and today's pending relearn passes last. A draft waits until the day
+// drafts (his own work first, D176, then the freshest source, D60) taking every fifth place, and today's pending relearn passes near the front (placeRetries). A draft waits until the day
 // after it was written, so its first review is spaced from the reading (D65). Up to `new_per_day` a day.
 export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}, open?: LibraryIndex): QueueEntry[] {
   return withIndex(lib, open, (index) => {
@@ -251,7 +251,7 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
       out.push(e);
       if (out.length % NEW_EVERY === NEW_EVERY - 1 && fresh.length) out.push(fresh.shift()!);
     }
-    return [...out, ...fresh, ...ordered.filter((e) => e.relearn)];
+    return placeRetries([...out, ...fresh], ordered.filter((e) => e.relearn), reviews);
   });
 }
 

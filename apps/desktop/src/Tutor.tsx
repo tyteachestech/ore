@@ -23,7 +23,7 @@ import { Grow } from "./Grow";
 import { escTaken, Hint, onlyTabbed } from "./Hint";
 import { useSideWidth } from "./Notes";
 import { cancelOre, ore, oreJob, oreWith, opt, type SkillColor } from "./ore";
-import { is } from "./keys";
+import { is, type KeyId } from "./keys";
 import { errorText, type Notify } from "./util";
 import { readingAt } from "./Outline";
 import { Working } from "./Working";
@@ -1344,7 +1344,9 @@ const FileIcon = ({ kind }: { kind: ChatFile["kind"] }) => (kind === "image" ? <
 /** The mole comes out of its hole once a launch, not each time the tutor closes (⌘J is a 100-times-a-day key). */
 let peeked = false;
 
-export function TutorBubble({ onOpen, said = null, failed = false, thinking = false, onHush }: { onOpen: () => void; said?: string | null; failed?: boolean; thinking?: boolean; onHush?: () => void }) {
+/** In Review (D363) the same button opens the chat about the exercise: `wave` is his one paw up
+ *  after a miss, `name` and `keys` say what the click does there. */
+export function TutorBubble({ onOpen, said = null, failed = false, thinking = false, onHush, wave = false, name = "Tutor", label = "Open the tutor", keys = "tutor" }: { onOpen: () => void; said?: string | null; failed?: boolean; thinking?: boolean; onHush?: () => void; wave?: boolean; name?: string; label?: string; keys?: KeyId }) {
   const [look, setLook] = useState(false);
   // Out of its hole once a launch; thinking while a reply is written; a hop when one lands, a jolt for an error.
   const [first, setFirst] = useState<Mood>(() => (peeked ? "idle" : ((peeked = true), "peek")));
@@ -1362,7 +1364,7 @@ export function TutorBubble({ onOpen, said = null, failed = false, thinking = fa
     clearTimeout(p.timer);
     p.timer = window.setTimeout(() => setHover(null), ms);
   };
-  const mood: Mood = thinking ? "thinking" : said ? (failed ? "surprised" : "happy") : (hover?.move ?? first);
+  const mood: Mood = thinking ? "thinking" : said ? (failed ? "surprised" : "happy") : (hover?.move ?? (wave ? "wave" : first));
   const mole = useRef<HTMLButtonElement>(null);
   return (
     <>
@@ -1382,11 +1384,11 @@ export function TutorBubble({ onOpen, said = null, failed = false, thinking = fa
           </svg>
         </div>
       )}
-      <Hint text="Tutor" keys="tutor" side={said ? "top" : "left"}>
+      <Hint text={name} keys={keys} side={said ? "top" : "left"}>
         <button
           ref={mole}
           className="tutor-bubble"
-          aria-label="Open the tutor"
+          aria-label={label}
           onClick={onOpen}
           onPointerEnter={(e) => (setLook(true), greet(e))}
           onPointerLeave={() => setLook(false)}

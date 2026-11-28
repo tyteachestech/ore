@@ -81,7 +81,16 @@ export async function docxToDoc(data: Uint8Array): Promise<OfficeDoc> {
   // Code paragraphs (Word's and Pandoc's "Source Code" style) keep their lines and indent, fenced (F177);
   // comments come along at the end instead of vanishing (F187).
   const styleMap = ["p[style-name='Source Code'] => pre:separator('\\n')", "p[style-name='HTML Preformatted'] => pre:separator('\\n')", "comment-reference => sup"];
-  const { value, messages } = await mammoth.convertToHtml(input, { convertImage, styleMap }).catch((cause: unknown) => {
+  const reading = mammoth.convertToHtml(input, { convertImage, styleMap });
+  // A part that isn't XML fails inside mammoth as a rejection of its own promise library (bluebird),
+  // handed to the unzipper's built-in promise a moment later. Where bluebird waits by microtask (a page's
+  // MutationObserver present: the iPhone, or a test run that left one behind) it checked in that moment and
+  // announced the failure as unhandled, beside the refusal below, which failed whichever test was running
+  // (F883). Every failure of mammoth's reaches the catch below, so its announcing
+  // is turned off. A private name of bluebird's: the test of this finding fails if an update renames it.
+  const quiet = Object.getPrototypeOf(reading) as { _notifyUnhandledRejection?: unknown } | null;
+  if (typeof quiet?._notifyUnhandledRejection === "function") quiet._notifyUnhandledRejection = () => {};
+  const { value, messages } = await reading.catch((cause: unknown) => {
     throw new Error("That Word file is damaged or only partly downloaded. Download it again, or open it in Word or Pages and save a fresh copy.", { cause });
   });
   // Mammoth reports OMML as ignored. Never save the remaining prose as a complete source.
