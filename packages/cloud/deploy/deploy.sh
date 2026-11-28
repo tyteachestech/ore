@@ -1,5 +1,5 @@
 #!/bin/sh
-# Puts this checkout's Ore Cloud on the server and restarts it (#550): deploy.sh root@<host>
+# Puts this checkout's Ore Cloud on the server and restarts it (#550): deploy.sh ore-cloud   (setup.sh makes that name; or root@<host>)
 # The host needs Docker, and /etc/ore-cloud.env holding ORE_DOMAIN and ORE_SESSION_SECRET.
 # Only what the image is built from is sent. The accounts and the certificate live in Docker volumes and stay.
 set -eu
