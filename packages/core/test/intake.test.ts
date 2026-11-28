@@ -13,7 +13,7 @@ import { cutText } from "../src/cut.ts";
 import { findItem, listItems } from "../src/items.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
-import { ocrMarkdown } from "../src/ingest/ocr.ts";
+import { ocrMarkdown, UNSURE } from "../src/ingest/ocr.ts";
 import { openPdf, pageViews } from "../src/ingest/pdf.ts";
 import { regionsFrom, type PaddlePage } from "../src/ingest/paddle.ts";
 import { rtfToDoc } from "../src/ingest/rtf.ts";
@@ -1822,11 +1822,11 @@ describe("import coverage: text recognition", () => {
     expect(item.body).toContain("## The testing effect\n\nRetrieving a memory makes it stronger than reading it again. Quiz yourself before you feel ready.");
   });
 
-  test("a photo with mostly low-confidence text keeps the image and says what to do", async () => {
+  test("a photo with mostly low-confidence text keeps the image and the words, under a line that says to check them", async () => {
     const ocr = process.env.ORE_OCR;
     const path = file("herodotus-photo.jpg");
     // Public-domain Tales from Herodotus, printed page 18 (Internet Archive).
-    // The replay uses reported misreads with synthetic confidence scores.
+    // The replay is Vision's own reading of it on macOS 27 (2026-11-28): 3 lines scored 1, 11 at 0.5, 5 at 0.3.
     process.env.ORE_OCR = helper(file("herodotus-photo.ocr.json"));
     try {
       const item = await addSource(await tempLibrary(), path);
@@ -1834,9 +1834,8 @@ describe("import coverage: text recognition", () => {
       expect(img).toBeDefined();
       expect(readFileSync(join(item.dir, img!))).toEqual(readFileSync(path));
       expect(readFileSync(join(item.dir, "source.jpg"))).toEqual(readFileSync(path));
-      expect(item.body.slice(item.body.indexOf("\n\n") + 2).trim()).toBe(
-        "Ore couldn’t read the words reliably. Add a copy with selectable text, or paste the words you need.",
-      );
+      expect(item.body.slice(item.body.indexOf("\n\n") + 2)).toStartWith(`${UNSURE}\n\n`);
+      expect(item.body).toContain("TALES FROM HERODOTUS");
       expect(item.meta.title).toBe("herodotus-photo");
     } finally {
       process.env.ORE_OCR = ocr;

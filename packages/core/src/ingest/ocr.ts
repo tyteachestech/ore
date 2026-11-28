@@ -94,17 +94,20 @@ function mostlyLowConfidence(pages: OcrPage[]): boolean {
   return lowConfidence > total / 2;
 }
 
+/** Stands above text Vision read with little confidence. */
+export const UNSURE = "*Ore isn’t sure it read these words right: check them against the picture, or paste the text you need.*";
+
 /** A scanned PDF or an image as a body of text: one `<!-- page N -->` section per PDF page. Throws
  *  with the next step when there is no text to find. */
 export async function scannedText(data: Uint8Array, ext: string, read = recognize): Promise<{ title?: string; body: string }> {
   const recognized = await readPages(data, ext, undefined, read);
-  if (ext !== "pdf" && mostlyLowConfidence(recognized)) {
-    return { body: "Ore couldn’t read the words reliably. Add a copy with selectable text, or paste the words you need.\n" };
-  }
   const pages = recognized.map(ocrMarkdown);
   const text = pages.join("\n\n");
   if (text.replace(/\s/g, "").length < 20)
     throw new Error(ext === "pdf" ? "Found no text on this PDF’s pages: they may be photos or drawings. Add a version with text, or paste what you need." : "Found no text in that image. Add a screenshot with text, or paste what you need.");
+  // Words Vision wasn't sure of (a script it can't read, handwriting) stay, under a line that says so, with no title
+  // taken from them: readable handwriting isn't lost, and gibberish never passes for the text.
+  if (ext !== "pdf" && mostlyLowConfidence(recognized)) return { body: `${UNSURE}\n\n${text}\n` };
   const body = ext === "pdf" ? pages.map((p, i) => `<!-- page ${i + 1} -->\n\n${p}`).join("\n\n") : text;
   const title = text.match(/^## (.+)$/m)?.[1] ?? text.split("\n")[0]!.slice(0, 80);
   return { title: title.length > 3 ? title : undefined, body: body + "\n" };

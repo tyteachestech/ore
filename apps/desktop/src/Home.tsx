@@ -397,10 +397,10 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
         {today && (
           <>
             <div className="home-goal">
-              <Ring value={today.goal_ms ? today.active_ms / today.goal_ms : 0} met={today.met} size={92} label={`${minutes(today.active_ms, today.goal_ms)} of ${today.goal_minutes} minutes today`} />
+              <Ring value={today.goal_ms ? today.active_ms / today.goal_ms : 0} met={today.met} size={92} label={`${minutes(today.active_ms, today.counts ? today.goal_ms : 0)} of ${today.goal_minutes} minutes today`} />
               <div className="home-goal-text">
                 <h1>
-                  <Roll id="goal" value={minutesText(today.active_ms, today.goal_ms)} /> <span className="goal-of">of {today.goal_minutes} min</span>
+                  <Roll id="goal" value={minutesText(today.active_ms, today.counts ? today.goal_ms : 0)} /> <span className="goal-of">of {today.goal_minutes} min</span>
                 </h1>
                 {/* Mid-goal with cards due, "N of 10 min" and Start review say it all (D65.4 as amended): no line. */}
                 {subline(today, empty) && <p>{subline(today, empty)}</p>}
@@ -415,7 +415,7 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 ) : (
                   today.plan && <p className="home-plan">After {today.plan}, I review.</p>
                 )}
-                <Week week={today.week} />
+                <Week week={today.week} goal={today.goal_ms} />
                 <Unreadable list={today.unreadable} />
               </div>
               {/* Beside the ring, not on a row of its own: Today is only as tall as the ring. Nothing due: the
@@ -674,13 +674,13 @@ function Unreadable({ list }: { list: Today["unreadable"] }) {
   );
 }
 
-function Week({ week }: { week: Today["week"] }) {
+function Week({ week, goal }: { week: Today["week"]; goal: number }) {
   const now = localDay(new Date());
   const short = week.filter((d) => d.status === "short").length;
   return (
     <div className="home-week" role="img" aria-label={`${week.filter((d) => d.status === "met").length} of ${count(week.filter((d) => d.status !== "off").length, "day")} met this week${short ? `, ${short} part done` : ""}`}>
       {week.map((d, i) => (
-        <Hint key={d.date} text={`${new Date(`${d.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" })} · ${d.status === "off" ? "off" : d.status === "short" && d.active_ms === 0 ? "reviewed" : `${minutesText(d.active_ms)} min`}`}>
+        <Hint key={d.date} text={`${new Date(`${d.date}T12:00:00`).toLocaleDateString(undefined, { weekday: "long" })} · ${d.status === "off" ? "off" : d.status === "short" && d.active_ms === 0 ? "reviewed" : `${minutesText(d.active_ms, goal)} min`}`}>
           <span className={`home-day ${d.status}${d.date === now ? " today" : ""}${d.date > now ? " later" : ""}`}>
             <i />
             {DAYS[i]}

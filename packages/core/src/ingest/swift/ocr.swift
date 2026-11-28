@@ -21,11 +21,6 @@ func recognize(_ image: CGImage) -> [Line] {
   request.usesLanguageCorrection = true
   if #available(macOS 13.0, *) {
     request.automaticallyDetectsLanguage = true
-    if let languages = try? request.supportedRecognitionLanguages(),
-       let greek = languages.first(where: { $0 == "el" || $0.hasPrefix("el-") }),
-       !request.recognitionLanguages.contains(greek) {
-      request.recognitionLanguages.append(greek)
-    }
   }
   do { try VNImageRequestHandler(cgImage: image).perform([request]) } catch { return [] }
   return (request.results ?? []).compactMap { o in

@@ -201,7 +201,9 @@ export function tutorPassages(lib: Library, query: string, focus: TutorFocus = {
     const question = ` ${titleWords(query)} `;
     const named = new Set(index.items().flatMap(({ id, title }) => {
       const words = titleWords(title);
-      return words && question.includes(` ${words} `) && (!inSkills || inSkills.has(id)) ? [id] : [];
+      // A title of one short or common word ("Memory", "Notes") is in everyday questions: only a longer one names a source.
+      const naming = !!words && (words.includes(" ") || words.length >= 8);
+      return naming && question.includes(` ${words} `) && (!inSkills || inSkills.has(id)) ? [id] : [];
     }));
     const explicit = new Set([...(focus.item ? [focus.item] : []), ...(focus.sources ?? [])]);
     const focused = new Set([...explicit, ...named]);
@@ -407,12 +409,18 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
           const problem = cardTextProblem(d.card) ?? blankProblem(d.card);
           if (problem) return problem;
         }
-        const reply = withoutLocalLinks(d.reply);
-        const steps = d.steps.map(withoutLocalLinks);
-        if (reply !== d.reply || steps.some((step, i) => step !== d.steps[i])) {
+        // Every text that reaches the screen: the reply and its steps, an exercise’s heading, a proposed card.
+        const texts: [() => string | null | undefined, (t: string) => void][] = [
+          [() => d.reply, (t) => (d.reply = t)],
+          ...d.steps.map((_, i): [() => string, (t: string) => void] => [() => d.steps[i]!, (t) => (d.steps[i] = t)]),
+          [() => d.exercise?.heading, (t) => (d.exercise!.heading = t)],
+          [() => d.card?.question, (t) => (d.card!.question = t)],
+          [() => d.card?.answer, (t) => (d.card!.answer = t)],
+        ];
+        const linked = texts.filter(([get]) => { const t = get(); return typeof t === "string" && withoutLocalLinks(t) !== t; });
+        if (linked.length) {
           if (attempt === 1) return "the answer links to a local path: cite the passage in citations instead, with its [n] marker in the reply or step";
-          d.reply = reply;
-          d.steps = steps;
+          for (const [get, set] of linked) set(withoutLocalLinks(get()!));
         }
         const uncited = d.general === false && !d.citations.length && !d.hint && !d.exercise && !d.covered.length;
         if (uncited && attempt === 2) {
