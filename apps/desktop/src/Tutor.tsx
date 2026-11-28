@@ -492,8 +492,7 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
   const caseAnswers = lastTurn?.exercise?.cases?.length === 2 && caseDraft?.turn === lastTurn.id
     ? caseDraft.said.map((answer) => answer.trim()) : [];
   const [caseA, caseB] = caseAnswers;
-  // What he has written of the two cases goes, as it did before Send knew about them; an empty case is left out.
-  const caseAnswer = [caseA && `A: ${caseA}`, caseB && `B: ${caseB}`].filter(Boolean).join("\n");
+  const caseAnswer = caseA && caseB ? `A: ${caseA}\nB: ${caseB}` : "";
   // The newest reply typed out at a steady pace (D321): the model sends words in clumps, and a
   // Codex reply comes whole, so the words on screen run on their own clock, never more than LAG behind.
   // Its [n] markers wait for the citations, which come with the whole reply; Stop shows what was sent.
@@ -1317,6 +1316,7 @@ export function useUnheard(turns: TutorTurn[], open: boolean) {
 const NO_CASES = ["", ""];
 /** `said` lives with the chat's draft, so closing the tutor mid-answer keeps it. */
 function Cases({ cases, open, said, onSaid, onSend }: { cases: string[]; open: boolean; said: string[]; onSaid: (said: string[]) => void; onSend: () => void }) {
+  const first = useRef<HTMLTextAreaElement>(null);
   const second = useRef<HTMLTextAreaElement>(null);
   return (
     <div className="tutor-cases">
@@ -1326,7 +1326,7 @@ function Cases({ cases, open, said, onSaid, onSend }: { cases: string[]; open: b
           <p>{c}</p>
           {open && (
             <Grow
-              ref={i ? second : undefined}
+              ref={i ? second : first}
               rows={1}
               className="field"
               aria-label={`Case ${"AB"[i]}: which idea fits, and what decides it`}
@@ -1337,6 +1337,8 @@ function Cases({ cases, open, said, onSaid, onSend }: { cases: string[]; open: b
                 if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
                 e.preventDefault();
                 if (!i) return second.current?.focus();
+                // A tell-apart wants both cases: Enter in B with A empty goes to A rather than doing nothing.
+                if (!said[0]?.trim()) return first.current?.focus();
                 onSend();
               }}
             />
