@@ -7,6 +7,8 @@ import { run, swiftHelper } from "./swift.ts";
 
 export interface OcrLine {
   t: string;
+  /** Vision's score from 0 to 1. Older helper output may omit it. */
+  confidence?: number;
   /** Box as fractions of the page, y from the top. */
   x: number;
   y: number;
@@ -58,27 +60,54 @@ export function ocrMarkdown(page: OcrPage): string {
   return out.join("\n\n");
 }
 
-/** Markdown from each page, or from selected PDF pages by their one-based numbers. */
-export async function recognizedPages(data: Uint8Array, ext: string, pages?: number[], read = recognize): Promise<string[]> {
+async function readPages(data: Uint8Array, ext: string, pages: number[] | undefined, read: typeof recognize): Promise<OcrPage[]> {
   const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const dir = mkdtempSync(join(tmpdir(), "ore-ocr-"));
   try {
     const file = join(dir, `scan.${ext}`);
     writeFileSync(file, data);
-    return (await read(file, pages)).map(ocrMarkdown);
+    return await read(file, pages);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 }
 
+/** Markdown from each page, or from selected PDF pages by their one-based numbers. */
+export async function recognizedPages(data: Uint8Array, ext: string, pages?: number[], read = recognize): Promise<string[]> {
+  return (await readPages(data, ext, pages, read)).map(ocrMarkdown);
+}
+
+function mostlyLowConfidence(pages: OcrPage[]): boolean {
+  let total = 0;
+  let lowConfidence = 0;
+  for (const { lines } of pages) {
+    for (const { t, confidence } of lines) {
+      // A short heading or page number counts less than a full line of prose.
+      const length = t.replace(/\s/g, "").length;
+      total += length;
+      // Vision scores a line it is sure of 1; on a clean scan or screenshot every line is (2026-11-28: a page of
+      // an old book, 66 of 66), while a page in a script it can't read comes back mostly at 0.5 and 0.3.
+      if (confidence !== undefined && confidence < 1) lowConfidence += length;
+    }
+  }
+  return lowConfidence > total / 2;
+}
+
+/** Stands above text Vision read with little confidence. */
+export const UNSURE = "*Ore isn’t sure it read these words right: check them against the picture, or paste the text you need.*";
+
 /** A scanned PDF or an image as a body of text: one `<!-- page N -->` section per PDF page. Throws
  *  with the next step when there is no text to find. */
 export async function scannedText(data: Uint8Array, ext: string, read = recognize): Promise<{ title?: string; body: string }> {
-  const pages = await recognizedPages(data, ext, undefined, read);
+  const recognized = await readPages(data, ext, undefined, read);
+  const pages = recognized.map(ocrMarkdown);
   const text = pages.join("\n\n");
   if (text.replace(/\s/g, "").length < 20)
     throw new Error(ext === "pdf" ? "Found no text on this PDF’s pages: they may be photos or drawings. Add a version with text, or paste what you need." : "Found no text in that image. Add a screenshot with text, or paste what you need.");
+  // Words Vision wasn't sure of (a script it can't read, handwriting) stay, under a line that says so, with no title
+  // taken from them: readable handwriting isn't lost, and gibberish never passes for the text.
+  if (ext !== "pdf" && mostlyLowConfidence(recognized)) return { body: `${UNSURE}\n\n${text}\n` };
   const body = ext === "pdf" ? pages.map((p, i) => `<!-- page ${i + 1} -->\n\n${p}`).join("\n\n") : text;
   const title = text.match(/^## (.+)$/m)?.[1] ?? text.split("\n")[0]!.slice(0, 80);
   return { title: title.length > 3 ? title : undefined, body: body + "\n" };

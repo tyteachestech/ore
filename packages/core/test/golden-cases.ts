@@ -15,6 +15,7 @@ export const CASES: { name: string; add: string; serve?: Record<string, [string,
   { name: "pdf-textbook", add: join(FIX, "files/textbook.pdf") }, // margin notes, numbered headings, lists
   { name: "pdf-glossary", add: join(FIX, "files/glossary.pdf") }, // a margin glossary's definitions (make-glossary-pdf.py)
   { name: "pdf-figures", add: join(FIX, "files/figures.pdf") },
+  { name: "pdf-map-soft-mask", add: join(FIX, "files/persian-wars-map.pdf") },
   { name: "pdf-scripts", add: join(FIX, "files/scripts.pdf") }, // Russian, Greek, Japanese, Chinese, Arabic
   { name: "pdf-code", add: join(FIX, "files/code.pdf") }, // code blocks and typewriter words (make-code-pdf.py)
   { name: "epub", add: join(FIX, "files/book.epub") }, // make-book-epub.ts

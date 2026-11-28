@@ -732,6 +732,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   const gemNow = card?.kind === "card" ? undefined : card?.history?.gem?.kind;
   const gemShown = gemNow === "ready" ? "rough" : gemNow;
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
+  const quickGoalLabel = start ? `${minutes(start.active_ms + s.activeMs, start.goal_ms)} of ${start.goal_minutes} minutes today` : "";
 
   return (
     // A full-window sheet: Tab and ⇧Tab stay on the card, never in the hidden app behind it. Let go while a
@@ -759,9 +760,9 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
         {quick ? (
           // The quick quiz has no fixed length; what matters is that it counts toward today's goal (D60).
           start && !end && start.counts && (
-            <Hint text={`${minutes(start.active_ms + s.activeMs)} of ${start.goal_minutes} minutes today`}>
+            <Hint text={quickGoalLabel}>
               <div className="quick-ring">
-                <Ring value={start.goal_ms ? (start.active_ms + s.activeMs) / start.goal_ms : 0} met={start.met} size={22} label={`${minutes(start.active_ms + s.activeMs)} of ${start.goal_minutes} minutes today`} />
+                <Ring value={start.goal_ms ? (start.active_ms + s.activeMs) / start.goal_ms : 0} met={start.met} size={22} label={quickGoalLabel} />
               </div>
             </Hint>
           )
@@ -1627,11 +1628,12 @@ export function EndScreen({ end, skills, quick, onDone, onAgain, onDig }: { end:
   // The count crosses the goal on screen: then the dots it throws are the moment, and the burst stays out of it.
   const crossing = !calm && plan.goal > 0 && plan.from < plan.goal && plan.to >= plan.goal;
   const over = quick ? 0 : overDots(plan.goal ? lap.min - plan.goal : 0, plan.goal, ringDots(END_RING));
+  const goalLabel = `${minutes(t.active_ms, plan.goal ? t.goal_ms : 0)} of ${t.goal_minutes} minutes today`;
   const ring = quick
-    ? <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={72} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`} />
+    ? <Ring value={part(full ? t : b)} from={part(b)} met={full ? t.met : !!b?.met} burst={closed && full} size={72} label={goalLabel} />
     : (
       // The ring follows the count, minute by minute; crossing the goal in the count is the moment (the dots it throws), so the burst is for a goal the count never crossed.
-      <Ring step={away && plan.goal > 0} value={!full ? part(b) : !away || !plan.goal ? part(t) : lap.min / plan.goal} from={part(b)} met={!full ? !!b?.met : !away || counted ? t.met : false} burst={closed && full && !crossing} over={over} hit={lap.hit} size={END_RING} label={`${minutes(t.active_ms)} of ${t.goal_minutes} minutes today`}>
+      <Ring step={away && plan.goal > 0} value={!full ? part(b) : !away || !plan.goal ? part(t) : lap.min / plan.goal} from={part(b)} met={!full ? !!b?.met : !away || counted ? t.met : false} burst={closed && full && !crossing} over={over} hit={lap.hit} size={END_RING} label={goalLabel}>
         {counted && <Sparkles over={over} n={ringDots(END_RING)} />}
       </Ring>
     );

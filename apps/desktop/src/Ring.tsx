@@ -69,9 +69,14 @@ export function Ring({ value, from = 0, size = 64, met, burst = false, label, ov
   );
 }
 
-export const minutes = (ms: number) => Math.max(0, Math.round(ms / 60_000));
+/** Progress towards a time goal counts whole minutes until the goal's time has elapsed. */
+export const minutes = (ms: number, goalMs = 0) =>
+  Math.max(0, ms < goalMs ? Math.floor(ms / 60_000) : Math.round(ms / 60_000));
 /** Minutes for display: a few seconds of review shows as "<1", never as 0. */
-export const minutesText = (ms: number) => (ms > 0 && ms < 30_000 ? "<1" : String(minutes(ms)));
+export const minutesText = (ms: number, goalMs = 0) => {
+  const shown = minutes(ms, goalMs);
+  return ms > 0 && shown === 0 ? "<1" : String(shown);
+};
 
 // Digits on a 5 by 7 grid, one string per row, for `DotNumber`.
 const DIGITS: Record<string, string[]> = {

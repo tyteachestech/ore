@@ -1,0 +1,5 @@
+{ "testers": [
+  { "name": "notetaker", "seed": "seed", "from": "/tmp/ore-learner/library" },
+  { "name": "importer", "seed": "init" },
+  { "name": "backlog", "seed": "seed", "from": "/tmp/ore-learner/library" }
+] }

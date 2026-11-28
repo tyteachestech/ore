@@ -13,7 +13,7 @@ import { cutText } from "../src/cut.ts";
 import { findItem, listItems } from "../src/items.ts";
 import { doctor } from "../src/doctor.ts";
 import { frontTab } from "../src/ingest/tab.ts";
-import { ocrMarkdown } from "../src/ingest/ocr.ts";
+import { ocrMarkdown, UNSURE } from "../src/ingest/ocr.ts";
 import { openPdf, pageViews } from "../src/ingest/pdf.ts";
 import { regionsFrom, type PaddlePage } from "../src/ingest/paddle.ts";
 import { rtfToDoc } from "../src/ingest/rtf.ts";
@@ -27,7 +27,7 @@ import { pdfToDoc, SCAN_UNREAD } from "../src/ingest/pdf.ts";
 import { parseHTML } from "linkedom";
 import { chapterLines } from "../src/ai/recall.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import { strFromU8, strToU8, unzlibSync, unzipSync, zipSync } from "fflate";
 import { tempLibrary } from "./helpers.ts";
 import { paths } from "../src/library.ts";
 
@@ -1822,6 +1822,26 @@ describe("import coverage: text recognition", () => {
     expect(item.body).toContain("## The testing effect\n\nRetrieving a memory makes it stronger than reading it again. Quiz yourself before you feel ready.");
   });
 
+  test("a photo with mostly low-confidence text keeps the image and the words, under a line that says to check them", async () => {
+    const ocr = process.env.ORE_OCR;
+    const path = file("herodotus-photo.jpg");
+    // Public-domain Tales from Herodotus, printed page 18 (Internet Archive).
+    // The replay is Vision's own reading of it on macOS 27 (2026-11-28): 3 lines scored 1, 11 at 0.5, 5 at 0.3.
+    process.env.ORE_OCR = helper(file("herodotus-photo.ocr.json"));
+    try {
+      const item = await addSource(await tempLibrary(), path);
+      const img = item.body.match(/^!\[\]\((assets\/[0-9a-f]{16}\.jpg)\)\n\n/)?.[1];
+      expect(img).toBeDefined();
+      expect(readFileSync(join(item.dir, img!))).toEqual(readFileSync(path));
+      expect(readFileSync(join(item.dir, "source.jpg"))).toEqual(readFileSync(path));
+      expect(item.body.slice(item.body.indexOf("\n\n") + 2)).toStartWith(`${UNSURE}\n\n`);
+      expect(item.body).toContain("TALES FROM HERODOTUS");
+      expect(item.meta.title).toBe("herodotus-photo");
+    } finally {
+      process.env.ORE_OCR = ocr;
+    }
+  });
+
   test("a scanned PDF is read page by page, titled by its first heading", async () => {
     const item = await addSource(await tempLibrary(), file("scan.pdf"));
     expect(item.meta).toMatchObject({ type: "pdf", title: "The testing effect" });
@@ -2798,6 +2818,38 @@ describe("import coverage: figures and slide pictures", () => {
     const two = readFileSync(join(item.dir, images(pages[1]!)[0]!.path));
     expect(two.subarray(1, 4).toString()).toBe("PNG");
     expect(two.readUInt32BE(16) / two.readUInt32BE(20)).toBeCloseTo(2, 1); // the two square panels side by side
+  });
+
+  test("PDF: a map with a soft mask keeps its colours", async () => {
+    // F878: the textbook draws a grayscale image inside a mask group before the map.
+    const item = await addSource(await tempLibrary(), file("persian-wars-map.pdf"));
+    expect(item.meta).toMatchObject({ title: "The Persian Wars — World History textbook excerpt", author: "Nadejda Williams" });
+    expect(item.body).toContain("put into question the citizenship status");
+    expect(item.body).toContain("### 5.9.5 The Persian Wars");
+    expect(item.body).toContain("Map 5.6 | The Achaemenid Empire under the rule of Cyrus");
+    const figures = images(item.body);
+    expect(figures).toHaveLength(1);
+    const png = readFileSync(join(item.dir, figures[0]!.path));
+    const chunks: Buffer[] = [];
+    for (let offset = 8; offset < png.length;) {
+      const size = png.readUInt32BE(offset);
+      if (png.toString("ascii", offset + 4, offset + 8) === "IDAT") chunks.push(png.subarray(offset + 8, offset + 8 + size));
+      offset += size + 12;
+    }
+    const pixels = unzlibSync(Buffer.concat(chunks));
+    const width = png.readUInt32BE(16);
+    const height = png.readUInt32BE(20);
+    const stride = 1 + 3 * width;
+    let coloured = 0;
+    // Ore writes unfiltered RGB rows, each starting with a filter byte of zero.
+    for (let row = 0; row < pixels.length; row += stride) {
+      for (let i = row + 1; i < row + stride; i += 3) {
+        const r = pixels[i], g = pixels[i + 1], b = pixels[i + 2];
+        if (r !== g || g !== b) coloured++;
+      }
+    }
+    expect(coloured).toBeGreaterThan(1000);
+    expect([width, height]).toEqual([1020, 635]); // the map's bounds, excluding its mask-only group
   });
 });
 
