@@ -987,7 +987,7 @@ journey("diagram: S styles at the pointer, keys stay on the canvas, Space never 
     await page.keyboard.press("e");
     await until("1–5, ⇧1–5 and Q W E restyle the box", async () => (await rect.getAttribute("stroke")) !== "#f2f1ec" && (await rect.getAttribute("fill")) !== "none" && (await rect.getAttribute("stroke-width")) === "4");
     await page.keyboard.press("Escape");
-    await until("Esc closes the picker, the box stays picked", async () => (await quick.count()) === 0 && (await page.locator(".sr-only[aria-live]").textContent()) === "Selected: Memory");
+    await until("Esc closes the picker, the box stays picked", async () => (await quick.count()) === 0 && (await page.locator(".diagram .sr-only[aria-live]").textContent()) === "Selected: Memory");
     await page.keyboard.press("Meta+z");
     await until("⌘Z takes back the last change", async () => (await rect.getAttribute("stroke-width")) === "2");
     // Picking a colour by click must not take the keys away from the drawing (Excalidraw).
@@ -1018,7 +1018,7 @@ journey("diagram: S styles at the pointer, keys stay on the canvas, Space never 
     await page.mouse.click(c.x + 500, c.y + 300);
     await page.keyboard.press("Meta+d");
     await page.keyboard.press("Meta+a");
-    const selected = () => page.locator(".sr-only[aria-live]").textContent();
+    const selected = () => page.locator(".diagram .sr-only[aria-live]").textContent();
     await until("⌘A picks both", async () => (await selected())?.includes("Memory, Memory") ?? false);
     await page.mouse.click(c.x + 500, c.y + 300);
     await until("a click on one of them picks it alone", async () => (await selected()) === "Selected: Memory");
@@ -1063,7 +1063,7 @@ journey("diagram: editing picks the whole label, a run of nudges is one undo ste
   await page.keyboard.type("Memory");
   await page.keyboard.press("Enter");
   const summary = () => page.locator("#draw-summary").textContent();
-  const selected = () => page.locator(".sr-only[aria-live]").textContent();
+  const selected = () => page.locator(".diagram .sr-only[aria-live]").textContent();
   await until("the box is labelled", async () => (await summary()) === "Memory");
   // Enter on the box opens its label with all of it selected, so typing replaces it (Excalidraw, Figma).
   await page.keyboard.press("Enter");
