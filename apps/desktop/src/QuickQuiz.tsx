@@ -6,6 +6,7 @@ import { Boundary } from "./Boundary";
 import { loadPick } from "./ReviewPick";
 import { loadSkills, type Skill } from "./ore";
 import { Review } from "./Review";
+import { useAskChats } from "./Ask";
 import { useMenu } from "./menubar";
 import { useToast } from "./Toast";
 
@@ -19,6 +20,7 @@ export function QuickQuiz() {
   const [pick, setPick] = useState<string[] | null>(null);
   const [skills, setSkills] = useState<Skill[]>([]);
   const { notify, clear, view } = useToast();
+  const asks = useAskChats(notify);
   const runRef = useRef(run);
   runRef.current = run;
   /** Showings so far: a showing right after putting it away (both in one task) still mounts a fresh Review. */
@@ -53,6 +55,7 @@ export function QuickQuiz() {
       {run > 0 && (
         <Boundary key={run} onBack={() => close(true)}>
           <Review
+            asks={asks}
             quick
             pick={pick}
             skills={skills}

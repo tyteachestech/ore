@@ -22,7 +22,7 @@ import { absolutize, rewrite } from "../src/ingest/links.ts";
 import { htmlToDoc, inlineMath } from "../src/ingest/web.ts";
 import { mathmlToTex } from "../src/ingest/mathml.ts";
 import { ommlToTex } from "../src/ingest/omml.ts";
-import { pdfToDoc } from "../src/ingest/pdf.ts";
+import { pdfToDoc, SCAN_UNREAD } from "../src/ingest/pdf.ts";
 import { parseHTML } from "linkedom";
 import { chapterLines } from "../src/ai/recall.ts";
 import { srtToVtt, vttToBody } from "../src/ingest/youtube.ts";
@@ -1626,9 +1626,10 @@ describe("import coverage: from the browser tab", () => {
 // Phase 3 of D96: scanned PDFs and screenshots read with the Mac's text recognition. A stand-in
 // helper (ORE_OCR) replays what Vision reads from the saved image, so this runs anywhere.
 describe("import coverage: text recognition", () => {
-  const helper = (json: string) => {
+  const helper = (json: string, page?: number) => {
     const bin = join(mkdtempSync(join(tmpdir(), "ore-ocr-bin-")), "ocr");
-    writeFileSync(bin, `#!/bin/sh\ncat '${json}'\n`);
+    const select = page === undefined ? "" : `test "$#" -eq 2 && test "$2" = ${page} || exit 1\n`;
+    writeFileSync(bin, `#!/bin/sh\n${select}cat '${json}'\n`);
     chmodSync(bin, 0o755);
     return bin;
   };
@@ -1681,6 +1682,62 @@ describe("import coverage: text recognition", () => {
     } finally {
       await task.destroy();
     }
+  });
+
+  test("PDF: a scanned page between text pages is read in place", async () => {
+    const lib = await tempLibrary();
+    const ocr = process.env.ORE_OCR;
+    process.env.ORE_OCR = helper(file("screenshot.ocr.json"), 2);
+    const item = await addSource(lib, file("mixed-scan.pdf")).finally(() => {
+      process.env.ORE_OCR = ocr;
+    });
+    expect(item.meta).toMatchObject({ type: "pdf", title: "Practice over time", author: "Ada Lovelace" });
+    const pages = item.body.trim().split(/(?=<!-- page \d+ -->)/);
+    expect(pages).toEqual([
+      expect.stringContaining("<!-- page 1 -->\n\n## Before practice\n\nPick one idea you want to remember"),
+      expect.stringContaining("<!-- page 2 -->\n\n## The testing effect\n\nRetrieving a memory makes it stronger than reading it again. Quiz yourself before you feel ready."),
+      expect.stringContaining("<!-- page 3 -->\n\n## After practice\n\nCheck your answer against the source"),
+    ]);
+    expect(images(item.body)).toEqual([]);
+  });
+
+  test("PDF: a scanned page stored as strips is read; a full-page figure with its own caption is not (code review of #582)", async () => {
+    const lib = await tempLibrary();
+    const ocr = process.env.ORE_OCR;
+    // The stand-in answers only for page 2: asked for page 3 as well, it fails, and the import says so.
+    process.env.ORE_OCR = helper(file("screenshot.ocr.json"), 2);
+    const item = await addSource(lib, file("scan-strips.pdf")).finally(() => {
+      process.env.ORE_OCR = ocr;
+    });
+    expect(item.body).toContain("<!-- page 2 -->\n\n## The testing effect\n\nRetrieving a memory makes it stronger");
+    expect(item.body).not.toContain(SCAN_UNREAD);
+    expect(item.body).toContain("Figure 1: a diagram");
+  });
+
+  test("PDF: a scanned page that recognition finds no words on says so (code review of #582)", async () => {
+    const lib = await tempLibrary();
+    const ocr = process.env.ORE_OCR;
+    const empty = join(mkdtempSync(join(tmpdir(), "ore-ocr-")), "empty.json");
+    writeFileSync(empty, JSON.stringify({ pages: [{ lines: [] }] }));
+    process.env.ORE_OCR = helper(empty, 2);
+    const item = await addSource(lib, file("mixed-scan.pdf")).finally(() => {
+      process.env.ORE_OCR = ocr;
+    });
+    expect(item.body).toContain(`<!-- page 2 -->\n\n${SCAN_UNREAD}`);
+  });
+
+  test("PDF: a scanned page between text pages whose words can't be read (no recognizer, as on the iPhone) says so, and the rest comes in", async () => {
+    const lib = await tempLibrary();
+    const ocr = process.env.ORE_OCR;
+    const broken = join(mkdtempSync(join(tmpdir(), "ore-ocr-bin-")), "ocr");
+    writeFileSync(broken, "#!/bin/sh\nexit 1\n");
+    chmodSync(broken, 0o755);
+    process.env.ORE_OCR = broken;
+    const item = await addSource(lib, file("mixed-scan.pdf")).finally(() => {
+      process.env.ORE_OCR = ocr;
+    });
+    expect(item.body).toContain(`<!-- page 2 -->\n\n${SCAN_UNREAD}`);
+    expect(item.body).toContain("## After practice");
   });
 
   test("an image with no text is refused", async () => {

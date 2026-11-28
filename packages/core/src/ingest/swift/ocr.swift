@@ -1,5 +1,5 @@
 // Text recognition for scanned PDFs and images (D96 phase 3), with Apple's Vision framework, on
-// the Mac. Usage: ocr <file.pdf|image>. Prints JSON: {"pages":[{"lines":[{"t","x","y","w","h"}]}]},
+// the Mac. Usage: ocr <file.pdf|image> [PDF page numbers, starting at 1]. Prints JSON: {"pages":[{"lines":[{"t","x","y","w","h"}]}]},
 // boxes as fractions of the page with y from the top. Compiled on first use by `ocr.ts`.
 import AppKit
 import Foundation
@@ -71,19 +71,24 @@ func lines(_ image: CGImage) -> [Line] {
   return out
 }
 
-guard CommandLine.arguments.count == 2 else { fail("usage: ocr <file>") }
-let url = URL(fileURLWithPath: CommandLine.arguments[1])
+let args = CommandLine.arguments
+guard args.count >= 2 else { fail("usage: ocr <file> [page ...]") }
+let url = URL(fileURLWithPath: args[1])
 var pages: [Page] = []
 if url.pathExtension.lowercased() == "pdf" {
   guard let doc = PDFDocument(url: url) else { fail("can't open the PDF") }
-  for i in 0..<doc.pageCount {
-    guard let page = doc.page(at: i) else { continue }
+  let indices = args.count == 2 ? Array(0..<doc.pageCount) : args.dropFirst(2).map { arg in
+    guard let n = Int(arg), n > 0, n <= doc.pageCount else { fail("invalid PDF page: \(arg)") }
+    return n - 1
+  }
+  for i in indices {
+    guard let page = doc.page(at: i) else { pages.append(Page(lines: [])); continue }
     // About 2,000 px across: small print stays legible without slowing a long scan down.
     let box = page.bounds(for: .mediaBox)
     let scale = 2000 / max(box.width, 1)
     let thumb = page.thumbnail(of: CGSize(width: box.width * scale, height: box.height * scale), for: .mediaBox)
-    guard let cg = thumb.cgImage(forProposedRect: nil, context: nil, hints: nil) else { continue }
-    pages.append(Page(lines: lines(cg)))
+    let cg = thumb.cgImage(forProposedRect: nil, context: nil, hints: nil)
+    pages.append(Page(lines: cg.map(lines) ?? []))
   }
 } else {
   guard let image = NSImage(contentsOf: url), let cg = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else { fail("can't open the image") }
