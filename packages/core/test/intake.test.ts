@@ -2563,6 +2563,19 @@ describe("import coverage: videos heard from their sound", () => {
 
 // D122: figures and slide pictures come in with the text they illustrate.
 // make-deep-pdfs.py: the PDFs the deep import pass found broken (2026-11-27).
+describe("import coverage: Office files, corpus run", () => {
+  test("Excel: a cell written with numeric character references (&#8212; for a dash, &#128218; for an emoji) reads as those characters", async () => {
+    const files = unzipSync(readFileSync(file("vocab.xlsx")));
+    files["xl/sharedStrings.xml"] = strToU8(strFromU8(files["xl/sharedStrings.xml"]!).replace("<t xml:space=\"preserve\">Meaning</t>", "<t xml:space=\"preserve\">Meaning &#8212; in short &#x2192; &#128218; &amp;#9;</t>"));
+    const lib = await tempLibrary();
+    const path = join(lib.root, "refs.xlsx");
+    writeFileSync(path, zipSync(files));
+    const body = (await addSource(lib, path)).body;
+    expect(body).toContain("Meaning — in short → 📚 &#9;");
+    expect(body).not.toContain("&#8212;");
+  });
+});
+
 describe("import coverage: PDF, deep import pass", () => {
   test("PDF: a typesetting service's stamp on every page, a notice turned up the margin, a download line atop each page, a long running foot with its page number, an export link's id as the title and sort-form authors (corpus run 2026-11-28)", async () => {
     // stamps.pdf (make-stamps-pdf.py): JMIR's pages as RenderX prints them.
