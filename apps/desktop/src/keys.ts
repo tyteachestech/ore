@@ -61,6 +61,8 @@ const DEFAULTS = [
   { id: "filter", label: "Find: filter sources, or search the open source", group: "General", combo: "Meta+KeyF", global: true },
   { id: "passage-next", label: "Next supporting passage", group: "Quiz", combo: "ArrowDown" },
   { id: "passage-prev", label: "Previous supporting passage", group: "Quiz", combo: "ArrowUp" },
+  // ⌘', beside ⌘⌫ No idea's reach: it works with the answer half typed. The diagram's ⌘' never shows in Review.
+  { id: "hint", label: "Hint: the first letters, then more", group: "Review", combo: "Meta+Quote", global: true },
   { id: "no-idea", label: "No idea", group: "Review", combo: "Meta+Backspace", global: true },
   { id: "in-head", label: "Answered in my head", group: "Review", combo: "Alt+Enter", global: true },
   { id: "edit-card", label: "Edit exercise", group: "Review", combo: "KeyE" },
@@ -316,7 +318,7 @@ export function invalid(id: KeyId, combo: Combo): string | null {
 }
 
 /** Review's own commands: they work only in Review, where the app's other keys are off (App.tsx). */
-export const IN_REVIEW: ReadonlySet<string> = new Set<KeyId>(["no-idea", "in-head", "later", "edit-card", "retire-card", "ask", "bad-version"]);
+export const IN_REVIEW: ReadonlySet<string> = new Set<KeyId>(["hint", "no-idea", "in-head", "later", "edit-card", "retire-card", "ask", "bad-version"]);
 /** App keys that work in Review too (⌘↵, the passage arrows, Undo and Redo, by its button and the toast), and the quick quiz, which works from any app. */
 const IN_REVIEW_TOO: ReadonlySet<string> = new Set<KeyId>(["finish", "passage-next", "passage-prev", "undo", "redo", "quick-quiz"]);
 

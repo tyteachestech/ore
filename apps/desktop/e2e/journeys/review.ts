@@ -2900,3 +2900,44 @@ journey("ambience: in a narrow window with the sidebar folded the radio sits in 
     await page.setViewportSize(size);
   }
 });
+
+// The guidebook's rule for "nothing comes back" (L246: add cues) and the brief's "a hint before a blank attempt":
+// Hint shows the first key point's first letters, More gives half its words, then only No idea or Check is left.
+journey("review: Hint before No idea shows first letters, then half the words; the rating records the hints taken and its suggestion is no higher than Hard", async (page) => {
+  const calls = oreCalls(page);
+  const q = page.locator(".review-q");
+  try {
+    await startReview(page, null);
+    const hint = page.getByRole("button", { name: "Hint", exact: true });
+    // Pass Fact exercises until an Explain one, which has the hint.
+    for (let n = 0; n < 8 && !(await hint.isVisible()); n++) {
+      await q.waitFor();
+      if (await hint.isVisible()) break;
+      await page.keyboard.press("Meta+l");
+      await page.waitForTimeout(250);
+    }
+    await hint.click();
+    const shown = page.getByLabel("Hint", { exact: true });
+    const first = await shown.innerText();
+    if (!/^\p{L}_*/u.test(first) || !first.includes("_")) throw new Error(`the first hint should be first letters and blanks: ${first}`);
+    // ⌘' from the answer field gives the second, which shows whole words; then the hint button is gone.
+    await page.getByRole("textbox", { name: "Your answer" }).focus();
+    await page.keyboard.press("Meta+Quote");
+    await until("the second hint shows whole words", async () => (await shown.innerText()) !== first && /\p{L}{2}/u.test(await shown.innerText()));
+    if (await page.getByRole("button", { name: /^(Hint|More)$/ }).count()) throw new Error("a third hint was offered");
+    await page.getByRole("textbox", { name: "Your answer" }).fill("Something I recalled with the hint");
+    if (await page.getByText("⌘'").count()) throw new Error("the key bar still offers a hint once both are taken");
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await page.getByRole("button", { name: "Check", exact: true }).click();
+    await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+    // Marking every key point got would suggest Good; with hints taken the suggestion stops at Hard.
+    for (const box of await page.locator(".quiz-points .quiz-mark").all()) if ((await box.getAttribute("aria-pressed")) !== "true") await box.click();
+    await until("Hard is suggested", async () => (await page.locator(".rate-2.suggested").count()) === 1);
+    await page.getByRole("button", { name: "Hard", exact: true }).click();
+    await until("the rating is sent with its hints", async () => calls.calls.some((a) => a[0] === "review" && a.includes("--cued=2") && a.includes("--rating=2")));
+  } finally {
+    await calls.undoAll();
+    if (await page.locator(".review").count()) await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
+  }
+});

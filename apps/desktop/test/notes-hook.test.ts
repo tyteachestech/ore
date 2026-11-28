@@ -208,3 +208,22 @@ test("a note that failed to load says so where the editor goes, and Try again lo
   expect(toasts).toEqual([]); // said where the note goes, not in a toast that fades
   await act(async () => root.unmount());
 });
+
+test("quitting the app saves the words typed in a note's last moment", async () => {
+  // F803: ⌘Q tells the page "quitting" (util.ts runs flushKept), never `beforeunload`, which was all the note listened for.
+  const { flushKept } = await import("../src/util");
+  let notes!: Notes;
+  const quiet = () => {}; // one function across renders, as the app's is: a new one each render closes the note, which saves it
+  const Probe = ({ id }: { id: string }) => {
+    notes = useSourceNote(id, quiet);
+    return null;
+  };
+  disk.q = "";
+  const root = createRoot(document.createElement("div") as unknown as Element);
+  await act(async () => root.render(React.createElement(Probe, { id: "q" })));
+  await act(async () => notes.edit("typed just before quitting"));
+  flushKept();
+  await act(async () => new Promise((r) => setTimeout(r, 0)));
+  expect(disk.q).toBe("typed just before quitting");
+  await act(async () => root.unmount());
+});
