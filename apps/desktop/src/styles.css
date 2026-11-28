@@ -1948,7 +1948,7 @@ button.try-stone:hover .stone { opacity: 1; }
 /* Quiz panel (D52 to D56): the finish step and chapter recalls float at the right of the reader;
    the source is blurred past reading until an answer is checked, then passages show like find. */
 .reader.quizzing .reader-scroll { padding-right: 420px; }
-/* D358: hidden, one veil over the source blurs it past reading. The blur spreads from the eye
+/* D-new-hide-blur: hidden, one veil over the source blurs it past reading. The blur spreads from the eye
    (--veil-x/y, HideVeil.tsx) to the farthest corner and draws back into it; the stops are shares of that
    distance, so a resized window stays covered. */
 @property --veil { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
