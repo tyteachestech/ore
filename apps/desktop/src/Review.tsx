@@ -8,6 +8,7 @@ import { Ask, type useAskChats } from "./Ask";
 import { Cutting, Gem } from "./Gem";
 import { EndMark } from "./EndMark";
 import { Mole, Mound } from "./Mole";
+import { TutorBubble } from "./Tutor";
 import { CartTip, oreFor } from "./CartTip";
 import { layer, sfx, type Sound } from "./sfx";
 import { still } from "./SideCursor";
@@ -449,6 +450,40 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   })();
   // Recalled with a hint is a weaker recall: the suggestion goes no higher than Hard; his pick stands (D21).
   const suggested = cued && uncapped ? Math.min(uncapped, 2) : uncapped;
+  // The mole after a miss (D363): one wave, on the session's first miss only, once the answer has
+  // settled. After that he sits quiet in his corner; a wave at every miss would be a nag.
+  const [wave, setWave] = useState(false);
+  const waved = useRef(false);
+  const missed = phase === "checked" && suggested === 1;
+  useEffect(() => {
+    if (!missed || waved.current || quick || PHONE) return;
+    // Counted once he has seen it: a rating inside the wait leaves the wave for the next miss.
+    const on = window.setTimeout(() => (waved.current = true, setWave(true)), 600);
+    const off = window.setTimeout(() => setWave(false), 600 + 1500);
+    return () => (clearTimeout(on), clearTimeout(off), setWave(false));
+  }, [missed, card?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const askPanel = asking && asks && card && (
+    <Ask
+      key={card.id}
+      mole={!quick}
+      missed={suggested === 1}
+      card={card}
+      answer={answer}
+      store={asks}
+      onApply={async (p) => {
+        try {
+          await setText(card, p.question, p.answer, p.rubric, true, card, p.ai);
+        } catch (e) {
+          notify(errorText(e), "error");
+          throw e;
+        }
+      }}
+      onClose={() => {
+        setAsking(false);
+        root.current?.focus({ preventScroll: true });
+      }}
+    />
+  );
   /** An exercise with something to hint from (D358): an Explain's first key point, a Fact's answer. */
   const hints = card ? cueLevels(cueSource(card)) : 0;
   const cueLine = card && cued > 0 && (
@@ -733,7 +768,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   const gemShown = gemNow === "ready" ? "rough" : gemNow;
   const sureMiss = phase === "checked" && conf === 3 && suggested !== undefined && suggested <= 2;
   // The four ratings and the warning an unexpected one gets (D237). On the Mac they are the bottom bar once the
-  // answer is shown (D363): nothing that loads above them, the passage first, can move them.
+  // answer is shown (D364): nothing that loads above them, the passage first, can move them.
   const rateRow = phase === "checked" && card && entry && !end && (
     <>
       <div className="review-rate" role="group" aria-label="How well did you remember it?" onMouseLeave={() => setPreview(undefined)} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget) && setPreview(undefined)}>
@@ -1093,11 +1128,12 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                 )}
                 {PHONE && rateRow}
                 {!PHONE && <div className="review-tools">
-                  <Hint text="Ask about this" keys="ask" side="top">
+                  {/* The quick quiz window is too small for the mole's panel: there the chat stays under the ratings. */}
+                  {quick && <Hint text="Ask about this" keys="ask" side="top">
                     <button aria-label="Ask about this" aria-pressed={asking} onClick={() => setAsking((v) => !v)}>
                       <ChatCircleDots size={14} aria-hidden="true" />
                     </button>
-                  </Hint>
+                  </Hint>}
                   <Hint text="Edit exercise" keys="edit-card" side="top">
                     <button aria-label="Edit exercise" onClick={edit}>
                       <PencilSimple size={14} aria-hidden="true" />
@@ -1129,31 +1165,17 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
                     </Hint>
                   )}
                 </div>}
-                {asking && asks && (
-                  <Ask
-                    key={card.id}
-                    card={card}
-                    answer={answer}
-                    store={asks}
-                    onApply={async (p) => {
-                      try {
-                        await setText(card, p.question, p.answer, p.rubric, true, card, p.ai);
-                      } catch (e) {
-                        notify(errorText(e), "error");
-                        throw e;
-                      }
-                    }}
-                    onClose={() => {
-                      setAsking(false);
-                      root.current?.focus({ preventScroll: true });
-                    }}
-                  />
-                )}
+                {quick && askPanel}
               </>
             )}
           </div>
         )}
       </div>
+      {/* The mole, in his corner once the answer is out (never before: the chat would show it). A click or / opens
+          his chat about this exercise beside Review; it closes with the rating and is kept with the exercise. */}
+      {!quick && !PHONE && asks && !end && card && phase === "checked" && (asking ? askPanel : (
+        <TutorBubble wave={wave} name="Ask about this" label="Ask about this" keys="ask" onOpen={() => setAsking(true)} />
+      ))}
       {!end && card && entry && (rateRow ? !PHONE && <div className="review-bar">{rateRow}</div> : <KeyFoot phase={phase} kind={card.kind} hint={cued < hints} inHead={!!card.in_head_ok} />)}
     </div>
     </Trap>
@@ -1161,7 +1183,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
 }
 
 /** The review footer while he answers or edits: the keys for this step, Raycast's action bar (DESIGN.md). Once the
- *  answer is shown the Mac's bar is the four ratings instead (D363); the iPhone shows no key bar. */
+ *  answer is shown the Mac's bar is the four ratings instead (D364); the iPhone shows no key bar. */
 function KeyFoot({ phase, kind, hint, inHead }: { phase: Phase; kind: CardFull["kind"]; hint: boolean; inHead: boolean }) {
   const map = useKeymap();
   const k = (id: KeyId) => label(map[id]);

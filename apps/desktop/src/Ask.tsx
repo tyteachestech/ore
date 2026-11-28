@@ -1,5 +1,5 @@
-import { ArrowUp, Sparkle, Stop } from "./icons";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { ArrowUp, PencilSimple, Question, Sparkle, Stop, TextAlignLeft, X, type Icon } from "./icons";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import { mend } from "./mend";
 import { useSteady } from "./steady";
@@ -12,11 +12,16 @@ import { is } from "./keys";
 import { errorText, type Notify } from "./util";
 import { wordDiff } from "./worddiff";
 import { Working } from "./Working";
+import { Mole } from "./Mole";
 
 type Turn = SavedExerciseChat["turns"][number];
 type Proposal = NonNullable<Turn["proposal"]> & { ai?: Turn["ai"] };
 
 const STARTERS = ["Why is this the answer?", "Give me an example", "Make this exercise clearer"];
+/** The mole's chat (D363): its starters are rows with an icon, as the tutor's are (D189). After a
+ *  miss they are the three ways on from it; the rest he types. */
+const STARTERS_MOLE: [string, Icon][] = [["Why is this the answer?", Question], ["Give me an example", TextAlignLeft], ["Make this exercise clearer", PencilSimple]];
+const STARTERS_MISS: [string, Icon][] = [["Why did I miss it?", Question], ["Explain it another way", TextAlignLeft], ["Try a similar one", PencilSimple]];
 
 type Run = { id: string; turn: string; session?: string; ai?: AskReply["ai"]; stopped?: boolean };
 type AskChat = SavedExerciseChat & { input: string; partial?: string; run?: Run };
@@ -50,7 +55,26 @@ export function useAskChats(notify: Notify) {
   };
 }
 
-type ChatProps = { card: CardFull; answer: string; onApply: (p: Proposal) => Promise<void>; onClose: () => void };
+/** `mole`: shown as the mole's floating chat beside Review, opened from his corner button; without it, the thread
+ *  under the ratings (the quick quiz window, too small for a panel). `missed`: he missed this one. */
+type ChatProps = { card: CardFull; answer: string; mole?: boolean; missed?: boolean; onApply: (p: Proposal) => Promise<void>; onClose: () => void };
+
+/** The mole's panel: the tutor's floating card (D160), with only Close in its head. */
+function Shell({ mole, onClose, children }: { mole?: boolean; onClose: () => void; children: ReactNode }) {
+  if (!mole) return <section className="ask" aria-label="Ask about this">{children}</section>;
+  return (
+    <aside className="tutor float review-chat" role="region" aria-label="Ask about this">
+      <div className="tutor-head">
+        <Hint text={<>Close <kbd>Esc</kbd></>}>
+          <button className="icon-btn" aria-label="Close the chat" onClick={onClose}>
+            <X size={14} aria-hidden="true" />
+          </button>
+        </Hint>
+      </div>
+      {children}
+    </aside>
+  );
+}
 
 /** Ask about this (D61): a chat about the card he just answered, like ChatGPT's thread under a
  *  message. It runs on his own plan through `ore ask` (claude -p or codex); a proposed card is
@@ -66,22 +90,26 @@ export function Ask({ store, ...props }: ChatProps & { store: ReturnType<typeof 
     return () => { open = false; };
   }, [card.id, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!chat) {
-    return <section className="ask" aria-label="Ask about this">
-      {error
-        ? <p className="err" role="alert">{error} <button className="link" onClick={() => { setError(null); retry((n) => n + 1); }}>Try again</button></p>
-        : <Working label="Opening your chat…" />}
-    </section>;
+    return <Shell mole={props.mole} onClose={props.onClose}>
+      <div className={props.mole ? "tutor-turns" : undefined}>
+        {error
+          ? <p className="err" role="alert">{error} <button className="link" onClick={() => { setError(null); retry((n) => n + 1); }}>Try again</button></p>
+          : <Working label="Opening your chat…" />}
+      </div>
+    </Shell>;
   }
   return <AskThread {...props} chat={chat} setChat={(f) => store.update(card.id, f)} save={(turns) => store.save(chat, card.question, turns)} />;
 }
 
-function AskThread({ card, answer, chat, setChat, save, onApply, onClose }: ChatProps & {
+function AskThread({ card, answer, mole, missed, chat, setChat, save, onApply, onClose }: ChatProps & {
   chat: AskChat;
   setChat: (f: (c: AskChat) => AskChat) => void;
   save: (turns: Turn[]) => void;
 }) {
   const { turns, input, run } = chat;
   const busy = !!run;
+  // The starters he opened it to stay: a grade landing or a mark flipped never swaps a row under his pointer.
+  const [afterMiss] = useState(!!missed);
   const last = turns.at(-1);
   const error = busy ? undefined : last?.error;
   /** Read off the card itself, never remembered: an undo or a later edit makes a suggestion usable again. */
@@ -164,23 +192,30 @@ function AskThread({ card, answer, chat, setChat, save, onApply, onClose }: Chat
     return () => document.removeEventListener("keydown", key, true);
   });
 
-  return (
-    <section className="ask" aria-label="Ask about this">
-      {turns.length === 0 && (
-        <div className="ask-starters">
-          {STARTERS.map((s) => (
-            <button key={s} onClick={() => void send(s)}>
-              {s}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="ask-turns" aria-live="polite">
+  const starters = turns.length === 0 && (mole ? (
+    <div className="tutor-starters">
+      {(afterMiss ? STARTERS_MISS : STARTERS_MOLE).map(([s, Glyph]) => (
+        <button key={s} className="menu-item" onClick={() => void send(s)}><Glyph size={14} aria-hidden="true" />{s}</button>
+      ))}
+    </div>
+  ) : (
+    <div className="ask-starters">
+      {STARTERS.map((s) => (
+        <button key={s} onClick={() => void send(s)}>
+          {s}
+        </button>
+      ))}
+    </div>
+  ));
+  // In his panel the mole is the one speaking, so no spark marks a reply: it is a bubble with a tail down to him.
+  const mark = !mole && <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />;
+  const thread = (
+    <>
         {turns.map((t) => (
           <Fragment key={t.id}>
             <p className="ask-me">{t.message}</p>
-            {t.reply !== undefined && <div className="ask-ai">
-              <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />
+            {t.reply !== undefined && <div className={`ask-ai${t === last && !busy ? " newest" : ""}`}>
+              {mark}
               <div className="ask-text">
                 <ReactMarkdown {...math}>{aiMath(t.reply)}</ReactMarkdown>
                 {t.stopped && <p className="tutor-general">Stopped</p>}
@@ -202,8 +237,8 @@ function AskThread({ card, answer, chat, setChat, save, onApply, onClose }: Chat
           </Fragment>
         ))}
         {busy && (
-          <div className="ask-ai">
-            <Sparkle className="ask-mark" size={14} weight="fill" aria-hidden="true" />
+          <div className="ask-ai newest">
+            {mark}
             {shown ? (
               <div className="ask-text">
                 <ReactMarkdown {...math}>{aiMath(mend(wholeFormulas(shown, chat.partial ?? "")))}</ReactMarkdown>
@@ -231,26 +266,32 @@ function AskThread({ card, answer, chat, setChat, save, onApply, onClose }: Chat
           </p>
         )}
         <div ref={end} />
-      </div>
+    </>
+  );
+  const line = (
+    <Grow
+      ref={field}
+      rows={1}
+      className="field"
+      aria-label="Ask about this exercise"
+      placeholder={turns.length ? "Ask a follow-up…" : "Ask about this exercise…"}
+      value={input}
+      onChange={(e) => { const v = e.target.value; setChat((c) => ({ ...c, input: v })); }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+          e.preventDefault();
+          void send(input);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          onClose();
+        }
+      }}
+    />
+  );
+  const composer = (
       <div className="ask-input">
-        <Grow
-          ref={field}
-          rows={1}
-          className="field"
-          aria-label="Ask about this exercise"
-          placeholder={turns.length ? "Ask a follow-up…" : "Ask about this exercise…"}
-          value={input}
-          onChange={(e) => { const v = e.target.value; setChat((c) => ({ ...c, input: v })); }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void send(input);
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              onClose();
-            }
-          }}
-        />
+        {/* The tutor's field (D186): a block blinks where his words will go. */}
+        {mole ? <div className="ask-line">{line}</div> : line}
         {busy ? (
           // While a reply is written the send button is Stop, as in the tutor (ChatGPT, Claude, Notion AI).
           <Hint text="Stop" keys="tutor-stop" side="top">
@@ -266,7 +307,31 @@ function AskThread({ card, answer, chat, setChat, save, onApply, onClose }: Chat
           </Hint>
         )}
       </div>
-    </section>
+  );
+  if (mole) {
+    return (
+      <Shell mole onClose={onClose}>
+        <div className="tutor-turns" aria-live="polite">
+          {starters}
+          {thread}
+        </div>
+        <div className="tutor-foot">
+          <div className="tutor-perch">
+            <span className="tutor-mole"><Mole bare size={36} mood={busy ? "thinking" : "idle"} /></span>
+          </div>
+          {composer}
+        </div>
+      </Shell>
+    );
+  }
+  return (
+    <Shell onClose={onClose}>
+      {starters}
+      <div className="ask-turns" aria-live="polite">
+        {thread}
+      </div>
+      {composer}
+    </Shell>
   );
 }
 

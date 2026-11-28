@@ -182,16 +182,29 @@ describe("new-card limit and skill filter (D58, D60)", () => {
     expect(dueQueue(lib, T())).toHaveLength(20);
   });
 
-  test("the relearn passes owed today come after the new cards, which take no place among them (D144, D21)", async () => {
+  test("a same-day restart brings Again back within three intervening reviews and before new exercises", async () => {
     const { lib, cards } = await library(12);
     const day1 = T();
     for (const c of cards.slice(0, 6)) await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, now: day1 });
     const later = new Date(day1.getTime() + 90 * 864e5);
-    later.setHours(12, 0, 0, 0); // midday, so the minute after it is still the same day on any clock
-    await recordReview(lib, cards[0]!.meta.id, { rating: 1, confidence: 3, now: later }); // a miss today owes one pass
-    const q = dueQueue(lib, new Date(later.getTime() + 60_000));
-    expect(q.map((e) => (e.relearn ? "R" : e.due === null ? "N" : "D")).join("")).toBe("DDDDNDNNNNNR");
-    expect(q.at(-1)!.id).toBe(cards[0]!.meta.id);
+    later.setHours(12, 0, 0, 0);
+    const at = (minute: number) => new Date(later.getTime() + minute * 60_000);
+    const missed = cards[0]!.meta.id;
+    const first = await startSession(lib, at(0));
+    await recordReview(lib, missed, { rating: 1, confidence: 3, now: at(1), session: first.id });
+    await endSession(lib, at(2), false, first.id);
+
+    const second = await startSession(lib, at(3));
+    const q = dueQueue(lib, at(3), { start: true });
+    expect(q.map((e) => (e.relearn ? "R" : e.due === null ? "N" : "D")).join("")).toBe("DDDRDNDNNNNN");
+    expect(q[3]!.id).toBe(missed);
+    for (const [i, e] of q.slice(0, 3).entries()) await recordReview(lib, e.id, { rating: 3, confidence: 3, now: at(4 + i), session: second.id });
+    await endSession(lib, at(7), false, second.id);
+
+    const third = await startSession(lib, at(8));
+    expect(dueQueue(lib, at(8), { start: true })[0]).toMatchObject({ id: missed, relearn: true });
+    await recordReview(lib, missed, { rating: 3, confidence: 3, now: at(9), session: third.id });
+    expect(dueQueue(lib, at(10)).some((e) => e.id === missed)).toBe(false);
   });
 
   test("a draft written today takes no fifth place; it gets one tomorrow (D65, D144)", async () => {

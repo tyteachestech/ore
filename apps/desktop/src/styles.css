@@ -600,7 +600,7 @@ img.thumb { filter: brightness(0.86); }
 .pick-bar .pick-x { padding: 0; width: 28px; justify-content: center; }
 .pick-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
 body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
-/* Review's ratings are its bottom bar (D363): the toasts stand above it, never over Hard and Good;
+/* Review's ratings are its bottom bar (D364): the toasts stand above it, never over Hard and Good;
    higher while the bar also holds the warning over an unexpected rating. Not while Review waits behind a source. */
 body:has(.review:not([hidden]) .review-bar) .toasts { bottom: 78px; }
 body:has(.review:not([hidden]) .review-bar .review-guard) .toasts { bottom: 108px; }
@@ -2474,10 +2474,11 @@ button.home-plan:hover { color: var(--text); }
 .review-quotes button:disabled { opacity: 0.3; }
 .review-time { font-variant-numeric: tabular-nums; }
 @media (min-width: 1340px) {
-  .review-passage { position: absolute; top: 32px; left: calc(100% + 32px); width: 300px; margin: 0; animation: card-in var(--t-3) ease-out both; }
+  /* Beside the exercise, unless the mole's chat holds that side: then it is back in the column. */
+  .review:not(:has(.review-chat)) .review-passage { position: absolute; top: 32px; left: calc(100% + 32px); width: 300px; margin: 0; animation: card-in var(--t-3) ease-out both; }
 }
 .review-rate { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 22px; }
-/* On the Mac the rating is the bottom bar once the answer is shown (D363, in place of D314's sticky
+/* On the Mac the rating is the bottom bar once the answer is shown (D364, in place of D314's sticky
    row): it stays in view under a long answer and nothing loading above it can move it (F865). The bar keeps the
    page's side padding so the four sit under the exercise's column. In a window too narrow for the card to clear
    the radio (D254), the card and the bar start to the radio's right, so the radio never sits on Again. */
@@ -3812,7 +3813,7 @@ body:has(.kb-bar) .phone-reader { padding-bottom: var(--kb-bar-inset); }
 @keyframes radio-wait { 50% { opacity: 0.4; } }
 .radio-pad.missing { color: color-mix(in srgb, var(--faint) 45%, transparent); }
 @media (prefers-reduced-motion: reduce) { .radio-tag, .radio-pad.loading svg { animation: none; } }
-.app:has(.quiz) .tutor-bubble { display: none; }
+.app:has(.quiz) .tutor-bubble:not(.review *) { display: none; }
 /* The mole's marks: eye glints white, eyes black, and his two colours, the pink nose and the amber lamp. */
 .mole-glint { fill: var(--text); }
 .mole-eye { fill: #060607; }
@@ -3933,6 +3934,17 @@ body:has(.kb-bar) .phone-reader { padding-bottom: var(--kb-bar-inset); }
   padding-top: 40px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-raised); box-shadow: var(--float);
 }
 .tutor.float .tutor-head { top: 8px; right: 8px; }
+/* The mole in Review (D363): his button and his chat sit over the keys bar, and a wide window
+   moves the exercise left of the chat, so nothing he is asking about is covered. */
+.review .tutor-bubble { bottom: 54px; }
+.review .review-chat { bottom: 54px; height: min(600px, calc(100vh - 118px)); animation: card-in var(--t-3) var(--ease-out) both; }
+.review-body { transition: padding-right var(--t-3) var(--ease-out); }
+/* In a window too narrow for the exercise to clear him, it ends to his left, as it starts right of the radio (D254). */
+:where(:root:not(.phone)) .review-body:not(.quick *) { padding-right: clamp(24px, calc(832px - 100vw), 76px); }
+@media (min-width: 880px) { :root .review:has(.review-chat) .review-body { padding-right: 432px; } }
+/* A suggested exercise in his bubble is set apart by its label and space, never a frame in a frame. */
+.review-chat .ask-card { padding: 0; border: 0; border-radius: 0; background: none; }
+@media (prefers-reduced-motion: reduce) { .review .review-chat { animation: none; } .review-body { transition: none; } }
 /* Under a reply: Show me (the hint ladder's last rung) and + Card (keep this idea in review). */
 .tutor-acts { display: flex; gap: 6px; margin-top: 10px; }
 /* A tell apart's cases side by side (D163): each a label over a rule, never framed; they stack when the tutor is too narrow for two. */
