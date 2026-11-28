@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { z } from "zod";
 import { locate } from "../anchoring.ts";
 import { eachMarker, markerNumbers } from "../markers.ts";
-import { findItem, listItems, wordCount, type AiStamp, type Item } from "../items.ts";
+import { AiStamp, findItem, listItems, wordCount, type Item } from "../items.ts";
 import { readAnnotations } from "../annotations.ts";
 import { blankProblem, cardTextProblem, ContentType, hideBlanks, listCards, writeNewCard, type Card } from "../cards.ts";
 import { readReviews } from "../reviews.ts";
@@ -424,11 +424,14 @@ export async function addTutorCard(lib: Library, item: string, card: TutorCard, 
   const problem = cardTextProblem(c);
   if (problem) throw new Error(problem);
   if (c.kind === "prompt" && !c.rubric.length) throw new Error("a prompt card needs rubric points");
+  // Checked as a card's read checks it: a stamp missing a field made a card no list could read (F-new-tutor-card-stamp).
+  const stamp = AiStamp.safeParse(ai);
+  if (!stamp.success) throw new Error(`--ai: ${stamp.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
   return withLock(paths.lock(lib), () => {
     const it = findItem(lib, item);
     return writeNewCard(lib, {
       kind: c.kind, item: it.meta.id, from: "tutor", skills: it.meta.skills, topics: it.meta.topics.slice(0, 1), content_type: c.content_type,
-      question: c.question, answer: c.answer, rubric: c.kind === "prompt" ? c.rubric : [], ai,
+      question: c.question, answer: c.answer, rubric: c.kind === "prompt" ? c.rubric : [], ai: stamp.data,
     });
   });
 }

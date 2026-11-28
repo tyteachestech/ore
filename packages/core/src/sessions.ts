@@ -98,7 +98,7 @@ export function reopenSession(lib: Library, id: string): Promise<void> {
 // (CI, a review that opened on "ENOENT … .ore/session"). Gone is the same as none.
 // Only an id whose start receipt is in the logs is open: a restore from the library's history (D5) can take the
 // receipt back while the gitignored marker still names it (history recovery pass, restore-03).
-export function openSessionIds(lib: Library): string[] {
+export function openSessionIds(lib: Library, receipts?: SessionReceipt[]): string[] {
   let ids: string[];
   try {
     ids = readFileSync(paths.openSession(lib), "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
@@ -107,7 +107,7 @@ export function openSessionIds(lib: Library): string[] {
     throw e;
   }
   if (!ids.length) return ids;
-  const started = new Set(readSessions(lib).filter((r) => r.type === "start").map((r) => r.id));
+  const started = new Set((receipts ?? readSessions(lib)).filter((r) => r.type === "start").map((r) => r.id));
   return ids.filter((id) => started.has(id));
 }
 

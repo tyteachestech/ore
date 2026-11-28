@@ -17,10 +17,19 @@ const git = (lib: Library, ...args: string[]) =>
  *  one checked out at an old snapshot would commit where no branch holds it (history recovery pass, restore-01,
  *  SNAPSHOT-02, SNAPSHOT-05). History waits for him or the agent to finish instead. */
 export function historyPaused(lib: Library): string | null {
+  try {
+    return paused(lib);
+  } catch {
+    return null; // no git on PATH: doctor and snapshot carry on
+  }
+}
+
+function paused(lib: Library): string | null {
   if (!existsSync(join(lib.root, ".git"))) return null;
-  const dir = git(lib, "rev-parse", "--git-dir");
+  // Absolute: a worktree's `.git` is a file naming its git dir elsewhere.
+  const dir = git(lib, "rev-parse", "--absolute-git-dir");
   if (dir.exitCode !== 0) return null;
-  const gitDir = join(lib.root, dir.stdout.toString().trim());
+  const gitDir = dir.stdout.toString().trim();
   const op = [["MERGE_HEAD", "merge"], ["REVERT_HEAD", "revert"], ["CHERRY_PICK_HEAD", "cherry-pick"], ["rebase-merge", "rebase"], ["rebase-apply", "rebase"]].find(([f]) => existsSync(join(gitDir, f!)));
   if (op) return `a git ${op[1]} in the library isn't finished: finish it (git ${op[1]} --continue) or take it back (git ${op[1]} --abort)`;
   if (git(lib, "ls-files", "-u").stdout.length) return "a restore left files in conflict: settle them and commit, or take it back with git checkout HEAD -- <file>";

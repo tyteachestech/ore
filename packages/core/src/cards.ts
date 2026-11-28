@@ -157,8 +157,7 @@ export interface NewCard extends CardContent {
 
 // Caller holds the library lock when writing several files together.
 export function writeNewCard(lib: Library, c: NewCard): Card {
-  // Checked as every read checks it: a card written wrong could never be read again, and lists skip it silently.
-  const meta: CardMeta = CardMetaSchema.parse({
+  const meta: CardMeta = {
     id: ulid(),
     kind: c.kind,
     item: c.item,
@@ -174,7 +173,7 @@ export function writeNewCard(lib: Library, c: NewCard): Card {
     ai: c.ai,
     evidence: c.evidence?.length ? c.evidence : undefined,
     figure: c.figure,
-  });
+  };
   const path = paths.card(lib, meta.id);
   const content = { question: hideBlanks(c.question), answer: c.answer, rubric: c.rubric };
   writeAtomic(path, stringifyFrontmatter(meta, renderCardBody(content)));

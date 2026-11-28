@@ -762,7 +762,8 @@ describe("tutor: hints and cards", () => {
     const c = await addTutorCard(lib, a.meta.id, { kind: "card", content_type: "fact", question: "In the Leitner system, where does a missed card go?", answer: "Back to the first box.", rubric: [] }, { vendor: "claude", model: "claude-fake-1", prompt_version: "tutor@3" });
     expect(c.meta).toMatchObject({ item: a.meta.id, from: "tutor", state: "draft", skills: ["learning"], ai: { prompt_version: "tutor@3" } });
     expect(findCard(lib, c.meta.id).answer).toBe("Back to the first box.");
-    await expect(addTutorCard(lib, a.meta.id, { kind: "prompt", content_type: "concept", question: "Why?", answer: "Because.", rubric: [] }, { vendor: "claude", model: "m", prompt_version: "tutor@3" })).rejects.toThrow("rubric");    // A stamp missing its prompt version is refused before a file is written: a card written with it could never be read
+    await expect(addTutorCard(lib, a.meta.id, { kind: "prompt", content_type: "concept", question: "Why?", answer: "Because.", rubric: [] }, { vendor: "claude", model: "m", prompt_version: "tutor@3" })).rejects.toThrow("rubric");
+    // A stamp missing its prompt version is refused before a file is written: a card written with it could never be read
     // again, and every list skipped it with no word (history recovery pass, F-new-tutor-card-stamp).
     const before = listCards(lib).length;
     await expect(addTutorCard(lib, a.meta.id, { kind: "card", content_type: "fact", question: "Where does a known card go?", answer: "Up a box.", rubric: [] }, { vendor: "claude", model: "m", prompt: "tutor@3" } as never)).rejects.toThrow("prompt_version");

@@ -158,7 +158,7 @@ Use `ore ls`, `ore search <query>` (also searches the source note), `ore stats [
 
 "Bring back yesterday's note", "undo what happened to that source": the library is a local git repo (D5) that `ore` snapshots at most every ten minutes and at every review session's end. Restoring from it is the one hand edit allowed:
 
-1. Commit what is there now (`git add -A && git commit -qm "Before restoring …"`), so the restore can itself be taken back.
+1. Save what is there now with `ore snapshot --json` (under the library's lock), so the restore can itself be taken back. If it answers `paused`, a restore is already half done: finish that first.
 2. Find the snapshot: `git log --format='%h %ad %s' --date=local -- <path>`, then `git show <sha>:<path>` to check it is the version he means.
 3. Restore only the paths he named: `git checkout <sha> -- <path>` (a source is its `items/<yyyy>/<slug>-<id>/` folder; its exercises are the `cards/` files with its id as `item:`). Never `git reset`, `git stash` or a checkout of the whole folder unless he asks for the whole library as it was: the `*.jsonl` logs hold his reviews and highlights from every device, and going back drops the ones since.
 4. `ore doctor --json`; the index reads the restored files by itself, and the app shows them once he is back in its window. Tell him what came back and from when, and that the last ten minutes before a snapshot may not be in it.

@@ -174,8 +174,9 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const today = localDay(now);
     // Relearn passes are owed for misses today, or since an open session began if that was earlier (a
     // session running past midnight, even while the quick quiz has one open too).
-    const openIds = new Set(openSessionIds(lib));
-    const began = readSessions(lib).find((s) => s.type === "start" && openIds.has(s.id))?.ts;
+    const receipts = readSessions(lib);
+    const openIds = new Set(openSessionIds(lib, receipts));
+    const began = receipts.find((s) => s.type === "start" && openIds.has(s.id))?.ts;
     const ownToday = new Map<string, Review[]>();
     for (const r of reviews) {
       if (localDay(r.ts) !== today && !(began && r.ts >= began)) continue;

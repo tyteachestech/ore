@@ -150,6 +150,15 @@ describe("cuts while the source changes", () => {
     expect(findItem(lib, item.meta.id).body).toBe(item.body);
   });
 
+  test("Undo of a cut of a paragraph that repeats the one before it puts it back where it was (code review of the restore-02 fix)", async () => {
+    const lib = await tempLibrary();
+    const item = await addText(lib, "# Twice\n\nSame words.\n\nSame words.\n\nThe end.\n");
+    const second = item.body.lastIndexOf("Same words.");
+    const c = await cutText(lib, item.meta.id, second, second + 1);
+    await restoreCut(lib, item.meta.id, c.id);
+    expect(findItem(lib, item.meta.id).body).toBe(item.body);
+  });
+
   test("Redo after an Undo that found the text a new place takes it out again from there (F606)", async () => {
     const lib = await tempLibrary();
     const item = await addText(lib, TEXT);

@@ -6,6 +6,14 @@ import { afterAnswer, lastWin, opt, ore, PHONE, putOff, type CardFull, type DueE
 import { Stale } from "./history";
 import { errorText, type Forget, type Notify } from "./util";
 
+/** Core's words (`undoReview`) for a rating Undo that can never apply: gone from the log (a restore from the
+ *  library's history) or rated again since. Such a step leaves the history (`Stale`), so the next ⌘Z goes on; a
+ *  test ties these words to core's (history recovery pass). */
+export const RATING_GONE = /no longer in the library|rated again after that/;
+const staleIfGone = (e: unknown): never => {
+  throw RATING_GONE.test(errorText(e)) ? new Stale(errorText(e)) : e;
+};
+
 /** One card adds at most this much active time (D60, as in core). */
 const ACTIVE_CAP_MS = 3 * 60_000;
 
@@ -520,7 +528,7 @@ export class ReviewSession<S> {
         "Rating",
         "quiet",
         // With Review closed, only the log changes (its session stays ended), and Home reads its numbers again.
-        (): Promise<unknown> => (this.mounted && this.undoRated(ts)) || run("review", id, opt("undo", ts)).then(() => this.screen.onLogged?.()),
+        (): Promise<unknown> => (this.mounted && this.undoRated(ts)) || run("review", id, opt("undo", ts)).then(() => this.screen.onLogged?.(), staleIfGone),
         // Given again after Review closed: its session has ended, so the rating goes in with none.
         (): Promise<unknown> =>
           (this.mounted && this.redoRated(id, args, rating, elapsed, { forget, setTs })) ||
@@ -553,9 +561,7 @@ export class ReviewSession<S> {
     this.setBusy(true);
     try {
       await this.run("review", last.card, opt("undo", last.ts)).catch((e) => {
-        // Gone from the log (a restore from the library's history) or rated again since: this Undo can never
-        // apply, so it leaves the history and the next ⌘Z goes on (core's undoReview words, history recovery pass).
-        if (!/no longer in the library|rated again after that/.test(errorText(e))) throw e;
+        if (e instanceof Stale || !RATING_GONE.test(errorText(e))) throw e;
         this.undos = this.undos.slice(0, -1);
         throw new Stale(errorText(e));
       });
@@ -586,7 +592,7 @@ export class ReviewSession<S> {
       this.undos = this.undos.slice(0, -1);
       this.setQueue(last.queue.filter((e) => !this.retired.has(e.id)));
     } finally {
-      // A failure goes to the history, which puts the step back and says why.
+      // A failure goes to the history, which says why and puts the step back (one that can never apply, `Stale`, leaves it).
       this.setBusy(false);
     }
   }

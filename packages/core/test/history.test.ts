@@ -135,3 +135,14 @@ describe("library history after a restore (D5)", () => {
     expect(end.exitCode).toBe(0);
   });
 });
+
+test("ore doctor and ore snapshot with no git on PATH answer, never crash (code review of the history recovery pass)", async () => {
+  const lib = await tempLibrary();
+  const cli = join(import.meta.dir, "../../cli/src/ore.ts");
+  const env = { ...process.env, ORE_LIBRARY: lib.root, ORE_NO_ENRICH: "1", PATH: "/nonexistent" };
+  for (const cmd of ["doctor", "snapshot"]) {
+    const r = Bun.spawnSync([process.execPath, cli, cmd, "--json"], { env, stdout: "pipe", stderr: "pipe" });
+    expect(r.stderr.toString()).toBe("");
+    expect(JSON.parse(r.stdout.toString())).not.toHaveProperty("error");
+  }
+});

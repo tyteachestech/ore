@@ -267,7 +267,8 @@ export async function restoreCut(lib: Library, ref: string, cutId: string): Prom
     const found = back ? null : placeBack(body, cut);
     // Placed by one side's context only, the text may already sit on the other side of that spot: a restore from
     // the library's history brought it back while this record stayed in .ore (history recovery pass, restore-02).
-    const at = found !== null && (body.slice(found - len, found) === cut.text || body.slice(found, found + len) === cut.text) ? null : found;
+    const exact = found === cut.at && body.slice(found - before.length, found) === before && body.slice(found, found + after.length) === after;
+    const at = found !== null && !exact && (body.slice(found - len, found) === cut.text || body.slice(found, found + len) === cut.text) ? null : found;
     if (at === null) throw new Error("That text is already back, or the source changed since.");
     const next = body.slice(0, at) + cut.text + body.slice(at);
     const moved = at - cut.at;

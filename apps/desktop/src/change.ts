@@ -92,7 +92,7 @@ export async function allOrNone(steps: ((on: boolean) => Promise<unknown>)[], on
  *  ⌘Z pressed meanwhile takes back this change, never the one before it: F146, F156, F459 to F487), and writes it
  *  and every Undo and Redo of it one after another. A first write that fails takes the change off the screen and
  *  the history and says why; resolves false then. An Undo or Redo that fails shows what stands again, and the
- *  history says why and keeps the step (history.ts). */
+ *  history says why and keeps the step, unless it can never apply (`Stale`, as `keepNewer` throws): then it leaves (history.ts). */
 export function change(notify: Notify, c: Change): Promise<boolean> {
   const id = `change ${++changes}`;
   const key = c.key ?? id;
