@@ -21,11 +21,18 @@ const kids = (e: Element) => Array.from(e.children);
 /** Equal-height tables laid side by side inside one pair of brackets form a single matrix. */
 export function joinMatrixTables(math: Element): void {
   const withoutSpace = (e: Element) => kids(e).filter((child) => name(child) !== "mspace");
-  for (const row of math.querySelectorAll("mrow")) {
-    const [open, ...inner] = withoutSpace(row);
-    const close = inner.pop();
-    if (!open || !close || name(open) !== "mo" || name(close) !== "mo") continue;
-    if (!["[]", "()", "{}"].includes(open.textContent!.trim() + close.textContent!.trim())) continue;
+  for (const row of [math, ...math.querySelectorAll("mrow, semantics, mfenced")]) {
+    const inner = withoutSpace(row).filter((child) => !["annotation", "annotation-xml"].includes(name(child)));
+    let brackets: string;
+    if (name(row) === "mfenced") {
+      brackets = (row.getAttribute("open") ?? "(").trim() + (row.getAttribute("close") ?? ")").trim();
+    } else {
+      const open = inner.shift();
+      const close = inner.pop();
+      if (!open || !close || name(open) !== "mo" || name(close) !== "mo") continue;
+      brackets = open.textContent!.trim() + close.textContent!.trim();
+    }
+    if (!["[]", "()", "{}"].includes(brackets)) continue;
     const tables = inner.length === 1 && name(inner[0]!) === "mrow" ? withoutSpace(inner[0]!) : inner;
     if (tables.length < 2 || tables.some((table) => name(table) !== "mtable")) continue;
     const [first, ...rest] = tables.map(kids);

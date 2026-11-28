@@ -49,6 +49,8 @@ function videoLinks(document: Document, url: string) {
     return parsed && (parsed.protocol === "https:" || parsed.protocol === "http:") ? parsed.href : undefined;
   };
   const base = webUrl(document.querySelector("base[href]")?.getAttribute("href") ?? null, url) ?? url;
+  const mediaUrl = (node: Element, attr: "src" | "poster") =>
+    webUrl(node.getAttribute(attr), base) ?? webUrl(node.getAttribute(`data-${attr}`), base);
   // The image-figure rule keeps only an image and caption, discarding the video link beside a poster.
   for (const figure of document.querySelectorAll("figure:has(video)")) {
     const group = document.createElement("div");
@@ -57,9 +59,9 @@ function videoLinks(document: Document, url: string) {
     figure.replaceWith(group);
   }
   for (const video of document.querySelectorAll("video")) {
-    const sources = [video, ...video.querySelectorAll("source[src]")];
-    const src = sources.map((node) => webUrl(node.getAttribute("src"), base)).find(Boolean);
-    const poster = webUrl(video.getAttribute("poster"), base);
+    const sources = [video, ...video.querySelectorAll("source")];
+    const src = sources.map((node) => mediaUrl(node, "src")).find(Boolean);
+    const poster = sources.map((node) => mediaUrl(node, "poster")).find(Boolean);
     const title = video.getAttribute("title")?.trim();
     const block = document.createElement(video.closest("p") ? "span" : "p");
     if (poster) {
@@ -125,6 +127,8 @@ function inlineCustom(document: Document) {
 }
 
 const SECTION_NUMBER = /^\s*\d+(?:\.\d+)*\.?\s+/;
+const OUTLINE_NUMBER = /^\s*\d+\.\d/;
+const SECTION_ID = /^(?:S\d+(?:\.S+\d+)*|(?:section|sec)[-_.]?\d+(?:[-_.]\d+)*)$/i;
 
 /** A section's heading in a `<header>` of its own (Brilliant's wiki: `<header class="section-header"><h2>…`): the
  *  extractor drops every header as the site's, with the heading. One that holds a section heading and nothing
@@ -137,19 +141,22 @@ function sectionHeaders(document: Document) {
     if (!heads.length || h.querySelector("h1, nav") || heads.map(text).join("") !== text(h)) continue;
     h.replaceWith(...Array.from(h.childNodes));
   }
-  // Defuddle's navigation score penalizes words like "related" even in a formal section heading.
-  // A numbered section with prose in the article is content. Mark it for the scorer that reads it.
+  const BOX = new Set(["more", "related", "comment", "comments", "share", "popular", "recommended", "promo", "newsletter", "subscribe", "sponsored", "trending"]);
+  const LINKS = new Set([...BOX, "posts", "articles", "stories", "reading", "from", "you", "also", "like", "may", "our", "the", "this", "on", "in", "next", "read"]);
+  const slug = (t: string) => t.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
+  // Defuddle's navigation score penalizes "related" even in a formal outline heading.
   for (const section of document.querySelectorAll("article section, main section")) {
     const heading = section.firstElementChild;
-    if (heading?.matches("h2, h3, h4, h5, h6") && SECTION_NUMBER.test(heading.textContent ?? "") &&
-        section.querySelector("p") && !section.closest("aside, nav")) section.classList.add("section-content");
+    if (!heading?.matches("h2, h3, h4, h5, h6") || !section.querySelector("p") || section.closest("aside, nav")) continue;
+    const title = heading.textContent ?? "";
+    if (!SECTION_NUMBER.test(title)) continue;
+    const words = slug(title.replace(SECTION_NUMBER, "")).split("-");
+    if (words.every((word) => LINKS.has(word))) continue;
+    if (OUTLINE_NUMBER.test(title) || SECTION_ID.test(section.id)) section.classList.add("section-content");
   }
   // A section whose id is its heading's words with a word the extractor reads as a box of links ("more-examples":
   // "more-") is dropped whole. Such an id is cleared when the heading says what the section teaches, not what a box
   // of links says ("More stories", "Related posts" keep theirs). Markdown keeps no ids, so nothing else is lost.
-  const BOX = new Set(["more", "related", "comment", "comments", "share", "popular", "recommended", "promo", "newsletter", "subscribe", "sponsored", "trending"]);
-  const LINKS = new Set([...BOX, "posts", "articles", "stories", "reading", "from", "you", "also", "like", "may", "our", "the", "this", "on", "in", "next", "read"]);
-  const slug = (t: string) => t.toLowerCase().normalize("NFKD").replace(/[^\p{L}\p{N}]+/gu, "-").replace(/^-|-$/g, "");
   const slugs = Array.from(document.querySelectorAll("h2, h3, h4, h5, h6"))
     .map((h) => slug((h.textContent ?? "").replace(SECTION_NUMBER, "")))
     .filter((t) => t.split("-").some((w) => BOX.has(w)) && t.split("-").some((w) => !LINKS.has(w)));

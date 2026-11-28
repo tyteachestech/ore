@@ -143,9 +143,14 @@ describe("tutor: replies", () => {
       expect(ps.slice(0, 30)).toEqual(own); // his source first, the library's after
     }
     expect(tutorPassages(lib, "summarize this", { item: a.meta.id }).some((p) => p.title === "Elsewhere")).toBe(true); // other sources still reach it
-    fakeClaude([{ ...OK, reply: "Part 30 explains the last idea [1].", citations: [{ passage: "P30", quote: "Section 30 explains idea number 30" }], general: false, title: "Thirty parts" }]);
-    await tutor(lib, "summarize this", { item: a.meta.id });
+    fakeClaude([
+      { ...OK, reply: "It covers thirty ideas.", general: false, title: "Thirty parts" },
+      { ...OK, reply: "Part 30 explains the last idea [1].", citations: [{ passage: "P30", quote: "Section 30 explains idea number 30" }], general: false, title: "Thirty parts" },
+    ]);
+    const summary = await tutor(lib, "summarize this", { item: a.meta.id });
     expect(sent()[0]!.reading).toEqual({ title: "Thirty parts", whole: true });
+    expect(summary).toMatchObject({ general: false, citations: [{ item: a.meta.id, heading: "Part 30" }] });
+    expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("citations are missing");
   });
 
   test("a source too long to send whole says so: its headings as an outline, and passages from across it when his words match none", async () => {
@@ -840,7 +845,7 @@ describe("tutor: practice", () => {
     const late: TutorCard = { kind: "card", content_type: "fact", question: "Where does a missed card go?", answer: "Box one.", rubric: [] };
     fakeClaude([
       out({ reply: "Right that it comes back sooner [1]. Missing: why box one. What does a miss say about the memory?", citations: [{ passage: "P2", quote: "goes back to the first box" }], general: false, covered: [false, true], evidence: ["", "you see it again soon"], card: late }),
-      out({ reply: "Both points, nicely put. What about a card you get right?", covered: [true, true], evidence: ["memory is weak", "comes round most often"] }),
+      out({ reply: "Both points, nicely put. What about a card you get right?", general: false, covered: [true, true], evidence: ["memory is weak", "comes round most often"] }),
       out({ reply: "Both points.", covered: [true], evidence: ["Both"] }),
       out({ reply: "Both points.", covered: [true, true], evidence: ["", ""] }),
     ]);
@@ -849,7 +854,9 @@ describe("tutor: practice", () => {
     const seen = sent()[0]!;
     expect(seen).toMatchObject({ exercise: { heading: exercise.heading, card: key } });
     expect(seen.earlier).toEqual([{ message: "Practice", reply: "Explain why a missed card goes back to box one." }, { message: "wait, what's box one?", reply: "The box reviewed most often." }]);
-    expect((await tutor(lib, "A miss shows the memory is weak, and box one comes round most often", { item: a.meta.id, earlier })).card).toBeNull();
+    const feedback = await tutor(lib, "A miss shows the memory is weak, and box one comes round most often", { item: a.meta.id, earlier });
+    expect(feedback).toMatchObject({ reply: "Both points, nicely put. What about a card you get right?", general: false, citations: [], card: null });
+    expect(readFileSync(join(binDir, "count"), "utf8")).toBe("2");
     expect((await tutor(lib, "Both", { item: a.meta.id, earlier })).card).toBeNull();
     expect(readFileSync(join(binDir, "msgs.jsonl"), "utf8")).toContain("covered: one boolean per rubric point (2)");
   });

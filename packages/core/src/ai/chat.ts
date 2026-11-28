@@ -59,12 +59,9 @@ export async function askAboutCard(lib: Library, cardRef: string, a: { message: 
   }));
   const r = await runChatTurn(lib, { prompt: "chat", system: prompt.text, message, schema: vendorSchema(ChatOutput), session, cwd: lib.root, onProgress });
   const out = ChatOutput.parse(parseOutput(r.output));
-  if (out.card) {
-    const problem = rubricProblem(kind, out.card.rubric);
-    if (problem) throw new Error(problem);
-    if (v && out.card.rubric.length !== v.rubric.length) {
-      throw new Error(`This version keeps its ${v.rubric.length} key points. Ask to reword them in the same order.`);
-    }
+  const proposal = out.card && !rubricProblem(kind, out.card.rubric) ? out.card : null;
+  if (v && proposal && proposal.rubric.length !== v.rubric.length) {
+    throw new Error(`This version keeps its ${v.rubric.length} key points. Ask to reword them in the same order.`);
   }
-  return { card: card.meta.id, reply: out.reply, proposal: out.card, session: `${r.vendor}:${r.session}`, ai: { vendor: r.vendor, model: r.model, prompt_version: prompt.version } };
+  return { card: card.meta.id, reply: out.reply, proposal, session: `${r.vendor}:${r.session}`, ai: { vendor: r.vendor, model: r.model, prompt_version: prompt.version } };
 }

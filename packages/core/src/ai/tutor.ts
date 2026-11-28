@@ -371,7 +371,7 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
           const problem = cardTextProblem(d.card) ?? blankProblem(d.card);
           if (problem) return problem;
         }
-        const uncited = d.general === false && !d.citations.length && !d.hint && !d.exercise;
+        const uncited = d.general === false && !d.citations.length && !d.hint && !d.exercise && !d.covered.length;
         if (uncited && attempt === 2) {
           const unmark = (text: string) => eachMarker(text, () => false, (marker, n) => n > 0 ? "" : marker);
           d.reply = unmark(d.reply);

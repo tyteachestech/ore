@@ -17,7 +17,7 @@ import { tryLine } from "../src/ai/tries.ts";
 import { digAnswer, digAsk } from "../src/ai/dig.ts";
 import { readDigs, startDig } from "../src/digs.ts";
 import { setSkillLook } from "../src/skills.ts";
-import { listCards, writeNewCard } from "../src/cards.ts";
+import { findCard, listCards, writeNewCard } from "../src/cards.ts";
 import { addSnippet, addText } from "../src/ingest/index.ts";
 import { sha256 } from "../src/fsutil.ts";
 import { createItem, findItem, setItemStatus, setPrequestionAttempt, updateItemMeta } from "../src/items.ts";
@@ -120,6 +120,19 @@ describe("Ask about this (D61)", () => {
     const r = await askAboutCard(lib, card.meta.id, { message: "Make this exercise clearer" });
     expect(r.proposal).toEqual(proposal);
     expect(r.ai.prompt_version).toBe("chat@3");
+  });
+
+  test.each([
+    ["card", [], ["An unexpected key point"]],
+    ["prompt", ["Recall strengthens the idea"], []],
+  ] as const)("a %s rewrite with invalid key points keeps the reply and leaves the exercise alone", async (kind, savedRubric, proposedRubric) => {
+    const lib = await tempLibrary();
+    const { item } = await addSnippet(lib, { text: "Retrieval strengthens the idea you recall." });
+    const card = writeNewCard(lib, { kind, item: item.meta.id, skills: [], topics: [], content_type: "concept", question: "What does retrieval strengthen?", answer: "The idea you recall.", rubric: [...savedRubric] });
+    const reply = "Name the idea being recalled.";
+    fakeClaude([{ reply, card: { question: "A proposed rewrite?", answer: "New answer.", rubric: proposedRubric } }]);
+    expect(await askAboutCard(lib, card.meta.id, { message: "Make this exercise clearer" })).toMatchObject({ reply, proposal: null });
+    expect(findCard(lib, card.meta.id)).toEqual(card);
   });
 
   // F755: every run's spend goes in usage.jsonl (#547), but Review's Ask about this ran outside runAgent and logged none.
