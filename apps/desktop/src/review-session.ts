@@ -3,6 +3,7 @@ import { rememberToday } from "./ReviewPick";
 import { waiting } from "./Home";
 import { newSession, rated, sfx, warm } from "./sfx";
 import { afterAnswer, lastWin, opt, ore, PHONE, putOff, type CardFull, type DueEntry, type Grade, type SessionEnd, type Today } from "./ore";
+import { Stale } from "./history";
 import { errorText, type Forget, type Notify } from "./util";
 
 /** One card adds at most this much active time (D60, as in core). */
@@ -551,7 +552,13 @@ export class ReviewSession<S> {
     // entry when a held Undo runs behind the history's previous write.
     this.setBusy(true);
     try {
-      await this.run("review", last.card, opt("undo", last.ts));
+      await this.run("review", last.card, opt("undo", last.ts)).catch((e) => {
+        // Gone from the log (a restore from the library's history) or rated again since: this Undo can never
+        // apply, so it leaves the history and the next ⌘Z goes on (core's undoReview words, history recovery pass).
+        if (!/no longer in the library|rated again after that/.test(errorText(e))) throw e;
+        this.undos = this.undos.slice(0, -1);
+        throw new Stale(errorText(e));
+      });
       if (end) {
         try {
           await this.run("session", "reopen", end.session.id);

@@ -96,13 +96,19 @@ export function reopenSession(lib: Library, id: string): Promise<void> {
 // (its relearn passes past midnight, Codex deep scan 3). Read without the lock (a review asks which session it belongs to),
 // so the file may go between a check and the read: an end in another window, or the one before it, removing it
 // (CI, a review that opened on "ENOENT … .ore/session"). Gone is the same as none.
+// Only an id whose start receipt is in the logs is open: a restore from the library's history (D5) can take the
+// receipt back while the gitignored marker still names it (history recovery pass, restore-03).
 export function openSessionIds(lib: Library): string[] {
+  let ids: string[];
   try {
-    return readFileSync(paths.openSession(lib), "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
+    ids = readFileSync(paths.openSession(lib), "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
     throw e;
   }
+  if (!ids.length) return ids;
+  const started = new Set(readSessions(lib).filter((r) => r.type === "start").map((r) => r.id));
+  return ids.filter((id) => started.has(id));
 }
 
 export function openSessionId(lib: Library): string | null {

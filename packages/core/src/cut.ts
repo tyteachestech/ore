@@ -264,7 +264,10 @@ export async function restoreCut(lib: Library, ref: string, cutId: string): Prom
     const len = cut.text.length;
     const { before = "", after = "" } = cut;
     const back = before || after ? body.includes(before + cut.text + after) : body.slice(cut.at, cut.at + len) === cut.text;
-    const at = back ? null : placeBack(body, cut);
+    const found = back ? null : placeBack(body, cut);
+    // Placed by one side's context only, the text may already sit on the other side of that spot: a restore from
+    // the library's history brought it back while this record stayed in .ore (history recovery pass, restore-02).
+    const at = found !== null && (body.slice(found - len, found) === cut.text || body.slice(found, found + len) === cut.text) ? null : found;
     if (at === null) throw new Error("That text is already back, or the source changed since.");
     const next = body.slice(0, at) + cut.text + body.slice(at);
     const moved = at - cut.at;

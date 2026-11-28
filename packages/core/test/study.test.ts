@@ -487,3 +487,17 @@ describe("two sessions open at once (D76)", () => {
     expect((await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: new Date(2026, 5, 2, 8, 5) })).session).toBeNull();
   });
 });
+
+// History recovery pass (restore-03): a whole day rolled back from the library's history takes the session's start
+// receipt with it, but `.ore/session` (gitignored) still named it, so the next rating went to a session that no
+// longer existed and its end failed with "no session".
+test("a session whose start a restore took back is not open: the next rating goes to none, and the next start is clean", async () => {
+  const lib = await tempLibrary();
+  const s = await startSession(lib);
+  for (const f of readdirSync(join(lib.root, "sessions"))) rmSync(join(lib.root, "sessions", f)); // the log as it was before
+  expect(readSessions(lib).some((r) => r.id === s.id)).toBe(false);
+  expect(openSessionId(lib)).toBeNull();
+  const t = await startSession(lib, new Date(), { stack: true });
+  expect(openSessionId(lib)).toBe(t.id);
+  await expect(endSession(lib)).resolves.toMatchObject({ id: t.id });
+});

@@ -1,3 +1,4 @@
+import { Stale } from "./history";
 import { errorText, inOrder, type Notify } from "./util";
 
 /** One change he can take back. The screen says what changed; `change` owns the rest. */
@@ -56,7 +57,7 @@ export function keepNewer<T>(read: () => Promise<T>, write: (to: T) => Promise<u
         const now = await read();
         if (now !== from) {
           newer = { v: now };
-          throw new Error(said(now));
+          throw new Stale(said(now));
         }
       }
       first = false;
