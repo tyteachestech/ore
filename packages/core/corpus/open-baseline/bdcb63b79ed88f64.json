@@ -1,0 +1,55 @@
+{
+ "key": "bdcb63b79ed88f64",
+ "add": "https://arxiv.org/pdf/1312.6114v11",
+ "note": "arXiv, math-heavy machine learning",
+ "fp": {
+  "type": "pdf",
+  "title": "Auto-Encoding Variational Bayes",
+  "words": 7348,
+  "headings": [
+   "## Auto-Encoding Variational Bayes",
+   "### Abstract",
+   "## 1 Introduction",
+   "## 2 Method",
+   "### 2.1 Problem scenario",
+   "### 2.2 The variational bound",
+   "### 2.3 The SGVB estimator and AEVB algorithm",
+   "### 2.4 The reparameterization trick",
+   "## 3 Example: Variational Auto-Encoder",
+   "## 4 Related work",
+   "## 5 Experiments",
+   "## 6 Conclusion",
+   "## 7 Future work",
+   "### References",
+   "## A Visualisations",
+   "## B Solution of - DKL(qbold0mu mumu 2005/06/28 ver: 1.3 subfig package(z) || pbold0mu mumu 2005/06/28 ver: 1.3 subfig package(z)), Gaussian case",
+   "### B Solution of −DKL(qφ(z)||pθ(z)), Gaussian case",
+   "## C MLP's as probabilistic encoders and decoders",
+   "### C MLP’s as probabilistic encoders and decoders",
+   "### C.1 Bernoulli MLP as decoder",
+   "### C.2 Gaussian MLP as encoder or decoder",
+   "## D Marginal likelihood estimator",
+   "## E Monte Carlo EM",
+   "## F Full VB",
+   "### F.1 Example"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 6,
+  "first": "page 1 auto encoding variational bayes diederik p kingma machine learning group",
+  "last": "denote the j th element of vectors μ i and σ i"
+ },
+ "flags": [
+  {
+   "rule": "heading-is-a-paragraph",
+   "detail": "1: “B Solution of - DKL(qbold0mu mumu 2005/06/28 ver: 1.3 subfig package(z) || pbold0mu mumu 2…”"
+  }
+ ],
+ "coverage": {
+  "lost": 0.096,
+  "added": 0.058,
+  "found": 0.693,
+  "inOrder": 1
+ }
+}

@@ -1,0 +1,32 @@
+{
+ "key": "556f718dba9187ce",
+ "add": "https://raw.githubusercontent.com/jakevdp/PythonDataScienceHandbook/master/notebooks/02.02-The-Basics-Of-NumPy-Arrays.ipynb",
+ "note": "Python Data Science Handbook notebook (MIT code, CC BY-NC-ND text)",
+ "fp": {
+  "type": "article",
+  "title": "The Basics of NumPy Arrays",
+  "words": 1069,
+  "headings": [
+   "# The Basics of NumPy Arrays",
+   "## NumPy Array Attributes",
+   "## Array Indexing: Accessing Single Elements",
+   "## Array Slicing: Accessing Subarrays",
+   "### One-Dimensional Subarrays",
+   "### Multidimensional Subarrays",
+   "#### Accessing array rows and columns",
+   "### Subarrays as No-Copy Views",
+   "### Creating Copies of Arrays",
+   "## Reshaping of Arrays",
+   "## Array Concatenation and Splitting",
+   "### Concatenation of Arrays",
+   "### Splitting of Arrays"
+  ],
+  "code": 101,
+  "tables": 0,
+  "math": 3,
+  "images": 0,
+  "first": "the basics of numpy arrays data manipulation in python is nearly synonymous",
+  "last": "higher dimensional arrays np dsplit will split arrays along the third axis"
+ },
+ "flags": []
+}

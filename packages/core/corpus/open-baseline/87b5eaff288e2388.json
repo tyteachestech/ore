@@ -1,0 +1,29 @@
+{
+ "key": "87b5eaff288e2388",
+ "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/haruko-html-jpeg.epub",
+ "note": "EPUB 3 Japanese manga, picture pages (IDPF)",
+ "fp": {
+  "type": "epub",
+  "title": "ハルコさんの彼氏",
+  "words": 253,
+  "headings": [
+   "## About this document",
+   "## この文書について",
+   "## Revition History",
+   "## 更新履歴"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 12,
+  "first": "chapter 1 chapter 2 about this document こ の 文 書 に",
+  "last": "epub 3 固 定 レ イ ア ウ ト に 対 応"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0,
+  "added": 0.016,
+  "found": 1,
+  "inOrder": 1
+ }
+}

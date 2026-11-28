@@ -1,0 +1,42 @@
+{
+ "key": "acb045cb4c2928d9",
+ "add": "https://standardebooks.org/ebooks/marcus-aurelius/meditations/george-long/downloads/marcus-aurelius_meditations_george-long.epub?source=download",
+ "note": "Standard Ebooks (CC0)",
+ "fp": {
+  "type": "epub",
+  "title": "Meditations",
+  "author": "Marcus Aurelius",
+  "published": "2014-05-25T00:00:00Z",
+  "words": 50896,
+  "headings": [
+   "## Imprint",
+   "## Book I",
+   "## Book II",
+   "## Book III",
+   "## Book IV",
+   "## Book V",
+   "## Book VI",
+   "## Book VII",
+   "## Book VIII",
+   "## Book IX",
+   "## Book X",
+   "## Book XI",
+   "## Book XII",
+   "## Colophon",
+   "## Uncopyright"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 2,
+  "first": "chapter 1 imprint this ebook is the product of many hours of",
+  "last": "to the unrestricted culture that has given all of us so much"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.001,
+  "added": 0.004,
+  "found": 0.98,
+  "inOrder": 0.936
+ }
+}

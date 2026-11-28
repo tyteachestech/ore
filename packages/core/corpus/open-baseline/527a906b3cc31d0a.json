@@ -1,0 +1,19 @@
+{
+ "key": "527a906b3cc31d0a",
+ "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/document/TestDocument.docx",
+ "note": "Apache POI",
+ "fp": {
+  "type": "article",
+  "title": "Test Doc",
+  "author": "Nick Burch",
+  "words": 35,
+  "headings": [],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "this is a test document this bit is in bold and italic",
+  "last": "as red and yellow text we have a hyperlink here and another"
+ },
+ "flags": []
+}

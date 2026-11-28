@@ -1,0 +1,48 @@
+{
+ "key": "8dd57547301f7420",
+ "add": "https://standardebooks.org/ebooks/henry-david-thoreau/walden/downloads/henry-david-thoreau_walden.epub?source=download",
+ "note": "Standard Ebooks (CC0)",
+ "fp": {
+  "type": "epub",
+  "title": "Walden",
+  "author": "Henry David Thoreau",
+  "published": "2014-05-25T00:00:00Z",
+  "words": 108319,
+  "headings": [
+   "## Imprint",
+   "## Economy",
+   "## Where I Lived, and What I Lived For",
+   "## Reading",
+   "## Sounds",
+   "## Solitude",
+   "## Visitors",
+   "## The Bean-Field",
+   "## The Village",
+   "## The Ponds",
+   "## Baker Farm",
+   "## Higher Laws",
+   "## Brute Neighbors",
+   "## House-Warming",
+   "## Former Inhabitants and Winter Visitors",
+   "## Winter Animals",
+   "## The Pond in Winter",
+   "## Spring",
+   "## Conclusion",
+   "## Colophon",
+   "## Uncopyright"
+  ],
+  "code": 0,
+  "tables": 9,
+  "math": 0,
+  "images": 2,
+  "first": "chapter 1 imprint this ebook is the product of many hours of",
+  "last": "to the unrestricted culture that has given all of us so much"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0,
+  "added": 0,
+  "found": 1,
+  "inOrder": 1
+ }
+}

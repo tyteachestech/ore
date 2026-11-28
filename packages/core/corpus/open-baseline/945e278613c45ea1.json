@@ -1,0 +1,45 @@
+{
+ "key": "945e278613c45ea1",
+ "add": "https://arxiv.org/pdf/math/0211159v1",
+ "note": "arXiv, pure mathematics",
+ "fp": {
+  "type": "pdf",
+  "title": "The entropy formula for the Ricci flow and its geometric applications",
+  "words": 16305,
+  "headings": [
+   "### Introduction",
+   "### 1 Ricci flow as a gradient flow",
+   "### 2 No breathers theorem I",
+   "### 3 No breathers theorem II",
+   "### 4 No local collapsing theorem I",
+   "### 5 A statistical analogy",
+   "### 6 Riemannian formalism in potentially infi- nite dimensions",
+   "### 7 A comparison geometry approach to the Ricci flow",
+   "### 8 No local collapsing theorem II",
+   "### 9 Differential Harnack inequality for solutions of the conjugate heat equation",
+   "### 10 Pseudolocality theorem",
+   "### 11 Ancient solutions with nonnegative cur- vature operator and bounded entropy",
+   "### 12 Almost nonnegative curvature in dimen- sion three",
+   "### 13 The global picture of the Ricci flow in di- mension three",
+   "### References"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "page 1 arxiv math 0211159v1 math dg 11 nov 2002 the entropy",
+  "last": "geometric properties of the bakry emery ricci tensor arxiv math dg 0211065"
+ },
+ "flags": [
+  {
+   "rule": "text-lost",
+   "detail": "12.9% of the original's 17497 words are not in the doc"
+  }
+ ],
+ "coverage": {
+  "lost": 0.129,
+  "added": 0.066,
+  "found": 0.593,
+  "inOrder": 1
+ }
+}
