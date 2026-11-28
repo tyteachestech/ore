@@ -471,7 +471,7 @@ journey("phone: a note's [[ link finds the library's sources", async (page) => {
   await page.locator(".note-menu-row").filter({ hasText: TESTING }).first().waitFor();
 }, "phone");
 
-journey("phone: a skill note's link results stay above the keyboard bar and insert on tap (F-new-phone-note-link-bar)", async (page) => {
+journey("phone: a skill note's link results stay above the keyboard bar and insert on tap (F876)", async (page) => {
   await tap(page, page.getByRole("button", { name: "Open menu" }));
   await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
   await tap(page, page.getByRole("button", { name: "Your note" }));

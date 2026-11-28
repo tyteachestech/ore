@@ -13,7 +13,7 @@ test("any progress lights one dot, and only a whole share lights them all", () =
   expect(lit(1, 14)).toBe(14);
 });
 
-test("goal minutes stay below the target until enough time has elapsed (F-new-goal-minutes-rounding)", () => {
+test("goal minutes stay below the target until enough time has elapsed (F877)", () => {
   const goal = 600_000;
   expect(minutes(573_084, goal)).toBe(9);
   expect(minutesText(599_999, goal)).toBe("9");

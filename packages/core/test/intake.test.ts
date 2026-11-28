@@ -2821,7 +2821,7 @@ describe("import coverage: figures and slide pictures", () => {
   });
 
   test("PDF: a map with a soft mask keeps its colours", async () => {
-    // F-new-pdf-map-soft-mask: the textbook draws a grayscale image inside a mask group before the map.
+    // F878: the textbook draws a grayscale image inside a mask group before the map.
     const item = await addSource(await tempLibrary(), file("persian-wars-map.pdf"));
     expect(item.meta).toMatchObject({ title: "The Persian Wars — World History textbook excerpt", author: "Nadejda Williams" });
     expect(item.body).toContain("put into question the citizenship status");

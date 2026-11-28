@@ -15,7 +15,7 @@ journey("Home: today's minutes are the big number, and the goal ring stands unfr
   if (look.ring !== "none") throw new Error(`goal ring framed: ${look.ring}`);
 });
 
-journey("Home: 9 minutes 33 seconds shows 9 of 10 min (F-new-goal-minutes-rounding)", async (page) => {
+journey("Home: 9 minutes 33 seconds shows 9 of 10 min (F877)", async (page) => {
   await page.route(/\/ore$/, async (route) => {
     if (route.request().postDataJSON().args[0] !== "today") return route.fallback();
     const response = await route.fetch();
