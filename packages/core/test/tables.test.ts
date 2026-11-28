@@ -308,6 +308,12 @@ describe("PDF tables and formulas (D125)", () => {
     expect(mixed).toContain("the last one.\n\nFigure 2: a screenshot.");
   });
 
+  test("PDF: a scanned page between text pages keeps the page reader's words", async () => {
+    const regions = (await regionsOf("scan")).map((region) => ({ ...region, page: 2 }));
+    const { body } = await pdfToDoc(pdf("mixed-scan.pdf"), regions);
+    expect(body).toContain("<!-- page 2 -->\n\n### The testing effect\n\nRetrieving a memory makes it stronger than reading it again. Quiz yourself before you feel ready.\n\n<!-- page 3 -->");
+  });
+
   test("PDF: on a page with its own text, what the reader wrote in a block of prose or a heading changes nothing, so it is not asked to read them (D357)", async () => {
     // The driver sends the reading model only tables, formulas, scans and captions with no text; this is the
     // rule that makes that safe. If the doc ever takes a prose block's words from the reader, this fails first.
