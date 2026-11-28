@@ -16,12 +16,12 @@ export interface OcrLine {
 export type OcrPage = { lines: OcrLine[] };
 
 /** The text on each page of a PDF, or in an image, as Vision reads it. Mac only. */
-export async function recognize(path: string): Promise<OcrPage[]> {
+export async function recognize(path: string, pages?: number[]): Promise<OcrPage[]> {
   // ORE_OCR names a stand-in helper (tests); both paths have the same recovery message.
   if (!process.env.ORE_OCR && process.platform !== "darwin") throw new Error("Reading scanned pages works on a Mac only. Copy the text and paste it here instead.");
   try {
     const helper = process.env.ORE_OCR ?? await swiftHelper("ocr");
-    return (JSON.parse(await run(helper, [path])) as { pages: OcrPage[] }).pages;
+    return (JSON.parse(await run(helper, [path, ...(pages?.map(String) ?? [])])) as { pages: OcrPage[] }).pages;
   } catch (cause) {
     const reason = cause instanceof Error ? cause.message : String(cause);
     throw new Error(`Text recognition failed: ${reason}. Export a fresh PDF or image and add that copy, or paste the text you need.`, { cause });
@@ -58,23 +58,28 @@ export function ocrMarkdown(page: OcrPage): string {
   return out.join("\n\n");
 }
 
-/** A scanned PDF or an image as a body of text: one `<!-- page N -->` section per PDF page. Throws
- *  with the next step when there is no text to find. */
-export async function scannedText(data: Uint8Array, ext: string, read = recognize): Promise<{ title?: string; body: string }> {
+/** Markdown from each page, or from selected PDF pages by their one-based numbers. */
+export async function recognizedPages(data: Uint8Array, ext: string, pages?: number[], read = recognize): Promise<string[]> {
   const { mkdtempSync, rmSync, writeFileSync } = await import("node:fs");
   const { tmpdir } = await import("node:os");
   const dir = mkdtempSync(join(tmpdir(), "ore-ocr-"));
   try {
     const file = join(dir, `scan.${ext}`);
     writeFileSync(file, data);
-    const pages = (await read(file)).map(ocrMarkdown);
-    const text = pages.join("\n\n");
-    if (text.replace(/\s/g, "").length < 20)
-      throw new Error(ext === "pdf" ? "Found no text on this PDF’s pages: they may be photos or drawings. Add a version with text, or paste what you need." : "Found no text in that image. Add a screenshot with text, or paste what you need.");
-    const body = ext === "pdf" ? pages.map((p, i) => `<!-- page ${i + 1} -->\n\n${p}`).join("\n\n") : text;
-    const title = text.match(/^## (.+)$/m)?.[1] ?? text.split("\n")[0]!.slice(0, 80);
-    return { title: title.length > 3 ? title : undefined, body: body + "\n" };
+    return (await read(file, pages)).map(ocrMarkdown);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** A scanned PDF or an image as a body of text: one `<!-- page N -->` section per PDF page. Throws
+ *  with the next step when there is no text to find. */
+export async function scannedText(data: Uint8Array, ext: string, read = recognize): Promise<{ title?: string; body: string }> {
+  const pages = await recognizedPages(data, ext, undefined, read);
+  const text = pages.join("\n\n");
+  if (text.replace(/\s/g, "").length < 20)
+    throw new Error(ext === "pdf" ? "Found no text on this PDF’s pages: they may be photos or drawings. Add a version with text, or paste what you need." : "Found no text in that image. Add a screenshot with text, or paste what you need.");
+  const body = ext === "pdf" ? pages.map((p, i) => `<!-- page ${i + 1} -->\n\n${p}`).join("\n\n") : text;
+  const title = text.match(/^## (.+)$/m)?.[1] ?? text.split("\n")[0]!.slice(0, 80);
+  return { title: title.length > 3 ? title : undefined, body: body + "\n" };
 }

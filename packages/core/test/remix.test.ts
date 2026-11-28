@@ -286,3 +286,15 @@ describe("answering in his head (D68)", () => {
     expect(inHeadOk(lib, findCard(lib, fact.meta.id))).toBe(false);
   });
 });
+
+describe("a hint before No idea", () => {
+  test("a review answered after a hint records how many hints he took; one without records none", async () => {
+    const lib = await tempLibrary();
+    const c = await concept(lib);
+    await recordReview(lib, c.meta.id, { rating: 2, confidence: 1, answer: "spacing", cued: 2, now: day() });
+    expect(own(lib, c.meta.id).at(-1)).toMatchObject({ cued: 2, rating: 2 });
+    await recordReview(lib, c.meta.id, { rating: 3, confidence: 2, answer: "spacing", now: day() });
+    expect(own(lib, c.meta.id).at(-1)!.cued).toBeUndefined();
+    await expect(recordReview(lib, c.meta.id, { rating: 3, confidence: 2, cued: 3, now: day() })).rejects.toThrow("--cued is 1 or 2");
+  });
+});

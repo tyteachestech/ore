@@ -1,0 +1,69 @@
+# Asker friction log
+
+Timing uses performance.now around UI actions. AI timings are full-answer waits through the supplied buffering bridge, not native first-token measurements.
+
+- Day 1 · Read / Ask · Opened library tutor (74.4 ms)
+- Day 1 · Read / Ask · day1-q1: Why can rereading make me feel I know something when I still cannot explain it from memory? Use my saved learning sources. — full response; visible working state, acknowledgment 31.4 ms (17547.3 ms)
+- Day 1 · Read / citation · day1-q1 citation 1 opened (476.3 ms)
+- Day 1 · Read / Ask · day1-q2: How should I combine the spacing chapter with How to write good prompts to make a review question that tests understanding rather than recognition? — full response; visible working state, acknowledgment 42.9 ms (18585.6 ms)
+- Day 1 · Read / citation · day1-q2 citation 1 opened (480.2 ms)
+- Day 1 · Read / citation · day1-q2 citation 2 opened (239.1 ms)
+- Day 1 · Read / Ask · day1-q3: My spacing chapter says expanding intervals had g = 0.034. Does that mean spacing itself does not work, or that fixed and expanding gaps were similar? — full response; visible working state, acknowledgment 43.8 ms (18570.6 ms)
+- Day 1 · Read / citation · day1-q3 citation 1 opened (412.4 ms)
+- Day 1 · Read / Ask · day1-q4: How do rational agents in Artificial Intelligence: A Modern Approach differ from AI that tries to think or act like a human? — full response; visible working state, acknowledgment 27.2 ms (22037.4 ms)
+- Day 1 · Read / citation · day1-q4 citation 1 opened (390.3 ms)
+- Day 1 · Read / citation · day1-q4 citation 2 opened (448.3 ms)
+- Day 1 · Read / Ask · day1-q5: Compare The AI Revolution: The Road to Superintelligence with Artificial Intelligence: A Modern Approach. Is being rational the same as being generally intelligent? Separate what the sources say from your synthesis. — full response; visible working state, acknowledgment 25.0 ms (25052.4 ms)
+- Day 1 · Read / citation · day1-q5 citation 1 opened (252.9 ms)
+- Day 1 · Read / citation · day1-q5 citation 2 opened (359.0 ms)
+- Day 1 · Read / citation · day1-q5 citation 3 opened (320.8 ms)
+- Day 1 · Read / Ask · day1-q6: In my note on The AI Revolution: The Road to Superintelligence, what did I write about S-curves and why people misread exponential progress? Check it against the source. — full response; visible working state, acknowledgment 49.9 ms (61343.7 ms)
+- Day 1 · Read / citation · day1-q6 citation 1 opened (219.2 ms)
+- Day 1 · Read / Ask · day1-q7: In the agent loop explained and What is tool use, who actually executes a requested tool, and how does its result get back to Claude? — full response; visible working state, acknowledgment 30.8 ms (56222.5 ms)
+- Day 1 · Read / Ask · day1-q8: Combine Context management and The agent loop explained: why does an agent conversation grow, and how are caching, compaction and memory different solutions? — full response; visible working state, acknowledgment 15.1 ms (45714.4 ms)
+- Day 1 · Read / citation · day1-q8 citation 2 opened (143.9 ms)
+- Day 1 · Read / Ask · day1-q9: According to my saved sources only, what was the exact dollar revenue of my Ty Teaches Tech business in October 2026? If it is not there, say so; do not search the web or estimate. — full response; visible working state, acknowledgment 20.0 ms (8952.2 ms)
+- Day 1 · Read / Ask · day1-q10: My highlight in Getting the most out of Opus 5.5 says to hand over the whole task and say when to stop and ask. How do Delegation and Discernment help me decide those boundaries? — full response; visible working state, acknowledgment 15.2 ms (16512.4 ms)
+- Day 1 · Read / citation · day1-q10 citation 1 opened (137.0 ms)
+- Day 1 · Read / Ask · Questions 7 and 8 used web versions/docs instead of the named saved lessons; both correctly disclosed missing excerpts. Read code to understand why: the three named lessons are archived and unscoped retrieval excludes archived sources. The screen could have explained that scope. This is recorded as friction, not a confirmed new defect.
+- Day 1 · Read / Ask · Q9 correctly declined to invent the business revenue; no citations or fabricated dollar amount.
+- Day 1 · Read / Ask · Q6 accurately quoted my note's “a bunch of little S-curves” and distinguished it from the source; all four source citations landed.
+- Day 1 · Read / citation · The harness records external URL openings rather than launching a browser. All six web-citation buttons in Q7/Q8 emitted their correct URLs. The five distinct destinations were opened read-only with the web tool; cited claims were supported. Q8's local compaction citation is indirect (summarizing for a model switch), but not a plainly false claim.
+- Day 2 · Read / Ask · day2-formula: In this scaled dot-product attention passage, why divide by the square root of dk? I can follow a dot product but not the variance argument. Give me one hint first, not the full answer. — full response; visible working state, acknowledgment 15.4 ms (16013.7 ms)
+- Day 2 · Read / Ask · day2-formula-followup: The squared distances become a quarter as large. So dividing by sqrt(dk) should make the variance about 1. Is that the reason, and how does it help softmax? — full response; visible working state, acknowledgment 29.0 ms (17030.3 ms)
+- Day 2 · Read / Ask · Stopped the table question while the bridge was still waiting; Stop settled (47.4 ms)
+- Day 2 · Read / Ask · Reworded the stopped table question using Edit; full answer (13873.5 ms)
+- Day 2 · Read / Ask · day2-table-followup: Canceling n times d leaves n versus d. So for n less than d self-attention is cheaper per layer, while O(1) sequential operations is a separate parallelism advantage. Am I reading that correctly? — full response; visible working state, acknowledgment 15.4 ms (20045.4 ms)
+- Day 2 · Read / Ask · day2-argument: This Beneficial machines section argues that a smarter agent with an incorrect objective can do more harm, then proposes uncertainty about human objectives. I do not see why uncertainty would make it safer rather than just less competent. Help me reason through that leap with a hint before telling me. — full response; visible working state, acknowledgment 27.8 ms (13575.3 ms)
+- Day 2 · Read · The existing Attention Is All You Need import presents Table 1 as a run of text and its equation as broken plain text. The tutor made both interpretable. This is the older import already described by prior testers, not evidence of a current importer regression; Day 4 will reimport it.
+- Day 2 · Read / Ask · Stop settled in 47.4 ms and kept the question with “Stopped.” Editing that question successfully replaced it and produced a hint about the intended table. No late reply overwrote the reworded turn. This tested stopping while waiting; the bridge did not expose partial text to stop mid-stream.
+- Day 2 · Read / Ask · day2-argument-followup: It could ask which meetings I want to keep, instead of optimizing an empty calendar as if that captured everything I value. Is that the passage's point? — full response; visible working state, acknowledgment 23.5 ms (14109.9 ms)
+- Day 3 · Review · Start in review picker to first question (849.3 ms)
+- Day 3 · Review · First Explain grade (8894.3 ms)
+- Day 3 · Review / Ask · day3-ask1: I confused consistent knowledge with identical wording. Use this exercise's supporting passage to give me one concrete example of rewording that is safe and one that changes what I retrieve. — answer; acknowledgment 12.8 ms (9486.3 ms)
+- Day 3 · Review · day3-rate1: chose Again; next question (165.1 ms)
+- Day 3 · Review / Ask · day3-ask2: I pictured clients opening a direct database connection. Why does this answer say endpoints instead? Explain using the source or my note, and say if this exercise has no supporting passage. — answer; acknowledgment 12.5 ms (11966.6 ms)
+- Day 3 · Review · day3-rate2: chose Again; next question (167.7 ms)
+- Day 3 · Review · Second Explain grade (13905.7 ms)
+- Day 3 · Review / Ask · day3-ask3: I got modularity marked as missing. What exactly must stay stable for existing clients to keep working when the backend changes? Give a concrete example so I can fix my explanation. — answer; acknowledgment 11.6 ms (12009.7 ms)
+- Day 3 · Review / simulation · Advanced 60 s of deliberate study time on exercise 3; excluded from wall-clock waits
+- Day 3 · Review · day3-rate3: chose Hard; next question (174.2 ms)
+- Day 3 · Review / simulation · Advanced 120 s on exercise 4 to test goal accumulation; excluded from wall-clock waits
+- Day 3 · Review · day3-rate4: chose Good; next question (153.3 ms)
+- Day 3 · Review · Repeat miss now answered correctly: Explain grade (10884.2 ms)
+- Day 3 · Review / simulation · Advanced 120 s on repeat exercise 5; total advanced 300 s
+- Day 3 · Review · day3-rate5: chose Good; next question (165.2 ms)
+- Day 3 · Close · Done to end screen (324.9 ms)
+- Day 3 · Read / keep · Explicitly added the formula explanation to Review (52.3 ms)
+- Day 4 · Read / reimport · Reimport completed (1702.7 ms)
+- Day 4 · Read / Ask · day4-table-current: I reopened the paper after reimport. For n = 1024 and d = 512, is self-attention's per-layer work term twice the recurrent term even though it has fewer sequential steps? Please cite the current paper. — full response; visible working state, acknowledgment 16.5 ms (14997.3 ms)
+- Day 4 · Review / revisit · Yesterday's API explanation is absent on the same exercise after reload; Ask opens an empty chat. No save-to-chat or note action is shown.
+- Day 4 · Review / Ask · day4-ask-recovery: Please explain again why the client calls an endpoint rather than connecting directly to the database. I wanted to revisit yesterday's example, but this chat reopened empty. — answer; acknowledgment 11.9 ms (14044.0 ms)
+- Day 4 · Review / revisit · Second reproduction: left Review after recovering the API explanation, reopened the same still-due exercise; Ask is empty again. Recovery cost 14.044 s, then those words were inaccessible again.
+- Day 4 · Read / citation · day4-todays-question-reopened citation 1 opened (209.3 ms)
+- Day 4 · Read / find · Found named saved lesson in Archived: Context management (23.7 ms)
+- Day 4 · Read / find · Found named saved lesson in Archived: The agent loop explained (11.8 ms)
+- Day 4 · Read / find · Found named saved lesson in Archived: What is tool use? (9.8 ms)
+- Day 4 · Read / revisit · Saved formula and table chats survived reload; their moved citations still landed, and today's new table answer reopened with both citations intact.
+- Day 4 · Read / keep · Formula exercise created explicitly on Day 3 appeared as New in source review on Day 4. No Day 4 ratings were saved.
+- Day 4 · Close / evidence · Read-only final audit found all four review-session end receipts, including zero-rating revisits. The browser logged five bridge fetch/CORS errors around session exits; no missing rating or receipt was found. Treat as an unisolated harness limitation, not a confirmed app finding.

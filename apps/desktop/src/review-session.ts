@@ -20,6 +20,8 @@ export type Answer = {
   answer: string;
   grade: Grade | null;
   inHead: boolean;
+  /** Hints he took before answering (D358); 0 for none. */
+  cued?: number;
   /** No moment was over the goal's note as he rated, so he has seen it: this rating takes it down. */
   noteSeen: boolean;
   /** Once the rating is in the log, before anything else: its moment, its draft dropped. */
@@ -34,6 +36,8 @@ export type Screen<S> = {
   onLogged?: () => void;
   /** The exercise on screen as he has it, for Later; null when none can be put off (still loading, its editor open). */
   shown: () => { id: string; shown: S } | null;
+  /** Keeps the time on an unfinished draft when Review leaves the exercise. */
+  keepDraftTime?: (elapsedMs: number) => void;
   /** A rating is being taken back: its moment goes at once. */
   unrated: () => void;
   /** Sends a key press on to the app history: his own ⌘Z that waited for a save, or the history's Undo or Redo. */
@@ -245,7 +249,10 @@ export class ReviewSession<S> {
    *  this session ends, by its id, never another window's. */
   leave() {
     const s = this.session;
-    if (s?.open) void this.run("session", "end", s.id).catch(() => {});
+    if (s?.open) {
+      this.keepDraftTime();
+      void this.run("session", "end", s.id).catch(() => {});
+    }
     this.session = null;
   }
 
@@ -369,6 +376,11 @@ export class ReviewSession<S> {
   /** A wall clock set back since it showed (a time zone fix, a sync) never makes it negative (F183). */
   private elapsed = () => Math.max(0, (this.awaySince ?? Date.now()) - this.shownAt);
 
+  keepDraftTime = () => {
+    // Capped as the goal counts it: a draft left open for hours carries no more than one exercise can.
+    if (!this.end) this.screen.keepDraftTime?.(Math.min(this.elapsed(), ACTIVE_CAP_MS));
+  };
+
   /** One write on the exercise on screen (an edit, a version dropped): nothing else starts until it is done.
    *  False if one is already out. */
   async hold(work: () => Promise<void>): Promise<boolean> {
@@ -391,6 +403,7 @@ export class ReviewSession<S> {
     const { quick, run, pick, source } = this;
     // Left before the session began: closing ends it once it has.
     if (!s?.open) return this.close();
+    this.keepDraftTime();
     this.setBusy(true);
     try {
       const receipt = await run<SessionEnd>("session", "end", s.id);
@@ -442,6 +455,7 @@ export class ReviewSession<S> {
         opt("elapsed-ms", String(elapsed)),
         ...variantOpt(card),
         ...(a.inHead ? ["--in-head"] : []),
+        ...(a.cued ? [opt("cued", String(a.cued))] : []),
         ...(this.session ? [opt("session", this.session.id)] : []),
       ];
       await this.submit(args, rating, elapsed);

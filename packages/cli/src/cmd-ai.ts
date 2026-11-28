@@ -1,5 +1,5 @@
 import {
-  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, usageSummary, listChats, readChat, saveChat, deleteChat, attachToChat, pendingItems, recallFeedback, research, setChapterRecall, clearChapterRecall, setRecall, type EnrichResult,
+  catchUpItems, markCatchUp, optimize, optimizeDue, chapterRecallFeedback, checkPrequestion, enrichItem, setCovered, scopeFinish, writeKeyPoints, gradeAnswer, askAboutCard, askLibrary, type AskProgress, type AskTurn, tutor, withSteps, addTutorCard, type TutorTurn, type TutorProgress, explainTerm, openLibrary, usageSummary, listChats, readChat, readExerciseChat, saveChat, deleteChat, attachToChat, pendingItems, recallFeedback, research, setChapterRecall, clearChapterRecall, setRecall, type EnrichResult,
 } from "@ore/core";
 import type { Command } from "./types.ts";
 import { fromBase64, int, need, readStdin, str, strs } from "./util.ts";
@@ -112,7 +112,7 @@ export const aiCommands: Record<string, Command> = {
       const lib = openLibrary();
       // --stream <id>: the reply as it is written, as `{"progress": {stream, reply}}` lines on stderr, as `ore tutor` sends them (claude only).
       const stream = str(f.stream);
-      const onProgress = stream ? (p: { reply: string; session: string }) => void process.stderr.write(JSON.stringify({ progress: { stream, ...p } }) + "\n") : undefined;
+      const onProgress = stream ? (p: AskProgress) => void process.stderr.write(JSON.stringify({ progress: { stream, ...p } }) + "\n") : undefined;
       const r = await askAboutCard(lib, need(ref, "<card>"), { message: need(str(f.message), "--message"), answer: str(f.answer), session: str(f.session), variant: str(f.variant), onProgress });
       const text = [r.reply, ...(r.proposal ? ["", "Proposed card:", `Q: ${r.proposal.question}`, `A: ${r.proposal.answer}`] : []), "", `(session ${r.session})`].join("\n");
       return { data: r, text };
@@ -158,8 +158,8 @@ export const aiCommands: Record<string, Command> = {
   },
 
   chat: {
-    usage: "[<id> [--set [--merge] [--keep-time] | --delete]] | --attach <file> | --attach - --name <name>   The tutor's saved chats (D172), chats/<id>.json: list them (last changed first), print one, replace one with the chat JSON on stdin ({id, title, carry, turns}; --merge keeps turns and replies saved since that copy was read, as the app saves so two windows lose nothing; --keep-time keeps its `updated`, as Undo of a delete does), or delete one (prints it, so it can be set back). --attach copies a file for a message into chats/files/ (an image, a PDF or a text file, 20 MB at most; --attach -: its bytes in base64 on stdin, as pasted) and prints {name, path, kind} (D189)",
-    options: { set: { type: "boolean" }, merge: { type: "boolean" }, "keep-time": { type: "boolean" }, delete: { type: "boolean" }, attach: { type: "string" }, name: { type: "string" } },
+    usage: "[<id> [--set [--merge] [--keep-time] | --delete]] | <exercise-id> --exercise | --attach <file> | --attach - --name <name>   Saved chats (D61, D172), chats/<id>.json: list Tutor's chats (last changed first), print one, replace one with the chat JSON on stdin ({id, title, carry, turns}; --merge keeps turns and replies saved since that copy was read, as the app saves so two windows lose nothing; --keep-time keeps its `updated`, as Undo of a delete does), or delete one (prints it, so it can be set back). --exercise reads the chat for an exercise. --attach copies a file for a message into chats/files/ (an image, a PDF or a text file, 20 MB at most; --attach -: its bytes in base64 on stdin, as pasted) and prints {name, path, kind} (D189)",
+    options: { set: { type: "boolean" }, merge: { type: "boolean" }, "keep-time": { type: "boolean" }, delete: { type: "boolean" }, exercise: { type: "boolean" }, attach: { type: "string" }, name: { type: "string" } },
     async run([id], f) {
       const lib = openLibrary();
       if (str(f.attach)) {
@@ -177,6 +177,10 @@ export const aiCommands: Record<string, Command> = {
       if (f.delete) {
         const c = await deleteChat(lib, need(id, "<id>"));
         return { data: c, text: `Deleted chat ${c.id}` };
+      }
+      if (f.exercise) {
+        const c = readExerciseChat(lib, need(id, "<exercise-id>"));
+        return { data: c, text: c.turns.map((t) => `> ${t.message}\n${t.reply ?? ""}`).join("\n\n") || "No messages yet." };
       }
       if (id) {
         const c = readChat(lib, id);

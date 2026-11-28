@@ -222,11 +222,11 @@ export class LibraryIndex {
     });
   }
 
-  /** Sources (not archived) whose title or text holds any of these word stems, best first (Ask your library). */
+  /** Sources whose title or text holds any of these word stems, best first (Ask your library). */
   sourcesMatching(stems: string[], limit: number): string[] {
     const match = stems.map((t) => `"${t.replace(/"/g, "")}"*`).join(" OR ");
     return this.db
-      .query<{ item: string }, [string, number]>("select item from fts where fts match ? and kind = 'item' and item not in (select id from items where archived = 1) order by bm25(fts, 0, 0, 0, 5, 1) limit ?")
+      .query<{ item: string }, [string, number]>("select item from fts where fts match ? and kind = 'item' order by bm25(fts, 0, 0, 0, 5, 1) * (case when item in (select id from items where archived = 1) then 0.5 else 1 end) limit ?")
       .all(match, limit)
       .map((r) => r.item);
   }

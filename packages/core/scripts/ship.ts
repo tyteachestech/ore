@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 // Merges this worktree's PR the one way docs/WORKFLOW.md asks: `bun run ship --reviewed`, after /code-review is clean.
-// It brings master in, numbers new decisions and findings (`bun run ids`) and checks none is left, pushes, waits for
-// the PR's checks, refuses while master's last finished test run is red, starts again if master moved meanwhile,
-// squash-merges, then pulls ~/Developer/ore so the app reinstalls. (Retro 2026-11-15: #429 merged with an unnumbered
+// It brings master in, pushes, waits for the PR's checks, refuses while master's last finished test run is red,
+// starts again if master moved meanwhile, then numbers new decisions and findings (`bun run ids`), checks none is
+// left, pushes the numbers and squash-merges, then pulls ~/Developer/ore so the app reinstalls. (Retro 2026-11-15: #429 merged with an unnumbered
 // finding and turned master red until #430.)
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -37,12 +37,6 @@ export async function ship({ sh, log, reviewed, wait = Bun.sleep, tries = 3, liv
       log("bringing master in…");
       must(["git", "merge", "--no-edit", "origin/master"], "Master doesn't merge in cleanly: resolve it, commit, and ship again.");
     }
-    must(["bun", "run", "ids"], "bun run ids failed.");
-    if (sh(["git", "status", "--porcelain"]).out) {
-      must(["git", "commit", "-qam", "Number new decisions and findings"], "Couldn't commit the numbers.");
-      log("numbered new decisions and findings");
-    }
-    must(["bun", "packages/core/scripts/ids.ts", "--check"], "A placeholder is still left (an F-new or D-new name with no row to number).");
     must(["git", "push", "-q", "-u", "origin", branch], "git push failed.");
     // The last run that finished: a cancelled or skipped run says nothing about master.
     const red = sh(["gh", "run", "list", "--workflow", "test.yml", "--branch", "master", "--status", "completed", "--limit", "20", "--json", "conclusion,url", "-q",
@@ -61,6 +55,24 @@ export async function ship({ sh, log, reviewed, wait = Bun.sleep, tries = 3, liv
     if (must(["git", "rev-parse", "origin/master"], "No origin/master.") !== master) {
       log("master moved while the checks ran: again");
       continue;
+    }
+    // Numbered only now, with master holding still: numbered before the checks, a master that moved meanwhile brought
+    // in rows with the same numbers, and the merge that followed left two rows one number (#562, three times).
+    must(["bun", "run", "ids"], "bun run ids failed.");
+    must(["bun", "packages/core/scripts/ids.ts", "--check"], "A placeholder is still left (an F-new or D-new name with no row to number).");
+    if (sh(["git", "status", "--porcelain"]).out) {
+      must(["git", "commit", "-qam", "Number new decisions and findings"], "Couldn't commit the numbers.");
+      must(["git", "push", "-q", "-u", "origin", branch], "git push failed.");
+      log("numbered new decisions and findings");
+      // Just after a push GitHub has not yet worked out whether the PR merges, and a merge then is refused as
+      // "not mergeable" (#562): wait until it says.
+      for (let t = 0; ; t++) {
+        const m = sh(["gh", "pr", "view", String(pr), "--json", "mergeable", "-q", ".mergeable"]).out;
+        if (m === "MERGEABLE") break;
+        if (m === "CONFLICTING") throw new Error(`PR #${pr} conflicts with master after numbering: merge master in and ship again.`);
+        if (t >= 30) throw new Error(`GitHub hadn't said whether PR #${pr} merges after 5 minutes.`);
+        await wait(10_000);
+      }
     }
     const head = must(["git", "rev-parse", "HEAD"], "No HEAD.");
     must(["gh", "pr", "merge", String(pr), "--squash", "--match-head-commit", head], "gh pr merge failed.");

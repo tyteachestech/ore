@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { type Page } from "playwright";
-import { AGENTS, answered, armGood, awayAndBack, BRIDGE, browser, errors, hold, isHeld, journey, LIB, MOCK, openSource, ore, oreCalls, release, reveal, running, startReview, TESTING, type TryRec, until, url } from "../harness";
+import { AGENTS, answered, armGood, awayAndBack, BRIDGE, browser, errors, hold, isHeld, journey, LIB, MOCK, openSource, ore, oreCalls, release, reveal, running, settled, startReview, TESTING, type TryRec, until, url } from "../harness";
 
 journey("Add, Settings and What to review: Tab and ⇧Tab stay inside the panel, as a Mac sheet's do", async (page) => {
   const inside = (sel: string) => page.evaluate((sel) => !!document.activeElement?.closest(sel), sel);
@@ -442,6 +442,46 @@ journey("review: a half-typed answer survives quitting the app, for a day", asyn
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+journey("review: a resumed answer keeps its active time through Esc and quitting", async (page) => {
+  const app = oreCalls(page);
+  const field = page.getByRole("textbox", { name: "Your answer" });
+  const draft = "fluency feels like knowing, so they overrate it";
+  await page.clock.install();
+  await page.reload();
+  try {
+    await startReview(page, /Teaching/);
+    await field.fill(draft);
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await page.clock.fastForward(70_000);
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+
+    await page.clock.fastForward("01:00:00");
+    await startReview(page, /Teaching/);
+    await until("the answer is back after Esc", async () => (await field.inputValue()) === draft);
+    await page.clock.fastForward(20_000);
+    await page.evaluate(() => (window as unknown as { __emit: (e: string) => void }).__emit("quitting"));
+    await page.reload();
+    await page.clock.fastForward("01:00:00");
+
+    await startReview(page, /Teaching/);
+    await until("the answer is back after the relaunch", async () => (await field.inputValue()) === draft);
+    await page.clock.fastForward(31_000);
+    await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 3, gaps: [], feedback: "", covered: [true, true] } }));
+    await page.getByRole("button", { name: "Check", exact: true }).click();
+    await page.getByRole("button", { name: "Good", exact: true }).click();
+    await until("the rating was saved", async () => app.rated.length === 1);
+    const rating = app.calls.find((args) => args[0] === "review");
+    const ms = Number(rating?.find((arg) => arg.startsWith("--elapsed-ms="))?.split("=")[1]);
+    // 121 seconds of answering plus the real time taken by the interactions above.
+    if (!(ms >= 121_000 && ms < 126_000)) throw new Error(`expected 121000–125999 ms of active time, recorded ${ms} ms`);
+    await page.locator(".review-foot").getByRole("button", { name: "Done" }).click();
+    await page.locator(".review").waitFor({ state: "detached" });
+  } finally {
+    await app.undoAll();
+  }
+});
+
 journey("review: the screen reader's summary counts the key points as he has marked them, not as the AI did", async (page) => {
   await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = { grade: { rating: 3, gaps: [], feedback: "", covered: [true, true] } }));
   await startReview(page, /Teaching/);
@@ -704,8 +744,24 @@ journey("review: Enter activates the focused button (Again, Edit exercise, Open 
   await page.locator(".review").waitFor({ state: "detached" });
 });
 
+/** Each journey leaves the seeded exercise available to the next journey with a fresh Ask chat. */
+function reviewAskCalls(page: Page) {
+  const { calls } = oreCalls(page);
+  return {
+    calls,
+    async clearChat() {
+      await settled(page);
+      const exercise = calls.find((args) => args[0] === "ask")?.[1];
+      if (!exercise) return;
+      const chat = await ore("chat", exercise, "--exercise") as { id: string; turns: unknown[] };
+      if (chat.turns.length) await ore("chat", chat.id, "--delete");
+    },
+  };
+}
+
 // F265: Review's chat showed three dots until the whole reply was there, and nothing stopped it.
 journey("review Ask: the reply shows as it is written, Stop keeps the words so far, and with none it says Stopped with Try again (D296)", async (page) => {
+  const { clearChat } = reviewAskCalls(page);
   let release = () => {};
   let streams: string[] = [];
   const bodies: string[] = [];
@@ -767,9 +823,11 @@ journey("review Ask: the reply shows as it is written, Stop keeps the words so f
   await page.unroute(/\/ore$/);
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
+  await clearChat();
 });
 
 journey("review Ask: closing and reopening it keeps the reply so far and a half-typed follow-up", async (page) => {
+  const { clearChat } = reviewAskCalls(page);
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
     if (route.request().method() !== "POST" || !body.includes('"ask",')) return route.fallback();
@@ -802,6 +860,66 @@ journey("review Ask: closing and reopening it keeps the reply so far and a half-
   await page.unroute(/\/ore$/);
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
+  await clearChat();
+});
+
+// F807
+journey("review Ask: reopening the same exercise restores its chat and resumes its session", async (page) => {
+  const message = "Why does the client call an endpoint?";
+  const reply = "The endpoint controls what the client can do.";
+  const followUp = "Can you give me an example?";
+  const example = "An endpoint can require permission before it updates an order.";
+  const session = "ask-reopen-session";
+  const { calls, clearChat } = reviewAskCalls(page);
+  await page.route(/\/ore$/, async (route) => {
+    const args = route.request().postDataJSON()?.args as string[] | undefined;
+    if (args?.[0] !== "ask") return route.fallback();
+    await route.fulfill({
+      contentType: "application/json",
+      json: { reply: args.includes(`--message=${followUp}`) ? example : reply, proposal: null, session },
+    });
+  });
+
+  const question = page.locator(".review-q");
+  const toggle = page.getByRole("button", { name: "Ask about this" });
+  const ask = page.getByRole("region", { name: "Ask about this" });
+  const field = ask.getByRole("textbox", { name: "Ask about this exercise" });
+  const answerAndOpen = async () => {
+    if (await toggle.count()) throw new Error("Ask opened before the answer");
+    const noIdea = page.getByRole("button", { name: "No idea" });
+    await (await noIdea.isVisible() ? noIdea : page.getByRole("radio", { name: "Think so" })).click();
+    await toggle.click();
+  };
+  const leave = async () => {
+    await toggle.click();
+    await ask.waitFor({ state: "detached" });
+    await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" });
+  };
+
+  await startReview(page, null);
+  const exercise = await question.innerText();
+  await answerAndOpen();
+  await field.fill(message);
+  await field.press("Enter");
+  await ask.getByText(reply, { exact: true }).waitFor();
+  await leave();
+  await settled(page);
+  await page.reload(); // a new app instance has to read the chat from the library
+  await startReview(page, null);
+  if (await question.innerText() !== exercise) throw new Error("Review opened a different exercise");
+  await answerAndOpen();
+  await ask.getByText(message, { exact: true }).waitFor();
+  await ask.getByText(reply, { exact: true }).waitFor();
+  await field.fill(followUp);
+  await field.press("Enter");
+  await ask.getByText(example, { exact: true }).waitFor();
+  const askCalls = calls.filter((args) => args[0] === "ask");
+  if (askCalls.length !== 2 || !askCalls[1]!.includes(`--session=${session}`)) throw new Error("The follow-up did not resume the saved session");
+  if (calls.some((args) => args[0] === "review")) throw new Error("Ask recorded a rating");
+  await leave();
+  await page.unroute(/\/ore$/);
+  await clearChat();
 });
 
 journey("review: rate a card, the session moves on, and Undo brings the card back", async (page) => {
@@ -2489,6 +2607,7 @@ journey("review: while a card edit saves, the editor is read-only and Esc waits,
 });
 
 journey("review Ask: a failed question offers Try again, which asks it again and keeps a follow-up he has typed since", async (page) => {
+  const { clearChat } = reviewAskCalls(page);
   const asked: string[] = [];
   await page.route(/\/ore$/, async (route) => {
     const body = route.request().postData() ?? "";
@@ -2516,9 +2635,11 @@ journey("review Ask: a failed question offers Try again, which asks it again and
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
+  await clearChat();
 });
 
 journey("review Ask: a suggested card shows only what it changes, struck and underlined, and keeps showing it once used (D161)", async (page) => {
+  const { clearChat } = reviewAskCalls(page);
   let id = "";
   let was = { question: "", answer: "" };
   await page.route(/\/ore$/, async (route) => {
@@ -2554,6 +2675,7 @@ journey("review Ask: a suggested card shows only what it changes, struck and und
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await page.locator(".review").waitFor({ state: "detached" });
+  await clearChat();
 });
 
 journey("review end: calibration shows a bar for each tap with enough answers, the counts on hover (D165)", async (page) => {
@@ -2776,5 +2898,46 @@ journey("ambience: in a narrow window with the sidebar folded the radio sits in 
   } finally {
     if (!folded) await page.getByRole("button", { name: "Show sidebar" }).click();
     await page.setViewportSize(size);
+  }
+});
+
+// The guidebook's rule for "nothing comes back" (L246: add cues) and the brief's "a hint before a blank attempt":
+// Hint shows the first key point's first letters, More gives half its words, then only No idea or Check is left.
+journey("review: Hint before No idea shows first letters, then half the words; the rating records the hints taken and its suggestion is no higher than Hard", async (page) => {
+  const calls = oreCalls(page);
+  const q = page.locator(".review-q");
+  try {
+    await startReview(page, null);
+    const hint = page.getByRole("button", { name: "Hint", exact: true });
+    // Pass Fact exercises until an Explain one, which has the hint.
+    for (let n = 0; n < 8 && !(await hint.isVisible()); n++) {
+      await q.waitFor();
+      if (await hint.isVisible()) break;
+      await page.keyboard.press("Meta+l");
+      await page.waitForTimeout(250);
+    }
+    await hint.click();
+    const shown = page.getByLabel("Hint", { exact: true });
+    const first = await shown.innerText();
+    if (!/^\p{L}_*/u.test(first) || !first.includes("_")) throw new Error(`the first hint should be first letters and blanks: ${first}`);
+    // ⌘' from the answer field gives the second, which shows whole words; then the hint button is gone.
+    await page.getByRole("textbox", { name: "Your answer" }).focus();
+    await page.keyboard.press("Meta+Quote");
+    await until("the second hint shows whole words", async () => (await shown.innerText()) !== first && /\p{L}{2}/u.test(await shown.innerText()));
+    if (await page.getByRole("button", { name: /^(Hint|More)$/ }).count()) throw new Error("a third hint was offered");
+    await page.getByRole("textbox", { name: "Your answer" }).fill("Something I recalled with the hint");
+    if (await page.getByText("⌘'").count()) throw new Error("the key bar still offers a hint once both are taken");
+    await page.getByRole("radio", { name: "Think so" }).click();
+    await page.getByRole("button", { name: "Check", exact: true }).click();
+    await page.getByRole("button", { name: "Good", exact: true }).waitFor();
+    // Marking every key point got would suggest Good; with hints taken the suggestion stops at Hard.
+    for (const box of await page.locator(".quiz-points .quiz-mark").all()) if ((await box.getAttribute("aria-pressed")) !== "true") await box.click();
+    await until("Hard is suggested", async () => (await page.locator(".rate-2.suggested").count()) === 1);
+    await page.getByRole("button", { name: "Hard", exact: true }).click();
+    await until("the rating is sent with its hints", async () => calls.calls.some((a) => a[0] === "review" && a.includes("--cued=2") && a.includes("--rating=2")));
+  } finally {
+    await calls.undoAll();
+    if (await page.locator(".review").count()) await page.keyboard.press("Escape");
+    await page.locator(".review").waitFor({ state: "detached" }).catch(() => {});
   }
 });
