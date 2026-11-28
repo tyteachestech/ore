@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
+  checkAiModel,
   AiStamp, CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, findItemDir, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
   mergedReviews, readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, setJobAi, jobAi, AI_JOBS, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type AiJob, type Card, type Library, type LibraryIndex, type QueueEntry, type EndReceipt, type SkillStats, type Variant,
 } from "@ore/core";
@@ -71,10 +72,10 @@ export const studyCommands: Record<string, Command> = {
     async run(_, f) {
       const lib = openLibrary();
       const state = oneOf(f.state, CardState.options, "state");
-      const item = str(f.item)?.toUpperCase();
+      const item = str(f.item) ? findItem(lib, str(f.item)!).meta.id : undefined;
       const stateOf = cardStates(lib);
       const cards = listCards(lib).filter(
-        (c) => (!state || stateOf(c) === state) && (!item || c.meta.item === item || c.meta.item.endsWith(item)) && (!f.skill || c.meta.skills.includes(f.skill as string)),
+        (c) => (!state || stateOf(c) === state) && (!item || c.meta.item === item) && (!f.skill || c.meta.skills.includes(f.skill as string)),
       );
       return {
         data: cards.map((c) => cardJson(lib, c, stateOf(c))),
@@ -288,6 +289,7 @@ export const studyCommands: Record<string, Command> = {
         await setJobAi(lib, job, own === "default" ? null : { ai: own, ...(typeof f.model === "string" ? { model: f.model } : {}) });
       }
       const ai = job ? undefined : oneOf(f.ai, ["claude", "codex"] as const, "ai");
+      if (!job && typeof f.model === "string") checkAiModel(f.model);
       if (ai) await setAiVendor(lib, ai);
       const vendor = chooseVendor(lib);
       if (!job && typeof f.model === "string") await setAiModel(lib, vendor, f.model);

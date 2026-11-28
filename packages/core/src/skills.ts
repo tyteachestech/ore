@@ -489,7 +489,16 @@ export async function undoSuggestedSkill(lib: Library, ref: string, input: Sugge
 export function checkSkills(lib: Library, ids: string[]): void {
   const known = new Set(loadSkills(lib).skills.map((s) => s.id));
   const unknown = ids.find((id) => !known.has(id));
-  if (unknown) throw new Error(`unknown skill "${unknown}"`);
+  if (unknown !== undefined) throw new Error(`unknown skill "${unknown}"`);
+}
+
+/** Validate a filing's explicit assignments before any metadata or exercise is saved. */
+export function checkItemSkills(lib: Library, ids: string[], cards?: Record<string, string[]>): void {
+  if (cards !== undefined && (cards === null || typeof cards !== "object" || Array.isArray(cards)
+    || Object.values(cards).some((skills) => !Array.isArray(skills) || skills.some((id) => typeof id !== "string")))) {
+    throw new Error("--cards must be an object mapping exercise IDs to arrays of skill IDs (for example, {\"exercise-id\":[\"learning\"]})");
+  }
+  checkSkills(lib, [...ids, ...Object.values(cards ?? {}).flat()]);
 }
 
 /** Each of a source's cards and its skills: what `setItemSkills` takes back to put them as they were (Undo). */
@@ -526,7 +535,7 @@ export async function setItemSkills(lib: Library, ref: string, ids: string[], ca
 /** The filing and its Undo snapshot share one exercise collection under the same lock. */
 export async function fileItemSkills(lib: Library, ref: string, ids: string[], cards?: Record<string, string[]>): Promise<{ meta: ItemMeta; cards_before: Record<string, string[]> }> {
   return withLock(paths.lock(lib), () => {
-    checkSkills(lib, [...ids, ...Object.values(cards ?? {}).flat()]);
+    checkItemSkills(lib, ids, cards);
     const item = findItem(lib, ref);
     const next = [...new Set(ids)];
     const added = next.filter((id) => !item.meta.skills.includes(id));

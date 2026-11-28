@@ -271,9 +271,13 @@ export async function remixCard(lib: Library, ref: string): Promise<{ card: stri
 export function findVariant(lib: Library, cardRef: string, variantRef: string): Variant {
   const id = findCard(lib, cardRef).meta.id;
   const key = variantRef.toUpperCase();
-  const v = readVariants(lib, id).find((x) => x.id === key || x.id.endsWith(key));
-  if (!v) throw new Error(`card ${id} has no variant "${variantRef}"`);
-  return v;
+  const variants = readVariants(lib, id);
+  const exact = variants.find((x) => x.id === key);
+  if (exact) return exact;
+  const matches = variants.filter((x) => x.id.startsWith(key) || x.id.endsWith(key));
+  if (!matches.length) throw new Error(`card ${id} has no variant "${variantRef}"`);
+  if (matches.length > 1) throw new Error(`ambiguous variant "${variantRef}" — use more of the id`);
+  return matches[0]!;
 }
 
 /** B in review, "Bad version" (D66): drops the variant; the reason goes to the writer next time. */
