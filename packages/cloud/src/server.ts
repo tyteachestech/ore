@@ -97,7 +97,7 @@ export const makeHandler = (auth: Auth, allowed = limiter(), run: Run = isolated
     auth.accounts.remove(sub);
     return json({ deleted: true });
   }
-  if (url.pathname === "/ai") return askAi ? askAi(account, (max) => capped(req, max)) : json({ error: "Ore's own AI isn't set up on this server." }, 503);
+  if (url.pathname === "/ai") return askAi ? askAi(account, (max) => capped(req, max), req.signal) : json({ error: "Ore's own AI isn't set up on this server." }, 503);
   const mine = running.get(sub) ?? 0;
   if (mine >= IMPORTS.perAccount) return json({ refused: "Ore's server is still reading the last ones you sent. Wait for one to finish, then send this again." }, 429);
   if (total >= IMPORTS.total) return json({ refused: "Ore's server is busy just now. Try again in a minute." }, 503);
@@ -161,8 +161,8 @@ function aiFromEnv(auth: Auth, db: string): Ai | undefined {
   const key = process.env.ORE_ANTHROPIC_KEY;
   if (!key) return undefined;
   const dollars = (name: string, usual: number) => {
-    const n = Number(process.env[name] ?? usual);
-    if (!(n >= 0)) throw new Error(`${name} is a number of dollars a month.`);
+    const n = Number(process.env[name]?.trim() || usual);
+    if (!Number.isFinite(n) || n < 0) throw new Error(`${name} is a number of dollars a month.`);
     return n;
   };
   return { ask: anthropic(key), ledger: ledger(db, auth.secret), allowance: dollars("ORE_AI_ALLOWANCE", 4), total: dollars("ORE_AI_TOTAL", 20), everyone: process.env.ORE_BILLING !== "on" };

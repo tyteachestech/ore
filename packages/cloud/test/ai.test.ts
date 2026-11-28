@@ -20,9 +20,9 @@ function server(opts: Partial<Ai> & { ask?: Ask; now?: () => number } = {}) {
   let now = NOV;
   const auth: Auth = { audience: [], secret: "s".repeat(32), keys: async () => [], accounts: accounts(":memory:"), now: opts.now ?? (() => now) };
   const asked: Parameters<Ask>[0][] = [];
-  const ask: Ask = async (body) => {
+  const ask: Ask = async (body, gone) => {
     asked.push(body);
-    return (opts.ask ?? (async () => said('{"grade":"good"}')))(body);
+    return (opts.ask ?? (async () => said('{"grade":"good"}')))(body, gone);
   };
   const ai: Ai = { ask, ledger: ledger(":memory:", auth.secret), allowance: 4, total: 100, everyone: true, ...opts, ...(opts.ask ? { ask } : {}) };
   const handle = makeHandler(auth, undefined, inProcess, ai);
@@ -52,7 +52,7 @@ test("a task comes back as the Mac's own AI gives it: the text, the model, and w
 test("what a run costs: each model's own price, cached input at its own rates, Haiku dearer past 100K tokens", () => {
   const u = (input_tokens: number, output_tokens: number, write = 0, read = 0) => ({ input_tokens, output_tokens, cache_creation_input_tokens: write, cache_read_input_tokens: read });
   expect(priced("claude-sonnet-5-5", u(1_000_000, 1_000_000))).toBeCloseTo(12);
-  expect(priced("claude-sonnet-5-5", u(0, 0, 1_000_000, 1_000_000))).toBeCloseTo(2.5 + 0.2);
+  expect(priced("claude-sonnet-5-5", u(0, 0, 1_000_000, 1_000_000))).toBeCloseTo(2.5 + 0.1);
   expect(priced("claude-haiku-5-5", u(100_000, 10_000))).toBeCloseTo(0.01 + 0.005);
   expect(priced("claude-haiku-5-5", u(60_000, 10_000, 0, 50_000))).toBeCloseTo(0.03 + 0.0025 + 0.025);
 });
@@ -125,7 +125,55 @@ test("the whole server's month has a cap of its own: past it, nobody's task runs
   expect((await s.as("001.b", task)).status).toBe(200);
   const res = await s.as("001.c", task);
   expect(res.status).toBe(503);
+  expect(await res.json()).toEqual({ refused: "Ore's AI is closed for the month. It opens again on December 1.", resets: "2026-12-01" });
   expect(s.asked).toHaveLength(2);
+});
+
+test("tasks sent together can't each slip under a cap: what is still running counts at the most it may cost", async () => {
+  // One run may cost 16¢ at most, more than the 10¢ left to this person and to the server.
+  for (const caps of [{ allowance: 0.1 }, { total: 0.1 }]) {
+    let free!: () => void;
+    const held = new Promise<void>((r) => (free = r));
+    const s = server({ ...caps, ask: async () => (await held, said("{}")) });
+    const first = s.as("001.a", task);
+    await Bun.sleep(10);
+    const second = await s.as("allowance" in caps ? "001.a" : "001.b", task);
+    expect(second.status).toBe("allowance" in caps ? 429 : 503);
+    expect(s.asked).toHaveLength(1);
+    free();
+    expect((await first).status).toBe(200);
+    // Nothing is left held once it ends.
+    expect((await s.as("001.b", task)).status).toBe(200);
+  }
+});
+
+test("when a run's cost can't be written down, its answer still comes and no more tasks run", async () => {
+  const errors: unknown[] = [];
+  const real = console.error;
+  console.error = (...a: unknown[]) => void errors.push(a);
+  try {
+    const s = server();
+    s.ai.ledger.add = () => {
+      throw new Error("disk full");
+    };
+    expect((await s.as("001.a", task)).status).toBe(200);
+    expect((await s.as("001.a", task)).status).toBe(503);
+    expect(s.asked).toHaveLength(1);
+    expect(errors).toHaveLength(1);
+  } finally {
+    console.error = real;
+  }
+});
+
+test("a task whose caller has gone is stopped", async () => {
+  let got: AbortSignal | undefined;
+  const auth: Auth = { audience: [], secret: "s".repeat(32), keys: async () => [], accounts: accounts(":memory:") };
+  const ai: Ai = { ask: async (_b, gone) => ((got = gone), said("{}")), ledger: ledger(":memory:", auth.secret), allowance: 4, total: 100, everyone: true };
+  const gone = new AbortController();
+  const req = new Request("http://x/ai", { method: "POST", signal: gone.signal, headers: { authorization: `Bearer ${await session(auth.accounts.signIn("001.a"), auth)}` }, body: JSON.stringify(task) });
+  await makeHandler(auth, undefined, inProcess, ai)(req);
+  gone.abort();
+  expect(got?.aborted).toBe(true);
 });
 
 test("so many a minute, and one person's tasks only so many at once", async () => {
