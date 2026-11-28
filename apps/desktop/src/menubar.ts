@@ -21,7 +21,7 @@ const MENUS: Spec[] = [
   { title: "View", items: ["palette", "sidebar", "side-panel", "notes", "collected", "questions", "-", "@fullscreen"] },
   { title: "Go", items: ["home", "go-feed", "go-toread", "go-done", "-", "nav-back", "nav-forward", "-", "lesson-prev", "lesson-next"] },
   { title: "Source", when: "reader", items: ["finish-source", "section", "look-up", "listen", "rename", "pin", "archive"] },
-  { title: "Review", items: ["review", "quick-quiz", "-", "no-idea", "in-head", "later", "edit-card", "retire-card", "ask", "bad-version"] },
+  { title: "Review", items: ["review", "quick-quiz", "-", "hint", "no-idea", "in-head", "later", "edit-card", "retire-card", "ask", "bad-version"] },
   { title: "Window", role: "window", items: ["@minimize", "@maximize"] },
   { title: "Help", role: "help", items: ["shortcuts"] },
 ];
@@ -63,6 +63,7 @@ const LABEL: Partial<Record<KeyId, string>> = {
   review: "Start Review",
   "quick-quiz": "Quick Quiz",
   "no-idea": "No Idea",
+  hint: "Hint",
   "in-head": "Answered in My Head",
   later: "Later",
   "edit-card": "Edit Exercise…",
@@ -103,7 +104,7 @@ export function setMenu(keymap: Record<KeyId, Combo>, where: Where) {
   void invoke("set_app_menu", { menus: menuSpec(keymap, where) }).catch(() => {});
 }
 
-const KEY: Record<string, string> = { BracketLeft: "[", BracketRight: "]", Comma: ",", Slash: "/", Backspace: "Backspace", Enter: "Enter", Space: " " };
+const KEY: Record<string, string> = { BracketLeft: "[", BracketRight: "]", Comma: ",", Slash: "/", Quote: "'", Backspace: "Backspace", Enter: "Enter", Space: " " };
 
 /** The keydown a combo stands for, as the page's handlers read it (they match on `code`). */
 export function keydownFor(combo: Combo): KeyboardEvent {
