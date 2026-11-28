@@ -117,7 +117,7 @@ describe("tutor: what it sees", () => {
 });
 
 describe("tutor: replies", () => {
-  // F-new-ask-archived
+  // F808
   test("the tutor retrieves and cites an archived source named in the question", async () => {
     const { lib, a } = await library();
     await setItemArchived(lib, a.meta.id, true);

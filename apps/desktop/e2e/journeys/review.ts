@@ -863,7 +863,7 @@ journey("review Ask: closing and reopening it keeps the reply so far and a half-
   await clearChat();
 });
 
-// F-new-review-ask-history
+// F807
 journey("review Ask: reopening the same exercise restores its chat and resumes its session", async (page) => {
   const message = "Why does the client call an endpoint?";
   const reply = "The endpoint controls what the client can do.";
