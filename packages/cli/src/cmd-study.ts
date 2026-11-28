@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import {
+  checkAiModel,
   AiStamp, CardState, cardStates, calibration, raterStats, loadParams, addCellCard, addFigureCard, figureFile, findItem, findItemDir, cardsToRemix, firstEndThisWeek, readReviews, doctor, findVariant, inHeadOk, cardHistory, loadSkills, rejectVariant, remixCard, restoreVariant, remixStats, reviewVersion, setVariant, dueQueue, endSession, findCard, libraryStats, listCards, openIndex, openLibrary, optimize, paths,
   mergedReviews, readCardFile, rebuildIndex, recordReview, reminderNote, reviewSettings, skillsFileProblems, setAiVendor, setAiModel, setJobAi, jobAi, AI_JOBS, savedModel, listModels, chooseVendor, setReviewSettings, skillGrowth, skillStrength, snapshot, historyPaused, startSession, reopenSession, today, undoReview, withLock, writeCardContent, writeCardMeta, type AiJob, type Card, type Library, type LibraryIndex, type QueueEntry, type EndReceipt, type SkillStats, type Variant,
 } from "@ore/core";
@@ -71,10 +72,15 @@ export const studyCommands: Record<string, Command> = {
     async run(_, f) {
       const lib = openLibrary();
       const state = oneOf(f.state, CardState.options, "state");
-      const item = str(f.item)?.toUpperCase();
       const stateOf = cardStates(lib);
+      const ref = str(f.item);
+      // A source whose folder is gone still has exercises to find and retire (doctor's advice): its full id lists them.
+      const item = ref === undefined ? undefined : (() => {
+        try { return findItem(lib, ref).meta.id; }
+        catch (e) { if (listCards(lib).some((c) => c.meta.item === ref.toUpperCase())) return ref.toUpperCase(); throw e; }
+      })();
       const cards = listCards(lib).filter(
-        (c) => (!state || stateOf(c) === state) && (!item || c.meta.item === item || c.meta.item.endsWith(item)) && (!f.skill || c.meta.skills.includes(f.skill as string)),
+        (c) => (!state || stateOf(c) === state) && (!item || c.meta.item === item) && (!f.skill || c.meta.skills.includes(f.skill as string)),
       );
       return {
         data: cards.map((c) => cardJson(lib, c, stateOf(c))),
@@ -140,7 +146,7 @@ export const studyCommands: Record<string, Command> = {
   },
 
   due: {
-    usage: "[--limit N] [--skill s]... [--source id] [--all] [--start]   ordered review queue: due cards, then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills (- for the ones filed under no skill); --source keeps one source's cards, every unseen draft of it included (Review this source); --all: every unseen draft, past the day's new-card limits; --start: a session's first fetch, opening on the likeliest recall of the first ten (D176)",
+    usage: "[--limit N] [--skill s]... [--source id] [--all] [--start]   ordered review queue: due cards (never more than two likely misses in a row, D360), then up to the day's new drafts (review.new_per_day); --skill keeps cards of those skills (- for the ones filed under no skill); --source keeps one source's cards, every unseen draft of it included (Review this source); --all: every unseen draft, past the day's new-card limits; --start: a session's first fetch, opening on the likeliest recall of the first ten (D176)",
     options: { limit: { type: "string" }, skill: { type: "string", multiple: true }, source: { type: "string" }, all: { type: "boolean" }, start: { type: "boolean" } },
     async run(_, f) {
       const lib = openLibrary();
@@ -288,6 +294,7 @@ export const studyCommands: Record<string, Command> = {
         await setJobAi(lib, job, own === "default" ? null : { ai: own, ...(typeof f.model === "string" ? { model: f.model } : {}) });
       }
       const ai = job ? undefined : oneOf(f.ai, ["claude", "codex"] as const, "ai");
+      if (!job && typeof f.model === "string") checkAiModel(f.model);
       if (ai) await setAiVendor(lib, ai);
       const vendor = chooseVendor(lib);
       if (!job && typeof f.model === "string") await setAiModel(lib, vendor, f.model);

@@ -1,0 +1,17 @@
+import assert from 'node:assert/strict';
+import {core,fresh,artifact} from './common.ts';
+const mode=process.argv[2]??'inside',control=process.argv[3]??'none';
+const lib=await fresh('cut-question-'+mode+'-'+control);
+const item=await core.addText(lib,'# Recall\n\nBeta spacing helps learning.\n\nGamma sleep consolidates memory.\n');
+const exact=mode==='after'?'Gamma sleep consolidates memory.':'Beta spacing helps learning.';
+const a=core.addHighlight(item,{exact,intent:mode==='keep'?'keep':'question',note:'Why does this help?'});
+const start=item.body.indexOf('Beta');
+const cut=await core.cutText(lib,item.meta.id,start,start+1);
+const mid=core.findAnnotation(lib,a.id).annotation;
+if(control==='rename')await core.renameItem(lib,item.meta.id,'Independent title');
+if(control==='reindex')core.rebuildIndex(lib);
+await core.restoreCut(lib,item.meta.id,cut.id);
+const back=core.findAnnotation(lib,a.id).annotation;
+const result={mode,control,before:{exact:a.exact,start:a.start,end:a.end},afterCut:{exact:mid.exact,start:mid.start,end:mid.end,status:mid.status},afterUndo:{exact:back.exact,start:back.start,end:back.end},note:back.note,bodyRestored:core.findItem(lib,item.meta.id).body===item.body};
+console.log('[DEEP]',JSON.stringify(result));artifact('cut-question-'+mode+'-'+control+'.json',result);
+assert.deepEqual(result.afterUndo,result.before,'Undo of a cut must restore the question passage without rewriting it to different words');

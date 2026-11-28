@@ -100,6 +100,8 @@ export interface Cut {
   after?: string;
   /** Highlights inside the removed text, as they were; removed with it (their cards stay). */
   removed: Annotation[];
+  /** Questions kept open inside the cut, whose positions still refer to the removed text. */
+  retained?: Annotation[];
 }
 
 const stashDir = (lib: Library, item: string) => join(lib.root, ".ore", "cuts", item);
@@ -133,16 +135,18 @@ const CONTEXT = 40;
 function apply(lib: Library, item: Item, c: Omit<Cut, "removed" | "before" | "after">): Cut {
   const body = item.body;
   const end = c.at + c.text.length;
-  const cut: Cut = { ...c, before: body.slice(Math.max(0, c.at - CONTEXT), c.at), after: body.slice(end, end + CONTEXT), removed: [] };
+  const cut: Cut = { ...c, before: body.slice(Math.max(0, c.at - CONTEXT), c.at), after: body.slice(end, end + CONTEXT), removed: [], retained: [] };
   const next = body.slice(0, cut.at) + body.slice(end);
   const len = cut.text.length;
   for (const a of readAnnotations(item)) {
+    // A question whose passage is already cut still refers to the old body.
+    if (a.intent === "question" && body.slice(a.start, a.end) !== a.exact) continue;
     if (a.end <= cut.at) continue;
     if (a.start >= end) reviseAnnotation(item, a, quoteSelector(next, a.start - len, a.end - len));
     else if (a.intent !== "question") {
       cut.removed.push(a);
       reviseAnnotation(item, a, { status: "deleted" });
-    }
+    } else cut.retained!.push(a);
   }
   writeAtomic(item.docPath, stringifyFrontmatter({ ...item.meta, text_sha256: sha256(next) }, next));
   mkdirSync(stashDir(lib, item.meta.id), { recursive: true });
@@ -272,7 +276,17 @@ export async function restoreCut(lib: Library, ref: string, cutId: string): Prom
     if (at === null) throw new Error("That text is already back, or the source changed since.");
     const next = body.slice(0, at) + cut.text + body.slice(at);
     const moved = at - cut.at;
-    for (const a of readAnnotations(item)) if (a.start >= at) reviseAnnotation(item, a, quoteSelector(next, a.start + len, a.end + len));
+    const live = readAnnotations(item);
+    // Old receipts did not save the questions: recognize their unchanged quote at its old position.
+    const retained = cut.retained ?? live.filter((a) => a.intent === "question" && a.end > cut.at && a.start < cut.at + len
+      && next.slice(a.start + moved, a.end + moved) === a.exact && body.slice(a.start, a.end) !== a.exact);
+    const kept = new Map(retained.map((a) => [a.id, a]));
+    for (const a of live) {
+      const was = kept.get(a.id);
+      if (was && a.exact === was.exact && a.start === was.start && a.end === was.end) reviseAnnotation(item, a, quoteSelector(next, was.start + moved, was.end + moved));
+      else if (a.start >= at && (a.intent !== "question" || body.slice(a.start, a.end) === a.exact))
+        reviseAnnotation(item, a, quoteSelector(next, a.start + len, a.end + len));
+    }
     const now = new Map(latestRevs(annotationRevs(item.dir)).map((a) => [a.id, a]));
     for (const was of cut.removed) {
       const c = now.get(was.id);
@@ -280,7 +294,7 @@ export async function restoreCut(lib: Library, ref: string, cutId: string): Prom
     }
     writeAtomic(item.docPath, stringifyFrontmatter({ ...item.meta, text_sha256: sha256(next) }, next));
     // Put back somewhere new: the record says where, so Redo takes it out from there.
-    if (moved) writeAtomic(join(stashDir(lib, item.meta.id), `${cut.id}.json`), JSON.stringify({ ...cut, at, removed: cut.removed.map((a) => ({ ...a, start: a.start + moved, end: a.end + moved })) }));
+    if (moved) writeAtomic(join(stashDir(lib, item.meta.id), `${cut.id}.json`), JSON.stringify({ ...cut, at, retained: retained.map((a) => ({ ...a, start: a.start + moved, end: a.end + moved })), removed: cut.removed.map((a) => ({ ...a, start: a.start + moved, end: a.end + moved })) }));
   });
   return readItemDir(dir);
 }

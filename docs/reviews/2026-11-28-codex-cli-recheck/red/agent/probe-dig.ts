@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {ore,out} from './common.ts';
+process.env.ORE_LIBRARY=out+'/libs/dig-note';
+const before=await ore('notes','--skill','learning'); assert.equal(before.text,'');
+const d=await ore('dig','learning','--done');
+const after=await ore('notes','--skill','learning'); assert.equal(after.text,'');
+console.log('[DEEP] Canonical ore notes path:',after.path,'still empty after --done:',after.text==='');
+await ore('notes','--skill','learning','--append',d.text,'--heading','Dig, 2026-11-27');
+assert((await ore('notes','--skill','learning')).text.includes(d.text));
+console.log('[DEEP] Explicit notes append supplies the missing write; UI Dig.tsx:82 does this before ore dig.');
+console.log('PASS Dig storage and note-write controls');

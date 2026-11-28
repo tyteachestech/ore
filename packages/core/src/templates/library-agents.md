@@ -6,7 +6,9 @@ This folder is Tyler's Ore library: captured material, highlights, review items 
 
 **Use `ore` for every write that has invariants**: creating items, highlights and annotation edits, review logging, sessions, enrichment, card state changes. Run `ore --help` for commands; every command accepts `--json`. Never hand-edit `*.jsonl` files or the `id`, `item`, `annotation`, `state`, `created`, `text_sha256` fields.
 
-Never edit a library file by hand: `ore` checks what it writes and keeps the lock, the review history and the index right. Card wording goes through `ore card set <id> --question … --answer … --point …`, a source's title, author and skills through `ore edit`, its status through `ore status`, skills through `ore skills`. When no command does what Tyler asks, say so instead of editing the file.
+Never edit a library file by hand: `ore` checks what it writes and keeps the lock, the review history and the index right. Card wording goes through `ore card set <id> --question … --answer … --point … --ai <stamp JSON or null>`, a source's title, author and skills through `ore edit`, its status through `ore status`, skills through `ore skills`. When no command does what Tyler asks, say so instead of editing the file.
+
+For AI-written replacement exercise wording, `--ai` is its actual author's `{vendor, model, prompt_version}` JSON. `ore ask` returns the rewrite as `proposal` with its `ai` stamp; use them together when your own model and prompt version are unknown. Never reuse the previous author's stamp. For Tyler's own wording, use `--ai null`.
 
 **`notes.md` (the source note, and each skill note in `skills/<id>/notes.md`) is Tyler's own writing.** Never edit it except through `ore notes` (when Tyler gives you his words) and `ore recall`. Never write AI text into it: no summaries, suggestions, corrections, links or "cleaned up" versions. Read it freely for questions about his library. A link in a note is `[text](ore:item/<id>)` or `[text](ore:skill/<id>)`; `ore backlinks <item>` (or `--skill <id>`) lists the notes that link somewhere.
 
@@ -52,3 +54,15 @@ Highlight intents: keep (a plain highlight), card (a ★ key point), question (o
 - Tyler's rating is what gets logged. An AI grade is only a proposal.
 - No streaks, XP, quotas or trend arrows.
 - Skill priority sets desired retention only; it never changes FSRS math.
+
+## Saving a Dig
+
+`ore dig <skill> --text` saves the Dig record; it does not append to the skill note. As in the app, save Tyler's words to both places. First read `ore dig <skill> --json` and confirm the skill has a goal. Once he gives his memory response, put those exact words in `ANS` by the shell-quoting rule (each `'` as `'\''`, inside the recipe's one pair of single quotes). Replace `<skill>` with its ID and `<YYYY-MM-DD>` with today's local date:
+
+```bash
+ANS='<shell-escaped text>'
+ore notes --skill <skill> --append "$ANS" --heading "Dig, <YYYY-MM-DD>" --json &&
+ore dig <skill> --text "$ANS" --json
+```
+
+Verify both with `ore notes --skill <skill> --json` and `ore dig <skill> --json`. Stop on an error; if the note was saved but the Dig failed, the words are already safe in the note, so do not append them again when resuming. Never put AI feedback in the note. `ore dig <skill> --drop <dig>` removes only the Dig record; it does not undo the note append.
