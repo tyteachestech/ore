@@ -2487,8 +2487,9 @@ button.home-plan:hover { color: var(--text); }
 /* The warning over an unexpected rating (D237) is the bar's top line: the bar grows up, the four stay where they are. */
 .review-bar .review-guard { width: 100%; max-width: 640px; margin: 0 auto; }
 .quick .review-bar { padding: 8px 22px 11px; }
-:where(:root:not(.phone)) .review-bar:not(.quick *) { padding-left: clamp(24px, calc(816px - 100vw), 76px); }
-:where(:root:not(.phone)) .review-body:not(.quick *) { padding-left: clamp(24px, calc(816px - 100vw), 76px); }
+/* Under 840px the centred column would start under the radio, whatever room the mole takes on the right,
+   so there the page and the bar start to the radio's right. */
+@media (max-width: 840px) { :where(:root:not(.phone)) :is(.review-body, .review-bar):not(.quick *) { padding-left: 76px; } }
 .review-rate button {
   height: 44px; border-radius: 12px; font: 700 14px var(--round); color: var(--text); background: var(--bg-raised);
   border: 1px solid var(--border); box-shadow: 0 3px 0 var(--border); transition: background-color var(--t-2);
@@ -3938,10 +3939,17 @@ body:has(.kb-bar) .phone-reader { padding-bottom: var(--kb-bar-inset); }
    moves the exercise left of the chat, so nothing he is asking about is covered. */
 .review .tutor-bubble { bottom: 54px; }
 .review .review-chat { bottom: 54px; height: min(600px, calc(100vh - 118px)); animation: card-in var(--t-3) var(--ease-out) both; }
+/* Over the ratings bar (D364), which is taller than the keys bar, and over its warning line when it has one. */
+.review:has(.review-bar) :is(.tutor-bubble, .review-chat) { bottom: 78px; }
+.review:has(.review-bar .review-guard) :is(.tutor-bubble, .review-chat) { bottom: 106px; }
+.review:has(.review-bar) .review-chat { height: min(600px, calc(100vh - 142px)); }
 .review-body { transition: padding-right var(--t-3) var(--ease-out); }
 /* In a window too narrow for the exercise to clear him, it ends to his left, as it starts right of the radio (D254). */
 :where(:root:not(.phone)) .review-body:not(.quick *) { padding-right: clamp(24px, calc(832px - 100vw), 76px); }
-@media (min-width: 880px) { :root .review:has(.review-chat) .review-body { padding-right: 432px; } }
+/* With his chat open the column has only the left of the window, so it starts to the radio's right as well. */
+@media (min-width: 880px) { :root .review:has(.review-chat) :is(.review-body, .review-bar) { padding-right: 432px; padding-left: 76px; } }
+/* The ratings bar keeps the page's side padding, so the four stay under the exercise wherever it stands (D364). */
+:where(:root:not(.phone)) .review-bar:not(.quick *) { padding-right: clamp(24px, calc(832px - 100vw), 76px); }
 /* A suggested exercise in his bubble is set apart by its label and space, never a frame in a frame. */
 .review-chat .ask-card { padding: 0; border: 0; border-radius: 0; background: none; }
 @media (prefers-reduced-motion: reduce) { .review .review-chat { animation: none; } .review-body { transition: none; } }

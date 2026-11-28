@@ -2943,6 +2943,19 @@ journey("review: under a long answer in a short window the four ratings stay in 
       const bad = (await seen()).filter((b) => !b.shown || b.underOrb);
       if (bad.length) throw new Error(`scrolled to the ${at}, a rating is out of view or under the radio: ${JSON.stringify(bad)}`);
     }
+    // Every width on the way to one where the centred column clears the radio by itself, and with the mole's
+    // chat open, which leaves the column only the left of the window.
+    for (const width of [760, 800, 840, 880]) {
+      await page.setViewportSize({ width, height: 480 });
+      const bad = (await seen()).filter((b) => b.underOrb);
+      if (bad.length) throw new Error(`at ${width}px wide a rating is under the radio: ${JSON.stringify(bad)}`);
+    }
+    await page.setViewportSize({ width: 1100, height: 720 });
+    await page.locator(".tutor-bubble").click();
+    await page.locator(".review-chat").waitFor();
+    const bad = (await seen()).filter((b) => b.underOrb);
+    if (bad.length) throw new Error(`with the mole's chat open a rating is under the radio: ${JSON.stringify(bad)}`);
+    await page.keyboard.press("Escape");
     await page.keyboard.press("Escape");
     await page.locator(".review").waitFor({ state: "detached" });
   } finally {
