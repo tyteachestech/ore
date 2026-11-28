@@ -485,7 +485,7 @@ describe("two sessions open at once (D76)", () => {
   });
 });
 
-describe("the due queue never serves more than two likely misses in a row (D359)", () => {
+describe("the due queue never serves more than two likely misses in a row (D360)", () => {
   test("a backlog of faded exercises with a few fresher ones: a likely recall comes after every two misses, with and without --start, and after misses just made", async () => {
     const lib = await tempLibrary();
     const { item } = await addSnippet(lib, { text: "Retrieval practice strengthens memory more than restudy." });

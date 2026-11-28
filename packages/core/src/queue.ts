@@ -94,7 +94,7 @@ const LIKELY_MISS = 0.5;
 /** How many likely misses may come back to back before a likely recall is brought forward. */
 const MISS_RUN = 2;
 
-// D359: never more than two likely misses in a row. Most forgotten first serves a backlog as one run of
+// D360: never more than two likely misses in a row. Most forgotten first serves a backlog as one run of
 // probable misses, and hard items in a run are what make people stop (Kang, Daniels & Schweitzer 2022;
 // guidebook L246: difficulty has to be surmountable). So once two misses have come, the next exercise he
 // will likely recall is brought forward to sit before the third. Order only: nothing is dropped or held
