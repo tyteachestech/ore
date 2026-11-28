@@ -1965,7 +1965,7 @@ button.try-stone:hover .stone { opacity: 1; }
 /* A picture's or a diagram's big shapes would show through the blur, so they dim and blur further under it (not the app's own
    icons, which are aria-hidden). */
 .reader-pane.hidden-src .reader-scroll :is(img, video, canvas, iframe, svg:not([aria-hidden])) { opacity: 0.3; filter: blur(14px); transition: opacity var(--t-4) var(--ease-out), filter var(--t-4) var(--ease-out); }
-@media (prefers-reduced-motion: reduce) { .hide-veil, .reader-pane.hidden-src .reader-scroll :is(img, video, canvas, iframe, svg) { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .hide-veil, .reader-pane.hidden-src .reader-scroll :is(img, video, canvas, iframe, svg:not([aria-hidden])) { transition: none; } }
 .hidden-chip {
   position: absolute; top: 38%; left: calc((100% - 420px) / 2); transform: translateX(-50%); z-index: 7;
   display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px;
