@@ -1,6 +1,7 @@
 import { GearSix } from "./icons";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type CSSProperties, type HTMLAttributes, type MouseEvent as ReactMouseEvent, type ReactNode, type Ref } from "react";
 import { gemHint, GemRing, NearGoal } from "./Gem";
+import { Mole } from "./Mole";
 import { Hint } from "./Hint";
 import { inTextField, is, label, useKeymap } from "./keys";
 import { MoreButton, WithMenu, type MenuAction } from "./Menu";
@@ -106,7 +107,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   reload: number;
   /** Review or a sheet is open over Home: its keys are theirs, even while focus is still on the page. */
   blocked?: boolean;
-  onReview: (pick: string[] | null) => void;
+  /** `short`: the mole's two minutes after days away (D365). */
+  onReview: (pick: string[] | null, short?: boolean) => void;
   onOpenSource: (id: string) => void;
   onOpenSkill: (id: string) => void;
   /** Files a source under other skills from its chips (the same picker as the source lists). */
@@ -404,6 +406,13 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
                 </h1>
                 {/* Mid-goal with cards due, "N of 10 min" and Start review say it all (D65.4 as amended): no line. */}
                 {subline(today, empty) && <p>{subline(today, empty)}</p>}
+                {/* Back after two or more days away (D365): the mole asks for two minutes, no more, and
+                    never says how long it has been (D62). Gone with the day's first rating. */}
+                {today.away && canStart && (
+                  <p className="home-away">
+                    <Mole bare size={22} /> Two minutes is plenty today.
+                  </p>
+                )}
                 {/* His plan (D67): the cue that starts review, set in Settings › Review. On the phone (no Settings)
                     the plan is read, not set: a button that does nothing is never shown. */}
                 {onSettings ? (
@@ -420,6 +429,13 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
               </div>
               {/* Beside the ring, not on a row of its own: Today is only as tall as the ring. Nothing due: the
                   subline already says so, so no dead button. The full pile waits in its hint (D65.4). */}
+              {today.away && canStart && (
+                <Hint text="A short review: it ends by itself after about two minutes">
+                  <button className="home-short" onClick={() => onReview(null, true)}>
+                    2 minutes
+                  </button>
+                </Hint>
+              )}
               {canStart && (
                 <Hint text={`Start review · ${today.due} due, about ${Math.max(1, minutes(today.estimate_ms))} min in all`} keys="review">
                   <button className="pill-btn home-go" onClick={ask}>
