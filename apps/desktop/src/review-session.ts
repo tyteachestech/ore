@@ -463,7 +463,7 @@ export class ReviewSession<S> {
     } catch (e) {
       // Retired or deleted elsewhere while it was on screen (an agent's `ore card retire`, the iPhone): no rating
       // can ever save, so it leaves the session as a retire here would, instead of an exercise that can't be rated.
-      if (await this.gone(card.id)) {
+      if (await this.outOfReview(card.id)) {
         this.retired.add(card.id);
         this.dropAhead();
         this.screen.notify("This exercise was retired elsewhere, so it left this review.", "info");
@@ -498,7 +498,7 @@ export class ReviewSession<S> {
 
   /** Whether the exercise is out of review in the library now: retired, or no longer there. A read that fails for
    *  another reason (a lock, a slow disk) is not taken for gone. */
-  private gone(id: string): Promise<boolean> {
+  private outOfReview(id: string): Promise<boolean> {
     return this.run<{ state: string }>("card", "show", id).then(
       (c) => c.state === "retired",
       (e) => /^no card matches/.test(errorText(e)),
