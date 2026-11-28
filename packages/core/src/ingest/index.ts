@@ -277,8 +277,9 @@ async function asEpisode(html: string, base: string, page: NewItem, opts: AddOpt
       throw new Error(noPaste("The episode’s audio on that page isn’t a sound file Ore can hear."));
     }
     const language = (await import("./audio.ts")).pageAudioLanguage(html) ?? opts.language;
-    const ep = await fromBytes(await readCapped(res), kind, page.title, page.url, page.url, { ...opts, language });
-    return { ...ep, title: page.title, author: page.author, published: page.published, page: html };
+    const title = (await import("./web.ts")).episodeHeading(html, base, page.title);
+    const ep = await fromBytes(await readCapped(res), kind, title, page.url, page.url, { ...opts, language });
+    return { ...ep, title, author: page.author, published: page.published, page: html };
   } catch (e) {
     if (!hasText(page.body) || opts.episode) throw e;
     return null;

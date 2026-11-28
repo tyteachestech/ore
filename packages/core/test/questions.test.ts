@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { findAnnotation } from "../src/annotations.ts";
 import { pendingHighlights } from "../src/ai/enrich.ts";
 import { addSnippet, addText } from "../src/ingest/index.ts";
-import { findItem } from "../src/items.ts";
+import { findItem, setItemArchived } from "../src/items.ts";
 import { answerQuestion, listQuestions, matchQuestion } from "../src/questions.ts";
 import { tempLibrary } from "./helpers.ts";
 import { setSystemTime } from "bun:test";
@@ -66,6 +66,19 @@ describe("questions → answers and sources (D75)", () => {
     const ts = view!.answers[1]!.ts;
     await answerQuestion(lib, q.id, { remove: ts });
     expect(findAnnotation(lib, q.id).annotation.answers).toHaveLength(1);
+  });
+
+  test("an answer contribution resolves its archived source (F906)", async () => {
+    const lib = await tempLibrary();
+    const { annotation: q } = await addSnippet(lib, { text: "How long should the gap be?", intent: "question", skills: ["learning"] });
+    const source = await addText(lib, ARTICLE, { skills: ["learning"] });
+    await matchQuestion(lib, source.meta.id, q.id);
+    await answerQuestion(lib, q.id, { text: "About a tenth of the delay.", item: source.meta.id, done: true });
+    await setItemArchived(lib, source.meta.id, true);
+
+    const [view] = listQuestions(lib, { skill: "learning" });
+    expect(view!.answers[0]).toMatchObject({ item: source.meta.id, item_title: "Spacing" });
+    expect(view!.matches).toEqual([]);
   });
 
   test("a contribution can be rewritten in place: same place, same source, new words", async () => {

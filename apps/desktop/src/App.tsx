@@ -186,6 +186,7 @@ export function App() {
   // The skills as last seen stand in until this launch's answer comes (D299): the sidebar opens
   // whole, where it used to open as three bare words and jump when the icons arrived (F300).
   const [skills, setSkills] = useState<Skill[]>(lastSkills);
+  const [skillsLoading, setSkillsLoading] = useState(true);
   const [status, setStatus] = useState<Tab>(() => lastView().status);
   /** Archived sources, for the Archived tab. */
   const [archived, setArchived] = useState<Item[]>([]);
@@ -365,11 +366,15 @@ export function App() {
         // A read from before a later layout write (an Undo) would put its step back; that write reads again.
         if (!read.lands()) return;
         setSkills(all);
+        setSkillsLoading(false);
         save(LAST_SKILLS, JSON.stringify(all));
         setSkill((k) => (k && !all.some((s) => s.id === k) ? null : k));
       },
       // Try again while `ore` is still down says so again in the same toast.
-      (e) => notify(errorText(e), "error", undefined, undefined, undefined, undefined, "skills"),
+      (e) => {
+        if (read.newest()) setSkillsLoading(false);
+        notify(errorText(e), "error", undefined, undefined, undefined, undefined, "skills");
+      },
     );
   }, [notify]);
 
@@ -2294,10 +2299,8 @@ export function App() {
             targets={targets}
             onOpenLink={openLink}
             onBack={() => {
-              // Back on Home, focus goes to the source's Continue reading row, as the list's row keeps it.
-              const id = openId;
-              flushSync(() => setOpenId(null));
-              if (!onSkillPage && place === "home") document.querySelector<HTMLElement>(`.home-read[data-id="${id}"] .home-open`)?.focus();
+              if (place === "home" && !skill) comingBackHome();
+              setOpenId(null);
             }}
             onChanged={() => void refresh()}
             onSkillsChanged={reloadSkills}
@@ -2345,6 +2348,7 @@ export function App() {
             items={items ?? []}
             empty={items?.length === 0}
             skills={skills}
+            skillsLoading={skillsLoading}
             recent={recent}
             reload={homeTick}
             blocked={overlay}
@@ -2478,6 +2482,7 @@ export function App() {
           following={following}
           onPickFiles={chooseFiles}
           onClose={() => setAdding(false)}
+          giveBack={place === "feed" ? () => document.querySelector<HTMLElement>(".feed-list") : undefined}
           notify={notify}
         />
       )}

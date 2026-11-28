@@ -861,7 +861,10 @@ export function Tutor({ docked, onFit, chat, reading, skillPage, sources, skills
                         )}
                         {t.card && (firstSource(t.citations) ?? t.item) && (
                           <Hint text={t.kept && t.kept !== "adding" ? "In review from tomorrow" : t.card.question}>
-                            <button className={t.kept ? "done" : undefined} aria-label={t.kept ? "Exercise added" : `Add exercise: ${t.card.question}`} disabled={!!t.kept} onClick={() => void chat.keep(t.id)}>
+                            <button className={t.kept ? "done" : undefined} aria-label={t.kept ? "Exercise added" : `Add exercise: ${t.card.question}`} disabled={!!t.kept} onClick={(e) => {
+                              if (e.currentTarget === document.activeElement) field.current?.focus({ preventScroll: true });
+                              void chat.keep(t.id);
+                            }}>
                               {t.kept ? <><Check size={12} aria-hidden="true" />Exercise added</> : <><Plus size={12} aria-hidden="true" />Exercise</>}
                             </button>
                           </Hint>

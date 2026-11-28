@@ -745,6 +745,10 @@ export function Reader(p: Props) {
   return <ReaderView key={version} {...p} reload={() => setVersion((v) => v + 1)} recording={recording} playFrom={playFrom} />;
 }
 
+/** The focus's first and last block, in reading order. */
+const focusSpan = ({ anchor, head }: { anchor: HTMLElement; head: HTMLElement }) =>
+  anchor.compareDocumentPosition(head) & Node.DOCUMENT_POSITION_PRECEDING ? ([head, anchor] as const) : ([anchor, head] as const);
+
 function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom: (file: string) => void }) {
   const [doc, setDoc] = useState<Doc | null>(null);
   /** In a course (D79), the first lesson after this one not done yet: the closing card offers it. */
@@ -912,6 +916,13 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }, [tools, chipSet]);
   // The reading focus (Readwise Reader): blocks from `anchor` to `head`, moved with ↑ ↓ and widened with ⇧.
   const [focus, setFocus] = useState<{ anchor: HTMLElement; head: HTMLElement } | null>(null);
+  const [announcedPassage, setAnnouncedPassage] = useState("");
+  useEffect(() => {
+    if (PHONE) return;
+    const range = focus && !closedBook && focus.anchor.isConnected && focus.head.isConnected
+      ? textRange(...focusSpan(focus)) : null;
+    setAnnouncedPassage(range?.toString().replace(/\s+/g, " ").trim() ?? "");
+  }, [focus, closedBook]);
   const pageRef = useRef<HTMLDivElement>(null);
   const [painted, setPainted] = useState<{ a: Annotation; r: Range }[]>([]);
   const [evidence, setEvidence] = useState<(Range | null)[]>([]);
@@ -2168,10 +2179,6 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
     if (holder) void setIntentOf(holder[0], passageKey ? "keep" : "card");
     else if (passage) createHighlight(passage.cloneRange(), "card", undefined, false);
   }
-
-  /** The focus's first and last block, in reading order. */
-  const focusSpan = (f: { anchor: HTMLElement; head: HTMLElement }) =>
-    f.anchor.compareDocumentPosition(f.head) & Node.DOCUMENT_POSITION_PRECEDING ? ([f.head, f.anchor] as const) : ([f.anchor, f.head] as const);
 
   /** ↑ ↓ step the focus a block at a time and ⇧ widens it, the head kept a third of the way down. The
    *  first press, or one after he scrolled it out of view, starts at the block a third of the way down. */
@@ -3487,7 +3494,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
             Its own class: `.doc-head` means the source is read and its title can be worked.
             It takes focus as the text's scroller does, so focus given to the reader while it opens lands (F873). */}
         <div className="reader-pane">
-        <div className="reader-scroll" tabIndex={-1}>
+        <div className="reader-scroll" tabIndex={-1} role={PHONE ? undefined : "region"} aria-label={PHONE ? undefined : p.known?.title ?? "Source"}>
           <div className="page">
             {p.known && (
               <header className="doc-opening">
@@ -3504,6 +3511,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       </div>
     );
 
+  const keyboardPassage = focus && !closedBook && focusSpan(focus);
   // A file on the Mac can't open on the phone; a web page opens in Safari.
   const source = PHONE && !doc.url ? null : originalLabel(doc);
   const published = pubDate(doc.published);
@@ -3729,7 +3737,11 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       )}
       <HideVeil hidden={hidden} eye={eyeRef} />
       {/* Only the words hide (F118): the toolbar above them, with Show the source, stays in reach of VoiceOver. */}
-      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} aria-hidden={hidden || undefined} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
+      <div className="reader-scroll" ref={scrollRef} tabIndex={-1} role={PHONE ? undefined : "region"} aria-label={PHONE ? undefined : doc.title} aria-hidden={hidden || undefined} onScroll={onScroll} onTouchMove={PHONE ? () => (lastTouch.current = performance.now()) : undefined}>
+        {/* The live region is in place before the first key moves the passage box. */}
+        {!PHONE && <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {announcedPassage}
+        </div>}
         <WithMenu actions={textMenu} native={menuNative}>
         <div className={`page${video ? " video" : ""}${cardMode ? " vcard" : ""}${video && player.started ? " listening" : ""}`} ref={pageRef} onMouseDown={onMouseDown} onMouseUp={onMouseUp} onClick={onClick} onMouseMove={onMouseMove} {...(PHONE ? { onTouchStart, onTouchMove, onTouchEnd } : {})} onMouseLeave={() => !matchMedia("(hover: none)").matches && setTip(null)}>
           <header className="doc-head">
@@ -3903,7 +3915,7 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
               />
             );
           })()}
-          {focus && !closedBook && <FocusBox from={focusSpan(focus)[0]} to={focusSpan(focus)[1]} />}
+          {keyboardPassage && <FocusBox from={keyboardPassage[0]} to={keyboardPassage[1]} />}
           {spots && !closedBook && (
             <Margin
               chapters={spots}

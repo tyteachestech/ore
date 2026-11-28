@@ -87,9 +87,8 @@ export function rowLine(item: Pick<Item, "words" | "type" | "video" | "status" |
 /** The picture again, for the blur a cover shown whole stands on. */
 const backdrop = (i: Item) => (i.thumbnail ? ({ "--pic": `url("${thumbSrc(i.thumbnail).replace(/["\\\n]/g, (c) => encodeURIComponent(c))}")` } as CSSProperties) : undefined);
 
-/** The row or tile he last opened from Home by the keyboard: Back puts focus on it again (Finder). Any other
- *  way back to Home forgets it. */
-let openedByKeys: string | null = null;
+/** Back restores the source row or keyboard-opened skill tile that led away from Home (Finder). */
+let focusOnBack: string | null = null;
 let backHome = false;
 /** Back (⌘[, the back arrow) is landing on Home. */
 export const comingBackHome = () => void (backHome = true);
@@ -97,11 +96,12 @@ export const comingBackHome = () => void (backHome = true);
 /** What a press on Home is not on, for it to be a click on empty space. */
 const BLANK_NOT = ".home-read, .home-skill, button, a, input, [role=menu], [role=dialog]";
 
-export function Home({ items, empty, skills, recent, reload, blocked = false, onReview, onOpenSource: openSource, onOpenSkill: openSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, onCopy, skillMenu, onRetry, notify, manyMenu, onDragSkill, onDropOnSkill}: {
+export function Home({ items, empty, skills, skillsLoading = false, recent, reload, blocked = false, onReview, onOpenSource: openSource, onOpenSkill: openSkill, onRefile, onCreateSkill, onSettings, sourceMenu, onRename, onCopy, skillMenu, onRetry, notify, manyMenu, onDragSkill, onDropOnSkill}: {
   items: Item[];
   /** The library has no sources yet (loaded, not loading): Home says how to add the first. */
   empty?: boolean;
   skills: Skill[];
+  skillsLoading?: boolean;
   recent: string[];
   /** Changes whenever Home should reload today's numbers (after a review). */
   reload: number;
@@ -134,8 +134,8 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
   notify: Notify;
 }) {
   const keys = useKeymap();
-  const onOpenSource = (id: string) => ((openedByKeys = typedLast() ? `.home-read[data-id="${CSS.escape(id)}"]` : null), openSource(id));
-  const onOpenSkill = (id: string) => ((openedByKeys = typedLast() ? `.home-skill[data-id="${CSS.escape(id)}"]` : null), openSkill(id));
+  const onOpenSource = (id: string) => ((focusOnBack = `.home-read[data-id="${CSS.escape(id)}"]`), openSource(id));
+  const onOpenSkill = (id: string) => ((focusOnBack = typedLast() ? `.home-skill[data-id="${CSS.escape(id)}"]` : null), openSkill(id));
   const [renaming, setRenaming] = useState<string | null>(null);
   /** Rename… where the source list has it, typed on the row itself. */
   const withRename = (acts: MenuAction[], i: Item): MenuAction[] =>
@@ -359,21 +359,39 @@ export function Home({ items, empty, skills, recent, reload, blocked = false, on
     return () => window.removeEventListener("keydown", onKey);
   }, [items, onCopy, blocked, pick, manyMenu]);
 
-  // Back on Home he is where he was: scrolled there, and on the row or tile he opened by the keyboard, once it is drawn.
+  // Back on Home he is where he was: scrolled there, and on the row or tile he opened, once it is drawn.
   const root = useRef<HTMLDivElement>(null);
   useKeptScroll(root, "home");
   // Read once as Home opens (kept through StrictMode's second run): where Back should put focus, if it was Back.
   const backTo = useRef<string | null>(null);
+  const placingFocus = useRef(true);
+  const placed = useRef<HTMLElement | null>(null);
   useLayoutEffect(() => {
-    const to = backHome ? openedByKeys : null;
-    (backHome = false), (openedByKeys = null);
+    const to = backHome ? focusOnBack : null;
+    (backHome = false), (focusOnBack = null);
     if (to) backTo.current = to;
   }, []);
   useLayoutEffect(() => {
-    const el = backTo.current && root.current?.querySelector<HTMLElement>(`${backTo.current} .home-open`);
-    if (!el) return;
-    backTo.current = null;
-    if (!document.activeElement || document.activeElement === document.body) focusQuietly(el);
+    // The control Home put focus on went (Start review, once Today learns nothing is due): place it again.
+    const gone = !placingFocus.current && !!placed.current && !placed.current.isConnected && document.activeElement === document.body;
+    if (gone) placingFocus.current = true;
+    if (PHONE || !placingFocus.current || blocked) return;
+    if (document.activeElement && document.activeElement !== document.body) {
+      placingFocus.current = false;
+      return;
+    }
+    if (!today && !error) return;
+    const row = backTo.current && root.current?.querySelector<HTMLElement>(`${backTo.current} .home-open`);
+    // Wait for the skills before deciding where to land when Today already knows review is due.
+    if (!row && today?.due && !canStart && skillsLoading && !error) return;
+    // Start review, else the first control (the review plan). When the one he was on went under him (the session just
+    // cleared what was due), the first row he can move through with the arrows instead (F401).
+    const el = row || root.current?.querySelector<HTMLElement>(".home-go") || (gone ? root.current?.querySelector<HTMLElement>(".home-open") : null) || root.current?.querySelector<HTMLElement>("button:not([disabled]), a[href]");
+    if (el) {
+      placingFocus.current = false;
+      placed.current = el;
+      focusQuietly(el);
+    }
   });
 
   const split = useSplit("ore.home-split", 1 / 3);

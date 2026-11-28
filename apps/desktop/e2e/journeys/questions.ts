@@ -395,3 +395,34 @@ journey("questions on a source: Collected lists only this source's questions, no
     await ore("skills", "rm", k.id).catch(() => {});
   }
 });
+
+journey("skill page: an answer still names and opens its archived source (F906)", async (page) => {
+  const question = "How should I space practice?";
+  const title = "A guide to practice gaps";
+  const passage = "Leave a short gap before the next practice session.";
+  const q = (await ore("snippet", `--text=${question}`, "--intent=question", "--skill=learning")) as { annotation: { id: string } };
+  const source = (await fetch(`http://localhost:${BRIDGE}/ore`, { method: "POST", body: JSON.stringify({ args: ["add", "--stdin", "--no-enrich", "--skill=learning"], stdin: `# ${title}\n\n${passage}` }) }).then((r) => r.json())) as { id: string };
+  try {
+    await ore("answer", q.annotation.id, "--text=Space out the sessions.", `--item=${source.id}`, "--done");
+    await page.reload();
+    const skill = page.locator(".sidebar .side-item", { hasText: "Learning" }).first();
+    const answered = page.getByRole("tab", { name: "Answered", exact: true });
+    const sourceLink = page.locator(".question", { hasText: question }).getByRole("button", { name: title, exact: true });
+    await skill.click();
+    await answered.click();
+    await sourceLink.click();
+    await page.getByRole("button", { name: "Source actions" }).click();
+    await page.getByRole("menuitem", { name: /^Archive/ }).click();
+    await until("the source is archived on disk", async () => !!(await ore("show", source.id)).archived_at);
+
+    await page.reload();
+    await skill.click();
+    await answered.click();
+    await page.getByText("Space out the sessions.", { exact: false }).filter({ visible: true }).first().waitFor();
+    if (!(await sourceLink.isVisible())) throw new Error("the saved answer lost its source link after Archive");
+    await sourceLink.click();
+    await page.locator(".doc").getByText(passage, { exact: true }).waitFor();
+  } finally {
+    await ore("annotate", q.annotation.id, "--status", "deleted");
+  }
+});

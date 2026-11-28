@@ -5,6 +5,62 @@ import { AGENTS, answered, BRIDGE, foundOnScreen, hasCaret, hold, inLibrary, isH
 
 // —— journeys ——
 
+// F901
+journey("Home: focus starts at Start review, returns there from a palette-opened source, and has a fallback (run 7)", async (page) => {
+  const home = page.locator(".home");
+  const start = home.getByRole("button", { name: "Start review" });
+  const focused = () => page.evaluate(() => {
+    const el = document.activeElement;
+    return el?.matches("button") ? el.textContent?.trim() : el?.tagName;
+  });
+  await start.waitFor();
+  const launch = await focused();
+  await page.keyboard.press("Meta+k");
+  await page.getByPlaceholder("Search sources or run a command…").fill(TESTING);
+  await page.getByRole("option", { name: new RegExp(TESTING) }).first().press("Enter");
+  await page.locator(".doc-head").filter({ hasText: TESTING }).waitFor();
+  await until("the reader has the keys", () => page.locator(".reader-scroll").evaluate((el) => el === document.activeElement));
+  await page.keyboard.press("Escape");
+  await start.waitFor();
+  const returned = await focused();
+
+  const path = /\/ore$/;
+  await page.route(path, async (route) => {
+    if (route.request().postDataJSON().args[0] !== "today") return route.fallback();
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), due: 0 } });
+  });
+  let fallback;
+  try {
+    await page.reload();
+    await home.getByRole("button", { name: /Plan when you review|^After .* I review\.$/ }).waitFor();
+    fallback = await focused();
+  } finally {
+    await page.unroute(path);
+    await page.reload();
+  }
+  if (launch !== "Start review" || returned !== "Start review" || !/^(Plan when you review|After .* I review\.)$/.test(fallback ?? "")) {
+    throw new Error(`Home focus at launch, after the reader, and without review: ${launch}, ${returned}, ${fallback}`);
+  }
+  await start.waitFor();
+}, "webkit");
+
+journey("Home: missing due skills leave focus on the review plan", async (page) => {
+  const path = /\/ore$/;
+  await page.route(path, async (route) => {
+    if (route.request().postDataJSON().args[0] !== "today") return route.fallback();
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), due: 1, skills: [{ skill: "missing-skill", due: 1 }] } });
+  });
+  try {
+    await page.reload();
+    const plan = page.locator(".home").getByRole("button", { name: /Plan when you review|^After .* I review\.$/ });
+    await until("the review plan has focus", () => plan.evaluate((el) => el === document.activeElement));
+  } finally {
+    await page.unroute(path);
+  }
+}, "webkit");
+
 journey("Home: today's minutes are the big number, and the goal ring stands unframed", async (page) => {
   await page.locator(".home-goal h1 .roll").waitFor();
   const look = await page.evaluate(() => {
@@ -236,6 +292,11 @@ journey("Home: Back puts Home where it was scrolled, and focus on the row or til
   await page.locator(".doc-head").filter({ hasText: title }).waitFor();
   await page.keyboard.press("Meta+BracketLeft");
   await until(`focus is back on “${title}”`, async () => (await focusedOn(page)) === title);
+  await row.click();
+  await page.locator(".doc-head").filter({ hasText: title }).waitFor();
+  await until("the reader has the keys", () => page.locator(".reader-scroll").evaluate((el) => el === document.activeElement));
+  await page.keyboard.press("Escape");
+  await until(`focus is back on the clicked “${title}”`, async () => (await focusedOn(page)) === title);
 });
 
 journey("Home: ⌘-click and ⇧-click pick Continue reading rows, ⋯ acts on them all, Esc clears; a row dragged onto a sidebar skill is filed there, as in the source lists (F9, F10)", async (page) => {

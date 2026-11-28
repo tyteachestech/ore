@@ -402,6 +402,37 @@ journey("Feed: Follow opens a box that takes a link only, and never saves what i
   await page.keyboard.press("Escape");
 });
 
+// F899
+journey("Feed: following the first feed by keyboard gives the post list focus (run 7)", async (page) => {
+  const title = "First post after following";
+  const server = Bun.serve({ port: 0, fetch: (r: Request): Response => new URL(r.url).pathname === "/feed.xml"
+    ? new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>First Feed</title><link>http://localhost/</link><item><title>${title}</title><link>http://localhost:${server.port}/p.html</link><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } })
+    : new Response(`<html><head><title>${title}</title></head><body><article>${"<p>Spacing beats cramming for anything kept past a week.</p>".repeat(8)}</article></body></html>`, { headers: { "content-type": "text/html" } }) });
+  const url = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await page.keyboard.press("Meta+3");
+    const follow = page.locator(".empty-state").getByRole("button", { name: "Follow" });
+    await follow.focus();
+    await page.keyboard.press("Enter");
+    const box = page.getByRole("dialog", { name: "Follow a feed" });
+    const field = box.getByRole("textbox", { name: "Link", exact: true });
+    await field.fill(url);
+    await page.keyboard.press("Enter");
+    await box.waitFor({ state: "detached" });
+    const list = page.getByRole("group", { name: "Feed", exact: true });
+    await list.getByText(title).waitFor();
+    const focus = await list.evaluate((el) => el === document.activeElement ? "Feed list" : document.activeElement?.tagName);
+    if (focus !== "Feed list") throw new Error(`After following, focus is on ${focus}`);
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("Enter");
+    await page.locator(".reader .doc").getByText("Spacing beats cramming", { exact: false }).first().waitFor();
+    await page.keyboard.press("Escape");
+  } finally {
+    await ore("feed", "unfollow", url);
+    server.stop();
+  }
+}, "webkit");
+
 journey("Feed: a post open beside the Feed is still there after a review started over it (⌘R, then Esc)", async (page) => {
   // Starting Review over a post read beside the Feed dropped its preview (`feed close`), so leaving Review reopened a post
   // that was gone: `show` failed, the reader stayed empty and focus fell to <body> (CI, #580 shard 1, the corners journey).

@@ -277,6 +277,26 @@ function siteless(title: string, h1: string | undefined): string {
   return rest.length <= 60 && /^\s+[-–—|·]\s+\S/.test(rest) ? h! : title;
 }
 
+/** Some episode pages put the linked homepage masthead in the title. Use the nearest heading
+ *  before the player when that is all the title says. */
+export function episodeHeading(html: string, url: string, title: string): string {
+  const { document } = parseHTML(html);
+  const masthead = document.querySelector("h1");
+  if (!masthead) return title;
+  const name = masthead.textContent?.replace(/\s+/g, " ").trim();
+  const home = masthead.querySelector("a[href]")?.getAttribute("href");
+  if (!name || title.trim().replace(/\s*[-–—|·]$/, "") !== name || !home || URL.parse(home, url)?.href !== new URL("/", url).href) return title;
+  const audio = document.querySelector("audio");
+  if (!audio) return title;
+  for (const el of [...document.querySelectorAll("h1, h2")].reverse()) {
+    if (el === masthead) break;
+    if (!(audio.compareDocumentPosition(el) & 2 /* DOCUMENT_POSITION_PRECEDING */)) continue;
+    const heading = el.textContent?.replace(/\s+/g, " ").trim();
+    if (heading) return heading;
+  }
+  return title;
+}
+
 // Defuddle → Markdown. Fallback: Readability text as paragraphs.
 // linkedom instead of jsdom: jsdom 30's selector engine rejects Defuddle's long selectors.
 /** A paper's authors from LaTeXML's markup (arXiv's HTML papers): each `.ltx_personname`'s own text,

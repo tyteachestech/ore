@@ -1,6 +1,6 @@
 import { findAnnotation, readAnnotations, reviseAnnotation, type Annotation, type Contribution } from "./annotations.ts";
 import { nowIso } from "./ids.ts";
-import { findItem, listItems, updateItemMeta, type Item, type QuestionMatch } from "./items.ts";
+import { allItems, findItem, updateItemMeta, type Item, type QuestionMatch } from "./items.ts";
 import { paths, type Library } from "./library.ts";
 import { withLock } from "./lock.ts";
 
@@ -19,12 +19,13 @@ export interface QuestionView extends Annotation {
 /** Questions filed under `skill`, or the ones a source is reading for (`item`: questions of its skills,
  *  asked in it, or matched to it). Open first, then newest asked. */
 export function listQuestions(lib: Library, opts: { skill?: string; item?: string } = {}): QuestionView[] {
-  const items = listItems(lib);
-  const title = new Map(items.map((i) => [i.meta.id, i.meta.title]));
+  // Saved answer links can go back to archived sources. Questions and reading leads still come from active sources.
+  const sources = allItems(lib);
+  const title = new Map(sources.map((i) => [i.meta.id, i.meta.title]));
+  const items = sources.filter((i) => !i.meta.archived_at);
   const matchedBy = new Map<string, QuestionView["matches"]>();
   for (const i of items)
     for (const m of i.meta.question_matches ?? []) {
-      if (i.meta.archived_at) continue;
       const list = matchedBy.get(m.question) ?? [];
       list.push({ item: i.meta.id, title: i.meta.title, quote: m.quote, start: m.start });
       matchedBy.set(m.question, list);

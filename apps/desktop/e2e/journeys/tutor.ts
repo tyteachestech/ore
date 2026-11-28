@@ -1575,3 +1575,39 @@ journey("Ask about this: an answer that comes back empty says so with Try again,
     await page.evaluate(() => ((window as unknown as { __ORE_REPLY: unknown }).__ORE_REPLY = {}));
   }
 });
+
+// F900
+journey("Tutor: keeping an exercise by keyboard moves focus to the composer (run 7)", async (page) => {
+  await openSource(page, TESTING);
+  const path = /\/ore$/;
+  await page.route(path, async (route) => {
+    if (route.request().postDataJSON().args[0] !== "tutor") return route.fallback();
+    await route.fulfill({ json: {
+      reply: "Try recalling it yourself.",
+      citations: [],
+      general: false,
+      hint: false,
+      card: { kind: "card", content_type: "fact", question: "What helps retrieval practice stick?", answer: "Recalling it yourself.", rubric: [] },
+      ai: { vendor: "claude", model: "mock", prompt_version: "tutor@3" },
+    } });
+  });
+  try {
+    await page.keyboard.press("Meta+j");
+    const tutor = page.getByRole("complementary", { name: "Tutor" });
+    const composer = tutor.getByRole("textbox", { name: "Message the tutor" });
+    await composer.fill("Give me an exercise.");
+    await page.keyboard.press("Enter");
+    await tutor.getByRole("button", { name: /^Add exercise:/ }).focus();
+    await page.keyboard.press("Enter");
+    const saved = tutor.getByRole("button", { name: "Exercise added" });
+    await saved.waitFor();
+    await settled(page);
+    const focus = await composer.evaluate((el) => el === document.activeElement ? "composer" : document.activeElement?.tagName);
+    if (focus !== "composer") throw new Error(`After keeping the exercise, focus is on ${focus}`);
+    await tutor.getByRole("button", { name: "New chat" }).focus();
+    await page.keyboard.press("Meta+z");
+    await tutor.getByRole("button", { name: /^Add exercise:/ }).waitFor();
+  } finally {
+    await page.unroute(path);
+  }
+}, "webkit");

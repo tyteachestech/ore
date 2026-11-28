@@ -2422,10 +2422,11 @@ journey("original: a JPEG 2000 scan's page shows ink, in WebKit, which runs pdf.
     await page.evaluate(([tab, notes]) => {
       for (const [k, v] of [["ore.sidetab", tab], ["ore.mynotes", notes]] as const) v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v);
     }, before);
-    // What the source view still reads answers before the page reloads: cut off, WebKit calls it a page error (CI on #587).
+    // No reload after: each journey opens its own page, and a reload cut the reads the archive set off, which WebKit
+    // reports as a page error (CI on #587 and #604).
     await settled(page);
     await ore("archive", made.id);
-    await page.reload();
+    await settled(page);
   }
 }, "webkit");
 
@@ -2541,3 +2542,45 @@ journey("reader: a book opens on its text, its publisher's pages under one shut 
     await ore("archive", made.id).catch(() => {});
   }
 });
+
+// F902
+journey("Reader: keyboard passage selection exposes the named reader and the selected text (run 7)", async (page) => {
+  const title = "Passage selection";
+  const first = "Retrieval strengthens memory.";
+  const last = "Space out retrieval over several days.";
+  await page.getByRole("button", { name: "+ Add" }).click();
+  await page.getByLabel("Link, file path or text").fill(`# ${title}\n\n${first}\n\n${last}`);
+  await page.keyboard.press("Enter");
+  const reader = page.locator(".reader-scroll");
+  await reader.locator(".doc").getByText(last).waitFor();
+  await until("the reader has the keys", () => reader.evaluate((el) => el === document.activeElement));
+  const before = await reader.ariaSnapshot();
+  for (let n = 0; n < 4; n++) await page.keyboard.press("ArrowDown");
+  await reader.locator(".focus-box").waitFor();
+  const status = reader.locator('[role="status"][aria-live="polite"][aria-atomic="true"]');
+  await until("the single passage is announced", async () => (await status.textContent()) === last);
+  const single = await reader.ariaSnapshot();
+  await page.keyboard.press("Shift+ArrowUp");
+  await until("the extended passage is announced", async () => (await status.textContent()) === `${first} ${last}`);
+  const extended = await reader.ariaSnapshot();
+  if (before === single || single === extended) throw new Error("The accessibility snapshot did not change with the keyboard selection");
+  if (!single.includes(`region "${title}"`)) throw new Error("The reader has no accessible name");
+  if (!single.includes(`status: ${last}`) || !extended.includes(`status: ${first} ${last}`)) {
+    throw new Error(`The accessibility snapshot has the wrong selection:\n${single}\n${extended}`);
+  }
+  // A render for an unrelated control must not read the selected blocks again.
+  const paragraph = reader.locator(".doc p").filter({ hasText: /Space out retrieval over several days\.|Changed DOM text/ });
+  await paragraph.evaluate((el) => { el.firstChild!.textContent = "Changed DOM text"; });
+  try {
+    await page.keyboard.press("Meta+f");
+    await page.getByRole("textbox", { name: "Find in source" }).waitFor();
+    if (!(await reader.ariaSnapshot()).includes(`status: ${first} ${last}`)) {
+      throw new Error("Opening Find changed the passage announcement");
+    }
+    await page.keyboard.press("Escape");
+  } finally {
+    await paragraph.evaluate((el, text) => { el.firstChild!.textContent = text; }, last);
+  }
+  await page.keyboard.press("Escape");
+  await until("Escape clears the announcement", async () => (await status.textContent()) === "");
+}, "webkit");
