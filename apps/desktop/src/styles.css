@@ -600,6 +600,9 @@ img.thumb { filter: brightness(0.86); }
 .pick-bar .pick-x { padding: 0; width: 28px; justify-content: center; }
 .pick-sep { width: 1px; height: 16px; background: var(--border); margin: 0 4px; }
 body:has(.pick-bar) .toasts, body:has(.pick-bar) .toast { bottom: 68px; }
+/* Review's ratings are its bottom bar (D-new-ratings-bar): a toast stands above them, never over Hard and Good. */
+body:has(.review-bar) :is(.toasts, .toast) { bottom: 78px; }
+body:has(.review-bar .review-guard) :is(.toasts, .toast) { bottom: 118px; }
 /* The tutor's field sits at the window's foot, where a toast and the pick bar land: with the tutor open they stand
    in the room left of it, never over what he is typing (F447). A floating tutor is 400px wide, 16px
    in from the right; a docked one is --tutor-w. The window is never under 720px, which leaves them 256px. */

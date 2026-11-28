@@ -1269,11 +1269,17 @@ journey("review: ⌘Z from the end screen after a Later doesn't count the time s
     await page.waitForTimeout(3000); // on the end screen
     await page.keyboard.press("Meta+z");
     await until("back on it", async () => !(await doneButton.isVisible()) && (await good.isVisible()));
+    // The toast that says what ⌘Z took back stands above the ratings bar, not over it: a press on Good right away lands.
+    const over = await page.evaluate(() => {
+      const bar = document.querySelector(".review-bar")!.getBoundingClientRect();
+      return [...document.querySelectorAll(".toast")].some((t) => t.getBoundingClientRect().bottom > bar.top);
+    });
+    if (over) throw new Error("a toast sits over the ratings bar");
     await good.click();
     await doneButton.waitFor();
     const last = calls.calls.filter((a) => a[0] === "review" && !a.some((x) => x.startsWith("--undo"))).at(-1)!;
     const ms = Number(last.find((x) => x.startsWith("--elapsed-ms="))!.split("=")[1]);
-    if (ms >= 2500) throw new Error(`the rating counted ${ms} ms: the time on the end screen went in`);
+    if (ms >= 2500) throw new Error(`the rating counted ${ms} ms: the time on the end screen went in; ${calls.calls.filter((a) => a[0] === "review" || a[0] === "session").map((a) => a.filter((x) => /elapsed|undo|reopen|end|start/.test(x)).join(" ")).join(" / ")}`);
     await page.keyboard.press("Enter");
     await page.locator(".review").waitFor({ state: "detached" });
   } finally {
