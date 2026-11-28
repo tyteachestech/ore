@@ -3429,9 +3429,10 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       <div className="reader">
         {/* Its title and author stand where they will be, from the row he clicked (Linear and Notion draw
             the page's head before its body), so the open is never an empty pane.
-            Its own class: `.doc-head` means the source is read and its title can be worked. */}
+            Its own class: `.doc-head` means the source is read and its title can be worked.
+            It takes focus as the text's scroller does, so focus given to the reader while it opens lands (F873). */}
         <div className="reader-pane">
-        <div className="reader-scroll">
+        <div className="reader-scroll" tabIndex={-1}>
           <div className="page">
             {p.known && (
               <header className="doc-opening">
