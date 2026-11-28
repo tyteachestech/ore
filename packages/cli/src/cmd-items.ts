@@ -179,7 +179,7 @@ export const itemCommands: Record<string, Command> = {
         const filled = f.owe ? [] : (await fillOwed(lib)).map((i) => ({ id: i.meta.id, title: i.meta.title }));
         for (const i of filled) startEnrich(lib, i.id);
         // Every link failing is a failure (the links stay for a retry); some failing is reported, not fatal.
-        return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n"), exitCode: r.failed.length && !r.added.length && !filled.length ? 1 : 0 };
+        return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.errors.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n"), exitCode: r.errors.length && !r.added.length && !filled.length ? 1 : 0 };
       }
       const all = queuedLinks(lib);
       return { data: all, text: all.length ? table(all.map((l) => [l.id, l.url, l.error ?? "waiting"])) : "Nothing waiting" };
@@ -436,7 +436,7 @@ export const itemCommands: Record<string, Command> = {
   },
 
   dig: {
-    usage: '<skill> [--text "<the skill from memory>" | --ask | --answer "<a>"... | --done | --drop <dig>] | --ready [--skill s]...   the Dig: the whole skill explained from memory against its goal, checked against its key points, outside review\'s schedule. Alone: where the skill stands (its ideas, whether the gap since the last dig has passed, the last dig). --text keeps a dig with the ideas as they stand; --ask (AI) marks the ideas that came and asks one or two questions at ideas left out; --answer (AI, one per question in order, "" skips one) marks which came with that nudge; --done ends it with nothing more answered; --drop takes a dig back. --ready: the one skill a session may offer (of --skill, when given), or null. Never a grade, never due',
+    usage: '<skill> [--text "<the skill from memory>" | --ask | --answer "<a>"... | --done | --drop <dig>] | --ready [--skill s]...   the Dig: the whole skill explained from memory against its goal, checked against its key points, outside review\'s schedule. Alone: where the skill stands (its ideas, whether the gap since the last dig has passed, the last dig). --text keeps a dig with the ideas as they stand; it does not append to the skill note: first save his words with ore notes --skill <skill> --append <text> --heading "Dig, <date>"; --ask (AI) marks the ideas that came and asks one or two questions at ideas left out; --answer (AI, one per question in order, "" skips one) marks which came with that nudge; --done ends it with nothing more answered; --drop takes a dig back. --ready: the one skill a session may offer (of --skill, when given), or null. Never a grade, never due',
     options: { text: { type: "string" }, ask: { type: "boolean" }, answer: { type: "string", multiple: true }, done: { type: "boolean" }, drop: { type: "string" }, ready: { type: "boolean" }, skill: { type: "string", multiple: true } },
     async run([skill], f) {
       const lib = openLibrary();

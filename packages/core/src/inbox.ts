@@ -159,11 +159,13 @@ export function mine(l: QueuedLink, now = Date.now(), device = deviceName()): bo
 
 /** Imports each waiting link that is this device's to import (`mine`) with `add`, the whole import. A link that fails keeps its reason for the phone
  *  to show and is tried again next time (the Mac may just have been offline); `failed` lists only new reasons, so
- *  the same failure isn't announced on every import. */
-export async function importQueued<T extends { id: string; title: string }>(lib: Library, add: (input: string, skills: string[]) => Promise<T>, now = Date.now()): Promise<{ added: (T & { url: string; inbox: string })[]; failed: QueuedLink[] }> {
+ *  the same failure isn't announced on every import. `errors` includes every failed attempt this time,
+ *  including unchanged reasons: notification deduplication must not turn a failed retry into success. */
+export async function importQueued<T extends { id: string; title: string }>(lib: Library, add: (input: string, skills: string[]) => Promise<T>, now = Date.now()): Promise<{ added: (T & { url: string; inbox: string })[]; failed: QueuedLink[]; errors: QueuedLink[] }> {
   // `inbox` is the waiting item's own id: the share card asks the app to open what that item became.
   const added: (T & { url: string; inbox: string })[] = [];
   const failed: QueuedLink[] = [];
+  const errors: QueuedLink[] = [];
   for (const l of queuedLinks(lib)) {
     if (!mine(l, now)) continue;
     let got: T;
@@ -171,6 +173,7 @@ export async function importQueued<T extends { id: string; title: string }>(lib:
       got = await add(l.file ? join(paths.inbox(lib), l.file) : l.url, l.skills);
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
+      errors.push({ ...l, error });
       // Removed on the phone while it was being imported: nothing to keep.
       if (!existsSync(item(lib, l))) continue;
       writeAtomic(item(lib, l), JSON.stringify({ ...l, error }, null, 2) + "\n");
@@ -182,5 +185,5 @@ export async function importQueued<T extends { id: string; title: string }>(lib:
     } catch {}
     added.push({ ...got, url: l.url, inbox: l.id });
   }
-  return { added, failed };
+  return { added, failed, errors };
 }
