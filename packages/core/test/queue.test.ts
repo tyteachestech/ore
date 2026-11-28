@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { orderQueue, pace, winFirst, type QueueEntry } from "../src/queue.ts";
+import { orderQueue, pace, placeRetries, winFirst, type QueueEntry } from "../src/queue.ts";
 
 let n = 0;
 function e(over: Partial<QueueEntry>): QueueEntry {
@@ -47,11 +47,10 @@ describe("due queue ordering", () => {
     expect([pos("d1"), pos("d2"), pos("d3")].sort()).toEqual([0, 1, 2]);
   });
 
-  test("relearn passes last", () => {
-    const due = e({ id: "due", retrievability: 0.5 });
+  test("a pending retry comes first when only new exercises remain", () => {
     const draft = e({ id: "draft", state: "draft", due: null, retrievability: 0 });
     const relearn = e({ id: "relearn", retrievability: 0, relearn: true });
-    expect(ids(orderQueue([relearn, due, draft]))).toEqual(["draft", "due", "relearn"]);
+    expect(ids(placeRetries([draft], [relearn], [{ card: "relearn" }, { card: "x" }, { card: "y" }, { card: "z" }]))).toEqual(["relearn", "draft"]);
   });
 });
 
