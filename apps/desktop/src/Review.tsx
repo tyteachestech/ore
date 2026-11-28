@@ -37,7 +37,7 @@ import { stampBefore } from "./transcript";
 import { passageText } from "./text";
 import { Evidence } from "./Evidence";
 import { Occluded } from "./Occluded";
-import { cue, cueSource, CUE_LEVELS } from "./cue";
+import { cue, cueLevels, cueSource } from "./cue";
 
 const SURE = ["Guess", "Think so", "Sure"] as const;
 const KEY_POINTS_CHANGED = "The key points changed.";
@@ -450,14 +450,14 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
   // Recalled with a hint is a weaker recall: the suggestion goes no higher than Hard; his pick stands (D21).
   const suggested = cued && uncapped ? Math.min(uncapped, 2) : uncapped;
   /** An exercise with something to hint from (D358): an Explain's first key point, a Fact's answer. */
-  const hintable = !!card && !!cueSource(card);
+  const hints = card ? cueLevels(cueSource(card)) : 0;
   const cueLine = card && cued > 0 && (
     <p className="review-cue" aria-label="Hint" aria-live="polite">
       {cue(cueSource(card), cued)}
     </p>
   );
   // No ⌘Z for a hint: what it showed can't be unseen, so taking it back would only hide that he saw it.
-  const hintButton = hintable && cued < CUE_LEVELS && (
+  const hintButton = cued < hints && (
     <Hint text={cued ? "Another hint" : "A hint: the first letters"} keys="hint" side="top">
       <button className="quiz-ghost" onClick={() => setCued(cued + 1)}>
         {cued ? "More" : "Hint"}
@@ -676,10 +676,10 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
     }
     const digit = reviewDigit(e);
     if (phase === "answer") {
-      if (is(e, "hint") && hintable) {
+      if (is(e, "hint") && hints > 0) {
         e.preventDefault();
         // A held ⌘' gives one hint, never both at once.
-        if (!e.repeat && cued < CUE_LEVELS) setCued(cued + 1);
+        if (!e.repeat && cued < hints) setCued(cued + 1);
       } else if (is(e, "no-idea")) {
         e.preventDefault();
         void check(true);
@@ -1146,7 +1146,7 @@ function Session({ pick, source, skills, onOpenSource, onDig, onClose, onLogged,
           </div>
         )}
       </div>
-      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} hint={hintable && cued < CUE_LEVELS} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} draft={entry.state === "draft"} />}
+      {!end && card && entry && <KeyFoot phase={phase} kind={card.kind} hint={cued < hints} suggested={suggested} variant={!!card.variant} inHead={!!card.in_head_ok} draft={entry.state === "draft"} />}
     </div>
     </Trap>
   );

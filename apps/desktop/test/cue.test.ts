@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { cue, cueSource, CUE_LEVELS } from "../src/cue";
+import { cue, cueLevels, cueSource, CUE_LEVELS } from "../src/cue";
 
 describe("a fading hint before No idea", () => {
   test("the first hint keeps each word's first letter and its length, nothing more", () => {
@@ -23,7 +23,6 @@ describe("a fading hint before No idea", () => {
     expect(cueSource({ kind: "prompt", answer: "Long model answer.", rubric: ["Retrieval strengthens memory", "Spacing"] })).toBe("Retrieval strengthens memory");
     expect(cueSource({ kind: "prompt", answer: "Only an answer.", rubric: [] })).toBe(""); // no key point: no hint
     expect(cueSource({ kind: "card", answer: "Hippocampus", rubric: [] })).toBe("Hippocampus");
-    expect(cueSource({ kind: "card", answer: "7", rubric: [] })).toBe(""); // its first letter is all of it: no hint
   });
 
   test("a number is masked like a word, so a point that turns on one doesn't give it away", () => {
@@ -33,6 +32,15 @@ describe("a fading hint before No idea", () => {
 
   test("an underscore inside a word stays part of it, so snake_case keeps its length", () => {
     expect(cue("use snake_case names", 1)).toBe("u__ s_________ n____");
+  });
+
+  test("a hint that would spell the answer out whole is not offered", () => {
+    expect(cueLevels("Spacing beats cramming")).toBe(2);
+    expect(cueLevels("7")).toBe(0); // its first letter is all of it
+    expect(cueLevels("Vitamin C")).toBe(1); // the second would read "Vitamin C"
+    expect(cueLevels("World War 2")).toBe(1);
+    expect(cueLevels("x_")).toBe(0); // an underscore of its own hides nothing
+    expect(cueLevels("")).toBe(0);
   });
 
   test("there are two hints, then No idea", () => expect(CUE_LEVELS).toBe(2));
