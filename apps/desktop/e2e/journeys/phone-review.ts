@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { journey, keyboardUp, PHONE_LIB, phoneSource, phoneWith, pointAt, press, settled, slid, swipe, tap, TESTING, until, tapFact } from "../harness";
+import { doubleTap, journey, keyboardUp, PHONE_LIB, phoneSource, phoneWith, pointAt, press, settled, slid, swipe, tap, TESTING, until, tapFact } from "../harness";
 
 journey("phone: the check-in before a session asks about what he is trying, its buttons are 44 pt taps, and Not yet goes on to the first exercise (D324)", async (page) => {
   // The seed's library has something he is trying, last touched before today.
@@ -628,8 +628,7 @@ journey("phone: the reader's bars go as he scrolls down, stay away as he scrolls
     await until("a second single tap sends them away", hidden);
     await Bun.sleep(400);
     // A double tap highlights its paragraph and leaves the bars as they were.
-    await page.touchscreen.tap(p.x, p.y);
-    await page.touchscreen.tap(p.x, p.y);
+    await doubleTap(page, p.x, p.y);
     await page.getByRole("dialog", { name: "Highlight" }).waitFor();
     await Bun.sleep(500);
     if (!(await hidden())) throw new Error("a double tap toggled the bars");
@@ -726,8 +725,7 @@ journey("phone: the phone ticks under his finger on four moments and no others: 
   await slid(page);
   const para = await pointAt(page, "familiarity is easily", ".phone-reader .doc");
   await page.waitForTimeout(300);
-  await page.touchscreen.tap(para.x, para.y);
-  await page.touchscreen.tap(para.x, para.y);
+  await doubleTap(page, para.x, para.y);
   await page.getByRole("dialog", { name: "Highlight" }).waitFor();
   await expectTicks("a highlight", "impact_feedback:medium selection_feedback impact_feedback:light");
   await page.keyboard.press("Escape");
