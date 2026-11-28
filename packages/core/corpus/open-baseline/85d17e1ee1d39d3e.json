@@ -1,0 +1,37 @@
+{
+ "key": "85d17e1ee1d39d3e",
+ "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/georgia-cfi.epub",
+ "note": "EPUB 3 travel book (IDPF)",
+ "fp": {
+  "type": "epub",
+  "title": "Georgia",
+  "author": "Various",
+  "words": 11657,
+  "headings": [
+   "# GEORGIA",
+   "## Climate and Soils.",
+   "## Minerals.",
+   "## Agriculture.",
+   "## Manufactures.",
+   "## Communications.",
+   "## Population.",
+   "## Government.",
+   "## Education.",
+   "## Finance.",
+   "## History."
+  ],
+  "code": 0,
+  "tables": 1,
+  "math": 0,
+  "images": 1,
+  "first": "chapter 1 georgia georgia a southern state of the united states of",
+  "last": "executive council and de facto governor 14 president of senate 15 provisional"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.001,
+  "added": 0.002,
+  "found": 0.997,
+  "inOrder": 1
+ }
+}

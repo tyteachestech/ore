@@ -1,0 +1,19 @@
+{
+ "key": "9070094b27ff5201",
+ "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/document/footnotes.docx",
+ "note": "Apache POI, footnotes",
+ "fp": {
+  "type": "article",
+  "title": "9070094b27ff5201",
+  "author": "Anton Trekin",
+  "words": 9,
+  "headings": [],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "eto ochen prostoy 1 text so snoskoy 1 snoska",
+  "last": "eto ochen prostoy 1 text so snoskoy 1 snoska"
+ },
+ "flags": []
+}

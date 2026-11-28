@@ -1,0 +1,35 @@
+{
+ "key": "ff5819e3a7b713c3",
+ "add": "https://arxiv.org/pdf/1406.2661v1",
+ "note": "arXiv, short NIPS paper",
+ "fp": {
+  "type": "pdf",
+  "title": "Generative Adversarial Nets",
+  "words": 4727,
+  "headings": [
+   "## Generative Adversarial Nets",
+   "### Abstract",
+   "### 1 Introduction",
+   "### 2 Related work",
+   "### 3 Adversarial nets",
+   "### 4 Theoretical Results",
+   "### 5 Experiments",
+   "### 6 Advantages and disadvantages",
+   "### 7 Conclusions and future work",
+   "### References"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 4,
+  "first": "page 1 generative adversarial nets ian j goodfellow jean pouget abadie mehdi",
+  "last": "rapidly decreasing ergodicity rates stochastics and stochastic reports 65 3 177 228"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.055,
+  "added": 0.03,
+  "found": 0.822,
+  "inOrder": 1
+ }
+}

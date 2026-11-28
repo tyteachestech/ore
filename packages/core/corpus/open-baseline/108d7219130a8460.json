@@ -1,0 +1,21 @@
+{
+ "key": "108d7219130a8460",
+ "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/slideshow/sample.pptx",
+ "note": "Apache POI slides",
+ "fp": {
+  "type": "article",
+  "title": "Lorem ipsum dolor sit amet",
+  "words": 29,
+  "headings": [
+   "## Lorem ipsum dolor sit amet",
+   "## Lorem ipsum dolor sit amet"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "slide 1 lorem ipsum dolor sit amet nunc at risus vel erat",
+  "last": "slide 2 lorem ipsum dolor sit amet lorem ipsum dolor sit amet"
+ },
+ "flags": []
+}

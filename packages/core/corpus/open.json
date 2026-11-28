@@ -1,0 +1,249 @@
+{
+ "entries": [
+  {
+   "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/moby-dick.epub",
+   "sha256": "81bc079841a38e91a02a7776d04786a2fc311cfd300064e9fc533ce7c54cf7b4",
+   "note": "EPUB 3 reference sample (IDPF, CC BY-SA)"
+  },
+  {
+   "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/accessible_epub_3.epub",
+   "sha256": "67f75b8e3cd1abe4bb143d91d5424191d5af3115c9d26ff029a38e19f8d16feb",
+   "note": "EPUB 3 with figures and tables (IDPF)"
+  },
+  {
+   "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/wasteland.epub",
+   "sha256": "1653b9fbe225b89a008f980744d6b89940504a4533b9036821f9d99daf8f6c9c",
+   "note": "EPUB 3 poem with notes (IDPF)"
+  },
+  {
+   "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/linear-algebra.epub",
+   "sha256": "87e523d8e16c2d1f4b211b47c0495841687a3573c828d3ef36b1f77f91b2abd4",
+   "note": "EPUB 3 textbook with MathML (IDPF)"
+  },
+  {
+   "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/cole-voyage-of-life.epub",
+   "sha256": "e38ed606ff604e638f737efaf66e0fd0b2997c3eab7432bcba9a00a81a925cf3",
+   "note": "EPUB 3 fixed layout, paintings (IDPF)"
+  },
+  {
+   "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/haruko-html-jpeg.epub",
+   "sha256": "87b5eaff288e238864d817ea54b4600dc8c6f96789d0efb946b8545d7ad2f0c0",
+   "note": "EPUB 3 Japanese manga, picture pages (IDPF)"
+  },
+  {
+   "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/regime-anticancer-arabic.epub",
+   "sha256": "5d10bf6a73f461b7b23294b6e34b72f2a1184c9543a424b4a0f737ed33967e96",
+   "note": "EPUB 3 Arabic, right to left (IDPF)"
+  },
+  {
+   "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/childrens-literature.epub",
+   "sha256": "191d14d07bcaefde647e494256f73d789f265c8edc46c404320641b23c86b76a",
+   "note": "EPUB 3 anthology (IDPF)"
+  },
+  {
+   "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/georgia-cfi.epub",
+   "sha256": "85d17e1ee1d39d3e9f59ee959e92a808456c5c371036cba560634c01292c5e06",
+   "note": "EPUB 3 travel book (IDPF)"
+  },
+  {
+   "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/trees.epub",
+   "sha256": "4fbaa5713555ea104b2aed8fc6182700225416b0ab5369f0cb7293d486bb718f",
+   "note": "EPUB 3 small, SVG (IDPF)"
+  },
+  {
+   "add": "https://standardebooks.org/ebooks/marcus-aurelius/meditations/george-long/downloads/marcus-aurelius_meditations_george-long.epub?source=download",
+   "sha256": "acb045cb4c2928d9ea762da1405b1eee961ad38ea2cd27c9c5b2e40c8f3b4050",
+   "note": "Standard Ebooks (CC0)"
+  },
+  {
+   "add": "https://standardebooks.org/ebooks/henry-david-thoreau/walden/downloads/henry-david-thoreau_walden.epub?source=download",
+   "sha256": "8dd57547301f74208894ca1993b198eb795c94671868c8835181af5f9d77b299",
+   "note": "Standard Ebooks (CC0)"
+  },
+  {
+   "add": "https://standardebooks.org/ebooks/charles-darwin/the-origin-of-species/downloads/charles-darwin_the-origin-of-species.epub?source=download",
+   "sha256": "5634241373460cb77b13d1a21157073fe65c42575457554d042332f45d9b227f",
+   "note": "Standard Ebooks, science with a glossary (CC0)"
+  },
+  {
+   "add": "https://standardebooks.org/ebooks/adam-smith/the-wealth-of-nations/downloads/adam-smith_the-wealth-of-nations.epub?source=download",
+   "sha256": "4b2446bc0c3b01eaa850a60fbdc3825a5de62c752d103ae63ba7a01322f451c3",
+   "note": "Standard Ebooks, long with tables (CC0)"
+  },
+  {
+   "add": "https://eloquentjavascript.net/Eloquent_JavaScript.epub",
+   "sha256": "d822672700433adc6202f9c04d74a0099a9699c31aaf5f6836a33176093554d0",
+   "note": "Eloquent JavaScript, code throughout (CC BY-NC)"
+  },
+  {
+   "add": "https://github.com/progit/progit2/releases/download/2.1.449/progit.epub",
+   "sha256": "488662a2968bbf98fe1353ba85815012b1f5427c13e61a5f5844ebe59c9155ac",
+   "note": "Pro Git, Asciidoctor build (CC BY-NC-SA)"
+  },
+  {
+   "add": "https://arxiv.org/pdf/1706.03762v7",
+   "sha256": "bdfaa68d8984f0dc02beaca527b76f207d99b666d31d1da728ee0728182df697",
+   "note": "arXiv, NeurIPS paper with tables and formulas",
+   "kind": "pdf"
+  },
+  {
+   "add": "https://arxiv.org/pdf/1312.6114v11",
+   "sha256": "bdcb63b79ed88f64f8ee2d43a721930d01dde5441a4dba20ecaa2342b34e017c",
+   "note": "arXiv, math-heavy machine learning",
+   "kind": "pdf"
+  },
+  {
+   "add": "https://arxiv.org/pdf/math/0211159v1",
+   "sha256": "945e278613c45ea1ab617b28c3095783d0e68958dc0546dfcfa9b42b9674fbe1",
+   "note": "arXiv, pure mathematics",
+   "kind": "pdf"
+  },
+  {
+   "add": "https://arxiv.org/pdf/hep-th/9711200v3",
+   "sha256": "b711c300aac9a8c93d84451675554da8829d4b7d3c1ae23cdd16e94523975f06",
+   "note": "arXiv, physics, older LaTeX",
+   "kind": "pdf"
+  },
+  {
+   "add": "https://arxiv.org/pdf/q-bio/0311039v1",
+   "sha256": "58e3f031e1d4ace897f66ef89664970510dab04d99f196afd6212da4946f09f9",
+   "note": "arXiv, biology",
+   "kind": "pdf"
+  },
+  {
+   "add": "https://arxiv.org/pdf/1512.03385v1",
+   "sha256": "1e0651b6810ecba34a3dbc5b5b0209226f889004607c1f203540a48d64e5a93a",
+   "note": "arXiv, CVPR two columns with figures",
+   "kind": "pdf"
+  },
+  {
+   "add": "https://arxiv.org/pdf/2106.09685v2",
+   "sha256": "e9a0d3128767db616085dc0f4e6e455e672e89af823e8ed1282793682787395a",
+   "note": "arXiv, long with appendix tables",
+   "kind": "pdf"
+  },
+  {
+   "add": "https://arxiv.org/pdf/1406.2661v1",
+   "sha256": "ff5819e3a7b713c3bd3107b7de3d51fe0a347aa5d8444f0efdcf2345ef0a8b63",
+   "note": "arXiv, short NIPS paper",
+   "kind": "pdf"
+  },
+  {
+   "add": "https://arxiv.org/pdf/1904.09751v2",
+   "sha256": "f0749cc4db8afeb82006a20785b2cd3615fcbced8a29886872b6174485ced21b",
+   "note": "arXiv, ICLR with sample text figures",
+   "kind": "pdf"
+  },
+  {
+   "add": "https://aclanthology.org/N19-1423.pdf",
+   "sha256": "987545ffb087f1ece898142c403a516baeabeb70ce19089397fac6f7db12c3d4",
+   "note": "ACL Anthology, two columns (CC BY)"
+  },
+  {
+   "add": "https://journals.plos.org/plosone/article/file?id=10.1371/journal.pone.0115069&type=printable",
+   "sha256": "4954959e9ab365e231b08d2340e8d9ff50a438e226ef2e29556c577bcd5318dd",
+   "note": "PLOS ONE (CC BY)",
+   "kind": "pdf"
+  },
+  {
+   "add": "https://www.nature.com/articles/s41586-021-03819-2.pdf",
+   "sha256": "6eae057a9faf4f671c3101e0745ed704460c6d3dec77243dfd3a9f2d2ab68970",
+   "note": "Nature, open access (CC BY)"
+  },
+  {
+   "add": "https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-63-3.pdf",
+   "sha256": "915bb812cb705918461e642e84141c6ca2adc2ca0106e1d88f3884c61f07110a",
+   "note": "US government standard (public domain)"
+  },
+  {
+   "add": "https://greenteapress.com/thinkpython2/thinkpython2.pdf",
+   "sha256": "6033000bac3f9268ad75ee041bf8e5d9a3bc8a33bb156399cbd014918cb59f94",
+   "note": "Think Python, a LaTeX textbook with code (CC BY-NC)"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/tracemonkey.pdf",
+   "sha256": "3662ff519e485810520552bf301d8c3b2b917fd2f83303f4965d7abed367e113",
+   "note": "pdf.js test corpus, two columns (Apache-2.0)"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/mozilla/pdf.js/master/test/pdfs/TAMReview.pdf",
+   "sha256": "a6db6d2f5e4f97e1e28a5919a875a40b89e38d0229b33cc023ca4d353f3ab3ec",
+   "note": "pdf.js test corpus, a review (Apache-2.0)"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/document/sample.docx",
+   "sha256": "be4fc1bf778ad8183f714e09b9df40669de34e9ecbc3adecfc8953f00749036f",
+   "note": "Apache POI test data (Apache-2.0)"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/document/Headers.docx",
+   "sha256": "bdf91038f9a5454355e6393b7b74fd819a4adc480b4a7011a86e878403952b5b",
+   "note": "Apache POI, only headers and footers: refused, its body is empty"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/document/TestDocument.docx",
+   "sha256": "527a906b3cc31d0a72a47290a6c8a53854a89a31178a60fa3cb314d70b57a413",
+   "note": "Apache POI"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/document/heading123.docx",
+   "sha256": "dac67500b907811030ab2bdd5b1c65cda97a15651d6ec0d33592ef70d34a5550",
+   "note": "Apache POI, heading levels"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/document/footnotes.docx",
+   "sha256": "9070094b27ff5201477f4de4b2c027730c66cb889106a1609c5adeed207a59c1",
+   "note": "Apache POI, footnotes"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/document/EmbeddedDocument.docx",
+   "sha256": "3cb521da0faab3b8a9e7c5d155961b4f5506fb2ceda8e69e0790d03ee01767f2",
+   "note": "Apache POI, an embedded document"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/slideshow/sample.pptx",
+   "sha256": "108d7219130a8460298896f45ff777dfe52b8b5527a4b4628b10731ed01d6a8e",
+   "note": "Apache POI slides"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/slideshow/SampleShow.pptx",
+   "sha256": "bfb4b2f07c9233afd2f32aa5781d849d0c7d225bf03721a10becf487b481d828",
+   "note": "Apache POI slides"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/slideshow/table_test.pptx",
+   "sha256": "b9c3eb4b198ef3e53a4ff1a5ef4118a5ce6ba1760592c553abf665b37dcac5f8",
+   "note": "Apache POI, a slide table"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/slideshow/shapes.pptx",
+   "sha256": "19fde9b87e33dd1a95fdbba0cf6abc2278bf03874f4665c7f8b88b6afe4a2571",
+   "note": "Apache POI, shapes"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/spreadsheet/SampleSS.xlsx",
+   "sha256": "44f1b6ef310c370d4902ee3452e6174da25a67bdb09f47850d51b3287cb3db71",
+   "note": "Apache POI sheet"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/spreadsheet/Formatting.xlsx",
+   "sha256": "5a0aa7c36c53b22cd26e3eeb2ee49bf16f7e4101aafa8b1503a0778f4010ddbc",
+   "note": "Apache POI, formatted cells"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/jakevdp/PythonDataScienceHandbook/master/notebooks/02.02-The-Basics-Of-NumPy-Arrays.ipynb",
+   "sha256": "556f718dba9187ce81bffeb2e2ffe7dc5cdabb7deac944d20f031afe91eeb915",
+   "note": "Python Data Science Handbook notebook (MIT code, CC BY-NC-ND text)"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/jakevdp/PythonDataScienceHandbook/master/notebooks/04.01-Simple-Line-Plots.ipynb",
+   "sha256": "2290c31c987c488fcee563c7238c972f1375d1983877a802ec9fbb5666c34f96",
+   "note": "notebook with plots"
+  },
+  {
+   "add": "https://raw.githubusercontent.com/fastai/fastbook/master/01_intro.ipynb",
+   "sha256": "5578188ac3d09ad190de04a8cd920f3599adbfaf19ac13ea6c33c44e649b7136",
+   "note": "fastbook notebook, a book chapter (GPL-3.0)"
+  }
+ ]
+}

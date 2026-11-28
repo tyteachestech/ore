@@ -1,0 +1,54 @@
+{
+ "key": "5578188ac3d09ad1",
+ "add": "https://raw.githubusercontent.com/fastai/fastbook/master/01_intro.ipynb",
+ "note": "fastbook notebook, a book chapter (GPL-3.0)",
+ "fp": {
+  "type": "article",
+  "title": "Your Deep Learning Journey",
+  "words": 18093,
+  "headings": [
+   "# Your Deep Learning Journey",
+   "## Deep Learning Is for Everyone",
+   "## Neural Networks: A Brief History",
+   "## Who We Are",
+   "## How to Learn Deep Learning",
+   "### Your Projects and Your Mindset",
+   "## The Software: PyTorch, fastai, and Jupyter",
+   "## Your First Model",
+   "### Getting a GPU Deep Learning Server",
+   "### Running Your First Notebook",
+   "### Sidebar: This Book Was Written in Jupyter Notebooks",
+   "### End sidebar",
+   "### What Is Machine Learning?",
+   "### What Is a Neural Network?",
+   "### A Bit of Deep Learning Jargon",
+   "### Limitations Inherent To Machine Learning",
+   "### How Our Image Recognizer Works",
+   "### What Our Image Recognizer Learned",
+   "### Image Recognizers Can Tackle Non-Image Tasks",
+   "### Jargon Recap",
+   "## Deep Learning Is Not Just for Image Classification",
+   "### Sidebar: The Order Matters",
+   "### End sidebar",
+   "### Sidebar: Datasets: Food for Models",
+   "### End sidebar",
+   "## Validation Sets and Test Sets",
+   "### Use Judgment in Defining Test Sets",
+   "## A _Choose Your Own Adventure_ moment",
+   "## Questionnaire",
+   "### Further Research"
+  ],
+  "code": 43,
+  "tables": 0,
+  "math": 0,
+  "images": 26,
+  "first": "your deep learning journey hello and thank you for letting us join",
+  "last": "see if you can find documented examples of that happening in practice"
+ },
+ "flags": [
+  {
+   "rule": "picture-missing",
+   "detail": "19: images/chapter7_neuron.png"
+  }
+ ]
+}

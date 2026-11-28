@@ -29,3 +29,6 @@ codex-out/
 
 # Ore Cloud server data, when run from the repo
 ore-cloud.db*
+
+# The import corpus's runs over his own files (bun run corpus <folder>): copyrighted text, never committed
+.corpus/

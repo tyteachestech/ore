@@ -1,0 +1,26 @@
+{
+ "key": "19fde9b87e33dd1a",
+ "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/slideshow/shapes.pptx",
+ "note": "Apache POI, shapes",
+ "fp": {
+  "type": "article",
+  "title": "PPTX Title",
+  "author": "yegor",
+  "words": 78,
+  "headings": [
+   "## Slide 1",
+   "## PPTX Title",
+   "## Slide 3",
+   "## Slide 4",
+   "## Hyperlinks",
+   "## Slide 6"
+  ],
+  "code": 0,
+  "tables": 3,
+  "math": 0,
+  "images": 1,
+  "first": "slide 1 slide 1 learning pptx cloud column1 column2 column3 data1 data2",
+  "last": "mailto dev poi apache org subject hi 20there slide 6 slide 6"
+ },
+ "flags": []
+}

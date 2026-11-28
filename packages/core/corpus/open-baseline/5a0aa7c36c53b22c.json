@@ -1,0 +1,21 @@
+{
+ "key": "5a0aa7c36c53b22c",
+ "add": "https://raw.githubusercontent.com/apache/poi/trunk/test-data/spreadsheet/Formatting.xlsx",
+ "note": "Apache POI, formatted cells",
+ "fp": {
+  "type": "article",
+  "title": "5a0aa7c36c53b22c",
+  "author": "Nick Burch",
+  "words": 62,
+  "headings": [
+   "## Sheet1"
+  ],
+  "code": 0,
+  "tables": 1,
+  "math": 0,
+  "images": 0,
+  "first": "sheet1 dates all 24th november 2006 dd mm yyyy 2006 11 24",
+  "last": "nn nnn 10 52 nn n 10 52 nn nn 10 52"
+ },
+ "flags": []
+}

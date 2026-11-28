@@ -1289,6 +1289,120 @@ describe("import coverage: what the reader shows", () => {
 });
 
 describe("import coverage: EPUB", () => {
+  test("EPUB: a note's link back to the text (\"GO TO NOTE REFERENCE IN TEXT\" under each note) is not kept as a line of text", async () => {
+    const lib = await tempLibrary();
+    const xhtml = (body: string) => `<?xml version="1.0" encoding="utf-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>t</title></head><body>${body}</body></html>`;
+    const epub = zipSync({
+      mimetype: strToU8("application/epub+zip"),
+      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
+      "OEBPS/content.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>River Notes</dc:title><dc:creator>Ada Learner</dc:creator></metadata>
+<manifest><item id="a" href="one.xhtml" media-type="application/xhtml+xml"/><item id="n" href="notes.xhtml" media-type="application/xhtml+xml"/></manifest>
+<spine><itemref idref="a"/><itemref idref="n"/></spine></package>`),
+      "OEBPS/one.xhtml": strToU8(xhtml(`<h1>The Delta</h1><p><span id="Phrase0">A delta grows</span> where a slow river drops its sand.</p>`)),
+      "OEBPS/notes.xhtml": strToU8(xhtml(`<div role="doc-endnotes"><h1>Notes</h1><ol class="blindnotes"><li><p><span>A delta grows</span>: see the survey of the river mouth, 1931.</p><p class="link_to_text"><a href="one.xhtml#Phrase0">GO TO NOTE REFERENCE IN TEXT</a></p></li></ol></div>`)),
+    });
+    const path = join(lib.root, "notes.epub");
+    writeFileSync(path, epub);
+    const body = (await addSource(lib, path)).body;
+    expect(body).toContain("see the survey of the river mouth, 1931.");
+    expect(body).not.toMatch(/GO TO NOTE REFERENCE/i);
+  });
+
+  test("EPUB: a book whose table of contents is a one-entry stub takes its chapter titles from its own contents page", async () => {
+    const lib = await tempLibrary();
+    const xhtml = (body: string) => `<?xml version="1.0" encoding="utf-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body>${body}</body></html>`;
+    const books = [1, 2, 3, 4, 5];
+    const epub = zipSync({
+      mimetype: strToU8("application/epub+zip"),
+      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
+      "content.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="2.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Shore Sayings</dc:title><dc:creator>Ada Learner</dc:creator></metadata>
+<manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="c" href="text/contents.html" media-type="application/xhtml+xml"/>${books.map((n) => `<item id="b${n}" href="text/book${n}.html" media-type="application/xhtml+xml"/>`).join("")}</manifest>
+<spine toc="ncx"><itemref idref="c"/>${books.map((n) => `<itemref idref="b${n}"/>`).join("")}</spine></package>`),
+      "toc.ncx": strToU8(`<?xml version="1.0"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap><navPoint id="s"><navLabel><text>Start</text></navLabel><content src="titlepage.xhtml"/></navPoint></navMap></ncx>`),
+      "text/contents.html": strToU8(xhtml(`<p class="toc-title">Contents</p>${books.map((n) => `<p class="toc"><a href="book${n}.html#anchor${n}">Book ${n}</a></p>`).join("")}`)),
+      ...Object.fromEntries(books.map((n) => [`text/book${n}.html`, strToU8(xhtml(`<p class="ct"><a id="anchor${n}"></a>Book ${n}</p><p class="indent">The tide keeps its own hours on shore number ${n}, whatever the clock says.</p>`))])),
+    });
+    const path = join(lib.root, "shore.epub");
+    writeFileSync(path, epub);
+    const body = (await addSource(lib, path)).body;
+    for (const n of books) expect(body).toMatch(new RegExp(`^# Book ${n}$`, "m"));
+  });
+
+  test("EPUB: authors in a library manager's sort form are named as on the cover, a tool's \"Unknown\" is no author, and a tab escaped twice is a space", async () => {
+    const { authorList: bookAuthor } = await import("../src/ingest/check.ts");
+    expect(bookAuthor(["Lovett, Marsha C.;Bridges, Michael W.;DiPietro, Michele"])).toBe("Marsha C. Lovett, Michael W. Bridges, Michele DiPietro");
+    expect(bookAuthor(["Unknown"])).toBeUndefined();
+    expect(bookAuthor(["Marcus Aurelius", "Gregory Hays"])).toBe("Marcus Aurelius, Gregory Hays");
+    // Two names in one creator, or a name with a suffix, are left as they are.
+    expect(bookAuthor(["Peter Brown, Henry Roediger"])).toBe("Peter Brown, Henry Roediger");
+    expect(bookAuthor(["Martin Luther King, Jr."])).toBe("Martin Luther King, Jr.");
+    // A PDF's Author field is free text: two surnames stay two people; an initial or a ";" says it is a sort form.
+    expect(bookAuthor(["Strunk, White"], { field: true })).toBe("Strunk, White");
+    expect(bookAuthor(["Brewer, William F."], { field: true })).toBe("William F. Brewer");
+    // A long Chinese or Japanese title with a number in it is a title, not an export link's id.
+    const { cleanTitle } = await import("../src/ingest/check.ts");
+    expect(cleanTitle("機械学習のための数学入門第2版ベクトルと行列から始める確率統計")).toBe("機械学習のための数学入門第2版ベクトルと行列から始める確率統計");
+    expect(cleanTitle("1diPCNuI9me_eHeGoEPVRpWwr41NDF4ts?format=pdf")).toBeUndefined();
+    const lib = await tempLibrary();
+    const epub = zipSync({
+      mimetype: strToU8("application/epub+zip"),
+      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
+      "content.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="2.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Four Habits</dc:title><dc:creator>Unknown</dc:creator></metadata><manifest><item id="a" href="a.html" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="a"/></spine></package>`),
+      "a.html": strToU8(`<html xmlns="http://www.w3.org/1999/xhtml"><body><h1>Habits</h1><p class="x07-List-Numbered-First">&amp;#9;1.&amp;#9;Accept only what is true.</p><p>Write &amp;#9; in HTML for a tab.</p></body></html>`),
+    });
+    const path = join(lib.root, "habits.epub");
+    writeFileSync(path, epub);
+    const item = await addSource(lib, path);
+    expect(item.meta.author).toBeUndefined();
+    expect(item.body).toContain("1\\. Accept only what is true.");
+    expect(item.body).toContain("Write &#9; in HTML for a tab.");
+  });
+
+  test("EPUB: a figure's caption set as a heading (O'Reilly's <h6>Figure 1-5. …</h6>) stays a line under its picture, out of the outline", async () => {
+    const lib = await tempLibrary();
+    const epub = zipSync({
+      mimetype: strToU8("application/epub+zip"),
+      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
+      "content.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Tide Models</dc:title><dc:creator>Ada Learner</dc:creator></metadata><manifest><item id="a" href="ch01.html" media-type="application/xhtml+xml"/><item id="i" href="assets/tide.png" media-type="image/png"/></manifest><spine><itemref idref="a"/></spine></package>`),
+      "ch01.html": strToU8(`<html xmlns="http://www.w3.org/1999/xhtml"><body><section><h1>Tides</h1><p>Two highs a day on most coasts.</p><figure><div class="figure" id="f1"><img alt="A curve" src="assets/tide.png"/><h6><span class="label">Figure 1-1. </span>Water height over one day.</h6></div></figure><h2>Spring tides</h2><p>The biggest come with a new moon.</p></section></body></html>`),
+      "assets/tide.png": readFileSync(join(FIX, "files/screenshot.png")),
+    });
+    const path = join(lib.root, "tides.epub");
+    writeFileSync(path, epub);
+    const body = (await addSource(lib, path)).body;
+    expect(body).toMatch(/^Figure 1-1\. Water height over one day\.$/m);
+    expect(body).not.toMatch(/^#+ Figure/m);
+    expect(body).toMatch(/^## Spring tides$/m);
+  });
+
+  test("EPUB: chapter titles the book sets as styled paragraphs, not headings, become headings from its table of contents (29 of 184 books in the corpus run had no outline)", async () => {
+    const lib = await tempLibrary();
+    const xhtml = (body: string) => `<?xml version="1.0" encoding="utf-8"?>\n<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head><body>${body}</body></html>`;
+    const epub = zipSync({
+      mimetype: strToU8("application/epub+zip"),
+      "META-INF/container.xml": strToU8(`<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>`),
+      "OEBPS/content.opf": strToU8(`<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="2.0"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>River Notes</dc:title><dc:creator>Ada Learner</dc:creator></metadata>
+<manifest><item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/><item id="a" href="text/part1.html" media-type="application/xhtml+xml"/><item id="b" href="text/part2.html" media-type="application/xhtml+xml"/></manifest>
+<spine toc="ncx"><itemref idref="a"/><itemref idref="b"/></spine></package>`),
+      "OEBPS/toc.ncx": strToU8(`<?xml version="1.0"?><ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1"><navMap>
+<navPoint id="n1"><navLabel><text>1 Reading the Current</text></navLabel><content src="text/part1.html"/>
+<navPoint id="n2"><navLabel><text>Eddies</text></navLabel><content src="text/part1.html#eddies"/></navPoint></navPoint>
+<navPoint id="n3"><navLabel><text>Book 2</text></navLabel><content src="text/part2.html#_idTextAnchor020"/></navPoint>
+</navMap></ncx>`),
+      "OEBPS/text/part1.html": strToU8(xhtml(`<p class="cn">1</p><p class="ct">Reading the Current</p><p class="indent">A river moves faster in the middle than near its banks, where the bed slows it.</p><p class="sub" id="eddies">Eddies</p><p class="indent">Behind a rock the water turns back on itself and rests.</p>`)),
+      "OEBPS/text/part2.html": strToU8(xhtml(`<div class="frame"><p class="ct"><a id="_idTextAnchor020"></a>Book 2</p><p class="indent">Book 2 opens at the river's mouth, where the current meets the tide.</p></div>`)),
+    });
+    const path = join(lib.root, "river.epub");
+    writeFileSync(path, epub);
+    const body = (await addSource(lib, path)).body;
+    expect(body).toMatch(/^# Reading the Current$/m);
+    expect(body).toMatch(/^## Eddies$/m);
+    expect(body).toMatch(/^# Book 2$/m);
+    // A line that only mentions a title is left as it is.
+    expect(body).toMatch(/^Book 2 opens at the river's mouth/m);
+    expect(body).not.toMatch(/^#+ 1$/m);
+  });
+
   // make-study-epubs.ts: plates.epub (a cover page whose picture is missing, a missing figure, plate pages) and one
   // two-chapter book as made, reordered and with a heading reworded.
   const chapterOf = (body: string, n: number) => body.split(/<!-- chapter \d+ -->/)[n]!.match(/^# .+/m)?.[0];
@@ -1378,7 +1492,7 @@ describe("import coverage: EPUB", () => {
     const [front, text] = item.body.split(FRONT_END);
     for (const kept of ["TIDE TABLES FOR BEGINNERS", "All rights reserved.", "ISBN 978-0-00-000000-2", "CONTENTS"]) expect(front).toContain(kept);
     // The text starts early, on a two-line note: it is the author's, so it shows.
-    expect(text).toMatch(/^\n\n<!-- chapter 4 -->\n\nA NOTE TO THE READER\n\nRead chapter 1 with a real tide table open beside you\./);
+    expect(text).toMatch(/^\n\n<!-- chapter 4 -->\n\n# A NOTE TO THE READER\n\nRead chapter 1 with a real tide table open beside you\./);
     expect(text).toContain("READING THE TABLE");
     // The copyright page at the back of the book is not front matter: it stays where it is, as the back matter.
     expect(text).toMatch(/<!-- back matter -->\n\n<!-- chapter 6 -->\n\nCopyright © 2019 by Ada Learner\. All rights reserved\.\n$/);
@@ -2456,7 +2570,34 @@ describe("import coverage: videos heard from their sound", () => {
 
 // D122: figures and slide pictures come in with the text they illustrate.
 // make-deep-pdfs.py: the PDFs the deep import pass found broken (2026-11-27).
+describe("import coverage: Office files, corpus run", () => {
+  test("Excel: a cell written with numeric character references (&#8212; for a dash, &#128218; for an emoji) reads as those characters", async () => {
+    const files = unzipSync(readFileSync(file("vocab.xlsx")));
+    files["xl/sharedStrings.xml"] = strToU8(strFromU8(files["xl/sharedStrings.xml"]!).replace("<t xml:space=\"preserve\">Meaning</t>", "<t xml:space=\"preserve\">Meaning &#8212; in short &#x2192; &#128218; &amp;#9;</t>"));
+    const lib = await tempLibrary();
+    const path = join(lib.root, "refs.xlsx");
+    writeFileSync(path, zipSync(files));
+    const body = (await addSource(lib, path)).body;
+    expect(body).toContain("Meaning — in short → 📚 &#9;");
+    expect(body).not.toContain("&#8212;");
+  });
+});
+
 describe("import coverage: PDF, deep import pass", () => {
+  test("PDF: a typesetting service's stamp on every page, a notice turned up the margin, a download line atop each page, a long running foot with its page number, an export link's id as the title and sort-form authors (corpus run 2026-11-28)", async () => {
+    // stamps.pdf (make-stamps-pdf.py): JMIR's pages as RenderX prints them.
+    const item = await addSource(await tempLibrary(), file("stamps.pdf"));
+    expect(item.meta.title).toBe("Life Between the Tides");
+    expect(item.meta.author).toBe("William F. Brewer, Edward H. Lichtenstein");
+    expect(item.body).not.toMatch(/XSL|RenderX/);
+    expect(item.body).not.toContain("J Tide Stud 2021");
+    expect(item.body).not.toMatch(/copyrighted by the Tide Studies|Version of Record/);
+    expect(item.body).toContain("On day 1 of the survey the snails in pool one grazed the algae.");
+    // A short label on every page, mid-page, is the text's own: only a page's edge or margin holds stamps.
+    expect(item.body.match(/Worked example/g)?.length).toBe(5);
+    expect(item.body).toMatch(/On day 135 of the survey the gobies in pool\n$/);
+  });
+
   test("PDF: a scan's text layer set at a slight tilt is the page's text, not margin to drop", async () => {
     const item = await addSource(await tempLibrary(), file("skewed.pdf"));
     const tilted = item.body.split("<!-- page 2 -->")[0]!;
@@ -2523,6 +2664,30 @@ describe("import coverage: figures and slide pictures", () => {
     expect(slides.map((s) => images(s).length)).toEqual([1, 1, 0]);
     expect(slides[0]).toMatch(/## The forgetting curve\n\n!\[\]\(assets\//); // "image.png" is no alt text
     for (const i of images(item.body)) expect(existsSync(join(item.dir, i.path))).toBe(true);
+  });
+
+  test("notebook: a picture its Markdown shows from beside it, as <img> or ![](), is saved", async () => {
+    // Import corpus 2026-11-28: fastbook's chapters show their figures as <img src="images/…"> in Markdown
+    // cells; the reader shows no raw HTML, so every figure was dropped without a word.
+    const dir = mkdtempSync(join(tmpdir(), "ore-nb-"));
+    mkdirSync(join(dir, "images"));
+    writeFileSync(join(dir, "images", "neuron.png"), readFileSync(join(FIX, "files", "screenshot.png")));
+    const cells = ["# Neurons", '<img alt="Natural and artificial neurons" width="500" src="images/neuron.png" id="neuron"/>', "A neuron sums its inputs.\n\n![A second view](images/neuron.png)"];
+    writeFileSync(join(dir, "intro.ipynb"), JSON.stringify({ nbformat: 4, nbformat_minor: 5, metadata: {}, cells: cells.map((s) => ({ cell_type: "markdown", metadata: {}, source: s })) }));
+    const lib = await tempLibrary();
+    const item = await addSource(lib, join(dir, "intro.ipynb"));
+    expect(item.body).not.toContain("<img");
+    const shown = images(item.body);
+    expect(shown.map((i) => i.alt)).toEqual(["Natural and artificial neurons", "A second view"]);
+    for (const i of shown) expect(existsSync(join(item.dir, i.path))).toBe(true);
+    // Read again from its kept copy, where images/ is not beside it, it keeps the pictures it saved.
+    const r = await reimportSource(lib, item.meta.id, { local: true });
+    expect(r.changed).toBe(false);
+    expect(readFileSync(findItem(lib, item.meta.id).docPath, "utf8")).toBe(readFileSync(item.docPath, "utf8"));
+    // A picture that isn't beside it stays as the notebook wrote it, never a link to this Mac's folder.
+    writeFileSync(join(dir, "alone.ipynb"), JSON.stringify({ nbformat: 4, nbformat_minor: 5, metadata: {}, cells: [{ cell_type: "markdown", metadata: {}, source: '# Alone\n\n<img alt="Gone" src="images/gone.png">' }] }));
+    const alone = await addSource(lib, join(dir, "alone.ipynb"));
+    expect(alone.body).not.toContain("file:");
   });
 
   test("notebook: a plot is saved as an image, its <Figure …> text dropped", async () => {

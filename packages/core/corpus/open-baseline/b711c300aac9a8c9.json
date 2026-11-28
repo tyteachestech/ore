@@ -1,0 +1,26 @@
+{
+ "key": "b711c300aac9a8c9",
+ "add": "https://arxiv.org/pdf/hep-th/9711200v3",
+ "note": "arXiv, physics, older LaTeX",
+ "fp": {
+  "type": "pdf",
+  "title": "The Large N Limit of Superconformal field theories and supergravity",
+  "words": 9105,
+  "headings": [
+   "## The Large N Limit of Superconformal field theories and supergravity"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "page 1 arxiv hep th 9711200v3 22 jan 1998 hep th 9711200",
+  "last": "large scale structure of spacetime cambrige univ press 1973 and references therein"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.078,
+  "added": 0.033,
+  "found": 0.782,
+  "inOrder": 1
+ }
+}

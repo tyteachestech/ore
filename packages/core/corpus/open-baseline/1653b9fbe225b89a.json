@@ -1,0 +1,38 @@
+{
+ "key": "1653b9fbe225b89a",
+ "add": "https://github.com/IDPF/epub3-samples/releases/download/20230704/wasteland.epub",
+ "note": "EPUB 3 poem with notes (IDPF)",
+ "fp": {
+  "type": "epub",
+  "title": "The Waste Land",
+  "author": "T.S. Eliot",
+  "published": "2011-09-01",
+  "words": 4747,
+  "headings": [
+   "# The Waste Land",
+   "## I. THE BURIAL OF THE DEAD",
+   "## II. A GAME OF CHESS",
+   "## III. THE FIRE SERMON",
+   "## IV. DEATH BY WATER",
+   "## V. WHAT THE THUNDER SAID",
+   "## NOTES ON \"THE WASTE LAND\"",
+   "### I. THE BURIAL OF THE DEAD",
+   "### II. A GAME OF CHESS",
+   "### III. THE FIRE SERMON",
+   "### V. WHAT THE THUNDER SAID"
+  ],
+  "code": 0,
+  "tables": 0,
+  "math": 0,
+  "images": 0,
+  "first": "chapter 1 the waste land t s eliot nam sibyllam quidem cumis",
+  "last": "passeth understanding is a feeble translation of the content of this word"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.009,
+  "added": 0.021,
+  "found": 0.843,
+  "inOrder": 0.992
+ }
+}

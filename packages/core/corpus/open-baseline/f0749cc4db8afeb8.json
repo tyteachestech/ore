@@ -1,0 +1,51 @@
+{
+ "key": "f0749cc4db8afeb8",
+ "add": "https://arxiv.org/pdf/1904.09751v2",
+ "note": "arXiv, ICLR with sample text figures",
+ "fp": {
+  "type": "pdf",
+  "title": "THE CURIOUS CASE OF NEURAL TEXT DeGENERATION",
+  "words": 8293,
+  "headings": [
+   "## THE CURIOUS CASE OF NEURAL TEXT DeGENERATION",
+   "### ABSTRACT",
+   "## 1 Introduction",
+   "## 2 Background",
+   "### 2.1 Text Generation Decoding Strategies",
+   "### 2.2 Open-ended vs directed generation",
+   "## 3 Language Model Decoding",
+   "### 3.1 Nucleus Sampling",
+   "### 3.2 Top-k Sampling",
+   "### 3.3 Sampling with Temperature",
+   "## 4 Likelihood Evaluation",
+   "### 4.1 Experimental Setup",
+   "### 4.2 Perplexity",
+   "### 4.3 Natural Language Does Not Maximize Probability",
+   "## 5 Distributional Statistical Evaluation",
+   "### 5.1 Zipf Distribution Analysis",
+   "### 5.2 Self-BLEU",
+   "### 5.3 Repetition",
+   "## 6 Human Evaluation",
+   "### 6.1 Human Unified with Statistical Evaluation (HUSE)",
+   "### 6.2 Qualitative Analysis",
+   "## 7 Conclusion",
+   "### ACKNOWLEDGMENTS",
+   "### REFERENCES",
+   "## A Beam Width Effect",
+   "## B Example generations"
+  ],
+  "code": 6,
+  "tables": 0,
+  "math": 0,
+  "images": 4,
+  "first": "page 1 the curious case of neural text degeneration ari holtzman jan",
+  "last": "example generations from an initial tag line all generations available at https"
+ },
+ "flags": [],
+ "coverage": {
+  "lost": 0.047,
+  "added": 0.02,
+  "found": 0.863,
+  "inOrder": 0.996
+ }
+}
