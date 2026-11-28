@@ -213,7 +213,12 @@ for (const r of results.sort((a, b) => a.add.localeCompare(b.add))) {
   if (base && said.length) regressions++;
   newFlags += fresh.length;
   if (said.length) lines.push(`- ${name(r)}${base ? "" : " (new)"} [${r.key}]\n${said.map((s) => `    ${s}`).join("\n")}`);
-  if (accept) writeFileSync(basePath, JSON.stringify({ ...r, ms: undefined, add: r.add }, null, 1) + "\n");
+  if (accept) {
+    writeFileSync(basePath, JSON.stringify({ ...r, ms: undefined }, null, 1) + "\n");
+    // His own files' docs are kept beside their accepted fingerprints, so a later change can be read line by line.
+    const doc = join(out, "docs", `${r.key}.md`);
+    if (!open && existsSync(doc)) writeFileSync(join(baseDir, `${r.key}.md`), readFileSync(doc));
+  }
 }
 const kinds = [...byKind].map(([k, l]) => `${k} ${Math.min(l.length, per)}`).join(", ");
 const summary = [

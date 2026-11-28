@@ -2564,13 +2564,14 @@ describe("import coverage: videos heard from their sound", () => {
 // D122: figures and slide pictures come in with the text they illustrate.
 // make-deep-pdfs.py: the PDFs the deep import pass found broken (2026-11-27).
 describe("import coverage: PDF, deep import pass", () => {
-  test("PDF: a typesetting service's stamp on every page, a long running foot with its page number, an export link's id as the title and sort-form authors (corpus run 2026-11-28)", async () => {
+  test("PDF: a typesetting service's stamp on every page, a notice turned up the margin, a download line atop each page, a long running foot with its page number, an export link's id as the title and sort-form authors (corpus run 2026-11-28)", async () => {
     // stamps.pdf (make-stamps-pdf.py): JMIR's pages as RenderX prints them.
     const item = await addSource(await tempLibrary(), file("stamps.pdf"));
     expect(item.meta.title).toBe("Life Between the Tides");
     expect(item.meta.author).toBe("William F. Brewer, Edward H. Lichtenstein");
     expect(item.body).not.toMatch(/XSL|RenderX/);
     expect(item.body).not.toContain("J Tide Stud 2021");
+    expect(item.body).not.toMatch(/copyrighted by the Tide Studies|Version of Record/);
     expect(item.body).toContain("On day 1 of the survey the snails in pool one grazed the algae.");
     expect(item.body).toMatch(/On day 135 of the survey the gobies in pool\n$/);
   });

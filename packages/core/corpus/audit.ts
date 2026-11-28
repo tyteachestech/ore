@@ -221,7 +221,8 @@ export function audit(meta: Record<string, unknown>, body: string, dir?: string,
   if (orig) {
     const c = coverage(orig, body);
     if (c) {
-      if (c.lost > 0.06) flag("text-lost", `${pct(c.lost)} of the original's ${orig.words.length} words are not in the doc`);
+      // A PDF's running heads, feet and stamps are its own text that Ore leaves out on purpose: up to a tenth of a paper.
+      if (c.lost > (fp.type === "pdf" ? 0.12 : 0.06)) flag("text-lost", `${pct(c.lost)} of the original's ${orig.words.length} words are not in the doc`);
       if (c.added > 0.08) flag("text-added", `${pct(c.added)} of the doc's words are not in the original`);
       if (c.found > 0.3 && c.inOrder < 0.9) flag("order-changed", `${pct(c.inOrder)} of found passages in the original's order`);
     }

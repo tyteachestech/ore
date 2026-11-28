@@ -238,13 +238,24 @@ function dropRunning(pages: Line[][], body: number, typical: number): Line[][] {
   const number = /^(?:page\s*)?\d{1,4}(?:\s*(?:of|\/)\s*\d+)?$/i;
   // A page number, or a front-matter one ("viii"), at either end of the line.
   const folio = /^(?:\d{1,4}|[ivxlc]{1,6})\s|\s(?:\d{1,4}|[ivxlc]{1,6})$/;
-  // A short line set the same on most pages wherever it sits is the printer's, not the text: a typesetting
-  // service's stamp in a page's corner ("XSL• FO" over "RenderX" on each of JMIR's pages, read as a heading on
-  // all 21: corpus run 2026-11-28). Numbers left out, as above; a longer line is text, however often it comes back.
-  const onPages = count(pages.flatMap((p) => [...new Set(p.filter((l) => !isBlock(l.text) && plain(l.text).length <= 40).map(key))]));
-  const stamp = (l: Line) => pages.length >= 4 && key(l).length >= 3 && (onPages.get(key(l)) ?? 0) >= Math.max(4, pages.length * 0.6);
-  return pages.map((page) => {
-    const lines = page.filter((l) => isBlock(l.text) || !stamp(l));
+  // A line set the same on most pages is the printer's, not the text: a typesetting service's stamp in a page's
+  // corner ("XSL• FO" over "RenderX" on each of JMIR's pages, read as a heading on all 21), a publisher's notice
+  // turned up a margin ("This document is copyrighted by the American Psychological Association", "NIH-PA
+  // Author Manuscript"), or a download line at a page's head or foot ("Version of Record at: …") (corpus run
+  // 2026-11-28). Numbers left out, as above. A long line is one only when turned or among a page's first or last
+  // three: in the body, text can come back.
+  const edge = (p: Line[]) => {
+    const byY = [...p].sort((a, b) => b.y - a.y);
+    return new Set([...byY.slice(0, 3), ...byY.slice(-3)]);
+  };
+  const candidates = pages.map((p) => {
+    const ends = edge(p);
+    return new Set(p.filter((l) => !isBlock(l.text) && key(l).length >= 3 && (plain(l.text).length <= 40 || l.size === 0 || ends.has(l))));
+  });
+  const onPages = count(candidates.flatMap((c) => [...new Set([...c].map(key))]));
+  const stamp = (l: Line, n: number) => pages.length >= 4 && candidates[n]!.has(l) && (onPages.get(key(l)) ?? 0) >= Math.max(4, pages.length * 0.6);
+  return pages.map((page, n) => {
+    const lines = page.filter((l) => !stamp(l, n));
     // Highest and lowest on the page, whatever order the file writes them in (Chromium and many
     // print-to-PDF tools write the head and the page number after the body).
     const byY = [...lines].sort((a, b) => b.y - a.y);
