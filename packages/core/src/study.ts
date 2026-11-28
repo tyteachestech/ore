@@ -155,7 +155,8 @@ export interface QueueOptions {
   item?: string;
   /** Apply the new-card limits (D60, D65, D144): at most `new_per_day`, and none drafted today. On by default. */
   newLimit?: boolean;
-  /** A session's first fetch: its first card is a likely recall (D176). A fetch mid-session leaves the order alone. */
+  /** A session's first fetch: its first card is a likely recall (D176). A fetch mid-session keeps the first card where the order has it.
+   *  Either way no more than two likely misses come in a row (D359). */
   start?: boolean;
 }
 
@@ -164,7 +165,8 @@ const NEW_EVERY = 5;
 /** A source finished this long ago or less still counts as just read (D279). */
 const RECENT_MS = 7 * 864e5;
 
-// Due queue (SPEC §3): live cards due now in queue order, opening on a likely recall (D176), with unseen
+// Due queue (SPEC §3): live cards due now in queue order, opening on a likely recall (D176) and never more than two
+// likely misses in a row (D359), with unseen
 // drafts (his own work first, D176, then the freshest source, D60) taking every fifth place, and today's pending relearn passes last. A draft waits until the day
 // after it was written, so its first review is spaced from the reading (D65). Up to `new_per_day` a day.
 export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}, open?: LibraryIndex): QueueEntry[] {
@@ -236,7 +238,11 @@ export function dueQueue(lib: Library, now = new Date(), opts: QueueOptions = {}
     const fresh = [...room, ...unseen.filter((u) => !room.includes(u))].slice(0, newLeft).map((u) => u.entry);
     const ordered = orderQueue(entries);
     const due = ordered.filter((e) => !e.relearn);
-    const live = pace(opts.start ? winFirst(due) : due);
+    // The misses he has just made in a row count toward D359's two, so a fetch after them opens on a likely recall.
+    const mine = [...ownToday.values()].flat().sort((a, b) => a.ts.localeCompare(b.ts));
+    let missed = 0;
+    while (missed < mine.length && mine[mine.length - 1 - missed]!.rating === 1) missed++;
+    const live = pace(opts.start ? winFirst(due) : due, missed);
     const out: QueueEntry[] = [];
     for (const e of live) {
       out.push(e);

@@ -101,6 +101,22 @@ describe("never more than two likely misses in a row (D359)", () => {
     expect(pace(q)).toBe(q);
     expect(pace([])).toEqual([]);
   });
+  test("a block that opens on a miss is not interrupted: the pull waits for the next single miss", () => {
+    const [m0, m1, m2, w] = facts([0.2, 0.3, 0.35, 0.8]) as [QueueEntry, QueueEntry, QueueEntry, QueueEntry];
+    const d = [0.3, 0.9, 0.3].map((retrievability, i) => e({ id: `d${i}`, content_type: "definition", item: "S1", topics: ["x"], retrievability }));
+    expect(ids(pace([m0, m1, ...d, m2, w]))).toEqual(["f0", "f1", "d0", "d1", "d2", "f2", "f3"]);
+  });
+  test("misses he has just made count: a fetch after two of them opens on a likely recall", () => {
+    const q = facts([0.2, 0.3, 0.7]);
+    expect(ids(pace(q, 2))).toEqual(["f2", "f0", "f1"]);
+    expect(ids(pace(q, 1))).toEqual(["f0", "f2", "f1"]);
+  });
+  test("a backlog of 40,000 misses is ordered in well under a second", () => {
+    const q = Array.from({ length: 40_000 }, (_, i) => e({ id: `m${i}`, topics: [`t${i}`], retrievability: 0.1 }));
+    const t0 = performance.now();
+    pace(q);
+    expect(performance.now() - t0).toBeLessThan(500);
+  });
   test("the opening win counts: it is not followed by a third thing moved for nothing", () => {
     const q = winFirst(facts([0.2, 0.3, 0.9, 0.4, 0.7]));
     expect(ids(pace(q))).toEqual(["f2", "f0", "f1", "f4", "f3"]);

@@ -94,33 +94,38 @@ const LIKELY_MISS = 0.5;
 /** How many likely misses may come back to back before a likely recall is brought forward. */
 const MISS_RUN = 2;
 
-// D359: never more than two likely misses in a row. Most forgotten first serves a backlog as
-// one run of probable misses, and hard items in a run are what make people stop (Kang, Daniels & Schweitzer
-// 2022; guidebook L246: difficulty has to be surmountable). So once two likely misses have come, the next
-// exercise he will likely recall is brought forward to sit between them and the third. Order only: nothing
-// is dropped or held back, no schedule changes (D22), and a block (confusables, one source's definitions,
-// D24) is never split and never moved, so a block of misses can run longer than two.
-export function pace(ordered: QueueEntry[]): QueueEntry[] {
+// D359: never more than two likely misses in a row. Most forgotten first serves a backlog as one run of
+// probable misses, and hard items in a run are what make people stop (Kang, Daniels & Schweitzer 2022;
+// guidebook L246: difficulty has to be surmountable). So once two misses have come, the next exercise he
+// will likely recall is brought forward to sit before the third. Order only: nothing is dropped or held
+// back, no schedule changes (D22). A block (confusables, one source's definitions, D24) is never split,
+// moved or interrupted, so a block of misses can run longer than two; when no likely recall is left the
+// misses run on. `already`: the misses he has just made in a row (today's last ratings), so a fetch
+// mid-session, the quick quiz's or `/ore`'s next batch, carries the run on instead of starting it at none.
+export function pace(ordered: QueueEntry[], already = 0): QueueEntry[] {
   const size = new Map<string, number>();
   for (const e of ordered) size.set(unitKey(e), (size.get(unitKey(e)) ?? 0) + 1);
+  const single = ordered.map((e) => size.get(unitKey(e)) === 1);
   const miss = (e: QueueEntry) => e.retrievability < LIKELY_MISS;
-  const rest = [...ordered];
+  // The likely recalls that may move, in queue order: `win` walks them once, so the whole pass is linear.
+  const wins = ordered.flatMap((e, i) => (single[i] && !miss(e) ? [i] : []));
+  const taken = new Set<number>();
   const out: QueueEntry[] = [];
-  let run = 0, moved = false;
-  while (rest.length) {
-    const next = rest[0]!;
-    const inBlock = out.length > 0 && size.get(unitKey(next))! > 1 && unitKey(next) === unitKey(out.at(-1)!);
-    if (run >= MISS_RUN && miss(next) && !inBlock) {
-      const win = rest.findIndex((e) => !miss(e) && size.get(unitKey(e)) === 1);
-      if (win > 0) {
-        out.push(rest.splice(win, 1)[0]!);
+  let run = already, win = 0;
+  for (let i = 0; i < ordered.length; i++) {
+    if (taken.has(i)) continue;
+    const next = ordered[i]!;
+    if (run >= MISS_RUN && single[i] && miss(next)) {
+      while (win < wins.length && wins[win]! < i) win++;
+      if (win < wins.length) {
+        const at = wins[win++]!;
+        taken.add(at);
+        out.push(ordered[at]!);
         run = 0;
-        moved = true;
-        continue;
       }
     }
-    out.push(rest.shift()!);
+    out.push(next);
     run = miss(next) ? run + 1 : 0;
   }
-  return moved ? out : ordered;
+  return taken.size ? out : ordered;
 }
