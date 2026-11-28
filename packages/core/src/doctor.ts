@@ -1,7 +1,10 @@
 import { historyPaused } from "./history.ts";
-import { existsSync, statSync, unlinkSync } from "node:fs";
-import { join, relative } from "node:path";
+import { existsSync, readFileSync, statSync, unlinkSync } from "node:fs";
+import { basename, join, relative, resolve } from "node:path";
 import { AnnotationSchema, anchorAnnotations, annotationRevs, annotationsPath, reanchorItem } from "./annotations.ts";
+import { Chat } from "./chats.ts";
+import { strays } from "./inbox.ts";
+import { rewriteImageUrls } from "./ingest/markdown.ts";
 import { cardFiles, readCardFile } from "./cards.ts";
 import { syncIndex } from "./db.ts";
 import { errorLine, logFiles, readJsonlLines, realNow, sha256, subdirs, visible } from "./fsutil.ts";
@@ -107,6 +110,15 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
     // Plain text and snippets need no original to read again; a deferred transcript has not kept one yet.
     if (item.meta.type !== "markdown" && item.meta.type !== "snippet" && !item.meta.owed?.length && !sourceFile(item))
       add("warn", dir, "no kept original; add the file again to restore it, or reimport from its link if it has one");
+    // Use the Markdown parser shared with import: code examples are not images, references are.
+    const images = new Set<string>();
+    rewriteImageUrls(item.body, (url) => { images.add(url); return undefined; });
+    for (const url of images) {
+      if (/^(?:[a-z][a-z0-9+.-]*:|\/\/|#)/i.test(url)) continue;
+      let local = url.split(/[?#]/)[0]!;
+      try { local = decodeURIComponent(local); } catch { /* Older hand edits may contain a literal %. */ }
+      if (local && !existsSync(resolve(dir, local))) add("warn", doc, `image "${url}" is missing; wait for sync, or restore the image from the original or a backup`);
+    }
     const annPath = annotationsPath(dir);
     for (const f of logFiles(annPath))
       for (const l of readJsonlLines(f)) {
@@ -135,7 +147,7 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
     try {
       const c = readCardFile(path);
       cardIds.add(c.meta.id);
-      if (!path.endsWith(`${c.meta.id}.md`)) add("error", path, `id ${c.meta.id} does not match file name`);
+      if (basename(path) !== `${c.meta.id}.md`) add("error", path, `id ${c.meta.id} does not match file name`);
       const item = items.get(c.meta.item);
       // A retired card is out of review, so a missing source no longer matters (doctor suggests retiring it).
       if (!item) { if (c.meta.state !== "retired") add("error", path, `its source ${c.meta.item} is missing or can't be read: restore the source's folder, or retire the card (ore card retire ${c.meta.id})`); }
@@ -161,12 +173,34 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
     }
   }
 
+  for (const name of visible(paths.chats(lib)).filter((f) => f.endsWith(".json"))) {
+    const file = join(paths.chats(lib), name);
+    try {
+      Chat.parse(JSON.parse(readFileSync(file, "utf8")));
+    } catch (e) {
+      add("warn", file, `chat cannot be read: ${errorLine(e)}; wait for sync, or restore the chat from a backup`);
+    }
+  }
+  for (const name of visible(paths.inbox(lib)).filter((f) => /\.(link|file)\.json$/.test(f))) {
+    const file = join(paths.inbox(lib), name);
+    try {
+      // Match the queue reader's older formats; optional capture metadata is not required.
+      const entry = JSON.parse(readFileSync(file, "utf8"));
+      if (name.endsWith(".file.json")) {
+        if (typeof entry?.file !== "string" || strays(entry.file)) throw new Error("invalid attachment path");
+        if (!existsSync(join(paths.inbox(lib), entry.file))) throw new Error(`attachment "${entry.file}" is missing`);
+      } else if (typeof entry?.url !== "string") throw new Error("missing link");
+    } catch (e) {
+      add("warn", file, `inbox entry cannot be read: ${errorLine(e)}; wait for sync, or restore the entry and its attachment from the capture device or a backup`);
+    }
+  }
+
   // Logs no other check reads line by line: a crash mid-write leaves a cut-off last line.
   const jsonl = (dir: string) => visible(dir).filter((f) => f.endsWith(".jsonl")).map((f) => join(dir, f));
   // A line that parses but isn't a record is skipped by its reader, so it is reported too.
   const isReceipt = (v: unknown) => {
     const r = v as { type?: unknown; id?: unknown; ts?: unknown } | null;
-    return !!r && (r.type === "start" || r.type === "end") && typeof r.id === "string" && typeof r.ts === "string" && !Number.isNaN(Date.parse(r.ts));
+    return !!r && (r.type === "start" || r.type === "end" || r.type === "reopen") && typeof r.id === "string" && typeof r.ts === "string" && !Number.isNaN(Date.parse(r.ts));
   };
   const checks: [string, string, (v: unknown) => boolean][] = [
     ...jsonl(paths.sessions(lib)).map((f): [string, string, (v: unknown) => boolean] => [f, "session receipt", isReceipt]),
@@ -176,6 +210,10 @@ export async function doctor(lib: Library, opts: { fix?: boolean } = {}): Promis
     for (const l of readJsonlLines(f)) {
       if (l.error) add("error", f, `line ${l.line}: ${CUT}`);
       else if (!valid(l.value)) add("warn", f, `line ${l.line}: not a valid ${what}, so it is skipped; fix or delete that line`);
+      else if (f.endsWith(".variants.jsonl")) {
+        const variant = VariantSchema.parse(l.value);
+        if (!cardIds.has(variant.card)) add("warn", f, `line ${l.line}: variant's exercise ${variant.card} is missing; wait for sync, or restore the exercise from a backup`);
+      }
     }
 
   if (skillIds.size)

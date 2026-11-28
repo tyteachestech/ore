@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { writeNewCard } from "../src/cards.ts";
 import { addSnippet, addSource, addText } from "../src/ingest/index.ts";
 import { paths } from "../src/library.ts";
-import { acceptSuggestedSkill, addSkill, archiveSkill, cardPriority, desiredRetention, loadSkills, setItemSkills, setSkillLook } from "../src/skills.ts";
+import { acceptSuggestedSkill, addSkill, archiveSkill, cardPriority, desiredRetention, loadSkills, setItemSkills, setSkillLook, undoSuggestedSkill } from "../src/skills.ts";
 import { findItem, setItemPriority, updateItemMeta } from "../src/items.ts";
 import { openIndex } from "../src/db.ts";
 import { dueQueue } from "../src/study.ts";
@@ -154,4 +154,20 @@ describe("a source's own importance", () => {
     await setSkillLook(lib, "habits", { priority: "P1" });
     expect([of(follows.meta.id), of(set.meta.id)]).toEqual(["P1", "P2"]);
   });
+});
+
+test("Undo of an accepted suggestion rearchives its existing skill and excludes its old exercises", async () => {
+  const { lib, mk } = await setup();
+  const card = mk("What belongs to learning?", ["learning"]);
+  await archiveSkill(lib, "learning", true);
+  const item = await addText(lib, "# New source\n\nPractice learning.");
+  await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, suggested_skill: { name: "Learning" } }));
+  for (let n = 0; n < 2; n++) {
+    const accepted = await acceptSuggestedSkill(lib, item.meta.id);
+    expect(loadSkills(lib).skills.find((s) => s.id === "learning")?.archived).toBeUndefined();
+    expect(dueQueue(lib, tomorrow()).map((c) => c.id)).toContain(card.meta.id);
+    await undoSuggestedSkill(lib, item.meta.id, JSON.parse(JSON.stringify(accepted.undo)));
+    expect(loadSkills(lib).skills.find((s) => s.id === "learning")?.archived).toBe(true);
+    expect(dueQueue(lib, tomorrow()).map((c) => c.id)).not.toContain(card.meta.id);
+  }
 });

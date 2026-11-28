@@ -64,7 +64,7 @@ function stateBefore(lib: Library, card: ReturnType<typeof findCard>, now: Date)
 export async function recordReview(lib: Library, cardRef: string, input: ReviewInput): Promise<ReviewResult> {
   return withLock(paths.lock(lib), () => {
     const card = findCard(lib, cardRef);
-    if (card.meta.state === "retired") throw new Error(`card ${card.meta.id} is retired`);
+    if (card.meta.state === "retired") throw new Error(`card ${card.meta.id} is retired: \`ore card restore ${card.meta.id}\` puts it back in review`);
     if (input.cued && input.cued !== 1 && input.cued !== 2) throw new Error("--cued is 1 or 2");
     // A time this card already has a review at (taken back or not, here or synced) moves on a millisecond:
     // an undo names its review by card and time, so two reviews sharing one would stand or fall together.

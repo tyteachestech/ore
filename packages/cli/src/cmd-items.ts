@@ -2,6 +2,8 @@ import { relative } from "node:path";
 import {
   digAnswer, digAsk, digReady, digState, dropDig, endDig, startDig, type Dig,
   reimportSource,
+  checkItemSkills,
+  tryView,
   undoReimport,
   readTables,
   tablesState,
@@ -176,8 +178,10 @@ export const itemCommands: Record<string, Command> = {
         // --owe (the iPhone): an episode is in at once, and the app fills it after, showing how far it is.
         const filled = f.owe ? [] : (await fillOwed(lib)).map((i) => ({ id: i.meta.id, title: i.meta.title }));
         for (const i of filled) startEnrich(lib, i.id);
-        // Every link failing is a failure (the links stay for a retry); some failing is reported, not fatal.
-        return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.failed.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n"), exitCode: r.failed.length && !r.added.length && !filled.length ? 1 : 0 };
+        // Every link failing for a new reason is a failure (the links stay for a retry); some failing is reported, not
+        // fatal. A retry failing for the same reason exits 0, or the Mac, which imports each time it comes to the front,
+        // would say the same failure again each time; `errors` lists every link that failed this time, for an agent.
+        return { data: { ...r, filled }, text: [`Added ${r.added.length} from the iPhone`, ...r.errors.map((l) => `  ${l.url}: ${l.error}`), ...filled.map((i) => `  filled in: ${i.title}`)].join("\n"), exitCode: r.failed.length && !r.added.length && !filled.length ? 1 : 0 };
       }
       const all = queuedLinks(lib);
       return { data: all, text: all.length ? table(all.map((l) => [l.id, l.url, l.error ?? "waiting"])) : "Nothing waiting" };
@@ -204,6 +208,7 @@ export const itemCommands: Record<string, Command> = {
       }
       if (sub === "set") {
         if (f.title === undefined && f.skills === undefined) throw new Error("nothing to change (--title or --skills)");
+        if (f.skills !== undefined) checkSkills(lib, strs(f.skills));
         let lessons = f.title !== undefined ? await renameCourse(lib, id, str(f.title) ?? "") : courseLessons(lib, id, { archived: true });
         if (f.skills !== undefined) lessons = await setCourseSkills(lib, id, strs(f.skills));
         return { data: out(lessons), text: `${lessons[0]!.meta.course!.title}: ${lessons.length} lessons under ${lessons[0]!.meta.skills.join(", ") || "no skill"}` };
@@ -322,11 +327,11 @@ export const itemCommands: Record<string, Command> = {
       const found = findAnnotation(lib, need(ref, "<annotation>"));
       const { item } = found;
       let annotation = found.annotation;
-      if (f.exact !== undefined) annotation = moveHighlight(item, annotation, need(str(f.exact), "--exact"), int(f.start, "start"));
       const patch: AnnotationPatch = {};
       if (f.note !== undefined) patch.note = str(f.note) || undefined;
       if (f.intent !== undefined) patch.intent = oneOf(f.intent, INTENTS, "intent");
       if (f.status !== undefined) patch.status = oneOf(f.status, AnnotationStatus.options, "status");
+      if (f.exact !== undefined) annotation = moveHighlight(item, annotation, need(str(f.exact), "--exact"), int(f.start, "start"));
       if (f["looked-up"] && !annotation.looked_up) patch.looked_up = true;
       if (!Object.keys(patch).length) {
         if (f.exact !== undefined || f["looked-up"]) return { data: annotation, text: `Annotation ${annotation.id} rev ${annotation.rev}` };
@@ -408,11 +413,11 @@ export const itemCommands: Record<string, Command> = {
       if (f.skill !== undefined) {
         if (ref) throw new Error("--skill adds a new try; leave out the try's id");
         if (!loadSkills(lib).skills.some((s) => s.id === f.skill)) throw new Error(`unknown skill "${f.skill}"`);
-        const { tried } = await addTry(lib, { skill: f.skill as string, plan: need(str(f.plan), "--plan"), when: str(f.when) });
-        return { data: tried, text: `Try ${tried.id}: to try` };
+        const { tried, item } = await addTry(lib, { skill: f.skill as string, plan: need(str(f.plan), "--plan"), when: str(f.when) });
+        return { data: tryView(item, tried), text: `Try ${tried.id}: to try` };
       }
-      const { tried } = await planTry(lib, need(ref, "<try>"), { plan: f.plan as string | undefined, when: f.when as string | undefined, obstacle: f.if as string | undefined, pick: !!f.pick });
-      return { data: tried, text: `Try ${tried.id}: ${f.pick ? "trying now" : "plan saved"} · used ${useCount(tried)}×` };
+      const { tried, item } = await planTry(lib, need(ref, "<try>"), { plan: f.plan as string | undefined, when: f.when as string | undefined, obstacle: f.if as string | undefined, pick: !!f.pick });
+      return { data: tryView(item, tried), text: `Try ${tried.id}: ${f.pick ? "trying now" : "plan saved"} · used ${useCount(tried)}×` };
     },
   },
 
@@ -428,12 +433,12 @@ export const itemCommands: Record<string, Command> = {
       }
       const { tried, item, card } = await markTried(lib, need(ref, "<try>"), { reflection: str(f.text), next: str(f.next), again: !!f.again, undo: !!f.undo });
       const enrich = card ? startEnrich(lib, item.meta.id) : "skipped";
-      return { data: { ...tried, enrich }, text: `Try ${tried.id}: ${tried.status === "done" ? "tried" : "to try"}${card ? `; card draft ${enrich}` : ""}` };
+      return { data: { ...tryView(item, tried), enrich }, text: `Try ${tried.id}: ${tried.status === "done" ? "tried" : "to try"}${card ? `; card draft ${enrich}` : ""}` };
     },
   },
 
   dig: {
-    usage: '<skill> [--text "<the skill from memory>" | --ask | --answer "<a>"... | --done | --drop <dig>] | --ready [--skill s]...   the Dig: the whole skill explained from memory against its goal, checked against its key points, outside review\'s schedule. Alone: where the skill stands (its ideas, whether the gap since the last dig has passed, the last dig). --text keeps a dig with the ideas as they stand; --ask (AI) marks the ideas that came and asks one or two questions at ideas left out; --answer (AI, one per question in order, "" skips one) marks which came with that nudge; --done ends it with nothing more answered; --drop takes a dig back. --ready: the one skill a session may offer (of --skill, when given), or null. Never a grade, never due',
+    usage: '<skill> [--text "<the skill from memory>" | --ask | --answer "<a>"... | --done | --drop <dig>] | --ready [--skill s]...   the Dig: the whole skill explained from memory against its goal, checked against its key points, outside review\'s schedule. Alone: where the skill stands (its ideas, whether the gap since the last dig has passed, the last dig). --text keeps a dig with the ideas as they stand; it does not append to the skill note: first save his words with ore notes --skill <skill> --append <text> --heading "Dig, <date>"; --ask (AI) marks the ideas that came and asks one or two questions at ideas left out; --answer (AI, one per question in order, "" skips one) marks which came with that nudge; --done ends it with nothing more answered; --drop takes a dig back. --ready: the one skill a session may offer (of --skill, when given), or null. Never a grade, never due',
     options: { text: { type: "string" }, ask: { type: "boolean" }, answer: { type: "string", multiple: true }, done: { type: "boolean" }, drop: { type: "string" }, ready: { type: "boolean" }, skill: { type: "string", multiple: true } },
     async run([skill], f) {
       const lib = openLibrary();
@@ -587,13 +592,18 @@ export const itemCommands: Record<string, Command> = {
       const id = findItem(lib, need(ref, "<item>")).meta.id;
       if (f.title === undefined && f.author === undefined && f.priority === undefined && f.skills === undefined) throw new Error("nothing to change (--title, --author, --priority or --skills)");
       // Every field is checked before the first is written, so a refused edit changes nothing.
-      if (f.skills !== undefined) checkSkills(lib, strs(f.skills));
+      let cards: Record<string, string[]> | undefined;
+      if (f.cards !== undefined && f.skills === undefined) throw new Error("--cards goes with --skills: it puts each exercise's skills back as a filing changes them");
+      if (f.cards !== undefined) {
+        try { cards = JSON.parse(str(f.cards)!); }
+        catch { throw new Error('--cards must be JSON mapping exercise IDs to arrays of skill IDs (for example, {"exercise-id":["learning"]})'); }
+      }
+      checkItemSkills(lib, f.skills !== undefined ? strs(f.skills) : [], cards);
       if (f.title !== undefined && !str(f.title)?.trim()) throw new Error("a source needs a title");
       if (f.priority !== undefined) checkPriority(str(f.priority) ?? "");
       let meta = f.title !== undefined ? await renameItem(lib, id, str(f.title) ?? "") : findItem(lib, id).meta;
       if (f.author !== undefined) meta = await setItemAuthor(lib, id, str(f.author) ?? "");
       if (f.priority !== undefined) meta = await setItemPriority(lib, id, str(f.priority) ?? "");
-      const cards = f.cards === undefined ? undefined : (JSON.parse(str(f.cards)!) as Record<string, string[]>);
       const filing = f.skills !== undefined ? await fileItemSkills(lib, id, strs(f.skills), cards) : undefined;
       if (filing) meta = filing.meta;
       return { data: filing ? { ...meta, cards_before: filing.cards_before } : meta, text: `${meta.title}${meta.skills.length ? ` (${meta.skills.join(", ")})` : ""}` };

@@ -220,6 +220,14 @@ export interface ReanchorReport {
 // one that moved (fresh quote + position selectors), and record the new
 // body hash. Orphans are kept untouched and reported.
 export async function reanchorItem(lib: Library, item: Item): Promise<ReanchorReport> {
+  const report = reanchorAnnotations(item);
+  if (report.hashChanged) await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, text_sha256: sha256(item.body) }));
+  return report;
+}
+
+/** The annotation part of reanchoring, for a source rewrite already holding the library lock.
+ * The caller records the new body hash with its metadata before releasing that lock. */
+export function reanchorAnnotations(item: Item): ReanchorReport {
   const report: ReanchorReport = { item: item.meta.id, hashChanged: sha256(item.body) !== item.meta.text_sha256, moved: [], orphaned: [] };
   if (!report.hashChanged) return report;
   for (const a of anchorAnnotations(item)) {
@@ -233,6 +241,5 @@ export async function reanchorItem(lib: Library, item: Item): Promise<ReanchorRe
       if (found.method !== "position") report.moved.push({ id: a.id, method: found.method });
     }
   }
-  await updateItemMeta(lib, item.meta.id, (m) => ({ ...m, text_sha256: sha256(item.body) }));
   return report;
 }

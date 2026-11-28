@@ -1,4 +1,4 @@
-import { AGENTS, failNext, hold, isHeld, journey, openSource, ore, release, type Rigged, until } from "../harness";
+import { AGENTS, failNext, hold, isHeld, journey, openSource, ore, release, type Rigged, startReview, until } from "../harness";
 
 journey("Feed: ⌘-click and ⇧-click pick posts, ⋯ marks them all read at once, ⇧⌘U marks the selected one, Esc clears (F9)", async (page) => {
   const day = new Date(Date.now() - 864e5).toUTCString();
@@ -381,4 +381,33 @@ journey("Feed: Follow opens a box that takes a link only, and never saves what i
   await page.getByRole("button", { name: "+ Add" }).click();
   if (!/any text/.test((await page.getByRole("dialog", { name: "Add a source", exact: true }).getByLabel("Link, file path or text").getAttribute("placeholder")) ?? "")) throw new Error("+ Add opened the follow box");
   await page.keyboard.press("Escape");
+});
+
+journey("Feed: a post open beside the Feed is still there after a review started over it (⌘R, then Esc)", async (page) => {
+  // Starting Review over a post read beside the Feed dropped its preview (`feed close`), so leaving Review reopened a post
+  // that was gone: `show` failed, the reader stayed empty and focus fell to <body> (CI, #580 shard 1, the corners journey).
+  const server = Bun.serve({ port: 0, fetch: (r: Request): Response => new URL(r.url).pathname === "/feed.xml"
+    ? new Response(`<?xml version="1.0"?><rss version="2.0"><channel><title>Over review</title><link>http://localhost/</link><item><title>A post read before review</title><link>http://localhost:${server.port}/p.html</link><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`, { headers: { "content-type": "application/rss+xml" } })
+    : new Response(`<html><head><title>Post</title></head><body><article><h1>A post read before review</h1>${"<p>Spacing beats cramming for anything kept past a week.</p>".repeat(8)}</article></body></html>`, { headers: { "content-type": "text/html" } }) });
+  const url = `http://localhost:${server.port}/feed.xml`;
+  try {
+    await ore("feed", "follow", url, "--skill=teaching");
+    await page.getByRole("button", { name: "Feed", exact: true }).click();
+    await page.locator(".row.post").first().click();
+    await page.locator(".reader .doc").filter({ hasText: "Spacing beats cramming" }).first().waitFor();
+    const calls: string[] = [];
+    page.on("request", (r) => void (r.method() === "POST" && calls.push(r.postData() ?? "")));
+    await startReview(page, null, true);
+    // Long enough for the post's close to have landed, had it been sent.
+    await page.waitForTimeout(1500);
+    if (calls.some((c) => c.includes('"feed"') && c.includes('"close"'))) throw new Error("starting Review closed the post open beside the Feed");
+    await page.keyboard.press("Escape");
+    await page.locator(".reader .doc").filter({ hasText: "Spacing beats cramming" }).first().waitFor();
+    // Given back, it closes as any post does once he leaves it.
+    await page.keyboard.press("Escape");
+    await until("leaving the post closes it", async () => calls.some((c) => c.includes('"feed"') && c.includes('"close"')));
+  } finally {
+    await ore("feed", "unfollow", url);
+    server.stop();
+  }
 });

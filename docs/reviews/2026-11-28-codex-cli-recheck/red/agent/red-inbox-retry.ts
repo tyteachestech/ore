@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {seed,ore} from './common.ts';
+import {commands} from '../../packages/cli/src/commands.ts';
+await seed('inbox-retry');
+globalThis.fetch=async()=>new Response('Not found',{status:404}) as any;
+await ore('inbox','--add','https://scout.invalid/missing');
+const first=await commands.inbox!.run([],{import:true,json:true});
+const second=await commands.inbox!.run([],{import:true,json:true});
+console.log('[DEEP] first exit:',first.exitCode??0,'body:',JSON.stringify(first.data));
+console.log('[DEEP] retry exit:',second.exitCode??0,'body:',JSON.stringify(second.data));
+console.log('[DEEP] entries still waiting:',(await ore('inbox')).length);
+assert.notEqual(second.exitCode??0,0,'retry where every import failed must exit nonzero (F235, SPEC)');

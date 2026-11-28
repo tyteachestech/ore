@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {existsSync,readFileSync} from 'node:fs';
+import {seed,ore} from './common.ts';
+import {skillNotesPath} from '../../packages/core/src/notes.ts';
+const {lib}=await seed('dig-note');
+await ore('skills','set','learning','--goal','Explain how to space retrieval.');
+const text='I would spread retrieval over several days and check what I missed.';
+const d=await ore('dig','learning','--text',text);
+const path=skillNotesPath(lib,'learning');
+const note=existsSync(path)?readFileSync(path,'utf8'):'';
+console.log('[DEEP] Saved Dig:',d.text,'done:',!!d.done_at);
+console.log('[DEEP] Skill note exists:',existsSync(path),'contains learner words:',note.includes(text));
+assert(note.includes(text),'D325 and generated library AGENTS.md promise Dig words in the skill note');
