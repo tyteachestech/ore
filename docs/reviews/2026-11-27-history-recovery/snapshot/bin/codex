@@ -1,0 +1,3 @@
+#!/bin/sh
+echo "snapshot scout: AI disabled" >&2
+exit 97

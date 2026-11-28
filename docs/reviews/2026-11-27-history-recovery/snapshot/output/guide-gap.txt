@@ -1,0 +1,5 @@
+{"path":"packages/core/src/templates/library-agents.md","tellsAgentToStop":true,"gitRecoveryCommands":false}
+FAIL: agent has a documented way to recover an overwritten file: packages/core/src/templates/library-agents.md
+{"path":"skills/ore/SKILL.md","tellsAgentToStop":true,"gitRecoveryCommands":false}
+FAIL: agent has a documented way to recover an overwritten file: skills/ore/SKILL.md
+Recovery commands: []

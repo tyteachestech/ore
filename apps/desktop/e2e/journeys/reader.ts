@@ -1960,6 +1960,7 @@ journey("source rename: a save that fails keeps the title he typed, in the field
 journey("source rename: pending Undo takes back the rename, not the source added before it (F190)", async (page) => {
   const title = `Source to rename ${Date.now()}`;
   await page.reload();
+  await page.locator(".side-item").first().waitFor(); // ⌘N before the app is up after a reload goes nowhere (F499, F827)
   await page.keyboard.press("Meta+n");
   await page.getByRole("textbox", { name: "Link, file path or text" }).fill(`# ${title}\n\nThis source must survive undoing its own rename.`);
   await page.keyboard.press("Enter");

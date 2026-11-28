@@ -89,12 +89,15 @@ describe("review loop", () => {
     const miss = await recordReview(lib, a.meta.id, { rating: 1, confidence: 3, now: at(1) });
     const pass = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: at(2) });
     // Only the card's latest review can go: the miss is not, while the pass stands.
-    await expect(undoReview(lib, a.meta.id, miss.ts, at(3))).rejects.toThrow();
+    await expect(undoReview(lib, a.meta.id, miss.ts, at(3))).rejects.toThrow("it was rated again after that");
     await undoReview(lib, a.meta.id, pass.ts, at(3));
     expect(dueQueue(lib, at(3)).find((e) => e.id === a.meta.id)?.relearn).toBe(true); // the pass is owed again
     await undoReview(lib, a.meta.id, miss.ts, at(4));
     await undoReview(lib, b.meta.id, rb.ts, at(5));
     expect(readReviews(lib)).toEqual([]);
+    // A rating the log no longer has (taken back, or the log restored from the library's history) says so in words,
+    // not as a timestamp and an id: the app shows this after "Couldn't undo" (history recovery pass, F812).
+    await expect(undoReview(lib, b.meta.id, rb.ts, at(5))).rejects.toThrow("that rating is no longer in the library");
     expect(dueQueue(lib, at(5)).map((e) => e.id).sort()).toEqual([a.meta.id, b.meta.id].sort());
     const redo = await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: at(6) });
     expect(redo).toMatchObject({ finishing: true, state_after: { reps: 1, lapses: 0 } });
@@ -483,4 +486,18 @@ describe("two sessions open at once (D76)", () => {
     expect(openSessionId(lib)).toBeNull();
     expect((await recordReview(lib, a.meta.id, { rating: 3, confidence: 2, now: new Date(2026, 5, 2, 8, 5) })).session).toBeNull();
   });
+});
+
+// History recovery pass (restore-03): a whole day rolled back from the library's history takes the session's start
+// receipt with it, but `.ore/session` (gitignored) still named it, so the next rating went to a session that no
+// longer existed and its end failed with "no session".
+test("a session whose start a restore took back is not open: the next rating goes to none, and the next start is clean", async () => {
+  const lib = await tempLibrary();
+  const s = await startSession(lib);
+  for (const f of readdirSync(join(lib.root, "sessions"))) rmSync(join(lib.root, "sessions", f)); // the log as it was before
+  expect(readSessions(lib).some((r) => r.id === s.id)).toBe(false);
+  expect(openSessionId(lib)).toBeNull();
+  const t = await startSession(lib, new Date(), { stack: true });
+  expect(openSessionId(lib)).toBe(t.id);
+  await expect(endSession(lib)).resolves.toMatchObject({ id: t.id });
 });
