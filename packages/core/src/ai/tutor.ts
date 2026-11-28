@@ -10,6 +10,7 @@ import { readAnnotations } from "../annotations.ts";
 import { blankProblem, cardTextProblem, ContentType, hideBlanks, listCards, writeNewCard, type Card } from "../cards.ts";
 import { readReviews } from "../reviews.ts";
 import { chatFilePath } from "../chats.ts";
+import { withIndex } from "../db.ts";
 import { getDiagram, sceneOutline } from "../diagrams.ts";
 import { writeAtomic } from "../fsutil.ts";
 import { withLock } from "../lock.ts";
@@ -33,6 +34,28 @@ export interface TutorTurn { message: string; reply: string; exercise?: z.input<
 
 /** A reply with its worked answer's steps numbered under it (D142): what it said, as text. */
 export const withSteps = (r: { reply: string; steps: string[] }) => [r.reply, ...r.steps.map((s, i) => `${i + 1}. ${s}`)].join("\n");
+
+/** Keep a link's visible Markdown, including any emphasis, when its destination can't cite a source. */
+function withoutLocalLinks(text: string): string {
+  if (!text.includes("[") && !text.includes("<")) return text;
+  const { fromMarkdown } = require("mdast-util-from-markdown") as typeof import("mdast-util-from-markdown");
+  type Node = { type: string; url?: string; identifier?: string; children?: Node[]; position?: { start: { offset?: number }; end: { offset?: number } } };
+  const links: Node[] = [];
+  const definitions = new Map<string, string>();
+  const walk = (node: Node) => {
+    if (node.type === "link" || node.type === "linkReference") links.push(node);
+    if (node.type === "definition" && !definitions.has(node.identifier!)) definitions.set(node.identifier!, node.url!);
+    node.children?.forEach(walk);
+  };
+  walk(fromMarkdown(text));
+  for (const link of links.reverse()) {
+    const url = link.type === "link" ? link.url! : definitions.get(link.identifier!);
+    if (url === undefined || isWebUrl(url) || /^#cite-\d+(?:,\d+)*$/.test(url)) continue;
+    const label = link.children?.length ? text.slice(link.children[0]!.position!.start.offset!, link.children.at(-1)!.position!.end.offset!) : "";
+    text = text.slice(0, link.position!.start.offset!) + label + text.slice(link.position!.end.offset!);
+  }
+  return text;
+}
 
 export const TutorCard = z.strictObject({
   kind: z.enum(["card", "prompt"]),
@@ -168,35 +191,48 @@ export function missedIn(lib: Library, focus: TutorFocus): string[] {
   return cards.filter((c) => last.get(c.meta.id)?.rating === 1).sort((a, b) => last.get(b.meta.id)!.ts.localeCompare(last.get(a.meta.id)!.ts)).slice(0, 5).map((c) => cut(c.question, 240));
 }
 
-/** The passages the tutor sees: the source he is reading whole (past WHOLE_WORDS, its best, or ones from across
- *  it when the message names no words in it), the @-mentioned sources' best, then the rest of the library's, or
- *  only of the @-mentioned skills' sources when he named a skill. */
+const titleWords = (text: string) => text.normalize("NFC").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim();
+
+/** The open source and sources named by title can go whole, up to the whole-source budget. Longer and
+ *  @-mentioned sources send their best passages, or passages from across the source when none match. */
 export function tutorPassages(lib: Library, query: string, focus: TutorFocus = {}): Passage[] {
-  const focused = [...new Set([...(focus.item ? [focus.item] : []), ...(focus.sources ?? [])])];
-  const each = focused.length ? Math.max(2, Math.floor(8 / focused.length)) : 0;
-  const here: Passage[] = [];
-  let whole = false;
-  for (const id of focused) {
-    const it = findItem(lib, id);
-    const all = () => splitPassages(it.body).map((p) => ({ ...p, id: "", item: it.meta.id, title: it.meta.title }));
-    if (id === focus.item && wordCount(it.body) <= wholeUpTo(it)) {
-      whole = true;
-      here.push(...all());
-      continue;
+  return withIndex(lib, undefined, (index) => {
+    const inSkills = focus.skills?.length ? new Set(listItems(lib).filter((i) => i.meta.skills.some((s) => focus.skills!.includes(s))).map((i) => i.meta.id)) : undefined;
+    const question = ` ${titleWords(query)} `;
+    const named = new Set(index.items().flatMap(({ id, title }) => {
+      const words = titleWords(title);
+      return words && question.includes(` ${words} `) && (!inSkills || inSkills.has(id)) ? [id] : [];
+    }));
+    const explicit = new Set([...(focus.item ? [focus.item] : []), ...(focus.sources ?? [])]);
+    const focused = new Set([...explicit, ...named]);
+    const each = focused.size ? Math.max(2, Math.floor(8 / focused.size)) : 0;
+    const here: Passage[] = [];
+    let whole = false;
+    let wholeRoom = WHOLE_WORDS;
+    for (const id of focused) {
+      let it: Item;
+      try { it = findItem(lib, id); } catch (e) { if (explicit.has(id)) throw e; continue; } // gone since indexing
+      const all = () => splitPassages(it.body).map((p) => ({ ...p, id: "", item: it.meta.id, title: it.meta.title }));
+      const words = wordCount(it.body);
+      if (id === focus.item ? words <= wholeUpTo(it) : !explicit.has(id) && words <= wholeRoom) {
+        whole = true;
+        wholeRoom -= words;
+        here.push(...all());
+        continue;
+      }
+      let ps = retrieve(lib, query, each, id);
+      if (!ps.length) {
+        const every = all();
+        const n = Math.min(each, every.length);
+        ps = Array.from({ length: n }, (_, i) => every[Math.floor((i * every.length) / n)]!);
+      }
+      here.push(...ps);
     }
-    let ps = retrieve(lib, query, each, id);
-    if (!ps.length) {
-      const every = all();
-      const n = Math.min(each, every.length);
-      ps = Array.from({ length: n }, (_, i) => every[Math.floor((i * every.length) / n)]!);
-    }
-    here.push(...ps);
-  }
-  const inSkills = focus.skills?.length ? listItems(lib).filter((i) => i.meta.skills.some((s) => focus.skills!.includes(s))).map((i) => i.meta.id) : undefined;
-  const rest = (inSkills ? (inSkills.length ? retrieve(lib, query, PASSAGES, inSkills) : []) : retrieve(lib, query, PASSAGES)).filter((p) => !focused.includes(p.item));
-  // A whole source can fill the count alone: a few of the library's still come, so "how does this connect to…" has them.
-  const room = Math.max(PASSAGES - here.length, whole ? 6 : 0);
-  return [...here, ...rest.slice(0, room)].map((p, i) => ({ ...p, id: `P${i + 1}` }));
+    const rest = (inSkills?.size === 0 ? [] : retrieve(lib, query, PASSAGES, inSkills ? [...inSkills] : undefined, index)).filter((p) => !focused.has(p.item));
+    // A whole source can fill the count alone: a few of the library's still come, so "how does this connect to…" has them.
+    const room = Math.max(PASSAGES - here.length, whole ? 6 : 0);
+    return [...here, ...rest.slice(0, room)].map((p, i) => ({ ...p, id: `P${i + 1}` }));
+  });
 }
 
 /** While a reply is written: its text so far ("" when a retry starts it over), or a web search starting or done. Codex sends its reply whole, so from it only the search shows. */
@@ -370,6 +406,13 @@ export async function tutor(lib: Library, message: string, { earlier = [], files
           d.card.question = hideBlanks(d.card.question); // what the + Exercise chip shows, before it is kept
           const problem = cardTextProblem(d.card) ?? blankProblem(d.card);
           if (problem) return problem;
+        }
+        const reply = withoutLocalLinks(d.reply);
+        const steps = d.steps.map(withoutLocalLinks);
+        if (reply !== d.reply || steps.some((step, i) => step !== d.steps[i])) {
+          if (attempt === 1) return "the answer links to a local path: cite the passage in citations instead, with its [n] marker in the reply or step";
+          d.reply = reply;
+          d.steps = steps;
         }
         const uncited = d.general === false && !d.citations.length && !d.hint && !d.exercise && !d.covered.length;
         if (uncited && attempt === 2) {

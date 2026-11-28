@@ -1,0 +1,28 @@
+- Day 1 | Open | Home usable | 1581 ms
+- Day 1 | Read/write | paste structured source note | 75 ms
+- Day 1 | Read/write | Structured note saved and reopened; prose, all 12 table cells, equation, toggle, callout and 3 ID links retained. Table whitespace normalized on initial paste; no semantic loss.
+- Day 2 | Open | Web Development skill note | 315 ms
+- Day 2 | Read/write | save skill recall | 323 ms
+- Day 2 | Read/write | drag troubleshooting block | 13 ms
+- Day 2 | Read/write | Failed save showed an error, kept the draft across navigation, and saved it after Try again when storage recovered. Block drag, cut/paste and undo/redo persisted; backlinks opened both directions.
+- Day 3 | Open | phone Home usable | 1091 ms
+- Day 3 | Read/write | phone to-do control | 28 ms
+- Day 3 | Read/write | Link picker result is covered by the keyboard bar: row y=787..831, bar y=799..844 at 390x844; 32 of 44 px hidden, including its label and centre. Tap could not reach the result (8 s automation wait, not app latency).
+- Day 3 | Read/write | tap centre of phone link result | 6 ms
+- Day 3 | Read/write | Reopened skill note and searched a second source: same 32 px overlap. Actual centre tap (6 ms) hit Heading and saved `## [[Spaced repetition` instead of a link. Return key is the workaround.
+- Day 3 | Read/write | Phone seed has no day-2 Mac skill note. Phone edits persist on reopening in this page and in IndexedDB; cross-device merge cannot be tested with these independent copies.
+- Day 4 | Review | open source exercises | 54 ms
+- Day 4 | Review | Good to next question | 207 ms
+- Day 4 | Review | Rating controls appeared after 114 ms while “Checking your answer…” remained. This measures immediate controls, not completed grading.
+- Day 4 | Review | Grading completion observed after 14326 ms (upper bound including tester inspection; exact bridge latency retained).
+- Day 4 | Review/Ask | Clearer proposal observed after 24511 ms; exact bridge wait retained. Proposal includes revised key points.
+- Day 4 | Review | DNS Explain grade | 9419 ms
+- Day 5 | Read | follow renamed source link | 341 ms
+- Day 5 | Read | follow archived source link | 124 ms
+- Day 5 | Read | search note phrase | 292 ms
+- Day 5 | Read/Ask | Tutor completed after 93592 ms observed; showed Reading your sources and about 10 seconds. Exact request latency in requests.jsonl.
+- Day 1 → Day 2 | Read/highlight | Esc canceled two unmodified new selections. Enter kept them on Day 2; both annotated highlights survived Esc on Day 1. Code inspection clarified that Esc cancels a new untouched selection. This was intentional behavior, not data loss.
+- Day 4 | Review/context | The highlight-backed exercise showed the source quote after answering; its personal annotation required opening the source. The two source-note exercises did not show a “from your notes” label or the note text in Review. Logged as context friction, not promoted to a bug in this run.
+- Day 5 | Read | Source and skill links opened renamed targets; archived target remained readable. Backlink used the skill’s new name immediately. Source-note phrase search found and opened the note.
+- Day 5 | Read/Ask | First answer quoted the archived source but its local-file link became plain text. Only Learning Science appeared in Sources. Follow-up took another 26,848 ms and told me to open the archived source manually instead of providing the requested citation.
+- Day 5 | Read/Ask | Reloaded and reopened saved chat: quoted target still plain text and Sources still contains only Learning Science. Same generated answer verified in two openings; exact two request waits total 91,028.847 ms.

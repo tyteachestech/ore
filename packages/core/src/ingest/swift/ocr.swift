@@ -1,12 +1,12 @@
 // Text recognition for scanned PDFs and images (D96 phase 3), with Apple's Vision framework, on
-// the Mac. Usage: ocr <file.pdf|image> [PDF page numbers, starting at 1]. Prints JSON: {"pages":[{"lines":[{"t","x","y","w","h"}]}]},
-// boxes as fractions of the page with y from the top. Compiled on first use by `ocr.ts`.
+// the Mac. Usage: ocr <file.pdf|image> [PDF page numbers, starting at 1]. Prints pages of lines with
+// text, confidence, and boxes as fractions of the page with y from the top. Compiled on first use.
 import AppKit
 import Foundation
 import PDFKit
 import Vision
 
-struct Line: Encodable { let t: String; let x, y, w, h: Double }
+struct Line: Encodable { let t: String; let confidence: Float; let x, y, w, h: Double }
 struct Page: Encodable { let lines: [Line] }
 struct Out: Encodable { let pages: [Page] }
 
@@ -19,12 +19,19 @@ func recognize(_ image: CGImage) -> [Line] {
   let request = VNRecognizeTextRequest()
   request.recognitionLevel = .accurate
   request.usesLanguageCorrection = true
-  if #available(macOS 13.0, *) { request.automaticallyDetectsLanguage = true }
+  if #available(macOS 13.0, *) {
+    request.automaticallyDetectsLanguage = true
+    if let languages = try? request.supportedRecognitionLanguages(),
+       let greek = languages.first(where: { $0 == "el" || $0.hasPrefix("el-") }),
+       !request.recognitionLanguages.contains(greek) {
+      request.recognitionLanguages.append(greek)
+    }
+  }
   do { try VNImageRequestHandler(cgImage: image).perform([request]) } catch { return [] }
   return (request.results ?? []).compactMap { o in
     guard let c = o.topCandidates(1).first else { return nil }
     let b = o.boundingBox
-    return Line(t: c.string, x: b.minX, y: 1 - b.maxY, w: b.width, h: b.height)
+    return Line(t: c.string, confidence: c.confidence, x: b.minX, y: 1 - b.maxY, w: b.width, h: b.height)
   }
 }
 
@@ -60,8 +67,8 @@ func lines(_ image: CGImage) -> [Line] {
     for l in recognize(tile) {
       // Back to fractions of the whole image, y still from the top.
       let line = tall
-        ? Line(t: l.t, x: l.x, y: (start + l.y * size) / h, w: l.w, h: l.h * size / h)
-        : Line(t: l.t, x: (start + l.x * size) / w, y: l.y, w: l.w * size / w, h: l.h)
+        ? Line(t: l.t, confidence: l.confidence, x: l.x, y: (start + l.y * size) / h, w: l.w, h: l.h * size / h)
+        : Line(t: l.t, confidence: l.confidence, x: (start + l.x * size) / w, y: l.y, w: l.w * size / w, h: l.h)
       let centre = tall ? (line.y + line.h / 2) * h : (line.x + line.w / 2) * w
       if centre >= lo && centre < hi && !out.contains(where: { same($0, line) }) { out.append(line) }
     }

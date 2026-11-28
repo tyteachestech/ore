@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { locate } from "../anchoring.ts";
-import { openIndex } from "../db.ts";
+import { withIndex, type LibraryIndex } from "../db.ts";
 import { findItem } from "../items.ts";
 import type { Library } from "../library.ts";
 import { runAgent, type Usage } from "./adapter.ts";
@@ -65,18 +65,11 @@ export function splitPassages(body: string): Omit<Passage, "id" | "item" | "titl
 /** The passages most likely to answer the question: up to `max` in all, at most five per source.
  *  `only` searches that one source (no cap per source) or those sources instead of the whole library
  *  (the tutor's "this source", or the sources he @-mentioned). */
-export function retrieve(lib: Library, question: string, max = PASSAGES, only?: string | string[]): Passage[] {
+export function retrieve(lib: Library, question: string, max = PASSAGES, only?: string | string[], index?: LibraryIndex): Passage[] {
   const terms = queryTerms(question);
   if (!terms.length) return [];
-  let ids: string[] = only === undefined ? [] : [only].flat();
-  if (only === undefined) {
-    const index = openIndex(lib);
-    try {
-      ids = index.sourcesMatching(terms, 8); // six lost a two-source question's second source among 250
-    } finally {
-      index.close();
-    }
-  }
+  // Six lost a two-source question's second source among 250.
+  const ids = only === undefined ? withIndex(lib, index, (idx) => idx.sourcesMatching(terms, 8)) : [only].flat();
   // Link targets and footnote marks aren't words he reads; a word in the title or heading counts as half a match.
   const tokens = (s: string) => s.replace(/\]\([^)]*\)|\[\^\d+\]/g, " ").toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
   const words = (s: string) => new Set(tokens(s));

@@ -15,6 +15,24 @@ journey("Home: today's minutes are the big number, and the goal ring stands unfr
   if (look.ring !== "none") throw new Error(`goal ring framed: ${look.ring}`);
 });
 
+journey("Home: 9 minutes 33 seconds shows 9 of 10 min (F-new-goal-minutes-rounding)", async (page) => {
+  await page.route(/\/ore$/, async (route) => {
+    if (route.request().postDataJSON().args[0] !== "today") return route.fallback();
+    const response = await route.fetch();
+    await route.fulfill({
+      response,
+      json: { ...(await response.json()), active_ms: 573_084, goal_minutes: 10, goal_ms: 600_000, counts: true, met: false, caught_up: false },
+    });
+  });
+  await page.reload();
+  const goal = page.locator(".home-goal");
+  const heading = goal.locator("h1");
+  await heading.waitFor();
+  const text = (await heading.innerText()).replace(/\s+/g, " ").trim();
+  if (text !== "9 of 10 min") throw new Error(`Home says "${text}", expected "9 of 10 min"`);
+  await goal.getByRole("img", { name: "9 of 10 minutes today", exact: true }).waitFor();
+});
+
 journey("Home: a source whose doc.md can't be read gets one quiet line that shows it in Finder; gone, the line goes (files-10)", async (page) => {
   const items = (await ore("ls")) as { dir: string }[];
   // A folder of its own, so no other journey's source is touched; cut-off frontmatter, as a crash mid-write leaves.

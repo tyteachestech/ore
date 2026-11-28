@@ -471,6 +471,36 @@ journey("phone: a note's [[ link finds the library's sources", async (page) => {
   await page.locator(".note-menu-row").filter({ hasText: TESTING }).first().waitFor();
 }, "phone");
 
+journey("phone: a skill note's link results stay above the keyboard bar and insert on tap (F-new-phone-note-link-bar)", async (page) => {
+  await tap(page, page.getByRole("button", { name: "Open menu" }));
+  await tap(page, page.locator(".phone-drawer button").filter({ hasText: "Learning" }));
+  await tap(page, page.getByRole("button", { name: "Your note" }));
+  const note = page.locator(".phone-note [contenteditable=true]");
+  await tap(page, note);
+  await page.keyboard.type("Sources for this skill");
+  await page.keyboard.press("Enter");
+  const bar = page.locator(".kb-bar");
+  await tap(page, bar.getByRole("button", { name: "Link to a source or skill" }));
+
+  const pick = async (query: string, title: string) => {
+    await page.keyboard.type(query);
+    const result = page.getByRole("option").filter({ hasText: title });
+    await result.waitFor();
+    const row = (await result.boundingBox())!;
+    const toolbar = (await bar.boundingBox())!;
+    if (row.width < 44 || row.height < 44 || row.y + row.height > toolbar.y) {
+      throw new Error(`link target is ${row.width}×${row.height} pt, y ${row.y}–${row.y + row.height}, with the bar at y ${toolbar.y}`);
+    }
+    await page.touchscreen.tap(row.x + row.width / 2, row.y + row.height / 2);
+    await note.getByRole("link", { name: title, exact: true }).waitFor();
+  };
+  await pick("Testing Eff", TESTING);
+  await keyboardUp(page, 300);
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("[[");
+  await pick("Building Effective Agents", "Building Effective Agents");
+}, "phone");
+
 journey("phone: a source added on the phone and a new skill each take ⌘Z (F160)", async (page) => {
   const words = "Spacing out practice sessions makes what is learned last longer than cramming it into one sitting. ".repeat(12);
   const article = `<html><head><title>Spacing on the phone</title></head><body><article><h1>Spacing on the phone</h1>${`<p>${words}</p>`.repeat(3)}</article></body></html>`;
