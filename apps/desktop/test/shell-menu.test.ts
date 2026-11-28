@@ -19,6 +19,20 @@ test("native menu commands reach the focused webview without raising main first"
   expect(setter).toContain('None => window.label() == "main"');
 });
 
+// F-new-quit-skips-flush, seen in the real window: the standard Quit item sends `terminate:`, which this Tauri
+// never turns into ExitRequested, so the pages were never told "quitting" and what he typed in his last moment
+// was lost. Only a Mac can press ⌘Q; here the contract is kept: Quit is Ore's own item and exits through the shell.
+test("Quit is Ore's own menu item, so the pages hear that the app is quitting and save what he just typed", () => {
+  const rust = source("../src-tauri/src/main.rs");
+  expect(rust).not.toContain("PredefinedMenuItem::quit");
+  const setter = rust.slice(rust.indexOf("fn set_app_menu("), rust.indexOf("/// Red underlines"));
+  expect(setter).toContain('MenuItem::with_id(&app, "ore:quit"');
+  expect(setter).toContain('Some("Cmd+Q")');
+  const route = rust.slice(rust.indexOf(".on_menu_event(|app, e|"), rust.indexOf("// Images in notes"));
+  expect(route).toMatch(/"ore:quit"[^;]*app\.exit\(0\)/);
+  expect(rust.slice(rust.indexOf("RunEvent::ExitRequested"))).toContain('app.emit("quitting", ())');
+});
+
 test("both webviews install the shared menu lifecycle, including focus refresh", () => {
   expect(source("../src/App.tsx")).toContain("useMenu(");
   expect(source("../src/QuickQuiz.tsx")).toContain("useMenu(");

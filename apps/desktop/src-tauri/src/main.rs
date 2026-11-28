@@ -665,6 +665,16 @@ fn set_app_menu(app: AppHandle, window: tauri::WebviewWindow, menus: Vec<Value>)
                 sub.append(&item).map_err(e)?;
                 continue;
             }
+            // Quit is Ore's own item, never the standard one: that one sends `terminate:`, which never becomes
+            // ExitRequested here (tao has no applicationShouldTerminate), so the pages were not told "quitting"
+            // and the words he typed just before ⌘Q were lost (F-new-quit-skips-flush). This one exits through
+            // `app.exit`, which does. The Dock's Quit and a logout still send `terminate:`.
+            if it["predef"].as_str() == Some("quit") {
+                let name = app.config().product_name.clone().unwrap_or_else(|| "Ore".into());
+                let item = MenuItem::with_id(&app, "ore:quit", format!("Quit {name}"), true, Some("Cmd+Q")).map_err(e)?;
+                sub.append(&item).map_err(e)?;
+                continue;
+            }
             let p = match it["predef"].as_str().unwrap_or("") {
                 "separator" => PredefinedMenuItem::separator(&app),
                 "about" => PredefinedMenuItem::about(&app, None, None),
@@ -672,7 +682,6 @@ fn set_app_menu(app: AppHandle, window: tauri::WebviewWindow, menus: Vec<Value>)
                 "hide" => PredefinedMenuItem::hide(&app, None),
                 "hide_others" => PredefinedMenuItem::hide_others(&app, None),
                 "show_all" => PredefinedMenuItem::show_all(&app, None),
-                "quit" => PredefinedMenuItem::quit(&app, None),
                 "close_window" => PredefinedMenuItem::close_window(&app, None),
                 "undo" => PredefinedMenuItem::undo(&app, None),
                 "redo" => PredefinedMenuItem::redo(&app, None),
@@ -739,7 +748,9 @@ fn main() {
             if !id.starts_with("ore:") {
                 return; // the menu bar item's own menu
             }
-            if id == "ore:quick-quiz" {
+            if id == "ore:quit" {
+                app.exit(0);
+            } else if id == "ore:quick-quiz" {
                 toggle_quiz(app);
             } else if let Some(w) = app.webview_windows().values().find(|w| w.is_focused().unwrap_or(false)) {
                 let _ = app.emit_to(w.label(), "menu", id);
