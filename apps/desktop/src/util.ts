@@ -23,7 +23,9 @@ export type Forget = (() => void) & { undo: () => void; hold: (write: Promise<un
 /** What went wrong, in words he can act on. A JS fault (usually an empty or malformed AI reply) never
  *  reaches the UI as "Cannot read properties of null". */
 export const errorText = (e: unknown, action?: string) =>
-  e instanceof TypeError || e instanceof SyntaxError
+  // The AI's answer failed Ore's check twice: the library says so in its own words ("claude returned invalid enrich
+  // output twice: no skills and no suggested_skill…"), which tell him nothing he can act on (F-new-ai-raw-words).
+  e instanceof TypeError || e instanceof SyntaxError || /returned invalid [\w-]+ output twice/.test(String(e))
     ? `${action ? `Couldn’t ${action}: g` : "G"}ot an unexpected reply. Try again, or carry on without it.`
     : e instanceof Error
       ? e.message
@@ -59,6 +61,10 @@ type Stamped<V> = { v: V; at: number };
 const flushers = new Set<() => void>();
 /** Writes every kept draft now. */
 export const flushKept = () => flushers.forEach((f) => f());
+/** Runs `f` whenever the page may be going (hidden, unloading, the app quitting), until the returned call: for a
+ *  write that waits on a pause in his typing, as a note's does. ⌘Q sends no `beforeunload`, so a listener of its
+ *  own for that missed the quit, and the words he typed in the note's last 800 ms were never saved (F-new-note-quit). */
+export const onLeave = (f: () => void) => (flushers.add(f), () => void flushers.delete(f));
 if (typeof window !== "undefined") {
   addEventListener("pagehide", flushKept);
   addEventListener("beforeunload", flushKept);
