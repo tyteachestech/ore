@@ -251,8 +251,8 @@ export function lastWin(queue: DueEntry[]): DueEntry[] | null {
   return best < 0 ? null : [queue[best]!, ...queue.slice(0, best), ...queue.slice(best + 1)];
 }
 
-/** A missed card comes back this many cards later (D59). */
-const AGAIN_GAP = 3;
+/** Exercises between a miss and its retry in the session; core's `RELEARN_GAP` (queue.ts) is the same rule across sessions. */
+export const AGAIN_GAP = 3;
 /** The queue once its first card is answered. A miss comes back once (D59), a few cards later; a second
  *  miss waits for its next FSRS date. Answered, a new card is live: it comes back as one he has seen. */
 export function afterAnswer(q: DueEntry[], again: boolean): DueEntry[] {
