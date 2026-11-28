@@ -2329,6 +2329,32 @@ journey("original: a click on a passage of the text lights where it sits on the 
   }
 });
 
+journey("original: Show on the page in a highlight's popup opens the Original tab with that highlight lit on its PDF page", async (page) => {
+  const made = (await ore("add", join(FIXTURES, "textbook.pdf"), "--no-enrich")) as { id: string };
+  const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);
+  try {
+    // The side panel on the source note: the Original tab is out of sight, as Tyler had it.
+    await page.evaluate(() => (localStorage.setItem("ore.sidetab", "note"), localStorage.removeItem("ore.mynotes")));
+    await page.reload();
+    await openSource(page, "Chapter 1: Learning");
+    await select(page, "Practice spread over days");
+    const button = page.locator(".popup").getByRole("button", { name: "Show on the page" });
+    await button.waitFor();
+    await button.click();
+    const sheet = page.locator(".original canvas");
+    await until("the Original tab is open", async () => (await page.getByRole("tab", { name: "Original" }).getAttribute("aria-selected")) === "true", 5000);
+    await until("the highlight is lit on page 3", async () => (await sheet.getAttribute("data-page")) === "3" && (await page.locator(".original-lit").count()) > 0, 15000);
+    if (await page.locator(".popup").count()) throw new Error("the popup stayed open over the page");
+  } finally {
+    await ore("archive", made.id).catch(() => {});
+    await page.evaluate(([tab, open]) => {
+      tab ? localStorage.setItem("ore.sidetab", tab) : localStorage.removeItem("ore.sidetab");
+      open ? localStorage.setItem("ore.mynotes", open) : localStorage.removeItem("ore.mynotes");
+    }, before);
+    await page.reload();
+  }
+});
+
 journey("original: a Korean PDF's page is drawn with its words, not blank (F379)", async (page) => {
   const made = (await ore("add", join(FIXTURES, "korean.pdf"), "--no-enrich")) as { id: string };
   const before = await page.evaluate(() => [localStorage.getItem("ore.sidetab"), localStorage.getItem("ore.mynotes")]);

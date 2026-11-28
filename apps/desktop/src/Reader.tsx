@@ -11,7 +11,7 @@ import { rehypeMath, remarkPlugins } from "./math-md";
 import { withImages } from "./md-images";
 import { FigureView } from "./phone/FigureView";
 import { Collected, CollectedPanel, ICON, LABEL, MEANS, type Fit } from "./Collected";
-import { PixelQuestion } from "./PixelIcon";
+import { PixelPage, PixelQuestion } from "./PixelIcon";
 import { FindBar, onceFound } from "./Find";
 import { backStart, frontEnd, unfold, unfoldFor } from "./front";
 import { SearchButton, SearchField } from "./HeadSearch";
@@ -1580,9 +1580,21 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
   }, [originalShown, ready, shownBody, deck]);
   /** The passage he clicked while the Original tab shows a PDF: the tab lights where it sits on its page (D315). */
   const [lit, setLit] = useState<{ page: number; text: string } | null>(null);
+  /** The passage to light once the Original tab opens: Show on the page from a highlight's popup. */
+  const litNext = useRef<{ page: number; text: string } | null>(null);
+  /** The page of the original a node of the text sits on: the last page mark before it (none before page 1's words). */
+  const pageOf = (node: Node) => {
+    let on = 1;
+    for (const m of docEl.current?.querySelectorAll<HTMLElement>("[data-page]") ?? []) {
+      if (!(m.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
+      on = Number(m.dataset.page);
+    }
+    return on;
+  };
   useEffect(() => {
     const el = docEl.current;
-    setLit(null);
+    setLit(litNext.current);
+    litNext.current = null;
     if (!originalShown || !pdf || !ready || !el) return;
     const onClick = (e: Event) => {
       // A plain click on words: a drag is a highlight, and a link, a button or a picture has its own click.
@@ -1594,17 +1606,23 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
       for (const m of words.querySelectorAll(".katex, .katex-error")) m.replaceWith(" ");
       const text = words.textContent?.trim();
       if (!text) return;
-      // Its page: the last page mark before it (none before page 1's words).
-      let on = 1;
-      for (const m of el.querySelectorAll<HTMLElement>("[data-page]")) {
-        if (!(m.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING)) break;
-        on = Number(m.dataset.page);
-      }
-      setLit({ page: on, text });
+      setLit({ page: pageOf(block), text });
     };
     el.addEventListener("click", onClick);
     return () => el.removeEventListener("click", onClick);
   }, [originalShown, pdf, ready, shownBody]);
+
+  /** Show on the page: the Original tab opens beside the text with the highlight lit on its PDF page (D315). */
+  const showOnPage = (range: Range) => {
+    const at = { page: pageOf(range.startContainer), text: range.toString().replace(/\s+/g, " ").trim() };
+    keepNote();
+    setPopup(null);
+    if (originalShown) setLit(at);
+    else {
+      litNext.current = at;
+      p.onShowSide("original", true);
+    }
+  };
 
   /** The chapter block (D115): the sign opens the source note with the chapter's title and three
    *  prompts, the source hidden (D34.4) until he ends it with ⌘↵ (recorded, then feedback) or Esc
@@ -3926,6 +3944,13 @@ function ReaderView(p: Props & { reload: () => void; recording: Player; playFrom
                   <Hint text="Play from here" side="right">
                     <button tabIndex={-1} className="intent icon extra" aria-label="Play from here" onClick={startHere}>
                       <Play size={14} aria-hidden="true" />
+                    </button>
+                  </Hint>
+                )}
+                {pdf && !PHONE && popupRange && (
+                  <Hint text="Show on the page" side="right">
+                    <button tabIndex={-1} className="intent icon extra" aria-label="Show on the page" onClick={() => showOnPage(popupRange)}>
+                      <PixelPage size={14} aria-hidden="true" />
                     </button>
                   </Hint>
                 )}
